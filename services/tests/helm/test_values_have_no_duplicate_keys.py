@@ -16,7 +16,10 @@ That is not hypothetical. Adding an `api.config.engines` block to
 left two top-level `api:` keys, and the second one discarded `replicas`,
 `strategy` and every `config` setting the first declared. The eval stack then
 booted without them and failed its own smoke test with "seeded sample workspace
-not found" — a message pointing nowhere near the cause.
+not found" — a message pointing nowhere near the cause. (That particular block
+is gone with the engine switch it configured, #1986; the failure it caused is
+why this check exists, and the next block appended to a values file will hit it
+the same way.)
 
 `yaml.safe_load` cannot catch this, because by the time it returns the duplicate
 is already resolved. The check has to run on the parse events, which is what

@@ -202,23 +202,33 @@ class TestTheSweep:
         assert "LIKE 'pulumi-update:%'" in str(compiled)
 
 
-class TestTheSweepIsEngineGated:
-    """Registered only with the Pulumi engine on, like every Pulumi surface (#1429)."""
+class TestTheSweepIsRegisteredUnconditionally:
+    """It used to be registered only with the Pulumi engine on (#1429).
 
-    def test_the_registration_sits_inside_the_engine_check(self) -> None:
+    That switch is withdrawn (#1986), so the inverse is what needs guarding: a
+    conditional registration is how a lapsed lease ends up with nothing to
+    notice it, holding the workspace lock and keeping the next apply back.
+    """
+
+    def test_it_is_registered_exactly_once_and_under_no_condition(self) -> None:
         app_py = pathlib.Path(locks.__file__).resolve().parent.parent / "api" / "app.py"
-        tree = ast.parse(app_py.read_text())
-        guarded = False
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.If)
-                and "engine_enabled" in ast.unparse(node.test)
-                and "pulumi" in ast.unparse(node.test)
-            ):
-                if "pulumi_update_sweep" in ast.unparse(node):
-                    guarded = True
-        assert guarded, "pulumi_update_sweep must be registered only when the engine is on"
-        assert app_py.read_text().count("pulumi_update_sweep") == 1
+        source = app_py.read_text()
+        tree = ast.parse(source)
+
+        assert source.count("pulumi_update_sweep") == 1, (
+            "registered more than once — the second registration would compete "
+            "with the first for the same Redis claim"
+        )
+        inside_a_conditional = [
+            ast.unparse(node.test)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.If) and "pulumi_update_sweep" in ast.unparse(node)
+        ]
+        assert not inside_a_conditional, (
+            "the sweep's registration is behind a condition: "
+            f"{inside_a_conditional} — there is no engine switch any more (#1986), "
+            "and a sweep that does not run leaves a lapsed lease holding the lock"
+        )
 
 
 RUN = uuid.uuid4()
@@ -426,15 +436,11 @@ class TestAskingForItWhenARunEnds:
         db.get.return_value = None if engine is None else SimpleNamespace(id=WS, engine=engine)
         return db
 
-    async def _enqueue(self, db, run, *, pulumi: bool = True, enqueue=None) -> AsyncMock:
-        from terrapod.config import settings
+    async def _enqueue(self, db, run, *, enqueue=None) -> AsyncMock:
         from terrapod.services import run_service
 
         enqueue = enqueue or AsyncMock()
-        with (
-            patch.object(settings.engines.pulumi, "enabled", pulumi),
-            patch(self.TRIGGER, enqueue),
-        ):
+        with patch(self.TRIGGER, enqueue):
             await run_service._enqueue_pulumi_run_ended(db, run)
         return enqueue
 
@@ -443,16 +449,6 @@ class TestAskingForItWhenARunEnds:
         enqueue.assert_awaited_once()
         assert enqueue.await_args.args[0] == locks.RUN_ENDED_TRIGGER
         assert enqueue.await_args.args[1] == {"run_id": str(RUN), "workspace_id": str(WS)}
-
-    async def test_with_the_engine_off_nothing_is_enqueued(self) -> None:
-        """#1429: the handler is not registered either, so an item would only
-        sit in a queue nothing drains."""
-        db = self._db_for("pulumi")
-        enqueue = await self._enqueue(db, self._run(), pulumi=False)
-        enqueue.assert_not_awaited()
-        # Cheapest gate first: a Terraform-only deployment does not even read the
-        # workspace on every terminal run.
-        db.get.assert_not_awaited()
 
     async def test_a_terraform_run_is_untouched(self) -> None:
         """With the engine on as well: Pulumi's arrival costs Terraform nothing."""
@@ -489,23 +485,28 @@ class TestAskingForItWhenARunEnds:
         assert any("TERMINAL_STATES" in test for test in called_under), called_under
 
 
-class TestTheRunEndedHandlerIsEngineGated:
-    """Registered only with the Pulumi engine on, like the sweep beside it (#1429)."""
+class TestTheRunEndedHandlerIsRegisteredUnconditionally:
+    """It used to be registered only with the Pulumi engine on (#1429).
 
-    def test_every_mention_of_it_sits_inside_the_engine_check(self) -> None:
-        """Both the import and the registration: an import outside the gate would
-        pull the module in on a deployment that has turned Pulumi off."""
+    Withdrawn with the switch (#1986). The property that replaces it: a handler
+    behind a condition means `_enqueue_pulumi_run_ended` pushes items into a
+    queue nothing drains, which is silent — the enqueue succeeds and the update
+    is never ended.
+    """
+
+    def test_it_is_registered_under_no_condition(self) -> None:
         app_py = pathlib.Path(locks.__file__).resolve().parent.parent / "api" / "app.py"
         source = app_py.read_text()
         tree = ast.parse(source)
-        guarded = [
-            ast.unparse(node)
-            for node in ast.walk(tree)
-            if isinstance(node, ast.If)
-            and "engine_enabled" in ast.unparse(node.test)
-            and "pulumi" in ast.unparse(node.test)
-        ]
+
         total = source.count("handle_run_ended")
         assert total, "handle_run_ended is never registered"
-        inside = sum(block.count("handle_run_ended") for block in guarded)
-        assert inside == total, f"{total - inside} mention(s) outside the Pulumi engine check"
+        conditional = [
+            ast.unparse(node.test)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.If) and "handle_run_ended" in ast.unparse(node)
+        ]
+        assert not conditional, (
+            f"handle_run_ended sits behind {conditional} — an unregistered "
+            "handler leaves enqueued items in a queue nothing drains"
+        )

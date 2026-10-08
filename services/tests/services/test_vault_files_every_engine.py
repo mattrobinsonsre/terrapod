@@ -22,7 +22,6 @@ import pytest
 
 import terrapod.runner.listener as listener_module
 from terrapod import engines
-from terrapod.config import settings
 from tests.runner.test_engine_options_seam import ATTRS, _runner_config
 from tests.services.test_listener import _make_listener
 
@@ -175,16 +174,6 @@ def fresh_shutdown_event():
     listener_module._shutdown = old_event
 
 
-@pytest.fixture
-def every_engine_enabled(monkeypatch):
-    """The listener resolves through the gate; this is about delivery, not gating."""
-    for name in ENGINES:
-        cfg = getattr(settings.engines, name, None)
-        if cfg is not None:
-            monkeypatch.setattr(cfg, "enabled", True)
-
-
-@pytest.mark.usefixtures("every_engine_enabled")
 @pytest.mark.parametrize("engine", ENGINES)
 async def test_the_listener_launches_every_engine_with_the_files(engine, fresh_shutdown_event):
     """Through `_launch_run` with the real strategy and the real builder: the

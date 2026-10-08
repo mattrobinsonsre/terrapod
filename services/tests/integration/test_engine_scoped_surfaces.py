@@ -22,7 +22,6 @@ that loses its filter; this catches the behaviour being wrong anyway.
 
 import pytest
 
-from terrapod.config import settings
 from tests.integration.conftest import AUTH, admin_user, set_auth
 
 pytestmark = pytest.mark.integration
@@ -36,14 +35,6 @@ TFE_PREFIXES = ("/api/tfe/v2", "/api/v2")
 
 #: And Terrapod's own, which must keep answering for every engine.
 NATIVE_PREFIXES = ("/api/v1", "/api/terrapod/v1")
-
-
-@pytest.fixture(autouse=True)
-def _pulumi_enabled():
-    before = settings.engines.pulumi.enabled
-    settings.engines.pulumi.enabled = True
-    yield
-    settings.engines.pulumi.enabled = before
 
 
 async def _workspace(client, name: str, engine: str) -> str:

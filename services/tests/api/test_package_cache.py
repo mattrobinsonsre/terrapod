@@ -284,9 +284,9 @@ class TestDisabled:
 
     Asserted by building the application *after* changing the setting, because
     that is when the decision is now made: an ecosystem nobody wants is never
-    registered rather than registered and refusing (#1429). Patching the router
-    module's `settings` no longer has any effect — the decision moved to
-    `engine_gating`, which reads the real settings object.
+    registered rather than registered and refusing. Patching the router module's
+    `settings` no longer has any effect — the decision lives in
+    `services/capabilities.py`, which reads the real settings object.
     """
 
     @pytest.fixture(autouse=True)

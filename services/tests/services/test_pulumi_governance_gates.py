@@ -73,14 +73,17 @@ class TestWhichEnginesAreEvaluated:
         assert engines.evaluates_policy_sets("chef")
         assert engines.evaluates_security_scans("chef")
 
-    def test_the_answer_does_not_depend_on_the_engine_being_switched_on(self):
-        # The property under test is that the gate's view of an engine does not
-        # move when `engines.pulumi` is switched off -- a Pulumi workspace still
-        # exists, and still reaches the post-plan gate. Only the expected value
-        # changed with #1567; the independence is the point.
-        with patch("terrapod.engines.engine_enabled", return_value=False):
-            assert engines.evaluates_policy_sets("pulumi")
-            assert not engines.evaluates_security_scans("pulumi")
+    def test_the_answer_comes_from_the_strategy_and_nothing_else(self):
+        # This used to prove the gate's view did not move when `engines.pulumi`
+        # was switched off. There is no switch any more (#1986), so the property
+        # is now that the answer is the strategy's own -- read off the registry
+        # rather than restated here, so a predicate that started consulting
+        # anything else fails.
+        from terrapod.engines import _REGISTRY
+
+        strategy = _REGISTRY["pulumi"]
+        assert engines.evaluates_policy_sets("pulumi") is strategy.evaluates_policy_sets
+        assert engines.evaluates_security_scans("pulumi") is strategy.evaluates_security_scans
 
 
 class TestThePolicyGate:

@@ -23,7 +23,6 @@ delivery rather than the category doing it.
 
 import pytest
 
-from terrapod.config import settings
 from tests.integration.conftest import AUTH, admin_user, set_auth
 
 pytestmark = pytest.mark.integration
@@ -34,17 +33,6 @@ pytestmark = pytest.mark.integration
 #: could not see a workspace belonging to another engine even if it could make
 #: one (#1535).
 WORKSPACES = "/api/terrapod/v1/workspaces"
-
-
-@pytest.fixture(autouse=True)
-def _pulumi_enabled():
-    """The engine gate filters `known_engines()`, so creating a Pulumi
-    workspace is refused outright while Pulumi is off — which is the gate doing
-    its job, and means these tests have to turn it on."""
-    before = settings.engines.pulumi.enabled
-    settings.engines.pulumi.enabled = True
-    yield
-    settings.engines.pulumi.enabled = before
 
 
 async def _workspace(client, name: str, engine: str = "terraform") -> str:

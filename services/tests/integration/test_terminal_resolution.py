@@ -236,46 +236,30 @@ class TestTheEngineColumnDrivesIt:
         with pytest.raises(ValueError, match="unknown engine"):
             strategy_for("bicep")
 
-    async def test_a_gated_off_engine_is_refused_differently_from_an_unknown_one(self):
-        """The two have completely different fixes.
+    async def test_terraform_resolves_whatever_else_is_built(self):
+        """Multi-engine ambition costs a terraform user nothing.
 
-        "Unknown" means a row was written by a newer replica or by hand.
-        "Not enabled" means an operator turned it off and the message should say
-        so — telling them Terrapod has never heard of Pulumi would send them
-        looking for a missing install.
+        This used to prove it in both positions of an on/off switch. The switch
+        is withdrawn (#1986), so the property is now unconditional and the only
+        thing left to assert is that another engine being present changes
+        nothing about resolving Terraform — including the None and empty-string
+        cases an older row leaves behind.
         """
-        from unittest.mock import patch
+        for value in ("terraform", None, ""):
+            assert strategy_for(value).name == "terraform"
 
-        with patch("terrapod.engines.engine_enabled", side_effect=lambda e: e != "pulumi"):
-            with pytest.raises(ValueError, match="not enabled"):
-                strategy_for("pulumi")
+    async def test_every_built_engine_resolves_and_is_listed(self):
+        """Derived from the registry, so a reintroduced filter fails here.
 
-    async def test_terraform_is_unaffected_by_the_pulumi_switch(self):
-        """The whole point of the gate: multi-engine ambition costs a terraform
-        user nothing, in either position of the switch."""
-        from unittest.mock import patch
+        There is no on/off switch to hide an engine (#1986), so `known_engines()`
+        is the whole registry and every name in it resolves. Naming "pulumi"
+        instead would silently stop covering a third engine added later.
+        """
+        from terrapod.engines import _REGISTRY
 
-        for pulumi_on in (True, False):
-            with patch(
-                "terrapod.engines.engine_enabled",
-                side_effect=lambda e, on=pulumi_on: True if e == "terraform" else on,
-            ):
-                assert strategy_for("terraform").name == "terraform"
-                assert strategy_for(None).name == "terraform"
-
-    async def test_pulumi_resolves_when_enabled(self):
-        assert strategy_for("pulumi").name == "pulumi"
-        assert "pulumi" in known_engines()
-
-    async def test_a_gated_off_engine_is_absent_from_known_engines(self):
-        """Absent, not listed-and-then-refused — the same rule the surfaces
-        follow, so a caller enumerating engines never offers one that cannot
-        run."""
-        from unittest.mock import patch
-
-        with patch("terrapod.engines.engine_enabled", side_effect=lambda e: e != "pulumi"):
-            assert "pulumi" not in known_engines()
-            assert "terraform" in known_engines()
+        assert set(known_engines()) == set(_REGISTRY)
+        for name in known_engines():
+            assert strategy_for(name).name == name
 
 
 class TestPulumiTerminalRules:

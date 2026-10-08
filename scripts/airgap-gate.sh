@@ -40,10 +40,16 @@
 
 set -euo pipefail
 
-# `--gated-off` asserts the other half of the engine gate (#1429): with the
-# ansible and pulumi engines switched off, these surfaces are *absent* rather
-# than answering 404, while terraform's own surfaces still answer. It needs no
-# clients, only a stack booted with the engines disabled.
+# `--gated-off` asserts the other half of the capability flags (#1986): with the
+# container registry and the package cache switched off, those surfaces are
+# *absent* rather than answering 404, while terraform's own surfaces still
+# answer. It needs no clients, only a stack booted with the flags off.
+#
+# There is no engine on/off switch any more — the engine gate this mode was
+# written for (#1429) is withdrawn. The per-capability flags that survived carry
+# the same requirement, and for the same reason: the registry originally shipped
+# an `enabled` flag nothing read, so `enabled: false` stopped two scheduled
+# tasks while /v2/ served push, pull and mirror.
 MODE="run"
 if [ "${1:-}" = "--gated-off" ]; then MODE="gated-off"; shift; fi
 
@@ -74,7 +80,7 @@ skip() { RESULTS+=("SKIP  $*"); printf '  \033[33mSKIP\033[0m  %s\n' "$*"; }
 # ── gated-off mode ─────────────────────────────────────────────────────
 
 if [ "$MODE" = "gated-off" ]; then
-  note "Engine gate: ansible and pulumi disabled"
+  note "Capability flags: the container registry and the package cache disabled"
   curl -sf "$BASE/" >/dev/null || { echo "no stack at $BASE"; exit 1; }
 
   schema="$(curl -sf "$BASE/api/openapi.json")" || { echo "no schema"; exit 1; }

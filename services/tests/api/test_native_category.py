@@ -311,42 +311,29 @@ class TestTheRemovedMachineryStaysRemoved:
         assert not hasattr(variable_service, "PULUMI_CONFIG_CATEGORY")
 
 
-class TestTheEngineGateIsUnaffected:
-    """#1429 requires every Pulumi-serving surface to be gated. The category is
-    not one: it is the same category a Terraform workspace uses, so gating it
-    would take Terraform's variables away with Pulumi's.
+class TestTheCategoryIsNotEngineScoped:
+    """The native category is the one a Terraform workspace uses too.
 
-    The gating that matters is structural and unchanged — a Pulumi workspace can
-    only be created on the native surface, which validates the engine against
-    `known_engines()`, so with Pulumi off there is no Pulumi workspace and
-    nothing that delivers a variable as stack config.
+    It used to be worth saying that an engine on/off switch did not reach it —
+    refusing the category with Pulumi off would have taken Terraform's variables
+    away with Pulumi's. That switch is withdrawn (#1986), so the remaining
+    property is the one that always mattered: the category is valid because it
+    is Terraform's, independent of which engines a deployment happens to use.
     """
 
-    def test_pulumi_is_absent_from_the_engines_on_offer_when_gated_off(self) -> None:
-        from terrapod.config import settings
+    def test_the_category_is_always_valid(self) -> None:
+        assert _NATIVE in variable_service.VALID_CATEGORIES
+
+    def test_no_engine_name_appears_in_the_valid_set(self) -> None:
+        """A category named after an engine would be a gate by another route."""
         from terrapod.engines import known_engines
 
-        before = settings.engines.pulumi.enabled
-        try:
-            settings.engines.pulumi.enabled = False
-            assert "pulumi" not in known_engines()
-            settings.engines.pulumi.enabled = True
-            assert "pulumi" in known_engines()
-        finally:
-            settings.engines.pulumi.enabled = before
-
-    def test_the_category_stays_valid_whatever_the_gate_says(self) -> None:
-        """It always was the Terraform category. Refusing it with Pulumi off
-        would break every Terraform workspace on the deployment."""
-        from terrapod.config import settings
-
-        before = settings.engines.pulumi.enabled
-        try:
-            for state in (False, True):
-                settings.engines.pulumi.enabled = state
-                assert _NATIVE in variable_service.VALID_CATEGORIES
-        finally:
-            settings.engines.pulumi.enabled = before
+        for engine in known_engines():
+            if engine == "terraform":
+                # `terraform` is the frozen TFE wire spelling, not an engine
+                # scope — it folds onto the native category on the way in.
+                continue
+            assert engine not in variable_service.VALID_CATEGORIES
 
 
 @pytest.mark.asyncio

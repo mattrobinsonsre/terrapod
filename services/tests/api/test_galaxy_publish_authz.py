@@ -38,12 +38,11 @@ COORD = ("victim", "widgets", "1.0.0")
 
 @pytest.fixture(autouse=True)
 def _galaxy_on():
-    """The surface is engine-gated; pin it on so a default change cannot mute these."""
-    before = (settings.engines.ansible.enabled, settings.registry.package_cache.galaxy.enabled)
-    settings.engines.ansible.enabled = True
+    """Pin the capability on so a default change cannot mute these (#1986)."""
+    before = settings.registry.package_cache.galaxy.enabled
     settings.registry.package_cache.galaxy.enabled = True
     yield
-    settings.engines.ansible.enabled, settings.registry.package_cache.galaxy.enabled = before
+    settings.registry.package_cache.galaxy.enabled = before
 
 
 def _user(email: str = "stranger@example.com", roles=None, auth_method: str = "session"):

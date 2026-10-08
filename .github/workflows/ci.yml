@@ -1665,28 +1665,42 @@ jobs:
             echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
           fi
           echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
-      - name: Engine gates render, including false (#1429)
+      - name: Capability flags render, including false (#1986)
         run: |
+          # There is no engine on/off switch any more (#1986) — these per-capability
+          # flags are what survived, and they are the half that was load-bearing: the
+          # OCI registry originally shipped a flag NOTHING read, so `enabled: false`
+          # stopped two scheduled tasks while /v2/ went on serving push, pull and
+          # mirror. A missing render line reinstates exactly that.
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --namespace terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
-          echo "$out" | grep -q "engines:" || { echo "FAIL: the engines block did not render — both gates would fall back to the code default and an operator could not switch Ansible or Pulumi off at all (#1429)"; exit 1; }
-          # `false` is the whole point of these keys, and Helm's `with` treats it
-          # as empty — a template using it drops the key silently, the code default
-          # (true) wins, and an operator who switched an engine off still has it.
+          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci did not render into config.yaml (#1986)"; exit 1; }
+          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache did not render into config.yaml (#1986)"; exit 1; }
+          # `false` is the whole point of these keys, and Helm's `with` treats it as
+          # empty — a template using it drops the key silently, the code default
+          # (true) wins, and a capability an operator switched off still serves.
           off=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --namespace terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
-              --set api.config.engines.ansible.enabled=false \
-              --set api.config.engines.pulumi.enabled=false)
-          echo "$off" | grep -qE "ansible:\s*$" || { echo "FAIL: engines.ansible did not render when set false (#1429)"; exit 1; }
-          echo "$off" | grep -A1 -E "ansible:\s*$" | grep -q "enabled: false" || { echo "FAIL: engines.ansible.enabled=false rendered as something other than false — 'off' would silently mean 'on' (#1429)"; exit 1; }
-          echo "$off" | grep -A1 -E "pulumi:\s*$" | grep -q "enabled: false" || { echo "FAIL: engines.pulumi.enabled=false rendered as something other than false (#1429)"; exit 1; }
-          echo "Engine gates render OK, including false"
+              --set api.config.registry.oci.enabled=false \
+              --set api.config.registry.package_cache.pypi.enabled=false \
+              --set api.config.registry.package_cache.npm.enabled=false \
+              --set api.config.registry.package_cache.galaxy.enabled=false \
+              --set api.config.registry.package_cache.pulumi.enabled=false \
+              --set api.config.registry.package_cache.go.enabled=false \
+              --set api.config.registry.package_cache.nuget.enabled=false)
+          # Counted, not grepped one at a time: `enabled: false` occurs elsewhere in
+          # the document, so the count within the registry block is what proves all
+          # seven arrived. None of the seven is false by default, so the delta is
+          # unambiguous and a single dropped flag fails this.
+          got=$(echo "$off" | sed -n '/^    registry:/,/^      provider_cache:/p' | grep -c "enabled: false")
+          [ "$got" = "7" ] || { echo "FAIL: $got of 7 capability flags rendered as false — a flag Helm dropped silently means the capability still serves (#1986)"; echo "$off" | sed -n '/^    registry:/,/^      provider_cache:/p'; exit 1; }
+          echo "Capability flags render OK, including false"
 
       - name: OCI garbage collection renders into config.yaml (#1419)
         run: |
@@ -1766,13 +1780,14 @@ jobs:
           echo "$hook" | grep -q "path: /api/v1/vcs-events" || { echo "FAIL: webhookIngress missing canonical vcs-events path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/v1/task-stage-results" || { echo "FAIL: webhookIngress missing canonical task-stage-results path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/terrapod/v1/vcs-events" || { echo "FAIL: webhookIngress dropped the deprecated alias path — already-registered webhooks would stop routing (#1529)"; exit 1; }
-          # Engine gating (#1429/#1522): the engine switches must reach the pod, or
-          # an operator who turned Pulumi off still gets its service surface mounted
-          # — the exact failure the OCI registry shipped with.
-          echo "$out" | grep -q "engines:" || { echo "FAIL: engines config not rendered into config.yaml (#1429)"; exit 1; }
-          off=$(helm template ./helm/terrapod --set api.config.engines.pulumi.enabled=false)
-          echo "$off" | grep -qE "pulumi:\s*$" || { echo "FAIL: engines.pulumi block missing when disabled (#1522)"; exit 1; }
-          echo "$off" | grep -q "enabled: false" || { echo "FAIL: engines.pulumi.enabled=false did not render (#1522)"; exit 1; }
+          # Capability flags (#1986): there is no engine switch, but each optional
+          # surface keeps its own flag and those must reach the pod — a flag nothing
+          # delivers is the defect the OCI registry shipped with, where
+          # `enabled: false` stopped the scheduled tasks and /v2/ served on.
+          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci not rendered into config.yaml (#1986)"; exit 1; }
+          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache not rendered into config.yaml (#1986)"; exit 1; }
+          off=$(helm template ./helm/terrapod --set api.config.registry.package_cache.pulumi.enabled=false)
+          echo "$off" | sed -n '/        pulumi:/,/        go:/p' | grep -q "enabled: false" || { echo "FAIL: package_cache.pulumi.enabled=false did not render — the proxy would go on serving (#1986)"; exit 1; }
           # The Pulumi CLI is a platform tool, not a baked-in binary (#1523): a
           # Terraform-only deployment should not carry another engine's binary, and
           # a missing render line leaves the version inert with the code default
@@ -3206,22 +3221,22 @@ jobs:
       - name: Real clients, with and without a route to the internet
         run: scripts/airgap-gate.sh http://localhost:3000
 
-      # The other half of the engine gate (#1429): switched off, these surfaces
-      # are ABSENT rather than answering 404, while terraform's own provider
-      # mirror, module registry and binary cache still answer. Asserted per-PR in
-      # unit tests; asserting it against a running stack is what makes it true
-      # rather than believed.
-      - name: Restart with the ansible and pulumi engines disabled
+      # The other half of the capability flags (#1986): switched off, these
+      # surfaces are ABSENT rather than answering 404, while terraform's own
+      # provider mirror, module registry and binary cache still answer. Asserted
+      # per-PR in unit tests; asserting it against a running stack is what makes
+      # it true rather than believed.
+      - name: Restart with the registry and package cache switched off
         run: |
           TERRAPOD_FS_BASE_URL=http://web:3000 \
-          TERRAPOD_ENGINES_ANSIBLE=false TERRAPOD_ENGINES_PULUMI=false \
+          TERRAPOD_OCI_ENABLED=false TERRAPOD_PACKAGE_CACHE_ENABLED=false \
             docker compose -f e2e/docker-compose.e2e.yml up -d
           for _ in $(seq 1 30); do
             curl -sf http://localhost:3000/ >/dev/null 2>&1 && break
             sleep 4
           done
 
-      - name: Gated-off surfaces are absent, terraform's still answer
+      - name: Switched-off surfaces are absent, terraform's still answer
         run: scripts/airgap-gate.sh --gated-off http://localhost:3000
 
       - name: Stack logs on failure

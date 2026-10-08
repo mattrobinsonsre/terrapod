@@ -877,59 +877,39 @@ class TestSecrets:
         assert base64.b64decode(back["plaintext"]).decode() == secret
 
 
-class TestTheEngineGate:
-    """#1429: off means ABSENT, not present-and-404ing.
+class TestTheServiceSurfaceIsAlwaysMounted:
+    """It used to be gated: off meant ABSENT, not present-and-404ing (#1429).
 
-    A surface that refuses every request is still in the schema, still carries
-    its dependencies, and still reads to an auditor as something this deployment
-    does. The registry shipped with an `enabled` flag nothing read, which is the
-    worked example this guards against.
+    That switch is withdrawn (#1986) — the platform should just work, so no
+    operator decides which engines they are allowed to use. The property that
+    replaces it is simply that the surface is there, unconditionally, which is
+    what an agent-mode Pulumi run needs as its service backend.
+
+    The reason the old gate was written that way is still worth keeping in mind
+    wherever something IS optional: a surface that refuses every request is
+    still in the schema, still carries its dependencies, and still reads to an
+    auditor as something this deployment does. The registry shipped with an
+    `enabled` flag nothing read, which is the worked example — and that half of
+    the mechanism survives, per `services/capabilities.py`.
     """
 
-    def _paths(self, *, pulumi: bool) -> set[str]:
+    def _paths(self) -> set[str]:
         from terrapod.api.app import create_application
 
-        with patch(
-            "terrapod.services.engine_gating.engine_enabled",
-            side_effect=lambda e: pulumi if e == "pulumi" else True,
-        ):
-            app = create_application()
+        app = create_application()
         return {getattr(r, "path", "") for r in app.routes}
 
-    def test_the_surface_is_absent_when_the_engine_is_off(self) -> None:
-        assert not any("/pulumi/api/" in p for p in self._paths(pulumi=False))
-
-    def test_the_surface_is_present_when_the_engine_is_on(self) -> None:
-        paths = self._paths(pulumi=True)
+    def test_the_surface_is_present(self) -> None:
+        paths = self._paths()
         assert any("/pulumi/api/user" in p for p in paths)
         assert any("/pulumi/api/stacks/" in p for p in paths)
 
-    def test_terraform_surfaces_are_untouched_either_way(self) -> None:
-        """The reason the gate exists: the great majority of users came for
-        terraform and openTofu, and multi-engine ambition must cost them
-        nothing. The provider mirror, binary cache and module registry are never
-        gateable."""
-        for pulumi in (True, False):
-            paths = self._paths(pulumi=pulumi)
-            assert any(p.startswith("/api/tfe/v2/") for p in paths), f"pulumi={pulumi}"
-            assert any("/provider-mirror/" in p for p in paths), f"pulumi={pulumi}"
-            assert any("/binary-cache/" in p for p in paths), f"pulumi={pulumi}"
-            assert any("/registry-modules" in p for p in paths), f"pulumi={pulumi}"
-
-    def test_gating_it_off_deletes_nothing(self) -> None:
-        """Turning an engine off hides and halts; stored content survives and
-        returns on re-enable. Asserted structurally: nothing in the router
-        performs a delete outside the explicit `stack rm` endpoint."""
-        import pathlib
-
-        src = (
-            pathlib.Path(__file__).resolve().parents[2] / "terrapod/api/routers/pulumi_service.py"
-        ).read_text()
-        # Nothing in the router deletes. `stack rm` hands the workspace to the
-        # shared recoverable delete (#1564) — an explicit user action, not a
-        # consequence of gating.
-        assert src.count("db.delete(") == 0
-        assert src.count("deleted_workspace_service.delete_workspace(") == 1
+    def test_no_configuration_removes_it(self) -> None:
+        """Built twice with nothing changed in between: the application has no
+        input that could drop it, so an app that ever lacks it is a regression
+        in the mount rather than a setting someone chose."""
+        assert self._paths() == self._paths()
+        assert any("/pulumi/api/" in p for p in self._paths())
 
 
 class TestTheAuthSchemeTheCliActuallySends:

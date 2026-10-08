@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.config import settings
 from terrapod.services import binary_cache_service as bcs
 
 
@@ -119,36 +120,41 @@ class TestPulumisDottedPreReleases:
         assert ordered[-1] == "3.208.0"
 
 
-class TestEngineGating:
-    """Off means absent, not present-and-answering (#1429)."""
+class TestTheCliIsAvailableToEveryDeployment:
+    """These used to be the two halves of an engine on/off switch (#1429).
 
-    async def test_listing_is_refused_when_pulumi_is_off(self):
-        with patch("terrapod.services.binary_cache_service.engine_enabled", return_value=False):
-            with pytest.raises(ValueError, match="not enabled"):
-                await bcs.list_available_versions("pulumi")
+    Withdrawn (#1986): the platform should just work, so neither the version
+    listing nor the warm manifest asks whether an engine is allowed. What is
+    left is the pair of properties that always mattered — every engine's
+    versions resolve, and a sealed install is warmed with the binaries it will
+    need, because a sealed install that forgets one has no way to get it.
+    """
 
-    async def test_terraform_is_never_gated(self):
-        # Terraform is not an optional engine; it is what Terrapod is.
-        with patch("terrapod.services.binary_cache_service.engine_enabled", return_value=False):
-            with patch.object(bcs, "_fetch_terraform_versions", AsyncMock(return_value=["1.12.0"])):
+    async def test_listing_resolves_for_every_engine(self):
+        for engine in ("terraform", "pulumi"):
+            with patch.object(bcs, f"_fetch_{engine}_versions", AsyncMock(return_value=["9.9.9"])):
                 with patch("terrapod.services.binary_cache_service._sealed", return_value=False):
-                    assert "1.12.0" in await bcs.list_available_versions("terraform")
+                    assert "9.9.9" in await bcs.list_available_versions(engine)
 
-    def test_a_terraform_only_deployment_warms_no_pulumi(self):
+    def test_the_warm_manifest_is_derived_from_the_configured_versions(self):
+        """Derived rather than left to the manifest, so a sealed install cannot
+        be missing a binary it has no way to fetch."""
         from terrapod.services import cache_warm_service
 
-        with patch("terrapod.services.cache_warm_service.engine_enabled", return_value=False):
+        entries = {e.tool: e.version for e in cache_warm_service.platform_tool_entries()}
+        assert entries["pulumi"] == settings.default_pulumi_version
+
+    def test_nothing_is_warmed_when_no_version_is_configured(self):
+        """The only thing deciding is data — a version to fetch — not a switch.
+
+        An operator who blanks the version is saying there is nothing to warm,
+        which is different from saying an engine is not allowed.
+        """
+        from terrapod.services import cache_warm_service
+
+        with patch.object(settings, "default_pulumi_version", ""):
             tools = [e.tool for e in cache_warm_service.platform_tool_entries()]
         assert "pulumi" not in tools
-
-    def test_a_pulumi_deployment_warms_it_without_being_asked(self):
-        # A sealed install that forgets has no Pulumi binary and no way to get
-        # one, so this is derived rather than left to the warm manifest.
-        from terrapod.services import cache_warm_service
-
-        with patch("terrapod.services.cache_warm_service.engine_enabled", return_value=True):
-            entries = {e.tool: e.version for e in cache_warm_service.platform_tool_entries()}
-        assert entries["pulumi"]
 
 
 class TestServedSums:

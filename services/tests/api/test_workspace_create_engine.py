@@ -187,7 +187,13 @@ class TestTheNativeSurfaceCarriesTheEngine:
                 )
 
         assert r.status_code == 422
-        assert "engines.pulumi.enabled" in json.dumps(r.json())
+        # The message names what this build can run, not a setting to change:
+        # there is no engine on/off switch any more (#1986), so pointing an
+        # operator at `engines.pulumi.enabled` would send them to a key that
+        # does not exist.
+        body = json.dumps(r.json())
+        assert "cannot run" in body
+        assert "engines.pulumi.enabled" not in body
         db.add.assert_not_called()
 
     async def test_an_unknown_engine_is_refused(self) -> None:
