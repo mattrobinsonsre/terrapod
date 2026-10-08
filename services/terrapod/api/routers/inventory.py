@@ -605,28 +605,42 @@ async def show_resolved_inventory(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """What this inventory resolves to: hosts, groups, and when it was taken.
+    """What this inventory resolves to: hosts and groups.
 
-    Serves the newest snapshot. When there is none and every source is one the
-    API owns, it resolves and records one first, so a workspace that has just
-    declared its hosts can see them without waiting for a configure to exist
-    (#1971, #1972) -- which is what #1967's observability scope requires.
+    **This is live.** Every source Terrapod implements is static -- declared
+    rows the managing Terraform owns -- so resolving is a database query and a
+    reader is never shown a target set that has drifted from what a configure
+    would select. There is no cached-versus-fresh distinction to surface.
 
-    When a source needs ansible, it answers **409** rather than resolving what
-    it can: a partial resolution is a target set that is silently too small.
+    Live does not mean a write per read. A version is recorded only when the
+    source stamp has moved, because the history is bounded and is what a
+    partial-configure retry subtracts against (#1973): a page left open on a
+    dashboard must not be able to evict the snapshot a configure is pinned to.
+    So an unchanged inventory returns the row it already has, which *is* the
+    live answer -- `taken-at` then says when the resolution came to be, not how
+    stale it is.
+
+    A source kind the API does not own needs ansible, which lives only in the
+    runner (#2010), so it serves the newest resolution a runner posted and
+    answers **409** when there is none. No such kind exists yet; the seam is
+    here because git (#1929) will be the first, and it is what that issue adds
+    a stored stamp and a short TTL for -- a stamp you can only learn by
+    fetching is the one case a TTL buys anything.
     """
     inventory = await _get_inventory(inventory_id, db)
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
     await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
 
-    version = await inv.latest_version(db, inventory.id)
-    if version is None:
-        sources = await inv.list_sources(db, inventory.id)
-        if not inv.api_can_resolve(sources):
-            raise _unresolvable_error(sources, "This inventory has never been resolved.")
-        _, version = await inv.resolve_and_snapshot(db, inventory)
-        await db.commit()
+    sources = await inv.list_sources(db, inventory.id)
 
+    if not inv.api_can_resolve(sources):
+        version = await inv.latest_version(db, inventory.id)
+        if version is None:
+            raise _unresolvable_error(sources, "This inventory has never been resolved.")
+        return JSONResponse(content={"data": _version_json(version, include_contents=True)})
+
+    version = await inv.resolve_if_stale(db, inventory)
+    await db.commit()
     return JSONResponse(content={"data": _version_json(version, include_contents=True)})
 
 
@@ -739,12 +753,17 @@ async def preview_limit(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Which hosts a `--limit` pattern would select, against the last snapshot.
+    """Which hosts a `--limit` pattern would select.
 
     #1967's scope says the resolution has to be observable, and that matters
     more than usual here: auto-configure is deliberately broad, so **visibility
     is the control rather than prevention**. An operator has to be able to ask
     "what would this target" before anything runs.
+
+    So it expands against a **live** resolution, by the same route as the
+    resolved view and for a sharper reason: previewing against a target set
+    that has since changed is the wrong answer in the one place an operator
+    came to check.
 
     Read-only and read-gated. It expands the forms an operator writes -- names,
     groups, `all`/`*`, comma or colon separated terms, `!` and `&` -- and
@@ -757,12 +776,14 @@ async def preview_limit(
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
     await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
 
-    version = await inv.latest_version(db, inventory.id)
-    if version is None:
-        raise HTTPException(
-            status_code=409,
-            detail="This inventory has no snapshot yet, so there is nothing to limit against",
-        )
+    sources = await inv.list_sources(db, inventory.id)
+    if inv.api_can_resolve(sources):
+        version = await inv.resolve_if_stale(db, inventory)
+        await db.commit()
+    else:
+        version = await inv.latest_version(db, inventory.id)
+        if version is None:
+            raise _unresolvable_error(sources, "This inventory has no resolution to limit against.")
 
     pattern = _attrs(body).get("limit") or ""
     if not isinstance(pattern, str):

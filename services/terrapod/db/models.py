@@ -4308,6 +4308,28 @@ class InventoryVersion(Base):
     #: presuming its table would be a guess this schema cannot take back.
     produced_by_ref: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
+    #: The source stamp this resolution was taken at, or empty when whatever
+    #: produced it could not say.
+    #:
+    #: **An equality token and nothing else.** Its format is deliberately opaque
+    #: -- no reader parses it, orders it, or infers a time from it; the only
+    #: question asked of it is "does this equal the stamp the sources carry
+    #: now", and a changed format simply reads as "moved", which re-resolves.
+    #:
+    #: It is what lets a read be live without a write. Resolution is a database
+    #: query for the one implemented source kind, so a read *can* resolve every
+    #: time -- but recording a row every time would evict the bounded history
+    #: that a partial-configure retry subtracts against (#1973), letting a page
+    #: left open on a dashboard push out the snapshot a configure is pinned to.
+    #: Comparing the stamp answers "has anything changed" without writing, so a
+    #: row is written only when the answer is yes.
+    #:
+    #: Empty rather than NULL-as-unknown so the comparison has one shape: a
+    #: version with no stamp never matches, so it is re-resolved rather than
+    #: trusted. That is the safe direction, and it is what every row predating
+    #: this column holds.
+    source_stamp: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )

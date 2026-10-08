@@ -17,6 +17,7 @@ caller and one of them carries a new implicit grant. The cases that matter:
 
 from __future__ import annotations
 
+import pathlib
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -559,34 +560,12 @@ class TestPartialUpdate:
 
 
 class TestResolvedView:
-    async def test_it_serves_the_latest_snapshot_with_its_age(self):
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        version = _mock_version(inventory_id=inventory.id)
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)),
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
-        assert res.status_code == 200
-        attrs = res.json()["data"]["attributes"]
-        # The freshness surface: a preview is as fresh as the last resolve, and
-        # saying so beats implying it is live.
-        assert attrs["taken-at"] == "2026-01-01T00:00:00Z"
-        assert attrs["host-count"] == 1
-        # Ansible's own shape, rendered rather than stored twice.
-        assert attrs["ansible-inventory"]["all"]["children"] == ["web"]
-
-    async def test_it_resolves_on_first_read_when_every_source_is_api_owned(self):
-        """A workspace that has just declared its hosts can see them without
-        waiting for a configure to exist."""
+    async def test_it_resolves_live_rather_than_reading_the_newest_row(self):
+        """Every implemented source is static, so resolving is a query and a
+        read is live. Pinned on WHICH path is taken, not on the payload: the
+        fixture returns the same version either way, so every assertion about
+        hosts and groups passes whether the answer was resolved or looked up.
+        """
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
         version = _mock_version(inventory_id=inventory.id)
@@ -598,17 +577,67 @@ class TestResolvedView:
                 f"{_R}.resolve_workspace_capabilities_for",
                 AsyncMock(return_value=caps_for_level("read")),
             ),
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=None)),
             patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source()])),
-            patch(
-                f"{_R}.inv.resolve_and_snapshot", AsyncMock(return_value=(None, version))
-            ) as snap,
+            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)) as live,
+            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
         ):
             async with await _client(app) as c:
                 res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
+
         assert res.status_code == 200
-        snap.assert_awaited_once()
+        live.assert_awaited_once()
+        cached.assert_not_awaited()
         db.commit.assert_awaited()
+
+        attrs = res.json()["data"]["attributes"]
+        # `taken-at` survives, and now says when the resolution came to be
+        # rather than how stale it is -- an unchanged inventory reuses its row,
+        # which IS the live answer.
+        assert attrs["taken-at"] == "2026-01-01T00:00:00Z"
+        assert attrs["host-count"] == 1
+        # Ansible's own shape, rendered rather than stored twice.
+        assert attrs["ansible-inventory"]["all"]["children"] == ["web"]
+
+    async def test_a_kind_the_api_does_not_own_reads_the_newest_row_instead(self):
+        """The seam git (#1929) will be the first to use. Inert today -- no such
+        kind can be created -- so this drives the branch directly to keep it
+        honest rather than leaving it unreachable and unasserted.
+        """
+        ws = _mock_ws()
+        inventory = _mock_inventory(workspace_id=ws.id)
+        version = _mock_version(inventory_id=inventory.id, produced_by="runner")
+        app, _ = _make_app(_user())
+        with (
+            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
+            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
+            patch(
+                f"{_R}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("read")),
+            ),
+            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
+            patch(f"{_R}.inv.resolve_if_stale", AsyncMock()) as live,
+            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
+
+        assert res.status_code == 200
+        live.assert_not_awaited()
+        cached.assert_awaited_once()
+
+    async def test_only_the_terraform_kind_is_api_resolvable_today(self):
+        """So the branch above is provably inert rather than merely untested --
+        and adding a kind without a resolver is a visible failure.
+        """
+        from terrapod.db.models import InventorySource
+
+        assert InventorySource.API_RESOLVABLE_KINDS == frozenset({InventorySource.KIND_TERRAFORM})
+        # And nothing can create another kind: one call site, one literal.
+        src = pathlib.Path("terrapod/services/inventory_service.py").read_text()
+        assert src.count("kind=InventorySource.KIND_TERRAFORM") == 1
+        assert "kind=InventorySource.KIND_" not in src.replace(
+            "kind=InventorySource.KIND_TERRAFORM", ""
+        )
 
     async def test_it_refuses_rather_than_partially_resolving(self):
         """A source needing ansible means the API answers 409.
@@ -628,7 +657,7 @@ class TestResolvedView:
             ),
             patch(f"{_R}.inv.latest_version", AsyncMock(return_value=None)),
             patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
-            patch(f"{_R}.inv.resolve_and_snapshot", AsyncMock()) as snap,
+            patch(f"{_R}.inv.resolve_if_stale", AsyncMock()) as snap,
         ):
             async with await _client(app) as c:
                 res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
@@ -738,7 +767,13 @@ class TestSnapshotUpload:
 
 
 class TestLimitPreview:
-    async def _preview(self, limit: str, *, version=None):
+    async def _preview(self, limit: str, *, version=None, api_owned=True):
+        """Drive the preview. `api_owned` picks which path it takes.
+
+        The expansion is against a **live** resolution for an inventory the API
+        owns -- previewing against a target set that has since changed is the
+        wrong answer in the one place an operator came to check.
+        """
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
         version = version or _mock_version(
@@ -746,6 +781,7 @@ class TestLimitPreview:
             hosts={"host1": {}, "host2": {}, "switch1": {}},
             groups={"web": ["host1", "host2"], "net": ["host2", "switch1"]},
         )
+        source = _mock_source() if api_owned else _mock_source(kind="git")
         app, _ = _make_app(_user())
         with (
             patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
@@ -754,6 +790,8 @@ class TestLimitPreview:
                 f"{_R}.resolve_workspace_capabilities_for",
                 AsyncMock(return_value=caps_for_level("read")),
             ),
+            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[source])),
+            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)),
             patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)),
         ):
             async with await _client(app) as c:
@@ -762,6 +800,37 @@ class TestLimitPreview:
                     json={"data": {"attributes": {"limit": limit}}},
                     headers=_AUTH,
                 )
+
+    async def test_it_expands_against_a_live_resolution(self):
+        """Pinned separately, because every expansion test below passes whether
+        the host set was resolved or read from a row -- the fixture supplies the
+        same set either way.
+        """
+        ws = _mock_ws()
+        inventory = _mock_inventory(workspace_id=ws.id)
+        version = _mock_version(inventory_id=inventory.id, hosts={"h": {}}, groups={})
+        app, _ = _make_app(_user())
+        with (
+            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
+            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
+            patch(
+                f"{_R}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("read")),
+            ),
+            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source()])),
+            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)) as live,
+            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"/api/v1/inventories/inv-{inventory.id}/actions/preview-limit",
+                    json={"data": {"attributes": {"limit": "all"}}},
+                    headers=_AUTH,
+                )
+
+        assert res.status_code == 200
+        live.assert_awaited_once()
+        cached.assert_not_awaited()
 
     async def test_it_answers_what_a_limit_would_target(self):
         """Visibility is the control here rather than prevention, because
@@ -783,7 +852,20 @@ class TestLimitPreview:
         assert res.status_code == 422
         assert "regular expression" in res.json()["detail"]
 
-    async def test_with_no_snapshot_there_is_nothing_to_limit_against(self):
+    async def test_an_api_owned_inventory_always_has_something_to_limit_against(self):
+        """Including the empty set. Resolving live removes the old "no snapshot
+        yet" refusal, which used to fire at exactly the moment an operator was
+        trying to see what they had just declared.
+        """
+        empty = _mock_version(inventory_id=uuid.uuid4(), hosts={}, groups={})
+        res = await self._preview("all", version=empty)
+        assert res.status_code == 200, res.text
+        assert res.json()["data"]["attributes"]["hosts"] == []
+
+    async def test_a_kind_the_api_does_not_own_with_no_resolution_is_a_409(self):
+        """The only remaining refusal, and it names the offending kinds so an
+        operator knows a runner has to produce the first one. Inert today.
+        """
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
         app, _ = _make_app(_user())
@@ -794,6 +876,7 @@ class TestLimitPreview:
                 f"{_R}.resolve_workspace_capabilities_for",
                 AsyncMock(return_value=caps_for_level("read")),
             ),
+            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
             patch(f"{_R}.inv.latest_version", AsyncMock(return_value=None)),
         ):
             async with await _client(app) as c:
@@ -803,6 +886,7 @@ class TestLimitPreview:
                     headers=_AUTH,
                 )
         assert res.status_code == 409
+        assert "git" in res.json()["detail"], res.json()["detail"]
 
 
 class TestPayNothing:

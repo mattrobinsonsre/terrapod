@@ -337,8 +337,15 @@ async def record_snapshot(
     *,
     produced_by: str,
     produced_by_ref: str = "",
+    source_stamp: str = "",
 ) -> InventoryVersion:
-    """Write an `InventoryVersion` and prune the history behind it."""
+    """Write an `InventoryVersion` and prune the history behind it.
+
+    `source_stamp` is what the resolution was taken at, and defaults to empty
+    for a producer that cannot say -- a runner posting a resolution it performed
+    with ansible. An empty stamp never matches, so such a row is re-resolved
+    rather than served as current, which is the safe direction.
+    """
     version = InventoryVersion(
         inventory_id=inventory.id,
         hosts=resolved.hosts,
@@ -347,6 +354,7 @@ async def record_snapshot(
         group_count=resolved.group_count,
         produced_by=produced_by,
         produced_by_ref=produced_by_ref,
+        source_stamp=source_stamp,
     )
     db.add(version)
     await db.flush()
@@ -426,6 +434,74 @@ async def count_items(db: AsyncSession, workspace_id: uuid.UUID) -> int:
     return int(result.scalar() or 0)
 
 
+async def source_stamp(db: AsyncSession, inventory: Inventory) -> str:
+    """An equality token for "what every source currently says".
+
+    Equal to a recorded version's `source_stamp` means nothing has changed since
+    that resolution, so it can be served as a live answer. Unequal, or empty,
+    means re-resolve. Nothing parses it or reads a time out of it.
+
+    Empty means **the API cannot say** -- a source kind it does not own. That
+    never matches a recorded stamp, so the caller re-resolves or refuses rather
+    than trusting a row it cannot check, which is the safe direction.
+
+    **A terraform source's stamp is `(count, max(updated_at))`, and the count is
+    load-bearing rather than belt-and-braces.** `max(updated_at)` alone is wrong
+    in one direction that matters: deleting a host changes the resolution while
+    leaving the maximum exactly where it was, so a read would go on serving a
+    set containing a host that no longer exists. An update moves the maximum, a
+    delete moves the count, an insert moves both. One query, two aggregates.
+
+    It is derived rather than stored, because the rows it summarises are the
+    resolution. A kind whose stamp can only be learned by fetching -- git's
+    resolved commit, #1929 -- has to store what it fetched, and that is also the
+    only case where a short TTL buys anything: a stored stamp can be stale in a
+    way a derived one cannot.
+    """
+    sources = await list_sources(db, inventory.id)
+    if not sources or not api_can_resolve(sources):
+        return ""
+
+    result = await db.execute(
+        select(func.count(), func.max(InventoryItem.updated_at)).where(
+            InventoryItem.workspace_id == inventory.workspace_id
+        )
+    )
+    count, newest = result.one()
+    # `None` when the workspace declares nothing, which is a real state with a
+    # real resolution (the empty set) and must be stampable like any other.
+    return f"tf:{len(sources)}:{int(count or 0)}:{newest.isoformat() if newest else '-'}"
+
+
+async def resolve_if_stale(db: AsyncSession, inventory: Inventory) -> InventoryVersion:
+    """The live read: resolve unless the newest recorded version is still current.
+
+    Resolution is a database query for the one implemented source kind, so a
+    read is live -- there is no cached-versus-fresh distinction to surface and
+    no staleness for a reader to reason about.
+
+    What it does **not** do is write a row per read. The version history is
+    bounded and is what a partial-configure retry subtracts against (#1973),
+    because the hosts a play never reached appear in no callback event and in no
+    PLAY RECAP. If a read recorded a row, a dashboard left open would evict the
+    snapshot a configure is pinned to. So the stamp decides: equal means the
+    recorded answer *is* the live answer, and only a moved stamp writes.
+
+    Raises `InventoryResolutionUnavailable` if a source needs ansible; callers
+    check `api_can_resolve` first.
+    """
+    stamp = await source_stamp(db, inventory)
+    latest = await latest_version(db, inventory.id)
+
+    if stamp and latest is not None and latest.source_stamp == stamp:
+        return latest
+
+    resolved = await resolve(db, inventory)
+    return await record_snapshot(
+        db, inventory, resolved, produced_by=InventoryVersion.SOURCE_API, source_stamp=stamp
+    )
+
+
 async def resolve_and_snapshot(
     db: AsyncSession, inventory: Inventory
 ) -> tuple[ResolvedInventory, InventoryVersion]:
@@ -434,9 +510,10 @@ async def resolve_and_snapshot(
     The whole of the API-side refresh: what `POST .../actions/resolve` does and
     what a read of the resolved view does when there is no snapshot yet.
     """
+    stamp = await source_stamp(db, inventory)
     resolved = await resolve(db, inventory)
     version = await record_snapshot(
-        db, inventory, resolved, produced_by=InventoryVersion.SOURCE_API
+        db, inventory, resolved, produced_by=InventoryVersion.SOURCE_API, source_stamp=stamp
     )
     return resolved, version
 
@@ -465,7 +542,9 @@ __all__ = [
     "record_snapshot",
     "resolve",
     "resolve_and_snapshot",
+    "resolve_if_stale",
     "resolve_source",
+    "source_stamp",
     "update_item",
     "validate_item_fields",
 ]

@@ -413,10 +413,36 @@ class TestRunnerPostedSnapshots:
         assert attrs["produced-by-ref"] == run_id
         assert attrs["host-count"] == 1
 
-        # And it becomes what a reader sees -- the runner's resolution wins over
-        # re-resolving the declared items, which is the point of posting it.
+        # It lands in the history, which is what posting it is for: the basis a
+        # partial-configure retry subtracts against (#1973).
+        versions = await client.get(f"{V1}/inventories/{inv_id}/versions", headers=AUTH)
+        assert versions.status_code == 200, versions.text
+        posted = [v for v in versions.json()["data"] if v["id"] == resp.json()["data"]["id"]]
+        assert posted, "the runner's snapshot is not in the history"
+
+        # But it is NOT what a reader sees, and that is deliberate. This
+        # inventory's only source is `terraform`, which the API resolves itself
+        # from the declared rows -- so the live answer is authoritative and a
+        # recorded row describing the same source is history, however recent.
+        # A runner's resolution wins only where the API cannot resolve at all,
+        # which is the kind git (#1929) will be the first to add.
         read = await client.get(f"{V1}/inventories/{inv_id}/resolved", headers=AUTH)
-        assert list(read.json()["data"]["attributes"]["hosts"]) == ["from-ansible"]
+        assert read.status_code == 200, read.text
+        assert list(read.json()["data"]["attributes"]["hosts"]) == ["declared-1"]
+
+        # And it carries no stamp, because the producer could not say what it
+        # resolved against -- which is why it never reads as current.
+        from sqlalchemy import select
+
+        from terrapod.db.models import InventoryVersion
+
+        async with get_db_session() as db:
+            got = await db.execute(
+                select(InventoryVersion.source_stamp).where(
+                    InventoryVersion.produced_by == InventoryVersion.SOURCE_RUNNER
+                )
+            )
+            assert [row[0] for row in got.all()] == [""]
 
 
 class TestLimitPreviewAgainstRealData:
@@ -452,3 +478,163 @@ class TestLimitPreviewAgainstRealData:
         )
 
         assert resp.status_code == 422, resp.text
+
+
+class TestTheSourceStampDecidesWhenARowIsWritten:
+    """Live reads without a write per read, against a real database.
+
+    Resolving is a query, so a read is live. What the stamp buys is that the
+    bounded version history -- the basis a partial-configure retry subtracts
+    against (#1973) -- is not evicted by reading. Every assertion here is about
+    row COUNT rather than payload, because the payload is identical either way
+    and that is exactly what hid this class of bug.
+    """
+
+    @staticmethod
+    async def _versions(inv_id: str) -> int:
+        from sqlalchemy import func, select
+
+        from terrapod.db.models import InventoryVersion
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            got = await db.execute(
+                select(func.count())
+                .select_from(InventoryVersion)
+                .where(InventoryVersion.inventory_id == uuid.UUID(inv_id.removeprefix("invver-")))
+            )
+            return int(got.scalar() or 0)
+
+    @staticmethod
+    async def _stamps(inv_id: str) -> list[str]:
+        from sqlalchemy import select
+
+        from terrapod.db.models import InventoryVersion
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            got = await db.execute(
+                select(InventoryVersion.source_stamp)
+                .where(InventoryVersion.inventory_id == uuid.UUID(inv_id))
+                .order_by(InventoryVersion.created_at)
+            )
+            return [row[0] for row in got.all()]
+
+    async def test_repeated_reads_do_not_write_a_row(self, client, app):
+        """The eviction hazard: a dashboard left open must not be able to push
+        out the snapshot a configure is pinned to."""
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        await _declare(client, ws_id, "web-1")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        first = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert first.status_code == 200, first.text
+        after_first = await self._versions(inv_id)
+        assert after_first == 1
+
+        for _ in range(5):
+            again = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+            assert again.status_code == 200, again.text
+            # Same answer, same row -- and `taken-at` does not move, because the
+            # resolution did not.
+            assert again.json()["data"]["id"] == first.json()["data"]["id"]
+            assert (
+                again.json()["data"]["attributes"]["taken-at"]
+                == first.json()["data"]["attributes"]["taken-at"]
+            )
+
+        assert await self._versions(inv_id) == after_first, "a read wrote a row"
+
+    async def test_declaring_a_host_moves_the_stamp(self, client, app):
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        await _declare(client, ws_id, "web-1")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        before = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert before.json()["data"]["attributes"]["host-count"] == 1
+
+        await _declare(client, ws_id, "web-2")
+        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert after.status_code == 200, after.text
+        assert after.json()["data"]["attributes"]["host-count"] == 2
+        assert await self._versions(inv_id) == 2
+
+        stamps = await self._stamps(inv_id)
+        assert stamps[0] != stamps[1], stamps
+        assert all(s for s in stamps), "an API resolution must carry a stamp"
+
+    async def test_DELETING_a_host_moves_the_stamp(self, client, app):
+        """The one `max(updated_at)` alone gets wrong, and it fails in the
+        direction that matters: a deleted host would go on being served as part
+        of the target set, because removing a row leaves the maximum exactly
+        where it was. The count is what catches it.
+        """
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        # Declare the one to delete FIRST, so the surviving host carries the
+        # later `updated_at` and the maximum is provably unmoved by the delete.
+        doomed = await _declare(client, ws_id, "web-doomed")
+        await _declare(client, ws_id, "web-keep")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        before = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert before.json()["data"]["attributes"]["host-count"] == 2
+
+        gone = await client.delete(f"{V1}/inventory-items/{doomed}", headers=AUTH)
+        assert gone.status_code in (200, 204), gone.text
+
+        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert after.status_code == 200, after.text
+        hosts = after.json()["data"]["attributes"]["hosts"]
+        assert "web-doomed" not in hosts, "a deleted host was still being served"
+        assert after.json()["data"]["attributes"]["host-count"] == 1
+        assert await self._versions(inv_id) == 2
+
+    async def test_updating_a_host_moves_the_stamp(self, client, app):
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        item_id = await _declare(client, ws_id, "web-1", address="10.0.0.1")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+
+        moved = await client.patch(
+            f"{V1}/inventory-items/{item_id}",
+            json={"data": {"attributes": {"address": "10.0.0.9"}}},
+            headers=AUTH,
+        )
+        assert moved.status_code == 200, moved.text
+
+        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert after.status_code == 200, after.text
+        assert after.json()["data"]["attributes"]["hosts"]["web-1"]["ansible_host"] == "10.0.0.9"
+        assert await self._versions(inv_id) == 2
+
+    async def test_the_limit_preview_sees_a_change_without_a_resolve(self, client, app):
+        """The preview is the safety surface, so it must not be the one place
+        still answering from a stale set."""
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        await _declare(client, ws_id, "web-1", groups=["web"])
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        first = await client.post(
+            f"{V1}/inventories/inv-{inv_id}/actions/preview-limit",
+            json={"data": {"attributes": {"limit": "web"}}},
+            headers=AUTH,
+        )
+        assert first.status_code == 200, first.text
+        assert first.json()["data"]["attributes"]["hosts"] == ["web-1"]
+
+        await _declare(client, ws_id, "web-2", groups=["web"])
+
+        second = await client.post(
+            f"{V1}/inventories/inv-{inv_id}/actions/preview-limit",
+            json={"data": {"attributes": {"limit": "web"}}},
+            headers=AUTH,
+        )
+        assert second.status_code == 200, second.text
+        assert second.json()["data"]["attributes"]["hosts"] == ["web-1", "web-2"]
+        assert second.json()["data"]["attributes"]["of-host-count"] == 2
