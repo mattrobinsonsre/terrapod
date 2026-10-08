@@ -20,6 +20,14 @@ from terrapod.db.models import (
     ExecutionHook,
     ExecutionHookWorkspace,
     GPGKey,
+    InventoryGlobalVar,
+    InventoryGroup,
+    InventoryGroupChild,
+    InventoryGroupVar,
+    InventoryHost,
+    InventoryHostGroup,
+    InventoryHostVar,
+    InventorySettings,
     ModuleAutodiscoveryRepository,
     ModuleAutodiscoveryRule,
     ModuleWorkspaceLink,
@@ -449,6 +457,89 @@ WORKSPACE_REMOTE_STATE_CONSUMERS = register(
 # That is the worse of the two failures. An absent state version reads as "this
 # workspace has never run", so a promoted node does not error — it plans the
 # entire estate as a first-time create. The operator sees a plan, not a fault.
+# ---------------------------------------------------------------------------
+# The ansible inventory (#1967, #1968)
+#
+# Eight classes, registered in foreign-key order, because a follower applies a
+# backfill page in registration order and a child whose parent is not there yet
+# fails its insert. The settings row points at a workspace and a VCS connection,
+# so it comes after both; the links come after the hosts and groups they join;
+# the variables come after their parents.
+#
+# **What a failover loses without these is a target set, not a feature.** An
+# ansible configure runs against the hosts the inventory resolves to, so a
+# promoted node missing them does not fail loudly -- it resolves a SMALLER
+# inventory and configures fewer machines than the operator asked for, reporting
+# success. That is the one outcome the whole resolution path is built to avoid
+# (it fails closed rather than answering with a partial host set), and losing
+# the rows would reintroduce it on the far side of a promotion.
+#
+# Nothing is excluded from any of them. Two columns look node-local and are not:
+#
+#   include_platform   False means "resolve the VCS source alone", which is how
+#                      an operator moves a repo's inventory in before declaring
+#                      anything. A node that defaults it to True resolves rows
+#                      the operator had deliberately taken out of play.
+#   ignore_paths       Part of what the git source IS. Dropping it widens the
+#                      source, so the promoted node reads inventory files the
+#                      leader was ignoring -- hosts appearing is as wrong as
+#                      hosts disappearing.
+#
+# `vcs_connection_id` is a nullable FK with ON DELETE SET NULL, and
+# `vcs_connections` is registered above, so it carries rather than being
+# excluded the way `state_versions.run_id` is.
+
+INVENTORY_SETTINGS = register(
+    ReplicatedClass(
+        name="inventory_settings",
+        model=InventorySettings,
+        # The workspace IS the key -- one inventory per workspace, so there is
+        # no surrogate id to replicate on.
+        pk_attrs=("workspace_id",),
+    )
+)
+
+INVENTORY_HOSTS = register(ReplicatedClass(name="inventory_hosts", model=InventoryHost))
+
+INVENTORY_GROUPS = register(ReplicatedClass(name="inventory_groups", model=InventoryGroup))
+
+# The two link classes. Each is a row in its own right with a surrogate id, not
+# a composite key, which is what gives it an addressable route and a Terraform
+# resource -- and here it means the ordinary single-key replication path applies
+# rather than the composite one `workspace_agent_pools` needs.
+#
+# A link lost at promotion is a host that is in no group, so every play limited
+# to that group skips it silently. A link that survives when its host did not
+# cannot happen: the composite foreign keys cascade.
+INVENTORY_HOST_GROUPS = register(
+    ReplicatedClass(name="inventory_host_groups", model=InventoryHostGroup)
+)
+
+INVENTORY_GROUP_CHILDREN = register(
+    ReplicatedClass(name="inventory_group_children", model=InventoryGroupChild)
+)
+
+# The three variable classes, each carrying an `EncryptedText` value.
+#
+# They are three tables rather than one polymorphic table because a polymorphic
+# parent reference cannot carry a real foreign key, and referential integrity is
+# the point of the composite keys above. The consequence here is three
+# registrations and three `encrypted-columns` matrix rows rather than one.
+#
+# A host variable is an ordinary place for an `ansible_become_password`, so these
+# carry secret material over the peer link. The key that protects it does not go
+# with them -- see `test_replication_node_local.py` for that rule.
+INVENTORY_HOST_VARS = register(ReplicatedClass(name="inventory_host_vars", model=InventoryHostVar))
+
+INVENTORY_GROUP_VARS = register(
+    ReplicatedClass(name="inventory_group_vars", model=InventoryGroupVar)
+)
+
+INVENTORY_GLOBAL_VARS = register(
+    ReplicatedClass(name="inventory_global_vars", model=InventoryGlobalVar)
+)
+
+
 # ---------------------------------------------------------------------------
 
 # Every state version, not only the current one: rollback is a shipped feature,
