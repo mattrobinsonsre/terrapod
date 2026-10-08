@@ -514,22 +514,6 @@ async def resolve_if_stale(db: AsyncSession, inventory: Inventory) -> InventoryV
     )
 
 
-async def resolve_and_snapshot(
-    db: AsyncSession, inventory: Inventory
-) -> tuple[ResolvedInventory, InventoryVersion]:
-    """Resolve now and record the result. Raises if the API cannot resolve.
-
-    The whole of the API-side refresh: what `POST .../actions/resolve` does and
-    what a read of the resolved view does when there is no snapshot yet.
-    """
-    stamp = await source_stamp(db, inventory)
-    resolved = await resolve(db, inventory)
-    version = await record_snapshot(
-        db, inventory, resolved, produced_by=InventoryVersion.SOURCE_API, source_stamp=stamp
-    )
-    return resolved, version
-
-
 __all__ = [
     "ADDRESS_VAR",
     "DEFAULT_INVENTORY_NAME",
@@ -553,7 +537,6 @@ __all__ = [
     "list_versions",
     "record_snapshot",
     "resolve",
-    "resolve_and_snapshot",
     "resolve_if_stale",
     "resolve_source",
     "source_stamp",

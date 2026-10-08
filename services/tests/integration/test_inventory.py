@@ -344,7 +344,13 @@ class TestSnapshotPruning:
 
         from terrapod.services import inventory_service as inv
 
-        for _ in range(inv.MAX_VERSIONS_PER_INVENTORY + 5):
+        # A host per iteration, because the action writes only when the
+        # resolution has moved -- which is the behaviour the class below pins.
+        # Resolving the same set twenty-five times is one row, so a loop that
+        # only resolved would exercise no pruning at all while still passing a
+        # bare length assertion.
+        for i in range(inv.MAX_VERSIONS_PER_INVENTORY + 5):
+            await _declare(client, ws_id, f"web-{i + 2}")
             resp = await client.post(f"{V1}/inventories/{inv_id}/actions/resolve", headers=AUTH)
             assert resp.status_code == 200, resp.text
         newest = resp.json()["data"]["id"]
@@ -682,3 +688,40 @@ class TestTheSourceStampDecidesWhenARowIsWritten:
         assert await self._versions(inv_id) == baseline, (
             "a sourceless inventory wrote a row per read"
         )
+
+    async def test_the_resolve_action_is_a_no_op_when_nothing_has_moved(self, client, app):
+        """`POST .../actions/resolve` takes the same stamped path a read does.
+
+        It used to write unconditionally. That handed anyone holding write an
+        eviction vector for nothing: the history is bounded, so a duplicate row
+        prunes the oldest while carrying no information a configure could
+        subtract against -- a matching stamp already proves the existing row IS
+        the current resolution. The action still exists because it GUARANTEES a
+        row describes the current resolution; it does not promise a new one.
+        """
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        await _declare(client, ws_id, "web-1")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        first = await client.post(f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH)
+        assert first.status_code == 200, first.text
+        assert await self._versions(inv_id) == 1
+
+        for _ in range(4):
+            again = await client.post(
+                f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH
+            )
+            assert again.status_code == 200, again.text
+            # The same row, returned again -- not a new one with the same bytes.
+            assert again.json()["data"]["id"] == first.json()["data"]["id"]
+
+        assert await self._versions(inv_id) == 1, "the action wrote a duplicate row"
+
+        # And it still writes when there is something to record, or the
+        # guarantee it exists for would be hollow.
+        await _declare(client, ws_id, "web-2")
+        moved = await client.post(f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH)
+        assert moved.status_code == 200, moved.text
+        assert moved.json()["data"]["id"] != first.json()["data"]["id"]
+        assert await self._versions(inv_id) == 2

@@ -655,15 +655,22 @@ async def resolve_inventory(
 
     It does **not** change what a reader is shown -- a read resolves live, so it
     already reflects the declared rows whether this has ever been called. What
-    it does is add a row to the history, unconditionally, even when the source
-    stamp has not moved.
+    it guarantees is that the history holds a row describing the current
+    resolution, which is what a configure pins and what a partial-configure
+    retry subtracts against (#1973).
 
-    That is why it still requires write. The history is bounded at
-    `MAX_VERSIONS_PER_INVENTORY` and is the basis a partial-configure retry
-    subtracts against (#1973), so writing to it prunes the oldest entry -- a
-    read-tier caller must not be able to evict a snapshot a configure is pinned
-    to, which is the whole reason a read compares the stamp instead of
-    recording.
+    **It takes the same stamped path a read does, so it writes only when the
+    resolution has actually moved.** It used to write unconditionally, which
+    handed anyone with write an eviction vector for nothing: the history is
+    bounded at `MAX_VERSIONS_PER_INVENTORY`, so a duplicate row prunes the
+    oldest while carrying no information a configure could use -- a matching
+    stamp already proves the existing row *is* the current resolution. Nothing
+    needs "stamp this moment" semantics; a retry needs the host set, not a
+    timestamp, and the call itself is in the audit log.
+
+    It still requires write because it still *may* write, and whether it does
+    depends on state the caller does not control. The read path is gated lower
+    precisely because it never writes.
     """
     inventory = await _get_inventory(inventory_id, db)
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
@@ -673,7 +680,7 @@ async def resolve_inventory(
     if not inv.api_can_resolve(sources):
         raise _unresolvable_error(sources, "This inventory was not refreshed.")
 
-    _, version = await inv.resolve_and_snapshot(db, inventory)
+    version = await inv.resolve_if_stale(db, inventory)
     await db.commit()
     return JSONResponse(content={"data": _version_json(version, include_contents=True)})
 
