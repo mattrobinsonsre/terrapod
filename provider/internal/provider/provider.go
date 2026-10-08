@@ -17,6 +17,7 @@ import (
 	architectureCritiqueDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/architecture_critique"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
 	catalogItemInterfaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_item_interface"
+	inventoryResolvedDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/inventory_resolved"
 	moduleRuleRepositoriesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/module_autodiscovery_rule_repositories"
 	oidcAudienceDefaultsDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/oidc_audience_defaults"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
@@ -33,7 +34,14 @@ import (
 	executionHookRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook"
 	executionHookWsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook_workspace"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
-	inventoryItemRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_item"
+	inventoryGlobalVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_global_var"
+	inventoryGroupRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_group"
+	inventoryGroupChildRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_group_child"
+	inventoryGroupVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_group_var"
+	inventoryHostRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host"
+	inventoryHostGroupRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_group"
+	inventoryHostVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_var"
+	inventorySettingsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_settings"
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
@@ -191,7 +199,18 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		registryProviderRes.NewResource,
 		moduleWorkspaceLinkRes.NewResource,
 		gpgKeyRes.NewResource,
-		inventoryItemRes.NewResource,
+		// Ansible inventory: the eight structures an inventory has, one
+		// resource each (#1968), so a second concern can contribute a host to
+		// a group, or a variable to a host, without owning the thing it
+		// attaches to.
+		inventorySettingsRes.NewResource,
+		inventoryHostRes.NewResource,
+		inventoryGroupRes.NewResource,
+		inventoryHostGroupRes.NewResource,
+		inventoryGroupChildRes.NewResource,
+		inventoryHostVarRes.NewResource,
+		inventoryGroupVarRes.NewResource,
+		inventoryGlobalVarRes.NewResource,
 	}
 }
 
@@ -209,5 +228,6 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		vcsConnectionDS.NewDataSource,
 		userDS.NewDataSource,
 		oidcAudienceDefaultsDS.NewDataSource,
+		inventoryResolvedDS.NewDataSource,
 	}
 }
