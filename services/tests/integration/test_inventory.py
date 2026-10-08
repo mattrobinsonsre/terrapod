@@ -115,6 +115,25 @@ async def _host_var(client, host_id: str, key: str, value: str = "v", **attrs):
     )
 
 
+def _no_ansible() -> bool:
+    """Whether a WORKING ansible-inventory is absent.
+
+    Probed rather than located: a stale shim whose module is gone answers
+    `--version` and dies on everything else.
+    """
+    import shutil
+    import subprocess
+
+    found = shutil.which("ansible-inventory")
+    if found is None:
+        return True
+    try:
+        probe = subprocess.run([found, "--version"], capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return probe.returncode != 0
+
+
 class TestTheCompositeKeysRefuseACrossWorkspaceLink:
     """The property the whole schema is shaped around.
 
@@ -648,3 +667,130 @@ class TestTheSettingsCheckConstraint:
         ws = await _workspace(client)
         resp = await client.get(f"{V1}/workspaces/{ws}/inventory/settings", headers=AUTH)
         assert resp.status_code == 404, resp.text
+
+
+class TestTheResolvedRead:
+    """End to end through the real router, the real database and real ansible.
+
+    The services tier drives `ansible-inventory` over a rendered fixture; this
+    drives the whole path -- rows written through the API, rendered, resolved,
+    cached in Redis and served -- because the rendering is the half that can
+    disagree with the rows.
+    """
+
+    async def test_declared_rows_resolve_to_hosts_and_groups(self, client, app):
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory; the test image provides one")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        web = await _mk_host(client, ws, "web-1")
+        bare = await _mk_host(client, ws, "switch-1")
+        group = await _mk_group(client, ws, "web")
+        await _member(client, group, web)
+        await _host_var(client, web, "ansible_host", "10.0.0.4")
+
+        resp = await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+
+        # The var-less host survives, which is the whole reason the host set is
+        # not read off `_meta.hostvars`.
+        assert sorted(attrs["hosts"]) == ["switch-1", "web-1"]
+        assert attrs["hosts"]["web-1"]["ansible_host"] == "10.0.0.4"
+        assert attrs["groups"]["web"] == ["web-1"]
+        assert attrs["host-count"] == 2
+        assert bare  # the id is not otherwise used; naming it documents the fixture
+
+    async def test_an_inventory_wide_variable_reaches_every_host(self, client, app):
+        """`group_vars/all`, which is what refusing `all` as a group name buys."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        await _mk_host(client, ws, "a")
+        await _mk_host(client, ws, "b")
+        await client.post(
+            f"{V1}/workspaces/{ws}/inventory/vars",
+            json={"data": {"attributes": {"key": "ansible_user", "value": "deploy"}}},
+            headers=AUTH,
+        )
+
+        attrs = (await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)).json()[
+            "data"
+        ]["attributes"]
+        for host in ("a", "b"):
+            assert attrs["hosts"][host]["ansible_user"] == "deploy"
+
+    async def test_a_structured_variable_arrives_as_its_type(self, client, app):
+        """`structured` is the same question `Variable.structured` answers: a
+        list or a number rather than a string, which is what ansible's own
+        `group_vars` carries natively."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        host = await _mk_host(client, ws, "web-1")
+        await _host_var(client, host, "ports", "[80, 443]", structured=True)
+
+        attrs = (await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)).json()[
+            "data"
+        ]["attributes"]
+        assert attrs["hosts"]["web-1"]["ports"] == [80, 443]
+
+    async def test_a_limit_narrows_the_host_set(self, client, app):
+        """The safety surface. Auto-configure is deliberately broad, so
+        visibility is the control -- "what would this target" has to be
+        answerable before anything runs."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        for name in ("web-1", "web-2", "db-1"):
+            host = await _mk_host(client, ws, name)
+            if name.startswith("web"):
+                pass
+        group = await _mk_group(client, ws, "web")
+        for name in ("web-1", "web-2"):
+            hosts = (
+                await client.get(f"{V1}/workspaces/{ws}/inventory/hosts", headers=AUTH)
+            ).json()["data"]
+            hid = next(h["id"] for h in hosts if h["attributes"]["name"] == name)
+            await _member(client, group, hid)
+
+        narrowed = await client.get(
+            f"{V1}/workspaces/{ws}/inventory/resolved?limit=web:!web-2", headers=AUTH
+        )
+        assert narrowed.status_code == 200, narrowed.text
+        attrs = narrowed.json()["data"]["attributes"]
+        assert sorted(attrs["hosts"]) == ["web-1"]
+        assert attrs["limit"] == "web:!web-2"
+        assert host  # fixture
+
+    async def test_a_workspace_with_nothing_resolves_to_the_empty_set(self, client, app):
+        """Not a 404 and not an error: the empty set is a real resolution, and
+        it is the answer at exactly the moment an operator is checking what they
+        have just declared."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        resp = await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs == {
+            "hosts": {},
+            "groups": {},
+            "group-children": {},
+            "host-count": 0,
+            "group-count": 0,
+        }
+
+    async def test_the_read_carries_no_freshness_field(self, client, app):
+        """Pinned, because the field it replaced was read as staleness. The read
+        resolved the rows to answer itself, so a date would only invite a reader
+        to ask a question the read has already answered."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        attrs = (await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)).json()[
+            "data"
+        ]["attributes"]
+        for gone in ("taken-at", "produced-by", "api-resolvable"):
+            assert gone not in attrs

@@ -56,6 +56,29 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && chmod 0755 /usr/local/bin/tofu \
     && /usr/local/bin/tofu version
 
+# ansible-core — so the inventory resolution tests run `ansible-inventory` for
+# REAL in CI rather than skipping. That matters more here than for most tools:
+# Terrapod deliberately implements no merge of its own, so every claim about
+# precedence, the group DAG and `--limit` expansion is a claim about ansible's
+# behaviour, and a test that does not run ansible asserts nothing about it.
+#
+# Two of ansible's output shapes are load-bearing and neither is documented:
+# a host with no variables is absent from `_meta.hostvars`, and a group with no
+# members has no top-level entry at all. Both were found by running it.
+#
+# Its OWN virtualenv, not the image's python: ansible-core shares jinja2, PyYAML
+# and packaging with the application, so installing it alongside would let its
+# ranges move the app's resolved versions and test something operators do not
+# run. It is how production gets it too (`services/api_ansible.py`), so this
+# also matches the real layout. Keep the version in step with
+# `api.config.default_ansible_version` in values.yaml.
+ARG ANSIBLE_CORE_VERSION=2.21.5
+RUN python -m venv /opt/ansible \
+    && /opt/ansible/bin/pip install --no-cache-dir --only-binary=:all: \
+        "ansible-core==${ANSIBLE_CORE_VERSION}" \
+    && ln -s /opt/ansible/bin/ansible-inventory /usr/local/bin/ansible-inventory \
+    && ansible-inventory --version
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir poetry==1.8.4
 

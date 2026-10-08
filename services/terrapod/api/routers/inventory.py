@@ -82,7 +82,13 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import inventory_service as inv
+from terrapod.services.api_ansible import AnsibleUnavailable
 from terrapod.services.inventory_resolution import InventoryValidationError
+from terrapod.services.inventory_resolve import (
+    InventoryResolutionFailed,
+    InventorySourceRefused,
+)
+from terrapod.services.inventory_resolve import resolve as resolve_inventory
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 router = APIRouter(tags=["inventory"])
@@ -1549,3 +1555,87 @@ def _var_routes(kind: str) -> None:
 
 for _kind in _VAR_KINDS:
     _var_routes(_kind)
+
+
+# ── Resolution ───────────────────────────────────────────────────────────────
+
+
+@router.get("/workspaces/{workspace_id}/inventory/resolved")
+async def show_resolved_inventory(
+    workspace_id: str = Path(...),
+    limit: str | None = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """What this workspace's inventory resolves to: hosts and groups.
+
+    **Resolved by ansible, not by Terrapod.** `ansible-inventory --list` does
+    the merge, the precedence, the group DAG, the derivation of `all` and
+    `ungrouped` and -- with `?limit=` -- the expansion of a `--limit` pattern.
+    So the answer is ansible's own, `~regex` terms included, rather than a
+    reimplementation that would diverge from it.
+
+    **Live, and it writes nothing.** Every source is static, so the resolution
+    is a function of the rows; the Redis entry is keyed on their content, so a
+    write supersedes it rather than needing an invalidation. There is no
+    timestamp and no freshness field, because there is no other resolution this
+    could be.
+
+    `?limit=` is the safety surface rather than a convenience. Auto-configure is
+    deliberately broad -- at scale the hazard is hosts left unconfigured, not
+    hosts configured -- so visibility is the control, and "what would this
+    target" has to be answerable before anything runs.
+
+    Unphased for a runner token: a plan reads inventory to diff it.
+    """
+    ws = await _get_workspace(workspace_id, db)
+    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
+
+    if limit is not None and not isinstance(limit, str):
+        raise HTTPException(status_code=422, detail="limit must be a string")
+
+    try:
+        resolved = await resolve_inventory(db, ws.id, limit=limit or None)
+    except InventorySourceRefused as exc:
+        # 422, not 503: the resolution did not fail, it was declined, and the
+        # operator has something to do about it.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except AnsibleUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"ansible could not be obtained, so this inventory cannot be resolved. "
+                f"It is installed on first use from Terrapod's own PyPI cache. {exc}"
+            ),
+        ) from exc
+    except InventoryResolutionFailed as exc:
+        # Fails closed. A partial or empty answer here is a target set that is
+        # silently too small, and unlike the runner's policy gate there is no
+        # later evaluation to catch it.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    hosts = resolved["hosts"]
+    groups = resolved["groups"]
+    attrs: dict[str, Any] = {
+        "hosts": hosts,
+        # DIRECT membership per group. Ansible does not flatten nesting into a
+        # group's host list -- a parent whose members all come through a child
+        # reports none of its own -- so `group-children` carries the structure
+        # and `?limit=<group>` is the authoritative effective set.
+        "groups": groups,
+        "group-children": resolved.get("children", {}),
+        "host-count": len(hosts),
+        "group-count": len(groups),
+    }
+    if limit:
+        attrs["limit"] = limit
+    return JSONResponse(
+        content={
+            "data": {
+                "id": f"ws-{ws.id}",
+                "type": "resolved-inventories",
+                "attributes": attrs,
+                "relationships": _ws_rel(ws.id),
+            }
+        }
+    )

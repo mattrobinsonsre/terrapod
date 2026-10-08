@@ -390,6 +390,14 @@
     "updated-at",
     "value"
   ],
+  "inventory.show_resolved_inventory": [
+    "group-children",
+    "group-count",
+    "groups",
+    "host-count",
+    "hosts",
+    "limit"
+  ],
   "module_autodiscovery_rules._preview_json": [
     "entries",
     "files-walked",
