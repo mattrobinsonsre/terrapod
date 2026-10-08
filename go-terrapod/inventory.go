@@ -262,7 +262,7 @@ func (c *Client) DeleteInventoryItem(ctx context.Context, id string) error {
 
 // ── The inventory object ─────────────────────────────────────────────────────
 
-// CreateInventory creates a named inventory with its `terraform` source.
+// CreateInventory creates a named inventory with its `platform` source.
 func (c *Client) CreateInventory(
 	ctx context.Context, workspaceID string, req CreateInventoryRequest,
 ) (*Inventory, error) {
@@ -325,7 +325,7 @@ func (c *Client) DeleteInventory(ctx context.Context, id string) error {
 // GetResolvedInventory reads what an inventory currently resolves to.
 //
 // LIVE for an inventory the API can resolve itself -- which is every inventory
-// that exists today, because the only declared source kind is terraform and
+// that exists today, because the only declared source kind is platform and
 // resolving that is a database query. A row is written only when the
 // resolution has actually moved, so reading does not evict the bounded
 // snapshot history a configure pins.

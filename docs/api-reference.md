@@ -5544,7 +5544,7 @@ POST /api/v1/workspaces/{id}/inventories
 
 `GET` requires `inventory:read` and supports the standard paging. It is **empty for a workspace that has never declared a host** — the `default` inventory is created lazily on the first write, so a Terraform/OpenTofu-only workspace carries no inventory rows at all.
 
-`POST` requires `inventory:write`, takes `name` (required) and `description`, and returns `201`. Every new inventory is created with its `terraform` source at **position 0**. `409` on a duplicate name in the workspace.
+`POST` requires `inventory:write`, takes `name` (required) and `description`, and returns `201`. Every new inventory is created with its `platform` source at **position 0**. `409` on a duplicate name in the workspace.
 
 ### Show / Delete Inventory
 

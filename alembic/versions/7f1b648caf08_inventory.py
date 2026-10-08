@@ -5,7 +5,7 @@ running the previous release neither reads nor writes any of them, so a rolling
 upgrade is unaffected in both directions.
 
 **Nothing is created for a workspace that does not use this.** The `default`
-inventory and its one `terraform` source are written lazily, on the first
+inventory and its one `platform` source are written lazily, on the first
 declared item or the first read of the resolved view. A deployment that runs
 only terraform/tofu therefore carries zero rows here, which is how "those users
 pay nothing" is delivered now that the engine on/off switch is withdrawn

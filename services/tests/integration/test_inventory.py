@@ -160,7 +160,7 @@ class TestLazyCreation:
         resp = await client.get(f"{V1}/workspaces/{ws_id}/inventories", headers=AUTH)
         assert len(resp.json()["data"]) == 1
 
-    async def test_the_default_inventory_starts_with_its_terraform_source(self, client, app):
+    async def test_the_default_inventory_starts_with_its_platform_source(self, client, app):
         set_auth(app, admin_user())
         ws_id = await _workspace(client)
         await _declare(client, ws_id, "web-1")
@@ -169,7 +169,7 @@ class TestLazyCreation:
         resp = await client.get(f"{V1}/inventories/{inv_id}", headers=AUTH)
 
         sources = resp.json()["data"]["attributes"]["sources"]
-        assert [s["kind"] for s in sources] == ["terraform"]
+        assert [s["kind"] for s in sources] == ["platform"]
         assert [s["position"] for s in sources] == [0]
         assert sources[0]["api-resolvable"] is True
         assert sources[0]["id"].startswith("invsrc-")

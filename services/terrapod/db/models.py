@@ -4153,18 +4153,25 @@ class InventorySource(Base):
 
     __tablename__ = "inventory_sources"
 
-    #: The only source kind implemented. Resolves to "this workspace's declared
-    #: `inventory_items`" -- rows Terrapod already owns, so resolving it is a
-    #: query with nothing to fetch, parse or time out. That is what lets the API
-    #: resolve an inventory made only of these without running ansible.
-    KIND_TERRAFORM = "terraform"
+    #: The platform's own static inventory: the `inventory_items` rows Terrapod
+    #: holds for this workspace. Resolving it is a query with nothing to fetch,
+    #: parse or time out, which is what lets the API resolve an inventory made
+    #: only of these without running ansible.
+    #:
+    #: **The kind names the SOURCE, not whoever writes it.** Terraform is the
+    #: first writer (`terrapod_inventory_item`, #1968) and a hand editor in the
+    #: UI writes the same rows (#1969) -- so a second writer is not a second
+    #: kind, and calling this `terraform` would have made it look like one.
+    #: There are two sources in total, this and git-supplied files (#1929);
+    #: external/dynamic inventory was declined (#1970).
+    KIND_PLATFORM = "platform"
 
     #: Kinds the API can resolve by itself. A source outside this set must be
     #: resolved by a runner, because it needs ansible to parse -- the API
     #: deliberately does not install ansible (#2010). Resolution refuses rather
     #: than partially resolving, so adding a kind here without a resolver is a
     #: visible failure instead of a silently shrinking host set.
-    API_RESOLVABLE_KINDS = frozenset({KIND_TERRAFORM})
+    API_RESOLVABLE_KINDS = frozenset({KIND_PLATFORM})
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
@@ -4178,7 +4185,7 @@ class InventorySource(Base):
     #: host variable.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
-    #: Per-kind settings. Empty for `terraform`, which needs none: the source is
+    #: Per-kind settings. Empty for `platform`, which needs none: the source is
     #: "every item this workspace declares".
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
@@ -4207,7 +4214,7 @@ class InventoryItem(Base):
 
     **Workspace-scoped, not inventory-scoped.** The resource carries no
     `inventory` attribute, so an item belongs to the workspace and every
-    inventory's `terraform` source draws on the same pool. Partitioning stays
+    inventory's `platform` source draws on the same pool. Partitioning stays
     additive through the source's `config` if it is ever wanted.
     """
 

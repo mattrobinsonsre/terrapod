@@ -30,6 +30,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import caps_for_level
+from terrapod.db.models import InventorySource
 from terrapod.db.session import get_db
 from terrapod.services.inventory_resolution import InventoryValidationError
 
@@ -102,7 +103,7 @@ def _mock_version(*, inventory_id, hosts=None, groups=None, produced_by="api"):
     return version
 
 
-def _mock_source(kind="terraform", position=0):
+def _mock_source(kind=InventorySource.KIND_PLATFORM, position=0):
     source = MagicMock()
     source.id = uuid.uuid4()
     source.kind = kind
@@ -631,12 +632,12 @@ class TestResolvedView:
         """
         from terrapod.db.models import InventorySource
 
-        assert InventorySource.API_RESOLVABLE_KINDS == frozenset({InventorySource.KIND_TERRAFORM})
+        assert InventorySource.API_RESOLVABLE_KINDS == frozenset({InventorySource.KIND_PLATFORM})
         # And nothing can create another kind: one call site, one literal.
         src = pathlib.Path("terrapod/services/inventory_service.py").read_text()
-        assert src.count("kind=InventorySource.KIND_TERRAFORM") == 1
+        assert src.count("kind=InventorySource.KIND_PLATFORM") == 1
         assert "kind=InventorySource.KIND_" not in src.replace(
-            "kind=InventorySource.KIND_TERRAFORM", ""
+            "kind=InventorySource.KIND_PLATFORM", ""
         )
 
     async def test_it_refuses_rather_than_partially_resolving(self):
@@ -1021,11 +1022,15 @@ class TestTheUnresolvableRefusalIsQuotedInTheDocs:
     def test_it_names_every_offending_kind_and_only_those(self):
         from terrapod.api.routers import inventory as mod
 
-        sources = [_mock_source("terraform", 0), _mock_source("git", 1), _mock_source("ini", 2)]
+        sources = [
+            _mock_source(InventorySource.KIND_PLATFORM, 0),
+            _mock_source("git", 1),
+            _mock_source("ini", 2),
+        ]
         detail = mod._unresolvable_error(sources, "lead.").detail
 
         assert "'git'" in detail and "'ini'" in detail
-        assert "terraform" not in detail, (
+        assert "platform" not in detail, (
             "naming the source the API CAN resolve would send an operator after the wrong one"
         )
 
@@ -1042,7 +1047,7 @@ class TestTheInventoryWireShape:
     async def test_sources_are_an_attribute_not_an_invented_top_level_key(self):
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source("terraform", 0), _mock_source("ini", 1)]
+        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
         app, _ = _make_app(_user())
         with (
             patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
@@ -1070,7 +1075,7 @@ class TestTheInventoryWireShape:
         which source wins a conflicting host variable."""
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source("terraform", 0), _mock_source("ini", 1)]
+        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
         app, _ = _make_app(_user())
         with (
             patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
@@ -1086,7 +1091,7 @@ class TestTheInventoryWireShape:
 
         entries = res.json()["data"]["attributes"]["sources"]
         assert [e["position"] for e in entries] == [0, 1]
-        assert [e["kind"] for e in entries] == ["terraform", "ini"]
+        assert [e["kind"] for e in entries] == ["platform", "ini"]
         assert all(e["id"].startswith("invsrc-") for e in entries)
         # Flat: no nested resource envelope inside an attribute value.
         assert "attributes" not in entries[0]
@@ -1097,7 +1102,7 @@ class TestTheInventoryWireShape:
         with only the rollup would have less than the error message does."""
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source("terraform", 0), _mock_source("ini", 1)]
+        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
         app, _ = _make_app(_user())
         with (
             patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),

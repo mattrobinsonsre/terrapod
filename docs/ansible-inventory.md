@@ -196,11 +196,17 @@ An inventory holds an ordered list of sources. Only one kind is implemented:
 |---|---|---|
 | `terraform` | Every inventory item this workspace declares | **Yes** — it is a database query |
 
-Every inventory is created with a `terraform` source at **position 0**. Others
-are appended after it, and that is also their precedence order. Git-sourced
-inventory files and UI-edited YAML are separate work; the source table exists
-now — rather than the `terraform` source being implied — precisely so they have
-a position to occupy without a migration that reorders anything.
+Every inventory is created with a `platform` source at **position 0**. Others
+are appended after it, and that is also their precedence order.
+
+**The kind names the source, not whoever writes it.** `platform` is the static
+inventory Terrapod holds — the `inventory_items` rows. Terraform is the first
+writer of those rows and a hand editor in the UI writes the same ones, so a
+second writer is not a second source. **There are two sources in total**: this
+and git-supplied inventory files, which are separate work (external and dynamic
+inventory was declined). The source table exists now — rather than the
+`platform` source being implied — precisely so git has a position to occupy
+without a migration that reorders anything.
 
 **Every kind Terrapod implements is static.** An external, AWX-style source that
 executes a script or a plugin to discover hosts is not among the kinds to come:
@@ -210,7 +216,7 @@ That is what makes a read of the resolved view live.
 
 **Declared items are workspace-scoped, not inventory-scoped.**
 `terrapod_inventory_item` carries no `inventory` attribute, so an item belongs to
-the workspace and every inventory's `terraform` source draws on the same pool.
+the workspace and every inventory's `platform` source draws on the same pool.
 Several inventories per workspace are supported because a configure definition
 references *an* inventory: "the declared items plus file A" and "the declared
 items plus file B" are two different target sets over one workspace.
@@ -451,7 +457,7 @@ expanded against, so an operator can see which host set produced the answer.
 
 ## Which sources the API can resolve, and what happens when it cannot
 
-The `terraform` source needs no ansible: the declared items are already rows
+The `platform` source needs no ansible: the declared items are already rows
 Terrapod owns, so resolving that source is a query with nothing to fetch, parse
 or time out. **Every other source kind needs ansible to parse, and ansible is
 installed only in the runner** — deliberately, because every fetch has to go
@@ -498,7 +504,7 @@ snapshot rather than having to infer it.
 ### For an inventory the API owns, a posted snapshot is history
 
 This is the one behaviour worth stating plainly rather than leaving to be
-discovered. The `terraform` source is one the API resolves from the declared
+discovered. The `platform` source is one the API resolves from the declared
 rows, so for an inventory holding only that source **the live answer is
 authoritative and a posted snapshot is not what a reader sees** — however
 recently it arrived. It is kept, it appears in the history, and something can be
@@ -508,7 +514,7 @@ A runner's resolution wins only where the API cannot resolve at all.
 
 ### No such source kind exists yet
 
-No kind other than `terraform` exists, so no inventory can be in that state
+No kind other than `platform` exists, so no inventory can be in that state
 today. The refusal is in place now so the runner path is forced when the first
 one lands rather than remembered, and the first will be
 [#1929](https://github.com/mattrobinsonsre/terrapod/issues/1929),
@@ -593,7 +599,7 @@ alias and serves all of these too. None of this is on the TFE-compatible prefix
 | `PATCH /api/v1/inventory-items/{id}` | `inventory:write` | Partial update: an absent attribute is left alone, an empty list clears |
 | `DELETE /api/v1/inventory-items/{id}` | `inventory:write` | Remove a declared host. `204` |
 | `GET /api/v1/workspaces/{id}/inventories` | `inventory:read` | This workspace's inventories. Empty for a workspace that has never declared a host |
-| `POST /api/v1/workspaces/{id}/inventories` | `inventory:write` | Create a named inventory, with its `terraform` source at position 0. `201` |
+| `POST /api/v1/workspaces/{id}/inventories` | `inventory:write` | Create a named inventory, with its `platform` source at position 0. `201` |
 | `GET /api/v1/inventories/{id}` | `inventory:read` | One inventory, with its ordered sources |
 | `DELETE /api/v1/inventories/{id}` | `inventory:write` | Delete an inventory, its sources and its snapshots. Declared items are untouched. `204` |
 | `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to. **Live** when every source is one the API owns, recording a snapshot only when the source stamp has moved. Otherwise the newest resolution a runner posted, or `409` naming the offending source kinds when there is none |

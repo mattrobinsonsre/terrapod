@@ -101,7 +101,7 @@ class TestMergeTakesAnsiblesSemantics:
         assert resolved.groups["net"] == ["host2", "switch1"]
 
     def test_one_source_is_a_degenerate_case_not_a_special_case(self):
-        resolved = merge([_source("terraform", HostEntry("h", groups=("web",)))])
+        resolved = merge([_source("platform", HostEntry("h", groups=("web",)))])
 
         assert resolved.hosts == {"h": {}}
         assert resolved.groups == {"web": ["h"]}
@@ -123,12 +123,12 @@ class TestMergeTakesAnsiblesSemantics:
     def test_provenance_records_which_sources_named_a_host(self):
         resolved = merge(
             [
-                _source("terraform", HostEntry("h")),
+                _source("platform", HostEntry("h")),
                 _source("git", HostEntry("h")),
             ]
         )
 
-        assert resolved.provenance["h"] == ["terraform", "git"]
+        assert resolved.provenance["h"] == ["platform", "git"]
 
 
 class TestAnsibleRendering:

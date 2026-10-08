@@ -13,7 +13,7 @@ cache would mean the API authenticating to its own HTTP surface with a
 credential it had minted for itself. So anything needing ansible to parse is
 resolved in a runner.
 
-**The `terraform` source needs none of it.** #1967 says so directly: the
+**The `platform` source needs none of it.** #1967 says so directly: the
 declared items "are already rows Terrapod owns: resolving that source is a
 query, with nothing to fetch, parse or time out". So the constraint is
 ansible-in-the-API, not resolution-in-the-API, and this module resolves sources
@@ -121,7 +121,7 @@ async def create_inventory(
     name: str,
     description: str = "",
 ) -> Inventory:
-    """Create an inventory with its one `terraform` source at position 0.
+    """Create an inventory with its one `platform` source at position 0.
 
     Every inventory starts with the declared-items source because that is the
     one source Terrapod owns and the one that needs no configuration. Others are
@@ -135,7 +135,7 @@ async def create_inventory(
         InventorySource(
             inventory_id=inventory.id,
             position=0,
-            kind=InventorySource.KIND_TERRAFORM,
+            kind=InventorySource.KIND_PLATFORM,
             config={},
         )
     )

@@ -93,7 +93,7 @@ test.describe('Workspace Inventory tab', () => {
 
     // And which source is why — per-source, not just the inventory's rollup.
     await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible()
-    await expect(page.getByText('terraform', { exact: true })).toBeVisible()
+    await expect(page.getByText('platform', { exact: true })).toBeVisible()
     await expect(page.getByText('API can resolve')).toBeVisible()
   })
 
