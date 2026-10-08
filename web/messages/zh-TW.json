@@ -2867,14 +2867,7 @@
         "subheading": "{name} 的合併結果，依順序取自每個來源。",
         "hosts": "主機",
         "groups": "主機組",
-        "takenAt": "此解析結果的時間：{when}",
-        "never": "從不",
-        "producedBy": {
-          "api": "由 API 解析",
-          "runner": "由執行器解析"
-        },
-        "producedByOther": "由 {by} 解析",
-        "liveNote": "這是即時的。此處的每個來源都在你的設定中宣告，因此解析只是一次資料庫查詢。上面的時間是該結果產生的時刻，而不是它有多陳舊。"
+        "liveNote": "這是即時的。此處的每個來源都在你的設定中宣告，因此解析只是一次資料庫查詢。"
       },
       "limit": {
         "heading": "--limit 會選取哪些主機？",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "來源",
         "body": "依順序解析，與重複指定 -i 旗標完全一樣：主機變數衝突時，後面的來源優先。",
-        "position": "位置 {position}",
-        "apiResolvable": "API 可解析",
-        "runnerOnly": "需要執行器",
-        "needsRunner": "這些來源需要 ansible，而只有執行器才有，因此上面的結果是執行器最後提交的解析結果，而不是即時解析：{kinds}。"
+        "position": "位置 {position}"
       },
       "errors": {
         "loadItems": "載入已宣告的主機失敗",

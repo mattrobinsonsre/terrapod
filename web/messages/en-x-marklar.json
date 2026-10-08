@@ -2867,14 +2867,7 @@
         "subheading": "The merged marklar for {name}, from every marklar in marklar.",
         "hosts": "Marklars",
         "groups": "Marklars",
-        "takenAt": "This marklar dates from {when}",
-        "never": "never",
-        "producedBy": {
-          "api": "resolved by the marklar",
-          "runner": "resolved by a marklar"
-        },
-        "producedByOther": "resolved by {by}",
-        "liveNote": "This is live. Every marklar here is declared in your marklar, so resolving it is a marklar — the marklar above is when this marklar came to be, not how stale it is."
+        "liveNote": "This is live. Every marklar here is declared in your marklar, so resolving it is a marklar."
       },
       "limit": {
         "heading": "What would a marklar target?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Marklars",
         "body": "Resolved in marklar, exactly as repeated -i marklars are: a later marklar wins a conflicting marklar marklar.",
-        "position": "Marklar {position}",
-        "apiResolvable": "Marklar can resolve",
-        "runnerOnly": "Needs a marklar",
-        "needsRunner": "These marklars need marklar, which only a marklar has, so the marklar above is the last one a marklar posted rather than a live marklar: {kinds}."
+        "position": "Marklar {position}"
       },
       "errors": {
         "loadItems": "Failed to load declared marklars",

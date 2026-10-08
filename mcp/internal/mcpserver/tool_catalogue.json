@@ -96,22 +96,6 @@
     }
   },
   {
-    "name": "terrapod_inventory_refresh",
-    "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-        "inventory_id": {
-          "description": "the inventory id, from terrapod_workspace_inventories",
-          "type": "string"
-        }
-      },
-      "required": [
-        "inventory_id"
-      ],
-      "type": "object"
-    }
-  },
-  {
     "name": "terrapod_inventory_resolved",
     "read_only": true,
     "input_schema": {
@@ -121,23 +105,6 @@
           "description": "also return the same resolution in the shape 'ansible-inventory --list' produces. Off by default; reason over 'hosts' instead, and ask for this only to hand the literal document to something that wants it",
           "type": "boolean"
         },
-        "inventory_id": {
-          "description": "the inventory id, from terrapod_workspace_inventories",
-          "type": "string"
-        }
-      },
-      "required": [
-        "inventory_id"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "name": "terrapod_inventory_versions",
-    "read_only": true,
-    "input_schema": {
-      "additionalProperties": false,
-      "properties": {
         "inventory_id": {
           "description": "the inventory id, from terrapod_workspace_inventories",
           "type": "string"

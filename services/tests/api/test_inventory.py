@@ -1,6 +1,6 @@
 """The inventory routers: authorization, phase binding and request validation.
 
-#1967 (the inventory object and its snapshots) and #1968 (declared items).
+#1967 (the inventory object and what it resolves to) and #1968 (declared items).
 
 The interesting half is authorization, because this router has **two** kinds of
 caller and one of them carries a new implicit grant. The cases that matter:
@@ -17,7 +17,6 @@ caller and one of them carries a new implicit grant. The cases that matter:
 
 from __future__ import annotations
 
-import pathlib
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,7 +31,10 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.models import InventorySource
 from terrapod.db.session import get_db
-from terrapod.services.inventory_resolution import InventoryValidationError
+from terrapod.services.inventory_resolution import (
+    InventoryValidationError,
+    ResolvedInventory,
+)
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -89,18 +91,16 @@ def _mock_inventory(*, workspace_id, name="default"):
     return inventory
 
 
-def _mock_version(*, inventory_id, hosts=None, groups=None, produced_by="api"):
-    version = MagicMock()
-    version.id = uuid.uuid4()
-    version.inventory_id = inventory_id
-    version.hosts = hosts if hosts is not None else {"host1": {}}
-    version.groups = groups if groups is not None else {"web": ["host1"]}
-    version.host_count = len(version.hosts)
-    version.group_count = len(version.groups)
-    version.produced_by = produced_by
-    version.produced_by_ref = ""
-    version.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    return version
+def _resolved(hosts=None, groups=None) -> ResolvedInventory:
+    """A real `ResolvedInventory`, not a mock.
+
+    The router renders ansible's shape from it, so a MagicMock standing in for
+    one would make every assertion about that shape a statement about the mock.
+    """
+    return ResolvedInventory(
+        hosts=hosts if hosts is not None else {"host1": {}},
+        groups=groups if groups is not None else {"web": ["host1"]},
+    )
 
 
 def _mock_source(kind=InventorySource.KIND_PLATFORM, position=0):
@@ -557,232 +557,84 @@ class TestPartialUpdate:
         assert cleared["address"] is None
 
 
-# ── Resolution and snapshots ─────────────────────────────────────────────────
+# ── Resolution ───────────────────────────────────────────────────────────────
 
 
 class TestResolvedView:
-    async def test_it_resolves_live_rather_than_reading_the_newest_row(self):
-        """Every implemented source is static, so resolving is a query and a
-        read is live. Pinned on WHICH path is taken, not on the payload: the
-        fixture returns the same version either way, so every assertion about
-        hosts and groups passes whether the answer was resolved or looked up.
-        """
+    """What the inventory resolves to, resolved to answer the request."""
+
+    async def _get(self, *, resolved=None, level="read"):
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
-        version = _mock_version(inventory_id=inventory.id)
         app, db = _make_app(_user())
         with (
             patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
             patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
             patch(
                 f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
+                AsyncMock(return_value=caps_for_level(level)),
             ),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source()])),
-            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)) as live,
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
+            patch(f"{_R}.inv.resolve", AsyncMock(return_value=resolved or _resolved())) as resolve,
         ):
             async with await _client(app) as c:
                 res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
+        return res, resolve, db
 
+    async def test_it_resolves_the_rows_to_answer_the_read(self):
+        res, resolve, _ = await self._get()
         assert res.status_code == 200
-        live.assert_awaited_once()
-        cached.assert_not_awaited()
-        db.commit.assert_awaited()
+        resolve.assert_awaited_once()
 
         attrs = res.json()["data"]["attributes"]
-        # `taken-at` survives, and now says when the resolution came to be
-        # rather than how stale it is -- an unchanged inventory reuses its row,
-        # which IS the live answer.
-        assert attrs["taken-at"] == "2026-01-01T00:00:00Z"
         assert attrs["host-count"] == 1
         # Ansible's own shape, rendered rather than stored twice.
         assert attrs["ansible-inventory"]["all"]["children"] == ["web"]
 
-    async def test_a_kind_the_api_does_not_own_reads_the_newest_row_instead(self):
-        """The seam git (#1929) will be the first to use. Inert today -- no such
-        kind can be created -- so this drives the branch directly to keep it
-        honest rather than leaving it unreachable and unasserted.
-        """
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        version = _mock_version(inventory_id=inventory.id, produced_by="runner")
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
-            patch(f"{_R}.inv.resolve_if_stale", AsyncMock()) as live,
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
+    async def test_it_writes_nothing(self):
+        """The property, not the absence of a route.
 
+        A read that resolves live has nothing to record, and recording one
+        anyway is what would let a dashboard left open evict a target set a
+        configure is pinned to. Asserting the route is gone proves only that
+        the route is gone; asserting the commit proves the read is read-only.
+        """
+        _, _, db = await self._get()
+        db.commit.assert_not_awaited()
+
+    async def test_an_empty_inventory_resolves_to_the_empty_set(self):
+        """Not a refusal, and not a 404.
+
+        The empty set is a real resolution, and it is the answer at exactly the
+        moment an operator is checking what they have just declared.
+        """
+        res, _, _ = await self._get(resolved=_resolved(hosts={}, groups={}))
         assert res.status_code == 200
-        live.assert_not_awaited()
-        cached.assert_awaited_once()
+        attrs = res.json()["data"]["attributes"]
+        assert attrs["host-count"] == 0
+        assert attrs["group-count"] == 0
 
-    async def test_only_the_terraform_kind_is_api_resolvable_today(self):
-        """So the branch above is provably inert rather than merely untested --
-        and adding a kind without a resolver is a visible failure.
+    async def test_it_carries_no_freshness_field(self):
+        """Pinned, because the field it replaced was read as staleness.
+
+        `taken-at` on a live answer invites a reader to ask whether it is
+        current, which is a question the read has already answered by
+        resolving. A revert that reintroduces it fails here.
         """
-        from terrapod.db.models import InventorySource
-
-        assert InventorySource.API_RESOLVABLE_KINDS == frozenset({InventorySource.KIND_PLATFORM})
-        # And nothing can create another kind: one call site, one literal.
-        src = pathlib.Path("terrapod/services/inventory_service.py").read_text()
-        assert src.count("kind=InventorySource.KIND_PLATFORM") == 1
-        assert "kind=InventorySource.KIND_" not in src.replace(
-            "kind=InventorySource.KIND_PLATFORM", ""
-        )
-
-    async def test_it_refuses_rather_than_partially_resolving(self):
-        """A source needing ansible means the API answers 409.
-
-        Resolving the rest would show a target set that is silently too small,
-        which is the failure the snapshot exists to prevent.
-        """
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=None)),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
-            patch(f"{_R}.inv.resolve_if_stale", AsyncMock()) as snap,
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
-        assert res.status_code == 409
-        snap.assert_not_awaited()
-        # And it names the offending kind. The read and the resolve action
-        # refuse for the same reason, and they had drifted: this one withheld
-        # the kinds, which is the actionable half, while being the refusal the
-        # UI actually hits. Both now compose one shared message.
-        assert "git" in res.json()["detail"], res.json()["detail"]
-
-    async def test_the_resolve_action_names_the_offending_source_kinds(self):
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("write")),
-            ),
-            patch(
-                f"{_R}.inv.list_sources",
-                AsyncMock(return_value=[_mock_source(), _mock_source(kind="git", position=1)]),
-            ),
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/actions/resolve", headers=_AUTH
-                )
-        assert res.status_code == 409
-        assert "git" in res.json()["detail"]
-
-
-class TestSnapshotUpload:
-    async def test_only_a_runner_token_may_post_a_snapshot(self):
-        """A snapshot records what a resolve actually found, so it is posted by
-        the thing that ran it -- not hand-written by a person with write."""
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}.inv.record_snapshot", AsyncMock()) as record,
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/versions",
-                    json={"data": {"attributes": {"hosts": {}, "groups": {}}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 403
-        assert "Runner token required" in res.json()["detail"]
-        record.assert_not_awaited()
-
-    async def test_a_runner_snapshot_is_recorded_against_its_run(self):
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        run_id = uuid.uuid4()
-        version = _mock_version(inventory_id=inventory.id, produced_by="runner")
-        app, _ = _make_app(_user(auth_method="runner_token", run_id=f"run-{run_id}"))
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.record_snapshot", AsyncMock(return_value=version)) as record,
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/versions",
-                    json={
-                        "data": {
-                            "attributes": {
-                                "hosts": {"h1": {"ansible_host": "10.0.0.1"}, "h2": {}},
-                                "groups": {"web": ["h1", "h2"]},
-                            }
-                        }
-                    },
-                    headers=_AUTH,
-                )
-        assert res.status_code == 201
-        kwargs = record.await_args.kwargs
-        assert kwargs["produced_by"] == "runner"
-        # The bare uuid, whichever spelling the token carried.
-        assert kwargs["produced_by_ref"] == str(run_id)
-
-    async def test_a_malformed_hosts_map_is_422(self):
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, _ = _make_app(_user(auth_method="runner_token", run_id=str(uuid.uuid4())))
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.record_snapshot", AsyncMock()) as record,
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/versions",
-                    json={"data": {"attributes": {"hosts": {"h1": "not-an-object"}}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
-        record.assert_not_awaited()
+        res, _, _ = await self._get()
+        attrs = res.json()["data"]["attributes"]
+        for gone in ("taken-at", "produced-by", "produced-by-ref", "api-resolvable"):
+            assert gone not in attrs, f"{gone} came back"
 
 
 class TestLimitPreview:
-    async def _preview(self, limit: str, *, version=None, api_owned=True):
-        """Drive the preview. `api_owned` picks which path it takes.
-
-        The expansion is against a **live** resolution for an inventory the API
-        owns -- previewing against a target set that has since changed is the
-        wrong answer in the one place an operator came to check.
-        """
+    async def _preview(self, limit: str, *, resolved=None):
+        """Drive the preview against a live resolution."""
         ws = _mock_ws()
         inventory = _mock_inventory(workspace_id=ws.id)
-        version = version or _mock_version(
-            inventory_id=inventory.id,
+        resolved = resolved or _resolved(
             hosts={"host1": {}, "host2": {}, "switch1": {}},
             groups={"web": ["host1", "host2"], "net": ["host2", "switch1"]},
         )
-        source = _mock_source() if api_owned else _mock_source(kind="git")
         app, _ = _make_app(_user())
         with (
             patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
@@ -791,9 +643,7 @@ class TestLimitPreview:
                 f"{_R}.resolve_workspace_capabilities_for",
                 AsyncMock(return_value=caps_for_level("read")),
             ),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[source])),
-            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)),
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)),
+            patch(f"{_R}.inv.resolve", AsyncMock(return_value=resolved)),
         ):
             async with await _client(app) as c:
                 return await c.post(
@@ -801,37 +651,6 @@ class TestLimitPreview:
                     json={"data": {"attributes": {"limit": limit}}},
                     headers=_AUTH,
                 )
-
-    async def test_it_expands_against_a_live_resolution(self):
-        """Pinned separately, because every expansion test below passes whether
-        the host set was resolved or read from a row -- the fixture supplies the
-        same set either way.
-        """
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        version = _mock_version(inventory_id=inventory.id, hosts={"h": {}}, groups={})
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source()])),
-            patch(f"{_R}.inv.resolve_if_stale", AsyncMock(return_value=version)) as live,
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=version)) as cached,
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/actions/preview-limit",
-                    json={"data": {"attributes": {"limit": "all"}}},
-                    headers=_AUTH,
-                )
-
-        assert res.status_code == 200
-        live.assert_awaited_once()
-        cached.assert_not_awaited()
 
     async def test_it_answers_what_a_limit_would_target(self):
         """Visibility is the control here rather than prevention, because
@@ -853,41 +672,15 @@ class TestLimitPreview:
         assert res.status_code == 422
         assert "regular expression" in res.json()["detail"]
 
-    async def test_an_api_owned_inventory_always_has_something_to_limit_against(self):
-        """Including the empty set. Resolving live removes the old "no snapshot
-        yet" refusal, which used to fire at exactly the moment an operator was
-        trying to see what they had just declared.
-        """
-        empty = _mock_version(inventory_id=uuid.uuid4(), hosts={}, groups={})
-        res = await self._preview("all", version=empty)
+    async def test_an_empty_inventory_always_has_something_to_limit_against(self):
+        """Including the empty set, rather than the old "no snapshot yet"
+        refusal that fired at exactly the wrong moment."""
+        res = await self._preview("all", resolved=_resolved(hosts={}, groups={}))
         assert res.status_code == 200, res.text
-        assert res.json()["data"]["attributes"]["hosts"] == []
 
-    async def test_a_kind_the_api_does_not_own_with_no_resolution_is_a_409(self):
-        """The only remaining refusal, and it names the offending kinds so an
-        operator knows a runner has to produce the first one. Inert today.
-        """
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=[_mock_source(kind="git")])),
-            patch(f"{_R}.inv.latest_version", AsyncMock(return_value=None)),
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/actions/preview-limit",
-                    json={"data": {"attributes": {"limit": "web"}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 409
-        assert "git" in res.json()["detail"], res.json()["detail"]
+    async def test_the_preview_carries_no_freshness_field(self):
+        res = await self._preview("all")
+        assert "taken-at" not in res.json()["data"]["attributes"]
 
 
 class TestPayNothing:
@@ -910,129 +703,6 @@ class TestPayNothing:
                 res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventories", headers=_AUTH)
         assert res.status_code == 200
         assert res.json()["data"] == []
-
-
-class TestTheUnresolvableRefusalIsQuotedInTheDocs:
-    """Every lead is the one a call site passes, distinct, and byte-exact after
-    the lead.
-
-    A doc quoting an error message is a claim that goes stale silently: the code
-    changes, the page keeps showing output nothing produces, and an operator
-    searching for the text they were given finds nothing.
-
-    **The pages are checked by `scripts/docs-audit/check_refusal_leads.py`, not
-    here.** `docker/Dockerfile.test` ships one file out of `docs/`, so a test in
-    this tier resolving `../docs/...` finds nothing and either fails outright --
-    which it did -- or quietly stops checking. The docs-audit job sees the whole
-    checkout. What stays here is what this tier can see, and it is the half that
-    matters most: that the pinned tuple is the set of literals the router really
-    passes.
-
-    **This class used to assert that the tails agree with EACH OTHER and never
-    against a literal, and that is not the same thing.** Two tails can agree
-    perfectly while both having moved away from what the pages reproduce --
-    which is exactly what had happened: `docs/api-reference.md` quoted "has to
-    refresh this inventory; the API will not resolve the rest of it" against a
-    code tail reading "has to produce it; the API will not resolve the rest of
-    the inventory". The defect this class exists to catch had already occurred
-    inside the page it names. So the tail is pinned as a literal now, and a
-    mutual-agreement assertion is kept only as the weaker extra check it is.
-    """
-
-    #: The three openings. All three are reproduced in the docs, so all three
-    #: are pinned -- the preview's was added later and was the one left out.
-    LEADS = (
-        "This inventory has never been resolved.",
-        "This inventory was not resolved.",
-        "This inventory has no resolution to limit against.",
-    )
-
-    #: Everything after the lead, character for character.
-    TAIL = (
-        " Sources [] need ansible to parse, and ansible is installed only in the runner. "
-        "A configure or a resolve operation has to produce it; the API will not resolve "
-        "the rest of the inventory, because a partial resolution is a target set that is "
-        "silently too small."
-    )
-
-    def test_every_lead_is_pinned_and_they_differ(self):
-        from terrapod.api.routers import inventory as mod
-
-        details = [mod._unresolvable_error([], lead).detail for lead in self.LEADS]
-
-        for lead, detail in zip(self.LEADS, details, strict=True):
-            assert detail.startswith(lead), detail
-        assert len(set(details)) == len(self.LEADS), "two refusals read identically"
-
-    def test_the_shared_tail_is_pinned_as_a_literal(self):
-        """Not merely "the tails agree" -- see the class docstring."""
-        from terrapod.api.routers import inventory as mod
-
-        for lead in self.LEADS:
-            detail = mod._unresolvable_error([], lead).detail
-            assert detail[len(lead) :] == self.TAIL, detail[len(lead) :]
-
-    def test_the_status_is_409_on_every_lead(self):
-        from terrapod.api.routers import inventory as mod
-
-        for lead in self.LEADS:
-            assert mod._unresolvable_error([], lead).status_code == 409
-
-    def test_the_leads_are_the_ones_the_call_sites_actually_pass(self):
-        """LEADS is DERIVED from the router, not declared beside it.
-
-        This is the hole the rest of the class had: every other test here feeds
-        a lead from the tuple INTO `_unresolvable_error`, so it only ever proves
-        the helper formats whatever it is handed. A call site passing a lead no
-        page quotes was invisible -- proven by mutation: changing one call
-        site's lead and leaving the tuple and the docs alone left all 44 tests
-        green, which is precisely the drift the class exists to catch arriving
-        through the one door it was not watching.
-
-        So the tuple is checked against the literals the module really passes.
-        Add a refusal and this fails until it is pinned and documented.
-        """
-        import ast
-
-        from terrapod.api.routers import inventory as mod
-
-        src = pathlib.Path(mod.__file__).read_text()
-        passed: set[str] = set()
-        for node in ast.walk(ast.parse(src)):
-            if not isinstance(node, ast.Call):
-                continue
-            fn = node.func
-            if not (isinstance(fn, ast.Name) and fn.id == "_unresolvable_error"):
-                continue
-            # The lead is the second positional argument. A non-literal would be
-            # unpinnable by construction, so it is refused rather than skipped.
-            assert len(node.args) >= 2, ast.unparse(node)
-            lead = node.args[1]
-            assert isinstance(lead, ast.Constant) and isinstance(lead.value, str), (
-                f"a refusal lead must be a literal to be pinned: {ast.unparse(node)}"
-            )
-            passed.add(lead.value)
-
-        assert passed, "no call site found -- has the helper been renamed?"
-        assert passed == set(self.LEADS), (
-            f"the router passes leads this class does not pin: {sorted(passed - set(self.LEADS))}; "
-            f"pinned but unused: {sorted(set(self.LEADS) - passed)}"
-        )
-
-    def test_it_names_every_offending_kind_and_only_those(self):
-        from terrapod.api.routers import inventory as mod
-
-        sources = [
-            _mock_source(InventorySource.KIND_PLATFORM, 0),
-            _mock_source("git", 1),
-            _mock_source("ini", 2),
-        ]
-        detail = mod._unresolvable_error(sources, "lead.").detail
-
-        assert "'git'" in detail and "'ini'" in detail
-        assert "platform" not in detail, (
-            "naming the source the API CAN resolve would send an operator after the wrong one"
-        )
 
 
 class TestTheInventoryWireShape:
@@ -1095,27 +765,3 @@ class TestTheInventoryWireShape:
         assert all(e["id"].startswith("invsrc-") for e in entries)
         # Flat: no nested resource envelope inside an attribute value.
         assert "attributes" not in entries[0]
-
-    async def test_api_resolvable_is_reported_per_source_as_well_as_rolled_up(self):
-        """The rolled-up value says a runner is needed; the per-source value says
-        which source needs one. The resolve refusal names the kinds, so a reader
-        with only the rollup would have less than the error message does."""
-        ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=sources)),
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}", headers=_AUTH)
-
-        attrs = res.json()["data"]["attributes"]
-        assert attrs["api-resolvable"] is False, "one source needs ansible"
-        assert [e["api-resolvable"] for e in attrs["sources"]] == [True, False]

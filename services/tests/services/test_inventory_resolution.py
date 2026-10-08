@@ -8,6 +8,8 @@ out loud rather than quietly.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from terrapod.services.inventory_resolution import (
@@ -27,6 +29,20 @@ from terrapod.services.inventory_resolution import (
 
 def _source(label: str, *hosts: HostEntry) -> SourceResolution:
     return SourceResolution(label=label, hosts=hosts)
+
+
+def _service_path() -> str:
+    """`inventory_service.py`, under either layout.
+
+    The test image flattens `services/` into `/app`, so a path relative to this
+    file's grandparent is right locally and resolves outside the image in CI.
+    """
+    here = pathlib.Path(__file__).resolve()
+    for root in (here.parents[2], here.parents[1]):
+        candidate = root / "terrapod" / "services" / "inventory_service.py"
+        if candidate.is_file():
+            return str(candidate)
+    raise AssertionError("inventory_service.py not found under either layout")
 
 
 class TestMergeTakesAnsiblesSemantics:
@@ -256,19 +272,36 @@ class TestNameValidation:
         with pytest.raises(InventoryValidationError, match="group_vars or host_vars"):
             validate_declared_vars({"ports": [80, 443]})
 
-    def test_a_resolved_snapshot_is_NOT_subject_to_this(self):
-        """The rule is about the declared surface only. A snapshot carries what
-        ansible actually produced, so it must keep rich values -- and the
-        snapshot path deliberately does not call this function.
+    def test_the_rule_reaches_the_DECLARED_surface_and_nothing_else(self):
+        """Derived from the source, because the alternative drifts silently.
+
+        A resolution carries whatever its sources produced, and a file-based
+        source carries `group_vars` and `host_vars` natively -- lists, numbers,
+        nested objects. Applying the declared-surface rule there would flatten
+        them to strings and lose the shape a configure needs.
+
+        So this asserts WHERE the function is called from rather than that some
+        particular caller omits it: naming one caller leaves every future one
+        unguarded, and the caller this replaced has since been deleted, which is
+        how an assertion of that shape stops meaning anything.
         """
-        import inspect
+        import re
 
-        from terrapod.api.routers import inventory as router
+        service = pathlib.Path(_service_path()).read_text()
+        # Walk the file keeping the most recent function name, and record the
+        # ones from which the validator is actually reached.
+        current, reached = None, []
+        for line in service.splitlines():
+            m = re.match(r"^(?:async )?def (\w+)\(", line)
+            if m:
+                current = m.group(1)
+            elif "validate_declared_vars(" in line and current:
+                reached.append(current)
 
-        src = inspect.getsource(router.record_inventory_version)
-        assert "validate_declared_vars" not in src, (
-            "a snapshot holds ansible's own resolution; flattening it to strings would "
-            "lose the shape a configure needs"
+        assert reached == ["validate_item_fields"], (
+            f"validate_declared_vars is reached from {reached}; it must apply to the "
+            f"declared-item surface only. A resolution holds what its sources produced, "
+            f"and flattening that to strings would lose the shape a configure needs."
         )
 
     def test_refuses_host_vars_that_are_not_a_mapping(self):

@@ -2867,14 +2867,7 @@
         "subheading": "{name} 的合并结果，按顺序取自每个来源。",
         "hosts": "主机",
         "groups": "主机组",
-        "takenAt": "此解析结果的时间：{when}",
-        "never": "从不",
-        "producedBy": {
-          "api": "由 API 解析",
-          "runner": "由运行器解析"
-        },
-        "producedByOther": "由 {by} 解析",
-        "liveNote": "这是实时的。此处的每个来源都在你的配置中声明，因此解析只是一次数据库查询。上面的时间是该结果产生的时刻，而不是它有多陈旧。"
+        "liveNote": "这是实时的。此处的每个来源都在你的配置中声明，因此解析只是一次数据库查询。"
       },
       "limit": {
         "heading": "--limit 会选中哪些主机？",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "来源",
         "body": "按顺序解析，与重复指定 -i 标志完全一样：主机变量冲突时，后面的来源优先。",
-        "position": "位置 {position}",
-        "apiResolvable": "API 可解析",
-        "runnerOnly": "需要运行器",
-        "needsRunner": "这些来源需要 ansible，而只有运行器才有，因此上面的结果是运行器最后提交的解析结果，而不是实时解析：{kinds}。"
+        "position": "位置 {position}"
       },
       "errors": {
         "loadItems": "加载已声明的主机失败",

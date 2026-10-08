@@ -2867,14 +2867,7 @@
         "subheading": "Det sammenflettede resultat for {name}, fra hver kilde i rækkefølge.",
         "hosts": "Værter",
         "groups": "Grupper",
-        "takenAt": "Denne opløsning er fra {when}",
-        "never": "aldrig",
-        "producedBy": {
-          "api": "opløst af API''et",
-          "runner": "opløst af en runner"
-        },
-        "producedByOther": "opløst af {by}",
-        "liveNote": "Dette er live. Hver kilde her er erklæret i din konfiguration, så det at opløse den er en databaseforespørgsel. Datoen ovenfor siger, hvornår dette resultat blev til, ikke hvor gammelt det er."
+        "liveNote": "Dette er live. Hver kilde her er erklæret i din konfiguration, så det at opløse den er en databaseforespørgsel."
       },
       "limit": {
         "heading": "Hvad ville et limit-mønster ramme?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Kilder",
         "body": "Opløses i rækkefølge, præcis som gentagne -i-flag: ved en modstridende værtsvariabel vinder den senere kilde.",
-        "position": "Position {position}",
-        "apiResolvable": "API''et kan opløse",
-        "runnerOnly": "Kræver en runner",
-        "needsRunner": "Disse kilder kræver ansible, som kun en runner har, så resultatet ovenfor er den seneste opløsning, en runner har sendt, og ikke en live-opløsning: {kinds}."
+        "position": "Position {position}"
       },
       "errors": {
         "loadItems": "Kunne ikke indlæse erklærede værter",

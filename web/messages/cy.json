@@ -2867,14 +2867,7 @@
         "subheading": "Y canlyniad cyfunol ar gyfer {name}, o bob ffynhonnell yn eu trefn.",
         "hosts": "Gwesteiwyr",
         "groups": "Grwpiau",
-        "takenAt": "Mae''r datrysiad hwn yn dyddio o {when}",
-        "never": "byth",
-        "producedBy": {
-          "api": "wedi''i ddatrys gan yr API",
-          "runner": "wedi''i ddatrys gan redwr"
-        },
-        "producedByOther": "wedi''i ddatrys gan {by}",
-        "liveNote": "Mae hyn yn fyw. Mae pob ffynhonnell yma wedi''i datgan yn eich cyfluniad, felly ymholiad yw ei datrys. Mae''r dyddiad uchod yn dweud pryd y daeth y canlyniad hwn i fod, nid pa mor hen ydyw."
+        "liveNote": "Mae hyn yn fyw. Mae pob ffynhonnell yma wedi''i datgan yn eich cyfluniad, felly ymholiad yw ei datrys."
       },
       "limit": {
         "heading": "Beth fyddai --limit yn ei dargedu?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Ffynonellau",
         "body": "Yn cael eu datrys yn eu trefn, yn union fel baneri -i a ailadroddir: mae ffynhonnell ddiweddarach yn trechu newidyn gwesteiwr sy''n gwrthdaro.",
-        "position": "Safle {position}",
-        "apiResolvable": "Gall yr API ddatrys",
-        "runnerOnly": "Angen rhedwr",
-        "needsRunner": "Mae angen ansible ar y ffynonellau hyn, a dim ond rhedwr sydd â hwnnw, felly y canlyniad uchod yw''r datrysiad diwethaf a bostiwyd gan redwr, nid datrysiad byw: {kinds}."
+        "position": "Safle {position}"
       },
       "errors": {
         "loadItems": "Methwyd llwytho''r gwesteiwyr a ddatganwyd",

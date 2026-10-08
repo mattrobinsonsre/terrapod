@@ -968,10 +968,6 @@ jobs:
       # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
       - name: Every token mint names its identity provider
         run: python3 scripts/docs-audit/check_token_mints.py
-      # Same reason: the refusal leads are quoted in two pages the test image
-      # does not ship, so the gate has to run where the whole checkout is.
-      - name: Documented refusal leads match the code
-        run: python3 scripts/docs-audit/check_refusal_leads.py
       # Advisory: prints for human review, never fails. Telling a factual
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list

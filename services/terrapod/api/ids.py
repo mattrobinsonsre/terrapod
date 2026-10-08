@@ -55,7 +55,6 @@ ID_PREFIXES: dict[str, str] = {
     "inventories": "inv-",
     "inventory-items": "invitem-",
     "inventory-sources": "invsrc-",
-    "inventory-versions": "invver-",
     "listeners": "listener-",
     "notification-configurations": "nc-",
     "plans": "plan-",

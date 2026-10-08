@@ -9,7 +9,7 @@ that produced the infrastructure, and nothing has to infer it afterwards.
 > ## Status: the inventory exists; configure operations do not
 >
 > **This release delivers the inventory object, the declared hosts, the merge,
-> the snapshot, and the surfaces that make all of it observable. It does not run
+> what they resolve to, and the surfaces that make all of it observable. It does not run
 > playbooks.** There is no configure operation, no playbook reference, and no
 > way to execute ansible from Terrapod today.
 >
@@ -332,18 +332,19 @@ the key. A variable that genuinely has to be a list, a number or a nested
 object belongs in the playbook repository's `group_vars` or `host_vars`, which
 is where an ansible operator keeps such a thing anyway.
 
-**A resolved snapshot is not subject to this.** It carries whatever ansible
+**A resolution is not subject to this.** It carries whatever ansible
 actually produced, rich values included — flattening it would lose the shape a
 configure needs. The rule is only about what Terraform declares.
 
 ---
 
-## A read is live, and what a snapshot is still for
+## A read is live, and writes nothing
 
 **Every source Terrapod implements is static** — declared rows the workspace's
 own Terraform owns — so resolving one is a database query with nothing to fetch,
-parse or time out. A read of the resolved view is therefore **live**. There is no
-cached-versus-fresh distinction to surface, and no staleness for a reader to
+parse or time out. A read of the resolved view is therefore **live**: Terrapod
+resolves the rows to answer the request. There is no cached-versus-fresh
+distinction, no timestamp beside the result, and no staleness for a reader to
 reason about.
 
 That follows from a decision rather than from an optimisation. **Dynamic
@@ -357,61 +358,41 @@ except versioned in git, reviewed in a pull request and visible in a plan. A
 dynamic source is also arbitrary code execution, which ansible performs whether
 it is invoked through the CLI or through its Python API.
 
-### Live does not mean a write per read
+**So there is nothing to refresh, and no endpoint that refreshes it.** An
+earlier shape stored each resolution and compared an equality token to decide
+whether to serve the stored copy; with every source static there is no second
+answer such a token could distinguish, so the whole mechanism is gone rather
+than kept as a no-op.
 
-Each resolution is still recorded as a **snapshot** — an `inventory-versions`
-resource holding the merged hosts, the groups, the counts, what produced it
-(`api` or `runner`), and **`taken-at`**. The history is **bounded**: the newest
-twenty per inventory are kept and older ones are pruned as each new one is
-written. That bound is exactly why a read must not write one every time — a
-dashboard left open on the resolved view would evict the snapshot something else
-is pinned to.
+### The target set a configure runs against is a separate thing
 
-So a read compares an internal **source stamp** — an equality token for "what
-every source currently says" — against the newest recorded snapshot's. If they
-match, nothing has moved, and that snapshot *is* the live answer: it is returned
-unchanged and nothing is written. Only a moved stamp resolves and records a new
-one. The token is deliberately opaque, is not on the wire and is not an
-attribute of anything — no client sees it, and nothing parses it, orders it or
-reads a time out of it.
+A *reader* needs a current answer, which is what the above gives. A *configure*
+needs something different: a record of exactly which hosts it targeted, fixed
+for the life of the run, so a partial failure can be recovered from.
 
-**So `taken-at` says when the resolution came to be, not how stale it is.** A
-`taken-at` of last Tuesday, on an inventory whose hosts nothing has touched
-since, is both correct and current.
-
-### Why a snapshot exists at all
-
-It is forced by measurement rather than chosen. Under `serial:`, ansible's
+That is forced by measurement rather than chosen. Under `serial:`, ansible's
 `v2_playbook_on_play_start` fires once per batch, and in a `serial` +
 `any_errors_fatal` abort the untouched hosts appear in **no callback event and
 in no PLAY RECAP at all**. So "hosts targeted minus hosts completed" cannot be
 computed from parsed results — a retry built that way fixes the failure, reports
-success, and silently leaves the rest unconfigured. A snapshot taken up front is
-the only thing that knows the full target set, so one artifact is both the
-targeting basis and the partial-recovery basis.
+success, and silently leaves the rest unconfigured.
 
-### `POST .../actions/resolve` records one on demand
-
-```
-POST /api/v1/inventories/{id}/actions/resolve
-```
-
-Records a new snapshot **unconditionally** — whether or not the source stamp has
-moved. It requires `inventory:write` because it is genuinely a write: it adds a
-row to that bounded history and prunes the oldest to stay inside the twenty.
-
-It is **not** how a reader gets a current answer, because a read is already
-live. It is how a point in the history gets pinned.
+So that record belongs to the **run**, written when the run is created, rather
+than to the inventory. Configure operations do not exist yet
+([#1971](https://github.com/mattrobinsonsre/terrapod/issues/1971),
+[#1972](https://github.com/mattrobinsonsre/terrapod/issues/1972)), and the
+recovery that subtracts against it is
+[#1973](https://github.com/mattrobinsonsre/terrapod/issues/1973).
 
 ### The exhaustive host map, and the trap it removes
 
-Terrapod's snapshot holds **every** host explicitly, including a host with no
+The resolved view holds **every** host explicitly, including a host with no
 variables at all. `ansible-inventory --list` does not: its `_meta.hostvars`
 **omits a var-less host entirely** — measured, a host appearing only in a group
 was absent from `_meta.hostvars`. Code that enumerates the host set from that
 shape loses hosts silently, which is the shape of bug that empties a target set.
 
-Ansible's own shape is still available: a read of one snapshot carries an
+Ansible's own shape is still available: the resolved read carries an
 `ansible-inventory` attribute rendered on demand from the normalised one, with
 `_meta.hostvars`, an `all` group whose `children` name every other group, and
 `ungrouped` for the hosts no declared group claims — and with every host present
@@ -432,99 +413,47 @@ and `*`, comma- or colon-separated terms, globs, `!` exclusion and `&`
 intersection. An inclusion term unions, except that the first term starts from
 nothing rather than from the whole inventory.
 
-**It expands against a live resolution**, by the same route as the resolved view
-and for a sharper reason: previewing against a target set that has since changed
-is the wrong answer in the one place an operator came to check. For an inventory
-the API owns there is always something to limit against, including the empty set
-of a workspace that has declared no host.
+**It expands against a live resolution**, by the same route as the resolved
+view: previewing against a target set that has since changed is the wrong answer
+in the one place an operator came to check. There is always something to limit
+against, including the empty set of a workspace that has declared no host.
 
 And two caveats, both of which matter more than they sound:
 
 **It is advisory.** The authoritative expansion is always
 `ansible-inventory --list --limit`, taken in the runner at the start of a
-configure, and that is what a snapshot records. This is a preview so the
-question can be asked before a Job exists.
+configure. This is a preview so the question can be asked before a Job exists.
 
 **A `~regex` term is refused, with `422`.** Ansible will apply the regular
 expression at run time; quietly matching nothing here would show an empty target
 set for a pattern ansible would have expanded — the wrong answer dressed as an
 answer. Declining is the honest result.
 
-The response carries `taken-at` and `of-host-count` from the resolution it
-expanded against, so an operator can see which host set produced the answer.
+The response carries `of-host-count` from the resolution it expanded against,
+so an operator can see how much of the inventory the pattern selects.
 
 ---
 
-## Which sources the API can resolve, and what happens when it cannot
+## Every source the API resolves itself
 
 The `platform` source needs no ansible: the declared items are already rows
 Terrapod owns, so resolving that source is a query with nothing to fetch, parse
-or time out. **Every other source kind needs ansible to parse, and ansible is
-installed only in the runner** — deliberately, because every fetch has to go
-through the [pull-through cache](package-cache.md) or an air-gapped deployment
-cannot work, and reaching that cache would mean the API authenticating to its own
-HTTP surface with a credential it had minted for itself.
+or time out. It is also the only source kind there is — **dynamic inventory was
+declined** ([#1970](https://github.com/mattrobinsonsre/terrapod/issues/1970)),
+so nothing here needs a runner to parse and no read can be served from anywhere
+but the rows themselves.
 
-So when an inventory contains a source the API does not own, **the API refuses
-rather than resolving the part it can**, naming the offending source kinds:
+That is what makes the whole surface simple to reason about: there is no
+resolvable-versus-not distinction on a source, no refusal for an inventory the
+API cannot handle, and no second place a resolution could come from.
 
-```
-409  This inventory was not resolved. Sources ['git'] need ansible to parse,
-     and ansible is installed only in the runner. A configure or a resolve
-     operation has to produce it; the API will not resolve the rest of the
-     inventory, because a partial resolution is a target set that is silently
-     too small.
-```
-
-That last clause is the whole reason. A partial resolution looks like an answer
-and is a host set missing everything the unresolvable source would have
-contributed — and nothing in the result says so. Refusing is louder and safer.
-
-It is **one message with three openings**, because an operator meeting any of
-them is asking the same two questions: which source, and what do I do about it.
-Everything after the opening clause is identical.
-
-| Where | Opening clause |
-|---|---|
-| `POST .../actions/resolve` | `This inventory was not resolved.` |
-| `GET .../resolved` | `This inventory has never been resolved.` |
-| `POST .../actions/preview-limit` | `This inventory has no resolution to limit against.` |
-
-For such an inventory, the read and the preview serve **the newest resolution a
-runner posted**, and refuse only when there is none. A runner posts one to
-`POST /api/v1/inventories/{id}/versions`, which is **runner-token only**: a
-snapshot records what a resolve actually found, so it is written by the thing
-that ran it, and a person posting one by hand is answered `403` with a pointer
-to the resolve action instead.
-
-Each source reports its own `api-resolvable`, not just the inventory's rolled-up
-one, so a reader can see **which** source is why a read is served from a posted
-snapshot rather than having to infer it.
-
-### For an inventory the API owns, a posted snapshot is history
-
-This is the one behaviour worth stating plainly rather than leaving to be
-discovered. The `platform` source is one the API resolves from the declared
-rows, so for an inventory holding only that source **the live answer is
-authoritative and a posted snapshot is not what a reader sees** — however
-recently it arrived. It is kept, it appears in the history, and something can be
-pinned to it; it simply does not win a read.
-
-A runner's resolution wins only where the API cannot resolve at all.
-
-### No such source kind exists yet
-
-No kind other than `platform` exists, so no inventory can be in that state
-today. The refusal is in place now so the runner path is forced when the first
-one lands rather than remembered, and the first will be
-[#1929](https://github.com/mattrobinsonsre/terrapod/issues/1929),
-git-supplied inventory files and directories.
-
-That is also where a **stored** source stamp and a short expiry belong. Terrapod
-stores no stamp today and puts no expiry on a resolution at all, because a
-`terraform` stamp is *derived* from the rows it summarises and a derived stamp
-cannot be stale. A stamp you can only learn by fetching — git's resolved commit
-— is the one case an expiry buys anything.
+Git-supplied inventory files and directories are
+[#1929](https://github.com/mattrobinsonsre/terrapod/issues/1929), and are static
+too — a file in a repository at a resolved commit, not a script that runs. What
+that issue adds is a **stored** source stamp and a short expiry, because a
+`platform` stamp is *derived* from the rows it summarises and a derived stamp
+cannot be stale, whereas a stamp you can only learn by fetching — git's resolved
+commit — is the one case an expiry buys anything.
 
 ---
 
@@ -534,8 +463,8 @@ Two capabilities in the workspace axis:
 
 | Capability | Tier | Grants |
 |---|---|---|
-| `inventory:read` | **read** | List and show declared hosts, inventories, snapshots, the resolved view, and the limit preview |
-| `inventory:write` | **write** | Declare, change and remove hosts; create and delete inventories; record a snapshot |
+| `inventory:read` | **read** | List and show declared hosts, inventories, the resolved view, and the limit preview |
+| `inventory:write` | **write** | Declare, change and remove hosts; create and delete inventories |
 
 Both are granted by the existing presets, so no role became more or less
 powerful when they were introduced.
@@ -565,7 +494,7 @@ target set of every configure definition that reads it.**
 Deleting an *inventory* does not delete the hosts. An item belongs to the
 workspace, not to any one inventory, and is owned by the Terraform that declares
 it — an inventory is a view over them, so removing the view cannot remove the
-hosts. Deleting an inventory does delete its sources and its snapshots.
+hosts. Deleting an inventory does delete its sources.
 
 ---
 
@@ -574,7 +503,6 @@ hosts. Deleting an inventory does delete its sources and its snapshots.
 | Limit | Value | On breach |
 |---|---|---|
 | Declared hosts per workspace | 5000 | `422` |
-| Snapshots kept per inventory | 20 (oldest pruned) | — |
 | Duplicate host name in a workspace | not allowed | `409` |
 | Duplicate inventory name in a workspace | not allowed | `409` |
 
@@ -601,15 +529,12 @@ alias and serves all of these too. None of this is on the TFE-compatible prefix
 | `GET /api/v1/workspaces/{id}/inventories` | `inventory:read` | This workspace's inventories. Empty for a workspace that has never declared a host |
 | `POST /api/v1/workspaces/{id}/inventories` | `inventory:write` | Create a named inventory, with its `platform` source at position 0. `201` |
 | `GET /api/v1/inventories/{id}` | `inventory:read` | One inventory, with its ordered sources |
-| `DELETE /api/v1/inventories/{id}` | `inventory:write` | Delete an inventory, its sources and its snapshots. Declared items are untouched. `204` |
-| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to. **Live** when every source is one the API owns, recording a snapshot only when the source stamp has moved. Otherwise the newest resolution a runner posted, or `409` naming the offending source kinds when there is none |
-| `POST /api/v1/inventories/{id}/actions/resolve` | `inventory:write` | Record a snapshot now, whether or not anything has moved. `409` naming the offending source kinds when a source needs ansible |
-| `GET /api/v1/inventories/{id}/versions` | `inventory:read` | Snapshot history, newest first. Contents omitted — the resolved view carries the current resolution's |
-| `POST /api/v1/inventories/{id}/versions` | **Runner token only** | A runner posts the resolution it performed. `403` for a person, pointing at the resolve action. `201` |
+| `DELETE /api/v1/inventories/{id}` | `inventory:write` | Delete an inventory and its sources. Declared items are untouched. `204` |
+| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to. **Live** — Terrapod resolves the rows to answer the request and writes nothing |
 | `POST /api/v1/inventories/{id}/actions/preview-limit` | `inventory:read` | Which hosts a `--limit` pattern would select, against a live resolution. `422` on a `~regex` term; `409` only when no source is one the API owns and no runner has posted a resolution |
 
 Typed id prefixes: `invitem-` for a declared host, `inv-` for an inventory,
-`invsrc-` for a source, `invver-` for a snapshot.
+`invsrc-` for a source.
 
 ---
 

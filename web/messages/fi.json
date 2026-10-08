@@ -2867,14 +2867,7 @@
         "subheading": "Yhdistetty tulos kohteelle {name}, kaikista lähteistä järjestyksessä.",
         "hosts": "Isännät",
         "groups": "Ryhmät",
-        "takenAt": "Tämä ratkaisu on ajankohdalta {when}",
-        "never": "ei koskaan",
-        "producedBy": {
-          "api": "API:n ratkaisema",
-          "runner": "runnerin ratkaisema"
-        },
-        "producedByOther": "ratkaisija: {by}",
-        "liveNote": "Tämä on reaaliaikainen. Jokainen lähde täällä on määritelty konfiguraatiossasi, joten ratkaiseminen on tietokantakysely. Yllä oleva ajankohta kertoo, milloin tämä tulos syntyi, ei sitä kuinka vanha se on."
+        "liveNote": "Tämä on reaaliaikainen. Jokainen lähde täällä on määritelty konfiguraatiossasi, joten ratkaiseminen on tietokantakysely."
       },
       "limit": {
         "heading": "Mihin --limit kohdistuisi?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Lähteet",
         "body": "Ratkaistaan järjestyksessä, täsmälleen kuten toistetut -i-liput: ristiriitaisessa isäntämuuttujassa voittaa myöhempi lähde.",
-        "position": "Sijainti {position}",
-        "apiResolvable": "API voi ratkaista",
-        "runnerOnly": "Vaatii runnerin",
-        "needsRunner": "Nämä lähteet tarvitsevat ansiblea, joka on vain runnerilla, joten yllä oleva tulos on viimeisin runnerin lähettämä ratkaisu eikä reaaliaikainen ratkaisu: {kinds}."
+        "position": "Sijainti {position}"
       },
       "errors": {
         "loadItems": "Määriteltyjen isäntien lataaminen epäonnistui",

@@ -353,7 +353,6 @@
     "role"
   ],
   "inventory._inventory_json": [
-    "api-resolvable",
     "created-at",
     "description",
     "name",
@@ -368,22 +367,18 @@
     "updated-at",
     "vars"
   ],
-  "inventory._version_json": [
+  "inventory._resolved_json": [
     "ansible-inventory",
     "group-count",
     "groups",
     "host-count",
-    "hosts",
-    "produced-by",
-    "produced-by-ref",
-    "taken-at"
+    "hosts"
   ],
   "inventory.preview_limit": [
     "host-count",
     "hosts",
     "limit",
-    "of-host-count",
-    "taken-at"
+    "of-host-count"
   ],
   "module_autodiscovery_rules._preview_json": [
     "entries",

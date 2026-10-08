@@ -2867,14 +2867,7 @@
         "subheading": "Th'' mingled tally fer {name}, from every wellspring in turn.",
         "hosts": "Hands",
         "groups": "Crews",
-        "takenAt": "This muster hails from {when}",
-        "never": "ne''er",
-        "producedBy": {
-          "api": "mustered by th'' API",
-          "runner": "mustered by a runner"
-        },
-        "producedByOther": "mustered by {by}",
-        "liveNote": "This be livin''. Every wellspring here be signed into yer own configuration, so musterin'' it be naught but a glance at th'' ledger — th'' date above tells when this tally came t'' be, not how long it''s been sittin''."
+        "liveNote": "This be livin''. Every wellspring here be signed into yer own configuration, so musterin'' it be naught but a glance at th'' ledger."
       },
       "limit": {
         "heading": "What would a limit lay hold of?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Wellsprings",
         "body": "Mustered in turn, just as repeated -i flags be: a later wellspring wins a quarrelin'' hand’s riggin''.",
-        "position": "Berth {position}",
-        "apiResolvable": "API can muster",
-        "runnerOnly": "Be needin'' a runner",
-        "needsRunner": "These wellsprings be needin'' ansible, an'' only a runner carries it — so th'' tally above be th'' last muster a runner sent in, not a livin'' one: {kinds}."
+        "position": "Berth {position}"
       },
       "errors": {
         "loadItems": "Failed t'' load th'' signed-on hands",

@@ -2867,14 +2867,7 @@
         "subheading": "7h3 m3rg3d r35ul7 f0r {name}, fr0m 3v3ry 50urc3 1n 0rd3r.",
         "hosts": "H0575",
         "groups": "Gr0up5",
-        "takenAt": "7h15 r350lu710n d4735 fr0m {when}",
-        "never": "n3v3r",
-        "producedBy": {
-          "api": "r350lv3d by 7h3 4P1",
-          "runner": "r350lv3d by 4 runn3r"
-        },
-        "producedByOther": "r350lv3d by {by}",
-        "liveNote": "7h15 15 l1v3. 3v3ry 50urc3 h3r3 15 d3cl4r3d 1n y0ur c0nf1gur4710n, 50 r350lv1ng 17 15 4 l00kup — 7h3 d473 4b0v3 15 wh3n 7h15 r35ul7 c4m3 70 b3, n07 h0w 574l3 17 15."
+        "liveNote": "7h15 15 l1v3. 3v3ry 50urc3 h3r3 15 d3cl4r3d 1n y0ur c0nf1gur4710n, 50 r350lv1ng 17 15 4 l00kup."
       },
       "limit": {
         "heading": "Wh47 w0uld 4 l1m17 74rg37?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "50urc35",
         "body": "R350lv3d 1n 0rd3r, 3x4c7ly 45 r3p3473d -1 fl4g5 4r3: 4 l473r 50urc3 w1n5 4 c0nfl1c71ng h057 v4r14bl3.",
-        "position": "P051710n {position}",
-        "apiResolvable": "4P1 c4n r350lv3",
-        "runnerOnly": "N33d5 4 runn3r",
-        "needsRunner": "7h353 50urc35 n33d 4n51bl3, wh1ch 0nly 4 runn3r h45, 50 7h3 r35ul7 4b0v3 15 7h3 l457 0n3 4 runn3r p0573d r47h3r 7h4n 4 l1v3 r350lu710n: {kinds}."
+        "position": "P051710n {position}"
       },
       "errors": {
         "loadItems": "F41l3d 70 l04d d3cl4r3d h0575",

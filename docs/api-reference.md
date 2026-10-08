@@ -5481,7 +5481,7 @@ Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read
 
 > **Host variables are stored and returned in the clear**, in full, to any holder of `inventory:read`. There is no `sensitive` flag and no masking. Do not put a credential in one.
 
-Typed id prefixes: `invitem-` (declared host), `inv-` (inventory), `invsrc-` (source), `invver-` (snapshot).
+Typed id prefixes: `invitem-` (declared host), `inv-` (inventory), `invsrc-` (source).
 
 ### List Workspace Inventory Items
 
@@ -5555,7 +5555,7 @@ DELETE /api/v1/inventories/{id}
 
 `GET` requires `inventory:read`; `DELETE` requires `inventory:write` and returns `204`.
 
-**Deleting an inventory deletes its sources and its snapshots, and leaves the declared items alone.** An item belongs to the workspace, not to any one inventory, so removing the view cannot remove the hosts.
+**Deleting an inventory deletes its sources and leaves the declared items alone.** An item belongs to the workspace, not to any one inventory, so removing the view cannot remove the hosts.
 
 **Response:**
 ```json
@@ -5587,7 +5587,7 @@ DELETE /api/v1/inventories/{id}
 | Attribute | Description |
 |---|---|
 | `api-resolvable` | Whether **every** source is one the API owns. `true` means a read of the resolved view is **live**. `false` means a resolution can only be produced in a runner, so a read serves the newest one a runner posted. |
-| `sources` | The composition, in `-i` order — a lower `position` resolves first, so a **higher** position wins a conflicting host variable. Each source reports its **own** `api-resolvable`, so a reader can see *which* source is why a read is served from a posted resolution rather than having to infer it. A source is deliberately not a nested JSON:API resource: it has no route of its own. |
+| `sources` | The composition, in `-i` order — a lower `position` resolves first, so a **higher** position wins a conflicting host variable. A source is deliberately not a nested JSON:API resource: it has no route of its own. |
 
 ### Show Resolved Inventory
 
@@ -5595,36 +5595,21 @@ DELETE /api/v1/inventories/{id}
 GET /api/v1/inventories/{id}/resolved
 ```
 
-Requires `inventory:read`. **This is live** when every source is one the API owns, which today is every inventory: the only implemented kind is `terraform`, resolving it is a database query, and a reader is never shown a target set that has drifted from the declared rows.
+Requires `inventory:read`. **This is live, and it writes nothing.** Every source kind is static — dynamic inventory was declined ([#1970](https://github.com/mattrobinsonsre/terrapod/issues/1970)) — so resolving one is a database query, Terrapod resolves the rows to answer the request, and a reader is never shown a target set that has drifted from the declared rows.
 
-Live does not mean a write per read. The response is a recorded snapshot, but a new one is written only when an internal **source stamp** — an opaque equality token for what the sources currently say — has moved. An unchanged inventory is served the snapshot it already has, which *is* the live answer, and nothing is written; the history is bounded to twenty per inventory, so a dashboard left open must not be able to evict a snapshot something is pinned to. The stamp is not an attribute and no client sees it.
+There is deliberately **no timestamp and no freshness field**. There is no other resolution this could be, so a date beside the result would only invite a reader to ask whether it is current — a question the read has already answered.
 
-So **`taken-at` says when the resolution came to be, not how stale it is.**
-
-When a source is one the API does *not* own it serves the newest resolution a **runner** posted, because ansible is installed only in the runner. For an inventory the API owns, a posted resolution is history rather than what a reader sees: the live answer is authoritative, so a posted row describing the same source is stale however recently it arrived.
-
-`409` only when a source needs ansible **and** no runner has ever posted a resolution. The refusal **names the offending source kinds** — the same message the resolve action and the limit preview give, differing only in its opening clause, because an operator meeting any of them asks the same question:
-
-```
-409  This inventory has never been resolved. Sources ['git'] need ansible to
-     parse, and ansible is installed only in the runner. A configure or a
-     resolve operation has to produce it; the API will not resolve the rest of
-     the inventory, because a partial resolution is a target set that is
-     silently too small.
-```
+The target set a *configure* runs against is a separate artifact, owned by the run and written when the run is created, because a partial-failure recovery has to subtract against a set that is fixed for the life of the run ([#1973](https://github.com/mattrobinsonsre/terrapod/issues/1973)).
 
 **Response:**
 ```json
 {
   "data": {
-    "id": "invver-0193...",
-    "type": "inventory-versions",
+    "id": "inv-0193...",
+    "type": "resolved-inventories",
     "attributes": {
       "host-count": 2,
       "group-count": 1,
-      "produced-by": "api",
-      "produced-by-ref": "",
-      "taken-at": "2026-10-07T09:05:00Z",
       "hosts": {
         "web-01": { "ansible_host": "10.0.1.20", "ansible_user": "ec2-user" },
         "jump": {}
@@ -5649,68 +5634,6 @@ When a source is one the API does *not* own it serves the newest resolution a **
 | `hosts` | Host name → merged variables. **Exhaustive — this is the host set**, including a host with no variables at all. |
 | `groups` | Declared group name → sorted member host names. `all` and `ungrouped` are not here; they are derived. |
 | `ansible-inventory` | The same resolution in the shape `ansible-inventory --list` produces, rendered on demand rather than stored twice. Unlike ansible's own output it includes **every** host in `_meta.hostvars` — ansible omits a var-less host entirely, and enumerating a host set from that shape loses hosts silently. |
-| `produced-by` | `api` (the API resolved sources it owns) or `runner`. |
-| `produced-by-ref` | Opaque reference to whatever produced it when a runner did — today a run id. Deliberately not a foreign key. |
-| `taken-at` | When this resolution came to be — **not** how stale it is. For an inventory the API owns, a read and a limit preview are live and this is the moment the answer they are serving first held, which may be some time ago if nothing has changed since. |
-
-### Resolve Inventory
-
-```
-POST /api/v1/inventories/{id}/actions/resolve
-```
-
-Requires `inventory:write`. Resolves every source in `-i` order and records a new snapshot **unconditionally** — whether or not the source stamp has moved — returning it with contents (same shape as the resolved view above).
-
-It is a write because it is one: it adds a row to a history bounded at twenty per inventory and prunes the oldest. It is **not** how a reader gets a current answer, because a read of an inventory the API owns is already live; it is how a point in the history gets pinned.
-
-`409` when any source needs ansible, **naming the offending source kinds**:
-
-```json
-{
-  "errors": [{
-    "status": "409",
-    "detail": "This inventory was not resolved. Sources ['git'] need ansible to parse, and ansible is installed only in the runner. A configure or a resolve operation has to produce it; the API will not resolve the rest of the inventory, because a partial resolution is a target set that is silently too small."
-  }]
-}
-```
-
-It refuses rather than resolving the part it can: a partial resolution looks like an answer and is a host set missing everything the unresolvable source would have contributed.
-
-### List Inventory Versions
-
-```
-GET /api/v1/inventories/{id}/versions
-```
-
-Requires `inventory:read`. Snapshot history, newest first, supporting the standard paging. **Contents are omitted** — `hosts`, `groups` and `ansible-inventory` are absent. The resolved view carries the *current* resolution's contents; an older snapshot's are not individually readable, since there is no show-one-version route. History is bounded to the newest 20 snapshots per inventory, pruned as each new one is written.
-
-### Record Inventory Version (runner protocol)
-
-```
-POST /api/v1/inventories/{id}/versions
-```
-
-**Runner token only.** A runner posts the resolution it actually performed — the write path for everything the API cannot resolve itself. A person is answered `403` pointing at `POST /inventories/{id}/actions/resolve` instead, because a snapshot records what a resolve found, so it is written by the thing that ran it. Returns `201` without contents.
-
-**Request body:**
-```json
-{
-  "data": {
-    "type": "inventory-versions",
-    "attributes": {
-      "hosts": { "web-01": { "ansible_host": "10.0.1.20" }, "jump": {} },
-      "groups": { "web": ["web-01"] }
-    }
-  }
-}
-```
-
-| Attribute | Description |
-|---|---|
-| `hosts` | Host name → variables object. Every entry's value must be an object or → `422`. Include **every** host, var-less ones included. |
-| `groups` | Group name → list of member host names. A non-list member list → `422`. |
-
-`produced-by` is recorded as `runner` and `produced-by-ref` as the posting token's run id.
 
 ### Preview a `--limit`
 
@@ -5731,30 +5654,21 @@ An empty or whitespace-only `limit` selects every host. It expands host names, g
 ```json
 {
   "data": {
-    "id": "invver-0193...",
+    "id": "inv-0193...",
     "type": "inventory-limit-previews",
     "attributes": {
       "limit": "web:&linux:!web-02",
       "hosts": ["web-01"],
       "host-count": 1,
-      "of-host-count": 12,
-      "taken-at": "2026-10-07T09:05:00Z"
+      "of-host-count": 12
     }
   }
 }
 ```
 
-One honesty caveat: the result is **advisory**. The authoritative expansion is always `ansible-inventory --list --limit`, taken in the runner at the start of a configure. `taken-at` and `of-host-count` describe the resolution the pattern was expanded against, so an operator can see which host set produced the answer.
+One honesty caveat: the result is **advisory**. The authoritative expansion is always `ansible-inventory --list --limit`, taken in the runner at the start of a configure. `of-host-count` is the size of the resolution the pattern was expanded against, so an operator can see how much of the inventory it selects.
 
-`422` on a `~regex` term, rather than quietly matching nothing: ansible applies the expression at run time, and showing an empty target set for a pattern it would have expanded is the wrong answer dressed as an answer. `422` when `limit` is not a string. `409` only when a source needs ansible **and** no runner has posted a resolution — for an inventory the API owns there is always something to limit against, including the empty set of a workspace that has declared no host. That refusal is the shared unresolvable-source message under its own opening clause:
-
-```
-409  This inventory has no resolution to limit against. Sources ['git'] need
-     ansible to parse, and ansible is installed only in the runner. A configure
-     or a resolve operation has to produce it; the API will not resolve the rest
-     of the inventory, because a partial resolution is a target set that is
-     silently too small.
-```
+`422` on a `~regex` term, rather than quietly matching nothing: ansible applies the expression at run time, and showing an empty target set for a pattern it would have expanded is the wrong answer dressed as an answer. `422` when `limit` is not a string. There is always something to limit against, including the empty set of a workspace that has declared no host.
 
 ## High Availability
 

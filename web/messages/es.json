@@ -2867,14 +2867,7 @@
         "subheading": "El resultado combinado de {name}, a partir de todos los orígenes en orden.",
         "hosts": "Hosts",
         "groups": "Grupos",
-        "takenAt": "Esta resolución data de {when}",
-        "never": "nunca",
-        "producedBy": {
-          "api": "resuelto por la API",
-          "runner": "resuelto por un runner"
-        },
-        "producedByOther": "resuelto por {by}",
-        "liveNote": "Esto es en vivo. Cada origen aquí está declarado en su configuración, así que resolverlo es una consulta: la fecha de arriba indica cuándo surgió este resultado, no lo desactualizado que está."
+        "liveNote": "Esto es en vivo. Cada origen aquí está declarado en su configuración, así que resolverlo es una consulta."
       },
       "limit": {
         "heading": "¿A qué apuntaría un límite?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Orígenes",
         "body": "Se resuelven en orden, exactamente igual que los indicadores -i repetidos: un origen posterior gana una variable de host en conflicto.",
-        "position": "Posición {position}",
-        "apiResolvable": "La API puede resolverlo",
-        "runnerOnly": "Necesita un runner",
-        "needsRunner": "Estos orígenes necesitan ansible, que solo tiene un runner, así que el resultado de arriba es la última resolución que publicó un runner y no una resolución en vivo: {kinds}."
+        "position": "Posición {position}"
       },
       "errors": {
         "loadItems": "No se pudieron cargar los hosts declarados",

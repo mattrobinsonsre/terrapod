@@ -2867,14 +2867,7 @@
         "subheading": "O resultado combinado de {name}, a partir de cada origem por ordem.",
         "hosts": "Hosts",
         "groups": "Grupos",
-        "takenAt": "Esta resolução é de {when}",
-        "never": "nunca",
-        "producedBy": {
-          "api": "resolvido pela API",
-          "runner": "resolvido por um runner"
-        },
-        "producedByOther": "resolvido por {by}",
-        "liveNote": "Isto é em tempo real. Cada origem aqui é declarada na sua configuração, pelo que resolvê-la é uma consulta: a data acima indica quando este resultado surgiu, não o quão desatualizado está."
+        "liveNote": "Isto é em tempo real. Cada origem aqui é declarada na sua configuração, pelo que resolvê-la é uma consulta."
       },
       "limit": {
         "heading": "O que é que um limite selecionaria?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Origens",
         "body": "Resolvidas por ordem, exatamente como as flags -i repetidas: uma origem posterior prevalece sobre uma variável de host em conflito.",
-        "position": "Posição {position}",
-        "apiResolvable": "A API consegue resolver",
-        "runnerOnly": "Necessita de um runner",
-        "needsRunner": "Estas origens necessitam do ansible, que só um runner tem, pelo que o resultado acima é a última resolução publicada por um runner e não uma resolução em tempo real: {kinds}."
+        "position": "Posição {position}"
       },
       "errors": {
         "loadItems": "Falha ao carregar os hosts declarados",

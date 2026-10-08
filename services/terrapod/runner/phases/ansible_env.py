@@ -56,15 +56,18 @@ the proxy, which *is* the cache. Exactly the position `pulumi_deps` is in with
 **Fails closed.** A configure that cannot get ansible must not proceed: there is
 no weaker answer than not running the playbook.
 
-**The runner is the only place ansible is installed.** The API deliberately does
-not install it, which is why there is no API-side sibling to this module. It
-could not fetch through the pull-through cache without either authenticating to
-its own HTTP surface with a credential it had minted for itself, or
-reimplementing pip's resolver in-process -- and fetching upstream instead is not
-an option, because every fetch has to go through the cache or an air-gapped
-deployment cannot work. So an inventory preview is served from the last
-`InventoryVersion` a configure wrote, refreshed by a resolve operation that runs
-here like anything else (#1967).
+**This module exists to RUN playbooks, not to read an inventory.** An inventory
+preview needs no ansible at all: dynamic inventory was declined (#1970), so
+every source is static -- rows this deployment already holds -- and resolving
+one is a database query the API answers itself (#1967).
+
+That distinction is worth keeping straight, because the reason once recorded
+here was a different and weaker one: that the API *could not* reach the
+pull-through cache without authenticating to its own HTTP surface or
+reimplementing pip's resolver. Neither holds -- `package_cache.substrate`
+exposes `get_or_fetch` as a plain async function, and `api_opa` already acquires
+a platform tool through it in-process. So if the API ever does need ansible, the
+obstacle is not the one written down.
 """
 
 from __future__ import annotations

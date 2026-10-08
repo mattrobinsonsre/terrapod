@@ -2867,14 +2867,7 @@
         "subheading": "Det sammenslåtte resultatet for {name}, fra hver kilde i rekkefølge.",
         "hosts": "Verter",
         "groups": "Grupper",
-        "takenAt": "Denne oppløsningen er fra {when}",
-        "never": "aldri",
-        "producedBy": {
-          "api": "løst opp av API-et",
-          "runner": "løst opp av en runner"
-        },
-        "producedByOther": "løst opp av {by}",
-        "liveNote": "Dette er sanntid. Hver kilde her er deklarert i konfigurasjonen din, så å løse den opp er et databasespørsmål. Datoen ovenfor sier når dette resultatet ble til, ikke hvor gammelt det er."
+        "liveNote": "Dette er sanntid. Hver kilde her er deklarert i konfigurasjonen din, så å løse den opp er et databasespørsmål."
       },
       "limit": {
         "heading": "Hva ville et limit-mønster treffe?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Kilder",
         "body": "Løses opp i rekkefølge, akkurat som gjentatte -i-flagg: ved en konflikt om en vertsvariabel vinner den senere kilden.",
-        "position": "Posisjon {position}",
-        "apiResolvable": "API-et kan løse opp",
-        "runnerOnly": "Krever en runner",
-        "needsRunner": "Disse kildene krever ansible, som bare en runner har, så resultatet ovenfor er den siste oppløsningen en runner sendte inn, og ikke en sanntidsoppløsning: {kinds}."
+        "position": "Posisjon {position}"
       },
       "errors": {
         "loadItems": "Kunne ikke laste erklærte verter",

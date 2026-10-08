@@ -10,8 +10,8 @@
  *
  * The rest cover what the tab is for: the declared hosts (read-only, because
  * the managing Terraform owns them), the resolution — which is LIVE, so it
- * says so and offers no refresh — and the limit preview with its advisory
- * caveat on screen.
+ * says so and carries neither a date nor a refresh — and the limit preview
+ * with its advisory caveat on screen.
  */
 import { test, expect } from '@playwright/test'
 import { getStoredToken, createWorkspace, seedInventoryItem, uniqueName } from '../helpers/api'
@@ -78,23 +78,25 @@ test.describe('Workspace Inventory tab', () => {
     await expect(page.getByText(/^Hosts\s*2$/)).toBeVisible()
     await expect(page.getByText(/^Groups\s*2$/)).toBeVisible()
 
-    // The honest part. The read is live, so the panel says so and the date is
-    // when this resolution came to be rather than how stale it is.
+    // The honest part. The read resolved these rows to answer itself, so the
+    // panel says it is live and shows no date beside the numbers.
     await expect(page.getByText(/This is live/i)).toBeVisible()
-    await expect(page.getByText(/This resolution dates from/i)).toBeVisible()
-    await expect(page.getByText(/resolved by the API/i)).toBeVisible()
 
-    // And NO refresh action, which is the point: `POST …/actions/resolve`
-    // records a version, the history is bounded, and a read that is already
-    // live buys a reader nothing by writing one. A button here would hand the
-    // eviction of a pinned snapshot to anyone holding write (#1973).
+    // No date and no refresh, which is the point. Both would invite an
+    // operator to wonder whether what they are looking at is current, which is
+    // the question the read has already answered by resolving.
     await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)
+    await expect(page.getByText(/This resolution dates from/i)).toHaveCount(0)
+    await expect(page.getByText(/resolved by (the API|a runner)/i)).toHaveCount(0)
     await expect(page.getByText(/not a live resolution/i)).toHaveCount(0)
 
-    // And which source is why — per-source, not just the inventory's rollup.
+    // The sources that produced it, named.
     await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible()
     await expect(page.getByText('platform', { exact: true })).toBeVisible()
-    await expect(page.getByText('API can resolve')).toBeVisible()
+    // No per-source resolvability badge: every source is static, so the
+    // distinction it drew cannot arise.
+    await expect(page.getByText('API can resolve')).toHaveCount(0)
+    await expect(page.getByText('Needs a runner')).toHaveCount(0)
   })
 
   test('the limit preview expands a pattern and shows its caveat', async ({ page }) => {
@@ -118,9 +120,9 @@ test.describe('Workspace Inventory tab', () => {
     await expect(matched.first()).toBeVisible()
 
     // The caveat that still applies rides WITH the result: a target list read
-    // without it is a target list an operator will act on. The freshness
-    // caveat that used to sit beside it is gone, because the expansion is
-    // taken against a live resolution — asserted absent so a revert of the
+    // without it is a target list an operator will act on. There is no
+    // freshness caveat, because the expansion is taken against a resolution
+    // performed to answer this request — asserted absent so a revert of the
     // copy cannot pass unnoticed.
     await expect(page.getByText(/Advisory only/i)).toBeVisible()
     await expect(page.getByText(/As fresh as/i)).toHaveCount(0)

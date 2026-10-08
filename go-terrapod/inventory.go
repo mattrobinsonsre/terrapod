@@ -8,9 +8,8 @@ import (
 	"strconv"
 )
 
-// Ansible inventory: the hosts a workspace declares (#1968), the inventory
-// object they resolve into, and the snapshots a configure targets against
-// (#1967).
+// Ansible inventory: the hosts a workspace declares (#1968) and the inventory
+// object they resolve into (#1967).
 //
 // # Paths use the canonical /api/v1 prefix with no legacy fallback
 //
@@ -80,28 +79,21 @@ type InventorySource struct {
 	CreatedAt     string         `json:"created-at,omitempty"`
 }
 
-// InventoryVersion is a snapshot of a resolved inventory.
+// ResolvedInventory is what an inventory resolves to, as resolved to answer
+// the read. There is no timestamp and nothing describing freshness: dynamic
+// inventory was declined (#1970), so every source is static and the server
+// resolves the rows per request.
 //
 // Hosts is exhaustive -- every host, including one with no variables -- which
 // is deliberately unlike ansible's own `_meta.hostvars`, where a var-less host
 // is omitted entirely. Enumerating a host set from that shape loses hosts
 // silently.
-type InventoryVersion struct {
+type ResolvedInventory struct {
 	ID          string `json:"id"`
 	InventoryID string `json:"inventory-id,omitempty"`
 	HostCount   int    `json:"host-count"`
 	GroupCount  int    `json:"group-count"`
-	// ProducedBy is "api" or "runner".
-	ProducedBy    string `json:"produced-by"`
-	ProducedByRef string `json:"produced-by-ref,omitempty"`
-	// TakenAt is when this resolution came to be -- NOT how stale it is.
-	// A read resolves live for an inventory the API can resolve itself, so
-	// this moves only when the resolution does. It IS a staleness reading for
-	// an inventory carrying a source that needs ansible, because that one is
-	// served from the newest snapshot a runner posted.
-	TakenAt string `json:"taken-at"`
 
-	// Populated by a read of one snapshot; absent from a list.
 	Hosts  map[string]map[string]any `json:"hosts,omitempty"`
 	Groups map[string][]string       `json:"groups,omitempty"`
 	// AnsibleInventory is the same resolution in the shape
@@ -120,7 +112,6 @@ type InventoryLimitPreview struct {
 	Hosts       []string `json:"hosts"`
 	HostCount   int      `json:"host-count"`
 	OfHostCount int      `json:"of-host-count"`
-	TakenAt     string   `json:"taken-at"`
 }
 
 // CreateInventoryItemRequest declares one host.
@@ -148,15 +139,6 @@ type UpdateInventoryItemRequest struct {
 type CreateInventoryRequest struct {
 	Name        string
 	Description string
-}
-
-// RecordInventoryVersionRequest posts a resolution a runner performed.
-//
-// Runner-token only: a snapshot records what a resolve actually found, so it is
-// written by the thing that ran it.
-type RecordInventoryVersionRequest struct {
-	Hosts  map[string]map[string]any
-	Groups map[string][]string
 }
 
 // ── Declared items ───────────────────────────────────────────────────────────
@@ -322,96 +304,23 @@ func (c *Client) DeleteInventory(ctx context.Context, id string) error {
 
 // ── Resolution and snapshots ─────────────────────────────────────────────────
 
-// GetResolvedInventory reads what an inventory currently resolves to.
+// GetResolvedInventory reads what an inventory resolves to.
 //
-// LIVE for an inventory the API can resolve itself -- which is every inventory
-// that exists today, because the only declared source kind is platform and
-// resolving that is a database query. A row is written only when the
-// resolution has actually moved, so reading does not evict the bounded
-// snapshot history a configure pins.
-//
-// Where a source needs ansible the newest snapshot a runner posted is served
-// instead, and a ConflictError is returned when there is none -- the API
-// refuses rather than resolving what it can, because a partial resolution is
-// a target set that is silently too small.
+// The server resolves the rows to answer this, so it is live and writes
+// nothing. Dynamic inventory was declined (#1970), so there is no source that
+// could need anything else and no staleness for a caller to reason about.
 func (c *Client) GetResolvedInventory(
 	ctx context.Context, inventoryID string,
-) (*InventoryVersion, error) {
+) (*ResolvedInventory, error) {
 	data, err := c.Get(ctx, "/api/v1/inventories/"+url.PathEscape(inventoryID)+"/resolved")
 	if err != nil {
 		return nil, err
 	}
-	return parseInventoryVersion(data)
-}
-
-// ResolveInventory records a snapshot of what the inventory resolves to now.
-//
-// It is NOT how a caller gets fresh data: GetResolvedInventory and the limit
-// preview are already live for an inventory the API can resolve itself. What
-// this guarantees is that the bounded snapshot history HOLDS a row describing
-// the current resolution, which is what a configure pins. It takes the same
-// stamped path a read does, so it returns the existing row unchanged when the
-// resolution has not moved.
-func (c *Client) ResolveInventory(
-	ctx context.Context, inventoryID string,
-) (*InventoryVersion, error) {
-	data, err := c.Post(ctx,
-		"/api/v1/inventories/"+url.PathEscape(inventoryID)+"/actions/resolve", nil)
-	if err != nil {
-		return nil, err
-	}
-	return parseInventoryVersion(data)
-}
-
-// ListInventoryVersions reads the snapshot history, newest first. Contents are
-// omitted; read one snapshot to get them.
-func (c *Client) ListInventoryVersions(
-	ctx context.Context, inventoryID string,
-) ([]InventoryVersion, error) {
-	data, err := c.Get(ctx, "/api/v1/inventories/"+url.PathEscape(inventoryID)+"/versions")
-	if err != nil {
-		return nil, err
-	}
-	resources, err := ParseResourceList(data)
-	if err != nil {
-		return nil, fmt.Errorf("parse inventory-version list: %w", err)
-	}
-	out := make([]InventoryVersion, 0, len(resources))
-	for i := range resources {
-		out = append(out, *inventoryVersionFromResource(&resources[i]))
-	}
-	return out, nil
-}
-
-// RecordInventoryVersion posts a resolution a runner performed. Runner-token
-// only; see RecordInventoryVersionRequest.
-func (c *Client) RecordInventoryVersion(
-	ctx context.Context, inventoryID string, req RecordInventoryVersionRequest,
-) (*InventoryVersion, error) {
-	attrs := map[string]any{
-		"hosts":  req.Hosts,
-		"groups": req.Groups,
-	}
-	if req.Hosts == nil {
-		attrs["hosts"] = map[string]map[string]any{}
-	}
-	if req.Groups == nil {
-		attrs["groups"] = map[string][]string{}
-	}
-	body, err := MarshalResource("inventory-versions", attrs, nil)
-	if err != nil {
-		return nil, fmt.Errorf("marshal inventory-version: %w", err)
-	}
-	data, err := c.Post(ctx,
-		"/api/v1/inventories/"+url.PathEscape(inventoryID)+"/versions", body)
-	if err != nil {
-		return nil, err
-	}
-	return parseInventoryVersion(data)
+	return parseResolvedInventory(data)
 }
 
 // PreviewInventoryLimit answers which hosts a --limit pattern would select,
-// against the inventory's latest snapshot.
+// against a live resolution.
 func (c *Client) PreviewInventoryLimit(
 	ctx context.Context, inventoryID, limit string,
 ) (*InventoryLimitPreview, error) {
@@ -434,7 +343,6 @@ func (c *Client) PreviewInventoryLimit(
 		Hosts:       GetListAttr(res, "hosts"),
 		HostCount:   int(GetIntAttr(res, "host-count")),
 		OfHostCount: int(GetIntAttr(res, "of-host-count")),
-		TakenAt:     GetStringAttr(res, "taken-at"),
 	}, nil
 }
 
@@ -565,22 +473,19 @@ func inventorySourcesFromAttr(res *Resource) []InventorySource {
 	return sources
 }
 
-func parseInventoryVersion(body []byte) (*InventoryVersion, error) {
+func parseResolvedInventory(body []byte) (*ResolvedInventory, error) {
 	res, err := ParseResource(body)
 	if err != nil {
-		return nil, fmt.Errorf("parse inventory-version response: %w", err)
+		return nil, fmt.Errorf("parse resolved-inventory response: %w", err)
 	}
-	return inventoryVersionFromResource(res), nil
+	return resolvedInventoryFromResource(res), nil
 }
 
-func inventoryVersionFromResource(res *Resource) *InventoryVersion {
-	out := &InventoryVersion{
-		ID:            res.ID,
-		HostCount:     int(GetIntAttr(res, "host-count")),
-		GroupCount:    int(GetIntAttr(res, "group-count")),
-		ProducedBy:    GetStringAttr(res, "produced-by"),
-		ProducedByRef: GetStringAttr(res, "produced-by-ref"),
-		TakenAt:       GetStringAttr(res, "taken-at"),
+func resolvedInventoryFromResource(res *Resource) *ResolvedInventory {
+	out := &ResolvedInventory{
+		ID:         res.ID,
+		HostCount:  int(GetIntAttr(res, "host-count")),
+		GroupCount: int(GetIntAttr(res, "group-count")),
 	}
 	if v := GetRelationshipID(res, "inventory"); v != "" {
 		out.InventoryID = v

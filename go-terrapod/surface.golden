@@ -517,23 +517,12 @@ field InventoryLimitPreview.HostCount int `json:"host-count"`
 field InventoryLimitPreview.Hosts []string `json:"hosts"`
 field InventoryLimitPreview.Limit string `json:"limit"`
 field InventoryLimitPreview.OfHostCount int `json:"of-host-count"`
-field InventoryLimitPreview.TakenAt string `json:"taken-at"`
 field InventorySource.APIResolvable bool `json:"api-resolvable"`
 field InventorySource.Config map[string]any `json:"config,omitempty"`
 field InventorySource.CreatedAt string `json:"created-at,omitempty"`
 field InventorySource.ID string `json:"id"`
 field InventorySource.Kind string `json:"kind"`
 field InventorySource.Position int `json:"position"`
-field InventoryVersion.AnsibleInventory map[string]any `json:"ansible-inventory,omitempty"`
-field InventoryVersion.GroupCount int `json:"group-count"`
-field InventoryVersion.Groups map[string][]string `json:"groups,omitempty"`
-field InventoryVersion.HostCount int `json:"host-count"`
-field InventoryVersion.Hosts map[string]map[string]any `json:"hosts,omitempty"`
-field InventoryVersion.ID string `json:"id"`
-field InventoryVersion.InventoryID string `json:"inventory-id,omitempty"`
-field InventoryVersion.ProducedBy string `json:"produced-by"`
-field InventoryVersion.ProducedByRef string `json:"produced-by-ref,omitempty"`
-field InventoryVersion.TakenAt string `json:"taken-at"`
 field LabelEntity.ID string `json:"id"`
 field LabelEntity.Labels map[string]string `json:"labels"`
 field LabelEntity.Name string `json:"name"`
@@ -795,8 +784,6 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
-field RecordInventoryVersionRequest.Groups map[string][]string
-field RecordInventoryVersionRequest.Hosts map[string]map[string]any
 field RegisteredModuleRef.Name string `json:"name"`
 field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
@@ -831,6 +818,13 @@ field RemoteStateConsumer.CreatedBy string `json:"created-by,omitempty"`
 field RemoteStateConsumer.ID string `json:"id"`
 field RemoteStateConsumer.ProducerWorkspaceID string `json:"producer-workspace-id"`
 field RemoteStateConsumer.ProducerWorkspaceName string `json:"producer-workspace-name"`
+field ResolvedInventory.AnsibleInventory map[string]any `json:"ansible-inventory,omitempty"`
+field ResolvedInventory.GroupCount int `json:"group-count"`
+field ResolvedInventory.Groups map[string][]string `json:"groups,omitempty"`
+field ResolvedInventory.HostCount int `json:"host-count"`
+field ResolvedInventory.Hosts map[string]map[string]any `json:"hosts,omitempty"`
+field ResolvedInventory.ID string `json:"id"`
+field ResolvedInventory.InventoryID string `json:"inventory-id,omitempty"`
 field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
@@ -1574,7 +1568,7 @@ method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderT
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
 method (*Client) GetRegistryProvider(ctx context.Context, name string) (*RegistryProvider, error)
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
-method (*Client) GetResolvedInventory( ctx context.Context, inventoryID string, ) (*InventoryVersion, error)
+method (*Client) GetResolvedInventory( ctx context.Context, inventoryID string, ) (*ResolvedInventory, error)
 method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
@@ -1625,7 +1619,6 @@ method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)
 method (*Client) ListInboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
 method (*Client) ListInventories( ctx context.Context, workspaceID string, ) ([]Inventory, error)
 method (*Client) ListInventoryItems( ctx context.Context, workspaceID string, ) ([]InventoryItem, error)
-method (*Client) ListInventoryVersions( ctx context.Context, inventoryID string, ) ([]InventoryVersion, error)
 method (*Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error)
 method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
 method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
@@ -1680,12 +1673,10 @@ method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs 
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
 method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
-method (*Client) RecordInventoryVersion( ctx context.Context, inventoryID string, req RecordInventoryVersionRequest, ) (*InventoryVersion, error)
 method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
 method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
 method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
-method (*Client) ResolveInventory( ctx context.Context, inventoryID string, ) (*InventoryVersion, error)
 method (*Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID string, opts RestoreOptions) (*RestoredWorkspace, error)
 method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
 method (*Client) RetryRun(ctx context.Context, runID string) (*Run, error)
@@ -1821,7 +1812,6 @@ type Inventory struct
 type InventoryItem struct
 type InventoryLimitPreview struct
 type InventorySource struct
-type InventoryVersion struct
 type LabelEntity struct
 type LabelKey struct
 type LabelValue struct
@@ -1861,13 +1851,13 @@ type Policy struct
 type PolicyCheck struct
 type PolicySet struct
 type ProviderTemplate struct
-type RecordInventoryVersionRequest struct
 type RegisteredModuleRef struct
 type RegistryModule struct
 type RegistryProvider struct
 type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
+type ResolvedInventory struct
 type Resource struct
 type ResourceAccess struct
 type ResourceAccessRole struct

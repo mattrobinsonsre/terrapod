@@ -2867,14 +2867,7 @@
         "subheading": "Das zusammengeführte Ergebnis für {name}, aus allen Quellen in ihrer Reihenfolge.",
         "hosts": "Hosts",
         "groups": "Gruppen",
-        "takenAt": "Diese Auflösung stammt von {when}",
-        "never": "nie",
-        "producedBy": {
-          "api": "von der API aufgelöst",
-          "runner": "von einem Runner aufgelöst"
-        },
-        "producedByOther": "von {by} aufgelöst",
-        "liveNote": "Dies ist live. Jede Quelle hier ist in Ihrer Konfiguration deklariert, die Auflösung ist also eine Abfrage — das Datum oben sagt, wann dieses Ergebnis entstanden ist, nicht wie veraltet es ist."
+        "liveNote": "Dies ist live. Jede Quelle hier ist in Ihrer Konfiguration deklariert, die Auflösung ist also eine Abfrage."
       },
       "limit": {
         "heading": "Was würde ein Limit-Muster erfassen?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Quellen",
         "body": "Werden in ihrer Reihenfolge aufgelöst, genau wie wiederholte -i-Flags: Bei einer widersprüchlichen Host-Variable gewinnt die spätere Quelle.",
-        "position": "Position {position}",
-        "apiResolvable": "API kann auflösen",
-        "runnerOnly": "Benötigt einen Runner",
-        "needsRunner": "Diese Quellen benötigen ansible, das nur ein Runner hat, daher ist das Ergebnis oben die letzte von einem Runner gemeldete Auflösung und keine Live-Auflösung: {kinds}."
+        "position": "Position {position}"
       },
       "errors": {
         "loadItems": "Deklarierte Hosts konnten nicht geladen werden",

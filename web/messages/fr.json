@@ -2867,14 +2867,7 @@
         "subheading": "Le résultat fusionné pour {name}, à partir de chaque source dans l''ordre.",
         "hosts": "Hôtes",
         "groups": "Groupes",
-        "takenAt": "Cette résolution date de {when}",
-        "never": "jamais",
-        "producedBy": {
-          "api": "résolu par l''API",
-          "runner": "résolu par un runner"
-        },
-        "producedByOther": "résolu par {by}",
-        "liveNote": "Ceci est en direct. Chaque source ici est déclarée dans votre configuration, la résoudre est donc une requête : la date ci-dessus indique quand ce résultat est apparu, pas à quel point il est périmé."
+        "liveNote": "Ceci est en direct. Chaque source ici est déclarée dans votre configuration, la résoudre est donc une requête."
       },
       "limit": {
         "heading": "Que ciblerait une limite ?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Sources",
         "body": "Résolues dans l''ordre, exactement comme des indicateurs -i répétés : une source ultérieure l''emporte sur une variable d''hôte en conflit.",
-        "position": "Position {position}",
-        "apiResolvable": "L''API peut résoudre",
-        "runnerOnly": "Nécessite un runner",
-        "needsRunner": "Ces sources nécessitent ansible, que seul un runner possède : le résultat ci-dessus est donc la dernière résolution publiée par un runner, et non une résolution en direct : {kinds}."
+        "position": "Position {position}"
       },
       "errors": {
         "loadItems": "Échec du chargement des hôtes déclarés",

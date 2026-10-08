@@ -1,7 +1,7 @@
-"""Ansible inventory: declared hosts, the inventory object, and its snapshots.
+"""Ansible inventory: declared hosts, the inventory object, and what it resolves to.
 
-#1967 (the inventory, its ordered sources, the `InventoryVersion` snapshot) and
-#1968 (`terrapod_inventory_item`, declared by the workspace's own Terraform).
+#1967 (the inventory and its ordered sources) and #1968
+(`terrapod_inventory_item`, declared by the workspace's own Terraform).
 
 Native surface only. None of this is on the TFE-compatible prefix: no
 `terraform`, `tofu` or `tfci` invocation consumes it, so by the rule in
@@ -12,10 +12,16 @@ Native surface only. None of this is on the TFE-compatible prefix: no
 * `…/inventory-items` — the **declared rows**. API-owned, instant, and makes no
   claim about resolution.
 * `…/inventories/{id}/resolved` — what the inventory **is**: the merged host and
-  group set.
+  group set, resolved to answer the request.
 
 Keeping them distinct is what stops a second implementation of "what does
 ansible think this is" growing for the fast path.
+
+**The resolved read writes nothing.** Every source is static -- dynamic
+inventory was declined (#1970) -- so resolving is a query and a read is live by
+construction. There is no snapshot, no equality token and no freshness for a
+reader to reason about. The target set a *configure* runs against is a separate
+artifact owned by the run (#1973), not by this surface.
 
 ## Authorization, and the one implicit grant
 
@@ -62,7 +68,6 @@ from terrapod.db.models import (
     Inventory,
     InventoryItem,
     InventorySource,
-    InventoryVersion,
     Run,
     Workspace,
 )
@@ -141,12 +146,6 @@ def _source_json(source: InventorySource) -> dict:
         "position": source.position,
         "kind": source.kind,
         "config": dict(source.config or {}),
-        # Whether the API can resolve this source by itself, or whether it
-        # needs ansible and therefore a runner. Surfaced per source, not just
-        # as the inventory's rolled-up `api-resolvable`, so a UI can say WHICH
-        # source is why a snapshot is as old as it is -- the same information
-        # the resolve refusal names, rather than leaving a reader to infer it.
-        "api-resolvable": source.kind in InventorySource.API_RESOLVABLE_KINDS,
         "created-at": _rfc3339(source.created_at),
     }
 
@@ -159,7 +158,6 @@ def _inventory_json(inventory: Inventory, sources: list[InventorySource]) -> dic
         "attributes": {
             "name": inventory.name,
             "description": inventory.description or "",
-            "api-resolvable": inv.api_can_resolve(sources),
             # The composition, in `-i` order: a lower position resolves first,
             # so a higher one wins a conflicting host variable.
             "sources": [_source_json(s) for s in sources],
@@ -175,36 +173,28 @@ def _inventory_json(inventory: Inventory, sources: list[InventorySource]) -> dic
     }
 
 
-def _version_json(version: InventoryVersion, *, include_contents: bool) -> dict:
-    ver_id = f"invver-{version.id}"
-    attrs: dict[str, Any] = {
-        "host-count": version.host_count,
-        "group-count": version.group_count,
-        "produced-by": version.produced_by,
-        "produced-by-ref": version.produced_by_ref or "",
-        # When this resolution came to be -- NOT how stale it is. A read is
-        # live, and an unchanged inventory returns the row it already has
-        # because the source stamp still matches, so an old `taken-at` on a
-        # fresh answer means "nothing has changed since", not "this is out of
-        # date". The superseded reading of this field was the opposite.
-        "taken-at": _rfc3339(version.created_at),
-    }
-    if include_contents:
-        attrs["hosts"] = dict(version.hosts or {})
-        attrs["groups"] = dict(version.groups or {})
-        # The shape a configure hands to ansible, rendered from the normalised
-        # one rather than stored twice.
-        attrs["ansible-inventory"] = to_ansible_inventory(
-            ResolvedInventory(hosts=dict(version.hosts or {}), groups=dict(version.groups or {}))
-        )
+def _resolved_json(inventory: Inventory, resolved: ResolvedInventory) -> dict:
+    """The resolved inventory, as resolved for this request.
+
+    No `taken-at`, and nothing describing freshness: the read resolved the rows
+    to answer it. There is no other resolution it could be showing, so a field
+    saying when one happened would only invite a reader to wonder whether it is
+    current.
+    """
     return {
-        "id": ver_id,
-        "type": "inventory-versions",
-        "attributes": attrs,
+        "id": f"inv-{inventory.id}",
+        "type": "resolved-inventories",
+        "attributes": {
+            "hosts": dict(resolved.hosts),
+            "groups": dict(resolved.groups),
+            "host-count": resolved.host_count,
+            "group-count": resolved.group_count,
+            # The shape a configure hands to ansible, rendered from the
+            # normalised one rather than stored twice.
+            "ansible-inventory": to_ansible_inventory(resolved),
+        },
         "relationships": {
-            "inventory": {
-                "data": {"id": f"inv-{version.inventory_id}", "type": "inventories"},
-            },
+            "inventory": {"data": {"id": f"inv-{inventory.id}", "type": "inventories"}},
         },
     }
 
@@ -385,33 +375,6 @@ async def create_inventory_item(
     return JSONResponse(content={"data": _item_json(item)}, status_code=201)
 
 
-def _unresolvable_error(sources: list[InventorySource], lead: str) -> HTTPException:
-    """The 409 for an inventory holding a source the API cannot resolve.
-
-    Shared by the resolved read and the resolve action, because they refuse for
-    the same reason and an operator meeting either asks the same question: which
-    source, and what do I do about it. They were written separately and had
-    already drifted -- the read withheld the offending kinds, which is the
-    actionable half, and the read is the one the UI calls, so it is where the
-    answer is needed most.
-
-    `lead` is the part that genuinely differs: a read is refusing because there
-    is no snapshot to serve, an action because it will not refresh one.
-    """
-    offending = sorted(
-        {s.kind for s in sources if s.kind not in InventorySource.API_RESOLVABLE_KINDS}
-    )
-    return HTTPException(
-        status_code=409,
-        detail=(
-            f"{lead} Sources {offending} need ansible to parse, and ansible is installed "
-            f"only in the runner. A configure or a resolve operation has to produce it; "
-            f"the API will not resolve the rest of the inventory, because a partial "
-            f"resolution is a target set that is silently too small."
-        ),
-    )
-
-
 def _item_integrity_error(exc: IntegrityError, name: str) -> HTTPException:
     """Translate an item write's `IntegrityError` into the status it deserves.
 
@@ -583,7 +546,7 @@ async def delete_inventory(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete an inventory and its snapshots. Declared items are not touched.
+    """Delete an inventory and its sources. Declared items are not touched.
 
     An item belongs to the workspace, not to any one inventory, and is owned by
     the Terraform that declares it. An inventory is a view over them, so
@@ -597,7 +560,7 @@ async def delete_inventory(
     await db.commit()
 
 
-# ── Resolution and snapshots ─────────────────────────────────────────────────
+# ── Resolution ───────────────────────────────────────────────────────────────
 
 
 @router.get("/inventories/{inventory_id}/resolved")
@@ -613,154 +576,18 @@ async def show_resolved_inventory(
     reader is never shown a target set that has drifted from what a configure
     would select. There is no cached-versus-fresh distinction to surface.
 
-    Live does not mean a write per read. A version is recorded only when the
-    source stamp has moved, because the history is bounded and is what a
-    partial-configure retry subtracts against (#1973): a page left open on a
-    dashboard must not be able to evict the snapshot a configure is pinned to.
-    So an unchanged inventory returns the row it already has, which *is* the
-    live answer -- `taken-at` then says when the resolution came to be, not how
-    stale it is.
-
-    A source kind the API does not own needs ansible, which lives only in the
-    runner (#2010), so it serves the newest resolution a runner posted and
-    answers **409** when there is none. No such kind exists yet; the seam is
-    here because git (#1929) will be the first, and it is what that issue adds
-    a stored stamp and a short TTL for -- a stamp you can only learn by
-    fetching is the one case a TTL buys anything.
+    And it writes nothing. There is no resolution to compare this one against,
+    because dynamic inventory was declined (#1970) and every source is a row
+    this deployment holds -- so a read cannot be stale and has nothing to
+    record. The target set a *configure* runs against is a separate artifact,
+    owned by the run and written when the run is created (#1973).
     """
     inventory = await _get_inventory(inventory_id, db)
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
     await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
 
-    sources = await inv.list_sources(db, inventory.id)
-
-    if not inv.api_can_resolve(sources):
-        version = await inv.latest_version(db, inventory.id)
-        if version is None:
-            raise _unresolvable_error(sources, "This inventory has never been resolved.")
-        return JSONResponse(content={"data": _version_json(version, include_contents=True)})
-
-    version = await inv.resolve_if_stale(db, inventory)
-    await db.commit()
-    return JSONResponse(content={"data": _version_json(version, include_contents=True)})
-
-
-@router.post("/inventories/{inventory_id}/actions/resolve")
-async def resolve_inventory(
-    inventory_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Record a resolution now, for an inventory the API can resolve.
-
-    It does **not** change what a reader is shown -- a read resolves live, so it
-    already reflects the declared rows whether this has ever been called. What
-    it guarantees is that the history holds a row describing the current
-    resolution, which is what a configure pins and what a partial-configure
-    retry subtracts against (#1973).
-
-    **It takes the same stamped path a read does, so it writes only when the
-    resolution has actually moved.** It used to write unconditionally, which
-    handed anyone with write an eviction vector for nothing: the history is
-    bounded at `MAX_VERSIONS_PER_INVENTORY`, so a duplicate row prunes the
-    oldest while carrying no information a configure could use -- a matching
-    stamp already proves the existing row *is* the current resolution. Nothing
-    needs "stamp this moment" semantics; a retry needs the host set, not a
-    timestamp, and the call itself is in the audit log.
-
-    It still requires write because it still *may* write, and whether it does
-    depends on state the caller does not control. The read path is gated lower
-    precisely because it never writes.
-    """
-    inventory = await _get_inventory(inventory_id, db)
-    ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
-    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
-
-    sources = await inv.list_sources(db, inventory.id)
-    if not inv.api_can_resolve(sources):
-        raise _unresolvable_error(sources, "This inventory was not resolved.")
-
-    version = await inv.resolve_if_stale(db, inventory)
-    await db.commit()
-    return JSONResponse(content={"data": _version_json(version, include_contents=True)})
-
-
-@router.get("/inventories/{inventory_id}/versions")
-async def list_inventory_versions(
-    inventory_id: str = Path(...),
-    request: Request = None,
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Snapshot history, newest first. Contents omitted -- read one to get them."""
-    inventory = await _get_inventory(inventory_id, db)
-    ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
-    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
-
-    versions = await inv.list_versions(db, inventory.id)
-    payload = [_version_json(v, include_contents=False) for v in versions]
-    page_items, meta = paginate(payload, request)
-    return JSONResponse(content={"data": page_items, "meta": meta})
-
-
-@router.post("/inventories/{inventory_id}/versions", status_code=201)
-async def record_inventory_version(
-    inventory_id: str = Path(...),
-    body: dict = Body(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """A runner posts the snapshot it resolved.
-
-    The write path for everything the API cannot resolve itself. Built now so
-    the configure phase (#1972) has somewhere to post on its first day rather
-    than needing an endpoint added alongside it.
-
-    Runner-token only: this is the runner protocol, and a snapshot is the
-    targeting basis a retry depends on (#1973), so it is not something a person
-    hand-posts.
-    """
-    inventory = await _get_inventory(inventory_id, db)
-    ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
-
-    if user.auth_method != "runner_token":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Runner token required: a snapshot records what a resolve actually found, "
-                "so it is posted by the thing that ran it. Use "
-                "POST /inventories/{id}/actions/resolve to refresh an inventory the API "
-                "can resolve."
-            ),
-        )
-    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db)
-
-    attrs = _attrs(body)
-    hosts = _as_mapping(attrs.get("hosts"), "hosts")
-    groups_raw = _as_mapping(attrs.get("groups"), "groups")
-
-    groups: dict[str, list[str]] = {}
-    for group, members in groups_raw.items():
-        groups[group] = _as_str_list(members, f"groups[{group}]")
-
-    for host_vars in hosts.values():
-        if not isinstance(host_vars, dict):
-            raise HTTPException(
-                status_code=422, detail="each entry in hosts must map a host name to an object"
-            )
-
-    resolved = ResolvedInventory(hosts=hosts, groups=groups)
-    version = await inv.record_snapshot(
-        db,
-        inventory,
-        resolved,
-        produced_by=InventoryVersion.SOURCE_RUNNER,
-        produced_by_ref=strip_id_prefix(user.run_id or "", "run-"),
-    )
-    await db.commit()
-    return JSONResponse(
-        content={"data": _version_json(version, include_contents=False)}, status_code=201
-    )
+    resolved = await inv.resolve(db, inventory)
+    return JSONResponse(content={"data": _resolved_json(inventory, resolved)})
 
 
 @router.post("/inventories/{inventory_id}/actions/preview-limit")
@@ -778,9 +605,8 @@ async def preview_limit(
     "what would this target" before anything runs.
 
     So it expands against a **live** resolution, by the same route as the
-    resolved view and for a sharper reason: previewing against a target set
-    that has since changed is the wrong answer in the one place an operator
-    came to check.
+    resolved view: previewing against a target set that has since changed is
+    the wrong answer in the one place an operator came to check.
 
     Read-only and read-gated. It expands the forms an operator writes -- names,
     groups, `all`/`*`, comma or colon separated terms, `!` and `&` -- and
@@ -793,20 +619,11 @@ async def preview_limit(
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
     await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
 
-    sources = await inv.list_sources(db, inventory.id)
-    if inv.api_can_resolve(sources):
-        version = await inv.resolve_if_stale(db, inventory)
-        await db.commit()
-    else:
-        version = await inv.latest_version(db, inventory.id)
-        if version is None:
-            raise _unresolvable_error(sources, "This inventory has no resolution to limit against.")
-
     pattern = _attrs(body).get("limit") or ""
     if not isinstance(pattern, str):
         raise HTTPException(status_code=422, detail="limit must be a string")
 
-    resolved = ResolvedInventory(hosts=dict(version.hosts or {}), groups=dict(version.groups or {}))
+    resolved = await inv.resolve(db, inventory)
     try:
         matched = limit_matches(resolved, pattern)
     except InventoryValidationError as exc:
@@ -815,14 +632,13 @@ async def preview_limit(
     return JSONResponse(
         content={
             "data": {
-                "id": f"invver-{version.id}",
+                "id": f"inv-{inventory.id}",
                 "type": "inventory-limit-previews",
                 "attributes": {
                     "limit": pattern,
                     "hosts": matched,
                     "host-count": len(matched),
-                    "of-host-count": version.host_count,
-                    "taken-at": _rfc3339(version.created_at),
+                    "of-host-count": resolved.host_count,
                 },
             }
         }

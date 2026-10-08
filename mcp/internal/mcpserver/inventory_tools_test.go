@@ -161,9 +161,8 @@ func TestInventoryResolvedToolReturnsTheTargetSet(t *testing.T) {
 	var gotPath string
 	sess := inventoryToolCaller(t, func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		_, _ = w.Write([]byte(`{"data":{"id":"invver-9","type":"inventory-versions","attributes":{
-		  "host-count":2,"group-count":1,"produced-by":"api","produced-by-ref":"",
-		  "taken-at":"2026-10-07T10:00:00Z",
+		_, _ = w.Write([]byte(`{"data":{"id":"inv-1","type":"resolved-inventories","attributes":{
+		  "host-count":2,"group-count":1,
 		  "hosts":{"web-1":{"ansible_host":"10.0.0.4"},"web-2":{}},
 		  "groups":{"web":["web-1","web-2"]},
 		  "ansible-inventory":{"web":{"hosts":["web-1","web-2"]},"_meta":{"hostvars":{}}}},
@@ -182,7 +181,7 @@ func TestInventoryResolvedToolReturnsTheTargetSet(t *testing.T) {
 	// `web-2` has no variables. Ansible's own shape omits such a host from
 	// _meta.hostvars entirely, so its presence here is the exhaustive-hosts
 	// property the agent's enumeration depends on.
-	for _, want := range []string{`"web-1"`, `"web-2"`, `"taken-at":"2026-10-07T10:00:00Z"`, `"produced-by":"api"`} {
+	for _, want := range []string{`"web-1"`, `"web-2"`, `"host-count":2`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("result missing %s: %s", want, out)
 		}
@@ -195,8 +194,8 @@ func TestInventoryResolvedToolReturnsTheTargetSet(t *testing.T) {
 
 func TestInventoryResolvedToolIncludesTheAnsibleShapeOnRequest(t *testing.T) {
 	sess := inventoryToolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"id":"invver-9","type":"inventory-versions","attributes":{
-		  "host-count":1,"group-count":1,"produced-by":"runner","taken-at":"2026-10-07T10:00:00Z",
+		_, _ = w.Write([]byte(`{"data":{"id":"inv-1","type":"resolved-inventories","attributes":{
+		  "host-count":1,"group-count":1,
 		  "hosts":{"web-1":{}},"groups":{"web":["web-1"]},
 		  "ansible-inventory":{"web":{"hosts":["web-1"]}}}}}`))
 	})
@@ -212,56 +211,6 @@ func TestInventoryResolvedToolIncludesTheAnsibleShapeOnRequest(t *testing.T) {
 
 // A 409 is the actionable answer, not a failure to hide: it names the source
 // kinds that need ansible and says a runner has to produce the first snapshot.
-func TestInventoryResolvedToolRelaysTheConflictDetail(t *testing.T) {
-	sess := inventoryToolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte(`{"errors":[{"status":"409","detail":
-		  "This inventory has never been resolved and contains a source the API cannot resolve. A configure or a resolve operation in a runner has to produce the first snapshot."}]}`))
-	})
-	res := callInventoryTool(t, sess, "terrapod_inventory_resolved",
-		map[string]any{"inventory_id": "inv-1"})
-	if !res.IsError {
-		t.Fatal("want a tool error for a 409")
-	}
-	msg := resultText(t, res)
-	for _, want := range []string{"cannot resolve", "runner"} {
-		if !strings.Contains(msg, want) {
-			t.Fatalf("the conflict detail was swallowed, leaving %q", msg)
-		}
-	}
-}
-
-func TestInventoryVersionsToolReturnsTheHistory(t *testing.T) {
-	var gotPath string
-	sess := inventoryToolCaller(t, func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		_, _ = w.Write([]byte(`{"data":[
-		  {"id":"invver-2","type":"inventory-versions","attributes":{"host-count":3,
-		    "group-count":2,"produced-by":"runner","produced-by-ref":"run-77",
-		    "taken-at":"2026-10-07T11:00:00Z"}},
-		  {"id":"invver-1","type":"inventory-versions","attributes":{"host-count":2,
-		    "group-count":1,"produced-by":"api","taken-at":"2026-10-07T10:00:00Z"}}]}`))
-	})
-
-	res := callInventoryTool(t, sess, "terrapod_inventory_versions",
-		map[string]any{"inventory_id": "inv-1"})
-	if res.IsError {
-		t.Fatalf("tool reported an error: %s", resultText(t, res))
-	}
-	if gotPath != "/api/v1/inventories/inv-1/versions" {
-		t.Fatalf("path = %s", gotPath)
-	}
-	out := resultText(t, res)
-	// "has a runner ever resolved this" is the question this answers, so
-	// produced-by and its ref are the fields that must survive.
-	for _, want := range []string{`"count":2`, `"produced-by":"runner"`, `"run-77"`, `"produced-by":"api"`} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("result missing %s: %s", want, out)
-		}
-	}
-}
-
 func TestInventoryLimitPreviewToolPostsThePatternAndReportsTheReach(t *testing.T) {
 	var gotPath string
 	var gotBody map[string]any
@@ -271,7 +220,7 @@ func TestInventoryLimitPreviewToolPostsThePatternAndReportsTheReach(t *testing.T
 		_ = json.Unmarshal(raw, &gotBody)
 		_, _ = w.Write([]byte(`{"data":{"id":"invlp-1","type":"inventory-limit-previews",
 		  "attributes":{"limit":"web:!web-2","hosts":["web-1"],"host-count":1,
-		  "of-host-count":12,"taken-at":"2026-10-07T10:00:00Z"}}}`))
+		  "of-host-count":12}}}`))
 	})
 
 	res := callInventoryTool(t, sess, "terrapod_inventory_limit_preview",
@@ -289,7 +238,7 @@ func TestInventoryLimitPreviewToolPostsThePatternAndReportsTheReach(t *testing.T
 	out := resultText(t, res)
 	// of-host-count is what turns "1 host" into "1 of 12", which is the blast
 	// radius the agent is being asked to show.
-	for _, want := range []string{`"web-1"`, `"host-count":1`, `"of-host-count":12`, `"taken-at"`} {
+	for _, want := range []string{`"web-1"`, `"host-count":1`, `"of-host-count":12`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("result missing %s: %s", want, out)
 		}
@@ -302,8 +251,7 @@ func TestInventoryLimitPreviewToolReportsAPatternThatSelectsNothing(t *testing.T
 		// shape that reaches the SDK as a nil slice, so it is the one that
 		// pins the normalisation. A server sending `[]` needs no code at all.
 		_, _ = w.Write([]byte(`{"data":{"id":"invlp-2","type":"inventory-limit-previews",
-		  "attributes":{"limit":"nope","host-count":0,"of-host-count":12,
-		  "taken-at":"2026-10-07T10:00:00Z"}}}`))
+		  "attributes":{"limit":"nope","host-count":0,"of-host-count":12}}}`))
 	})
 	res := callInventoryTool(t, sess, "terrapod_inventory_limit_preview",
 		map[string]any{"inventory_id": "inv-1", "limit": "nope"})
@@ -339,42 +287,11 @@ func TestInventoryLimitPreviewToolRefusesAnEmptyPattern(t *testing.T) {
 	// `all` is the explicit way to ask for everything, and must work.
 	sess2 := inventoryToolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"data":{"id":"invlp-3","type":"inventory-limit-previews",
-		  "attributes":{"limit":"all","hosts":["web-1"],"host-count":1,"of-host-count":1,
-		  "taken-at":"2026-10-07T10:00:00Z"}}}`))
+		  "attributes":{"limit":"all","hosts":["web-1"],"host-count":1,"of-host-count":1}}}`))
 	})
 	if res := callInventoryTool(t, sess2, "terrapod_inventory_limit_preview",
 		map[string]any{"inventory_id": "inv-1", "limit": "all"}); res.IsError {
 		t.Fatalf("'all' must be accepted: %s", resultText(t, res))
-	}
-}
-
-func TestInventoryRefreshToolPostsTheResolveAction(t *testing.T) {
-	var gotPath, gotMethod string
-	sess := inventoryToolCaller(t, func(w http.ResponseWriter, r *http.Request) {
-		gotPath, gotMethod = r.URL.Path, r.Method
-		_, _ = w.Write([]byte(`{"data":{"id":"invver-3","type":"inventory-versions","attributes":{
-		  "host-count":4,"group-count":2,"produced-by":"api","taken-at":"2026-10-07T12:00:00Z",
-		  "hosts":{"web-1":{},"web-2":{},"db-1":{},"db-2":{}},
-		  "groups":{"web":["web-1","web-2"],"db":["db-1","db-2"]},
-		  "ansible-inventory":{"_meta":{"hostvars":{}}}}}}`))
-	})
-
-	res := callInventoryTool(t, sess, "terrapod_inventory_refresh",
-		map[string]any{"inventory_id": "inv-1"})
-	if res.IsError {
-		t.Fatalf("tool reported an error: %s", resultText(t, res))
-	}
-	if gotMethod != http.MethodPost || gotPath != "/api/v1/inventories/inv-1/actions/resolve" {
-		t.Fatalf("%s %s", gotMethod, gotPath)
-	}
-	out := resultText(t, res)
-	for _, want := range []string{`"host-count":4`, `"taken-at":"2026-10-07T12:00:00Z"`, `"db-1"`} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("result missing %s: %s", want, out)
-		}
-	}
-	if strings.Contains(out, "ansible-inventory") {
-		t.Fatalf("a refresh returns the exhaustive maps, not the lossy rendering: %s", out)
 	}
 }
 
@@ -391,8 +308,7 @@ func TestInventoryToolsRequireTheirIDs(t *testing.T) {
 		{"terrapod_inventory_list", map[string]any{}},
 		{"terrapod_workspace_inventories", map[string]any{}},
 		{"terrapod_inventory_resolved", map[string]any{}},
-		{"terrapod_inventory_versions", map[string]any{}},
-		{"terrapod_inventory_refresh", map[string]any{}},
+		{"terrapod_inventory_limit_preview", map[string]any{"limit": "all"}},
 	} {
 		res := callInventoryTool(t, sess, tc.tool, tc.args)
 		if !res.IsError {
@@ -407,34 +323,48 @@ func TestInventoryToolsRequireTheirIDs(t *testing.T) {
 // TestTheInventoryToolsDoNotTellAnAgentAReadIsStale guards the claim an agent
 // acts on, which no other gate reaches.
 //
-// This exists because the four descriptions it checks were all FALSE for a
-// release, and every gate was green. They said a read served "the newest
-// snapshot", that the limit preview was "only as FRESH as the last snapshot,
-// not live", and that an agent finding `taken-at` old should refresh before
-// previewing. Each was true when written and stopped being true when the read
-// path became live — and nothing noticed, because the catalogue golden freezes
-// names, annotations and input schemas and NOT descriptions (see
-// liveToolsByName). The docs had a gate that quotes the API's own literals and
-// the web tab had an e2e assertion; MCP had neither, so MCP is the surface that
-// shipped the falsehood.
+// This exists because the descriptions it checks were FALSE for a release and
+// every gate was green. They said a read served "the newest snapshot", that
+// the limit preview was "only as FRESH as the last snapshot, not live", and
+// that an agent finding `taken-at` old should refresh before previewing. Each
+// was true when written and stopped being true when the code moved underneath
+// it — and nothing noticed, because the catalogue golden freezes names,
+// annotations and input schemas and NOT descriptions (see liveToolsByName).
+// The docs had a gate quoting the API's own literals and the web tab had an
+// e2e assertion; MCP had neither, so MCP is the surface that shipped it.
 //
-// It is deliberately NOT a golden of description text. A golden would only
-// catch an unreviewed EDIT, and nobody edited these — the code moved
-// underneath them. What is pinned instead is the property: the claim is
-// conditional on what Terrapod can resolve, and the retired absolute phrasing
-// appears nowhere.
+// It is deliberately NOT a golden of description text. A golden catches an
+// unreviewed EDIT, and nobody edited these. What is pinned is the property.
+//
+// # The property has changed, and so has this guard
+//
+// It used to require the liveness claim to carry a CONDITION — "for an
+// inventory Terrapod can resolve itself" — because an inventory holding a
+// source that needed ansible really was served from a snapshot. Dynamic
+// inventory was then declined outright (#1970), so every source is static,
+// every read resolves, and there is no longer a case the condition would
+// exclude. A condition that can never fail is not caution; it tells an agent
+// to doubt an answer that is always current, which is the same disservice the
+// retired phrasings did.
+//
+// So the guard is inverted rather than dropped: the claim must be
+// UNCONDITIONAL, and the conditional phrasing joins the retired list.
 func TestTheInventoryToolsDoNotTellAnAgentAReadIsStale(t *testing.T) {
 	tools := liveToolsByName(t)
 
 	// Phrasings that were true before the read path became live, and are now
 	// the wrong answer in the direction that matters: an agent told its data
-	// may be stale either refuses to act on it or writes a snapshot it does
-	// not need, and the history is bounded.
+	// may be stale either refuses to act on it or reaches for a refresh tool
+	// that no longer exists.
 	retired := []string{
 		"only as FRESH as the last snapshot",
 		"only as fresh as the last snapshot",
 		"Serves the newest snapshot",
 		"stale target set is brought up to date",
+		// The condition itself, now that nothing can fail it.
+		"resolve itself",
+		"needs ansible",
+		"taken-at",
 	}
 	for name, desc := range tools {
 		if !strings.HasPrefix(name, "terrapod_inventory") &&
@@ -443,17 +373,17 @@ func TestTheInventoryToolsDoNotTellAnAgentAReadIsStale(t *testing.T) {
 		}
 		for _, phrase := range retired {
 			if strings.Contains(desc, phrase) {
-				t.Errorf("%s describes a read as stale unconditionally (%q); it is live "+
-					"for every source kind Terrapod can resolve itself, which is every "+
-					"kind that exists today", name, phrase)
+				t.Errorf("%s qualifies or doubts a read that is always live (%q): every "+
+					"source is static, so the read resolves the rows to answer the call",
+					name, phrase)
 			}
 		}
 	}
 
 	// And the two tools whose answer an operator acts on must SAY the read is
-	// live, with the condition attached. Asserting the absence of the retired
-	// phrasing alone would pass on a description that said nothing at all,
-	// which is the same disservice more quietly.
+	// live. Asserting the absence of the retired phrasing alone would pass on
+	// a description that said nothing at all, which is the same disservice
+	// more quietly.
 	for _, name := range []string{"terrapod_inventory_resolved", "terrapod_inventory_limit_preview"} {
 		desc, ok := tools[name]
 		if !ok {
@@ -462,23 +392,17 @@ func TestTheInventoryToolsDoNotTellAnAgentAReadIsStale(t *testing.T) {
 		if !strings.Contains(desc, "LIVE") && !strings.Contains(desc, "live") {
 			t.Errorf("%s does not tell an agent the resolution is live", name)
 		}
-		// The condition, not an unqualified promise: an inventory carrying a
-		// source that needs ansible really is served from a snapshot, and an
-		// agent that believes otherwise reports a stale host set as current.
-		if !strings.Contains(desc, "resolve itself") {
-			t.Errorf("%s claims liveness without the condition it depends on "+
-				"(an inventory Terrapod can resolve itself)", name)
-		}
 	}
 
-	// The write tool must not sell itself as the way to get fresh data, or an
-	// agent spends a bounded history slot on a no-op per read.
-	refresh := tools["terrapod_inventory_refresh"]
-	if refresh == "" {
-		t.Fatal("terrapod_inventory_refresh is not registered")
-	}
-	if !strings.Contains(refresh, "do NOT need this") {
-		t.Error("terrapod_inventory_refresh does not say a read is already live, " +
-			"so an agent will reach for it to refresh data that was never stale")
+	// There must be no refresh tool. One existed, and its description had to
+	// talk an agent out of using it; removing the snapshot removed the reason
+	// for both. If one comes back, its description is a claim this guard has
+	// no opinion on yet — so fail here and make that a deliberate decision.
+	for name := range tools {
+		if strings.Contains(name, "inventory_refresh") ||
+			strings.Contains(name, "inventory_versions") {
+			t.Errorf("%s is registered; a read is live and writes nothing, so a refresh "+
+				"or a history is a surface that needs its own justification", name)
+		}
 	}
 }

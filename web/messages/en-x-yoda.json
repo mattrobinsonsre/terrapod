@@ -2867,14 +2867,7 @@
         "subheading": "For {name}, the merged result — from every source, in order.",
         "hosts": "Hosts",
         "groups": "Groups",
-        "takenAt": "From {when}, this resolution dates",
-        "never": "never",
-        "producedBy": {
-          "api": "by the API, resolved",
-          "runner": "by a runner, resolved"
-        },
-        "producedByOther": "by {by}, resolved",
-        "liveNote": "Live, this is. In your configuration, every source here is declared — so a lookup, resolving it is. When this result came to be, the date above says; how stale it is, it does not."
+        "liveNote": "Live, this is. In your configuration, every source here is declared — so a lookup, resolving it is."
       },
       "limit": {
         "heading": "Target, what would a limit?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Sources",
         "body": "In order, resolved they are — as repeated -i flags are. A conflicting host variable, a later source wins.",
-        "position": "Position {position}",
-        "apiResolvable": "Resolve, the API can",
-        "runnerOnly": "A runner, it needs",
-        "needsRunner": "Ansible these sources need, and only a runner has it — so the last resolution a runner posted, the result above is; a live one, it is not: {kinds}."
+        "position": "Position {position}"
       },
       "errors": {
         "loadItems": "Load the declared hosts, it did not",

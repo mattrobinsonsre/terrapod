@@ -2867,14 +2867,7 @@
         "subheading": "Het samengevoegde resultaat voor {name}, uit elke bron op volgorde.",
         "hosts": "Hosts",
         "groups": "Groepen",
-        "takenAt": "Deze oplossing dateert van {when}",
-        "never": "nooit",
-        "producedBy": {
-          "api": "opgelost door de API",
-          "runner": "opgelost door een runner"
-        },
-        "producedByOther": "opgelost door {by}",
-        "liveNote": "Dit is live. Elke bron hier is in uw configuratie gedeclareerd, dus oplossen is een query — de datum hierboven geeft aan wanneer dit resultaat is ontstaan, niet hoe verouderd het is."
+        "liveNote": "Dit is live. Elke bron hier is in uw configuratie gedeclareerd, dus oplossen is een query."
       },
       "limit": {
         "heading": "Wat zou een limit-patroon selecteren?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Bronnen",
         "body": "Worden in volgorde opgelost, precies zoals herhaalde -i-vlaggen: bij een conflicterende hostvariabele wint de latere bron.",
-        "position": "Positie {position}",
-        "apiResolvable": "API kan oplossen",
-        "runnerOnly": "Vereist een runner",
-        "needsRunner": "Deze bronnen hebben ansible nodig, dat alleen een runner heeft, dus het resultaat hierboven is de laatste oplossing die een runner heeft gepubliceerd en geen live-oplossing: {kinds}."
+        "position": "Positie {position}"
       },
       "errors": {
         "loadItems": "Kan gedeclareerde hosts niet laden",

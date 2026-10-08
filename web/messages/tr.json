@@ -2867,14 +2867,7 @@
         "subheading": "{name} için birleştirilmiş sonuç, tüm kaynaklardan sırayla.",
         "hosts": "Ana makineler",
         "groups": "Gruplar",
-        "takenAt": "Bu çözümleme {when} tarihinde oluştu",
-        "never": "hiç",
-        "producedBy": {
-          "api": "API tarafından çözümlendi",
-          "runner": "bir runner tarafından çözümlendi"
-        },
-        "producedByOther": "{by} tarafından çözümlendi",
-        "liveNote": "Bu canlıdır. Buradaki her kaynak yapılandırmanızda bildirilmiştir, dolayısıyla çözümleme bir veritabanı sorgusudur. Yukarıdaki tarih bu sonucun ne zaman oluştuğunu söyler, ne kadar eski olduğunu değil."
+        "liveNote": "Bu canlıdır. Buradaki her kaynak yapılandırmanızda bildirilmiştir, dolayısıyla çözümleme bir veritabanı sorgusudur."
       },
       "limit": {
         "heading": "Bir --limit neyi hedefler?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Kaynaklar",
         "body": "Tekrarlanan -i bayrakları gibi sırayla çözümlenir: çakışan bir ana makine değişkeninde sonraki kaynak kazanır.",
-        "position": "Konum {position}",
-        "apiResolvable": "API çözümleyebilir",
-        "runnerOnly": "Runner gerekir",
-        "needsRunner": "Bu kaynaklar ansible gerektirir ve ansible yalnızca runner üzerinde bulunur; bu nedenle yukarıdaki sonuç canlı bir çözümleme değil, bir runner tarafından gönderilen en son çözümlemedir: {kinds}."
+        "position": "Konum {position}"
       },
       "errors": {
         "loadItems": "Bildirilen ana makineler yüklenemedi",

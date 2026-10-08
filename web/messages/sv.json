@@ -2867,14 +2867,7 @@
         "subheading": "Det sammanslagna resultatet för {name}, från varje källa i ordning.",
         "hosts": "Värdar",
         "groups": "Grupper",
-        "takenAt": "Den här upplösningen är från {when}",
-        "never": "aldrig",
-        "producedBy": {
-          "api": "upplöst av API:t",
-          "runner": "upplöst av en runner"
-        },
-        "producedByOther": "upplöst av {by}",
-        "liveNote": "Detta är live. Varje källa här är deklarerad i din konfiguration, så att lösa upp den är en databasfråga. Datumet ovan säger när det här resultatet uppstod, inte hur gammalt det är."
+        "liveNote": "Detta är live. Varje källa här är deklarerad i din konfiguration, så att lösa upp den är en databasfråga."
       },
       "limit": {
         "heading": "Vad skulle ett limit-mönster träffa?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Källor",
         "body": "Löses upp i ordning, precis som upprepade -i-flaggor: vid en motstridig värdvariabel vinner den senare källan.",
-        "position": "Position {position}",
-        "apiResolvable": "API:t kan lösa upp",
-        "runnerOnly": "Kräver en runner",
-        "needsRunner": "Dessa källor behöver ansible, som bara en runner har, så resultatet ovan är den senaste upplösningen en runner skickade in och inte en liveupplösning: {kinds}."
+        "position": "Position {position}"
       },
       "errors": {
         "loadItems": "Det gick inte att läsa in deklarerade värdar",

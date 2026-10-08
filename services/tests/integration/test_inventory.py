@@ -171,7 +171,6 @@ class TestLazyCreation:
         sources = resp.json()["data"]["attributes"]["sources"]
         assert [s["kind"] for s in sources] == ["platform"]
         assert [s["position"] for s in sources] == [0]
-        assert sources[0]["api-resolvable"] is True
         assert sources[0]["id"].startswith("invsrc-")
 
 
@@ -182,26 +181,18 @@ class TestCascade:
         set_auth(app, admin_user())
         ws_id = await _workspace(client)
         await _declare(client, ws_id, "web-1")
-        inv_id = await _default_inventory(client, ws_id)
-        # Resolve so there is a version row to cascade too.
-        r = await client.post(f"{V1}/inventories/{inv_id}/actions/resolve", headers=AUTH)
-        assert r.status_code == 200, r.text
+        await _default_inventory(client, ws_id)
 
         gone = await client.delete(f"{V1}/workspaces/{ws_id}", headers=AUTH)
         assert gone.status_code in (200, 204), gone.text
 
         from sqlalchemy import func, select
 
-        from terrapod.db.models import (
-            Inventory,
-            InventoryItem,
-            InventorySource,
-            InventoryVersion,
-        )
+        from terrapod.db.models import Inventory, InventoryItem, InventorySource
         from terrapod.db.session import get_db_session
 
         async with get_db_session() as db:
-            for model in (Inventory, InventorySource, InventoryItem, InventoryVersion):
+            for model in (Inventory, InventorySource, InventoryItem):
                 count = await db.execute(select(func.count()).select_from(model))
                 assert count.scalar() == 0, f"{model.__tablename__} survived"
 
@@ -220,27 +211,9 @@ class TestCascade:
         items = await client.get(f"{V1}/workspaces/{ws_id}/inventory-items", headers=AUTH)
         assert [i["attributes"]["name"] for i in items.json()["data"]] == ["web-1"]
 
-    async def test_deleting_an_inventory_removes_its_snapshots(self, client, app):
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = await _default_inventory(client, ws_id)
-        await client.post(f"{V1}/inventories/{inv_id}/actions/resolve", headers=AUTH)
-
-        await client.delete(f"{V1}/inventories/{inv_id}", headers=AUTH)
-
-        from sqlalchemy import func, select
-
-        from terrapod.db.models import InventoryVersion
-        from terrapod.db.session import get_db_session
-
-        async with get_db_session() as db:
-            count = await db.execute(select(func.count()).select_from(InventoryVersion))
-            assert count.scalar() == 0
-
 
 class TestResolutionEndToEnd:
-    """Declared items through the real route to a real snapshot."""
+    """Declared items through the real route to a real resolution."""
 
     async def test_it_resolves_hosts_groups_and_the_address_fold(self, client, app):
         set_auth(app, admin_user())
@@ -267,7 +240,6 @@ class TestResolutionEndToEnd:
         assert attrs["hosts"]["web-1"]["ansible_host"] == "10.0.1.10"
         assert attrs["hosts"]["web-1"]["role"] == "frontend"
         assert attrs["groups"]["prod"] == ["db-1", "web-1"]
-        assert attrs["produced-by"] == "api"
 
     async def test_an_explicit_ansible_host_beats_the_declared_address(self, client, app):
         """The fold is a default, not an override: a host var the operator wrote
@@ -290,8 +262,8 @@ class TestResolutionEndToEnd:
 
     async def test_a_host_with_no_vars_is_still_in_the_host_set(self, client, app):
         """`ansible-inventory --list` omits a var-less host from `_meta.hostvars`,
-        so enumerating the host set from that shape loses it. The snapshot holds
-        every host explicitly for exactly this reason."""
+        so enumerating the host set from that shape loses it. The resolved view
+        holds every host explicitly for exactly this reason."""
         set_auth(app, admin_user())
         ws_id = await _workspace(client)
         await _declare(client, ws_id, "bare-1")
@@ -312,147 +284,13 @@ class TestResolutionEndToEnd:
         await client.get(f"{V1}/inventories/{inv_id}/resolved", headers=AUTH)
 
         await client.delete(f"{V1}/inventory-items/{doomed}", headers=AUTH)
-        resp = await client.post(f"{V1}/inventories/{inv_id}/actions/resolve", headers=AUTH)
+        resp = await client.get(f"{V1}/inventories/{inv_id}/resolved", headers=AUTH)
 
         assert list(resp.json()["data"]["attributes"]["hosts"]) == ["web-1"]
 
-    async def test_the_resolved_view_creates_the_first_snapshot_itself(self, client, app):
-        """#1967's observability scope: a workspace that has just declared its
-        hosts can see them without waiting for a configure to exist."""
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = await _default_inventory(client, ws_id)
-
-        before = await client.get(f"{V1}/inventories/{inv_id}/versions", headers=AUTH)
-        assert before.json()["data"] == []
-
-        await client.get(f"{V1}/inventories/{inv_id}/resolved", headers=AUTH)
-
-        after = await client.get(f"{V1}/inventories/{inv_id}/versions", headers=AUTH)
-        assert len(after.json()["data"]) == 1
-
-
-class TestSnapshotPruning:
-    """The history is bounded, and the bound keeps the newest."""
-
-    async def test_it_keeps_the_newest_twenty(self, client, app):
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = await _default_inventory(client, ws_id)
-
-        from terrapod.services import inventory_service as inv
-
-        # A host per iteration, because the action writes only when the
-        # resolution has moved -- which is the behaviour the class below pins.
-        # Resolving the same set twenty-five times is one row, so a loop that
-        # only resolved would exercise no pruning at all while still passing a
-        # bare length assertion.
-        for i in range(inv.MAX_VERSIONS_PER_INVENTORY + 5):
-            await _declare(client, ws_id, f"web-{i + 2}")
-            resp = await client.post(f"{V1}/inventories/{inv_id}/actions/resolve", headers=AUTH)
-            assert resp.status_code == 200, resp.text
-        newest = resp.json()["data"]["id"]
-
-        listed = await client.get(f"{V1}/inventories/{inv_id}/versions", headers=AUTH)
-        ids = [v["id"] for v in listed.json()["data"]]
-
-        assert len(ids) == inv.MAX_VERSIONS_PER_INVENTORY
-        # Newest first, and the one just written survived -- a prune that kept
-        # the *oldest* would pass a bare length assertion.
-        assert ids[0] == newest
-
-
-class TestRunnerPostedSnapshots:
-    """What a configure will post on its first day (#1972)."""
-
-    async def test_a_runner_snapshot_records_its_run(self, client, app):
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "declared-1")
-        inv_id = await _default_inventory(client, ws_id)
-
-        run_id = str(uuid.uuid4())
-        from terrapod.auth.runner_tokens import generate_runner_token
-
-        token = generate_runner_token(run_id)
-
-        # The grant is "a runner token may manage the inventory of its own run's
-        # workspace", so the run has to exist and belong to this workspace.
-        # Seeded through the ORM rather than raw SQL: `runs` has ~70 columns and
-        # a hand-written INSERT breaks on the next NOT NULL anyone adds, with a
-        # driver error that names the column and nothing about why this test
-        # cares.
-        from terrapod.db.models import Run
-        from terrapod.db.session import get_db_session
-
-        async with get_db_session() as db:
-            db.add(
-                Run(
-                    id=uuid.UUID(run_id),
-                    workspace_id=uuid.UUID(ws_id.removeprefix("ws-")),
-                    status="planning",
-                    source="tfe-api",
-                    plan_only=False,
-                )
-            )
-            await db.commit()
-
-        resp = await client.post(
-            f"{V1}/inventories/{inv_id}/versions",
-            json={
-                "data": {
-                    "type": "inventory-versions",
-                    "attributes": {
-                        "hosts": {"from-ansible": {"ansible_host": "10.9.9.9"}},
-                        "groups": {"discovered": ["from-ansible"]},
-                    },
-                }
-            },
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert resp.status_code == 201, resp.text
-        attrs = resp.json()["data"]["attributes"]
-        assert attrs["produced-by"] == "runner"
-        assert attrs["produced-by-ref"] == run_id
-        assert attrs["host-count"] == 1
-
-        # It lands in the history, which is what posting it is for: the basis a
-        # partial-configure retry subtracts against (#1973).
-        versions = await client.get(f"{V1}/inventories/{inv_id}/versions", headers=AUTH)
-        assert versions.status_code == 200, versions.text
-        posted = [v for v in versions.json()["data"] if v["id"] == resp.json()["data"]["id"]]
-        assert posted, "the runner's snapshot is not in the history"
-
-        # But it is NOT what a reader sees, and that is deliberate. This
-        # inventory's only source is `terraform`, which the API resolves itself
-        # from the declared rows -- so the live answer is authoritative and a
-        # recorded row describing the same source is history, however recent.
-        # A runner's resolution wins only where the API cannot resolve at all,
-        # which is the kind git (#1929) will be the first to add.
-        read = await client.get(f"{V1}/inventories/{inv_id}/resolved", headers=AUTH)
-        assert read.status_code == 200, read.text
-        assert list(read.json()["data"]["attributes"]["hosts"]) == ["declared-1"]
-
-        # And it carries no stamp, because the producer could not say what it
-        # resolved against -- which is why it never reads as current.
-        from sqlalchemy import select
-
-        from terrapod.db.models import InventoryVersion
-
-        async with get_db_session() as db:
-            got = await db.execute(
-                select(InventoryVersion.source_stamp).where(
-                    InventoryVersion.produced_by == InventoryVersion.SOURCE_RUNNER
-                )
-            )
-            assert [row[0] for row in got.all()] == [""]
-
 
 class TestLimitPreviewAgainstRealData:
-    async def test_it_expands_a_group_term_from_the_stored_snapshot(self, client, app):
+    async def test_it_expands_a_group_term_against_the_live_resolution(self, client, app):
         set_auth(app, admin_user())
         ws_id = await _workspace(client)
         await _declare(client, ws_id, "web-1", groups=["web"])
@@ -484,244 +322,3 @@ class TestLimitPreviewAgainstRealData:
         )
 
         assert resp.status_code == 422, resp.text
-
-
-class TestTheSourceStampDecidesWhenARowIsWritten:
-    """Live reads without a write per read, against a real database.
-
-    Resolving is a query, so a read is live. What the stamp buys is that the
-    bounded version history -- the basis a partial-configure retry subtracts
-    against (#1973) -- is not evicted by reading. Every assertion here is about
-    row COUNT rather than payload, because the payload is identical either way
-    and that is exactly what hid this class of bug.
-    """
-
-    @staticmethod
-    async def _versions(inv_id: str) -> int:
-        from sqlalchemy import func, select
-
-        from terrapod.db.models import InventoryVersion
-        from terrapod.db.session import get_db_session
-
-        async with get_db_session() as db:
-            got = await db.execute(
-                select(func.count())
-                .select_from(InventoryVersion)
-                .where(InventoryVersion.inventory_id == uuid.UUID(inv_id.removeprefix("invver-")))
-            )
-            return int(got.scalar() or 0)
-
-    @staticmethod
-    async def _stamps(inv_id: str) -> list[str]:
-        from sqlalchemy import select
-
-        from terrapod.db.models import InventoryVersion
-        from terrapod.db.session import get_db_session
-
-        async with get_db_session() as db:
-            got = await db.execute(
-                select(InventoryVersion.source_stamp)
-                .where(InventoryVersion.inventory_id == uuid.UUID(inv_id))
-                .order_by(InventoryVersion.created_at)
-            )
-            return [row[0] for row in got.all()]
-
-    async def test_repeated_reads_do_not_write_a_row(self, client, app):
-        """The eviction hazard: a dashboard left open must not be able to push
-        out the snapshot a configure is pinned to."""
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        first = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert first.status_code == 200, first.text
-        after_first = await self._versions(inv_id)
-        assert after_first == 1
-
-        for _ in range(5):
-            again = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-            assert again.status_code == 200, again.text
-            # Same answer, same row -- and `taken-at` does not move, because the
-            # resolution did not.
-            assert again.json()["data"]["id"] == first.json()["data"]["id"]
-            assert (
-                again.json()["data"]["attributes"]["taken-at"]
-                == first.json()["data"]["attributes"]["taken-at"]
-            )
-
-        assert await self._versions(inv_id) == after_first, "a read wrote a row"
-
-    async def test_declaring_a_host_moves_the_stamp(self, client, app):
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        before = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert before.json()["data"]["attributes"]["host-count"] == 1
-
-        await _declare(client, ws_id, "web-2")
-        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert after.status_code == 200, after.text
-        assert after.json()["data"]["attributes"]["host-count"] == 2
-        assert await self._versions(inv_id) == 2
-
-        stamps = await self._stamps(inv_id)
-        assert stamps[0] != stamps[1], stamps
-        assert all(s for s in stamps), "an API resolution must carry a stamp"
-
-    async def test_DELETING_a_host_moves_the_stamp(self, client, app):
-        """The one `max(updated_at)` alone gets wrong, and it fails in the
-        direction that matters: a deleted host would go on being served as part
-        of the target set, because removing a row leaves the maximum exactly
-        where it was. The count is what catches it.
-        """
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        # Declare the one to delete FIRST, so the surviving host carries the
-        # later `updated_at` and the maximum is provably unmoved by the delete.
-        doomed = await _declare(client, ws_id, "web-doomed")
-        await _declare(client, ws_id, "web-keep")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        before = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert before.json()["data"]["attributes"]["host-count"] == 2
-
-        gone = await client.delete(f"{V1}/inventory-items/{doomed}", headers=AUTH)
-        assert gone.status_code in (200, 204), gone.text
-
-        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert after.status_code == 200, after.text
-        hosts = after.json()["data"]["attributes"]["hosts"]
-        assert "web-doomed" not in hosts, "a deleted host was still being served"
-        assert after.json()["data"]["attributes"]["host-count"] == 1
-        assert await self._versions(inv_id) == 2
-
-    async def test_updating_a_host_moves_the_stamp(self, client, app):
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        item_id = await _declare(client, ws_id, "web-1", address="10.0.0.1")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-
-        moved = await client.patch(
-            f"{V1}/inventory-items/{item_id}",
-            json={"data": {"attributes": {"address": "10.0.0.9"}}},
-            headers=AUTH,
-        )
-        assert moved.status_code == 200, moved.text
-
-        after = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert after.status_code == 200, after.text
-        assert after.json()["data"]["attributes"]["hosts"]["web-1"]["ansible_host"] == "10.0.0.9"
-        assert await self._versions(inv_id) == 2
-
-    async def test_the_limit_preview_sees_a_change_without_a_resolve(self, client, app):
-        """The preview is the safety surface, so it must not be the one place
-        still answering from a stale set."""
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1", groups=["web"])
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        first = await client.post(
-            f"{V1}/inventories/inv-{inv_id}/actions/preview-limit",
-            json={"data": {"attributes": {"limit": "web"}}},
-            headers=AUTH,
-        )
-        assert first.status_code == 200, first.text
-        assert first.json()["data"]["attributes"]["hosts"] == ["web-1"]
-
-        await _declare(client, ws_id, "web-2", groups=["web"])
-
-        second = await client.post(
-            f"{V1}/inventories/inv-{inv_id}/actions/preview-limit",
-            json={"data": {"attributes": {"limit": "web"}}},
-            headers=AUTH,
-        )
-        assert second.status_code == 200, second.text
-        assert second.json()["data"]["attributes"]["hosts"] == ["web-1", "web-2"]
-        assert second.json()["data"]["attributes"]["of-host-count"] == 2
-
-    async def test_an_inventory_with_no_sources_is_stamped_rather_than_unstampable(
-        self, client, app
-    ):
-        """`api_can_resolve([])` is vacuously True, so the stamp must not answer
-        "cannot say" for the same input -- the caller would resolve, the empty
-        stamp would never match, and a row would be written on every read, which
-        is the eviction the stamp exists to prevent.
-
-        Unreachable through the API (an inventory is created with a terraform
-        source and no route removes one), so the source row is deleted through
-        the ORM to reach it at all. That is the point: the two helpers disagreed
-        about one input, and a latent disagreement is worth closing while it is
-        still cheap.
-        """
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        from sqlalchemy import delete
-
-        from terrapod.db.models import InventorySource
-        from terrapod.db.session import get_db_session
-
-        async with get_db_session() as db:
-            await db.execute(
-                delete(InventorySource).where(InventorySource.inventory_id == uuid.UUID(inv_id))
-            )
-            await db.commit()
-
-        first = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-        assert first.status_code == 200, first.text
-        # No sources resolves to the empty set, deterministically.
-        assert first.json()["data"]["attributes"]["host-count"] == 0
-        baseline = await self._versions(inv_id)
-
-        for _ in range(3):
-            again = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
-            assert again.status_code == 200, again.text
-
-        assert await self._versions(inv_id) == baseline, (
-            "a sourceless inventory wrote a row per read"
-        )
-
-    async def test_the_resolve_action_is_a_no_op_when_nothing_has_moved(self, client, app):
-        """`POST .../actions/resolve` takes the same stamped path a read does.
-
-        It used to write unconditionally. That handed anyone holding write an
-        eviction vector for nothing: the history is bounded, so a duplicate row
-        prunes the oldest while carrying no information a configure could
-        subtract against -- a matching stamp already proves the existing row IS
-        the current resolution. The action still exists because it GUARANTEES a
-        row describes the current resolution; it does not promise a new one.
-        """
-        set_auth(app, admin_user())
-        ws_id = await _workspace(client)
-        await _declare(client, ws_id, "web-1")
-        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
-
-        first = await client.post(f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH)
-        assert first.status_code == 200, first.text
-        assert await self._versions(inv_id) == 1
-
-        for _ in range(4):
-            again = await client.post(
-                f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH
-            )
-            assert again.status_code == 200, again.text
-            # The same row, returned again -- not a new one with the same bytes.
-            assert again.json()["data"]["id"] == first.json()["data"]["id"]
-
-        assert await self._versions(inv_id) == 1, "the action wrote a duplicate row"
-
-        # And it still writes when there is something to record, or the
-        # guarantee it exists for would be hollow.
-        await _declare(client, ws_id, "web-2")
-        moved = await client.post(f"{V1}/inventories/inv-{inv_id}/actions/resolve", headers=AUTH)
-        assert moved.status_code == 200, moved.text
-        assert moved.json()["data"]["id"] != first.json()["data"]["id"]
-        assert await self._versions(inv_id) == 2

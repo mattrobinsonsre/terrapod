@@ -8,8 +8,8 @@ import (
 )
 
 // registerInventory adds the declared-inventory tools: the hosts a workspace
-// declares through its own Terraform (#1968), the inventory object those
-// sources resolve into, and the snapshots a configure targets against (#1967).
+// declares through its own Terraform (#1968) and the inventory object those
+// sources resolve into (#1967).
 //
 // # Why the limit preview is the tool that earns its place
 //
@@ -22,17 +22,17 @@ import (
 // before anything runs is the safety surface this whole group exists to give
 // it. Ask the preview, show the host list, then act.
 //
-// # Reads only, and deliberately
+// # Reads only, and there is nothing to write
 //
-// There is no tool here that declares or removes a host. A declared host is
-// owned by the managing Terraform's `terrapod_inventory_item` resource, so one
-// written straight through the API is in no configuration's state: nothing
-// prunes it (the server prunes snapshot history, never items), so it persists
-// in the target set of every configure reading that inventory as an orphan no
-// code owns, and it can collide with the name a later apply wants. An agent
-// that wants a host declared edits the configuration and lets the apply do it.
-// The one write here is a snapshot refresh, which is a record rather than a
-// declaration and is therefore safe to drive directly.
+// No tool here declares or removes a host: a declared host is owned by the
+// managing Terraform's `terrapod_inventory_item` resource, so an agent that
+// wants one edits the configuration and lets the apply do it.
+//
+// Nor is there a refresh. Dynamic inventory was declined (#1970), so every
+// source is static and `terrapod_inventory_resolved` resolves the rows to
+// answer the call. There is no stale copy for a write tool to bring up to
+// date, which is why the group is read-only in both senses: it changes
+// nothing, and there is nothing it could usefully change.
 func registerInventory(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_inventory_list ──────────────────────────────────────
 	type inventoryItemListIn struct {
@@ -80,7 +80,7 @@ func registerInventory(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_workspace_inventories",
 		Description: "List a workspace's ansible inventories and the ordered sources each one composes. " +
 			"`position` is the `-i` ordering, so a HIGHER position wins a conflicting host variable (hosts and group memberships union; the conflict is per variable, so a non-conflicting variable from an earlier source survives). " +
-			"`api-resolvable` is the field to read before anything else: false means a source needs ansible to parse, which only a runner has, so Terrapod cannot resolve that inventory itself and its newest snapshot may be older than the declared hosts. " +
+			"Every source is static, so terrapod_inventory_resolved resolves any of these to a current answer; there is no source here that needs a runner to parse. " +
 			"Empty for a workspace that has never declared a host — an inventory is created when something uses one.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceInventoriesIn) (*mcp.CallToolResult, workspaceInventoriesOut, error) {
@@ -106,53 +106,23 @@ func registerInventory(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_inventory_resolved",
-		Description: "Read what an inventory currently resolves to: every host with its merged variables, every group's membership, how many of each, when this resolution came to be (`taken-at`) and what produced it (`produced-by`: `api` or `runner`). " +
+		Description: "Read what an inventory resolves to: every host with its merged variables, every group's membership, and how many of each. " +
 			"This is the target set a configure would run against, so it is what to show a user before anything runs. " +
 			"`hosts` is EXHAUSTIVE — it includes a host with no variables, deliberately unlike ansible's own `_meta.hostvars`, which omits one entirely; enumerating a host set from ansible's shape loses hosts silently, which is why `hosts` is the map to reason over and the ansible-shaped rendering is off unless asked for. " +
-			"It is LIVE for an inventory Terrapod can resolve itself — which is every inventory that exists today, because the only declared source kind is `platform` and resolving that is a database query. So the hosts you read are the hosts as they are, not as of some earlier moment, and `taken-at` says when this resolution came to be rather than how stale it is. " +
-			"Where a source needs ansible, Terrapod cannot resolve it: the newest snapshot a runner posted is served instead (then `taken-at` IS a staleness reading), and where there is no snapshot it answers a CONFLICT naming the offending source kinds rather than resolving the rest — a partial resolution is a target set that is silently too small. Relay that message; it says a configure or a runner-side resolve has to produce the first one, which is the actionable part.",
+			"It is LIVE and there is nothing to refresh. Dynamic inventory was declined, so every source is static and Terrapod resolves the rows to answer this call — the hosts you read are the hosts as they are, not as of some earlier moment. There is deliberately no timestamp and no freshness field: a reader has nothing to reason about, and no write tool is needed to bring this up to date.",
 		Annotations: readOnly,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inventoryResolvedIn) (*mcp.CallToolResult, *terrapod.InventoryVersion, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inventoryResolvedIn) (*mcp.CallToolResult, *terrapod.ResolvedInventory, error) {
 		if in.InventoryID == "" {
 			return errText("inventory_id is required"), nil, nil
 		}
-		version, err := c.GetResolvedInventory(ctx, in.InventoryID)
+		resolved, err := c.GetResolvedInventory(ctx, in.InventoryID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}
 		if !in.IncludeAnsibleShape {
-			version.AnsibleInventory = nil
+			resolved.AnsibleInventory = nil
 		}
-		return nil, version, nil
-	})
-
-	// ── terrapod_inventory_versions ──────────────────────────────────
-	type inventoryVersionsIn struct {
-		InventoryID string `json:"inventory_id" jsonschema:"the inventory id, from terrapod_workspace_inventories"`
-	}
-	type inventoryVersionsOut struct {
-		Count    int                         `json:"count"`
-		Versions []terrapod.InventoryVersion `json:"versions"`
-	}
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "terrapod_inventory_versions",
-		Description: "List an inventory's snapshot history, newest first — each one's host and group counts, `taken-at`, and `produced-by` (`api` or `runner`) with the ref that produced it. " +
-			"This is the history, not the current answer — terrapod_inventory_resolved is live for an inventory Terrapod can resolve itself, so do NOT read `taken-at` here as staleness unless `api-resolvable` is false. " +
-			"What it answers is whether a runner has ever resolved this inventory (one whose snapshots are all `api`-produced has not been resolved by ansible itself) and which recorded target set a configure ran against. The history is bounded, so the oldest entries fall off. " +
-			"Contents are omitted here; read terrapod_inventory_resolved for the hosts and groups.",
-		Annotations: readOnly,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inventoryVersionsIn) (*mcp.CallToolResult, inventoryVersionsOut, error) {
-		if in.InventoryID == "" {
-			return errText("inventory_id is required"), inventoryVersionsOut{}, nil
-		}
-		versions, err := c.ListInventoryVersions(ctx, in.InventoryID)
-		if err != nil {
-			return errResult(err), inventoryVersionsOut{}, nil
-		}
-		if versions == nil {
-			versions = []terrapod.InventoryVersion{}
-		}
-		return nil, inventoryVersionsOut{Count: len(versions), Versions: versions}, nil
+		return nil, resolved, nil
 	})
 
 	// ── terrapod_inventory_limit_preview ─────────────────────────────
@@ -165,7 +135,7 @@ func registerInventory(s *mcp.Server, c *terrapod.Client) {
 		Description: "Answer which hosts an ansible `--limit` pattern would select, BEFORE anything runs. Show the result to the user when a configure's blast radius matters. " +
 			"Auto-configure is deliberately broad (operators at scale prefer the blast radius to the manual process), so visibility is the control rather than prevention, and this is the tool that provides it. " +
 			"Two honesty conditions on the answer. It is ADVISORY: the authoritative expansion is `ansible-inventory --list --limit` taken in the runner at the start of the configure, and this covers the forms an operator writes rather than reimplementing ansible's pattern language — a `~regex` term is REFUSED rather than matched, because an empty target set for a pattern ansible would have expanded is the wrong answer dressed as an answer. " +
-			"It expands against a LIVE resolution for an inventory Terrapod can resolve itself, so it reflects a host declared a moment ago; compare `host-count` against `of-host-count` (the hosts it expanded against) to see how much of the inventory the pattern selects. Where a source needs ansible it expands against the newest snapshot instead, and answers a conflict when there is none.",
+			"It expands against a LIVE resolution, so it reflects a host declared a moment ago; compare `host-count` against `of-host-count` (the hosts it expanded against) to see how much of the inventory the pattern selects.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inventoryLimitPreviewIn) (*mcp.CallToolResult, *terrapod.InventoryLimitPreview, error) {
 		if in.InventoryID == "" {
@@ -189,41 +159,5 @@ func registerInventory(s *mcp.Server, c *terrapod.Client) {
 			preview.Hosts = []string{}
 		}
 		return nil, preview, nil
-	})
-
-	// ── terrapod_inventory_refresh ───────────────────────────────────
-	//
-	// Named "refresh" rather than "resolve" on purpose: `terrapod_inventory_
-	// resolve` sits one letter from the read-only `terrapod_inventory_resolved`,
-	// and a write tool an agent can reach for by near-miss is a bad trade for
-	// matching the route name.
-	//
-	// It is deliberately NOT how an agent gets fresh data -- a read is live for
-	// every source kind that exists today. It exists because the snapshot
-	// history is what a configure pins (#1973), and the endpoint behind it is
-	// the only way to put a row there without running one.
-	type inventoryRefreshIn struct {
-		InventoryID string `json:"inventory_id" jsonschema:"the inventory id, from terrapod_workspace_inventories"`
-	}
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "terrapod_inventory_refresh",
-		Description: "Record a snapshot of what the inventory resolves to now, and return it. " +
-			"You almost certainly do NOT need this to see current data: terrapod_inventory_resolved and the limit preview are already live for an inventory Terrapod can resolve itself. What this guarantees is that the bounded snapshot history HOLDS a row describing the current resolution — which is what a configure pins and what a partial-configure retry subtracts against. It is a no-op returning the existing row when the resolution has not moved, so calling it twice does not consume two slots. " +
-			"It writes a snapshot record; it declares no hosts and touches no infrastructure, and the hosts it reports come from the sources as they already are. " +
-			"Requires inventory write on the workspace. Only works for an inventory Terrapod can resolve itself: one carrying a source that needs ansible answers a conflict naming the offending kinds, because the API will not resolve the rest of it — a partial resolution is a target set that is silently too small, and a runner has to do that one.",
-		Annotations: mutating,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inventoryRefreshIn) (*mcp.CallToolResult, *terrapod.InventoryVersion, error) {
-		if in.InventoryID == "" {
-			return errText("inventory_id is required"), nil, nil
-		}
-		version, err := c.ResolveInventory(ctx, in.InventoryID)
-		if err != nil {
-			return errResult(err), nil, nil
-		}
-		// The ansible-shaped rendering is the lossy one (a var-less host is
-		// omitted from it), and a refresh is about freshness rather than the
-		// document, so the exhaustive maps are what comes back here.
-		version.AnsibleInventory = nil
-		return nil, version, nil
 	})
 }

@@ -292,86 +292,11 @@ func TestGetResolvedInventoryKeepsVarLessHosts(t *testing.T) {
 	if len(version.Groups["net"]) != 2 {
 		t.Errorf("groups = %#v", version.Groups)
 	}
-	if version.TakenAt != "2026-01-01T00:00:00Z" {
-		t.Errorf("taken-at not read: %q", version.TakenAt)
-	}
 	if version.AnsibleInventory == nil {
 		t.Error("the rendered ansible shape should be carried through")
 	}
 	if version.InventoryID != "inv-3333" {
 		t.Errorf("inventory relationship not read: %q", version.InventoryID)
-	}
-}
-
-func TestResolvedInventoryRefusalIsAConflict(t *testing.T) {
-	// A source needing ansible, with no snapshot yet. The API refuses rather
-	// than resolving what it can, so the SDK surfaces that as a conflict rather
-	// than an empty inventory.
-	c, _ := inventoryServer(t, http.StatusConflict,
-		`{"errors":[{"status":"409","detail":"contains a source the API cannot resolve"}],"detail":"contains a source the API cannot resolve"}`)
-
-	_, err := c.GetResolvedInventory(t.Context(), "inv-3333")
-	var cf *ConflictError
-	if !errors.As(err, &cf) {
-		t.Fatalf("want ConflictError, got %v", err)
-	}
-}
-
-func TestRecordInventoryVersionSendsEmptyMapsNotNull(t *testing.T) {
-	// An empty resolution is a real answer -- a workspace whose hosts have all
-	// been destroyed. Sending null would make the server read it as absent.
-	c, got := inventoryServer(t, http.StatusCreated, resolvedJSON)
-
-	if _, err := c.RecordInventoryVersion(t.Context(), "inv-3333",
-		RecordInventoryVersionRequest{}); err != nil {
-		t.Fatal(err)
-	}
-
-	if got.path != "/api/v1/inventories/inv-3333/versions" {
-		t.Errorf("path = %s", got.path)
-	}
-	for _, key := range []string{"hosts", "groups"} {
-		v, has := got.attrs[key]
-		if !has {
-			t.Errorf("%s must be sent even when empty: %#v", key, got.attrs)
-			continue
-		}
-		if _, ok := v.(map[string]any); !ok {
-			t.Errorf("%s = %#v, want an object", key, v)
-		}
-	}
-}
-
-func TestRecordInventoryVersionSendsTheResolution(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusCreated, resolvedJSON)
-
-	_, err := c.RecordInventoryVersion(t.Context(), "inv-3333", RecordInventoryVersionRequest{
-		Hosts:  map[string]map[string]any{"h1": {"ansible_port": 2222}},
-		Groups: map[string][]string{"web": {"h1"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hosts, ok := got.attrs["hosts"].(map[string]any)
-	if !ok {
-		t.Fatalf("hosts = %#v", got.attrs["hosts"])
-	}
-	h1, ok := hosts["h1"].(map[string]any)
-	if !ok || h1["ansible_port"] != float64(2222) {
-		t.Errorf("a runner may post a non-string variable: %#v", hosts)
-	}
-}
-
-func TestResolveInventory(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, resolvedJSON)
-
-	if _, err := c.ResolveInventory(t.Context(), "inv-3333"); err != nil {
-		t.Fatal(err)
-	}
-	if got.method != http.MethodPost ||
-		got.path != "/api/v1/inventories/inv-3333/actions/resolve" {
-		t.Errorf("wrong request: %s %s", got.method, got.path)
 	}
 }
 
@@ -495,27 +420,6 @@ func TestAnInventoryWithNoSourcesParsesCleanly(t *testing.T) {
 	}
 	if inventory.Sources != nil {
 		t.Errorf("sources = %#v", inventory.Sources)
-	}
-}
-
-func TestListInventoryVersionsNewestFirst(t *testing.T) {
-	c, _ := inventoryServer(t, http.StatusOK, `{"data":[
-	  {"id":"invver-b","type":"inventory-versions","attributes":{"host-count":3,"produced-by":"runner","taken-at":"2026-01-02T00:00:00Z"}},
-	  {"id":"invver-a","type":"inventory-versions","attributes":{"host-count":2,"produced-by":"api","taken-at":"2026-01-01T00:00:00Z"}}]}`)
-
-	versions, err := c.ListInventoryVersions(t.Context(), "inv-3333")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(versions) != 2 {
-		t.Fatalf("got %d", len(versions))
-	}
-	if versions[0].ProducedBy != "runner" || versions[0].HostCount != 3 {
-		t.Errorf("first: %+v", versions[0])
-	}
-	// A list omits contents; reading one snapshot is how they are fetched.
-	if versions[0].Hosts != nil {
-		t.Errorf("a list should not carry contents: %#v", versions[0].Hosts)
 	}
 }
 

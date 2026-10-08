@@ -2867,14 +2867,7 @@
         "subheading": "{name}의 모든 소스를 순서대로 병합한 결과입니다.",
         "hosts": "호스트",
         "groups": "그룹",
-        "takenAt": "이 해석 결과의 시점: {when}",
-        "never": "없음",
-        "producedBy": {
-          "api": "API가 해석",
-          "runner": "러너가 해석"
-        },
-        "producedByOther": "{by}가 해석",
-        "liveNote": "이것은 실시간입니다. 여기의 모든 소스는 구성에 선언되어 있으므로 해석은 데이터베이스 조회에 불과합니다. 위 시점은 이 결과가 생긴 때이며, 얼마나 오래되었는지를 뜻하지 않습니다."
+        "liveNote": "이것은 실시간입니다. 여기의 모든 소스는 구성에 선언되어 있으므로 해석은 데이터베이스 조회에 불과합니다."
       },
       "limit": {
         "heading": "--limit은 어떤 호스트를 대상으로 하나요?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "소스",
         "body": "-i 플래그를 반복해서 지정한 것과 똑같이 순서대로 해석됩니다. 호스트 변수가 충돌하면 나중 소스가 우선합니다.",
-        "position": "{position}번째",
-        "apiResolvable": "API로 해석 가능",
-        "runnerOnly": "러너 필요",
-        "needsRunner": "이 소스들은 ansible이 필요하고 ansible은 러너에만 있습니다. 따라서 위 결과는 실시간 해석이 아니라 러너가 마지막으로 보낸 해석 결과입니다: {kinds}."
+        "position": "{position}번째"
       },
       "errors": {
         "loadItems": "선언된 호스트를 불러오지 못했습니다",

@@ -188,10 +188,9 @@ def validate_declared_vars(host_vars: dict[str, Any]) -> dict[str, Any]:
       not the one odd value, all of them -- with nothing anywhere saying why.
 
     Refusing at the write turns that into a 422 naming the key. Richer values
-    are not lost to the platform: a resolved **snapshot** carries whatever
-    ansible produced, and a future file-based source carries `group_vars` and
-    `host_vars` natively. This rule is only about the flat surface Terraform
-    declares, which is why the snapshot path deliberately does not call it.
+    are not lost to the platform: a file-based source carries `group_vars` and
+    `host_vars` natively, and a resolution carries whatever ansible produced.
+    This rule is only about the flat surface Terraform declares.
     """
     if not isinstance(host_vars, dict):
         raise InventoryValidationError("host variables must be a mapping")
@@ -237,9 +236,9 @@ def merge(resolutions: list[SourceResolution]) -> ResolvedInventory:
 
     return ResolvedInventory(
         hosts=hosts,
-        # Sorted so the snapshot is byte-stable for the same inputs: an
-        # unordered set would make two identical resolutions compare unequal and
-        # a diff between snapshots unreadable.
+        # Sorted so the result is byte-stable for the same inputs: an
+        # unordered set would make two identical resolutions compare unequal
+        # and a diff between two reads unreadable.
         groups={name: sorted(members) for name, members in sorted(group_members.items())},
         provenance=provenance,
     )
@@ -292,9 +291,8 @@ def limit_matches(resolved: ResolvedInventory, pattern: str) -> list[str]:
     guesses: a `~regex` term raises, because quietly matching nothing would
     show an empty target set for a limit that ansible would have expanded.
 
-    The authoritative expansion is always `ansible-inventory --list --limit`
-    taken in the runner at the start of a configure, which is what the
-    `InventoryVersion` snapshot records (#1967).
+    The authoritative expansion is always `ansible-inventory --list --limit`,
+    taken against the inventory a configure runs with.
     """
     if not pattern or not pattern.strip():
         return sorted(resolved.hosts)

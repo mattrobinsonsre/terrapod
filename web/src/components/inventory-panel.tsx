@@ -19,32 +19,26 @@
 // be an affordance for losing work. The tab says so in as many words, because an
 // operator who is not told goes looking for the button.
 //
-// ## The resolved view is LIVE — which is why there is no Refresh here
+// ## The resolved view is LIVE, and there is nothing to refresh
 //
 // Dynamic inventory is banned (#1970, closed `NOT_PLANNED`), so every source
 // Terrapod implements is static — declared rows the managing Terraform owns —
-// and resolving one is a database query. A read is therefore live: there is no
-// cached-versus-fresh distinction left to surface and no staleness for a reader
-// to reason about, so the panel states what the numbers ARE rather than how old
-// they might be. `taken-at` survives and now says when this resolution came to
-// be, not how stale it is.
+// and resolving one is a database query. The read resolves the rows to answer
+// itself, so the panel states what the numbers ARE, with no date beside them
+// and no refresh action: both would invite an operator to wonder whether what
+// they are looking at is current, which is a question the read has already
+// answered.
 //
-// There is deliberately **no refresh action**. `POST …/actions/resolve` still
-// exists and still records a version, but the version history is bounded and is
-// what a partial-configure retry subtracts against (#1973) — which is exactly
-// why a read does NOT write: a page left open on a dashboard must not be able
-// to evict the snapshot a configure is pinned to. A button here would hand that
-// same eviction to every reader who happens to hold write, and buy them
-// nothing, because the answer already on screen is the live one. It was also
-// only ever offered when `api-resolvable` was true — precisely the case that is
-// now live — so no narrower honest purpose survives for it.
+// The screen carrying a timestamp was the earlier shape, when a resolution was
+// a stored snapshot. Nothing stores one now, so there is no second answer a
+// button could fetch.
 //
 // ## The limit preview is the safety surface
 //
 // Auto-configure is deliberately broad, so **visibility is the control rather
 // than prevention**: "what would this target" is the question an operator needs
 // answered before anything runs. It expands against the same live resolution,
-// so the freshness caveat is gone; the one that remains is on screen whenever a
+// so there is no freshness caveat; the one that remains is on screen whenever a
 // result is, and still matters — the expansion here is ADVISORY, because the
 // authoritative one is `ansible-inventory --list --limit` taken in the runner. A
 // `~regex` term is refused by the API with a 422, and that message is shown
@@ -64,7 +58,6 @@ export interface InventorySource {
   position: number
   kind: string
   config: Record<string, unknown>
-  'api-resolvable': boolean
   'created-at': string
 }
 
@@ -73,7 +66,6 @@ export interface Inventory {
   attributes: {
     name: string
     description: string
-    'api-resolvable': boolean
     // In `-i` order: a lower position resolves first, so a higher one wins a
     // conflicting host variable. The API sends them sorted.
     sources: InventorySource[]
@@ -97,9 +89,6 @@ interface InventoryItem {
 interface ResolvedAttrs {
   'host-count': number
   'group-count': number
-  'produced-by': string
-  'produced-by-ref': string
-  'taken-at': string
   hosts: Record<string, Record<string, unknown>>
   groups: Record<string, string[]>
 }
@@ -109,9 +98,6 @@ interface LimitPreviewAttrs {
   hosts: string[]
   'host-count': number
   'of-host-count': number
-  // Still on the wire and deliberately not rendered: the expansion is taken
-  // against a live resolution, so there is no snapshot age to qualify it with.
-  'taken-at': string
 }
 
 /** Host vars as one readable `key=value` run. Values are not prose: no translation. */
@@ -225,7 +211,6 @@ export function InventoryPanel({
 
   const attrs = inventory.attributes
   const sources = attrs.sources || []
-  const stale = sources.filter((s) => !s['api-resolvable'])
   const groups = resolved?.groups ?? {}
   const groupNames = Object.keys(groups).sort()
 
@@ -285,29 +270,10 @@ export function InventoryPanel({
               <StatChip label={t('resolved.hosts')} value={resolved['host-count']} />
               <StatChip label={t('resolved.groups')} value={resolved['group-count']} />
             </div>
-            {/* When this resolution came to be, and who produced it. A version
-                is recorded only when the declared hosts actually move, so for
-                an API-resolvable inventory this date is also "nothing has
-                changed since" — not an age to discount the numbers by. */}
-            <p className="mt-3 text-xs text-slate-500 break-words">
-              {t('resolved.takenAt', {
-                when: resolved['taken-at']
-                  ? new Date(resolved['taken-at']).toLocaleString()
-                  : t('resolved.never'),
-              })}
-              {' · '}
-              {t.has(`resolved.producedBy.${resolved['produced-by']}`)
-                ? t(`resolved.producedBy.${resolved['produced-by']}`)
-                : t('resolved.producedByOther', { by: resolved['produced-by'] })}
-              {resolved['produced-by-ref'] ? ` (${resolved['produced-by-ref']})` : ''}
-            </p>
-            {/* Only said where it is TRUE. An inventory carrying a source the
-                API cannot resolve is served from the last version a runner
-                posted, and `sources.needsRunner` below says so for that case
-                rather than this line claiming live for both. */}
-            {attrs['api-resolvable'] && (
-              <p className="mt-1 text-xs text-slate-500">{t('resolved.liveNote')}</p>
-            )}
+            {/* No date, deliberately: the read resolved these rows to answer
+                itself, so there is no other resolution this could be and
+                nothing for a timestamp to distinguish it from. */}
+            <p className="mt-3 text-xs text-slate-500">{t('resolved.liveNote')}</p>
 
             {groupNames.length > 0 && (
               <dl className="mt-4 space-y-2">
@@ -506,16 +472,6 @@ export function InventoryPanel({
       <section className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-4">
         <h3 className="text-sm font-semibold text-slate-200">{t('sources.heading')}</h3>
         <p className="mt-1 text-sm text-slate-400">{t('sources.body')}</p>
-        {/* Per-source `api-resolvable` is what lets a reader say WHICH source is
-            why the resolution above came from a runner rather than live, rather
-            than inferring it from the inventory's rolled-up flag. No such kind
-            exists yet — `terraform` is the only one — so this is the seam git
-            (#1929) will be the first to light up. */}
-        {stale.length > 0 && (
-          <p className="mt-2 text-xs text-amber-400/90">
-            {t('sources.needsRunner', { kinds: stale.map((s) => s.kind).join(', ') })}
-          </p>
-        )}
         <ul className="mt-3 space-y-2">
           {sources.map((s) => (
             <li
@@ -527,15 +483,6 @@ export function InventoryPanel({
               </span>
               <span className="font-mono text-xs text-slate-200" dir="ltr">
                 {s.kind}
-              </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  s['api-resolvable']
-                    ? 'bg-emerald-900/40 text-emerald-300'
-                    : 'bg-amber-900/40 text-amber-300'
-                }`}
-              >
-                {s['api-resolvable'] ? t('sources.apiResolvable') : t('sources.runnerOnly')}
               </span>
             </li>
           ))}

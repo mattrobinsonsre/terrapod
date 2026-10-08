@@ -4166,13 +4166,6 @@ class InventorySource(Base):
     #: external/dynamic inventory was declined (#1970).
     KIND_PLATFORM = "platform"
 
-    #: Kinds the API can resolve by itself. A source outside this set must be
-    #: resolved by a runner, because it needs ansible to parse -- the API
-    #: deliberately does not install ansible (#2010). Resolution refuses rather
-    #: than partially resolving, so adding a kind here without a resolver is a
-    #: visible failure instead of a silently shrinking host set.
-    API_RESOLVABLE_KINDS = frozenset({KIND_PLATFORM})
-
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
@@ -4257,90 +4250,3 @@ class InventoryItem(Base):
         UniqueConstraint("workspace_id", "name", name="uq_inventory_items_workspace_name"),
         Index("ix_inventory_items_workspace_id", "workspace_id"),
     )
-
-
-class InventoryVersion(Base):
-    """A snapshot of a resolved inventory (#1967).
-
-    **Load-bearing, and that is forced by measurement rather than chosen.**
-    `v2_playbook_on_play_start` fires once per batch under `serial:`, and in a
-    `serial` + `any_errors_fatal` abort the untouched hosts appear in no
-    callback event and in no PLAY RECAP at all. So "hosts targeted minus hosts
-    completed" cannot be computed from parsed results -- a retry built that way
-    fixes the failure, reports success, and silently leaves the rest
-    unconfigured (#1973). The snapshot taken up front is the only thing that
-    knows the full target set.
-
-    So one artifact is both the targeting basis and the partial-recovery basis.
-
-    `hosts` holds **every** host explicitly, including hosts with no variables.
-    `ansible-inventory --list` does not -- its `_meta.hostvars` omits a var-less
-    host entirely -- so enumerating from that shape loses hosts silently.
-    Ansible's shape is rendered on demand by
-    `inventory_resolution.to_ansible_inventory` instead, leaving one source of
-    truth rather than two representations to keep in step.
-    """
-
-    __tablename__ = "inventory_versions"
-
-    #: Produced by the API, resolving sources it owns. See
-    #: `InventorySource.API_RESOLVABLE_KINDS`.
-    SOURCE_API = "api"
-    #: Produced by a runner, which is the only place ansible is installed and
-    #: therefore the only place a non-API-owned source can be resolved (#2010).
-    SOURCE_RUNNER = "runner"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
-    )
-    inventory_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("inventories.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    #: host name -> merged variables. Exhaustive; this is the host set.
-    hosts: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    #: group name -> sorted member host names. Declared groups only.
-    groups: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    #: Denormalised so a list view does not have to load the JSONB to say how
-    #: big a snapshot is.
-    host_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    group_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-    #: SOURCE_API or SOURCE_RUNNER -- what produced this snapshot.
-    produced_by: Mapped[str] = mapped_column(String(16), nullable=False)
-    #: Opaque reference to whatever produced it, when a runner did: today that
-    #: is a run id. Deliberately **not** a foreign key, because the thing a
-    #: configure *is* has not been built yet (#1971, #1972, #1988) and a column
-    #: presuming its table would be a guess this schema cannot take back.
-    produced_by_ref: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-
-    #: The source stamp this resolution was taken at, or empty when whatever
-    #: produced it could not say.
-    #:
-    #: **An equality token and nothing else.** Its format is deliberately opaque
-    #: -- no reader parses it, orders it, or infers a time from it; the only
-    #: question asked of it is "does this equal the stamp the sources carry
-    #: now", and a changed format simply reads as "moved", which re-resolves.
-    #:
-    #: It is what lets a read be live without a write. Resolution is a database
-    #: query for the one implemented source kind, so a read *can* resolve every
-    #: time -- but recording a row every time would evict the bounded history
-    #: that a partial-configure retry subtracts against (#1973), letting a page
-    #: left open on a dashboard push out the snapshot a configure is pinned to.
-    #: Comparing the stamp answers "has anything changed" without writing, so a
-    #: row is written only when the answer is yes.
-    #:
-    #: Empty rather than NULL-as-unknown so the comparison has one shape: a
-    #: version with no stamp never matches, so it is re-resolved rather than
-    #: trusted. That is the safe direction, and it is what every row predating
-    #: this column holds.
-    source_stamp: Mapped[str] = mapped_column(String(128), nullable=False, default="")
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=now_utc, nullable=False
-    )
-
-    inventory: Mapped[Inventory] = relationship()
-
-    __table_args__ = (Index("ix_inventory_versions_inventory_id", "inventory_id"),)

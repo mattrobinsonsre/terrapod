@@ -146,7 +146,7 @@ Everything below is implemented and shipped today.
 | Agent execution | Server-side plan / apply on ephemeral K8s Jobs (ARC pattern) |
 | Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
 | TFE V2 CLI surface | The `cloud`-backend subset of the TFE V2 API (JSON:API) consumed by `terraform`/`tofu` + `terraform login` — not the full TFE V2 API |
-| Ansible inventory | A workspace's [inventory of ansible hosts](docs/ansible-inventory.md), declared by its own Terraform as `terrapod_inventory_item` resources — including a data-sources-only workspace that targets an existing fleet with no infrastructure change. Ansible's own `-i` merge semantics, snapshotted per resolution, with a `--limit` preview. Configure (playbook execution) is not here yet |
+| Ansible inventory | A workspace's [inventory of ansible hosts](docs/ansible-inventory.md), declared by its own Terraform as `terrapod_inventory_item` resources — including a data-sources-only workspace that targets an existing fleet with no infrastructure change. Ansible's own `-i` merge semantics, resolved live on every read, with a `--limit` preview. Configure (playbook execution) is not here yet |
 | Run triggers | Cross-workspace dependency chains — a source apply triggers downstream runs |
 | Conditional auto-apply | Auto-apply only when the plan is within a declared safety standard — adds only, or adds and in-place updates. Anything that destroys or replaces a resource stops for a human |
 | Workspace undelete | Deleting a workspace leaves its state behind a delete marker, so an admin can salvage it into a new workspace within the retention window. A salvage operation, not an undo — the recovered workspace has a new id and comes back inert |

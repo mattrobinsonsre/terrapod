@@ -2867,14 +2867,7 @@
         "subheading": "Scalony wynik dla {name}, ze wszystkich źródeł po kolei.",
         "hosts": "Hosty",
         "groups": "Grupy",
-        "takenAt": "To rozwiązanie pochodzi z {when}",
-        "never": "nigdy",
-        "producedBy": {
-          "api": "rozwiązane przez API",
-          "runner": "rozwiązane przez runnera"
-        },
-        "producedByOther": "rozwiązane przez {by}",
-        "liveNote": "To jest na bieżąco. Każde źródło tutaj jest zadeklarowane w twojej konfiguracji, więc rozwiązanie to zapytanie do bazy danych. Data powyżej mówi, kiedy ten wynik powstał, a nie jak jest nieaktualny."
+        "liveNote": "To jest na bieżąco. Każde źródło tutaj jest zadeklarowane w twojej konfiguracji, więc rozwiązanie to zapytanie do bazy danych."
       },
       "limit": {
         "heading": "Co obejmie --limit?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Źródła",
         "body": "Rozwiązywane po kolei, dokładnie tak jak powtórzone flagi -i: przy konflikcie zmiennej hosta wygrywa późniejsze źródło.",
-        "position": "Pozycja {position}",
-        "apiResolvable": "API może rozwiązać",
-        "runnerOnly": "Wymaga runnera",
-        "needsRunner": "Te źródła wymagają ansible, który ma tylko runner, więc wynik powyżej to ostatnie rozwiązanie przesłane przez runnera, a nie rozwiązanie na bieżąco: {kinds}."
+        "position": "Pozycja {position}"
       },
       "errors": {
         "loadItems": "Nie udało się wczytać zadeklarowanych hostów",

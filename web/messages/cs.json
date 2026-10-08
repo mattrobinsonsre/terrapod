@@ -2867,14 +2867,7 @@
         "subheading": "Sloučený výsledek pro {name}, ze všech zdrojů v daném pořadí.",
         "hosts": "Hostitelé",
         "groups": "Skupiny",
-        "takenAt": "Toto vyhodnocení pochází z {when}",
-        "never": "nikdy",
-        "producedBy": {
-          "api": "vyhodnoceno API",
-          "runner": "vyhodnoceno runnerem"
-        },
-        "producedByOther": "vyhodnoceno: {by}",
-        "liveNote": "Toto je aktuální. Každý zdroj zde je deklarován ve vaší konfiguraci, takže vyhodnocení je dotaz do databáze. Datum výše říká, kdy tento výsledek vznikl, nikoli jak je zastaralý."
+        "liveNote": "Toto je aktuální. Každý zdroj zde je deklarován ve vaší konfiguraci, takže vyhodnocení je dotaz do databáze."
       },
       "limit": {
         "heading": "Na co by mířil --limit?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Zdroje",
         "body": "Vyhodnocují se v daném pořadí, přesně jako opakované přepínače -i: při konfliktu proměnné hostitele vítězí pozdější zdroj.",
-        "position": "Pozice {position}",
-        "apiResolvable": "API dokáže vyhodnotit",
-        "runnerOnly": "Vyžaduje runner",
-        "needsRunner": "Tyto zdroje potřebují ansible, který má jen runner, takže výsledek výše je poslední vyhodnocení odeslané runnerem, nikoli aktuální vyhodnocení: {kinds}."
+        "position": "Pozice {position}"
       },
       "errors": {
         "loadItems": "Nepodařilo se načíst deklarované hostitele",

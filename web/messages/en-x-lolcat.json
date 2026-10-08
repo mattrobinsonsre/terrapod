@@ -2867,14 +2867,7 @@
         "subheading": "Teh all-mushed-togethr anser for {name}, frum evry sorce in ordur.",
         "hosts": "Hostz",
         "groups": "Groupz",
-        "takenAt": "Dis anser cummd frum {when}",
-        "never": "nevur",
-        "producedBy": {
-          "api": "dun by teh API",
-          "runner": "dun by a runnr"
-        },
-        "producedByOther": "dun by {by}",
-        "liveNote": "Dis is liv. Evry sorce heer is declaird in ur config, so werkin it owt is jus a peek — teh date up ther sez wen dis anser showd up, not how old it is."
+        "liveNote": "Dis is liv. Evry sorce heer is declaird in ur config, so werkin it owt is jus a peek."
       },
       "limit": {
         "heading": "Wut wud a limit hitz?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Sorcez",
         "body": "Dun in ordur, jus like repeetd -i flagz: a latr sorce winz a fitey host variabul.",
-        "position": "Spot {position}",
-        "apiResolvable": "API can do it",
-        "runnerOnly": "Needz a runnr",
-        "needsRunner": "Deez sorcez needz ansible, an only a runnr haz it, so teh anser up ther is teh last wun a runnr sended, not a liv wun: {kinds}."
+        "position": "Spot {position}"
       },
       "errors": {
         "loadItems": "Coudnt load teh declaird hostz",

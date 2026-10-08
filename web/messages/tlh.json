@@ -2867,14 +2867,7 @@
         "subheading": "{name} tetlh boQDu'' tay'': Hoch mung mIwDaq.",
         "hosts": "hostmey",
         "groups": "ghommey",
-        "takenAt": "{when} wIvlu''pu''",
-        "never": "not",
-        "producedBy": {
-          "api": "API wIvta''",
-          "runner": "vumwI'' wIvta''"
-        },
-        "producedByOther": "{by} wIvta''",
-        "liveNote": "DaH wIvlu''. naDev Hoch mung Terraform maq; vaj wIv ghel neH ''oH. poH Dung: ghorgh boQ chenpu'' ''oH; qantaHghach ''oHbe''."
+        "liveNote": "DaH wIvlu''. naDev Hoch mung Terraform maq; vaj wIv ghel neH ''oH."
       },
       "limit": {
         "heading": "nuq wIv veH''e''?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "mungmey",
         "body": "mIwDaq wIvlu'', -i per qa''mey rur: mung tlhaQ choHlaHmey Qap.",
-        "position": "Daq {position}",
-        "apiResolvable": "API wIvlaH",
-        "runnerOnly": "vumwI'' poQ",
-        "needsRunner": "mungmeyvam ansible poQ; vumwI''Daq neH ansible tu''lu''. vaj boQ Dung ''oH vumwI'' ngeHpu''bogh wIv Qav''e''; DaH wIvlu''be''bogh: {kinds}."
+        "position": "Daq {position}"
       },
       "errors": {
         "loadItems": "maqlu''bogh hostmey ghelmeH lujpu''",

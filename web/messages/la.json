@@ -2867,14 +2867,7 @@
         "subheading": "Effectus coniunctus pro {name}, ex omni fonte ordine.",
         "hosts": "Hospites",
         "groups": "Greges",
-        "takenAt": "Haec resolutio orta est {when}",
-        "never": "numquam",
-        "producedBy": {
-          "api": "ab API resolutum",
-          "runner": "a cursore resolutum"
-        },
-        "producedByOther": "per {by} resolutum",
-        "liveNote": "Haec viva est. Omnis fons hic in configuratione tua declaratus est, itaque resolvere interrogatio est. Dies supra dicit quando hoc effectum ortum sit, non quam vetus sit."
+        "liveNote": "Haec viva est. Omnis fons hic in configuratione tua declaratus est, itaque resolvere interrogatio est."
       },
       "limit": {
         "heading": "Quid limes peteret?",
@@ -2899,10 +2892,7 @@
       "sources": {
         "heading": "Fontes",
         "body": "Ordine resolvuntur, prorsus ut vexilla -i iterata: fons posterior variabilem hospitis repugnantem vincit.",
-        "position": "Positio {position}",
-        "apiResolvable": "API resolvere potest",
-        "runnerOnly": "Cursorem requirit",
-        "needsRunner": "Hi fontes ansible requirunt, quod solus cursor habet, itaque effectum supra est ultima resolutio a cursore missa, non resolutio viva: {kinds}."
+        "position": "Positio {position}"
       },
       "errors": {
         "loadItems": "Hospites declarati onerari non potuerunt",
