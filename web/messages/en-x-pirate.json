@@ -2882,7 +2882,7 @@
       "limit": {
         "heading": "What would a limit lay hold of?",
         "body": "Unfurl an ansible --limit pattern against th'' log above, so ye may see which hands it picks afore aught sets sail.",
-        "inputLabel": "Limit pattern",
+        "inputLabel": "Limit markin''s",
         "placeholder": "web:!web-2",
         "preview": "Spyglass",
         "previewing": "Peerin''…",
@@ -2905,7 +2905,7 @@
         "body": "Mustered in turn, just as repeated -i flags be: a later wellspring wins a quarrelin'' hand’s riggin''.",
         "position": "Berth {position}",
         "apiResolvable": "API can muster",
-        "runnerOnly": "Needs a runner",
+        "runnerOnly": "Be needin'' a runner",
         "needsRunner": "Th'' log can only be mustered anew by a runner while these wellsprings be aboard: {kinds}."
       },
       "errors": {
