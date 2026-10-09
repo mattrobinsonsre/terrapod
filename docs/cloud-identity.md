@@ -267,6 +267,14 @@ Or `PATCH /api/terrapod/v1/workspaces/{id}`:
 {"data": {"attributes": {"oidc-audiences": {"vault": ["https://vault-eu.example.com"]}}}}
 ```
 
+Three places in the web UI set the same thing, and which one you want depends on scope:
+
+| Surface | Use it for |
+|---|---|
+| **Workspace → Settings** | One workspace, by hand |
+| **Admin → Autodiscovery**, in a rule's workspace template | Every workspace a rule creates *from now on* — it is a template default, so it does not touch workspaces the rule has already created |
+| **Admin → Bulk update** | Every workspace a filter matches, in one all-or-nothing write (dry-run by default). Read the [caveat](api-reference.md#bulk-workspace-operations) first: a fleet-wide audience change auto-discards already-planned applies |
+
 **An empty override is the common case and does not mean "mints nothing"** — it
 means "take the catalogue as it stands". A workspace mints nothing only when the
 **resolved merge** is empty.
@@ -419,6 +427,7 @@ provider's `default_tags`. The effective map is on the `terrapod_workspace`
 | Audience length | **255** characters |
 | Key length | **128** characters |
 | Key shape | no whitespace; at most one `.`; no leading or trailing `.` |
+| Key path safety | **refused**: `/`, `\`, NUL, or any `..` segment — a security control, not hygiene. See below |
 | A blank audience | **refused**, not dropped |
 | A duplicate audience under one key | **refused** |
 | An empty list for a key | **refused** — remove the key |
@@ -432,6 +441,26 @@ Deliberately **not** validated: whether an audience suits the provider it is
 keyed under, and whether the same audience appears under two keys. The first is
 the cloud's trust policy to decide; the second may legitimately be two OpenBao
 instances that share a `bound_audiences`.
+
+#### Why path safety is a security control, not key hygiene
+
+The other key-shape checks are conservative tidiness — a provider name is whatever the
+configuration calls it, so inventing a grammar risks refusing a legitimate key. The path
+check is different in kind, because **a key becomes a directory name**: the runner writes
+each token to `<token dir>/<target>/token`.
+
+The attack is `aws./../vault`. Lookup splits on the **first** dot, so that key resolves
+through an ordinary `aws` entry — and the resulting path then lands an **AWS-audienced token
+at the file the operator's `vault` provider block reads**. Anything holding the run's token
+can ask for it, including the workspace's own configuration.
+
+So a key containing `/`, `\`, NUL, or a `..` segment is refused at **three** sinks:
+
+| Sink | Where | Why it is there too |
+|---|---|---|
+| The workspace write | `workspace_settings.validate_oidc_audiences` | `422`, so an operator is told at the point of configuring |
+| The mint request | `POST .../cloud-identity-tokens` | `400` — a target is echoed back and then joined into a path, and the per-request cap bounds the *list*, never an item |
+| The runner, before the join | `runner/phases/cloud_identity.py` | **Deliberately duplicated.** The runner is a separately versioned image that may be older or newer than the API, so it does not rely on the server having checked |
 
 ---
 
@@ -873,7 +902,7 @@ Every token for every target carries the same claims; only `aud` differs.
 | Claim | Example | Notes |
 |---|---|---|
 | `iss` | `https://terrapod-webhooks.example.com` | Matched **exactly** by the cloud |
-| `sub` | `workspace:prod-dns:phase:apply` | Composite, colon-delimited, phase last |
+| `sub` | `workspace:prod-dns:phase:apply` | Composite, colon-delimited, phase last. **`:phase:<phase>` is absent when the runner token made no phase claim** — the `sub` is then just `workspace:prod-dns`. See below |
 | `aud` | `["sts.amazonaws.com"]` | **This target's** audiences, verbatim and in order |
 | `workspace` | `prod-dns` | The workspace name |
 | `workspace_id` | `0f8b…` | The id — stable across a rename, where the name is readable |
@@ -896,6 +925,22 @@ well as claimed discretely.
 **Targets that can read arbitrary claims should condition on the discrete claims
 instead**, which needs no wildcard and no string parsing. AWS, GCP and
 OpenBao/Vault can all do this, and the examples above do.
+
+#### The phase suffix is conditional, and on Azure that matters
+
+`sub` is built as `workspace:<name>`, **plus** `:phase:<phase>` only when the runner token
+carried a phase claim. So a token minted without one — a listener image predating the claim,
+per [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)
+— has `sub: workspace:prod-dns`, with no suffix at all.
+
+On a target that reads discrete claims this is benign: `phase` is simply absent, so a trust
+policy conditioning on it does not match and the credential is refused. **On Azure it is the
+same outcome by a different route, and it is the one to plan for**: a federated identity
+credential whose `subject` is pinned to the phased form (`workspace:prod-dns:phase:apply`)
+stops matching an unphased `sub` entirely. The failure direction is safe — the exchange is
+refused rather than widened — but it presents as "Azure suddenly rejects every token from
+this workspace" with nothing wrong on the Terrapod side, so check the listener image before
+the trust policy.
 
 Azure's "flexible federated identity credentials" would allow claim expressions,
 but they are gated to a hardcoded allow-list of issuers (GitHub, GitLab and
@@ -1111,6 +1156,23 @@ A token minted before the phase claim existed carries no phase, which is read as
 "makes no claim": the JWT then carries no `phase` either, so a trust policy
 conditioning on it simply does not match. That refuses the credential rather than
 quietly widening it.
+
+### The other direction: a *listener* image that predates the feature
+
+A **lagging listener with a current runner** fails differently, and loudly rather than
+silently. The listener image is what builds the runner Job's pod spec, so the in-memory
+volume the credential phase writes each token into is created by the **listener**, not the
+runner. A listener that predates the feature creates no such volume, the runner's first
+`mkdir` lands on the container's read-only root filesystem, and the run fails closed with an
+`EROFS` error naming a filesystem path — which reads as a broken mount rather than as a stale
+image, so it is worth knowing before you meet it.
+
+**Upgrade your listeners before enabling cloud identity**, and keep them at or ahead of your
+runners. Both images default to the chart's `appVersion`, so this is only reachable if
+`runners.image.tag` and `listener.image.tag` have been pinned independently — the same shape
+as [Vault → Older listeners](vault.md#older-listeners), where file delivery needs the listener
+upgraded first. See [versioning-and-support.md → Component version
+skew](versioning-and-support.md#component-version-skew).
 
 ---
 
