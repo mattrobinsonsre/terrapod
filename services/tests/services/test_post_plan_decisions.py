@@ -217,7 +217,7 @@ class TestPolicyChecks:
         assert policy_check_service.parse_check_id(value) is None
 
     def test_a_blocking_mandatory_policy_soft_fails_and_says_why(self):
-        check = policy_check_service._opa_check(
+        check = policy_check_service.opa_check(
             uuid.uuid4(), [_eval(outcome="failed"), _eval(name="tags", outcome="passed")]
         )
         assert check.status == "soft_failed"
@@ -226,13 +226,13 @@ class TestPolicyChecks:
         assert "deny: port 22 open to the world" in check.output
 
     def test_an_advisory_failure_passes(self):
-        check = policy_check_service._opa_check(
+        check = policy_check_service.opa_check(
             uuid.uuid4(), [_eval(level="advisory", outcome="failed")]
         )
         assert (check.status, check.advisory_failed, check.is_overridable) == ("passed", 1, False)
 
     def test_an_overridden_policy_reports_overridden(self):
-        check = policy_check_service._opa_check(
+        check = policy_check_service.opa_check(
             uuid.uuid4(), [_eval(outcome="failed", overridden_by="admin@example.com")]
         )
         assert check.status == "overridden"
@@ -242,14 +242,14 @@ class TestPolicyChecks:
     def test_an_errored_mandatory_set_can_be_overridden(self):
         # Terrapod lets an admin release a run whose mandatory set errored (for
         # example a runner too old to evaluate it), so the CLI must offer that.
-        check = policy_check_service._opa_check(
+        check = policy_check_service.opa_check(
             uuid.uuid4(), [_eval(outcome="errored", result={"error": "Runner did not evaluate"})]
         )
         assert check.status == "soft_failed"
         assert "error: Runner did not evaluate" in check.output
 
     def test_an_enforced_scan_failure_soft_fails_worst_first(self):
-        check = policy_check_service._scan_check(uuid.uuid4(), _scan())
+        check = policy_check_service.scan_check(uuid.uuid4(), _scan())
         assert (check.status, check.scope) == ("soft_failed", "workspace")
         assert check.output.index("CKV_AWS_24") < check.output.index("CKV_AWS_23")
 
@@ -262,7 +262,7 @@ class TestPolicyChecks:
         ],
     )
     def test_scan_statuses(self, kw, status):
-        assert policy_check_service._scan_check(uuid.uuid4(), _scan(**kw)).status == status
+        assert policy_check_service.scan_check(uuid.uuid4(), _scan(**kw)).status == status
 
     async def test_a_run_has_a_check_only_for_a_gate_that_recorded_something(self):
         run = _run()

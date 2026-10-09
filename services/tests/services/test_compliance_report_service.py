@@ -187,6 +187,10 @@ class TestWorkspaceComplianceReport:
             return mock_res
 
         db.execute = AsyncMock(side_effect=_execute)
+        # Deliberately larger than the sample: the two numbers must not be
+        # reported from the same source, or "50 of 500" cannot be told from
+        # "50 of 50".
+        db.scalar = AsyncMock(return_value=137)
 
         ws_report = await compliance_report_service.generate_workspace_compliance_report(
             db, ws_id, limit=50
@@ -194,6 +198,7 @@ class TestWorkspaceComplianceReport:
 
         assert ws_report["workspace-id"] == str(ws_id)
         assert ws_report["total-runs-evaluated"] == 2
+        assert ws_report["total-runs-in-workspace"] == 137
         assert ws_report["summary"]["compliant"] == 1
         assert ws_report["summary"]["non-compliant"] == 1
         assert ws_report["summary"]["compliance-rate-percent"] == 50.0
@@ -202,3 +207,29 @@ class TestWorkspaceComplianceReport:
         assert "run_id,workspace_id,verdict" in csv_text
         assert "COMPLIANT" in csv_text
         assert "NON_COMPLIANT" in csv_text
+
+    async def test_an_unevaluated_workspace_reports_no_rate_rather_than_a_perfect_one(self):
+        """A workspace that has never run is unevaluated, not compliant.
+
+        It reported `compliance-rate-percent: 100.0`, so an audit over a fleet
+        would show a perfect score for every workspace nobody had used -- and
+        100.0 is indistinguishable from a genuine clean sweep. `None` is the
+        only answer that cannot be read as a finding either way.
+        """
+        ws_id = uuid.uuid4()
+        db = MagicMock()
+
+        async def _execute(stmt):
+            mock_res = MagicMock()
+            mock_res.scalars().all.return_value = []
+            return mock_res
+
+        db.execute = AsyncMock(side_effect=_execute)
+        db.scalar = AsyncMock(return_value=0)
+
+        report = await compliance_report_service.generate_workspace_compliance_report(db, ws_id)
+
+        assert report["total-runs-evaluated"] == 0
+        assert report["total-runs-in-workspace"] == 0
+        assert report["summary"]["compliance-rate-percent"] is None
+        assert report["runs"] == []
