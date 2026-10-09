@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import PolicyEvaluation, Run, SecurityScanResult
@@ -134,7 +134,18 @@ async def generate_run_compliance_report(db: AsyncSession, run: Run) -> dict[str
 async def generate_workspace_compliance_report(
     db: AsyncSession, workspace_id: uuid.UUID, limit: int = 50
 ) -> dict[str, Any]:
-    """Generate an aggregate compliance report across recent runs for a workspace without N+1 queries."""
+    """An aggregate compliance report over the workspace's most recent runs.
+
+    `limit` bounds the sample, so the report states BOTH how many runs it
+    evaluated and how many the workspace holds. Without the second number a
+    reader cannot tell whether a rate describes the whole history or the last
+    fifty runs of five hundred -- and on an audit report that is the difference
+    between a finding and a false clean bill of health.
+
+    The rate is `None`, not 100.0, when nothing was evaluated: a workspace that
+    has never run is not compliant, it is unevaluated, and reporting perfect
+    compliance for it is the one error an audit report must not make.
+    """
     stmt = (
         select(Run)
         .where(Run.workspace_id == workspace_id)
@@ -148,12 +159,13 @@ async def generate_workspace_compliance_report(
         return {
             "workspace-id": str(workspace_id),
             "total-runs-evaluated": 0,
+            "total-runs-in-workspace": 0,
             "summary": {
                 "compliant": 0,
                 "non-compliant": 0,
                 "overridden": 0,
                 "pending-review": 0,
-                "compliance-rate-percent": 100.0,
+                "compliance-rate-percent": None,
             },
             "runs": [],
         }
@@ -188,12 +200,12 @@ async def generate_workspace_compliance_report(
         scan = scan_by_run.get(r.id)
 
         checks = []
-        opa_check = policy_check_service._opa_check(r.id, evals)
+        opa_check = policy_check_service.opa_check(r.id, evals)
         if opa_check.status in policy_check_service.STATUSES and (evals or opa_check.output):
             checks.append(opa_check)
 
         if scan:
-            scan_check = policy_check_service._scan_check(r.id, scan)
+            scan_check = policy_check_service.scan_check(r.id, scan)
             checks.append(scan_check)
 
         report = _build_run_compliance_report_from_data(r, checks, evals, scan)
@@ -210,15 +222,19 @@ async def generate_workspace_compliance_report(
             pending_count += 1
 
     total_runs = len(runs)
-    compliance_rate = (
-        round((compliant_count + overridden_count) / total_runs * 100, 2)
-        if total_runs > 0
-        else 100.0
+    compliance_rate = round((compliant_count + overridden_count) / total_runs * 100, 2)
+
+    # What the sample was drawn from. One cheap aggregate, so a reader can see
+    # "50 of 500" rather than inferring the sample size from `limit` they did
+    # not necessarily pass.
+    total_in_workspace = await db.scalar(
+        select(func.count()).select_from(Run).where(Run.workspace_id == workspace_id)
     )
 
     return {
         "workspace-id": str(workspace_id),
         "total-runs-evaluated": total_runs,
+        "total-runs-in-workspace": int(total_in_workspace or 0),
         "summary": {
             "compliant": compliant_count,
             "non-compliant": non_compliant_count,

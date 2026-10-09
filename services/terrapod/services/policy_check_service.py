@@ -82,7 +82,14 @@ def parse_check_id(value: str) -> tuple[str, uuid.UUID] | None:
         return None
 
 
-def _opa_check(run_id: uuid.UUID, evals: list[PolicyEvaluation]) -> PolicyCheck:
+def opa_check(run_id: uuid.UUID, evals: list[PolicyEvaluation]) -> PolicyCheck:
+    """The OPA check for one run, built from evaluations already loaded.
+
+    Public because `compliance_report_service` builds the same check over a batch
+    of runs it has already fetched, so it cannot go through `list_checks` without
+    reintroducing the per-run queries that batching removed. A private name there
+    was a cross-module reach with nothing to stop a rename breaking it silently.
+    """
     blocking = [
         e
         for e in evals
@@ -131,7 +138,8 @@ def _opa_check(run_id: uuid.UUID, evals: list[PolicyEvaluation]) -> PolicyCheck:
     )
 
 
-def _scan_check(run_id: uuid.UUID, scan: SecurityScanResult) -> PolicyCheck:
+def scan_check(run_id: uuid.UUID, scan: SecurityScanResult) -> PolicyCheck:
+    """The security-scan check for one run. Public for the same reason as `opa_check`."""
     failing = scan.outcome in _FAILING
     enforced = scan.enforcement_level == "enforced"
     if failing and enforced and scan.overridden_by is None:
@@ -186,10 +194,10 @@ async def list_checks(db: AsyncSession, run: Run) -> list[PolicyCheck]:
     checks: list[PolicyCheck] = []
     evals = await policy_set_service.get_run_evaluations(db, run.id)
     if evals:
-        checks.append(_opa_check(run.id, evals))
+        checks.append(opa_check(run.id, evals))
     scan = await security_scan_service.get_run_scan(db, run.id)
     if scan is not None:
-        checks.append(_scan_check(run.id, scan))
+        checks.append(scan_check(run.id, scan))
     return checks
 
 

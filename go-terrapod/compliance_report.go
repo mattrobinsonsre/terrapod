@@ -65,19 +65,29 @@ type RunComplianceReport struct {
 
 // WorkspaceComplianceSummary carries aggregated counts across workspace runs.
 type WorkspaceComplianceSummary struct {
-	Compliant             int     `json:"compliant"`
-	NonCompliant          int     `json:"non-compliant"`
-	Overridden            int     `json:"overridden"`
-	PendingReview         int     `json:"pending-review"`
-	ComplianceRatePercent float64 `json:"compliance-rate-percent"`
+	Compliant     int `json:"compliant"`
+	NonCompliant  int `json:"non-compliant"`
+	Overridden    int `json:"overridden"`
+	PendingReview int `json:"pending-review"`
+
+	// A pointer because the server sends null when nothing was evaluated.
+	// As a float64 that null unmarshals to 0.0 -- reported as total
+	// non-compliance, which is the opposite of what it means.
+	ComplianceRatePercent *float64 `json:"compliance-rate-percent"`
 }
 
 // WorkspaceComplianceReport aggregates compliance reports across workspace runs.
 type WorkspaceComplianceReport struct {
-	WorkspaceID        string                     `json:"workspace-id"`
-	TotalRunsEvaluated int                        `json:"total-runs-evaluated"`
-	Summary            WorkspaceComplianceSummary `json:"summary"`
-	Runs               []RunComplianceReport      `json:"runs"`
+	WorkspaceID string `json:"workspace-id"`
+
+	// TotalRunsEvaluated is the size of the sample; TotalRunsInWorkspace is
+	// what it was drawn from. Read the rate against both -- a rate over the
+	// last fifty of five hundred runs is not a rate over the history.
+	TotalRunsEvaluated   int `json:"total-runs-evaluated"`
+	TotalRunsInWorkspace int `json:"total-runs-in-workspace"`
+
+	Summary WorkspaceComplianceSummary `json:"summary"`
+	Runs    []RunComplianceReport      `json:"runs"`
 }
 
 // GetRunComplianceReport fetches an audit-ready compliance report for a single run.
@@ -161,6 +171,9 @@ func (c *Client) GetWorkspaceComplianceReport(ctx context.Context, workspaceID s
 	}
 	if raw, ok := res.Attributes["total-runs-evaluated"]; ok {
 		_ = json.Unmarshal(raw, &report.TotalRunsEvaluated)
+	}
+	if raw, ok := res.Attributes["total-runs-in-workspace"]; ok {
+		_ = json.Unmarshal(raw, &report.TotalRunsInWorkspace)
 	}
 	if raw, ok := res.Attributes["summary"]; ok {
 		_ = json.Unmarshal(raw, &report.Summary)

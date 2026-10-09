@@ -1459,8 +1459,9 @@ field WorkspaceChange.Name string `json:"name"`
 field WorkspaceComplianceReport.Runs []RunComplianceReport `json:"runs"`
 field WorkspaceComplianceReport.Summary WorkspaceComplianceSummary `json:"summary"`
 field WorkspaceComplianceReport.TotalRunsEvaluated int `json:"total-runs-evaluated"`
+field WorkspaceComplianceReport.TotalRunsInWorkspace int `json:"total-runs-in-workspace"`
 field WorkspaceComplianceReport.WorkspaceID string `json:"workspace-id"`
-field WorkspaceComplianceSummary.ComplianceRatePercent float64 `json:"compliance-rate-percent"`
+field WorkspaceComplianceSummary.ComplianceRatePercent *float64 `json:"compliance-rate-percent"`
 field WorkspaceComplianceSummary.Compliant int `json:"compliant"`
 field WorkspaceComplianceSummary.NonCompliant int `json:"non-compliant"`
 field WorkspaceComplianceSummary.Overridden int `json:"overridden"`

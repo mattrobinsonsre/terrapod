@@ -23,9 +23,20 @@ const runComplianceResponseBody = `{"data":{"id":"cmpl-run-1111","type":"complia
 const workspaceComplianceResponseBody = `{"data":{"id":"ws-cmpl-ws-1111","type":"workspace-compliance-reports","attributes":{
   "workspace-id":"ws-1111",
   "total-runs-evaluated":1,
+  "total-runs-in-workspace":7,
   "summary":{"compliant":1,"non-compliant":0,"overridden":0,"pending-review":0,"compliance-rate-percent":100},
   "runs":[]
 },"relationships":{"workspace":{"data":{"id":"ws-1111","type":"workspaces"}}}}}`
+
+// An unevaluated workspace. The rate is null, not a number -- see the pointer's
+// comment in compliance_report.go.
+const emptyWorkspaceComplianceResponseBody = `{"data":{"id":"ws-cmpl-ws-2222","type":"workspace-compliance-reports","attributes":{
+  "workspace-id":"ws-2222",
+  "total-runs-evaluated":0,
+  "total-runs-in-workspace":0,
+  "summary":{"compliant":0,"non-compliant":0,"overridden":0,"pending-review":0,"compliance-rate-percent":null},
+  "runs":[]
+},"relationships":{"workspace":{"data":{"id":"ws-2222","type":"workspaces"}}}}}`
 
 func TestGetRunComplianceReport(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +46,8 @@ func TestGetRunComplianceReport(t *testing.T) {
 			_, _ = w.Write([]byte(runComplianceResponseBody))
 		case r.Method == http.MethodGet && p == "/api/v1/workspaces/ws-1111/compliance-report":
 			_, _ = w.Write([]byte(workspaceComplianceResponseBody))
+		case r.Method == http.MethodGet && p == "/api/v1/workspaces/ws-2222/compliance-report":
+			_, _ = w.Write([]byte(emptyWorkspaceComplianceResponseBody))
 		default:
 			http.Error(w, `{"errors":[{"status":"404"}]}`, http.StatusNotFound)
 		}
@@ -64,7 +77,29 @@ func TestGetRunComplianceReport(t *testing.T) {
 	if wsReport.TotalRunsEvaluated != 1 {
 		t.Errorf("expected total-runs-evaluated 1, got %d", wsReport.TotalRunsEvaluated)
 	}
-	if wsReport.Summary.ComplianceRatePercent != 100 {
-		t.Errorf("expected compliance rate 100, got %f", wsReport.Summary.ComplianceRatePercent)
+	// The sample size is only meaningful against what it was drawn from.
+	if wsReport.TotalRunsInWorkspace != 7 {
+		t.Errorf("expected total-runs-in-workspace 7, got %d", wsReport.TotalRunsInWorkspace)
+	}
+	if wsReport.Summary.ComplianceRatePercent == nil {
+		t.Fatal("expected a compliance rate, got nil")
+	}
+	if *wsReport.Summary.ComplianceRatePercent != 100 {
+		t.Errorf("expected compliance rate 100, got %f", *wsReport.Summary.ComplianceRatePercent)
+	}
+
+	// An unevaluated workspace reports no rate at all. As a float64 this
+	// field would read 0.0 here -- total non-compliance for a workspace
+	// nobody has run, which is the one answer an audit report must not give.
+	empty, err := c.GetWorkspaceComplianceReport(t.Context(), "ws-2222", 50)
+	if err != nil {
+		t.Fatalf("GetWorkspaceComplianceReport (empty) failed: %v", err)
+	}
+	if empty.Summary.ComplianceRatePercent != nil {
+		t.Errorf("expected no compliance rate for an unevaluated workspace, got %f",
+			*empty.Summary.ComplianceRatePercent)
+	}
+	if empty.TotalRunsInWorkspace != 0 {
+		t.Errorf("expected total-runs-in-workspace 0, got %d", empty.TotalRunsInWorkspace)
 	}
 }

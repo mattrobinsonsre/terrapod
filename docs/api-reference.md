@@ -1349,7 +1349,16 @@ Requires `run:read` capability on the run's workspace.
 GET /api/v1/workspaces/{workspace_id}/compliance-report[?limit=50&format=json|csv]
 ```
 
-Returns an aggregate compliance report across recent runs for a workspace, including total runs evaluated, compliance rate percentage, and breakdown by verdict. Supports CSV export when `format=csv` is supplied.
+Returns an aggregate compliance report across recent runs for a workspace, with a breakdown by verdict. Supports CSV export when `format=csv` is supplied.
+
+`limit` bounds the sample (default 50, maximum 500), so the report states both
+`total-runs-evaluated` — the size of the sample — and `total-runs-in-workspace`,
+what it was drawn from. Read `compliance-rate-percent` against both: a rate over
+the last 50 of 500 runs is not a rate over the history.
+
+`compliance-rate-percent` is `null`, not `100.0`, when nothing was evaluated. A
+workspace that has never run is unevaluated rather than compliant, and reporting
+a perfect score for it would be indistinguishable from a genuine clean sweep.
 
 Requires `run:read` capability on the workspace.
 
