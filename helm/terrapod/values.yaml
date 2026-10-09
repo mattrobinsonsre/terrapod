@@ -60,6 +60,14 @@ api:
   tokenSigningKey:
     existingSecret: ""               # name of a K8s Secret holding the key
     existingSecretKey: "token_signing_key"  # key within that Secret
+  # NOTE: leaving tokenSigningKey unset is reported at startup as a warning
+  # (GHSA-hc47-q72v-4vcm). Set api.config.require_strong_secrets to make it
+  # fatal instead, once the key is set and any static encryption key is
+  # generated material rather than a typed passphrase.
+  #
+  # It does NOT apply to oidcSigningKey below: leaving that unset is the
+  # recommended default, is not reported at startup, and is not governed by
+  # require_strong_secrets.
 
     # NOTE: a deployment that upgraded into this from before the key was stored
     # ADOPTS its previous sha256(database_url) value, so tokens in flight across
@@ -77,7 +85,8 @@ api:
   # generated key is persisted, shared across replicas, and rotatable in place.
   #
   # Must be an RSA private key in PKCS8 PEM form. An Ed25519 or EC key is
-  # refused at startup by name, because workload identity federation does not
+  # refused by name at startup -- logged, not fatal: the pod stays Ready and the
+  # issuer routes 503 -- because workload identity federation does not
   # accept EdDSA at every cloud.
   oidcSigningKey:
     existingSecret: ""                      # name of a K8s Secret holding the PEM
@@ -715,7 +724,7 @@ api:
       platform_tools:
         opa_version: "1.21.1"
         trivy_version: "0.75.0"
-        checkov_version: "3.3.23"
+        checkov_version: "3.3.26"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"

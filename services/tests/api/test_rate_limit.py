@@ -777,3 +777,133 @@ class TestPresignedBucketing:
         app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
         resp = TestClient(app).get("/storage/get/cache/a.tgz")
         assert resp.headers.get("x-ratelimit-limit") == "100"
+
+
+class TestTheOIDCIssuerTier:
+    """The issuer's two public documents get their own bucket (#1901).
+
+    Neither `_OIDC_ISSUER_PATHS` nor its branch was mentioned by any test.
+    Deleting the `elif` drops both documents into the unauthenticated per-IP
+    tier -- and behind the BFF that is ONE bucket shared with every other
+    anonymous request, which is the #1075 shape with a far worse blast radius:
+    exhaust it and the JWKS 429s, so every cloud fails to verify every token and
+    every federated run breaks at once, including runs whose own traffic had
+    nothing to do with filling it.
+
+    Legitimate volume here is very low -- AWS and GCP both cache the JWKS for
+    hours -- so this is a rare-and-critical path rather than a hot one. The
+    fetches that do happen are the ones after a rotation or a cache expiry,
+    which is exactly when being throttled would fail real runs.
+    """
+
+    def _app(self, get_redis, *, rpm=5, authenticated_rpm=1000):
+        """An app serving the two issuer paths plus one ordinary anonymous one.
+
+        `_make_app` above does not route `/.well-known/*`, and the middleware
+        keys on the PATH, so the third route is what makes the isolation
+        assertions mean something: without it there is nothing for the issuer
+        bucket to be isolated FROM.
+        """
+        app = FastAPI()
+
+        @app.get("/.well-known/openid-configuration")
+        async def discovery():
+            return {"issuer": "https://issuer.example.test"}
+
+        @app.get("/.well-known/jwks.json")
+        async def jwks():
+            return {"keys": []}
+
+        @app.get("/.well-known/terraform.json")
+        async def terraform_discovery():
+            return {"modules.v1": "/api/v2/registry/modules/"}
+
+        @app.get("/api/terrapod/v1/workspaces")
+        async def workspaces():
+            return {"data": []}
+
+        app.add_middleware(
+            RateLimitMiddleware,
+            requests_per_minute=rpm,
+            authenticated_requests_per_minute=authenticated_rpm,
+            runner_requests_per_minute=0,
+            auth_requests_per_minute=2,
+            distinct_credentials_per_minute=200,
+            get_redis=get_redis,
+        )
+        return app
+
+    def _keys(self, mock_redis):
+        return [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
+
+    def test_both_documents_bucket_under_their_own_prefix(self):
+        mock_redis = _make_redis_mock(count=1)
+        client = TestClient(self._app(lambda: mock_redis))
+
+        client.get("/.well-known/openid-configuration")
+        client.get("/.well-known/jwks.json")
+
+        keys = self._keys(mock_redis)
+        assert len(keys) == 2
+        assert all(k.startswith("tp:ratelimit:api_oidc_issuer:") for k in keys), keys
+
+    def test_the_issuer_bucket_is_not_the_shared_anonymous_one(self):
+        """The property, stated as the separation rather than as a prefix
+        string: an unrelated anonymous request from the SAME source IP must land
+        in a DIFFERENT bucket, so neither can exhaust the other's budget."""
+        mock_redis = _make_redis_mock(count=1)
+        client = TestClient(self._app(lambda: mock_redis))
+
+        client.get("/.well-known/jwks.json")
+        client.get("/api/terrapod/v1/workspaces")
+
+        issuer_key, anon_key = self._keys(mock_redis)
+        assert issuer_key != anon_key
+        assert anon_key.startswith("tp:ratelimit:api:")
+
+    def test_the_issuer_tier_uses_the_generous_limit_not_the_anonymous_base(self):
+        """A 429 here breaks token verification for every cloud, so the limit
+        exists to bound abuse rather than to shape normal use. The response
+        header is what an operator debugging a throttled cloud reads."""
+        mock_redis = _make_redis_mock(count=1)
+        client = TestClient(self._app(lambda: mock_redis, rpm=5, authenticated_rpm=1000))
+        resp = client.get("/.well-known/jwks.json")
+        assert resp.headers.get("x-ratelimit-limit") == "1000"
+
+    def test_the_terraform_discovery_document_is_not_in_the_issuer_bucket(self):
+        """Matched EXACTLY, not by prefix. `/.well-known` would drag the
+        terraform service-discovery document in, which should be a decision
+        rather than a side effect of a bucketing rule -- and it is polled by
+        every CLI, so it does not want the issuer's generous allowance."""
+        mock_redis = _make_redis_mock(count=1)
+        client = TestClient(self._app(lambda: mock_redis))
+        client.get("/.well-known/terraform.json")
+        keys = self._keys(mock_redis)
+        assert len(keys) == 1
+        assert not keys[0].startswith("tp:ratelimit:api_oidc_issuer:"), keys
+
+    def test_the_path_set_is_exactly_the_two_published_documents(self):
+        """The set is the published trust root, and a third entry would silently
+        hand some other path an allowance sized for machine fetches."""
+        from terrapod.api.rate_limit import _OIDC_ISSUER_PATHS
+
+        assert _OIDC_ISSUER_PATHS == {
+            "/.well-known/openid-configuration",
+            "/.well-known/jwks.json",
+        }
+
+    def test_neither_document_is_exempted_from_rate_limiting_altogether(self):
+        """The alternative fix, rejected: exempting them like `/health` would
+        leave an unauthenticated endpoint with no bound at all. A bucket of its
+        own keeps the bound while removing the shared-fate problem."""
+        from terrapod.api.rate_limit import _EXEMPT_PATHS, _OIDC_ISSUER_PATHS
+
+        assert not (_EXEMPT_PATHS & _OIDC_ISSUER_PATHS)
+        mock_redis = _make_redis_mock(count=1)
+        client = TestClient(self._app(lambda: mock_redis))
+        client.get("/.well-known/jwks.json")
+        assert self._keys(mock_redis), "the issuer paths went through no bucket at all"

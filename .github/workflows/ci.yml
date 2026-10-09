@@ -963,6 +963,11 @@ jobs:
         run: python3 scripts/docs-audit/check_counts.py
       - name: Named targets, values and paths exist
         run: python3 scripts/docs-audit/check_references.py
+      # The provider hard-codes copies of server defaults, and schema.golden
+      # records types rather than defaults -- so a drift is invisible to every
+      # other gate. It happened: the provider sat a minor behind for a release.
+      - name: Provider defaults agree with the server's
+        run: python3 scripts/docs-audit/check_provider_defaults.py
       # Not a docs gate, but it belongs to a job that sees the whole checkout:
       # the pytest tiers run in an image that does not ship `scripts/`, and the
       # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).

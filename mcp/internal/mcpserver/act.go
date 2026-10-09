@@ -300,7 +300,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			"authenticating to its cloud or secret store. Read terrapod_oidc_signing_keys first — a rotation is only " +
 			"safe to judge against which key is signing now. A rotation is a SET, not a swap: the new key is published " +
 			"immediately and begins signing only after the deployment's propagation window, so the returned key's " +
-			"`signing` is FALSE and that is correct, not a failure. Report `meta.note` verbatim rather than restating " +
+			"`signing` is FALSE and that is correct, not a failure. Report `note` verbatim rather than restating " +
 			"the window — its length is the operator's configuration and only the server knows the value. The retired " +
 			"key stays published for its grace window because the tokens it already signed are still inside their own " +
 			"lifetime, so do NOT rotate again to 'finish' the first one: that retires the key that has only just " +

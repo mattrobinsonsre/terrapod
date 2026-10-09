@@ -22,6 +22,7 @@ Endpoints (all under /api/terrapod/v1):
         POST /oidc/signing-keys/actions/rotate      add a key, retire the current one
 """
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path
@@ -40,6 +41,7 @@ from terrapod.api.ids import parse_id
 from terrapod.db.models import OIDCSigningKey, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import workspace_settings
 
 router = APIRouter(tags=["cloud-identity"])
 
@@ -191,7 +193,7 @@ async def mint_cloud_identity_tokens(
     from terrapod.auth.oidc_signing import sign_identity_token
     from terrapod.config import settings
     from terrapod.engines import discovers_provider_configurations
-    from terrapod.services import cloud_identity_resolver
+    from terrapod.services import cloud_identity_resolver, run_service
 
     require_runner_for_run(user, run_id)
 
@@ -203,6 +205,19 @@ async def mint_cloud_identity_tokens(
     run = await db.get(Run, parse_id(run_id, "run-", detail="Run not found"))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # A runner token is good until it expires -- run state is not checked when it
+    # is verified -- and the default TTL is an hour. This is the first endpoint
+    # that converts one into CLOUD credentials, so the missing liveness check
+    # costs more here than elsewhere: code in the plan pod that exfiltrates the
+    # token could keep POSTing here after the run finished, drawing fresh
+    # short-lived credentials for the workspace's identity from anywhere, for the
+    # remainder of the hour. A finished run has no legitimate reason to mint.
+    if run.status in run_service.TERMINAL_STATES:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"Run is {run.status} — a finished run cannot mint cloud identity tokens."),
+        )
 
     snapshot = run.oidc_audiences or {}
     if not snapshot:
@@ -269,6 +284,27 @@ async def mint_cloud_identity_tokens(
             # entry and would land an AWS-audienced token at the path the
             # operator's `vault` block reads. Anything holding this run's token
             # can send it, including the workspace's own configuration.
+            #
+            # And bound the ITEM, not just the list. A name longer than the
+            # write path allows cannot match a catalogue key -- those are capped
+            # at the same constant -- but it can still resolve through the
+            # GENERAL fallback, because the lookup splits on the first dot and
+            # `aws.<64KB>` answers through an ordinary `aws` entry. Without this
+            # the name is echoed back, joined into a path, written into
+            # `oidc_minted_targets` for ever, and named in a log line.
+            #
+            # Only on this branch: the `else` below iterates the workspace's own
+            # stored snapshot, which `validate_oidc_audiences` already capped at
+            # the same constant, and a key predating that guard is handled by
+            # its 422. This list is the caller's.
+            if len(t) > workspace_settings.MAX_OIDC_TARGET_LEN:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"provider configuration name is longer than "
+                        f"{workspace_settings.MAX_OIDC_TARGET_LEN} characters"
+                    ),
+                )
             unsafe = cloud_identity_resolver.unsafe_target_reason(t)
             if unsafe:
                 raise HTTPException(
@@ -352,7 +388,7 @@ async def mint_cloud_identity_tokens(
 
     phase = user.run_phase
     ttl = settings.auth.oidc_issuer.token_ttl_seconds
-    tokens = []
+    pending: list[tuple[str, list[str], dict]] = []
     for target in wanted:
         audiences = resolved[target]
         claims: dict = {
@@ -378,7 +414,15 @@ async def mint_cloud_identity_tokens(
         }
         if phase:
             claims["phase"] = phase
-        tokens.append(
+        pending.append((target, audiences, claims))
+
+    # Rule 13: one RS256 signature is ~1ms and this signs once per target, so a
+    # full request is ~100ms of blocking CPU on the event loop -- for every
+    # tenant, not just this one, and anything holding this run's token can ask.
+    # `rotate_signing_key` already does exactly this for its keygen, citing the
+    # same rule; the asymmetry was the tell.
+    def _sign_all() -> list[dict]:
+        return [
             {
                 "token": sign_identity_token(claims, ttl_seconds=ttl),
                 # Echoed so the runner writes the file under the name it asked
@@ -387,7 +431,10 @@ async def mint_cloud_identity_tokens(
                 "target": target,
                 "audiences": audiences,
             }
-        )
+            for target, audiences, claims in pending
+        ]
+
+    tokens = await asyncio.to_thread(_sign_all)
 
     # Record what was actually minted, so the confirm-time staleness check can
     # be scoped to the identities this run PRESENTED rather than to the ones it
@@ -398,11 +445,43 @@ async def mint_cloud_identity_tokens(
     # Written after signing, never before: a recorded target that was never
     # served would make the confirm check refuse an apply over an identity the
     # plan never presented.
+    # Re-read the row FOR UPDATE before appending. The model comment argued this
+    # needed no locking because the runner mints "one at a time per phase" and the
+    # list "only ever grows, so a superset is still sound" -- but a lost update
+    # does not produce a superset, it produces a SUBSET, and concurrent mints are
+    # reachable: the runner retries on 5xx, so a first attempt that timed out
+    # after committing can overlap its own retry. A dropped target then falls
+    # outside the confirm-time staleness check, and an apply proceeds under an
+    # identity its plan was never reviewed against -- the one direction the
+    # comment ruled out.
+    # `refresh(..., with_for_update=True)` rather than a second `select()`: same
+    # re-read under the same row lock, but it does not add a `db.execute` call --
+    # and every test on this route scripts `db.execute` as an ordered list, so an
+    # extra one desynchronises all of them (#1565's lesson, 39 failures when this
+    # was written the other way).
+    await db.refresh(run, with_for_update=True)
     minted = list(run.oidc_minted_targets or [])
     added = [t["target"] for t in tokens if t["target"] not in minted]
     if added:
-        run.oidc_minted_targets = minted + added
-        await db.commit()
+        # Capped, because this grows across requests and the runner may call
+        # repeatedly: it retries on 5xx, and a phase asks once per phase. A run
+        # cannot legitimately present more distinct identities than it may ask
+        # for in one request, so MAX_TARGETS is the ceiling. Truncating rather
+        # than refusing: the tokens are already signed and on their way back, so
+        # failing here would hand the runner credentials the record disclaims.
+        # The record is only ever read to scope the confirm-time staleness check,
+        # and a short record narrows that check rather than widening it.
+        combined = minted + added
+        if len(combined) > MAX_TARGETS:
+            logger.warning(
+                "cloud identity minted-target record truncated",
+                run_id=str(run.id),
+                kept=MAX_TARGETS,
+                dropped=len(combined) - MAX_TARGETS,
+            )
+            combined = combined[:MAX_TARGETS]
+        run.oidc_minted_targets = combined
+    await db.commit()
 
     logger.info(
         "minted cloud identity tokens",
@@ -439,14 +518,34 @@ async def get_oidc_audience_defaults(
     grants nothing on its own: the cloud's own trust policy is the gate, and
     minting needs a phase-bound runner token scoped to a run on that workspace.
 
-    Contrast the runner-facing targets route above, which returns NAMES only.
-    The asymmetry is the point: a runner writes a file and the engine reads it,
-    so it has no use for the values, and the set of audiences names the roles
-    this deployment can ask to assume.
+    The runner never sees this. It sends the provider configurations it
+    discovered and is answered with tokens, so it has no use for the catalogue
+    at all -- which is the asymmetry worth keeping: the set of audiences names
+    the roles this deployment can ask to assume, and only a person composing an
+    override needs to read it.
 
     Empty when the deployment configures no catalogue, which is the default --
     not an error, and not the same as the issuer being disabled.
     """
+
+    # A runner token must not read this. It is deployment-wide topology -- every
+    # federation target every workspace uses -- and the plan Job runs the
+    # workspace's own HCL: an `external` data source, a `pre_init` hook or a
+    # third-party module can read TP_AUTH_TOKEN out of the environment. The
+    # discovery document deliberately publishes no audiences for exactly this
+    # reason, and serving them one tier up to anything holding a runner token
+    # gives the disclosure back.
+    #
+    # The runner has no use for it either: the mint already returns the resolved
+    # audiences per target, which is all the credential phase writes.
+    if user.auth_method == "runner_token":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "A runner token cannot read the deployment's audience catalogue. "
+                "The mint returns this run's own resolved audiences."
+            ),
+        )
     from terrapod.config import settings
 
     cfg = settings.auth.oidc_issuer

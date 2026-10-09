@@ -80,7 +80,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_get",
-		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing.",
+		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing. One field is not what it looks like: `oidc-audiences` is returned as the MERGED view of the deployment's cloud identity catalogue with this workspace's own override, so an entry appearing here does NOT mean the workspace set it. Writing this value back through terrapod_workspace_update would promote every inherited entry into a permanent override. Read terrapod_oidc_audience_defaults and subtract it to get what the workspace actually owns.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceGetIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Workspace == "" {
@@ -464,7 +464,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	type oidcSigningKeysIn struct{}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_oidc_signing_keys",
-		Description: "Report the OIDC signing keys Terrapod publishes as an identity provider for run identity tokens (#1901) -- the first thing to read when a federated run cannot authenticate to a cloud or secret store. Public key material only; the private half never leaves the API. Per key: `kid` (an RFC 7638 thumbprint, so it is the same value the federation target reads out of a token header and matches against the published JWKS), `created-at`, `activates-at`, `retired-at`, and `signing`. `meta.signing-kid` names the key signing right now, and is NULL when nothing is -- the issuer is off, or every key's activation window is still ahead of it, which is not the same as an error. Read `signing` per key rather than inferring it from the timestamps: a rotation is a SET, not a swap, so the newest key is published immediately and starts signing only after the propagation window, because a federation target caches the JWKS on its own schedule and cannot verify a token signed with a key it has not fetched. A retired key stays published for its grace window, because the tokens it already signed are still inside their own lifetime. So the diagnosis for a rejected token is usually one of: no key is signing; the signing key is newer than the target's cached JWKS; or the workspace mints nothing for the provider configuration the run uses. Read that last one from the workspace's `oidc-audiences`, not from here: it is a MAP keyed on the provider configuration (`aws`, or `aws.west` for one aliased configuration), and it is the MERGED view of the deployment's catalogue with the workspace's own override, so an entry being present does not mean the workspace set it. A run mints only for the keys that map answers, so the question is whether the provider the configuration actually uses has one -- not whether the map is non-empty. Read-only; requires platform admin. Rotation is `terrapod_oidc_signing_key_rotate`, which is destructive and platform-admin gated: read this first, because a rotation is only safe to judge against which key is signing now and how recently the targets can have fetched the JWKS.",
+		Description: "Report the OIDC signing keys Terrapod publishes as an identity provider for run identity tokens (#1901) -- the first thing to read when a federated run cannot authenticate to a cloud or secret store. Public key material only; the private half never leaves the API. Per key: `kid` (an RFC 7638 thumbprint, so it is the same value the federation target reads out of a token header and matches against the published JWKS), `created-at`, `activates-at`, `retired-at`, and `signing`. `signing-kid` names the key signing right now, and is EMPTY when nothing is -- the issuer is off, or every key's activation window is still ahead of it, which is not the same as an error. Read `signing` per key rather than inferring it from the timestamps: a rotation is a SET, not a swap, so the newest key is published immediately and starts signing only after the propagation window, because a federation target caches the JWKS on its own schedule and cannot verify a token signed with a key it has not fetched. A retired key stays published for its grace window, because the tokens it already signed are still inside their own lifetime. So the diagnosis for a rejected token is usually one of: no key is signing; the signing key is newer than the target's cached JWKS; or the workspace mints nothing for the provider configuration the run uses. Read that last one from the workspace's `oidc-audiences`, not from here: it is a MAP keyed on the provider configuration (`aws`, or `aws.west` for one aliased configuration), and it is the MERGED view of the deployment's catalogue with the workspace's own override, so an entry being present does not mean the workspace set it. A run mints only for the keys that map answers, so the question is whether the provider the configuration actually uses has one -- not whether the map is non-empty. Read-only; requires platform admin. Rotation is `terrapod_oidc_signing_key_rotate`, which is destructive and platform-admin gated: read this first, because a rotation is only safe to judge against which key is signing now and how recently the targets can have fetched the JWKS.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ oidcSigningKeysIn) (*mcp.CallToolResult, *terrapod.OIDCSigningKeySet, error) {
 		set, err := c.ListOIDCSigningKeys(ctx)
@@ -472,6 +472,25 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			return errResult(err), nil, nil
 		}
 		return nil, set, nil
+	})
+
+	// ── terrapod_oidc_audience_defaults ──────────────────────────────
+	// The write-side tools warn an agent that a workspace reports its
+	// `oidc-audiences` as the MERGED view, so writing it back promotes every
+	// inherited entry into a permanent override. Without this tool that warning
+	// names a trap with no way out: the agent cannot see the catalogue, so it
+	// cannot compute what the workspace actually owns.
+	type oidcAudienceDefaultsIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_oidc_audience_defaults",
+		Description: "Report the deployment-wide cloud identity audience CATALOGUE that every workspace's own `oidc-audiences` override merges over (#1901). Read this BEFORE writing `oidc_audiences` on a workspace, and subtract it from what a workspace reports: a workspace read returns the MERGED map with no indication of which entries it owns, so writing that value back would promote every INHERITED entry into a permanent override on that workspace -- which then stops tracking the catalogue when an operator changes it. The difference between the two is the workspace's actual override. A MAP keyed on the provider configuration a token is minted for: the bare provider type exactly as a `provider` block writes it (`aws`, `vault`), or `type.alias` for one aliased configuration (`aws.west`); the alias is part of the KEY and `vault.eu` is answered by a `vault` entry when there is no `vault.eu` one (lookup is specific-then-general). Each value is always a list of opaque audience strings the federation target itself named -- nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. `issuer-enabled` is reported separately and the distinction matters for diagnosis: an EMPTY catalogue and a DISABLED issuer produce the same symptom (\"my workspace minted nothing\") and only the first is fixed by adding audiences. An empty catalogue is the default and is not an error. Read-only; any authenticated user, because a workspace read already discloses that workspace's merged audiences to anyone who can read it and knowing an audience grants nothing on its own -- the federation target's own trust policy is the gate, and minting needs a phase-bound runner token scoped to a run on that workspace.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ oidcAudienceDefaultsIn) (*mcp.CallToolResult, *terrapod.OIDCAudienceDefaults, error) {
+		defaults, err := c.GetOIDCAudienceDefaults(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, defaults, nil
 	})
 
 	// ── terrapod_vault_status ────────────────────────────────────────

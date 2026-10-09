@@ -124,6 +124,34 @@ To confirm the header cannot be forged, send a bogus entry from a machine whose
 address is already attributed correctly and repeat the test. If forging it moved
 you into a different bucket, your peer is trusted when it should not be.
 
+## The OIDC issuer paths have their own bucket
+
+The two [cloud identity](cloud-identity.md) issuer documents —
+`/.well-known/openid-configuration` and `/.well-known/jwks.json` — are limited in a
+**dedicated `api_oidc_issuer` bucket**, at the authenticated limit
+(`rate_limit.authenticated_requests_per_minute`, not the lower unauthenticated one), even
+though both are anonymous by design. They are not exempt, and they do not share a bucket with
+anything else.
+
+The isolation matters in both directions, which is why it is not simply an exemption:
+
+- **Nothing else can starve them.** A `429` on the JWKS does not degrade one caller — it
+  breaks token verification for *every* federated run, at every cloud, until the limit
+  window rolls. Sharing the anonymous per-IP bucket would let unrelated anonymous traffic
+  through the same ingress do exactly that.
+- **They cannot starve anything else.** A machine polling the JWKS harder than it should
+  consumes its own bucket and nobody else's.
+
+Legitimate volume here is very low — AWS and GCP both cache a JWKS for hours, and the
+responses carry a derived `Cache-Control` (half `key_propagation_seconds`) which is the real
+defence. The limit is a backstop for a client that ignores it, generous enough never to be
+reached in normal use.
+
+**So if a cloud is getting `429` on the JWKS, the bucket is not the usual suspect** — check
+attribution above, and whether something is fetching it in a loop. Note also that these two
+paths are served through the public `webhookIngress`, so they are attributed like any other
+request arriving there.
+
 ## Why this matters beyond fairness
 
 The per-credential bucketing that protects live log streaming (#1075) has a

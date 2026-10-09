@@ -56,7 +56,12 @@ def unsafe_target_reason(name: str) -> str | None:
     for ch in _PATH_SIGNIFICANT:
         if ch in name:
             return f"cannot contain {ch!r}"
-    if name in (".", "..") or any(part == ".." for part in name.split(ALIAS_SEP)):
+    # `name in (".", "..")` alone: the dot-split test that used to sit beside it
+    # could not fire. Splitting ON the separator means no element it yields can
+    # contain one, so `"..".split(".")` is `["", "", ""]` and the clause was
+    # unconditionally false for every input. The runner's twin carried the same
+    # dead clause and dropped it; this copy is the other half of that pair.
+    if name in (".", ".."):
         return "cannot be or contain a parent reference"
     return None
 

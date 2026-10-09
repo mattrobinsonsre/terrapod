@@ -39,6 +39,7 @@ windows are configuration, because only the operator knows how long their clouds
 cache.
 """
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -95,6 +96,18 @@ _signing_kid: str | None = None
 #: RFC 7638 thumbprint DERIVED from the key material, so identical kids mean
 #: identical keys and changed material cannot reuse a kid.
 _jwks_cache: tuple[tuple[str, ...], dict[str, list[dict[str, str]]]] | None = None
+
+#: Prepared private keys, by kid. `jwt.encode` given a PEM STRING re-parses it on
+#: every call, and the mint signs once per provider configuration a run uses --
+#: up to `MAX_TARGETS` of them in one request, synchronously, on the event loop.
+#: A kid is a thumbprint OF the key material, so it cannot name two different
+#: keys -- so an entry for a key no longer in the set is stale but never WRONG,
+#: and this is deliberately NOT cleared when the set is rebuilt. `reload` runs
+#: every 30s, so clearing there would empty the memo on every cycle and leave
+#: the per-token parse this exists to remove. Growth is one entry per key the
+#: process has ever signed with, i.e. bounded by rotations, and `_reset_for_tests`
+#: clears it for isolation.
+_prepared_keys: dict[str, object] = {}
 
 
 def generate_private_key() -> rsa.RSAPrivateKey:
@@ -321,6 +334,45 @@ def get_signing_key() -> SigningKey:
     raise RuntimeError(f"OIDC signing key {_signing_kid} is not in the loaded set")
 
 
+async def refresh_signing_keys_cycle() -> None:
+    """Periodic task: keep this process's signing set current, and recover it.
+
+    Two jobs, and the first is why this is not simply a reload.
+
+    `init_oidc_signing` is the only path that GENERATES a key; `reload_signing_keys`
+    only re-reads. So when the lifespan's `init` failed -- a transient database
+    error, or the ordinary race where the pod starts before the migration Job
+    finishes -- nothing else would ever make it succeed. `reload` raises on an
+    empty table for ever, `_keys` stays None, and the issuer serves 503 until
+    somebody restarts the pod, on a deployment whose pod reports Ready.
+
+    Calling `init` here is safe to repeat: it returns early for an
+    operator-supplied key, and otherwise serialises on the advisory lock so
+    concurrent replicas queue rather than each generating a key. It is used
+    only on the recovery path, so the steady state keeps `reload`'s lighter
+    read and its deliberate do-not-assign-on-failure behaviour, which leaves a
+    working cache intact through a database blip.
+    """
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        if signing_keys_loaded():
+            await reload_signing_keys(db)
+        else:
+            await init_oidc_signing(db)
+
+
+def signing_keys_loaded() -> bool:
+    """Whether a usable signing set is in this process.
+
+    Exists so the refresh task can tell recovery from steady state without
+    reaching into the module global. `None` means initialisation has not
+    succeeded in this process -- not that the deployment has no key, which is
+    the distinction the task turns on.
+    """
+    return _keys is not None
+
+
 def get_jwks() -> dict[str, list[dict[str, str]]]:
     """The published key set.
 
@@ -383,7 +435,10 @@ async def rotate_signing_key(db: AsyncSession) -> SigningKey:
     cfg = settings.auth.oidc_issuer
     now = datetime.now(UTC)
 
-    key = generate_private_key()
+    # RSA-2048 keygen is hundreds of milliseconds and highly variable, and this
+    # runs inside an `async def` route handler -- rule 13. Admin-only so the
+    # frequency is low, but it is exactly the CPU work that rule names.
+    key = await asyncio.to_thread(generate_private_key)
     kid = compute_kid(key)
     row = OIDCSigningKey(
         kid=kid,
@@ -444,10 +499,11 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
 
 
 def _reset_for_tests() -> None:
-    global _keys, _signing_kid, _jwks_cache  # noqa: PLW0603
+    global _keys, _signing_kid, _jwks_cache, _prepared_keys  # noqa: PLW0603
     _keys = None
     _signing_kid = None
     _jwks_cache = None
+    _prepared_keys = {}
 
 
 def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
@@ -459,6 +515,8 @@ def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
     """
     import jwt
 
+    global _prepared_keys  # noqa: PLW0603
+
     key = get_signing_key()
     now = int(time.time())
     payload = {
@@ -468,4 +526,9 @@ def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
         "exp": now + ttl_seconds,
         "jti": str(uuid.uuid4()),
     }
-    return jwt.encode(payload, key.private_key_pem, algorithm="RS256", headers={"kid": key.kid})
+    prepared = _prepared_keys.get(key.kid)
+    if prepared is None:
+        prepared = load_private_key(key.private_key_pem)
+        _prepared_keys[key.kid] = prepared
+
+    return jwt.encode(payload, prepared, algorithm="RS256", headers={"kid": key.kid})

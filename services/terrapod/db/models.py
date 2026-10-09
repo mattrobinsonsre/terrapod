@@ -2505,9 +2505,19 @@ class Run(Base):
     # apply in the fleet, including runs whose own identity had not moved. This
     # is the set the check is actually about: what the plan presented.
     #
-    # Written sequentially by the runner (one mint at a time per phase), so the
-    # read-modify-write here needs no locking. It only ever grows, so a retry
-    # that re-mints is harmless and a superset is still sound.
+    # Written sequentially by the runner -- one mint per phase, carrying the whole
+    # batch of provider configurations the engine discovered -- so a retry
+    # re-mints the SAME set and recomputes the same addition. That is what makes
+    # it safe, and it is the premise to re-check before adding a caller: the
+    # route appends with a read-modify-write over the whole JSONB column, so two
+    # concurrent writers with DIFFERENT batches would lose one.
+    #
+    # The earlier note here said "a superset is still sound", which inverted the
+    # risk: a lost update does not produce a superset, it produces a SUBSET. A
+    # dropped target then falls outside the confirm-time staleness check
+    # (`_cloud_identity_moved_since_plan` is scoped to this list), so an apply
+    # could proceed under an identity its plan was never reviewed against. The
+    # route re-reads under a row lock so that stays true of a future caller too.
     oidc_minted_targets: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )

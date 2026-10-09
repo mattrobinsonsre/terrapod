@@ -36,6 +36,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **No secrets in `values.yaml`** -- Database URLs, Redis URLs, SSO client secrets, and bootstrap passwords are all referenced via `existingSecret` / `secretKeyRef`. See [Security Hardening: Secrets](security-hardening.md#secrets-management).
 - [ ] **External Secrets Operator** (recommended) -- Sync secrets from AWS Secrets Manager, Azure Key Vault, or GCP Secret Manager into Kubernetes Secrets automatically. See [Security Hardening: Secrets](security-hardening.md#secrets-management).
 - [ ] **Bootstrap password is changed or bootstrap is disabled** -- After initial setup, either change the admin password or set `bootstrap.enabled: false` to prevent the bootstrap Job from running on upgrades.
+- [ ] **The OIDC issuer signing key is owned deliberately** (only if [per-workspace cloud identity](cloud-identity.md) is enabled) -- It is an RSA private key backing a trust root your clouds federate to. Either leave `api.oidcSigningKey` unset and let Terrapod generate and rotate its own, or supply yours via `api.oidcSigningKey.existingSecret` / `existingSecretKey` (default key `oidc_signing_key`) and own rotation too -- a supplied key wins on every startup, is never persisted, and makes the rotate endpoint return `409`. See [Security Hardening: OIDC issuer signing key](security-hardening.md#oidc-issuer-signing-key).
 
 ---
 
@@ -52,7 +53,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **Database backups are automated** -- Managed databases (RDS, Cloud SQL) provide automated daily backups with PITR. Verify backup retention meets your compliance requirements. See [Security Hardening: Backup Strategy](security-hardening.md#backup-strategy).
 - [ ] **Object storage versioning is enabled** -- S3 versioning, Azure Blob soft delete, or GCS versioning protects against accidental state file deletion. See [Security Hardening: Object Storage](security-hardening.md#object-storage).
 - [ ] **Break-glass recovery procedure is tested** -- Follow the [Disaster Recovery](disaster-recovery.md) guide in a non-production environment to verify you can recover Terraform state directly from object storage if Terrapod is unavailable.
-- [ ] **Kubernetes Secrets are backed up** -- OIDC client secrets, bootstrap credentials, and listener join tokens stored in K8s Secrets are not recoverable from the database. Back them up or ensure they can be regenerated from your secrets manager.
+- [ ] **Kubernetes Secrets are backed up** -- OIDC client secrets, bootstrap credentials, listener join tokens, and an operator-supplied OIDC issuer signing key stored in K8s Secrets are not recoverable from the database. Back them up or ensure they can be regenerated from your secrets manager. (A Terrapod-generated issuer signing key *is* in the database, encrypted, and comes back with it.)
 
 ---
 
