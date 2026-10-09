@@ -988,7 +988,7 @@
             },
             "extraArgs": {
               "type": "array",
-              "items": {
+                    "items": {
                 "type": "string"
               },
               "description": "Extra container args (eval/dev tuning only)."

@@ -7,7 +7,7 @@ ORM-side default and config default move in lockstep in the same
 change.
 
 Revision ID: 3214ad466305
-Revises: 15a8b636ea54
+Revises: cea79e480688
 Create Date: 2026-10-06
 """
 
