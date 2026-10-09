@@ -118,9 +118,6 @@ data:
       {{- if .Values.api.config.auth.callback_base_url }}
       callback_base_url: {{ .Values.api.config.auth.callback_base_url | quote }}
       {{- end }}
-      {{- if hasKey .Values.api.config.auth "legacy_callback_url" }}
-      legacy_callback_url: {{ .Values.api.config.auth.legacy_callback_url }}
-      {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 | int64 }}
       {{- /* Per-workspace cloud identity (#1901). `signing_key_pem` is
              deliberately ABSENT here and always will be: it is a private key,
@@ -387,30 +384,6 @@ data:
         {{- end }}
         {{- if .Values.api.config.registry.binary_cache.terragrunt_version_index_url }}
         terragrunt_version_index_url: {{ .Values.api.config.registry.binary_cache.terragrunt_version_index_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.pulumi_mirror_url }}
-        pulumi_mirror_url: {{ .Values.api.config.registry.binary_cache.pulumi_mirror_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.pulumi_version_index_url }}
-        pulumi_version_index_url: {{ .Values.api.config.registry.binary_cache.pulumi_version_index_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.node_mirror_url }}
-        node_mirror_url: {{ .Values.api.config.registry.binary_cache.node_mirror_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.node_version_index_url }}
-        node_version_index_url: {{ .Values.api.config.registry.binary_cache.node_version_index_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.go_mirror_url }}
-        go_mirror_url: {{ .Values.api.config.registry.binary_cache.go_mirror_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.go_version_index_url }}
-        go_version_index_url: {{ .Values.api.config.registry.binary_cache.go_version_index_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.dotnet_mirror_url }}
-        dotnet_mirror_url: {{ .Values.api.config.registry.binary_cache.dotnet_mirror_url | quote }}
-        {{- end }}
-        {{- if .Values.api.config.registry.binary_cache.dotnet_version_index_url }}
-        dotnet_version_index_url: {{ .Values.api.config.registry.binary_cache.dotnet_version_index_url | quote }}
         {{- end }}
         {{- if .Values.api.config.registry.binary_cache.allow_prerelease }}
         allow_prerelease: {{ .Values.api.config.registry.binary_cache.allow_prerelease | quote }}

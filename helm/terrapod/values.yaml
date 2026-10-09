@@ -52,6 +52,14 @@ api:
   tokenSigningKey:
     existingSecret: ""               # name of a K8s Secret holding the key
     existingSecretKey: "token_signing_key"  # key within that Secret
+  # NOTE: leaving tokenSigningKey unset is reported at startup as a warning
+  # (GHSA-hc47-q72v-4vcm). Set api.config.require_strong_secrets to make it
+  # fatal instead, once the key is set and any static encryption key is
+  # generated material rather than a typed passphrase.
+  #
+  # It does NOT apply to oidcSigningKey below: leaving that unset is the
+  # recommended default, is not reported at startup, and is not governed by
+  # require_strong_secrets.
 
   # The RSA private key Terrapod signs run identity tokens with (#1901), when
   # you want to hold it yourself rather than let Terrapod generate and persist
@@ -67,11 +75,6 @@ api:
   oidcSigningKey:
     existingSecret: ""                      # name of a K8s Secret holding the PEM
     existingSecretKey: "oidc_signing_key"   # key within that Secret
-
-    # NOTE: leaving tokenSigningKey unset is reported at startup as a warning
-    # (GHSA-hc47-q72v-4vcm). Set api.config.require_strong_secrets to make it
-    # fatal instead, once the key is set and any static encryption key is
-    # generated material rather than a typed passphrase.
 
   # CA bundle for database TLS server-cert verification, used when
   # config.database.ssl_mode is "verify-ca"/"verify-full" (cloud-IAM DB auth).
