@@ -555,51 +555,132 @@ class TestItMintsAndFails:
         assert str(parent) in msg
 
 
-class TestTheWriteTimeTargetGuard:
-    """Defence in depth -- and it was the weaker of the two copies.
+class TestATargetFromTheAPIIsRefusedBeforeItBecomesAPath:
+    """The runner's own traversal guard, which nothing was exercising.
 
-    The runner duplicates the API's refusal deliberately: it is a separately
-    versioned image, so it must not trust the API it is talking to about a value
-    it is about to join into a filesystem path. But the check was
-    `".." in target.split(".")`, and `"..".split(".")` is `["", "", ""]` -- no
-    `".."` element. So a bare parent reference passed the guard that exists to
-    stop it, while the API's own `unsafe_target_reason` caught it, inverting the
-    argument for keeping a second copy.
+    It is deliberate duplication: the API refuses these targets too, at the
+    workspace write AND on the mint, but this is a separately versioned image
+    that may be older or newer than the API it is talking to, and a token is a
+    bearer credential for one of the workspace's cloud identities. So the check
+    belongs at the write as well as at the request -- and the whole point of a
+    defence-in-depth check is that it holds when the other layer does not, which
+    is exactly the condition no test was creating.
+
+    Deleting the six lines in `phases/cloud_identity.py` passed every one of the
+    555 lines this file had before, because every fixture here sends well-formed
+    targets. The API-side twin is well covered, which is what made this look
+    covered.
+
+    `target` is echoed back by the API and joined as
+    `<token dir>/<target>/token`, so the consequence of each case below is a
+    token written somewhere the operator's provider block is not reading from --
+    or, worse, somewhere another provider block IS.
     """
 
-    def test_the_split_does_not_contain_a_bare_parent_reference(self):
-        """The Python fact the bug turned on, pinned so the fix is not
-        'simplified' back to the form that looked equivalent."""
-        assert ".." not in "..".split(".")
-        assert "." not in ".".split(".")
+    def _refuse(self, tmp_path, target, *, token="jwt-value"):
+        """Drive one target through the real phase and return the message."""
 
-    @pytest.mark.parametrize("target", [".", "..", "aws/../vault", "a\x00b"])
-    def test_a_path_significant_target_is_refused(self, target, tmp_path):
-        handler, _ = _api(mint=[target])
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "tokens": [{"target": target, "token": token, "audiences": ["aud"]}],
+                    "phase": "plan",
+                    "expires_in": 900,
+                },
+            )
+
         discover_fn, _ = _found({"aws"})
-        with pytest.raises(cloud_identity.CloudIdentityUnavailable) as e:
+        with pytest.raises(cloud_identity.CloudIdentityUnavailable) as exc:
             cloud_identity.run(
                 _cfg(),
                 binary="tofu",
                 cwd=tmp_path,
-                token_dir=tmp_path / "oidc",
+                token_dir=tmp_path / "run" / "oidc",
                 client=_client(handler),
                 discover_fn=discover_fn,
             )
-        assert "not a provider configuration name" in str(e.value)
-        assert not list((tmp_path / "oidc").rglob("token")), "nothing was written"
+        return str(exc.value)
 
-    def test_an_ordinary_target_still_writes(self, tmp_path):
-        """The negative path: the widened guard must not refuse a legitimate
-        aliased name, which contains exactly one dot."""
-        handler, _ = _api(mint=["aws.west"])
-        discover_fn, _ = _found({"aws.west"})
+    def _nothing_written(self, tmp_path, token="jwt-value"):
+        """No file anywhere under the temp tree holds the token.
+
+        Asserted over the WHOLE tree rather than under the token directory,
+        because escaping that directory is the thing being prevented -- a check
+        scoped to it would pass precisely when the guard failed.
+        """
+        leaked = [
+            p for p in tmp_path.rglob("*") if p.is_file() and token in p.read_text(errors="ignore")
+        ]
+        assert not leaked, f"the token was written to {leaked}"
+
+    @pytest.mark.parametrize(
+        "target",
+        [
+            "aws/../vault",  # lands at the path the operator's `vault` block reads
+            "../token",
+            "/etc/terrapod",  # absolute: `Path / "/x"` discards the directory entirely
+            "aws\\..\\vault",
+            "aws\x00/vault",
+        ],
+    )
+    def test_a_target_that_would_not_resolve_inside_the_token_directory_is_refused(
+        self, tmp_path, target
+    ):
+        msg = self._refuse(tmp_path, target)
+        assert "not a provider configuration name" in msg
+        assert "has not been written" in msg
+        self._nothing_written(tmp_path)
+
+    @pytest.mark.parametrize("target", ["..", "."])
+    def test_a_bare_parent_or_current_reference_is_refused(self, tmp_path, target):
+        """The two the clause as first written could not catch, because
+        `target.split(".")` splits ON the dot and so can never yield an element
+        equal to `".."` -- `"..".split(".")` is `["", "", ""]`.
+
+        `..` wrote `<token dir>/../token`, one level above the directory. `.`
+        wrote `<token dir>/token`, which is the combined-token path
+        `test_no_combined_token_file_is_written` asserts must never exist -- so a
+        single malformed target could manufacture the very file whose absence is
+        the reason tokens are minted per target at all.
+
+        The API refuses both (`unsafe_target_reason` tests `name in (".", "..")`
+        explicitly), so this is reachable only across image skew -- and skew is
+        the only reason this guard exists.
+        """
+        msg = self._refuse(tmp_path, target)
+        assert "not a provider configuration name" in msg
+        self._nothing_written(tmp_path)
+        assert not (tmp_path / "run" / "token").exists()
+
+    def test_the_refusal_names_the_offending_target(self, tmp_path):
+        """An operator reading a failed run log needs to know which entry was
+        rejected; there may be several, and the token must not be in the line."""
+        msg = self._refuse(tmp_path, "aws/../vault", token="jwt-secret")
+        assert "aws/../vault" in msg
+        assert "jwt-secret" not in msg
+
+    def test_a_legitimate_aliased_target_is_still_written(self, tmp_path):
+        """The guard must not refuse the form it exists to protect: one dot
+        separates provider from alias, so `vault.eu` is ordinary and common.
+        Without this the parametrisations above would pass against a guard that
+        refused everything."""
+        handler, _ = _api(mint=["vault.eu"])
+        discover_fn, _ = _found({"vault.eu"})
         cloud_identity.run(
             _cfg(),
             binary="tofu",
             cwd=tmp_path,
-            token_dir=tmp_path / "oidc",
+            token_dir=tmp_path / "run" / "oidc",
             client=_client(handler),
             discover_fn=discover_fn,
         )
-        assert (tmp_path / "oidc" / "aws.west" / "token").read_text() == "jwt-for-aws.west"
+        assert (tmp_path / "run" / "oidc" / "vault.eu" / "token").read_text() == "jwt-for-vault.eu"
+
+    def test_the_split_form_could_never_have_fired(self):
+        """The Python fact the dead clause turned on, asserted rather than only
+        described, so the guard is not 'simplified' back to the form that read
+        as equivalent. Splitting ON the dot means no element can contain one."""
+        assert ".." not in "..".split(".")
+        assert "." not in ".".split(".")
+        assert ".." not in "a..b".split(".")
