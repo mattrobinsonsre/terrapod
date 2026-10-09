@@ -98,6 +98,11 @@ logger = get_logger(__name__)
 # here because there's nothing left running.
 _CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
 
+#: The run states an apply-phase Job is launched from. A plan-only run never
+#: reaches either, which is what makes this a usable check on the phase a
+#: listener claims when it asks for a runner token -- see `create_runner_token`.
+_APPLY_PHASE_STATES = frozenset({"confirmed", "applying"})
+
 
 def _rfc3339(dt) -> str:
     if dt is None:
@@ -2370,8 +2375,11 @@ async def create_runner_token(
     Called by the listener after claiming a run. The token authenticates
     runner Job API calls (binary cache, provider mirror, artifact upload/download).
 
-    The listener names the Job's `phase` in the body, which is bound into the
-    token. The federation-token mint for per-workspace cloud identity (#1901)
+    The listener names the Job's `phase` in the body and it is bound into the
+    token -- but it is CHECKED against `run.status` first, because `apply` is
+    what resolves to the extra apply cloud identity and the listener is only
+    echoing back a value the API gave it on the claim. An `apply` claim on a run
+    that is not applying is downgraded to `plan` and logged. The federation-token mint for per-workspace cloud identity (#1901)
     reads the phase from the presented token rather than from its own request
     body, so a plan-phase Job cannot ask for the apply identity. **Optional, and
     it has to stay optional**: a listener image older than the claim sends no
@@ -2392,6 +2400,27 @@ async def create_runner_token(
     requested_ttl = body.get("ttl", config.token_ttl_seconds)
     requested_phase = body.get("phase")
     phase = requested_phase if requested_phase in RUNNER_PHASES else None
+
+    # The listener echoes back the phase the API gave it on the claim, so the
+    # value is ours already -- but it arrives as an unverified request field, and
+    # the `apply` phase is what resolves to the extra apply cloud identity
+    # (#1901). Accepting it on trust means the claim is only as good as the
+    # listener's honesty about a field it chooses, while the server holds the
+    # authoritative answer in `run.status`.
+    #
+    # Downgraded rather than refused: a listener that asks wrongly is a bug in
+    # the listener, and failing the token would fail the run instead of
+    # correcting it. Logged at warning, because silently downgrading is how such
+    # a bug stays invisible.
+    if phase == "apply" and run.status not in _APPLY_PHASE_STATES:
+        logger.warning(
+            "listener asked for an apply-phase runner token on a run that is not "
+            "applying; issuing a plan-phase token",
+            run_id=str(run.id),
+            listener_id=listener_id,
+            run_status=run.status,
+        )
+        phase = "plan"
     token = generate_runner_token(run.id, ttl=requested_ttl, phase=phase)
 
     # Compute actual TTL (may have been clamped)

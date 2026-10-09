@@ -404,7 +404,18 @@ def run(
         # lands at the `vault` path and an absolute target escapes the directory
         # entirely. The token is a credential, so the check belongs at the write
         # as well as at the request.
-        if "/" in target or "\\" in target or "\x00" in target or ".." in target.split("."):
+        if (
+            "/" in target
+            or "\\" in target
+            or "\x00" in target
+            # `target in (".", "..")` is NOT covered by the split below:
+            # `"..".split(".")` is `["", "", ""]`, which contains no ".." element,
+            # so a bare parent reference passed the guard that exists to stop it.
+            # The API's own `unsafe_target_reason` catches both, which left the
+            # copy duplicated FOR skew safety as the weaker of the two.
+            or target in (".", "..")
+            or ".." in target.split(".")
+        ):
             raise CloudIdentityUnavailable(
                 f"The API returned a cloud identity target {target!r} that is not a provider "
                 "configuration name — it would not resolve to a path inside this run's token "

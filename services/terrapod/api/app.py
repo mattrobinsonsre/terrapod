@@ -541,21 +541,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # scheduler has no per-replica task type, and `asyncio.create_task` for
     # background work is forbidden.
     #
-    # Best-effort by construction: `reload_signing_keys` raises before it
-    # assigns, so a transient database error leaves the working cache intact.
+    # Best-effort by construction in the steady state: `reload_signing_keys`
+    # raises before it assigns, so a transient database error leaves the working
+    # cache intact. It is also the RECOVERY path -- the handler calls
+    # `init_oidc_signing` when this process holds no set at all, because `reload`
+    # can only re-read and would otherwise leave a pod that lost the startup race
+    # serving 503 for ever while reporting Ready.
     if settings.auth.oidc_issuer.enabled:
-
-        async def _oidc_signing_refresh() -> None:
-            from terrapod.auth.oidc_signing import reload_signing_keys
-
-            async with get_db_session() as db:
-                await reload_signing_keys(db)
+        from terrapod.auth.oidc_signing import refresh_signing_keys_cycle
 
         register_periodic_task(
             "oidc_signing_refresh",
             interval_seconds=30,
-            handler=_oidc_signing_refresh,
-            description="Re-read the OIDC signing keys so a rotation reaches every replica",
+            handler=refresh_signing_keys_cycle,
+            description=(
+                "Re-read the OIDC signing keys so a rotation reaches every replica, "
+                "and initialise them when a startup attempt failed"
+            ),
         )
 
     # Leadership probe (#960). Registered only under `ha.role=auto` — a static

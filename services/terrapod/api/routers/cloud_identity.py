@@ -169,7 +169,7 @@ async def mint_cloud_identity_tokens(
     from terrapod.api.routers.oidc_issuer import issuer_url
     from terrapod.auth.oidc_signing import sign_identity_token
     from terrapod.config import settings
-    from terrapod.services import cloud_identity_resolver
+    from terrapod.services import cloud_identity_resolver, run_service
 
     require_runner_for_run(user, run_id)
 
@@ -181,6 +181,19 @@ async def mint_cloud_identity_tokens(
     run = await db.get(Run, parse_id(run_id, "run-", detail="Run not found"))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # A runner token is good until it expires -- run state is not checked when it
+    # is verified -- and the default TTL is an hour. This is the first endpoint
+    # that converts one into CLOUD credentials, so the missing liveness check
+    # costs more here than elsewhere: code in the plan pod that exfiltrates the
+    # token could keep POSTing here after the run finished, drawing fresh
+    # short-lived credentials for the workspace's identity from anywhere, for the
+    # remainder of the hour. A finished run has no legitimate reason to mint.
+    if run.status in run_service.TERMINAL_STATES:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"Run is {run.status} — a finished run cannot mint cloud identity tokens."),
+        )
 
     snapshot = run.oidc_audiences or {}
     if not snapshot:
@@ -307,11 +320,26 @@ async def mint_cloud_identity_tokens(
     # Written after signing, never before: a recorded target that was never
     # served would make the confirm check refuse an apply over an identity the
     # plan never presented.
+    # Re-read the row FOR UPDATE before appending. The model comment argued this
+    # needed no locking because the runner mints "one at a time per phase" and the
+    # list "only ever grows, so a superset is still sound" -- but a lost update
+    # does not produce a superset, it produces a SUBSET, and concurrent mints are
+    # reachable: the runner retries on 5xx, so a first attempt that timed out
+    # after committing can overlap its own retry. A dropped target then falls
+    # outside the confirm-time staleness check, and an apply proceeds under an
+    # identity its plan was never reviewed against -- the one direction the
+    # comment ruled out.
+    # `refresh(..., with_for_update=True)` rather than a second `select()`: same
+    # re-read under the same row lock, but it does not add a `db.execute` call --
+    # and every test on this route scripts `db.execute` as an ordered list, so an
+    # extra one desynchronises all of them (#1565's lesson, 39 failures when this
+    # was written the other way).
+    await db.refresh(run, with_for_update=True)
     minted = list(run.oidc_minted_targets or [])
     added = [t["target"] for t in tokens if t["target"] not in minted]
     if added:
         run.oidc_minted_targets = minted + added
-        await db.commit()
+    await db.commit()
 
     logger.info(
         "minted cloud identity tokens",
@@ -357,6 +385,25 @@ async def get_oidc_audience_defaults(
     Empty when the deployment configures no catalogue, which is the default --
     not an error, and not the same as the issuer being disabled.
     """
+
+    # A runner token must not read this. It is deployment-wide topology -- every
+    # federation target every workspace uses -- and the plan Job runs the
+    # workspace's own HCL: an `external` data source, a `pre_init` hook or a
+    # third-party module can read TP_AUTH_TOKEN out of the environment. The
+    # discovery document deliberately publishes no audiences for exactly this
+    # reason, and serving them one tier up to anything holding a runner token
+    # gives the disclosure back.
+    #
+    # The runner has no use for it either: the mint already returns the resolved
+    # audiences per target, which is all the credential phase writes.
+    if user.auth_method == "runner_token":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "A runner token cannot read the deployment's audience catalogue. "
+                "The mint returns this run's own resolved audiences."
+            ),
+        )
     from terrapod.config import settings
 
     cfg = settings.auth.oidc_issuer

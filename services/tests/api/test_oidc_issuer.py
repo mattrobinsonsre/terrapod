@@ -19,7 +19,23 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from terrapod.api.routers import oidc_issuer as router
+from terrapod.auth import oidc_signing
+
+
+@pytest.fixture(autouse=True)
+def _a_key_is_loaded():
+    """Both documents refuse with 503 when this process holds no signing set.
+
+    Added when that guard was: these tests drive the route functions directly to
+    pin paths and caching, which does not otherwise need a key. The guard is the
+    point of a separate test, so here it just has to be satisfied -- a deployment
+    serving either document always has one loaded.
+    """
+    with patch.object(oidc_signing, "_keys", [MagicMock(kid="k-test")]):
+        yield
 
 
 def _settings(*, public_url="", webhook="", external="", propagation=600):

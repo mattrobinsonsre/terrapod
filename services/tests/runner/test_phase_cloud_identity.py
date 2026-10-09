@@ -553,3 +553,53 @@ class TestItMintsAndFails:
         msg = self._expect_raise(tmp_path, handler, token_dir=parent / "oidc")
         assert "aws" in msg
         assert str(parent) in msg
+
+
+class TestTheWriteTimeTargetGuard:
+    """Defence in depth -- and it was the weaker of the two copies.
+
+    The runner duplicates the API's refusal deliberately: it is a separately
+    versioned image, so it must not trust the API it is talking to about a value
+    it is about to join into a filesystem path. But the check was
+    `".." in target.split(".")`, and `"..".split(".")` is `["", "", ""]` -- no
+    `".."` element. So a bare parent reference passed the guard that exists to
+    stop it, while the API's own `unsafe_target_reason` caught it, inverting the
+    argument for keeping a second copy.
+    """
+
+    def test_the_split_does_not_contain_a_bare_parent_reference(self):
+        """The Python fact the bug turned on, pinned so the fix is not
+        'simplified' back to the form that looked equivalent."""
+        assert ".." not in "..".split(".")
+        assert "." not in ".".split(".")
+
+    @pytest.mark.parametrize("target", [".", "..", "aws/../vault", "a\x00b"])
+    def test_a_path_significant_target_is_refused(self, target, tmp_path):
+        handler, _ = _api(mint=[target])
+        discover_fn, _ = _found({"aws"})
+        with pytest.raises(cloud_identity.CloudIdentityUnavailable) as e:
+            cloud_identity.run(
+                _cfg(),
+                binary="tofu",
+                cwd=tmp_path,
+                token_dir=tmp_path / "oidc",
+                client=_client(handler),
+                discover_fn=discover_fn,
+            )
+        assert "not a provider configuration name" in str(e.value)
+        assert not list((tmp_path / "oidc").rglob("token")), "nothing was written"
+
+    def test_an_ordinary_target_still_writes(self, tmp_path):
+        """The negative path: the widened guard must not refuse a legitimate
+        aliased name, which contains exactly one dot."""
+        handler, _ = _api(mint=["aws.west"])
+        discover_fn, _ = _found({"aws.west"})
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert (tmp_path / "oidc" / "aws.west" / "token").read_text() == "jwt-for-aws.west"
