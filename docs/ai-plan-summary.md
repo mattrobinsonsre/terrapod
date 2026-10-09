@@ -116,7 +116,7 @@ api:
         # Optional cross-account hop. When set, Terrapod's pod-side
         # IAM identity (IRSA) calls sts:AssumeRole before invoking
         # Bedrock. Empty = use the pod's ambient credentials.
-        aws_role_arn: arn:aws:iam::703581221739:role/terrapod
+        aws_role_arn: arn:aws:iam::123456789012:role/terrapod
       context:
         fleet_context: |
           Production AWS infrastructure for service-X.
