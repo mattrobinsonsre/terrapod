@@ -76,7 +76,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_get",
-		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing.",
+		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing. One field is not what it looks like: `oidc-audiences` is returned as the MERGED view of the deployment's cloud identity catalogue with this workspace's own override, so an entry appearing here does NOT mean the workspace set it. Writing this value back through terrapod_workspace_update would promote every inherited entry into a permanent override. Read terrapod_oidc_audience_defaults and subtract it to get what the workspace actually owns.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceGetIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Workspace == "" {
@@ -437,6 +437,25 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			return errResult(err), nil, nil
 		}
 		return nil, set, nil
+	})
+
+	// ── terrapod_oidc_audience_defaults ──────────────────────────────
+	// The write-side tools warn an agent that a workspace reports its
+	// `oidc-audiences` as the MERGED view, so writing it back promotes every
+	// inherited entry into a permanent override. Without this tool that warning
+	// names a trap with no way out: the agent cannot see the catalogue, so it
+	// cannot compute what the workspace actually owns.
+	type oidcAudienceDefaultsIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_oidc_audience_defaults",
+		Description: "Report the deployment-wide cloud identity audience CATALOGUE that every workspace's own `oidc-audiences` override merges over (#1901). Read this BEFORE writing `oidc_audiences` on a workspace, and subtract it from what a workspace reports: a workspace read returns the MERGED map with no indication of which entries it owns, so writing that value back would promote every INHERITED entry into a permanent override on that workspace -- which then stops tracking the catalogue when an operator changes it. The difference between the two is the workspace's actual override. A MAP keyed on the provider configuration a token is minted for: the bare provider type exactly as a `provider` block writes it (`aws`, `vault`), or `type.alias` for one aliased configuration (`aws.west`); the alias is part of the KEY and `vault.eu` is answered by a `vault` entry when there is no `vault.eu` one (lookup is specific-then-general). Each value is always a list of opaque audience strings the federation target itself named -- nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. `issuer-enabled` is reported separately and the distinction matters for diagnosis: an EMPTY catalogue and a DISABLED issuer produce the same symptom (\"my workspace minted nothing\") and only the first is fixed by adding audiences. An empty catalogue is the default and is not an error. Read-only; any authenticated user, because a workspace read already discloses that workspace's merged audiences to anyone who can read it and knowing an audience grants nothing on its own -- the federation target's own trust policy is the gate, and minting needs a phase-bound runner token scoped to a run on that workspace.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ oidcAudienceDefaultsIn) (*mcp.CallToolResult, *terrapod.OIDCAudienceDefaults, error) {
+		defaults, err := c.GetOIDCAudienceDefaults(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, defaults, nil
 	})
 
 	// ── terrapod_vault_status ────────────────────────────────────────
