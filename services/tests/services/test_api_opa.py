@@ -72,8 +72,6 @@ class TestOpaBinary:
 
     async def test_downloads_once_under_concurrent_first_use(self, tmp_path, monkeypatch):
         """Two policy writes arriving together must not both fetch ~50MB."""
-        import asyncio
-
         monkeypatch.setattr(api_opa, "_tool_dir", lambda: tmp_path)
         version = api_opa.configured_version("opa")
 
