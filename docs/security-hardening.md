@@ -239,8 +239,9 @@ only signing with it after `key_propagation_seconds`, because a cloud cannot ver
 signed by a key it has not fetched yet. That is the path to prefer unless you have a reason
 not to; there is no weak derived fallback here, so leaving it unset costs you nothing.
 
-To supply your own — an RSA private key in PKCS8 PEM form; an Ed25519 or EC key is refused at
-startup by name, because workload identity federation does not accept EdDSA at every cloud:
+To supply your own — an RSA private key in PKCS8 PEM form; an Ed25519 or EC key is refused by
+name at startup (as a logged error, not a failed start — the pod stays Ready and the issuer
+routes 503, so check those two documents rather than the pod's status), because workload identity federation does not accept EdDSA at every cloud:
 
 ```zsh
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out oidc.pem

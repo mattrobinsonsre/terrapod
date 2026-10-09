@@ -2797,8 +2797,9 @@ a URL mismatch, not the key.
    token-rejected symptom with nothing wrong with the key.
 4. **Check the API log** for either of two warnings, both of which mean the
    windows did not cover you:
-   - `No OIDC signing key has finished propagating; signing with the newest
-     unretired key anyway` — reached when no retired key is still published, so
+   - `No OIDC signing key is active and no retired key is still published;
+     signing with the newest even though the clouds may not hold it yet` —
+     reached when no retired key is still published, so
      there was nothing to sign with but the un-propagated one. In practice this
      means `retired_key_grace_seconds` is shorter than the time between two
      rotations: **raise it**, and do not rotate twice inside that window.
