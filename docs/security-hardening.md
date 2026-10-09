@@ -223,6 +223,53 @@ they land on the wrong half — until the last pod holding the old key retires,
 at which point the fleet agrees again on the weaker derived key without saying
 so. Recreate the Secret and roll the API.
 
+### OIDC issuer signing key
+
+A different key, a different decision, and only relevant when
+[per-workspace cloud identity](cloud-identity.md) is enabled. This one signs the short-lived
+RS256 JWT each run presents to your clouds, and **its public half is published** at
+`/.well-known/jwks.json` as the trust root those clouds federate to. It is therefore the
+highest-consequence secret the feature adds: whoever holds the private half can mint a token
+claiming any workspace and any phase, and every federated cloud will accept it.
+
+**By default Terrapod generates and manages its own**, stores it encrypted in the database,
+and rotates it through
+`POST /api/terrapod/v1/oidc/signing-keys/actions/rotate` — publishing the new key first and
+only signing with it after `key_propagation_seconds`, because a cloud cannot verify a token
+signed by a key it has not fetched yet. That is the path to prefer unless you have a reason
+not to; there is no weak derived fallback here, so leaving it unset costs you nothing.
+
+To supply your own — an RSA private key in PKCS8 PEM form; an Ed25519 or EC key is refused at
+startup by name, because workload identity federation does not accept EdDSA at every cloud:
+
+```zsh
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out oidc.pem
+kubectl -n terrapod create secret generic terrapod-oidc-signing \
+  --from-file=oidc_signing_key=oidc.pem
+```
+
+```yaml
+api:
+  oidcSigningKey:
+    existingSecret: "terrapod-oidc-signing"
+    existingSecretKey: "oidc_signing_key"
+```
+
+Three properties follow from supplying it, and they are the whole trade:
+
+- **It wins on every startup**, so replacing the Secret really replaces the key rather than
+  being ignored in favour of a stored one.
+- **It is never persisted.** Terrapod does not copy it into the database, which is what makes
+  the first property true — and means a backup of the database does not contain it. Back the
+  Secret up yourself.
+- **The rotate endpoint returns `409`.** The key is yours, so rotation is yours: replace the
+  Secret and restart the API. There is no propagation window doing the staging for you, so
+  roll the new public key out to your clouds' trust configuration before you cut over, or
+  every federated run fails at the cloud's token exchange in the meantime.
+
+It is injected as `TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM` from the Secret, never a
+ConfigMap. The same GitOps caveats as the token signing key above apply, for the same reasons.
+
 ## Network Policies
 
 Terrapod ships with NetworkPolicy templates that restrict pod-to-pod and pod-to-external traffic. Enable them:

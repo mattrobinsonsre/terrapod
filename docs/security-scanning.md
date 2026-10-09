@@ -122,7 +122,7 @@ api:
   config:
     registry:
       platform_tools:
-        checkov_version: "3.3.21"
+        checkov_version: "3.3.26"
         trivy_version: "0.75.0"
 ```
 

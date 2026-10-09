@@ -543,7 +543,7 @@ Workspaces support the following drift detection attributes (settable on create 
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `oidc-audiences` | object | `{}` | The workspace's **override** of the deployment's cloud-identity audience catalogue, and its half of the opt-in for [per-workspace cloud identity](cloud-identity.md). A map keyed on the provider configuration a token is for — the bare provider type as a `provider` block writes it (`aws`, `azurerm`, `vault`), optionally with an alias (`aws.west`, where the alias is part of the key). Each value is **always a list**, even for one entry. One token is minted per key: a token audienced for two targets is replayable between them, and AWS refuses a multi-valued `aud` outright. Lookup is specific-then-general, so `vault.eu` is answered by an entry for `vault.eu` if there is one and by `vault` otherwise. **Merged over** `api.config.auth.oidc_issuer.audiences` per key, replacing that key's whole list — so an empty map is valid and common, and means "take the catalogue as it stands"; removing a key is the defined way to stop overriding it, and an explicitly empty list for a key is **refused** because it is neither. **This attribute returns the MERGED map, not the stored override** — so an entry the workspace does not override still appears, and a client that writes the read straight back would promote it into one. Subtract the catalogue (`GET /api/terrapod/v1/oidc/audience-defaults`) and send only what the workspace owns; the Terraform provider reconciles only the keys the practitioner declared, for exactly this reason. At most 10 keys, 10 audiences per key, 255 characters per audience and 128 per key; a key carries no whitespace and at most one `.`; a blank or duplicate audience is **refused**, not dropped. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose. Terrapod attaches no meaning to any of them — any provider may be mapped to any audience, and the cloud's own trust policy is the only gate. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
+| `oidc-audiences` | object | `{}` | The workspace's **override** of the deployment's cloud-identity audience catalogue, and its half of the opt-in for [per-workspace cloud identity](cloud-identity.md). A map keyed on the provider configuration a token is for — the bare provider type as a `provider` block writes it (`aws`, `azurerm`, `vault`), optionally with an alias (`aws.west`, where the alias is part of the key). Each value is **always a list**, even for one entry. One token is minted per key: a token audienced for two targets is replayable between them, and AWS refuses a multi-valued `aud` outright. Lookup is specific-then-general, so `vault.eu` is answered by an entry for `vault.eu` if there is one and by `vault` otherwise. **Merged over** `api.config.auth.oidc_issuer.audiences` per key, replacing that key's whole list — so an empty map is valid and common, and means "take the catalogue as it stands"; removing a key is the defined way to stop overriding it, and an explicitly empty list for a key is **refused** because it is neither. **This attribute returns the MERGED map, not the stored override** — so an entry the workspace does not override still appears, and a client that writes the read straight back would promote it into one. Subtract the catalogue (`GET /api/terrapod/v1/oidc/audience-defaults`) and send only what the workspace owns; the Terraform provider reconciles only the keys the practitioner declared, for exactly this reason. At most 10 keys, 10 audiences per key, 255 characters per audience and 128 per key; a key carries no whitespace and at most one `.`; a blank or duplicate audience is **refused**, not dropped. A key containing `/`, `\`, NUL or any `..` segment is **refused** as well, and that one is a security control rather than key hygiene: the key becomes a directory name (`<token dir>/<target>/token`), and because lookup splits on the first `.`, `aws./../vault` would resolve through an ordinary `aws` entry and land an AWS-audienced token at the path the operator's `vault` provider block reads. It is enforced at the workspace write (`422`), at the mint (`400`), and again in the runner before the path join — the last deliberately duplicated, because the runner is a separately versioned image. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose. Terrapod attaches no meaning to any of them — any provider may be mapped to any audience, and the cloud's own trust policy is the only gate. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
 
 ### Terragrunt Attributes
 
@@ -857,14 +857,16 @@ A **post-plan** hold specifically:
 
 In 2.0 a held run reports `policy_override` or `post_plan_awaiting_decision` instead of `planning`; see [deprecations.md](deprecations.md#announced-behaviour-changes-for-20).
 
-#### Stale-plan guards: state drift (#647) & expiry (#646)
+#### Stale-plan guards: state drift (#647), cloud identity drift (#1901) & expiry (#646)
 
-Beyond supersede (a *newer run* case), two guards protect against applying a plan that no longer reflects reality. Both resolve an apply-capable `planned` run to `discarded` and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
+Beyond supersede (a *newer run* case), three guards protect against applying a plan that no longer reflects reality. All three resolve an apply-capable `planned` run to `discarded` and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
 
 - **State-version drift (#647, always on)** — a plan is snapshotted against the workspace's state serial when it starts. If the current state serial advances before the plan is applied — another apply, a CLI `state push`, a rollback, a manual upload — the plan is stale and is auto-discarded (`discard-reason: state changed since plan (serial N -> M)`). This runs even in agent mode, where the server drives the apply and there is no client to catch it. A first apply (no prior state) has no baseline and is never stale.
+- **Cloud identity drift (#1901)** — when the [per-workspace cloud identity](cloud-identity.md) the run would present has moved since its plan was reviewed, because the deployment's audience catalogue or the workspace's `oidc-audiences` override changed (`discard-reason: cloud identity configuration changed since plan (aws, vault.eu)`, naming the targets). Scoped to the targets the run **actually minted for**, not the whole merged map, so one catalogue edit does not refuse every pending apply in the fleet; a target the catalogue has *gained* since the plan is deliberately not a cause, because the apply would present the same identity the plan did. The runner's mint path refuses the same mismatch per target, but only inside a Job and after `init` — this fires before anything is scheduled. Never fires for a workspace that mints nothing.
 - **Time-based expiry (#646, per-workspace, off by default)** — when a workspace sets `plan-expiry-seconds`, a plan older than that TTL (from completion) is auto-discarded by a periodic sweep and at confirm time (`discard-reason: plan expired after {ttl}s`).
 
-Whichever reason fires first wins, and both compose with supersede.
+They are evaluated in the order listed — state drift, then cloud identity drift, then expiry.
+Whichever reason fires first wins, and all three compose with supersede.
 
 #### Configuration version resolution
 
@@ -2432,21 +2434,38 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 **Request body (optional):**
 ```json
 {
-  "ttl": 3600
+  "ttl": 3600,
+  "phase": "plan"
 }
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) |
+| `phase` | string | *(none)* | The phase of the Job this token is for — `plan` or `apply` (added in v1.10.0). Bound into the signed token, so the holder cannot edit it. **Optional, and deliberately never a `4xx`:** anything else, or an absent value, mints the older unphased form rather than failing, so a listener image that predates the claim keeps working |
 
 **Response:**
 ```json
 {
-  "token": "runtok:{run_id}:{ttl}:{timestamp}:{hmac_sig}",
-  "expires_in": 3600
+  "token": "runtok:{run_id}:{phase}:{ttl}:{timestamp}:{hmac_sig}",
+  "expires_in": 3600,
+  "phase": "plan"
 }
 ```
+
+Two token forms exist and **both are accepted indefinitely**:
+
+```
+runtok:{run_id}:{phase}:{ttl}:{timestamp}:{hmac_sig}   # six fields, a phase claimed
+runtok:{run_id}:{ttl}:{timestamp}:{hmac_sig}           # five fields, no claim
+```
+
+Field count distinguishes them. An absent phase is read as *"this token makes no claim"* —
+never as a mismatch — so an endpoint that checks the phase skips the check rather than
+refusing. `phase` is echoed in the response so a listener can tell whether the server bound
+one; it is absent from an older server's response, which reads as `null`. Which endpoints
+actually consume the claim is set out in
+[runners.md → Per-phase auth Secret](runners.md#per-phase-auth-secret).
 
 **Auth:** Listener certificate.
 
@@ -2986,6 +3005,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "ai-summary-mode": "enabled",
     "ai-summary-context": "payments estate; PCI in scope",
     "ai-policy-mode": "disabled",
+    "oidc-audiences": {"aws": ["sts.amazonaws.com"]},
     "debug-mode": true,
     "terragrunt-enabled": true, "terragrunt-version": "0.67.4",
     "trigger-prefixes": ["infra/net"],
@@ -3018,7 +3038,7 @@ Semantics:
   - `vcs-workflow: apply_then_merge` needs a VCS connection and auto-apply off on **every** matched workspace — the apply runs before the PR merges, so auto-applying would apply from a branch nobody approved. Turning auto-apply off in the same request is allowed, mirroring the `PATCH` path.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
-- **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).
+- **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows). **One qualification, for `oidc-audiences` only:** writing it triggers nothing, but a run already sitting in `planned` on a matched workspace is auto-**discarded** the next time anyone tries to confirm it, by the cloud-identity staleness guard above — the identity it would present is no longer the one its plan was reviewed under. So a fleet-wide audience edit can invalidate every pending apply across the matched set at once. That is the guard working as designed (it fails before the apply rather than at the cloud's token exchange mid-apply), but it is a side effect of a "pure settings write", so plan the edit for a quiet moment and expect to re-plan. Nothing is applied, and no run is queued.
 - Per-workspace audit entries.
 
 Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchanged}`; apply `{dry_run:false, matched, applied, changes, unchanged, errors:[]}`; any failure ⇒ `409`/`422` and **nothing applied**.

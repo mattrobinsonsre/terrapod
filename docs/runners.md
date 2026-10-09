@@ -509,7 +509,36 @@ tprun-<run-short-id>-plan-auth     # plan-phase Job consumes this
 tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
 ```
 
-The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id`, so a leaked token cannot be replayed against an unrelated run or used to download a different workspace's state. It is **not** bound to a phase: the token is `runtok:{run_id}:{ttl}:{timestamp}:{signature}` and carries no phase, so a plan-phase token remains usable against that same run's apply-phase endpoints until its TTL expires. The per-phase Secret naming above is collision avoidance between overlapping Jobs, not a narrower scope. Earlier text here claimed the phase binding; it has never existed, and the TTL (`runners.tokenTTLSeconds`, default 1h) is what actually bounds a leaked token's life.
+The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id`, so a leaked token cannot be replayed against an unrelated run or used to download a different workspace's state.
+
+**Since v1.10.0 the token also carries a signed phase claim**, because per-workspace cloud identity needs one:
+
+```
+runtok:{run_id}:{phase}:{ttl}:{timestamp}:{signature}   # six fields, phase claimed
+runtok:{run_id}:{ttl}:{timestamp}:{signature}           # five fields, no claim
+```
+
+The listener names the Job's phase when it asks for the token (`{"phase": "plan"}` or
+`{"phase": "apply"}` on the `runner-token` request body), and the phase travels **inside the
+signed message** — so whoever holds the token cannot edit it, which is the only reason it is
+worth anything. Field count is what distinguishes the two forms.
+
+**The claim is optional and has to stay optional.** A listener image older than the claim
+sends no phase and gets the five-field form, which verifies exactly as it did before. An
+absent phase reads as *"this token makes no claim"* — never as *"this token claims the wrong
+phase"* — so the endpoints that check one skip the check rather than refusing, and a lagging
+listener keeps working. An unrecognised phase value mints the unphased form too, rather than
+failing the request or guessing.
+
+**What the claim buys today, stated plainly, because it is narrower than it sounds.** Exactly
+one endpoint consumes it: the [cloud identity](cloud-identity.md) token mint
+(`POST /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens`) takes the phase from the
+presented token rather than from its own request body, so a plan-phase Job structurally cannot
+ask for the apply identity. **No other endpoint enforces it.** A plan-phase token remains
+usable against that same run's artifact, state and cache endpoints until it expires, so the
+TTL (`runners.tokenTTLSeconds`, default 1h) is still what bounds a leaked token's reach
+against everything except the mint. The per-phase Secret naming above is collision avoidance
+between overlapping Jobs, not a narrower scope.
 
 ### Per-phase vars Secret
 

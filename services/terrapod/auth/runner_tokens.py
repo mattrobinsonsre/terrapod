@@ -9,12 +9,19 @@ Two formats, and both are accepted for ever:
     runtok:{run_id}:{phase}:{ttl}:{timestamp}:{hmac_signature}   (current)
     runtok:{run_id}:{ttl}:{timestamp}:{hmac_signature}           (no phase claim)
 
-The phase claim is what stops a plan-phase token driving an apply-phase endpoint.
-It arrived on mainline as the fix for GHSA-xmrf-hxq9-m59m and is carried here
-because per-workspace cloud identity (#1901) needs it: the federation-token mint
-endpoint takes the phase from the presented token rather than from a request
-field, so a plan-phase runner cannot ask for the apply identity. It is
-**additive on the wire**: a listener that does not
+The phase claim arrived on mainline as the fix for GHSA-xmrf-hxq9-m59m and is
+carried here because per-workspace cloud identity (#1901) needs it: the
+federation-token mint endpoint takes the phase from the presented token rather
+than from a request field, so a plan-phase runner cannot ask for the apply
+identity.
+
+**On this release line that mint is the ONLY consumer**, so the claim does not
+yet stop a plan-phase token driving any other apply-phase endpoint. Mainline
+pairs it with per-endpoint phase enforcement; that half is not here, so the TTL
+is still what bounds a leaked token against the artifact, state and cache
+routes. Do not read the claim as a general phase boundary on this line.
+
+It is **additive on the wire**: a listener that does not
 send a phase when it mints a token gets the older five-field form, which verifies
 exactly as before and carries no phase — so a listener image lagging the API
 keeps working, and the endpoints that check a phase skip the check rather than

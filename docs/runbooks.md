@@ -332,15 +332,37 @@ A run sitting in `planned` (waiting for a confirm) was automatically moved to `d
 ### Symptoms
 
 - A `planned` run flips to `discarded` without anyone clicking Discard.
-- The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 → 7)` or `plan expired (older than 3600s)`.
+- The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 -> 7)`, `cloud identity configuration changed since plan (aws, vault.eu)`, or `plan expired after 3600s`.
 - A confirm attempt (`POST /api/v2/runs/{id}/actions/apply`) returns **409** with the same reason.
 
 ### Diagnosis
 
-Two guards discard stale plans:
+Three guards discard stale plans, evaluated in this order — whichever fires first supplies the reason:
 
-1. **State drift (always on, #647)** — the workspace's state version advanced (a newer apply, a rollback, or a manual/CLI state upload) *after* this run was planned, so the plan was computed against an older state. Reason: `state changed since plan (serial N → M)`.
-2. **Plan expiry (opt-in, #646)** — the workspace sets `plan-expiry-seconds` and the plan is older than that TTL. Reason: `plan expired (older than <N>s)`. Off unless configured per workspace.
+1. **State drift (always on, #647)** — the workspace's state version advanced (a newer apply, a rollback, or a manual/CLI state upload) *after* this run was planned, so the plan was computed against an older state. Reason: `state changed since plan (serial N -> M)`.
+2. **Cloud identity drift (#1901)** — the [per-workspace cloud identity](cloud-identity.md) this run would present is no longer the one its plan was reviewed under, because the deployment catalogue (`api.config.auth.oidc_issuer.audiences`) or the workspace's own `oidc-audiences` override moved in between. Reason: `cloud identity configuration changed since plan (aws, vault.eu)` — the targets are named, because "something moved" would not tell anyone which. Only fires for a workspace that mints at all.
+3. **Plan expiry (opt-in, #646)** — the workspace sets `plan-expiry-seconds` and the plan is older than that TTL. Reason: `plan expired after <N>s`. Off unless configured per workspace.
+
+#### Reading the cloud-identity reason
+
+This is the **only operator-visible signal** that the identity moved: a run's resolved
+`oidc-audiences` and the targets it actually minted for are not exposed on the API, so the
+`discard-reason` string is all there is. Two scoping rules make it less alarming than it looks:
+
+- **It compares only the targets this run actually minted for**, not everything the workspace
+  is configured for. The configured map is the *merged* view and carries deployment-wide
+  catalogue entries a workspace may never use, so comparing against all of it would mean one
+  catalogue edit refusing every pending apply in the fleet — including runs whose own identity
+  had not moved at all.
+- **A target the catalogue has *gained* since the plan is deliberately not a cause.** The mint
+  reads the run's own snapshot, so a newly added target yields no token at apply exactly as it
+  yielded none at plan; the identity the apply would present is unchanged, so there is nothing
+  to refuse.
+
+A fleet-wide audience change — a [bulk update](api-reference.md#bulk-workspace-operations) of
+`oidc-audiences`, or an edit to the Helm catalogue — is therefore the usual cause of several
+of these at once. That is working as intended: re-plan, and the new runs pick up the current
+configuration.
 
 In-flight `confirmed`/`applying` runs are never discarded; only waiting `planned`/`pending`/`queued` apply-capable runs are. Plan-only/speculative/drift runs are exempt.
 

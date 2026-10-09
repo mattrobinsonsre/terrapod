@@ -348,10 +348,11 @@ async def get_oidc_audience_defaults(
     grants nothing on its own: the cloud's own trust policy is the gate, and
     minting needs a phase-bound runner token scoped to a run on that workspace.
 
-    Contrast the runner-facing targets route above, which returns NAMES only.
-    The asymmetry is the point: a runner writes a file and the engine reads it,
-    so it has no use for the values, and the set of audiences names the roles
-    this deployment can ask to assume.
+    The runner never sees this. It sends the provider configurations it
+    discovered and is answered with tokens, so it has no use for the catalogue
+    at all -- which is the asymmetry worth keeping: the set of audiences names
+    the roles this deployment can ask to assume, and only a person composing an
+    override needs to read it.
 
     Empty when the deployment configures no catalogue, which is the default --
     not an error, and not the same as the issuer being disabled.
