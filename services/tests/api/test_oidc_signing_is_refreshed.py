@@ -40,18 +40,31 @@ class TestTheRefreshIsWired:
             "handover never happens"
         )
 
-    def test_the_task_actually_calls_reload_signing_keys(self):
-        """The name alone proves nothing, and that is not hypothetical: the
-        first version of this test asserted the NAME and SURVIVED deleting the
-        call, because the handler's own `from ... import reload_signing_keys`
-        line keeps the substring alive. Pin the AWAITED CALL."""
+    def test_the_registered_handler_is_the_refresh_cycle(self):
+        """Pins the WIRING; the behaviour is pinned behaviourally elsewhere.
+
+        Two earlier versions of this test read `app.py`'s source. The first
+        asserted the handler's NAME and survived deleting the call, because the
+        handler's own `from ... import reload_signing_keys` keeps the substring
+        alive. The second asserted the awaited call inside an inline closure --
+        and broke when the handler became a named function in `oidc_signing.py`,
+        which is where every other one of this file's twenty periodic handlers
+        already lives. The behaviour had not changed at all.
+
+        That is the limit of a source-text assertion: it tracks where the code
+        is written rather than what it does. So this one checks only the thing
+        source can answer honestly -- that the registration names the cycle
+        function -- and `tests/api/test_oidc_issuer_recovery.py` executes that
+        function to pin what it actually does, including that it INITIALISES
+        when nothing is loaded rather than only re-reading.
+        """
         source = inspect.getsource(app_module)
         reg = source.index('"oidc_signing_refresh"')
-        handler = source.rindex("async def _oidc_signing_refresh", 0, reg)
-        body = source[handler:reg]
-        assert "await reload_signing_keys(" in body, (
-            "the refresh task does not call reload_signing_keys, so the cache is "
-            "never recomputed and a rotation still reaches only one replica"
+        window = source[reg : reg + 400]
+        assert "handler=refresh_signing_keys_cycle" in window, (
+            "the periodic task does not register refresh_signing_keys_cycle, so "
+            "either a rotation never reaches other replicas or a failed startup "
+            "never recovers"
         )
 
     def test_it_is_gated_on_the_issuer_being_enabled(self):
