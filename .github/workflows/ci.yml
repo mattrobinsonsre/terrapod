@@ -833,6 +833,8 @@ jobs:
           # snapshotted at pod start and never refreshes, and the key is a
           # per-process global -- so without this annotation a changed Secret
           # leaves older pods on the old key and half of every run's calls 401.
+          grep -q 'checksum/oidc-signing' ./helm/terrapod/templates/deployment-api.yaml \
+            || { echo "deployment-api.yaml lost its checksum/oidc-signing annotation -- an OIDC signing key rotation would split the fleet, and the failure lands at the cloud rather than here"; exit 1; }
           grep -q 'checksum/token-signing' ./helm/terrapod/templates/deployment-api.yaml \
             || { echo "the API pod template has no checksum for the signing key"; exit 1; }
 
