@@ -321,6 +321,45 @@ def get_signing_key() -> SigningKey:
     raise RuntimeError(f"OIDC signing key {_signing_kid} is not in the loaded set")
 
 
+async def refresh_signing_keys_cycle() -> None:
+    """Periodic task: keep this process's signing set current, and recover it.
+
+    Two jobs, and the first is why this is not simply a reload.
+
+    `init_oidc_signing` is the only path that GENERATES a key; `reload_signing_keys`
+    only re-reads. So when the lifespan's `init` failed -- a transient database
+    error, or the ordinary race where the pod starts before the migration Job
+    finishes -- nothing else would ever make it succeed. `reload` raises on an
+    empty table for ever, `_keys` stays None, and the issuer serves 503 until
+    somebody restarts the pod, on a deployment whose pod reports Ready.
+
+    Calling `init` here is safe to repeat: it returns early for an
+    operator-supplied key, and otherwise serialises on the advisory lock so
+    concurrent replicas queue rather than each generating a key. It is used
+    only on the recovery path, so the steady state keeps `reload`'s lighter
+    read and its deliberate do-not-assign-on-failure behaviour, which leaves a
+    working cache intact through a database blip.
+    """
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        if signing_keys_loaded():
+            await reload_signing_keys(db)
+        else:
+            await init_oidc_signing(db)
+
+
+def signing_keys_loaded() -> bool:
+    """Whether a usable signing set is in this process.
+
+    Exists so the refresh task can tell recovery from steady state without
+    reaching into the module global. `None` means initialisation has not
+    succeeded in this process -- not that the deployment has no key, which is
+    the distinction the task turns on.
+    """
+    return _keys is not None
+
+
 def get_jwks() -> dict[str, list[dict[str, str]]]:
     """The published key set.
 

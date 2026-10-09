@@ -10,8 +10,9 @@ publish only public key material and the issuer's own URL.
 Both are also deliberately **cacheable**, and the JWKS max-age is DERIVED from
 `key_propagation_seconds` rather than configured separately -- see
 `_jwks_max_age`. Caching is both a correctness requirement for rotation and the
-mitigation for the endpoints being open: without it an anonymous caller can make
-the API parse RSA keys at whatever rate they like.
+mitigation for the endpoints being open. It bounds request VOLUME; it is not
+what bounds the cost of a request, which is `get_jwks`'s own memo on the kid
+tuple -- repeated fetches re-serialise a cached dict and parse nothing.
 
 Both are mounted only when `auth.oidc_issuer.enabled` — and off means the router
 is not mounted at all rather than mounted and refusing. A deployment that has not
@@ -27,7 +28,7 @@ prefix would bring the terraform service-discovery document along with it, which
 is harmless but should be a decision rather than a side effect.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 router = APIRouter(tags=["oidc-issuer"])
@@ -93,6 +94,35 @@ def issuer_url() -> str:
     return (settings.external_url or "").strip().rstrip("/")
 
 
+def _require_loaded() -> None:
+    """Refuse both documents with 503 when this process holds no signing set.
+
+    503 rather than letting the RuntimeError from `get_jwks` reach the catch-all
+    handler as a 500. The state really is temporary -- the refresh task calls
+    `init_oidc_signing` when nothing is loaded, so a pod that lost the startup
+    race recovers on its own -- and 500 tells a cloud and an operator that
+    something is broken rather than starting. `Retry-After` names the interval
+    that will fix it.
+
+    The DISCOVERY document refuses too, which is the less obvious half. It
+    touches no key material, so it would happily serve 200 while the `jwks_uri`
+    it points at failed -- and with a 300s cache, a cloud would hold a trust
+    root it cannot resolve for five minutes after the key arrived. Refusing both
+    keeps the two documents telling the same story.
+    """
+    from terrapod.auth.oidc_signing import signing_keys_loaded
+
+    if not signing_keys_loaded():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The OIDC issuer signing key is not loaded in this process yet. "
+                "It is resolved at startup and retried every 30s."
+            ),
+            headers={"Retry-After": "30"},
+        )
+
+
 @router.get("/.well-known/openid-configuration")
 async def openid_configuration() -> JSONResponse:
     """The discovery document.
@@ -107,6 +137,7 @@ async def openid_configuration() -> JSONResponse:
     the OIDC discovery spec requires them and some validators refuse a document
     without them, even for a flow that never runs.
     """
+    _require_loaded()
     base = issuer_url()
     return JSONResponse(
         headers={"Cache-Control": f"public, max-age={_DISCOVERY_MAX_AGE}"},
@@ -144,6 +175,7 @@ async def jwks() -> JSONResponse:
     """
     from terrapod.auth.oidc_signing import get_jwks
 
+    _require_loaded()
     return JSONResponse(
         headers={"Cache-Control": f"public, max-age={_jwks_max_age()}"},
         content=get_jwks(),
