@@ -70,7 +70,8 @@ api:
   # generated key is persisted, shared across replicas, and rotatable in place.
   #
   # Must be an RSA private key in PKCS8 PEM form. An Ed25519 or EC key is
-  # refused at startup by name, because workload identity federation does not
+  # refused by name at startup -- logged, not fatal: the pod stays Ready and the
+  # issuer routes 503 -- because workload identity federation does not
   # accept EdDSA at every cloud.
   oidcSigningKey:
     existingSecret: ""                      # name of a K8s Secret holding the PEM

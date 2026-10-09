@@ -218,7 +218,7 @@ versions, every run with a policy set applied and every run with scanning on err
 after that `helm upgrade`, without the operator having changed anything. The mirror
 had to be seeded with the v1.9.0 versions first, or the old ones pinned in values.
 
-**If you are upgrading past v1.9.0, read the v1.10.0 entry below instead** — Checkov
+**If you are upgrading past v1.9.0, read the v1.10.0 entry above instead** — Checkov
 moved again, and seeding 3.3.21 now would leave you one bump behind.
 
 ### A variable-set assignment rule naming `drift_status` or `locked` stops matching

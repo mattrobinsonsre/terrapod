@@ -261,7 +261,7 @@ resource "terrapod_workspace" "dns" {
 }
 ```
 
-Or `PATCH /api/terrapod/v1/workspaces/{id}`:
+Or `PATCH /api/v2/workspaces/{id}`:
 
 ```json
 {"data": {"attributes": {"oidc-audiences": {"vault": ["https://vault-eu.example.com"]}}}}
@@ -1121,7 +1121,7 @@ cloud retry storm cannot starve anything else.
 | `audiences` | `{}` | The deployment's audience catalogue: provider configuration → its audiences. A workspace's `oidc-audiences` is merged over this per key |
 | `token_ttl_seconds` | `900` | Token lifetime, 60–43200. Short because the target exchanges it immediately |
 | `key_propagation_seconds` | `600` | How long a rotated-in key is published before it starts signing. The retired key signs across this window, and the JWKS `max-age` is half of it |
-| `retired_key_grace_seconds` | `3600` | How long a retired key stays published. Must exceed both `token_ttl_seconds` and `key_propagation_seconds` |
+| `retired_key_grace_seconds` | `3600` | How long a retired key stays published. Should normally exceed both `token_ttl_seconds` and `key_propagation_seconds` — only the first of those is enforced at startup. `0` is permitted and is the emergency response to a compromised key; see [the runbook](runbooks.md#the-oidc-issuer-signing-key-is-compromised) |
 
 The signing key is not among these, because it is key material: it is supplied as
 `api.oidcSigningKey.existingSecret` / `existingSecretKey` and injected by

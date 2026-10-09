@@ -40,18 +40,22 @@ type OIDCSigningKey struct {
 // every key's activation window is still ahead of it. Neither is an error, so
 // it is a field rather than a returned error.
 type OIDCSigningKeySet struct {
-	Keys       []OIDCSigningKey
-	SigningKID string
+	Keys []OIDCSigningKey `json:"keys"`
+	// SigningKID is tagged, like every other field here, because this struct is
+	// marshalled straight to an MCP agent as the tool's structured output. An
+	// untagged field reaches it as `SigningKID`, so a tool description naming
+	// anything else sends the agent looking for a key that is not there.
+	SigningKID string `json:"signing-kid"`
 }
 
 // OIDCSigningKeyRotation is the result of rotating the signing key: the key
 // that was added, and the server's note about when it begins signing.
 type OIDCSigningKeyRotation struct {
-	Key OIDCSigningKey
+	Key OIDCSigningKey `json:"key"`
 	// Note is the server's own wording about the propagation window. Surfaced
 	// verbatim rather than restated here, because the window is the operator's
 	// configuration and only the server knows its value.
-	Note string
+	Note string `json:"note"`
 }
 
 // OIDCAudienceDefaults is the deployment-wide audience catalogue that a

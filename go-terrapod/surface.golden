@@ -614,10 +614,10 @@ field OIDCSigningKey.CreatedAt string `json:"created-at,omitempty"`
 field OIDCSigningKey.Kid string `json:"kid"`
 field OIDCSigningKey.RetiredAt string `json:"retired-at,omitempty"`
 field OIDCSigningKey.Signing bool `json:"signing"`
-field OIDCSigningKeyRotation.Key OIDCSigningKey
-field OIDCSigningKeyRotation.Note string
-field OIDCSigningKeySet.Keys []OIDCSigningKey
-field OIDCSigningKeySet.SigningKID string
+field OIDCSigningKeyRotation.Key OIDCSigningKey `json:"key"`
+field OIDCSigningKeyRotation.Note string `json:"note"`
+field OIDCSigningKeySet.Keys []OIDCSigningKey `json:"keys"`
+field OIDCSigningKeySet.SigningKID string `json:"signing-kid"`
 field OnboardingAvailability.AIAvailable bool `json:"ai-available"`
 field OnboardingAvailability.AIModelConfigured bool `json:"ai-model-configured"`
 field OnboardingDataSource.HasFilter bool `json:"has_filter"`
