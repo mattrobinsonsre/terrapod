@@ -116,6 +116,18 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   control plane and let runners/listeners catch up later; the reverse (a newer
   runner against an older API) is also supported within the same window. This is
   what the frozen wire protocol above buys you.
+- **runner ↔ listener:** normally not a pair that can skew, because both default to
+  the chart's `appVersion` — but `runners.image.tag` and `listener.image.tag` are
+  **independently settable**, so pinning one and not the other creates a skew the
+  wire protocol above does not cover. **One feature couples them, from v1.10.0:
+  [per-workspace cloud identity](cloud-identity.md).** The listener image is what
+  builds the runner Job's pod spec, so the in-memory volume the runner's credential
+  phase writes its tokens into is created by the *listener*, not the runner. A newer
+  runner launched by a listener that predates the feature therefore finds no volume,
+  hits the container's read-only root filesystem, and fails closed with an `EROFS`
+  error naming a filesystem path rather than a stale image. **Upgrade listeners before
+  (or with) runners**, and before enabling cloud identity. Pinning only one of the two
+  tags is what makes this reachable at all.
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 

@@ -33,14 +33,16 @@ it had accidentally written a 409 scenario.
 
 from __future__ import annotations
 
+import textwrap
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.routers import cloud_identity as router
-from terrapod.services import cloud_identity_resolver
+from terrapod.services import cloud_identity_resolver, workspace_settings
 
 AWS = "sts.amazonaws.com"
 AZURE = "api://AzureADTokenExchange"
@@ -116,6 +118,11 @@ def _db(run, ws):
     # awaitable, so this fixture has to match production rather than the route's
     # earlier read-only shape.
     db.commit = AsyncMock()
+    # The mint re-reads the run under a row lock before appending to
+    # `oidc_minted_targets`, so the fixture has to model that. A no-op is right:
+    # there is no second writer here, and the row object is already the one the
+    # route holds.
+    db.refresh = AsyncMock()
     return db
 
 
@@ -727,12 +734,32 @@ class TestTheAudienceDefaults:
         served["aws"].append("injected")
         assert catalogue["aws"] == [AWS], "mutating the served value reached live settings"
 
-    async def test_a_runner_token_is_not_the_intended_caller_but_is_authenticated(self):
-        """Documented asymmetry: the runner-facing targets route returns names
-        only, because a runner writes a file and the engine reads it. This route
-        is for a person composing configuration. It does not special-case the
-        runner, and does not need to — the runner never calls it."""
-        resp = await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
+    async def test_a_runner_token_cannot_read_the_catalogue(self):
+        """Supersedes a test that asserted 200 here.
+
+        Its reasoning was "it does not special-case the runner, and does not
+        need to — the runner never calls it". The second half still holds and is
+        why nothing legitimate breaks: the mint already returns this run's own
+        resolved audiences, which is all the credential phase writes. The first
+        half was the wrong question. What the legitimate runner calls says
+        nothing about what anything HOLDING a runner token can call, and the plan
+        Job runs the workspace's own HCL — an `external` data source, a
+        `pre_init` hook or a third-party module can read `TP_AUTH_TOKEN` out of
+        the environment.
+
+        What it would read is deployment-wide topology: every federation target
+        every workspace in the deployment uses. The discovery document
+        deliberately publishes no audiences for exactly that reason, so serving
+        them one tier up to a runner token gave the disclosure straight back.
+        """
+        with pytest.raises(HTTPException) as e:
+            await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
+        assert e.value.status_code == 403
+
+    async def test_a_session_user_still_reads_it(self):
+        """The negative path: the refusal must be scoped to runner tokens, not
+        applied to the practitioner the route exists for."""
+        resp = await _call_defaults(_user(method="session"), cfg=_enabled(audiences={}))
         assert resp.status_code == 200
 
 
@@ -1093,3 +1120,174 @@ class TestAnEngineThatCannotDiscover:
         )
         assert cap["claims"]["phase"] == "apply"
         assert cap["claims"]["sub"].endswith(":phase:apply")
+
+
+class TestAFinishedRunCannotMint:
+    """A runner token is good until it EXPIRES -- run state is not checked when
+    it is verified, and the default TTL is an hour.
+
+    That is an inherited property of runner tokens rather than something new,
+    but this is the first endpoint that converts one into CLOUD credentials, so
+    the missing liveness check costs more here. Code in the plan pod that
+    exfiltrates the token could keep POSTing after the run finished, drawing
+    fresh short-lived credentials for the workspace's identity, from anywhere,
+    for the remainder of the hour. `debug_mode`'s lingering pods widen the
+    window further. A finished run has no legitimate reason to mint.
+    """
+
+    @pytest.mark.parametrize("status", ["applied", "errored", "discarded", "canceled"])
+    async def test_a_terminal_run_is_refused(self, status):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        run.status = status
+        with pytest.raises(HTTPException) as e:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws")
+        assert e.value.status_code == 409
+        assert status in e.value.detail
+
+    async def test_a_live_run_still_mints(self):
+        """The negative path: the refusal is scoped to terminal states, and must
+        not refuse the states a run actually mints in."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        run.status = "planning"
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws"
+        )
+        assert resp.status_code == 200
+
+
+class TestATargetNameIsBounded:
+    """`providers`' `max_length` bounds the LIST; this bounds an ITEM.
+
+    The write path caps a provider name at `MAX_OIDC_TARGET_LEN`, so no
+    catalogue key can be longer -- but a longer name still RESOLVES, because
+    `audiences_for_target` splits on the first dot and falls back to the bare
+    provider type. So `aws.` + 64KB answers through an ordinary `aws` entry,
+    and without a cap that name is echoed back to the runner, joined into a
+    path, written into `oidc_minted_targets` for ever and named in a log line.
+    Anything holding this run's token can send it, 100 at a time.
+    """
+
+    async def test_a_name_longer_than_the_write_path_allows_is_refused(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        from fastapi import HTTPException
+
+        long_alias = "aws." + ("x" * workspace_settings.MAX_OIDC_TARGET_LEN)
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"), run, ws, target=long_alias, cfg=cfg
+            )
+        assert exc.value.status_code == 400
+        assert str(workspace_settings.MAX_OIDC_TARGET_LEN) in exc.value.detail
+
+    async def test_the_refusal_does_not_echo_the_name_back(self):
+        """The name is attacker-chosen and may be 64KB. The sibling path-safety
+        refusal echoes it deliberately (it is short and naming it is the point);
+        this one must not, or the response is the amplification."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        from fastapi import HTTPException
+
+        junk = "z" * 4096
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"), run, ws, target=f"aws.{junk}", cfg=cfg
+            )
+        assert junk not in exc.value.detail
+        assert len(exc.value.detail) < 200
+
+    async def test_a_name_at_the_limit_still_mints(self):
+        """The negative path: the cap must not refuse a name the write path
+        would have accepted, or a legitimate long alias stops working."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        at_limit = "aws." + ("x" * (workspace_settings.MAX_OIDC_TARGET_LEN - 4))
+        assert len(at_limit) == workspace_settings.MAX_OIDC_TARGET_LEN
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, target=at_limit, cfg=cfg
+        )
+        assert resp.status_code == 200
+
+
+class TestTheMintedRecordIsBounded:
+    """`oidc_minted_targets` accumulates ACROSS requests, so without a cap it
+    grows without bound: the runner retries on 5xx and asks once per phase, and
+    each request may name 100 targets it has not named before.
+
+    It is truncated rather than refused, because by this point the tokens are
+    signed and on their way back -- failing here would hand the runner
+    credentials the record disclaims. A short record NARROWS the confirm-time
+    staleness check rather than widening it, which is the safe direction.
+    """
+
+    async def test_the_record_stops_at_the_request_cap(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        # Already at the ceiling from earlier requests.
+        run.oidc_minted_targets = [f"aws.pre{i}" for i in range(router.MAX_TARGETS)]
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, target="aws.new", cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert len(run.oidc_minted_targets) == router.MAX_TARGETS
+
+    async def test_an_ordinary_run_is_not_truncated(self):
+        """So the test above cannot pass against a cap that truncates always."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "vault": ["https://v"]})
+        run.oidc_minted_targets = []
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "vault"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 200
+        assert sorted(run.oidc_minted_targets) == ["aws", "vault"]
+
+
+class TestTheSignaturesDoNotRunOnTheEventLoop:
+    """Rule 13, and a POSITIONAL property, so it needs a positional gate.
+
+    One RS256 signature is ~1ms (measured) and the handler signs once per
+    target, so a full request is ~100ms of blocking CPU -- on the event loop
+    every tenant shares, requested by anything holding one run's token.
+    `rotate_signing_key` already hands its keygen to a thread citing this rule
+    by name; this handler did not, and no behavioural test can see the
+    difference because the result is identical either way.
+    """
+
+    def test_the_signing_call_is_inside_a_to_thread_and_not_in_the_handler_body(self):
+        import ast
+        import inspect
+
+        src = inspect.getsource(router.mint_cloud_identity_tokens)
+        tree = ast.parse(textwrap.dedent(src))
+
+        # Every `sign_identity_token(...)` call, and whether a nested plain
+        # `def` encloses it. A call in the async handler's own body is the
+        # defect; a call inside the function handed to `to_thread` is the fix.
+        nested: list[ast.FunctionDef] = [
+            n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
+        ]
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "sign_identity_token"
+        ]
+        assert calls, "the handler no longer signs anything -- this gate lost its subject"
+        for call in calls:
+            enclosed = any(any(call is c for c in ast.walk(fn)) for fn in nested)
+            assert enclosed, (
+                "sign_identity_token runs directly in the async handler body, so "
+                "every signature blocks the event loop (rule 13). It belongs in "
+                "the function handed to asyncio.to_thread."
+            )
+
+        awaited = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Await)
+            and isinstance(n.value, ast.Call)
+            and isinstance(n.value.func, ast.Attribute)
+            and n.value.func.attr == "to_thread"
+        ]
+        assert awaited, "nothing is handed to asyncio.to_thread any more"

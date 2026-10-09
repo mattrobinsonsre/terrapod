@@ -284,12 +284,12 @@ func TestOIDCSigningKeysTool(t *testing.T) {
 	if want := "/api/terrapod/v1/oidc/signing-keys"; path != want {
 		t.Errorf("tool requested %q, want %q", path, want)
 	}
-	if out["SigningKID"] != "kid-old" {
-		t.Errorf("SigningKID = %v, want kid-old", out["SigningKID"])
+	if out["signing-kid"] != "kid-old" {
+		t.Errorf("signing-kid = %v, want kid-old", out["signing-kid"])
 	}
-	keys, ok := out["Keys"].([]any)
+	keys, ok := out["keys"].([]any)
 	if !ok || len(keys) != 2 {
-		t.Fatalf("Keys = %v, want two entries", out["Keys"])
+		t.Fatalf("keys = %v, want two entries", out["keys"])
 	}
 	signing := map[string]bool{}
 	for _, raw := range keys {
@@ -421,9 +421,9 @@ func TestOIDCSigningKeyRotateTool(t *testing.T) {
 	if want := "/api/terrapod/v1/oidc/signing-keys/actions/rotate"; path != want {
 		t.Errorf("tool requested %q, want %q", path, want)
 	}
-	key, ok := out["Key"].(map[string]any)
+	key, ok := out["key"].(map[string]any)
 	if !ok {
-		t.Fatalf("Key = %#v, want the rotated key", out["Key"])
+		t.Fatalf("key = %#v, want the rotated key", out["key"])
 	}
 	if key["kid"] != "kid-new" {
 		t.Errorf("rotated kid = %v, want kid-new", key["kid"])
@@ -437,8 +437,8 @@ func TestOIDCSigningKeyRotateTool(t *testing.T) {
 	// The note is the only statement of when the key starts signing, and its
 	// value is the operator's configuration, so dropping it leaves the agent
 	// with nothing true to say about the window.
-	if note, _ := out["Note"].(string); note == "" {
-		t.Error("meta.note was dropped; it is the only statement of when the key starts signing")
+	if note, _ := out["note"].(string); note == "" {
+		t.Error("`note` was dropped; it is the only statement of when the key starts signing")
 	}
 }
 

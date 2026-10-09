@@ -528,3 +528,85 @@ class TestListenerProofOfPossessionIsEnforcedOnBothPaths:
         with _pop(True), p1, p2, p3:
             ident = await authenticate_listener(req)
         assert str(ident.listener_id) == ld["id"]
+
+
+class TestTheRunnerTokenPhaseReachesThePrincipal:
+    """The middle link of the phase chain, which nothing joined (#1901).
+
+    Three things have to line up for a phase-conditioned cloud trust policy to
+    work: the token must CARRY the phase, the principal must EXPOSE it, and the
+    mint must USE it. The first and third were each tested in their own file —
+    `tests/auth/test_runner_tokens.py` proves the token round-trips a phase, and
+    `tests/api/test_cloud_identity.py` proves the handler reads
+    `user.run_phase`. Both of those build their own principal, so nothing
+    exercised the code that puts the phase on it.
+
+    Deleting `run_phase=claims.phase` from both sites in `dependencies.py` left
+    2,810 tests passing. Every minted token then loses its `phase` claim AND the
+    `:phase:<phase>` suffix on `sub` — and for Azure a federated credential
+    matches on issuer, subject and audience only, so `sub` is the one place a
+    phase condition can be expressed there. Every phase-conditioned policy stops
+    matching, silently, failing inside the cloud's token exchange with nothing
+    wrong on Terrapod's side to look at.
+
+    A real token through the real dependency, because that is the only thing
+    that covers the assignment.
+    """
+
+    @pytest.mark.parametrize("phase", ["plan", "apply"])
+    async def test_get_current_user_carries_the_phase_the_token_claims(self, phase):
+        from terrapod.auth.runner_tokens import generate_runner_token
+
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, ttl=3600, phase=phase)
+
+        user = await get_current_user(
+            request=_mock_request(),
+            credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials=token),
+            db=MagicMock(),
+        )
+
+        assert user.auth_method == "runner_token"
+        assert user.run_id == run_id
+        assert user.run_phase == phase, (
+            "the phase claim did not reach the principal, so the mint cannot put "
+            "it in the token it signs"
+        )
+
+    async def test_the_older_unphased_token_still_resolves_with_no_phase(self):
+        """The negative path, and it is load-bearing rather than tidy: a lagging
+        listener mints the five-field form, which must resolve as `None` —
+        "no claim" — never as a mismatch or a refusal."""
+        from terrapod.auth.runner_tokens import generate_runner_token
+
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, ttl=3600)
+
+        user = await get_current_user(
+            request=_mock_request(),
+            credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials=token),
+            db=MagicMock(),
+        )
+
+        assert user.auth_method == "runner_token"
+        assert user.run_phase is None
+
+    @pytest.mark.parametrize("phase", ["plan", "apply"])
+    async def test_authenticate_request_carries_it_too(self, phase):
+        """The second site. `authenticate_request` is the SSE/streaming path —
+        it manages its own short-lived DB session rather than taking `get_db` —
+        so it populates the principal separately and can drift from the
+        dependency above."""
+        from terrapod.api.dependencies import authenticate_request
+        from terrapod.auth.runner_tokens import generate_runner_token
+
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, ttl=3600, phase=phase)
+
+        user = await authenticate_request(
+            _mock_request(headers={"authorization": f"Bearer {token}"})
+        )
+
+        assert user is not None
+        assert user.auth_method == "runner_token"
+        assert user.run_phase == phase

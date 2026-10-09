@@ -423,7 +423,17 @@ def run(
         # lands at the `vault` path and an absolute target escapes the directory
         # entirely. The token is a credential, so the check belongs at the write
         # as well as at the request.
-        if "/" in target or "\\" in target or "\x00" in target or ".." in target.split("."):
+        #
+        # `target in (".", "..")` names the two explicitly, mirroring the API's
+        # `unsafe_target_reason`. It replaced `".." in target.split(".")`, which
+        # could not fire at all: splitting ON the dot means no element it yields
+        # can contain one, so `"..".split(".")` is `["", "", ""]` and the clause
+        # was unconditionally false for every input. A bare `..` therefore wrote
+        # `<token dir>/../token`, one level above the directory, and a bare `.`
+        # wrote `<token dir>/token` -- the combined-token path that is
+        # deliberately never written, because a token audienced for several
+        # targets is replayable between them.
+        if "/" in target or "\\" in target or "\x00" in target or target in (".", ".."):
             raise CloudIdentityUnavailable(
                 f"The API returned a cloud identity target {target!r} that is not a provider "
                 "configuration name — it would not resolve to a path inside this run's token "

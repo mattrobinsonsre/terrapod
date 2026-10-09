@@ -140,7 +140,7 @@ api:
         aws_region: us-east-1
         # aws_role_arn intentionally unset — use the pod's env-var
         # creds (terrapod-testing user) directly. Set to
-        # "arn:aws:iam::703581221739:role/terrapod" in production.
+        # "arn:aws:iam::123456789012:role/terrapod" in production.
       context:
         fleet_context: |
           This is a local Tilt development stack for Terrapod itself.

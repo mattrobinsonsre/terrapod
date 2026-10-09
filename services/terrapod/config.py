@@ -653,6 +653,44 @@ class OIDCIssuerConfig(BaseSettings):
         ),
     )
 
+    @model_validator(mode="after")
+    def _check_rotation_windows(self) -> "OIDCIssuerConfig":
+        """The two invariants three docs state and nothing enforced.
+
+        Both fail in the cloud rather than here, which is why they are worth
+        refusing at startup: a token that stops verifying mid-lifetime is
+        rejected at assume-role time with nothing wrong on the Terrapod side to
+        look at.
+
+        `retired_key_grace_seconds` has to outlive `token_ttl_seconds`, or a
+        rotation drops the outgoing key from the published set while tokens it
+        signed are still inside their own lifetime.
+
+        The companion invariant -- that an enabled issuer has a RESOLVABLE URL --
+        cannot be checked here: `issuer_url()` falls back through `public_url`,
+        then `public_webhook_url`, then `external_url`, and the last two live on
+        the parent settings object, which a nested model cannot see. It is
+        enforced on `Settings` instead.
+        """
+        if not self.enabled:
+            return self
+
+        if (
+            self.retired_key_grace_seconds
+            and self.retired_key_grace_seconds < self.token_ttl_seconds
+        ):
+            raise ValueError(
+                f"auth.oidc_issuer.retired_key_grace_seconds "
+                f"({self.retired_key_grace_seconds}s) must be at least "
+                f"token_ttl_seconds ({self.token_ttl_seconds}s), or a rotation "
+                f"stops a token verifying while it is still inside its own "
+                f"lifetime. 0 is permitted and means an immediate retirement, "
+                f"which is what an emergency rotation after a key compromise "
+                f"asks for."
+            )
+
+        return self
+
 
 class AuthConfig(BaseSettings):
     """Authentication configuration."""
@@ -3618,6 +3656,46 @@ class Settings(BaseSettings):
             dotenv_settings,
             file_secret_settings,
         )
+
+    @model_validator(mode="after")
+    def _issuer_needs_a_resolvable_url(self) -> "Settings":
+        """An enabled OIDC issuer must have a URL a cloud can reach.
+
+        `issuer_url()` falls back `public_url` -> `public_webhook_url` ->
+        `external_url`. With all three empty it returns "", and then the
+        discovery document publishes `{"issuer": ""}` while every minted token
+        carries `iss: ""`. No cloud matches that, so every federated run fails at
+        assume-role time -- in the cloud, with nothing wrong here to look at.
+
+        The chart renders that combination without complaint: its own path
+        validation only runs when `webhookIngress.enabled`, so issuer-enabled
+        with no public ingress and no `external_url` has no guard at all.
+
+        Checked here rather than on `OIDCIssuerConfig` because two of the three
+        fallbacks live on this object, which a nested model cannot see.
+
+        This cannot verify REACHABILITY -- an `external_url` pointing at a
+        tailnet-only management hostname satisfies it and no cloud can fetch it.
+        That one is documented rather than enforced; this catches only the empty
+        case, which is the one the chart can produce silently.
+        """
+        if not self.auth.oidc_issuer.enabled:
+            return self
+
+        if not (
+            (self.auth.oidc_issuer.public_url or "").strip()
+            or (self.public_webhook_url or "").strip()
+            or (self.external_url or "").strip()
+        ):
+            raise ValueError(
+                "auth.oidc_issuer.enabled is true but no issuer URL resolves. Set "
+                "auth.oidc_issuer.public_url, or webhookIngress.hostname (which "
+                "derives api.config.public_webhook_url), or api.config.external_url. "
+                "It must be a URL the cloud provider can reach, not a private "
+                "management hostname."
+            )
+
+        return self
 
 
 # Global settings instance

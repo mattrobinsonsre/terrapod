@@ -82,6 +82,33 @@ why. It's better to find a constraint here than in production.
   is proprietary and not supported; migrated Sentinel policies are listed by
   name for you to rewrite as Rego. See [Policy-as-Code](policies.md).
 
+## Per-workspace cloud identity
+
+Two limitations of the OIDC federation added in v1.10.0. Full detail in
+[Cloud Identity](cloud-identity.md).
+
+- **No air-gapped variant, by design**. Making the credential boundary the
+  workspace means a cloud has to fetch two documents
+  (`/.well-known/openid-configuration` and `/.well-known/jwks.json`) from
+  Terrapod, anonymously, before it will trust a token. The clouds publish no
+  way to supply those out of band, so a deployment with no inbound path from
+  the internet cannot use this feature — it is **mutually exclusive with the
+  fully isolated recipe** in
+  [Network Isolation](deployment-network-isolation.md). This is the trade the
+  feature exists to make, not a gap we expect to close; an isolated deployment
+  keeps the agent pool's own workload identity, which is what it had before.
+  See [Cloud Identity → The trade](cloud-identity.md#the-trade-network-isolation-for-fine-grained-authorization).
+- **A runner image predating the feature falls through silently** — *not yet*.
+  Such a runner never asks for a token, so a workspace that maps targets runs
+  as the agent pool's identity anyway. **Terrapod cannot detect it:** no
+  runner-image version is reported to the API, so there is no server-side check
+  to add, which is why this is listed as a limitation rather than fixed. It
+  fails safe in one sense (the run authenticates as the pool, exactly as before)
+  and unsafe in another (a workspace you deliberately moved off the pool's broad
+  permissions is still using them). Upgrade runner images when you adopt this,
+  and treat a federated workspace on a stale pool as mis-scoped until you have.
+  See [Cloud Identity → The honest limitation](cloud-identity.md#the-honest-limitation-a-runner-image-that-predates-this-feature).
+
 ## Object storage
 
 - **Native SDKs + filesystem; no S3-compat shim**. State and

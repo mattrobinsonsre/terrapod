@@ -434,6 +434,14 @@
     }
   },
   {
+    "name": "terrapod_oidc_audience_defaults",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_oidc_signing_key_rotate",
     "destructive": true,
     "input_schema": {

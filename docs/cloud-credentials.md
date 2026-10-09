@@ -960,7 +960,19 @@ These platform secrets are read from K8s Secrets / env and can therefore be sour
 | **Redis URL** | `TERRAPOD_REDIS_URL` via `secretKeyRef` | `redis.existingSecret` / `redis.existingSecretKey` (default key `url`) |
 | **OIDC client secrets** | `TERRAPOD_<NAME>_CLIENT_SECRET` via `secretKeyRef` | `existingSecret` / `existingSecretKey` per OIDC provider entry (default key `client_secret`) |
 | **API token signing key** (optional — Terrapod generates and stores its own if you supply none) | `TERRAPOD_TOKEN_SIGNING_KEY` via `secretKeyRef` | `api.tokenSigningKey.existingSecret` / `existingSecretKey` (default key `token_signing_key`) |
+| **OIDC issuer signing key** (optional — likewise generated and stored on first startup) | `TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM` via `secretKeyRef` | `api.oidcSigningKey.existingSecret` / `existingSecretKey` (default key `oidc_signing_key`) |
 | **GitHub webhook secret** | `TERRAPOD_GITHUB_WEBHOOK_SECRET` via `secretKeyRef` | `api.config.vcs.github.existingSecret` / `existingSecretKey` (default key `webhook_secret`) |
+
+The **OIDC issuer signing key** is the highest-consequence entry in that table: it is an RSA
+private key (PKCS8 PEM — an Ed25519 or EC key is refused at startup by name, because workload
+identity federation does not accept EdDSA at every cloud) whose public half Terrapod publishes
+as a trust root your clouds federate to. Supplying it here means it **wins on every startup
+and is never persisted**, which is what makes replacing the Secret a real rotation rather than
+a value the database ignores — and it is also why
+`POST /api/terrapod/v1/oidc/signing-keys/actions/rotate` returns **409** on such a deployment:
+the key is yours, and so is rotating it. Leave `api.oidcSigningKey` unset and Terrapod
+generates and manages its own instead. See [Cloud Identity → Key management and
+rotation](cloud-identity.md#key-management-and-rotation).
 
 Example ESO `ExternalSecret` rendering the DB URL Secret that the chart then consumes:
 

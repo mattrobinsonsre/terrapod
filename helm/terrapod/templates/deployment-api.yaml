@@ -57,6 +57,34 @@ spec:
         checksum/token-signing: {{ .data | toYaml | sha256sum }}
         {{- end }}
         {{- end }}
+        {{- /* Same hazard, sharper consequence, and no `else` branch: the chart
+             never generates this key (tests/helm/test_oidc_signing_key_is_not_
+             chart_generated.py), so when the operator supplies none there is
+             nothing to hash -- the application generates and persists its own,
+             which no manifest contains and no render of ours can re-mint.
+
+             When one IS supplied it is read at every startup and never stored,
+             so replacing the Secret is a real rotation -- and without this,
+             an unsynchronised one. This key is a PUBLISHED TRUST ROOT, so a
+             split fleet means roughly half of all run identity tokens fail
+             verification at the cloud's token exchange, with nothing wrong on
+             the Terrapod side to look at.
+
+             Scope, stated because the mechanism is narrower than it reads:
+             this depends on `lookup`, so it rolls the Deployment under
+             `helm install`/`upgrade` and renders NOTHING under `helm template`
+             -- which is what Argo CD and Flux run. The existing
+             checksum/token-signing annotation has exactly the same hole for a
+             supplied Secret (verified: 0 occurrences under `helm template
+             --set api.tokenSigningKey.existingSecret=...`), so this matches
+             established behaviour rather than extending it. A GitOps operator
+             rotating this Secret must still roll the API Deployment
+             themselves. */}}
+        {{- if .Values.api.oidcSigningKey.existingSecret }}
+        {{- with (lookup "v1" "Secret" .Release.Namespace .Values.api.oidcSigningKey.existingSecret) }}
+        checksum/oidc-signing: {{ .data | toYaml | sha256sum }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.api.config.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"

@@ -332,15 +332,37 @@ A run sitting in `planned` (waiting for a confirm) was automatically moved to `d
 ### Symptoms
 
 - A `planned` run flips to `discarded` without anyone clicking Discard.
-- The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 → 7)` or `plan expired (older than 3600s)`.
+- The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 -> 7)`, `cloud identity configuration changed since plan (aws, vault.eu)`, or `plan expired after 3600s`.
 - A confirm attempt (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409** with the same reason.
 
 ### Diagnosis
 
-Two guards discard stale plans:
+Three guards discard stale plans, evaluated in this order — whichever fires first supplies the reason:
 
-1. **State drift (always on, #647)** — the workspace's state version advanced (a newer apply, a rollback, or a manual/CLI state upload) *after* this run was planned, so the plan was computed against an older state. Reason: `state changed since plan (serial N → M)`.
-2. **Plan expiry (opt-in, #646)** — the workspace sets `plan-expiry-seconds` and the plan is older than that TTL. Reason: `plan expired (older than <N>s)`. Off unless configured per workspace.
+1. **State drift (always on, #647)** — the workspace's state version advanced (a newer apply, a rollback, or a manual/CLI state upload) *after* this run was planned, so the plan was computed against an older state. Reason: `state changed since plan (serial N -> M)`.
+2. **Cloud identity drift (#1901)** — the [per-workspace cloud identity](cloud-identity.md) this run would present is no longer the one its plan was reviewed under, because the deployment catalogue (`api.config.auth.oidc_issuer.audiences`) or the workspace's own `oidc-audiences` override moved in between. Reason: `cloud identity configuration changed since plan (aws, vault.eu)` — the targets are named, because "something moved" would not tell anyone which. Only fires for a workspace that mints at all.
+3. **Plan expiry (opt-in, #646)** — the workspace sets `plan-expiry-seconds` and the plan is older than that TTL. Reason: `plan expired after <N>s`. Off unless configured per workspace.
+
+#### Reading the cloud-identity reason
+
+This is the **only operator-visible signal** that the identity moved: a run's resolved
+`oidc-audiences` and the targets it actually minted for are not exposed on the API, so the
+`discard-reason` string is all there is. Two scoping rules make it less alarming than it looks:
+
+- **It compares only the targets this run actually minted for**, not everything the workspace
+  is configured for. The configured map is the *merged* view and carries deployment-wide
+  catalogue entries a workspace may never use, so comparing against all of it would mean one
+  catalogue edit refusing every pending apply in the fleet — including runs whose own identity
+  had not moved at all.
+- **A target the catalogue has *gained* since the plan is deliberately not a cause.** The mint
+  reads the run's own snapshot, so a newly added target yields no token at apply exactly as it
+  yielded none at plan; the identity the apply would present is unchanged, so there is nothing
+  to refuse.
+
+A fleet-wide audience change — a [bulk update](api-reference.md#bulk-workspace-operations) of
+`oidc-audiences`, or an edit to the Helm catalogue — is therefore the usual cause of several
+of these at once. That is working as intended: re-plan, and the new runs pick up the current
+configuration.
 
 In-flight `confirmed`/`applying` runs are never discarded; only waiting `planned`/`pending`/`queued` apply-capable runs are. Plan-only/speculative/drift runs are exempt.
 
@@ -2756,9 +2778,18 @@ Only the operator knows how long their clouds cache, which is why both are
 configuration rather than constants. Two constraints:
 
 - **`retired_key_grace_seconds` > `token_ttl_seconds`**, or a token signed moments
-  before a rotation stops verifying while still inside its own lifetime.
+  before a rotation stops verifying while still inside its own lifetime. **This one
+  is enforced** — the API refuses to start otherwise.
 - **`retired_key_grace_seconds` > `key_propagation_seconds`**, because the retired
-  key is what carries the signing load until the new one activates.
+  key is what carries the signing load until the new one activates. **This one is
+  not enforced**: set it wrongly and the rotation signs with a key the clouds
+  cannot yet verify, with no error at `helm upgrade`.
+
+Both are guidance for a *routine* rotation. **`0` is a legitimate value for either**,
+and `0`/`0` together is the emergency response to a compromised key — sign with the
+new key now, stop publishing the old one now, and accept that tokens already in
+flight stop verifying. See [the compromised-key
+runbook](#the-oidc-issuer-signing-key-is-compromised).
 
 A rotation needs no downtime and no coordination with the clouds: the handover
 happens on its own, and at no point is a token signed with a key that is not
@@ -2857,8 +2888,9 @@ a URL mismatch, not the key.
    token-rejected symptom with nothing wrong with the key.
 4. **Check the API log** for either of two warnings, both of which mean the
    windows did not cover you:
-   - `No OIDC signing key has finished propagating; signing with the newest
-     unretired key anyway` — reached when no retired key is still published, so
+   - `No OIDC signing key is active and no retired key is still published;
+     signing with the newest even though the clouds may not hold it yet` —
+     reached when no retired key is still published, so
      there was nothing to sign with but the un-propagated one. In practice this
      means `retired_key_grace_seconds` is shorter than the time between two
      rotations: **raise it**, and do not rotate twice inside that window.
@@ -2877,10 +2909,20 @@ a URL mismatch, not the key.
 - **Issuer URL moved:** set `api.config.auth.oidc_issuer.public_url` explicitly
   so it stops being derived, and reconcile the cloud's configured issuer to
   match. Do not change it in one place only.
-- **Every key retired** (`Every OIDC issuer signing key is retired` at startup,
-  and the API refuses to start): rotate to create one, or supply your own via
+- **Every key retired** (`Every OIDC issuer signing key is retired` at startup):
+  rotate to create one, or supply your own via
   `api.oidcSigningKey.existingSecret`. This is reachable only by retiring the
   last key by hand.
+
+  **The API does NOT refuse to start, and this is the trap in diagnosing it.**
+  Startup initialisation is deliberately tolerant — a deployment that has not
+  opted in must not be blocked from starting — so the failure is a single
+  `warning` and the pod goes **Ready**. There is no crash-loop to find. What you
+  see instead is `/.well-known/openid-configuration` and `/.well-known/jwks.json`
+  answering **503** while every other route serves normally, and every federated
+  run failing inside its cloud's token exchange. Check the two issuer documents
+  directly rather than the pod's status; the rotation below works precisely
+  because the API is up.
 - **Do not rotate again to fix a rotation.** A second rotation adds a third key
   and retires the one the clouds may just have picked up, which makes the window
   worse rather than shorter.
@@ -2888,3 +2930,76 @@ a URL mismatch, not the key.
 **Verification.** A federated plan on an affected workspace reaches the cloud,
 and `GET /api/terrapod/v1/oidc/signing-keys` shows one key with
 `signing: true` whose `kid` appears in the public JWKS.
+
+## The OIDC issuer signing key is compromised
+
+The private half of the issuer signing key is the highest-consequence secret
+[per-workspace cloud identity](cloud-identity.md) adds: whoever holds it can mint a
+token claiming **any workspace and any phase**, and every cloud federated to this
+issuer will accept it. Treat it as you would a root cloud credential.
+
+**A normal rotation is the wrong response.** It is designed for a handover with no
+downtime, so it deliberately keeps the outgoing key signing for
+`key_propagation_seconds` (default 600) and published for
+`retired_key_grace_seconds` (default 3600) afterwards. Run it on a compromised key
+and that key stays usable by the attacker for the best part of an hour.
+
+### Immediate containment
+
+The fastest way to stop the issuer being trusted at all is to **remove the trust at
+the cloud**, not at Terrapod: delete or disable the OIDC provider / federated
+credential in each affected account. That takes effect immediately, needs no
+Terrapod change, and does not depend on any cache expiring. Do this first if the
+exposure is confirmed; federated runs fail until it is restored, which is the point.
+
+### Then, in Terrapod
+
+Set both windows to zero and roll the API, so the replacement key signs at once and
+the compromised one stops being published at once:
+
+```yaml
+api:
+  config:
+    auth:
+      oidc_issuer:
+        key_propagation_seconds: 0
+        retired_key_grace_seconds: 0
+```
+
+Then rotate:
+
+```zsh
+curl -fsS -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  "$TERRAPOD_URL/api/terrapod/v1/oidc/signing-keys/actions/rotate"
+```
+
+Restore the defaults afterwards, in a separate change — zero windows make every
+later routine rotation break tokens in flight.
+
+**If the deployment signs with an operator-supplied key**
+(`api.oidcSigningKey.existingSecret`), the rotate endpoint answers **409**: the key
+is yours, and so is replacing it. Generate a new RSA key, update the Secret, and
+roll the API. The `checksum/oidc-signing` annotation means changing the Secret rolls
+every replica together, so there is no window where replicas disagree about which
+key signs.
+
+### What this cannot do
+
+- **Tokens already minted stay valid until they expire** (`token_ttl_seconds`,
+  default 900). They are bearer credentials for a cloud role; nothing in Terrapod
+  can recall one. Containment at the cloud is what bounds this.
+- **A cloud that has cached the JWKS may keep accepting the compromised key** until
+  its own cache expires, on its own schedule. Terrapod serves the key set with a
+  `Cache-Control` max-age of half `key_propagation_seconds` — but that value has a
+  **60-second floor**, so even at `key_propagation_seconds: 0` a compliant cache is
+  told it may hold the old key set for another minute, and a provider is free to
+  ignore the header entirely. Un-publishing a key is not the same as it being
+  untrusted, which is why cloud-side containment comes first.
+
+### Afterwards
+
+Rotate anything the same exposure may have reached — the database encryption key if
+the leak was a database copy, API tokens if it was a backup — and check
+`audit_logs` for `oidc` activity you cannot account for. A minted token does not
+appear there once it leaves Terrapod, so the cloud's own logs (CloudTrail, Entra
+sign-in logs, GCP audit logs) are the authority on what it was used for.

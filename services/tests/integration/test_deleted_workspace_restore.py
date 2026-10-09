@@ -14,6 +14,7 @@ or treats live infrastructure as unmanaged.
 """
 
 import json
+import uuid
 
 import pytest
 
@@ -940,3 +941,133 @@ class TestPulumiRestore:
         raw = await storage.get(f"state/{new_raw}/{versions[-1].id}.tfstate")
         restored = json.loads(await dws.decrypt_state_bytes(raw))
         assert restored["manifest"] == {"n": 2}
+
+
+class TestRestorePreservesTheCloudIdentity:
+    """`oidc_audiences` survives a restore (#1901), and nothing writes it back
+    by accident.
+
+    The SNAPSHOT side has an introspection gate -- every settable column must
+    appear in the marker. The RESTORE side had none, so deleting the
+    `oidc_audiences=` kwarg from `deleted_workspace_service` passed everything:
+    a restored workspace silently loses its audience override, which is not a
+    visible breakage but a quiet downgrade. Every run then resolves to the
+    deployment catalogue alone or to nothing, and falls through to the agent
+    pool's identity -- which is broader than the one the workspace was
+    deliberately moved off, and which the workspace name in a cloud audit log
+    will not distinguish from the correct one.
+
+    Its call site carries the reasoning in a comment: an absent value defaults
+    the OPTED-OUT way, "the mirror of the fork-PR flag whose restore path
+    defaulted the permissive way". Both halves of that are pinned here, because
+    they pull in opposite directions and only a test can hold both: a recorded
+    value must come back, and an absent one must not become something.
+    """
+
+    OVERRIDE = {"aws": ["sts.amazonaws.example"], "vault.eu": ["https://vault.example/"]}
+
+    async def _column(self, ws_id: str) -> dict:
+        """The column itself, not the merged read.
+
+        A workspace read returns the override merged over the deployment
+        catalogue, so with an empty catalogue the two agree -- and a test that
+        only checked the merged value would pass against a restore that wrote
+        nothing if the catalogue ever happened to carry the same entries.
+        """
+        from sqlalchemy import select
+
+        from terrapod.db.models import Workspace
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as session:
+            ws = (
+                await session.execute(
+                    select(Workspace).where(Workspace.id == uuid.UUID(ws_id.removeprefix("ws-")))
+                )
+            ).scalar_one()
+            return dict(ws.oidc_audiences or {})
+
+    async def test_the_audience_override_comes_back_byte_for_byte(self, app, client):
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client,
+            "restore-oidc",
+            [1],
+            "lin-oidc",
+            **{"oidc-audiences": self.OVERRIDE},
+        )
+
+        # The marker is the only surviving account of what the workspace was.
+        marker = await dws.read_marker(get_storage(), old_id)
+        assert marker["settings"]["oidc_audiences"] == self.OVERRIDE
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        new_id = resp.json()["data"]["id"]
+
+        # Byte-for-byte, which is also the no-normalisation property: the
+        # Terraform provider writes the server's response back into state, so a
+        # restore that lower-cased or reordered would make the next plan
+        # disagree with its own apply.
+        assert await self._column(new_id) == self.OVERRIDE
+        attrs = (await client.get(f"/api/v2/workspaces/{new_id}", headers=AUTH)).json()["data"][
+            "attributes"
+        ]
+        assert attrs["oidc-audiences"] == self.OVERRIDE
+
+        # It is NOT in `suppressed`: unlike auto-apply and drift, an audience
+        # map cannot start a run, so carrying it over is safe and losing it is
+        # the harm.
+        assert "oidc_audiences" not in resp.json()["data"]["attributes"]["suppressed"]
+
+    async def test_a_workspace_that_held_no_identity_does_not_gain_one(self, app, client):
+        """The other direction, which the `or {}` is there for: a marker written
+        before the column existed carries no key at all, and the restore must
+        read that as "no identity" rather than reaching for anything else.
+
+        This is the half that makes the test above more than a round trip. A
+        restore defaulting the permissive way would hand a workspace a cloud
+        identity nobody granted it.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-oidc-none", [1], "lin-oidc-none")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        assert await self._column(resp.json()["data"]["id"]) == {}
+
+    async def test_a_marker_predating_the_column_restores_to_an_empty_map(self, app, client):
+        """`settings.get("oidc_audiences") or {}` -- exercised by removing the
+        key from a real marker, which is what a workspace deleted by an older
+        release left behind. `None` in a NOT NULL JSONB column would fail the
+        insert, so the fallback is load-bearing rather than defensive.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client,
+            "restore-oidc-legacy",
+            [1],
+            "lin-oidc-legacy",
+            **{"oidc-audiences": self.OVERRIDE},
+        )
+
+        marker = await dws.read_marker(get_storage(), old_id)
+        # The `pop` is the setup, not the check: it is what makes this marker
+        # look like one written before the column existed. Done as a statement
+        # rather than inside the assert, because `python -O` strips asserts --
+        # the key would survive, the marker would be rewritten unchanged, and
+        # the fallback below would be asserted against a value that is still
+        # there. The test would pass while testing nothing.
+        removed = marker["settings"].pop("oidc_audiences")
+        assert removed == self.OVERRIDE, "the marker did not hold the override to remove"
+        await dws.write_marker(get_storage(), old_id, marker)
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        assert await self._column(resp.json()["data"]["id"]) == {}

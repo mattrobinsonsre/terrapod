@@ -57,7 +57,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI) |
-| **Per-Workspace Cloud Identity** | Terrapod as an OIDC issuer for its own runs, so the cloud credential boundary is the workspace rather than the agent pool; fall-through (a workspace with no audiences keeps using the pool's ServiceAccount), and the `phase` claim keeps write permissions out of a pull-request plan |
+| **Per-Workspace Cloud Identity** | Terrapod as an OIDC issuer for its own runs, so the cloud credential boundary is the workspace rather than the agent pool; fall-through (a workspace with no audiences keeps using the pool's ServiceAccount). **Put** write permissions behind the `apply` phase in your cloud's trust policy and a pull-request plan cannot assume them |
 | **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries; download base + version-index sources are operator-overridable to an internal mirror (restricted-network / air-gapped) and honour the forward proxy/CA |
 | **Supply-chain Verification** | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS with pinned keys; the runner re-verifies the executable (visible in the run log) before running it |
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |

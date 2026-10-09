@@ -129,6 +129,47 @@ To move it: add `{callback_base_url}/api/v1/auth/callback` — and
 then set `legacy_callback_url: false`. The default flips in 2.0.0; see
 [upgrading-to-2.0.md](upgrading-to-2.0.md).
 
+## Behaviour changes in v1.10.0
+
+Nothing is removed or renamed in v1.10.0. Two defaults move, and both change what a
+run does without anyone editing their values.
+
+### The default engine version moves to OpenTofu 1.13
+
+`api.config.default_terraform_version` and the runner's own default both move
+**1.12 → 1.13** (OpenTofu 1.13 is GA). Migration `3214ad466305` moves the two
+server-side column defaults.
+
+**A workspace or autodiscovery rule that pins a version is untouched.** The migration
+moves the *defaults*, not stored rows: a workspace explicitly on 1.12 stays on 1.12,
+exactly as the 1.11 → 1.12 bump behaved. What moves is every workspace and rule that
+never named a version and was therefore taking the server default — their next run
+plans on 1.13.
+
+One nuance worth checking before you upgrade, because it is not symmetrical with the
+above: **the Terraform provider and the autodiscovery admin form were still defaulting
+to 1.11**, so a rule created through `terraform-provider-terrapod` without an explicit
+`terraform_version` got a different version from the same rule created through the API.
+Both now track the server default. If you create autodiscovery rules through Terraform
+and have not pinned a version, the version those rules carry changes on upgrade — pin
+`terraform_version` explicitly if you need the old one.
+
+### The pinned platform-tool versions moved again
+
+`registry.platform_tools` now defaults to OPA **1.21.1**, Trivy **0.75.0** and Checkov
+**3.3.26**. OPA and Trivy are unchanged since v1.9.0; **Checkov moves 3.3.23 → 3.3.26**
+(and 3.3.21 → 3.3.26 if you are coming from v1.9.0). Reviewing these three defaults is
+a checklist item on every minor release, because nothing but a Terrapod release moves
+them.
+
+These binaries are not in any image — they are fetched at run time, and a fetch failure
+is **fatal to the run** rather than a silently skipped gate. So on an air-gapped or
+egress-restricted deployment whose mirror holds only the older versions, every run with
+a policy set applied and every run with scanning on will error after `helm upgrade`,
+without the operator having changed anything. **Seed your mirror with the new versions
+first**, or pin the old ones in your values. A routine bump on a connected deployment;
+not routine behind a mirror.
+
 ## Behaviour changes in v1.9.0
 
 Not deprecations — nothing was removed and nothing is scheduled to be — but each
@@ -229,16 +270,18 @@ behaviour. (`GHSA-x4jp-5g4j-f8rr`, critical.)
 
 ### The pinned platform-tool versions moved
 
-`registry.platform_tools` now defaults to OPA **1.21.1**, Trivy **0.75.0** and
-Checkov **3.3.21** (from 1.21.0 / 0.74.0 / 3.3.19). These binaries are not in any
+`registry.platform_tools` moved to OPA **1.21.1**, Trivy **0.75.0** and Checkov
+**3.3.21** in v1.9.0 (from 1.21.0 / 0.74.0 / 3.3.19). These binaries are not in any
 image — they are fetched at run time, and a fetch failure is **fatal to the run**
 rather than a silently skipped gate.
 
-So on an air-gapped or egress-restricted deployment whose mirror holds only the old
-versions, every run with a policy set applied and every run with scanning on will
-error after `helm upgrade`, without the operator having changed anything. **Seed
-your mirror with the new versions first**, or pin the old ones in your values. A
-routine bump on a connected deployment; not routine behind a mirror.
+So on an air-gapped or egress-restricted deployment whose mirror held only the older
+versions, every run with a policy set applied and every run with scanning on errored
+after that `helm upgrade`, without the operator having changed anything. The mirror
+had to be seeded with the v1.9.0 versions first, or the old ones pinned in values.
+
+**If you are upgrading past v1.9.0, read the v1.10.0 entry above instead** — Checkov
+moved again, and seeding 3.3.21 now would leave you one bump behind.
 
 ### A variable-set assignment rule naming `drift_status` or `locked` stops matching
 

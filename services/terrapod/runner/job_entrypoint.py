@@ -848,8 +848,10 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # both of which run after this point.
     #
     # `{}` when this workspace mints nothing, which is most of them: the run then
-    # authenticates with the agent pool's own identity exactly as before, and
-    # does not invoke the engine for discovery at all. Anything else propagates
+    # authenticates with the agent pool's own identity exactly as before. Note
+    # discovery still runs -- it happens BEFORE the API is asked, by design, so
+    # every run pays one engine `graph` walk and one round trip even when the
+    # answer is "nothing". Anything else propagates
     # — there is deliberately no warn-and-continue here, because falling through
     # does not mean no credentials, it means the POOL's, broader than the ones
     # this workspace was moved off, so the run would succeed against real

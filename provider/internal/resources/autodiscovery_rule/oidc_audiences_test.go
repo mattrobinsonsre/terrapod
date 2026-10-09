@@ -166,7 +166,10 @@ func TestRuleOIDCAudiencesRoundTrips(t *testing.T) {
 
 // A rule holding nothing reads back null, so a config that never set the
 // attribute produces no spurious diff against the server's empty map.
-func TestRuleOIDCAudiencesReadsAnEmptyMapAsNull(t *testing.T) {
+// An empty answer on a model that held NOTHING — a refresh or an import of a
+// rule that templates no audiences. Null is right here: there is no config
+// value to stay consistent with.
+func TestRuleOIDCAudiencesReadsAnEmptyMapAsNullWhenNothingWasPlanned(t *testing.T) {
 	ctx := context.Background()
 
 	var m autodiscoveryRuleModel
@@ -177,6 +180,38 @@ func TestRuleOIDCAudiencesReadsAnEmptyMapAsNull(t *testing.T) {
 	if !m.OIDCAudiences.IsNull() {
 		t.Errorf("oidc_audiences = %v, want null for a rule that templates nothing",
 			m.OIDCAudiences)
+	}
+}
+
+// The other half, and the one that was missing. A practitioner writing
+// `oidc_audiences = {}` — which the workspace resource's own description tells
+// them to do, to clear an inherited entry — plans an EMPTY MAP. The server
+// echoes the attribute back empty, so a read that collapsed every empty answer
+// to null applied null against a planned `{}`: "Provider produced inconsistent
+// result after apply", which no re-run fixes because the config never changes.
+//
+// The workspace resource was immune because `ownedAudiences` branches on the
+// CONFIG rather than on the server's answer. The rule attribute has the same
+// name and shape and did not.
+func TestRuleOIDCAudiencesKeepsAnExplicitlyEmptyMap(t *testing.T) {
+	ctx := context.Background()
+
+	planned, d := types.MapValueFrom(ctx, audienceElemType, map[string][]string{})
+	if d.HasError() {
+		t.Fatalf("build planned value: %v", d)
+	}
+	m := autodiscoveryRuleModel{OIDCAudiences: planned}
+
+	res := ruleResource(t, map[string]any{"oidc-audiences": map[string][]string{}})
+	if diags := readAutodiscoveryRuleIntoModel(ctx, res, &m); diags.HasError() {
+		t.Fatalf("read: %v", diags)
+	}
+	if m.OIDCAudiences.IsNull() {
+		t.Fatal("oidc_audiences read back as null against a planned empty map — " +
+			"Terraform core rejects that apply as an inconsistent result")
+	}
+	if n := len(m.OIDCAudiences.Elements()); n != 0 {
+		t.Errorf("oidc_audiences has %d entries, want the planned empty map", n)
 	}
 }
 
