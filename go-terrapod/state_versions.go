@@ -2,6 +2,10 @@ package terrapod
 
 import (
 	"context"
+	// The TFE state-version API carries an `md5` attribute and go-tfe sends it, so
+	// this is a protocol field, not a security primitive. The semgrep suppression
+	// lives at the md5.Sum call rather than here, because that is what the rule
+	// matches — and it must be the line immediately above it or semgrep ignores it.
 	"crypto/md5" //nolint:gosec // not a security primitive — TFE-compatible checksum
 	"encoding/hex"
 	"fmt"
@@ -81,6 +85,7 @@ func (c *Client) UploadStateContent(ctx context.Context, stateVersionID string, 
 // the wrapped error so the operator can clean up manually.
 func (c *Client) CreateAndUploadState(ctx context.Context, workspaceID string, raw []byte, req CreateStateVersionRequest) (*StateVersion, error) {
 	if req.MD5 == "" {
+		// nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
 		sum := md5.Sum(raw) //nolint:gosec
 		req.MD5 = hex.EncodeToString(sum[:])
 	}
