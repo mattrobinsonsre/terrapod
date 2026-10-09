@@ -738,6 +738,11 @@ jobs:
         run: python3 scripts/docs-audit/check_counts.py
       - name: Named targets, values and paths exist
         run: python3 scripts/docs-audit/check_references.py
+      # The provider hard-codes copies of server defaults, and schema.golden
+      # records types rather than defaults -- so a drift is invisible to every
+      # other gate. It happened: the provider sat a minor behind for a release.
+      - name: Provider defaults agree with the server's
+        run: python3 scripts/docs-audit/check_provider_defaults.py
       # Advisory: prints for human review, never fails. Telling a factual
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list

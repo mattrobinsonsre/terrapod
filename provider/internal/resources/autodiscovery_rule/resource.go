@@ -1100,12 +1100,24 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	// own map with nothing merged into it, so every key that comes back is one
 	// this configuration wrote. The deployment catalogue is merged per workspace
 	// at mint time, which is downstream of here.
+	//
+	// An EMPTY answer must not collapse to null, because the practitioner can
+	// write `oidc_audiences = {}` — the workspace resource's own description
+	// tells them to, to clear an inherited entry. Planning `{}` and applying
+	// null is "Provider produced inconsistent result after apply", which no
+	// re-run fixes. So an empty answer preserves whatever the model already
+	// holds: null on a refresh or an import where the practitioner wrote
+	// nothing, and the empty map on an apply where they wrote one.
 	if auds := terrapod.GetAudienceMapAttr(res, "oidc-audiences"); len(auds) > 0 {
 		v, d := types.MapValueFrom(ctx, audienceElemType, auds)
 		diags.Append(d...)
 		m.OIDCAudiences = v
-	} else {
+	} else if m.OIDCAudiences.IsNull() || m.OIDCAudiences.IsUnknown() {
 		m.OIDCAudiences = types.MapNull(audienceElemType)
+	} else {
+		v, d := types.MapValueFrom(ctx, audienceElemType, map[string][]string{})
+		diags.Append(d...)
+		m.OIDCAudiences = v
 	}
 
 	// Optional templating fields (#318). Tolerate missing/empty: an

@@ -22,6 +22,7 @@ Endpoints (all under /api/terrapod/v1):
         POST /oidc/signing-keys/actions/rotate      add a key, retire the current one
 """
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path
@@ -40,6 +41,7 @@ from terrapod.api.ids import parse_id
 from terrapod.db.models import OIDCSigningKey, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import workspace_settings
 
 router = APIRouter(tags=["cloud-identity"])
 
@@ -239,6 +241,22 @@ async def mint_cloud_identity_tokens(
         # would land an AWS-audienced token at the path the operator's `vault`
         # block reads. Anything holding this run's token can send it, including
         # the workspace's own configuration.
+        #
+        # And bound the ITEM, not just the list. A name longer than the write
+        # path allows cannot match a catalogue key -- those are capped at the
+        # same constant -- but it can still resolve through the GENERAL
+        # fallback, because the lookup splits on the first dot and `aws.<64KB>`
+        # answers through an ordinary `aws` entry. Without this the name is
+        # echoed back, joined into a path, written into `oidc_minted_targets`
+        # for ever, and named in a log line.
+        if len(t) > workspace_settings.MAX_OIDC_TARGET_LEN:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"provider configuration name is longer than "
+                    f"{workspace_settings.MAX_OIDC_TARGET_LEN} characters"
+                ),
+            )
         unsafe = cloud_identity_resolver.unsafe_target_reason(t)
         if unsafe:
             raise HTTPException(
@@ -274,7 +292,7 @@ async def mint_cloud_identity_tokens(
 
     phase = user.run_phase
     ttl = settings.auth.oidc_issuer.token_ttl_seconds
-    tokens = []
+    pending: list[tuple[str, list[str], dict]] = []
     for target in wanted:
         audiences = resolved[target]
         claims: dict = {
@@ -300,7 +318,15 @@ async def mint_cloud_identity_tokens(
         }
         if phase:
             claims["phase"] = phase
-        tokens.append(
+        pending.append((target, audiences, claims))
+
+    # Rule 13: one RS256 signature is ~1ms and this signs once per target, so a
+    # full request is ~100ms of blocking CPU on the event loop -- for every
+    # tenant, not just this one, and anything holding this run's token can ask.
+    # `rotate_signing_key` already does exactly this for its keygen, citing the
+    # same rule; the asymmetry was the tell.
+    def _sign_all() -> list[dict]:
+        return [
             {
                 "token": sign_identity_token(claims, ttl_seconds=ttl),
                 # Echoed so the runner writes the file under the name it asked
@@ -309,7 +335,10 @@ async def mint_cloud_identity_tokens(
                 "target": target,
                 "audiences": audiences,
             }
-        )
+            for target, audiences, claims in pending
+        ]
+
+    tokens = await asyncio.to_thread(_sign_all)
 
     # Record what was actually minted, so the confirm-time staleness check can
     # be scoped to the identities this run PRESENTED rather than to the ones it
@@ -338,7 +367,24 @@ async def mint_cloud_identity_tokens(
     minted = list(run.oidc_minted_targets or [])
     added = [t["target"] for t in tokens if t["target"] not in minted]
     if added:
-        run.oidc_minted_targets = minted + added
+        # Capped, because this grows across requests and the runner may call
+        # repeatedly: it retries on 5xx, and a phase asks once per phase. A run
+        # cannot legitimately present more distinct identities than it may ask
+        # for in one request, so MAX_TARGETS is the ceiling. Truncating rather
+        # than refusing: the tokens are already signed and on their way back, so
+        # failing here would hand the runner credentials the record disclaims.
+        # The record is only ever read to scope the confirm-time staleness check,
+        # and a short record narrows that check rather than widening it.
+        combined = minted + added
+        if len(combined) > MAX_TARGETS:
+            logger.warning(
+                "cloud identity minted-target record truncated",
+                run_id=str(run.id),
+                kept=MAX_TARGETS,
+                dropped=len(combined) - MAX_TARGETS,
+            )
+            combined = combined[:MAX_TARGETS]
+        run.oidc_minted_targets = combined
     await db.commit()
 
     logger.info(
