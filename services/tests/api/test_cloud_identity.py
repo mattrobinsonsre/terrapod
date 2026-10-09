@@ -37,6 +37,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.routers import cloud_identity as router
@@ -111,6 +112,11 @@ def _db(run, ws):
     # awaitable, so this fixture has to match production rather than the route's
     # earlier read-only shape.
     db.commit = AsyncMock()
+    # The mint re-reads the run under a row lock before appending to
+    # `oidc_minted_targets`, so the fixture has to model that. A no-op is right:
+    # there is no second writer here, and the row object is already the one the
+    # route holds.
+    db.refresh = AsyncMock()
     return db
 
 
@@ -722,12 +728,32 @@ class TestTheAudienceDefaults:
         served["aws"].append("injected")
         assert catalogue["aws"] == [AWS], "mutating the served value reached live settings"
 
-    async def test_a_runner_token_is_not_the_intended_caller_but_is_authenticated(self):
-        """Documented asymmetry: the runner-facing targets route returns names
-        only, because a runner writes a file and the engine reads it. This route
-        is for a person composing configuration. It does not special-case the
-        runner, and does not need to — the runner never calls it."""
-        resp = await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
+    async def test_a_runner_token_cannot_read_the_catalogue(self):
+        """Supersedes a test that asserted 200 here.
+
+        Its reasoning was "it does not special-case the runner, and does not
+        need to — the runner never calls it". The second half still holds and is
+        why nothing legitimate breaks: the mint already returns this run's own
+        resolved audiences, which is all the credential phase writes. The first
+        half was the wrong question. What the legitimate runner calls says
+        nothing about what anything HOLDING a runner token can call, and the plan
+        Job runs the workspace's own HCL — an `external` data source, a
+        `pre_init` hook or a third-party module can read `TP_AUTH_TOKEN` out of
+        the environment.
+
+        What it would read is deployment-wide topology: every federation target
+        every workspace in the deployment uses. The discovery document
+        deliberately publishes no audiences for exactly that reason, so serving
+        them one tier up to a runner token gave the disclosure straight back.
+        """
+        with pytest.raises(HTTPException) as e:
+            await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
+        assert e.value.status_code == 403
+
+    async def test_a_session_user_still_reads_it(self):
+        """The negative path: the refusal must be scoped to runner tokens, not
+        applied to the practitioner the route exists for."""
+        resp = await _call_defaults(_user(method="session"), cfg=_enabled(audiences={}))
         assert resp.status_code == 200
 
 
@@ -902,5 +928,38 @@ class TestATargetCannotEscapeItsOwnDirectory:
         ws, run, cfg = _scenario(catalogue={target.split(".")[0]: [AWS]})
         resp, _ = await _call(
             _user(run_id=str(run.id), phase="plan"), run, ws, target=target, cfg=cfg
+        )
+        assert resp.status_code == 200
+
+
+class TestAFinishedRunCannotMint:
+    """A runner token is good until it EXPIRES -- run state is not checked when
+    it is verified, and the default TTL is an hour.
+
+    That is an inherited property of runner tokens rather than something new,
+    but this is the first endpoint that converts one into CLOUD credentials, so
+    the missing liveness check costs more here. Code in the plan pod that
+    exfiltrates the token could keep POSTing after the run finished, drawing
+    fresh short-lived credentials for the workspace's identity, from anywhere,
+    for the remainder of the hour. `debug_mode`'s lingering pods widen the
+    window further. A finished run has no legitimate reason to mint.
+    """
+
+    @pytest.mark.parametrize("status", ["applied", "errored", "discarded", "canceled"])
+    async def test_a_terminal_run_is_refused(self, status):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        run.status = status
+        with pytest.raises(HTTPException) as e:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws")
+        assert e.value.status_code == 409
+        assert status in e.value.detail
+
+    async def test_a_live_run_still_mints(self):
+        """The negative path: the refusal is scoped to terminal states, and must
+        not refuse the states a run actually mints in."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        run.status = "planning"
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws"
         )
         assert resp.status_code == 200

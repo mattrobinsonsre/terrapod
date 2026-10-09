@@ -39,6 +39,7 @@ windows are configuration, because only the operator knows how long their clouds
 cache.
 """
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -95,6 +96,18 @@ _signing_kid: str | None = None
 #: RFC 7638 thumbprint DERIVED from the key material, so identical kids mean
 #: identical keys and changed material cannot reuse a kid.
 _jwks_cache: tuple[tuple[str, ...], dict[str, list[dict[str, str]]]] | None = None
+
+#: Prepared private keys, by kid. `jwt.encode` given a PEM STRING re-parses it on
+#: every call, and the mint signs once per provider configuration a run uses --
+#: up to `MAX_TARGETS` of them in one request, synchronously, on the event loop.
+#: A kid is a thumbprint OF the key material, so it cannot name two different
+#: keys -- so an entry for a key no longer in the set is stale but never WRONG,
+#: and this is deliberately NOT cleared when the set is rebuilt. `reload` runs
+#: every 30s, so clearing there would empty the memo on every cycle and leave
+#: the per-token parse this exists to remove. Growth is one entry per key the
+#: process has ever signed with, i.e. bounded by rotations, and `_reset_for_tests`
+#: clears it for isolation.
+_prepared_keys: dict[str, object] = {}
 
 
 def generate_private_key() -> rsa.RSAPrivateKey:
@@ -413,7 +426,10 @@ async def rotate_signing_key(db: AsyncSession) -> SigningKey:
     cfg = settings.auth.oidc_issuer
     now = datetime.now(UTC)
 
-    key = generate_private_key()
+    # RSA-2048 keygen is hundreds of milliseconds and highly variable, and this
+    # runs inside an `async def` route handler -- rule 13. Admin-only so the
+    # frequency is low, but it is exactly the CPU work that rule names.
+    key = await asyncio.to_thread(generate_private_key)
     kid = compute_kid(key)
     row = OIDCSigningKey(
         kid=kid,
@@ -474,10 +490,11 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
 
 
 def _reset_for_tests() -> None:
-    global _keys, _signing_kid, _jwks_cache  # noqa: PLW0603
+    global _keys, _signing_kid, _jwks_cache, _prepared_keys  # noqa: PLW0603
     _keys = None
     _signing_kid = None
     _jwks_cache = None
+    _prepared_keys = {}
 
 
 def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
@@ -489,6 +506,8 @@ def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
     """
     import jwt
 
+    global _prepared_keys  # noqa: PLW0603
+
     key = get_signing_key()
     now = int(time.time())
     payload = {
@@ -498,4 +517,9 @@ def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
         "exp": now + ttl_seconds,
         "jti": str(uuid.uuid4()),
     }
-    return jwt.encode(payload, key.private_key_pem, algorithm="RS256", headers={"kid": key.kid})
+    prepared = _prepared_keys.get(key.kid)
+    if prepared is None:
+        prepared = load_private_key(key.private_key_pem)
+        _prepared_keys[key.kid] = prepared
+
+    return jwt.encode(payload, prepared, algorithm="RS256", headers={"kid": key.kid})
