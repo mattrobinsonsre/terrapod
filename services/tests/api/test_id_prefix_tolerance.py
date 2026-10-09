@@ -58,6 +58,9 @@ _NOT_RESOURCE_IDS = {
     "lock-",  # `lock-{email}`: a lock token value handed to the CLI
     "re-",  # `re-{run_id}-{i}`: a synthetic index inside a collection
     "vrc-",  # `vrc-{uuid4()}`: minted per response, never re-fetched
+    "cmpl-",  # `cmpl-{run_id}` / `ws-cmpl-{ws_id}`: the JSON:API envelope id of
+    # a DERIVED report. Both compliance routes are keyed on the run or the
+    # workspace, so this spelling is never sent back and nothing strips it.
     "at-",  # a real id, but `at-{token_hex}` -- not a uuid; the prefix is
     # part of the stored primary key, so tolerance there means
     # normalising up (see auth/api_tokens.get_token_by_id), not

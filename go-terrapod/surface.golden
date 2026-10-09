@@ -775,6 +775,18 @@ field PolicyCheck.RunID string `json:"run-id"`
 field PolicyCheck.Scope string `json:"scope"`
 field PolicyCheck.SoftFailed int `json:"soft-failed"`
 field PolicyCheck.Status string `json:"status"`
+field PolicyCheckSummary.AdvisoryFailed int `json:"advisory-failed"`
+field PolicyCheckSummary.ID string `json:"id"`
+field PolicyCheckSummary.Kind string `json:"kind"`
+field PolicyCheckSummary.Passed int `json:"passed"`
+field PolicyCheckSummary.SoftFailed int `json:"soft-failed"`
+field PolicyCheckSummary.Status string `json:"status"`
+field PolicyEvaluationDetail.EnforcementLevel string `json:"enforcement-level"`
+field PolicyEvaluationDetail.Outcome string `json:"outcome"`
+field PolicyEvaluationDetail.OverriddenAt *string `json:"overridden-at,omitempty"`
+field PolicyEvaluationDetail.OverriddenBy *string `json:"overridden-by,omitempty"`
+field PolicyEvaluationDetail.PolicySetID *string `json:"policy-set-id,omitempty"`
+field PolicyEvaluationDetail.PolicySetName string `json:"policy-set-name"`
 field PolicySet.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
 field PolicySet.AllowNames []string `json:"allow-names,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
@@ -977,6 +989,18 @@ field RunActions.IsCancelable bool `json:"is-cancelable"`
 field RunActions.IsConfirmable bool `json:"is-confirmable"`
 field RunActions.IsDiscardable bool `json:"is-discardable"`
 field RunActions.IsRetryable bool `json:"is-retryable"`
+field RunComplianceReport.CreatedAt string `json:"created-at"`
+field RunComplianceReport.ExecutionBackend string `json:"execution-backend"`
+field RunComplianceReport.ID string `json:"id"`
+field RunComplianceReport.IsDestroy bool `json:"is-destroy"`
+field RunComplianceReport.PlanOnly bool `json:"plan-only"`
+field RunComplianceReport.PolicyChecksSummary []PolicyCheckSummary `json:"policy-checks-summary"`
+field RunComplianceReport.PolicyEvaluations []PolicyEvaluationDetail `json:"policy-evaluations"`
+field RunComplianceReport.RunID string `json:"run-id"`
+field RunComplianceReport.RunStatus string `json:"run-status"`
+field RunComplianceReport.SecurityScan *SecurityScanSummary `json:"security-scan,omitempty"`
+field RunComplianceReport.Verdict string `json:"verdict"`
+field RunComplianceReport.WorkspaceID string `json:"workspace-id"`
 field RunStatusTimestamps.AppliedAt string `json:"applied-at,omitempty"`
 field RunStatusTimestamps.ApplyingAt string `json:"applying-at,omitempty"`
 field RunStatusTimestamps.PlanQueuedAt string `json:"plan-queued-at,omitempty"`
@@ -1023,6 +1047,20 @@ field SecurityScanFinding.Title string `json:"title"`
 field SecurityScanStatus.NotEvaluatedReason string
 field SecurityScanStatus.Scan *SecurityScan
 field SecurityScanStatus.Summary map[string]any
+field SecurityScanSummary.BlockingCount int `json:"blocking-count"`
+field SecurityScanSummary.CriticalCount int `json:"critical-count"`
+field SecurityScanSummary.EnforcementLevel string `json:"enforcement-level"`
+field SecurityScanSummary.Engine string `json:"engine"`
+field SecurityScanSummary.Error *string `json:"error,omitempty"`
+field SecurityScanSummary.HighCount int `json:"high-count"`
+field SecurityScanSummary.LowCount int `json:"low-count"`
+field SecurityScanSummary.MediumCount int `json:"medium-count"`
+field SecurityScanSummary.Outcome string `json:"outcome"`
+field SecurityScanSummary.OverriddenAt *string `json:"overridden-at,omitempty"`
+field SecurityScanSummary.OverriddenBy *string `json:"overridden-by,omitempty"`
+field SecurityScanSummary.SeverityThreshold string `json:"severity-threshold"`
+field SecurityScanSummary.TotalCount int `json:"total-count"`
+field SecurityScanSummary.UnknownCount int `json:"unknown-count"`
 field StateEdge.Kind string `json:"kind"`
 field StateEdge.Source string `json:"source"`
 field StateEdge.Target string `json:"target"`
@@ -1418,6 +1456,15 @@ field Workspace.WorkingDirectory string `json:"working-directory,omitempty"`
 field WorkspaceChange.Diff map[string]any `json:"diff,omitempty"`
 field WorkspaceChange.ID string `json:"id"`
 field WorkspaceChange.Name string `json:"name"`
+field WorkspaceComplianceReport.Runs []RunComplianceReport `json:"runs"`
+field WorkspaceComplianceReport.Summary WorkspaceComplianceSummary `json:"summary"`
+field WorkspaceComplianceReport.TotalRunsEvaluated int `json:"total-runs-evaluated"`
+field WorkspaceComplianceReport.WorkspaceID string `json:"workspace-id"`
+field WorkspaceComplianceSummary.ComplianceRatePercent float64 `json:"compliance-rate-percent"`
+field WorkspaceComplianceSummary.Compliant int `json:"compliant"`
+field WorkspaceComplianceSummary.NonCompliant int `json:"non-compliant"`
+field WorkspaceComplianceSummary.Overridden int `json:"overridden"`
+field WorkspaceComplianceSummary.PendingReview int `json:"pending-review"`
 field WorkspaceCostEstimate.Currency string `json:"currency"`
 field WorkspaceCostEstimate.Diff CostRange `json:"diff"`
 field WorkspaceCostEstimate.Previous CostRange `json:"previous"`
@@ -1628,6 +1675,7 @@ method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, rol
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPolicyStatus, error)
+method (*Client) GetRunComplianceReport(ctx context.Context, runID string) (*RunComplianceReport, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
@@ -1646,6 +1694,7 @@ method (*Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) 
 method (*Client) GetVaultStatus(ctx context.Context) (*VaultStatus, error)
 method (*Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error)
 method (*Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error)
+method (*Client) GetWorkspaceComplianceReport(ctx context.Context, workspaceID string, limit int) (*WorkspaceComplianceReport, error)
 method (*Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID string) (*WorkspaceCostEstimate, error)
 method (*Client) IsWorkspaceAssignedToExecutionHook(ctx context.Context, hookID, workspaceID string) (bool, error)
 method (*Client) IsWorkspaceAssignedToVarset(ctx context.Context, varsetID, workspaceID string) (bool, error)
@@ -1917,6 +1966,8 @@ type PlanSummaryMessage struct
 type PlanSummaryRiskFactor struct
 type Policy struct
 type PolicyCheck struct
+type PolicyCheckSummary struct
+type PolicyEvaluationDetail struct
 type PolicySet struct
 type ProviderTemplate struct
 type PutInventorySettingsRequest struct
@@ -1940,6 +1991,7 @@ type RoleReachOptions struct
 type RoleReachWorkspace struct
 type Run struct
 type RunActions struct
+type RunComplianceReport struct
 type RunStatusTimestamps struct
 type RunTask struct
 type RunTrigger struct
@@ -1947,6 +1999,7 @@ type SearchWorkspacesResult struct
 type SecurityScan struct
 type SecurityScanFinding struct
 type SecurityScanStatus struct
+type SecurityScanSummary struct
 type StateEdge struct
 type StateGraph struct
 type StateGraphMeta struct
@@ -1993,6 +2046,8 @@ type WarmProviderEntry struct
 type WarmResult struct
 type Workspace struct
 type WorkspaceChange struct
+type WorkspaceComplianceReport struct
+type WorkspaceComplianceSummary struct
 type WorkspaceCostEstimate struct
 type WorkspaceFilter struct
 type WorkspaceList struct
