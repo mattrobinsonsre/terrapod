@@ -14,6 +14,7 @@ or treats live infrastructure as unmanaged.
 """
 
 import json
+import uuid
 
 import pytest
 
