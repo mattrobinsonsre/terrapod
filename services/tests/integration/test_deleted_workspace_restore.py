@@ -924,7 +924,14 @@ class TestRestorePreservesTheCloudIdentity:
         )
 
         marker = await dws.read_marker(get_storage(), old_id)
-        assert marker["settings"].pop("oidc_audiences") == self.OVERRIDE
+        # The `pop` is the setup, not the check: it is what makes this marker
+        # look like one written before the column existed. Done as a statement
+        # rather than inside the assert, because `python -O` strips asserts --
+        # the key would survive, the marker would be rewritten unchanged, and
+        # the fallback below would be asserted against a value that is still
+        # there. The test would pass while testing nothing.
+        removed = marker["settings"].pop("oidc_audiences")
+        assert removed == self.OVERRIDE, "the marker did not hold the override to remove"
         await dws.write_marker(get_storage(), old_id, marker)
 
         resp = await client.post(
