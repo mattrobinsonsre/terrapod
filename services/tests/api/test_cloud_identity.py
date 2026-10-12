@@ -187,6 +187,10 @@ async def _call(
     settings.auth.oidc_issuer = cfg or _enabled()
     captured: dict = {"all": []}
 
+    def _issuer() -> str:
+        captured["issuer_url_returned"] = issuer
+        return issuer
+
     def _sign(claims, *, ttl_seconds):
         captured["claims"] = claims
         captured["ttl"] = ttl_seconds
@@ -202,7 +206,11 @@ async def _call(
     with (
         patch("terrapod.config.settings", settings),
         patch("terrapod.auth.oidc_signing.sign_identity_token", _sign),
-        patch("terrapod.api.routers.oidc_issuer.issuer_url", return_value=issuer),
+        # Recorded rather than only patched, so a test can assert the `iss`
+        # claim equals what THIS FUNCTION returned during the call -- three
+        # values have to agree and a literal on both sides of the comparison
+        # would pass while the mint read some other source.
+        patch("terrapod.api.routers.oidc_issuer.issuer_url", side_effect=_issuer),
     ):
         resp = await router.mint_cloud_identity_tokens(
             payload=payload,
@@ -600,6 +608,54 @@ class TestTheSubjectCarriesTheWorkspaceId:
         assert captured["claims"]["sub"] == "workspace:dns-prod:phase:apply"
 
 
+class TestTheIdentifyingClaimsCannotBeDrivenFromTheREQUEST:
+    """`run_id`, `workspace` and `workspace_id` come from the server's own rows.
+
+    They are what a trust policy binds, so a request field that reached any of
+    them would let a run mint an identity for a workspace it is not. The body is
+    `extra="forbid"`, which is the structural half; these pin that it stays
+    structural and that the values come from the run and workspace the SERVER
+    resolved from the token's run id.
+    """
+
+    async def test_an_unknown_body_field_is_refused_outright(self):
+        """`extra="forbid"`, so there is no field to smuggle one in through.
+        Asserted here rather than left to the model, because relaxing it to
+        `ignore` is a one-word edit that no behavioural test would notice."""
+        import pydantic
+
+        with pytest.raises(pydantic.ValidationError):
+            router.CloudIdentityMintRequest(providers=["aws"], workspace_id="ws-evil")
+
+    async def test_the_model_forbids_extras_by_configuration(self):
+        assert router.CloudIdentityMintRequest.model_config["extra"] == "forbid"
+
+    async def test_the_claims_come_from_the_SERVER_rows(self):
+        """Not from anything the caller sent. The runner names only providers and
+        a discovery outcome; the identifying claims are read off the run the
+        token is scoped to and the workspace that run belongs to."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, name="finance-prod")
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        claims = captured["claims"]
+        assert claims["workspace"] == "finance-prod"
+        assert claims["workspace_id"] == str(ws.id)
+        assert claims["run_id"] == str(run.id)
+
+    async def test_the_run_id_claim_is_the_RESOLVED_run_not_the_token_string(self):
+        """The token carries a bare uuid and the path may carry `run-<uuid>`;
+        both are normalised before the scope check. So the claim has to be the
+        resolved run's own id, or a `run-` prefixed caller would get a `run_id`
+        claim no cloud audit log could match back to a Terrapod run."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        _, captured = await _call(
+            _user(run_id=f"run-{run.id}", phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["run_id"] == str(run.id)
+        assert not captured["claims"]["run_id"].startswith("run-")
+
+
 class TestThePhaseComesFromTheToken:
     """The security property. A request body cannot influence it, because there
     is no request body — and the claim is built from `user.run_phase`, which is
@@ -658,7 +714,13 @@ class TestTheClaimSet:
         )
         claims = captured["claims"]
 
-        assert claims["iss"] == "https://terrapod.example.com"
+        # Against `issuer_url()`'s own answer, not a literal: three values have
+        # to agree (this claim, the discovery document's `issuer`, its
+        # `jwks_uri`) and a hardcoded string here would pass while the mint read
+        # a different source. Read from the module the mint imports it from --
+        # the import is function-local, so that attribute is what it resolves at
+        # call time, and it is the one `_call` patches.
+        assert claims["iss"] == captured["issuer_url_returned"]
         assert claims["aud"] == [AWS]
         assert claims["workspace"] == "dns-prod"
         assert claims["workspace_id"] == str(ws.id)
@@ -687,15 +749,44 @@ class TestTheClaimSet:
 
 
 class TestTheAuthBoundary:
-    async def test_a_session_user_is_refused(self):
+    @pytest.mark.parametrize("method", ["session", "api_token"])
+    async def test_every_non_runner_auth_method_is_refused(self, method):
         """Runner protocol only. A person has no business minting a run's cloud
-        identity, and `require_runner_for_run` is what says so."""
+        identity, and `require_runner_for_run` is what says so -- it compares
+        `auth_method` to the single literal `runner_token`, so EVERY other method
+        has to be refused rather than only the one a test happened to pick.
+
+        `api_token` is the one that matters, and it was untested. A session is a
+        person at a browser; an API token is automation, which is exactly the
+        shape of caller that would plausibly try this -- and it is the long-lived
+        credential, where a session expires in twelve hours.
+        """
         from fastapi import HTTPException
 
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
         with pytest.raises(HTTPException) as exc:
-            await _call(_user(method="session"), run, ws, target="aws", cfg=cfg)
+            await _call(_user(method=method), run, ws, target="aws", cfg=cfg)
         assert exc.value.status_code == 403
+        assert "Runner token required" in exc.value.detail
+
+    async def test_an_api_token_SCOPED_TO_THE_RUN_is_still_refused(self):
+        """The subtler half: refusal is on the METHOD, not on whether the caller
+        named the right run. An API token that somehow carried a matching
+        `run_id` must not pass -- otherwise a caller who can read a run id can
+        mint its cloud identity."""
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(method="api_token", run_id=str(run.id), phase="apply"),
+                run,
+                ws,
+                target="aws",
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 403
+        assert "Runner token required" in exc.value.detail
 
     async def test_a_runner_token_for_a_different_run_is_refused(self):
         """A leaked token from run A must not mint an identity for run B — which
