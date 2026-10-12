@@ -252,13 +252,11 @@ data "aws_instance" "app" {
 }
 
 resource "terrapod_inventory_group" "app" {
-  workspace_id = var.workspace_id
-  name         = "app"
+  name = "app"
 }
 
 resource "terrapod_inventory_host" "app" {
-  for_each     = data.aws_instance.app
-  workspace_id = var.workspace_id
+  for_each = data.aws_instance.app
 
   # The inventory hostname is unique per workspace, and a fleet selected by a
   # shared tag shares its `Name` tag -- so the tag cannot be the identity.
@@ -278,6 +276,15 @@ resource "terrapod_inventory_host_group" "app" {
   group_id = terrapod_inventory_group.app.id
 }
 ```
+
+**Neither resource names a workspace**, and that is not an omission. Inside a run
+Terrapod exports `TERRAPOD_WORKSPACE` from the run's own workspace — in both the
+plan and the apply phase, because the provider reads inventory in one and writes
+it in the other — so `provider "terrapod" {}` with nothing in it is enough and
+`workspace_id` defaults to the workspace the configuration belongs to. Set it
+explicitly only to point a resource at a *different* workspace, or when applying
+locally, where there is no run to export it. The provider's `workspace`
+attribute does the same job for a whole configuration.
 
 That workspace creates nothing, changes nothing, and adopts nothing into the
 configuration's management. It is ansible targeting over an existing fleet of
@@ -316,9 +323,8 @@ resource "aws_instance" "web" {
 }
 
 resource "terrapod_inventory_host" "web" {
-  for_each     = aws_instance.web
-  workspace_id = var.workspace_id
-  name         = each.key
+  for_each = aws_instance.web
+  name     = each.key
 }
 
 resource "terrapod_inventory_host_var" "web_address" {

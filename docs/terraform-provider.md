@@ -130,6 +130,7 @@ Configuration attributes (all also settable via environment variables):
 | `hostname` | `TERRAPOD_HOSTNAME` | The Terrapod instance hostname (e.g. `terrapod.example.com`). |
 | `token` | `TERRAPOD_TOKEN` | API token. Prefer `terraform login <host>` (writes `~/.terraform.d/credentials.tfrc.json`) or the env var over hard-coding it. |
 | `skip_tls_verify` | — | Skip TLS verification (local/dev only). |
+| `workspace` | `TERRAPOD_WORKSPACE` | The workspace a resource uses when its own `workspace_id` is not set. **A Terrapod run exports this from its own workspace, in both the plan and the apply phase** — so inside a run `provider "terrapod" {}` needs nothing and the inventory resources need no workspace id. Supply it for a local apply, where there is no run to export it. |
 
 ### 2. Declare Terrapod objects
 
