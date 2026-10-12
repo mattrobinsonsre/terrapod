@@ -27,6 +27,16 @@ import (
 //
 // The subject is DERIVED from the provider's own schemas rather than listed, so
 // a resource added later is in scope without anyone remembering to add it here.
+//
+// WHAT IT DELIBERATELY DOES NOT COVER, so nobody "fixes the inconsistency" later:
+// an attribute that names a ROLE in a relationship between two workspaces rather
+// than the resource's own workspace. terrapod_run_trigger.source_workspace_id is
+// one (defaulting it to self declares a workspace that triggers itself), and
+// terrapod_remote_state_consumer's producer_workspace_id/consumer_workspace_id are
+// the sharper case: the resource IS the grant, so neither end is "mine", and a
+// guess is wrong in a security-relevant direction -- defaulting the producer when
+// the author meant the consumer grants read of this workspace's state instead of
+// requesting read of another's. Both stay required on purpose.
 
 // wiredByHand is for a surface that carries a workspace_id it must NOT default.
 // An entry needs a reason, because the whole point of deriving the subject is

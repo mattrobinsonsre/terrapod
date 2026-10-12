@@ -138,9 +138,13 @@ The default applies to **every** resource and data source that takes a workspace
 the workspace-scoped data sources. A value you set always wins, which is how a
 configuration declares into a *different* workspace from the one its run belongs to.
 
-One deliberate exception: `terrapod_run_trigger.source_workspace_id` stays required.
-It names the *other* workspace in the relationship, and defaulting it to the run's own
-would declare a workspace that triggers itself.
+Attributes that name a **role** in a relationship between two workspaces stay
+required, because neither end is "this resource's workspace":
+`terrapod_run_trigger.source_workspace_id` (defaulting it to the run's own would
+declare a workspace that triggers itself), and `terrapod_remote_state_consumer`'s
+`producer_workspace_id` / `consumer_workspace_id` — that resource *is* the grant, so
+a guess would be wrong in a direction that matters: defaulting the producer when you
+meant the consumer grants read of your state rather than requesting read of theirs.
 
 With no workspace from any source — no attribute, no provider `workspace`, no env var
 — a plan fails naming all three, rather than applying an empty id against the server.
