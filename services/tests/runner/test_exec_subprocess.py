@@ -441,3 +441,82 @@ class TestTheLogStreamRedactsRegisteredSecrets:
         exec_subprocess.register_secret(self.TOKEN)
         exec_subprocess.register_secret(self.TOKEN)
         assert len(exec_subprocess._SECRETS) == 1
+
+
+class TestTheHeldBackTailIsBoundedInTimeAsWellAsBytes:
+    """`_split_tail`: a slow stream must not go silent for minutes (#2051).
+
+    Holding back `longest secret - 1` BYTES is what makes a straddling secret
+    impossible, and on its own it is badly behaved in time. `bufsize=0` makes a
+    read one syscall returning whatever is available -- typically one line --
+    so with an ~850-byte identity token a `tofu apply` emitting one short
+    "Still creating..." line every ten seconds would hold back seventeen lines,
+    nearly three minutes of silence. That is the log someone watches to see
+    where a slow apply is stuck, and it is every run in the cloud-identity
+    cohort.
+    """
+
+    OVERLAP = 849  # a realistic token length minus one
+
+    def test_a_slow_line_stream_emits_each_line_as_it_arrives(self):
+        """The regression this exists for. Byte-bounded, these lines are held."""
+        line = b"aws_db_instance.x: Still creating... [10s elapsed]\n"
+        send, carry = exec_subprocess._split_tail(line, overlap=self.OVERLAP, line_safe=True)
+        assert send == line, "a complete line must go out, not wait for 849 bytes"
+        assert carry == b""
+
+    def test_byte_bounded_the_same_line_is_held(self):
+        """The contrast, so the test above is not passing for some other
+        reason: with a newline-bearing secret registered there is no safe cut
+        and the line is correctly held back."""
+        line = b"aws_db_instance.x: Still creating... [10s elapsed]\n"
+        send, carry = exec_subprocess._split_tail(line, overlap=self.OVERLAP, line_safe=False)
+        assert send == b""
+        assert carry == line
+
+    def test_a_partial_line_is_still_held(self):
+        """Cutting at the newline must not emit an incomplete trailing line --
+        a secret could still be forming in it."""
+        send, carry = exec_subprocess._split_tail(
+            b"done\npartial-", overlap=self.OVERLAP, line_safe=True
+        )
+        assert send == b"done\n"
+        assert carry == b"partial-"
+
+    def test_a_single_line_longer_than_the_overlap_still_respects_the_byte_bound(self):
+        """A stream with no newlines at all -- or one very long line -- must not
+        grow the carry without limit, and must still hold back enough that a
+        secret cannot straddle."""
+        buf = b"x" * (self.OVERLAP + 100)
+        send, carry = exec_subprocess._split_tail(buf, overlap=self.OVERLAP, line_safe=True)
+        assert len(carry) == self.OVERLAP
+        assert send == buf[:100]
+
+    def test_nothing_registered_emits_everything(self):
+        """`overlap` is 0 when no secret is registered, so the bytes go straight
+        through -- the property that makes an unaffected deployment pay
+        nothing."""
+        buf = b"no newline here"
+        send, carry = exec_subprocess._split_tail(buf, overlap=0, line_safe=True)
+        assert send == buf
+        assert carry == b""
+
+    def test_the_split_never_loses_or_duplicates_a_byte(self):
+        """The invariant the whole loop depends on. Checked across both modes
+        and several shapes, because a flush that drops the tail loses the end
+        of the log -- where a provider's last error prints."""
+        for buf in (
+            b"",
+            b"\n",
+            b"a",
+            b"a\nb",
+            b"x" * 5000,
+            b"line\n" * 300,
+            b"head\n" + b"y" * 2000,
+        ):
+            for line_safe in (True, False):
+                for overlap in (0, 1, self.OVERLAP):
+                    send, carry = exec_subprocess._split_tail(
+                        buf, overlap=overlap, line_safe=line_safe
+                    )
+                    assert send + carry == buf, (buf[:20], line_safe, overlap)

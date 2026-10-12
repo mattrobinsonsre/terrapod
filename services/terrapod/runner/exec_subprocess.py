@@ -155,6 +155,7 @@ def _install_handler(state: _SignalState) -> None:
 #: coordinate.
 _SECRETS: set[bytes] = set()
 
+
 #: Below this, a value is SKIPPED rather than registered. A short string would
 #: match ordinary output and mangle the log, which is a worse failure than the
 #: leak it would prevent.
@@ -166,6 +167,39 @@ _SECRETS: set[bytes] = set()
 #: function, which is the one thing it must not do. Nothing of value is lost by
 #: skipping, because a value this short cannot be a JWT and so is not the
 #: credential this exists to hide.
+def _split_tail(buf: bytes, *, overlap: int, line_safe: bool) -> tuple[bytes, bytes]:
+    """Split already-redacted bytes into (emit now, hold back).
+
+    A secret can STRADDLE two reads, so something must be held back or a
+    per-chunk replace misses exactly that case -- silently, while looking as
+    though it worked. `overlap` is `longest secret - 1`, which makes the
+    straddle impossible because any occurrence is then whole within some
+    `carry + chunk`.
+
+    Holding back that many BYTES is correct and, on its own, badly behaved in
+    TIME. `bufsize=0` makes a read one syscall returning whatever is available
+    -- typically a single line -- so with an ~850-byte token a stream emitting
+    one short line every ten seconds would sit silent for nearly three minutes.
+    The log of a slow apply is exactly what someone watches to see where it is
+    stuck.
+
+    So when no registered secret contains a newline (`line_safe`, checked by
+    the caller rather than assumed), the split goes at the last newline: a
+    secret with no newline cannot span one, so every occurrence in the emitted
+    region is whole within it. The byte bound still applies to whatever is left,
+    which covers both a newline-bearing secret and a single line longer than
+    the longest secret.
+    """
+    cut = 0
+    if line_safe:
+        cut = buf.rfind(b"\n") + 1
+    if len(buf) - cut > overlap:
+        cut = len(buf) - overlap
+    if cut <= 0:
+        return b"", buf
+    return buf[:cut], buf[cut:]
+
+
 _MIN_SECRET_LEN = 24
 
 _REDACTED = b"[redacted: cloud identity token]"
@@ -272,12 +306,27 @@ def run(
         # what makes the straddle impossible, because any occurrence is then whole
         # within some `carry + chunk`.
         #
-        # The cost is that the live stream lags by under a kilobyte while a secret
-        # is registered; the flush after the loop means nothing is lost. With no
-        # secrets registered -- every run on a deployment not using per-workspace
-        # cloud identity -- `overlap` is 0 and the bytes are emitted exactly as
-        # before, unexamined.
+        # The byte cost is under a kilobyte, but bytes are the wrong unit: with
+        # `bufsize=0` a `read()` is one syscall returning whatever is available,
+        # typically a single line. A terrapod identity token is ~850 bytes, so a
+        # `tofu apply` emitting one ~50-byte "Still creating..." line every ten
+        # seconds would hold back seventeen lines -- nearly three minutes of
+        # silence -- and an operator watching a run, or trying to see where a
+        # hung apply is stuck, sees a frozen log. That is every run in the
+        # cloud-identity cohort, which is the cohort this exists for.
+        #
+        # So the tail is cut at the last NEWLINE when it can be: no registered
+        # secret contains one (`_newline_free` checks rather than assumes), and
+        # a secret with no newline cannot span one, so every occurrence in the
+        # emitted region is whole within it. The byte overlap stays as the
+        # fallback for a newline-bearing secret and as the bound on a single
+        # very long line, so the straddle remains impossible either way.
+        #
+        # With no secrets registered -- every run on a deployment not using
+        # per-workspace cloud identity -- `overlap` is 0 and the bytes are
+        # emitted exactly as before, unexamined.
         overlap = max((len(s) for s in _SECRETS), default=1) - 1
+        line_safe = all(b"\n" not in s for s in _SECRETS)
         carry = b""
 
         # Read child output a chunk at a time. Larger chunks reduce
@@ -290,11 +339,9 @@ def run(
                 _emit(chunk)
                 continue
             buf = _redact(carry + chunk)
-            if len(buf) > overlap:
-                _emit(buf[: len(buf) - overlap])
-                carry = buf[len(buf) - overlap :]
-            else:
-                carry = buf
+            send, carry = _split_tail(buf, overlap=overlap, line_safe=line_safe)
+            if send:
+                _emit(send)
         if carry:
             # Emitted as-is, and NOT re-redacted: `carry` is only ever a slice of
             # `_redact(carry + chunk)`, so every byte in it has already been
