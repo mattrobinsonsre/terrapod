@@ -120,6 +120,85 @@ def _install_handler(state: _SignalState) -> None:
     signal.signal(signal.SIGQUIT, handler)
 
 
+#: Values this run holds that must never appear in its log stream.
+#:
+#: **This is the one place redaction is the right tool, and it is worth saying why,
+#: because the house rule is the opposite.** `git_auth` states it: "the runner
+#: streams stdout/stderr verbatim, so the guarantee is mechanism, not redaction" --
+#: credentials live in 0600 files read out-of-band, never in an argv or on stdout.
+#: That holds for every secret the runner controls, and it is a better guarantee
+#: than scrubbing.
+#:
+#: A cloud identity token is the exception, because we hand it to third-party code
+#: ON PURPOSE. The token is in a 0600 file and scrubbed from the engine's
+#: environment, so nothing on our side prints it -- and then the provider reads the
+#: file and puts it in its OWN output. Measured: terraform-provider-aws logs the
+#: STS `AssumeRoleWithWebIdentity` request body, which carries
+#: `WebIdentityToken=<the whole JWT>`, at `TF_LOG=DEBUG` and above. Its only body
+#: redaction masks AWS access keys and a run of exactly 40 base64 characters, and a
+#: base64url JWT matches neither. (azurerm, google and vault do not; see #2047.)
+#:
+#: No mechanism of ours can prevent that, so the token is live in the run log for
+#: `token_ttl_seconds` and readable by anyone with workspace read.
+#:
+#: **Exact values, never a JWT-shaped pattern.** The runner knows the literal
+#: strings -- it wrote them -- so this cannot false-positive on a plan that
+#: legitimately contains a JWT (a Kubernetes Secret, an OIDC config resource), and
+#: it cannot miss the token it was handed. A shape regex would be wrong in both
+#: directions.
+#:
+#: A module global rather than a parameter threaded through `init_phase` and
+#: `plan_apply`, which have no other interest in it: a runner Job is one
+#: single-purpose process, and "the secrets this run holds" is genuinely
+#: process-wide. Not the in-process state AGENTS.md rule 11 forbids -- that is
+#: about coordination between API replicas, and there is nothing here to
+#: coordinate.
+_SECRETS: set[bytes] = set()
+
+#: Below this, a value is SKIPPED rather than registered. A short string would
+#: match ordinary output and mangle the log, which is a worse failure than the
+#: leak it would prevent.
+#:
+#: Skipped and warned rather than raised, which it was first. Raising put the
+#: power to FAIL A RUN in a log-hygiene mechanism: the only caller hands over
+#: whatever the API returned, so a short or malformed token would have aborted a
+#: run that was otherwise fine -- a security measure breaking legitimate
+#: function, which is the one thing it must not do. Nothing of value is lost by
+#: skipping, because a value this short cannot be a JWT and so is not the
+#: credential this exists to hide.
+_MIN_SECRET_LEN = 24
+
+_REDACTED = b"[redacted: cloud identity token]"
+
+
+def register_secret(value: str) -> bool:
+    """Register a value to strip from the child's log stream. Idempotent.
+
+    Returns whether it was registered. Best-effort by construction: see
+    `_MIN_SECRET_LEN` for why a short value is skipped rather than refused.
+    """
+    if not value or len(value) < _MIN_SECRET_LEN:
+        logger.warning(
+            "not registering a redaction value below the minimum length; it would "
+            "match ordinary output and mangle the log",
+            length=len(value or ""),
+            minimum=_MIN_SECRET_LEN,
+        )
+        return False
+    _SECRETS.add(value.encode())
+    return True
+
+
+def _reset_secrets_for_tests() -> None:
+    _SECRETS.clear()
+
+
+def _redact(buf: bytes) -> bytes:
+    for secret in _SECRETS:
+        buf = buf.replace(secret, _REDACTED)
+    return buf
+
+
 def run(
     argv: list[str],
     *,
@@ -176,20 +255,55 @@ def run(
 
     try:
         assert proc.stdout is not None
+
+        def _emit(data: bytes) -> None:
+            if log_fh is not None:
+                log_fh.write(data)
+            if tee_to_stdout:
+                try:
+                    sys.stdout.buffer.write(data)
+                    sys.stdout.buffer.flush()
+                except (BrokenPipeError, OSError):
+                    pass
+
+        # How much of the tail to hold back between reads. A secret can STRADDLE a
+        # chunk boundary, and a per-chunk replace would miss exactly that case --
+        # silently, and look like it worked. Holding back `longest - 1` bytes is
+        # what makes the straddle impossible, because any occurrence is then whole
+        # within some `carry + chunk`.
+        #
+        # The cost is that the live stream lags by under a kilobyte while a secret
+        # is registered; the flush after the loop means nothing is lost. With no
+        # secrets registered -- every run on a deployment not using per-workspace
+        # cloud identity -- `overlap` is 0 and the bytes are emitted exactly as
+        # before, unexamined.
+        overlap = max((len(s) for s in _SECRETS), default=1) - 1
+        carry = b""
+
         # Read child output a chunk at a time. Larger chunks reduce
         # syscall overhead vs. readline().
         while True:
             chunk = proc.stdout.read(4096)
             if not chunk:
                 break
-            if log_fh is not None:
-                log_fh.write(chunk)
-            if tee_to_stdout:
-                try:
-                    sys.stdout.buffer.write(chunk)
-                    sys.stdout.buffer.flush()
-                except (BrokenPipeError, OSError):
-                    pass
+            if not _SECRETS:
+                _emit(chunk)
+                continue
+            buf = _redact(carry + chunk)
+            if len(buf) > overlap:
+                _emit(buf[: len(buf) - overlap])
+                carry = buf[len(buf) - overlap :]
+            else:
+                carry = buf
+        if carry:
+            # Emitted as-is, and NOT re-redacted: `carry` is only ever a slice of
+            # `_redact(carry + chunk)`, so every byte in it has already been
+            # through the redactor and a second pass provably cannot find
+            # anything. A `_redact` here would be a guard whose only evidence of
+            # working is this comment -- which is the shape worth deleting. What
+            # IS load-bearing is the flush itself: without it the held-back tail
+            # is dropped and the end of the log disappears.
+            _emit(carry)
     finally:
         if log_fh is not None:
             log_fh.close()
