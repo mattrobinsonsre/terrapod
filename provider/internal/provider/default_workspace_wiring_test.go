@@ -139,3 +139,54 @@ func TestEverySurfaceTakingAWorkspaceIDDefaultsIt(t *testing.T) {
 	}
 	t.Logf("checked %d surfaces: %s", len(names), fmt.Sprint(strings.Join(names, ", ")))
 }
+
+// Where a resource calls BOTH plan modifiers, DefaultWorkspaceID must come
+// first. KeepComputedWhenUnchanged treats an unknown planned value as a change,
+// so a workspace_id still unknown by the time it runs makes a no-change re-plan
+// look like an update and the carried computed attributes go unknown for ever --
+// the #1619 shape, which this project has already shipped once.
+//
+// planmods pins that the ORDER matters (swap the two calls and its test fails
+// with that diagnostic). This pins that every call site actually has it, which
+// no behavioural test can see: a positional defect needs a positional gate.
+func TestTheWorkspaceDefaultRunsBeforeKeepComputed(t *testing.T) {
+	roots := []string{
+		filepath.Join("..", "resources"),
+		filepath.Join("..", "datasources"),
+	}
+	checked := 0
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") {
+				return err
+			}
+			raw, rerr := os.ReadFile(path)
+			if rerr != nil {
+				return rerr
+			}
+			src := string(raw)
+			iDefault := strings.Index(src, "planmods.DefaultWorkspaceID(")
+			iKeep := strings.Index(src, "planmods.KeepComputedWhenUnchanged(")
+			if iDefault < 0 || iKeep < 0 {
+				return nil // not a both-helpers file
+			}
+			checked++
+			if iDefault > iKeep {
+				t.Errorf("%s calls KeepComputedWhenUnchanged before DefaultWorkspaceID; "+
+					"a workspace_id still unknown at that point makes every no-change "+
+					"re-plan show an update that never converges (#1619)", path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walking %s: %v", root, err)
+		}
+	}
+	// Five at the time of writing (terrapod_variable and the four inventory
+	// resources that carry a workspace_id). A floor, so a renamed helper fails
+	// here rather than matching nothing and passing.
+	if checked < 5 {
+		t.Fatalf("found only %d call sites using both modifiers; the derivation has broken", checked)
+	}
+	t.Logf("checked %d call sites that use both modifiers", checked)
+}

@@ -136,3 +136,63 @@ func TestAResourceWithoutTheAttributeIsNotOurBusiness(t *testing.T) {
 		t.Fatalf("a resource without workspace_id must be ignored: %v", resp.Diagnostics)
 	}
 }
+
+// The two helpers compose, and the order matters. KeepComputedWhenUnchanged
+// treats an unknown planned value as a change ("An unknown planned value is
+// never Equal to a known one"), so a workspace_id still unknown by the time it
+// runs makes a no-change re-plan look like an update and the carried computed
+// attributes go unknown for ever -- the #1619 shape, which this project has
+// already shipped once.
+//
+// terrapod_variable runs DefaultWorkspaceID first for exactly this reason. This
+// drives the same pair in the same order over a no-change re-plan.
+func TestTheDefaultRunsBeforeKeepComputedOrTheReplanNeverConverges(t *testing.T) {
+	s := schema.Schema{Attributes: map[string]schema.Attribute{
+		"workspace_id": schema.StringAttribute{Optional: true, Computed: true},
+		"key":          schema.StringAttribute{Required: true},
+		"updated_at":   schema.StringAttribute{Computed: true},
+	}}
+	obj := tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+		"workspace_id": tftypes.String,
+		"key":          tftypes.String,
+		"updated_at":   tftypes.String,
+	}}
+	mk := func(ws, updated tftypes.Value) tftypes.Value {
+		return tftypes.NewValue(obj, map[string]tftypes.Value{
+			"workspace_id": ws,
+			"key":          tftypes.NewValue(tftypes.String, "DB_HOST"),
+			"updated_at":   updated,
+		})
+	}
+	// State holds the real values; the plan arrives with workspace_id unknown
+	// (config omits it) and updated_at unknown (computed).
+	state := tfsdk.State{Schema: s, Raw: mk(
+		tftypes.NewValue(tftypes.String, "ws-default"),
+		tftypes.NewValue(tftypes.String, "2026-10-12T00:00:00Z"))}
+	plan := tfsdk.Plan{Schema: s, Raw: mk(
+		tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+		tftypes.NewValue(tftypes.String, tftypes.UnknownValue))}
+
+	req := resource.ModifyPlanRequest{Plan: plan, State: state}
+	resp := resource.ModifyPlanResponse{Plan: plan}
+
+	ctx := context.Background()
+	DefaultWorkspaceID(ctx, req, &resp, "ws-default")
+	KeepComputedWhenUnchanged(ctx, req, &resp, []string{"workspace_id", "key"}, []string{"updated_at"})
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected error: %v", resp.Diagnostics)
+	}
+	var updated types.String
+	if d := resp.Plan.GetAttribute(ctx, path.Root("updated_at"), &updated); d.HasError() {
+		t.Fatalf("reading updated_at: %v", d)
+	}
+	if updated.IsUnknown() {
+		t.Fatal("updated_at stayed unknown on a no-change re-plan: the default did not " +
+			"reach KeepComputedWhenUnchanged, so every plan will show an update that " +
+			"never converges (#1619)")
+	}
+	if got := updated.ValueString(); got != "2026-10-12T00:00:00Z" {
+		t.Errorf("updated_at should have been carried from state, got %q", got)
+	}
+}
