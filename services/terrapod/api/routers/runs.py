@@ -113,6 +113,44 @@ _CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "a
 #: listener claims when it asks for a runner token -- see `create_runner_token`.
 _APPLY_PHASE_STATES = frozenset({"confirmed", "applying"})
 
+#: The `(current, target)` transitions a LISTENER may report.
+#:
+#: The listener PATCH took a free `status` from the body and handed anything but
+#: an apply-capable `planned` to the generic `transition_run` -- where
+#: `planned -> confirmed` is a perfectly valid transition. So whoever held a
+#: listener certificate could confirm its pool's planned runs, which skips the
+#: `run:apply` capability check, the human confirmation itself, the staleness and
+#: plan-expiry guards, the cloud-identity staleness check, the
+#: CLI-config-version-on-a-VCS-workspace block and the mergeability gate. The
+#: post-plan gates still held, because a held run stays in `planning`.
+#:
+#: **Keyed on the PAIR, not on the target.** `confirmed` is the whole
+#: vulnerability from `planned` and is the legitimate apply-phase UNCLAIM from
+#: `applying` -- the twin of `planning -> queued`, undoing a claim the API could
+#: not serve. A target-only rule either reopens the bypass or breaks the unclaim,
+#: and the unclaim failing means a run the API could not serve is stuck rather
+#: than returned to the pool.
+#:
+#: Everything here is a listener REPORTING an outcome it observed. A user act --
+#: confirming, discarding, cancelling -- is deliberately absent, including
+#: `planning -> discarded`, which exists for a human discarding a run held at a
+#: post-plan gate rather than for anything a runner saw.
+_LISTENER_REPORTABLE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("planning", "planned"),
+        ("planning", "errored"),
+        ("planning", "queued"),  # the plan-phase unclaim
+        ("applying", "applied"),
+        ("applying", "errored"),
+        ("applying", "confirmed"),  # the apply-phase unclaim, NOT the bypass
+        # The `canceling` outcomes. A user asked for the cancel; the listener
+        # reports which terminal the Job actually reached.
+        ("canceling", "canceled"),
+        ("canceling", "applied"),
+        ("canceling", "errored"),
+    }
+)
+
 
 def _rfc3339(dt) -> str:
     if dt is None:
@@ -608,26 +646,17 @@ async def create_run(
     # always setting the run's `plan-only` attribute. Without honoring the CV
     # flag, a CLI `plan` on a VCS-connected workspace is mis-read as an apply
     # and rejected by the guard below (#661).
-    if cv_uuid is not None:
-        from terrapod.db.models import ConfigurationVersion
-
-        _spec_cv = await db.get(ConfigurationVersion, cv_uuid)
-        if _spec_cv is not None and _spec_cv.speculative:
-            if save_plan:
-                # The forcing below would silently turn the saved plan into a
-                # plan-only run — the same swallowed contradiction as above,
-                # arriving by a different door.
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="A saved-plan run cannot use a speculative configuration "
-                    "version: speculative configurations are plan-only, so the saved "
-                    "plan could never be applied.",
-                )
-            plan_only = True
     # Config-managed guardrail (#535): a catalog-managed workspace runs only the
     # wrapper config the catalog generated for it. A run that pins a different
     # configuration version would diverge it from its catalog item — reject.
     # CV-less re-runs (re-plan/re-apply of the generated config) stay allowed.
+    #
+    # BEFORE the configuration-version lookup below, deliberately. Such a
+    # workspace may pin NO configuration version, so whose it is cannot matter,
+    # and this is the answer that tells the operator what to do -- where the
+    # ownership 404 would not. It also means a 404 and a 409 cannot be compared
+    # to learn whether a given id exists in this workspace, by a caller who may
+    # not pin one anyway. And it refuses without a database read.
     if ws.catalog_item_id is not None and has_cv:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -636,6 +665,42 @@ async def create_run(
                 "custom configuration version. Manage it through the catalog."
             ),
         )
+    if cv_uuid is not None:
+        from terrapod.db.models import ConfigurationVersion
+
+        _cv = await db.get(ConfigurationVersion, cv_uuid)
+        # The configuration version must belong to THIS workspace (#2049).
+        #
+        # Run creation took the relationship on trust, so a run could be created
+        # pinning another workspace's configuration version -- or one that does
+        # not exist at all, leaving `configuration_version_id` pointing at
+        # nothing. Not exploitable today, because the archive key is built from
+        # `run.workspace_id` rather than from the CV, so a foreign id simply does
+        # not resolve. It is one refactor away from executing another workspace's
+        # code under this workspace's identity, and since per-workspace cloud
+        # identity that means under its cloud credentials.
+        #
+        # 404 for both cases rather than 422 for the mismatch: a caller who may
+        # not read the other workspace should not learn from the status code that
+        # the id exists.
+        if _cv is None or _cv.workspace_id != ws.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Configuration version not found for this workspace",
+            )
+        if _cv.speculative:
+            if save_plan:
+                # The forcing below would silently turn the saved plan into a
+                # plan-only run -- the same swallowed contradiction as the
+                # explicit `save-plan` + `plan-only` pair above, arriving by a
+                # different door (#1903).
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="A saved-plan run cannot use a speculative configuration "
+                    "version: speculative configurations are plan-only, so the saved "
+                    "plan could never be applied.",
+                )
+            plan_only = True
     if ws.execution_mode == "agent" and ws.vcs_connection_id is not None and has_cv:
         if save_plan:
             # Refused for the same reason every CLI apply is refused here —
@@ -2736,6 +2801,33 @@ async def update_run_status(
     if not target_status:
         raise HTTPException(status_code=422, detail="status is required")
 
+    # A listener reports outcomes; it does not decide them. Checked on the
+    # `(current, target)` pair -- see `_LISTENER_REPORTABLE` for why a
+    # target-only rule cannot express this.
+    #
+    # Gated on the status actually CHANGING, so a retry is untouched: the
+    # listener retries with bounded backoff, `_complete_plan` is idempotent and
+    # returns early once the run has left `planning`, and a same-status report
+    # must keep answering as it does today rather than becoming a 403 the
+    # listener reads as a failure of work that succeeded.
+    if target_status != run.status and (run.status, target_status) not in _LISTENER_REPORTABLE:
+        logger.warning(
+            "listener attempted a transition it may not report",
+            run_id=str(run.id),
+            listener_id=listener_id,
+            current=run.status,
+            requested=target_status,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"A listener may not move a run from {run.status!r} to "
+                f"{target_status!r}. A listener reports what its Job did; "
+                f"confirming, discarding and cancelling a run are not outcomes it "
+                f"can observe."
+            ),
+        )
+
     # Listener is reporting a pre-launch failure if it's transitioning a run
     # from planning/applying → errored while job_name is still NULL (no Job
     # was ever created). Surface that in metrics so we can alert on bursts of
@@ -2796,7 +2888,14 @@ async def create_runner_token(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(default={}),
-    listener: object = Depends(get_listener_identity),
+    # `identity: ListenerIdentity`, matching every sibling listener endpoint.
+    # It was `listener: object`, and the weak type is why the missing check was
+    # invisible: typed as `object` the parameter reads as an opaque handle with
+    # nothing to read off it, so nobody noticed `.listener_id` was never
+    # compared to the path. Typed properly, this endpoint is now
+    # indistinguishable from its siblings -- which matters because the next
+    # listener endpoint will be written by copying one of them.
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Generate a short-lived runner token for a run.
@@ -2823,13 +2922,53 @@ async def create_runner_token(
 
     run = await _get_run(run_id, db)
 
-    # Verify this listener owns the run
     l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
+
+    # The caller's CERTIFICATE must name the listener in the path. Every sibling
+    # listener endpoint carries this -- `/runs/next`, the status PATCH,
+    # job-launched, job-status, log-stream and the agent-pool listener routes --
+    # and this one resolved the certificate through `get_listener_identity` and
+    # then let it go unread, checking only `run.listener_id` against a path
+    # segment the caller chooses.
+    #
+    # So any holder of a valid listener certificate from ANY pool could name
+    # another pool's listener and one of its runs and be handed a runner token
+    # for it. That already broke the pool tenancy boundary -- a runner token
+    # reads and writes the run's artifacts and state -- and since per-workspace
+    # cloud identity it is a route to the target workspace's federated identity
+    # with the real `workspace`, `workspace_id` and `phase` claims, which no
+    # cloud-side trust policy can tell from a legitimate one. Compromise of a
+    # low-trust pool therefore reached the apply-phase cloud identity of
+    # workspaces on a high-trust pool.
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
     config = load_runner_config()
     requested_ttl = body.get("ttl", config.token_ttl_seconds)
+    # Validated here because this is the request boundary and 422 is the answer.
+    #
+    # Unvalidated, a non-integer reached `ttl > max_ttl` inside
+    # `generate_runner_token` and answered 500 on a TypeError, and a negative
+    # value sailed past that same comparison to mint an already-expired token --
+    # which fails the run with an authentication error rather than a cause.
+    #
+    # `bool` is excluded explicitly: it is a subclass of `int`, so `ttl: true`
+    # would otherwise pass an isinstance check and mint a one-second token.
+    if isinstance(requested_ttl, bool) or not isinstance(requested_ttl, int):
+        raise HTTPException(
+            status_code=422,
+            detail=f"ttl must be an integer number of seconds, got {type(requested_ttl).__name__}",
+        )
+    if requested_ttl < 1:
+        raise HTTPException(
+            status_code=422,
+            detail=f"ttl must be at least 1 second, got {requested_ttl}",
+        )
     requested_phase = body.get("phase")
     phase = requested_phase if requested_phase in RUNNER_PHASES else None
 
@@ -2853,6 +2992,63 @@ async def create_runner_token(
             run_status=run.status,
         )
         phase = "plan"
+
+    # `require_phase` closes the unphased form off entirely (#2041). Refused HERE
+    # as well as at the mint, and this is the better of the two places: the
+    # listener sees the error and the run fails with a cause, where a refusal at
+    # the mint surfaces as the credential phase failing for a reason the listener
+    # never saw. Off by default -- a lagging listener must keep working across an
+    # upgrade -- and the default in 2.0.
+    from terrapod.config import settings as _settings
+
+    if phase is None and _settings.auth.oidc_issuer.require_phase:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "auth.oidc_issuer.require_phase is set, so a runner token must name "
+                "a phase. This listener sent none, which means it predates the phase "
+                "claim -- upgrade the listener image, or unset require_phase until "
+                "every listener is on v1.10 or later."
+            ),
+        )
+    # The run must be EXECUTING the phase this token names.
+    #
+    # The mint endpoint refused only `TERMINAL_STATES`, and a plan-only run never
+    # reaches one: it finishes in `planned` and stays there. Speculative PR plans,
+    # module-impact plans and drift runs are all plan-only -- and are exactly the
+    # runs executing the least-trusted code, an unmerged branch. So for them the
+    # liveness check never engaged and fresh tokens could be issued, and fresh
+    # cloud identity minted, for the rest of a token's lifetime and from anywhere
+    # that can reach the API.
+    #
+    # Keyed on the executing state rather than on "not terminal", and the
+    # legitimate path is unaffected because `claim_next_run` moves
+    # `queued -> planning` and `confirmed -> applying` ATOMICALLY as part of the
+    # claim, and the listener asks for the token only after the claim returns.
+    #
+    # `_APPLY_PHASE_STATES` is deliberately not reused: it answers "may this run
+    # have an apply-phase token at all", which is the downgrade decision above
+    # and legitimately includes `confirmed`. This answers "is that phase running
+    # now". Two questions, two predicates.
+    from terrapod.services.run_service import LIVE_STATES_FOR_PHASE
+
+    live = LIVE_STATES_FOR_PHASE.get(phase or "")
+    if live is None:
+        # An unphased token -- a listener predating the phase claim. We cannot
+        # tell which phase it is for, so any live state is accepted.
+        # `auth.oidc_issuer.require_phase` is how an operator closes this off.
+        live = frozenset().union(*LIVE_STATES_FOR_PHASE.values())
+    if run.status not in live:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"This run is {run.status!r}, so it is not executing a "
+                f"{phase or 'runner'} phase and cannot be issued a runner token. A "
+                f"token is issued for a phase in flight; a finished run -- including "
+                f"a plan-only run, which stays `planned` -- has none."
+            ),
+        )
+
     token = generate_runner_token(run.id, ttl=requested_ttl, phase=phase)
 
     # Compute actual TTL (may have been clamped)
@@ -2932,6 +3128,20 @@ async def report_job_status(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+
+    # The cross-pool boundary (GHSA-g4j5, one endpoint over). Keyed on the
+    # POOL and deliberately NOT on `run.listener_id` the way the sibling
+    # listener endpoints are: the reconciler publishes `check_job_status` and
+    # `stream_logs` to `listener:events:{run.pool_id}` -- the POOL's channel --
+    # so any listener in the owning pool is entitled to answer, and a
+    # listener-identity check here would refuse a sibling listener doing
+    # exactly what it was asked to do. A run with no pool was never published
+    # to any channel, so a report for one is unsolicited and refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
 
     job_status = body.get("status", "")
     if not job_status:
@@ -3014,6 +3224,19 @@ async def upload_log_stream(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+    # The cross-pool boundary (GHSA-g4j5, one endpoint over). Keyed on the
+    # POOL and deliberately NOT on `run.listener_id` the way the sibling
+    # listener endpoints are: the reconciler publishes `check_job_status` and
+    # `stream_logs` to `listener:events:{run.pool_id}` -- the POOL's channel --
+    # so any listener in the owning pool is entitled to answer, and a
+    # listener-identity check here would refuse a sibling listener doing
+    # exactly what it was asked to do. A run with no pool was never published
+    # to any channel, so a report for one is unsolicited and refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
     if phase not in ("plan", "apply"):
         phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()

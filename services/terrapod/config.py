@@ -7,6 +7,7 @@ Non-secret configuration loaded from YAML file, secrets from environment variabl
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import yaml
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn, field_validator, model_validator
@@ -622,6 +623,59 @@ class OIDCIssuerConfig(BaseSettings):
             "persists it, which is what most deployments want."
         ),
     )
+    signing_key_pem_next: str = Field(
+        default="",
+        description=(
+            "A SECOND operator-supplied RSA private key, published in the JWKS but "
+            "never used to sign. It exists so a BYO deployment can stage a key "
+            "change the way a generated-key rotation does: publish the incoming key, "
+            "wait for every cloud to refetch, then promote it to signing_key_pem and "
+            "drop this. Without it a BYO deployment publishes exactly one key at a "
+            "time, so there is no moment when both the outgoing and incoming public "
+            "keys are published and federated runs fail from the cutover until each "
+            "cloud refetches. Ignored unless signing_key_pem is also set, since "
+            "there would be nothing to stage against."
+        ),
+    )
+    subject_format: str = Field(
+        default="name-and-id",
+        description=(
+            "How `sub` identifies the workspace. `name-and-id` (the default) is "
+            "`workspace:<name>@<id>[:phase:<phase>]`; `name` is the v1.10.0 form, "
+            "`workspace:<name>[:phase:<phase>]`. The id is what makes the subject "
+            "stable: a workspace name is mutable and reusable, and on AWS and "
+            "Azure `sub` is the ONLY thing a trust policy can bind, so a name-only "
+            "subject is satisfied by whatever workspace holds that name when it "
+            "runs. Set `name` only to keep a v1.10.0 trust policy working while "
+            "you migrate it; it is removed in 2.0."
+        ),
+    )
+    require_phase: bool = Field(
+        default=False,
+        description=(
+            "Refuse to mint an identity token for a run whose runner token carries "
+            "no phase, and refuse to issue such a runner token in the first place. "
+            "An unphased token exists only for a listener predating the phase "
+            "claim; it yields an identity with no `phase` claim and an unphased "
+            "`sub`, which is a form every trust policy then has to remember to "
+            "exclude. Default false so an upgrade cannot break a lagging listener; "
+            "set it once every listener is on v1.10 or later. It becomes the "
+            "default in 2.0."
+        ),
+    )
+    require_assigned_pool: bool = Field(
+        default=False,
+        description=(
+            "Refuse to mint an identity for a run whose executing agent pool is "
+            "no longer in the workspace's pool set. A run snapshots its candidate "
+            "pools at creation, so detaching a pool from a workspace mid-flight "
+            "leaves that run claimable by a pool the workspace no longer has -- and "
+            "which pool runs a workspace is which listeners its federated "
+            "credential is reachable from. Off by default because the window is "
+            "narrow and the refusal fails the run; it does NOT constrain multi-pool "
+            "routing, since every pool in the set is a legitimate executor."
+        ),
+    )
     token_ttl_seconds: int = Field(
         default=900,
         ge=60,
@@ -652,6 +706,14 @@ class OIDCIssuerConfig(BaseSettings):
             "verifying while it is still inside its own lifetime."
         ),
     )
+
+    @field_validator("subject_format")
+    @classmethod
+    def _valid_subject_format(cls, v: str) -> str:
+        allowed = {"name-and-id", "name"}
+        if v not in allowed:
+            raise ValueError(f"auth.oidc_issuer.subject_format must be one of {sorted(allowed)}")
+        return v
 
     @model_validator(mode="after")
     def _check_rotation_windows(self) -> "OIDCIssuerConfig":
@@ -3682,11 +3744,16 @@ class Settings(BaseSettings):
         if not self.auth.oidc_issuer.enabled:
             return self
 
-        if not (
-            (self.auth.oidc_issuer.public_url or "").strip()
-            or (self.public_webhook_url or "").strip()
-            or (self.external_url or "").strip()
-        ):
+        # Mirrors `issuer_url()`'s fallback chain. Validating the RESOLVED value
+        # rather than each setting is the point: two of the three serve other
+        # purposes as well, and what a cloud matches is whatever came out.
+        candidates = [
+            ("auth.oidc_issuer.public_url", (self.auth.oidc_issuer.public_url or "").strip()),
+            ("api.config.public_webhook_url", (self.public_webhook_url or "").strip()),
+            ("api.config.external_url", (self.external_url or "").strip()),
+        ]
+        chosen = next((pair for pair in candidates if pair[1]), None)
+        if chosen is None:
             raise ValueError(
                 "auth.oidc_issuer.enabled is true but no issuer URL resolves. Set "
                 "auth.oidc_issuer.public_url, or webhookIngress.hostname (which "
@@ -3694,6 +3761,40 @@ class Settings(BaseSettings):
                 "It must be a URL the cloud provider can reach, not a private "
                 "management hostname."
             )
+        source, resolved = chosen
+
+        parts = urlsplit(resolved)
+        lead = f"auth.oidc_issuer.enabled is true but the issuer URL resolved from {source} "
+
+        if parts.scheme != "https" or not parts.netloc:
+            raise ValueError(
+                f"{lead}({resolved!r}) is not an absolute https URL. Workload identity "
+                "federation requires https: AWS, Azure and GCP all refuse to fetch an "
+                "http issuer's discovery document, and the refusal surfaces at the "
+                "cloud's token exchange rather than here. Note webhookIngress.tls=false "
+                "produces an http URL."
+            )
+        if parts.query or parts.fragment:
+            raise ValueError(
+                f"{lead}({resolved!r}) carries a query string or fragment. An issuer is "
+                "a bare origin and path; the cloud appends "
+                "/.well-known/openid-configuration to it, which a query or fragment "
+                "would land in the wrong place."
+            )
+        # A trailing slash is NOT refused here, deliberately. `issuer_url()`
+        # strips it from all three candidates, so the value is mechanically
+        # harmless -- and `settings = Settings()` is evaluated at this module's
+        # import, which means a raise is not a feature refusal but a pod that
+        # will not start. Refusing `https://host/` -- an entirely ordinary thing
+        # to paste, and a working configuration on every release that has one --
+        # would take the whole control plane down for a cosmetic value.
+        #
+        # What it was guarding is real but is the operator's half: issuer
+        # matching is exact, so a cloud configured WITH the slash rejects every
+        # token, because the minted `iss` has been stripped. That is warned
+        # about at startup by `warn_about_issuer_url_cosmetics`, where a logger
+        # exists -- nothing here can log, since `terrapod.config` imports
+        # nothing from Terrapod (#1151).
 
         return self
 

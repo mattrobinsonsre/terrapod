@@ -280,7 +280,14 @@ class TestTheRefreshHandlerItselfRuns:
 
         with (
             patch("terrapod.db.session.get_db_session", fake_session),
-            patch.object(oidc_signing, "_keys", [MagicMock(kid="k1")]),
+            patch.object(
+                oidc_signing,
+                "_keys",
+                # A real `SigningKey`: `_live_keys` compares `retired_at`
+                # against a datetime on every read, so a MagicMock raises
+                # there rather than standing in for "never retired".
+                [oidc_signing.SigningKey(kid="k1", private_key_pem="")],
+            ),
             patch.object(oidc_signing, "reload_signing_keys", new_callable=AsyncMock) as reload,
         ):
             asyncio.run(oidc_signing.refresh_signing_keys_cycle())
@@ -305,7 +312,14 @@ class TestTheRefreshHandlerItselfRuns:
 
         with (
             patch("terrapod.db.session.get_db_session", fake_session),
-            patch.object(oidc_signing, "_keys", [MagicMock(kid="k1")]),
+            patch.object(
+                oidc_signing,
+                "_keys",
+                # A real `SigningKey`: `_live_keys` compares `retired_at`
+                # against a datetime on every read, so a MagicMock raises
+                # there rather than standing in for "never retired".
+                [oidc_signing.SigningKey(kid="k1", private_key_pem="")],
+            ),
             patch.object(
                 oidc_signing,
                 "reload_signing_keys",

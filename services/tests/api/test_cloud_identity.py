@@ -67,10 +67,27 @@ def _enabled(**over):
     # A real dict, not a MagicMock attribute: the resolver reads it, and a
     # MagicMock would resolve to {} and turn every test into a 409.
     cfg.audiences = over.get("audiences", {})
+    # Likewise a real string: `_subject` compares it to "name", and a MagicMock
+    # would take the id branch by accident rather than by configuration -- so the
+    # default-path tests would pass without the default ever being modelled.
+    cfg.subject_format = over.get("subject_format", "name-and-id")
+    # A real bool for the same reason: the mint refuses an unphased token when
+    # this is set, and a MagicMock is truthy -- so every unphased-token test
+    # would be asserting the refusal rather than the fall-through.
+    cfg.require_phase = over.get("require_phase", False)
+    cfg.require_assigned_pool = over.get("require_assigned_pool", False)
     return cfg
 
 
-def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod", engine="terraform"):
+def _scenario(
+    *,
+    catalogue=None,
+    override=None,
+    snapshot=None,
+    name="dns-prod",
+    engine="terraform",
+    pool=None,
+):
     """A workspace, its run and the deployment config, wired as production does.
 
     `snapshot` defaults to what the resolver produces from `catalogue` and
@@ -96,20 +113,52 @@ def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod", 
     run.oidc_audiences = (
         snapshot if snapshot is not None else cloud_identity_resolver.merge(catalogue, override)
     )
+    # A real None, not a MagicMock: the mint looks the pool up only when this is
+    # set, and a MagicMock is truthy -- so every test would make a pool query the
+    # fixture then answered None for, which is the shape of a locally executed
+    # run arriving by accident rather than by configuration. `pool` is the
+    # AgentPool the run was claimed by, which is what `run.pool_id` holds once a
+    # listener has taken it.
+    run.pool_id = pool.id if pool is not None else None
+    run._pool = pool
 
     return ws, run, _enabled(audiences=catalogue)
 
 
-def _db(run, ws):
+def _pool(name="prod-eu"):
+    pool = MagicMock()
+    pool.id = uuid.uuid4()
+    pool.name = name
+    return pool
+
+
+def _db(run, ws, *, looked_up: list | None = None, pool_still_assigned: bool = True):
     db = MagicMock()
+    # The membership query behind `require_assigned_pool`. A real value, because
+    # the route treats None as "detached" -- a MagicMock would read as assigned
+    # and the refusal could never be reached.
+    db.scalar = AsyncMock(return_value=run.pool_id if pool_still_assigned else None)
 
     async def _get(model, pk):
-        from terrapod.db.models import Run, Workspace
+        from terrapod.db.models import AgentPool, Run, Workspace
 
+        if looked_up is not None:
+            looked_up.append(model)
         if model is Run:
             return run
         if model is Workspace:
             return ws
+        if model is AgentPool:
+            # Mirrors SQLAlchemy: a None primary key does NOT short-circuit. It
+            # warns `fully NULL primary key identity cannot load any object` and
+            # still issues the query -- "may raise an error in a future release".
+            # So returning None here would hide the very guard that stops a
+            # pointless round-trip on every locally executed run.
+            assert pk is not None, (
+                "the mint looked up an agent pool with a null id; SQLAlchemy "
+                "queries anyway and warns, and is documented to start raising"
+            )
+            return getattr(run, "_pool", None)
         return None
 
     db.get = AsyncMock(side_effect=_get)
@@ -137,6 +186,9 @@ async def _call(
     detail="",
     issuer="https://terrapod.example.com",
     cfg=None,
+    looked_up=None,
+    pool_still_assigned=True,
+    status=None,
 ):
     """Drive the batched mint.
 
@@ -145,9 +197,26 @@ async def _call(
     claim set signed, and `captured["all"]` every one -- so a single-target test
     reads as it always did and a batched test can check each.
     """
+    # The run's status is DERIVED from the token's phase unless a test pins it.
+    #
+    # The mint refuses a run that is not executing the phase its token names
+    # (GHSA-p9jh), so a MagicMock status fails every test for the wrong reason.
+    # Deriving it models production -- `claim_next_run` moves `queued ->
+    # planning` and `confirmed -> applying` atomically as it hands the run over,
+    # so a runner holding a plan-phase token is on a `planning` run by
+    # construction. `status=` is for the tests that are ABOUT the refusal.
+    if status is not None:
+        run.status = status
+    elif not isinstance(run.status, str):
+        run.status = "applying" if user.run_phase == "apply" else "planning"
+
     settings = MagicMock()
     settings.auth.oidc_issuer = cfg or _enabled()
     captured: dict = {"all": []}
+
+    def _issuer() -> str:
+        captured["issuer_url_returned"] = issuer
+        return issuer
 
     def _sign(claims, *, ttl_seconds):
         captured["claims"] = claims
@@ -164,10 +233,17 @@ async def _call(
     with (
         patch("terrapod.config.settings", settings),
         patch("terrapod.auth.oidc_signing.sign_identity_token", _sign),
-        patch("terrapod.api.routers.oidc_issuer.issuer_url", return_value=issuer),
+        # Recorded rather than only patched, so a test can assert the `iss`
+        # claim equals what THIS FUNCTION returned during the call -- three
+        # values have to agree and a literal on both sides of the comparison
+        # would pass while the mint read some other source.
+        patch("terrapod.api.routers.oidc_issuer.issuer_url", side_effect=_issuer),
     ):
         resp = await router.mint_cloud_identity_tokens(
-            payload=payload, run_id=f"run-{run.id}", user=user, db=_db(run, ws)
+            payload=payload,
+            run_id=f"run-{run.id}",
+            user=user,
+            db=_db(run, ws, looked_up=looked_up, pool_still_assigned=pool_still_assigned),
         )
     return resp, captured
 
@@ -328,6 +404,285 @@ class TestTheConfigurationMovedUnderTheRun:
         assert captured["claims"]["aud"] == [AWS]
 
 
+class TestTheAgentPoolIsClaimed:
+    """Which pool executed a run decides WHERE its identity can be minted, and
+    the token said nothing about it.
+
+    Moving a workspace to another pool -- or adding one, which `pool:assign` on
+    the DESTINATION pool allows -- moves that, and neither the cloud nor an
+    auditor could tell from the token that it had happened. The claim is the
+    pool the run was actually CLAIMED by (`run.pool_id` is rewritten on claim),
+    not the workspace's first choice, because the first choice is not what ran.
+    """
+
+    async def test_the_pool_name_and_id_are_both_claimed(self):
+        """Both, for the same reason `workspace` and `workspace_id` are both
+        there: the name is what a human reads in a policy and the id is what
+        survives a rename."""
+        pool = _pool("prod-eu")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=pool)
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["agent_pool"] == "prod-eu"
+        assert captured["claims"]["agent_pool_id"] == str(pool.id)
+
+    async def test_a_run_with_no_pool_omits_both_rather_than_claiming_null(self):
+        """A locally executed workspace has no pool. A claim present with no
+        value is worse than absent: a Rego rule testing
+        `input.agent_pool == "prod"` fails either way, while one testing for
+        presence would pass on a null."""
+        from terrapod.db.models import AgentPool
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        looked_up: list = []
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            looked_up=looked_up,
+        )
+        assert "agent_pool" not in captured["claims"]
+        assert "agent_pool_id" not in captured["claims"]
+        # And it must not ASK. `db.get(Model, None)` is not a short-circuit in
+        # SQLAlchemy -- it warns and queries anyway -- so without the `if
+        # run.pool_id` guard this is a wasted round-trip on every locally
+        # executed run, and a future SQLAlchemy is documented to raise.
+        assert AgentPool not in looked_up, (
+            "the mint queried for an agent pool on a run that has none"
+        )
+
+    async def test_every_target_in_a_batch_carries_it(self):
+        """The claim is built per target, so a batched mint is where a per-target
+        construction drops one."""
+        pool = _pool("shared")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azurerm": [AZURE]}, pool=pool)
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            providers=["aws", "azurerm"],
+            cfg=cfg,
+        )
+        # `captured["all"]` is every claim set signed, not only the last -- which
+        # is the only way to see a per-target construction that drops one.
+        assert len(captured["all"]) == 2
+        assert [c["agent_pool"] for c in captured["all"]] == ["shared", "shared"]
+        assert {c["agent_pool_id"] for c in captured["all"]} == {str(pool.id)}
+
+
+class TestRequireAssignedPoolRefusesADetachedPool:
+    """`require_assigned_pool` (#2040).
+
+    A run's candidate pools are snapshotted at creation, so detaching a pool
+    from the workspace afterwards leaves that run claimable by a pool the
+    workspace no longer has -- and which pool runs a workspace is which
+    listeners its federated credential is reachable from.
+
+    It asks about MEMBERSHIP, not about a primary pool: there is none. The pool
+    set is flat, `ordinal` is display order with no dispatch meaning, and a run
+    is offered to every pool at once so which claims it is a race. A first-pool
+    rule would refuse at random on any multi-pool workspace, which is why this
+    one does not exist.
+    """
+
+    async def test_a_detached_pool_is_refused_when_it_is_set(self):
+        pool = _pool("retired-pool")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=pool)
+        cfg.require_assigned_pool = True
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="apply"),
+                run,
+                ws,
+                target="aws",
+                cfg=cfg,
+                pool_still_assigned=False,
+            )
+        assert exc.value.status_code == 403
+        assert "require_assigned_pool" in exc.value.detail
+        assert "retired-pool" in exc.value.detail, "the operator needs to know WHICH pool"
+
+    async def test_a_STILL_ASSIGNED_pool_mints_normally(self):
+        """The contrast, and the thing that makes this safe to turn on: every
+        pool in the set is a legitimate executor, so an ordinary multi-pool run
+        must pass."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=_pool("prod-eu"))
+        cfg.require_assigned_pool = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["agent_pool"] == "prod-eu"
+
+    async def test_a_detached_pool_mints_when_it_is_NOT_set(self):
+        """The default. The window is narrow and the refusal fails a run, so an
+        operator opts in rather than inheriting it."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=_pool("retired-pool"))
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            pool_still_assigned=False,
+        )
+        assert captured["claims"]["agent_pool"] == "retired-pool"
+
+    async def test_a_run_with_no_pool_is_not_refused(self):
+        """A locally executed workspace has no pool at all, so there is nothing
+        to be detached -- and refusing it would make this setting mean "agent
+        execution only", which it does not say."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_assigned_pool = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            pool_still_assigned=False,
+        )
+        assert "agent_pool" not in captured["claims"]
+
+
+class TestRequirePhaseRefusesAnUnphasedToken:
+    """`require_phase` closes off the unphased form entirely (#2041).
+
+    An unphased runner token exists only for a listener predating the phase
+    claim. It mints an identity with no `phase` claim and an unphased subject,
+    which is a form every trust policy then has to remember to exclude -- and a
+    wildcard that forgets is how a plan-phase run reaches an apply-phase role.
+
+    Off by default, because an upgrade must not break a lagging listener.
+    """
+
+    async def test_an_unphased_token_is_refused_when_it_is_set(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_phase = True
+        with pytest.raises(HTTPException) as exc:
+            await _call(_user(run_id=str(run.id)), run, ws, target="aws", cfg=cfg)
+        assert exc.value.status_code == 403
+        assert "require_phase" in exc.value.detail
+
+    async def test_a_PHASED_token_is_unaffected(self):
+        """The contrast. A refusal that caught phased tokens too would break
+        every run on a deployment that set this, which is the opposite of what
+        it is for."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_phase = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["phase"] == "apply"
+
+    async def test_an_unphased_token_still_mints_when_it_is_NOT_set(self):
+        """The default, and it has to stay working: a listener predating the
+        phase claim is the only thing that produces an unphased token, and an
+        upgrade must not strand it."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        _, captured = await _call(_user(run_id=str(run.id)), run, ws, target="aws", cfg=cfg)
+        assert "phase" not in captured["claims"]
+
+
+class TestTheSubjectCarriesTheWorkspaceId:
+    """`sub` is the only thing an AWS or Azure trust policy can bind, and a
+    workspace NAME is mutable and reusable -- any authenticated user can create
+    one with a free name, an admin can rename, and a delete frees the name. So a
+    name-only subject is satisfied by whatever workspace holds that name when it
+    runs. The id is immutable, which is the whole point of putting it there.
+    """
+
+    async def test_two_workspaces_with_THE_SAME_NAME_get_different_subjects(self):
+        """The property, stated the way it matters. Asserting the literal string
+        would pass just as well with the id omitted from one of them."""
+        ws_a, run_a, cfg = _scenario(catalogue={"aws": [AWS]}, name="dns-prod")
+        ws_b, run_b, _ = _scenario(catalogue={"aws": [AWS]}, name="dns-prod")
+        assert ws_a.name == ws_b.name
+        assert ws_a.id != ws_b.id
+
+        _, cap_a = await _call(
+            _user(run_id=str(run_a.id), phase="apply"), run_a, ws_a, target="aws", cfg=cfg
+        )
+        _, cap_b = await _call(
+            _user(run_id=str(run_b.id), phase="apply"), run_b, ws_b, target="aws", cfg=cfg
+        )
+        assert cap_a["claims"]["sub"] != cap_b["claims"]["sub"], (
+            "a workspace that takes a trusted name must not inherit its subject"
+        )
+
+    async def test_a_name_cannot_forge_the_id_segment(self):
+        """Safe to concatenate only because the name grammar
+        (`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`) admits neither `@` nor `:`. If that ever
+        relaxes, the composite stops parsing unambiguously -- so pin it here,
+        beside the thing that depends on it."""
+        from terrapod.services.workspace_name import validate_workspace_name
+
+        for forged in ("dns-prod@11111111-1111-1111-1111-111111111111", "dns-prod:phase:apply"):
+            with pytest.raises(ValueError):
+                validate_workspace_name(forged)
+
+    async def test_the_legacy_name_only_form_is_still_reachable(self):
+        """Kept only so a trust policy written in the three days the name-only
+        form was the default can be migrated rather than broken at the upgrade.
+        It goes in 2.0."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.subject_format = "name"
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["sub"] == "workspace:dns-prod:phase:apply"
+
+
+class TestTheIdentifyingClaimsCannotBeDrivenFromTheREQUEST:
+    """`run_id`, `workspace` and `workspace_id` come from the server's own rows.
+
+    They are what a trust policy binds, so a request field that reached any of
+    them would let a run mint an identity for a workspace it is not. The body is
+    `extra="forbid"`, which is the structural half; these pin that it stays
+    structural and that the values come from the run and workspace the SERVER
+    resolved from the token's run id.
+    """
+
+    async def test_an_unknown_body_field_is_refused_outright(self):
+        """`extra="forbid"`, so there is no field to smuggle one in through.
+        Asserted here rather than left to the model, because relaxing it to
+        `ignore` is a one-word edit that no behavioural test would notice."""
+        import pydantic
+
+        with pytest.raises(pydantic.ValidationError):
+            router.CloudIdentityMintRequest(providers=["aws"], workspace_id="ws-evil")
+
+    async def test_the_model_forbids_extras_by_configuration(self):
+        assert router.CloudIdentityMintRequest.model_config["extra"] == "forbid"
+
+    async def test_the_claims_come_from_the_SERVER_rows(self):
+        """Not from anything the caller sent. The runner names only providers and
+        a discovery outcome; the identifying claims are read off the run the
+        token is scoped to and the workspace that run belongs to."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, name="finance-prod")
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        claims = captured["claims"]
+        assert claims["workspace"] == "finance-prod"
+        assert claims["workspace_id"] == str(ws.id)
+        assert claims["run_id"] == str(run.id)
+
+    async def test_the_run_id_claim_is_the_RESOLVED_run_not_the_token_string(self):
+        """The token carries a bare uuid and the path may carry `run-<uuid>`;
+        both are normalised before the scope check. So the claim has to be the
+        resolved run's own id, or a `run-` prefixed caller would get a `run_id`
+        claim no cloud audit log could match back to a Terrapod run."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        _, captured = await _call(
+            _user(run_id=f"run-{run.id}", phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["run_id"] == str(run.id)
+        assert not captured["claims"]["run_id"].startswith("run-")
+
+
 class TestThePhaseComesFromTheToken:
     """The security property. A request body cannot influence it, because there
     is no request body — and the claim is built from `user.run_phase`, which is
@@ -341,7 +696,7 @@ class TestThePhaseComesFromTheToken:
         )
         assert resp.status_code == 200
         assert captured["claims"]["phase"] == phase
-        assert captured["claims"]["sub"] == f"workspace:dns-prod:phase:{phase}"
+        assert captured["claims"]["sub"] == f"workspace:dns-prod@{ws.id}:phase:{phase}"
 
     async def test_the_body_cannot_NAME_A_PHASE_or_anything_else(self):
         """The endpoint takes a body now, so the guarantee moves to its shape.
@@ -375,7 +730,7 @@ class TestThePhaseComesFromTheToken:
         assert resp.status_code == 200
         assert "phase" not in captured["claims"]
         # And `sub` falls back to the workspace alone rather than inventing one.
-        assert captured["claims"]["sub"] == "workspace:dns-prod"
+        assert captured["claims"]["sub"] == f"workspace:dns-prod@{ws.id}"
 
 
 class TestTheClaimSet:
@@ -386,7 +741,13 @@ class TestTheClaimSet:
         )
         claims = captured["claims"]
 
-        assert claims["iss"] == "https://terrapod.example.com"
+        # Against `issuer_url()`'s own answer, not a literal: three values have
+        # to agree (this claim, the discovery document's `issuer`, its
+        # `jwks_uri`) and a hardcoded string here would pass while the mint read
+        # a different source. Read from the module the mint imports it from --
+        # the import is function-local, so that attribute is what it resolves at
+        # call time, and it is the one `_call` patches.
+        assert claims["iss"] == captured["issuer_url_returned"]
         assert claims["aud"] == [AWS]
         assert claims["workspace"] == "dns-prod"
         assert claims["workspace_id"] == str(ws.id)
@@ -415,15 +776,44 @@ class TestTheClaimSet:
 
 
 class TestTheAuthBoundary:
-    async def test_a_session_user_is_refused(self):
+    @pytest.mark.parametrize("method", ["session", "api_token"])
+    async def test_every_non_runner_auth_method_is_refused(self, method):
         """Runner protocol only. A person has no business minting a run's cloud
-        identity, and `require_runner_for_run` is what says so."""
+        identity, and `require_runner_for_run` is what says so -- it compares
+        `auth_method` to the single literal `runner_token`, so EVERY other method
+        has to be refused rather than only the one a test happened to pick.
+
+        `api_token` is the one that matters, and it was untested. A session is a
+        person at a browser; an API token is automation, which is exactly the
+        shape of caller that would plausibly try this -- and it is the long-lived
+        credential, where a session expires in twelve hours.
+        """
         from fastapi import HTTPException
 
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
         with pytest.raises(HTTPException) as exc:
-            await _call(_user(method="session"), run, ws, target="aws", cfg=cfg)
+            await _call(_user(method=method), run, ws, target="aws", cfg=cfg)
         assert exc.value.status_code == 403
+        assert "Runner token required" in exc.value.detail
+
+    async def test_an_api_token_SCOPED_TO_THE_RUN_is_still_refused(self):
+        """The subtler half: refusal is on the METHOD, not on whether the caller
+        named the right run. An API token that somehow carried a matching
+        `run_id` must not pass -- otherwise a caller who can read a run id can
+        mint its cloud identity."""
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(method="api_token", run_id=str(run.id), phase="apply"),
+                run,
+                ws,
+                target="aws",
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 403
+        assert "Runner token required" in exc.value.detail
 
     async def test_a_runner_token_for_a_different_run_is_refused(self):
         """A leaked token from run A must not mint an identity for run B — which
@@ -792,12 +1182,24 @@ class TestTheMintRecordsWhatItServed:
 
     async def test_a_second_batch_accumulates_rather_than_replacing(self):
         """The apply phase re-mints what the plan did, and may use more. The
-        confirm check reads the union, so the plan's identities must survive."""
+        confirm check reads the union, so the plan's identities must survive.
+
+        The run's status is ADVANCED between the two calls, because that is what
+        happens: a run plans, is confirmed, and is claimed into `applying`. It
+        used to be left alone, which only passed because nothing read it -- and
+        now that the mint checks the phase against the state, modelling the
+        sequence is the honest fixture.
+        """
         ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
         run.oidc_minted_targets = []
         await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws"], cfg=cfg)
         await _call(
-            _user(run_id=str(run.id), phase="apply"), run, ws, providers=["aws", "azure"], cfg=cfg
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            providers=["aws", "azure"],
+            cfg=cfg,
+            status="applying",
         )
         assert run.oidc_minted_targets == ["aws", "azure"]
 
@@ -1122,7 +1524,7 @@ class TestAnEngineThatCannotDiscover:
         assert cap["claims"]["sub"].endswith(":phase:apply")
 
 
-class TestAFinishedRunCannotMint:
+class TestOnlyARunEXECUTINGThePhaseCanMint:
     """A runner token is good until it EXPIRES -- run state is not checked when
     it is verified, and the default TTL is an hour.
 
@@ -1132,11 +1534,24 @@ class TestAFinishedRunCannotMint:
     exfiltrates the token could keep POSTing after the run finished, drawing
     fresh short-lived credentials for the workspace's identity, from anywhere,
     for the remainder of the hour. `debug_mode`'s lingering pods widen the
-    window further. A finished run has no legitimate reason to mint.
+    window further.
+
+    **This class used to be `TestAFinishedRunCannotMint`, and the premise it
+    tested was wrong** (GHSA-p9jh). The check refused `TERMINAL_STATES`, and a
+    plan-only run never reaches one: it finishes in `planned` and stays there.
+    Speculative pull-request plans, module-impact plans and drift runs are ALL
+    plan-only -- and are exactly the runs executing the least-trusted code, an
+    unmerged branch. So the one class of run the guard most needed to cover was
+    the one it could never fire on, and every test here passed throughout.
+
+    The question is "is this run executing the phase its token names", which the
+    terminal set cannot express.
     """
 
     @pytest.mark.parametrize("status", ["applied", "errored", "discarded", "canceled"])
     async def test_a_terminal_run_is_refused(self, status):
+        """Still refused -- a terminal run executes nothing -- but now as a
+        consequence of the rule rather than as the rule itself."""
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
         run.status = status
         with pytest.raises(HTTPException) as e:
@@ -1144,13 +1559,78 @@ class TestAFinishedRunCannotMint:
         assert e.value.status_code == 409
         assert status in e.value.detail
 
+    async def test_a_PLANNED_run_is_refused_which_the_terminal_check_could_not_do(self):
+        """The finding, stated as the one case that distinguishes the two rules.
+
+        `planned` is in no terminal set, so the old check let this through --
+        and it is where every plan-only run comes to rest, which is where a
+        pull-request plan's exfiltrated token lived.
+        """
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status="planned",
+            )
+        assert e.value.status_code == 409
+        assert "plan-only" in e.value.detail, "the message must name why `planned` is the case"
+
+    @pytest.mark.parametrize("status", ["queued", "pending"])
+    async def test_a_run_not_yet_executing_is_refused_too(self, status):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status=status,
+            )
+        assert e.value.status_code == 409
+
+    async def test_a_PLAN_phase_token_cannot_mint_on_an_APPLYING_run(self):
+        """The phases are checked against each other, not merely against
+        liveness. A plan-phase token on an applying run is a token outliving its
+        own phase, which is the same residual-lifetime problem one state along."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status="applying",
+            )
+        assert e.value.status_code == 409
+
     async def test_a_live_run_still_mints(self):
-        """The negative path: the refusal is scoped to terminal states, and must
-        not refuse the states a run actually mints in."""
+        """The negative path. A refusal that caught a run actually executing its
+        phase would break every federated run in the estate."""
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
         run.status = "planning"
         resp, _ = await _call(
             _user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws"
+        )
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize("status", ["confirmed", "applying"])
+    async def test_an_apply_phase_token_mints_in_both_apply_states(self, status):
+        """`confirmed` is kept on purpose; see `LIVE_STATES_FOR_PHASE`. A patch
+        must not fail every apply to buy a window in which no Job has launched."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            cfg=cfg,
+            target="aws",
+            status=status,
         )
         assert resp.status_code == 200
 

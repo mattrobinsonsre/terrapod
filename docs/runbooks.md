@@ -2976,12 +2976,40 @@ curl -fsS -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
 Restore the defaults afterwards, in a separate change — zero windows make every
 later routine rotation break tokens in flight.
 
+**One rotation is enough, and rotating twice is safe.** A rotation retires *every*
+key that was not already retired, not only the one currently signing, so it cannot
+leave a key published with no retirement date for any grace window to measure. It
+also takes an advisory lock, so two replicas — or an operator and a retry —
+rotating at once cannot each leave their own key behind.
+
+**A replica that cannot reach the database stops serving expired keys**, rather
+than holding its last key set indefinitely. It filters the grace window every time
+it answers, so with `retired_key_grace_seconds: 0` the compromised key leaves its
+JWKS at once even on a replica that never saw the rotation. Such a replica then
+answers 503 on both issuer documents and refuses to mint, which is the correct
+direction during an incident: a run fails rather than presenting an identity you
+have withdrawn, and the thirty-second refresh task recovers the process as soon as
+the database is reachable. Note the cloud-side cache caveat below still applies —
+un-publishing a key is not the same as it being untrusted.
+
 **If the deployment signs with an operator-supplied key**
 (`api.oidcSigningKey.existingSecret`), the rotate endpoint answers **409**: the key
 is yours, and so is replacing it. Generate a new RSA key, update the Secret, and
-roll the API. The `checksum/oidc-signing` annotation means changing the Secret rolls
-every replica together, so there is no window where replicas disagree about which
-key signs.
+roll the API. **Do not stage it through `nextExistingSecret` during a
+compromise** — that exists to publish an incoming key *alongside* the outgoing
+one, which during an incident means going on publishing the compromised key for
+as long as the staging lasts. Staging is for a planned change; a compromise wants
+the cutover, and the window it costs. **Roll it yourself** — do not rely on the
+`checksum/oidc-signing`
+annotation to do it for you. The annotation is computed inside a `lookup`, so it
+renders under `helm install`/`upgrade` and renders **nothing** under `helm
+template`, which is what Argo CD and Flux run; `deployment-api.yaml` says so in its
+own comment. And even where it does render, a rolling update serves two different
+JWKS documents from different pods until the roll completes — and in a cutover
+like this one, where you are deliberately not staging, each of those documents
+holds a single key, so which one a cloud fetches mid-roll decides whether it can
+verify. Expect a window, and plan the cutover around it rather than assuming
+there is none.
 
 ### What this cannot do
 

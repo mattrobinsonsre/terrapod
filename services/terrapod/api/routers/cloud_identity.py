@@ -38,7 +38,13 @@ from terrapod.api.dependencies import (
     require_runner_for_run,
 )
 from terrapod.api.ids import parse_id
-from terrapod.db.models import OIDCSigningKey, Run, Workspace
+from terrapod.db.models import (
+    AgentPool,
+    OIDCSigningKey,
+    Run,
+    Workspace,
+    WorkspaceAgentPool,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import workspace_settings
@@ -51,6 +57,34 @@ router = APIRouter(tags=["cloud-identity"])
 MAX_TARGETS = 100
 
 logger = get_logger(__name__)
+
+
+def _subject(ws: Workspace, phase: str | None) -> str:
+    """The `sub` claim: `workspace:<name>@<id>[:phase:<phase>]`.
+
+    The id is the point. A workspace NAME is mutable and reusable, and on the two
+    clouds most operators use it is the only thing a trust policy can bind --
+    Azure federated identity credentials match on issuer, subject and audience
+    only, and a generic AWS IAM OIDC provider conditions only on `aud`, `oaud`,
+    `sub`, `amr` and `email`. So a name-only subject is satisfied by whatever
+    workspace holds that name when it runs, which is a window anyone who can
+    create or rename a workspace can open.
+
+    Safe to concatenate because the workspace-name grammar is
+    `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`: it admits neither `@` nor `:`, so the parts
+    cannot run together and no name can forge the id segment.
+
+    `name` is the v1.10.0 form, kept only so a trust policy written in the three
+    days it was the default can be migrated rather than broken at the upgrade. It
+    goes in 2.0.
+    """
+    from terrapod.config import settings
+
+    if settings.auth.oidc_issuer.subject_format == "name":
+        base = f"workspace:{ws.name}"
+    else:
+        base = f"workspace:{ws.name}@{ws.id}"
+    return base + (f":phase:{phase}" if phase else "")
 
 
 def _rfc3339(dt) -> str | None:
@@ -212,11 +246,34 @@ async def mint_cloud_identity_tokens(
     # costs more here than elsewhere: code in the plan pod that exfiltrates the
     # token could keep POSTing here after the run finished, drawing fresh
     # short-lived credentials for the workspace's identity from anywhere, for the
-    # remainder of the hour. A finished run has no legitimate reason to mint.
-    if run.status in run_service.TERMINAL_STATES:
+    # remainder of the hour.
+    #
+    # **`TERMINAL_STATES` was the wrong set, and wrong for exactly the runs that
+    # matter.** A plan-only run never reaches one: it finishes in `planned` and
+    # stays there. A speculative pull-request plan, a module-impact plan and a
+    # drift-detection run are all plan-only -- and are precisely the runs
+    # executing the least-trusted code, an unmerged branch or an unmerged module
+    # PR inside a consumer workspace. So for every one of them the check never
+    # engaged, and the exfiltrated token went on minting the workspace's
+    # plan-phase identity for the rest of its own lifetime.
+    #
+    # The question is not "has this run finished" but "is this run executing the
+    # phase the presented token names". `claim_next_run` moves
+    # `queued -> planning` and `confirmed -> applying` atomically as part of the
+    # claim, and a runner only holds a token after that, so the strict answer
+    # costs the legitimate path nothing.
+    live = run_service.LIVE_STATES_FOR_PHASE.get(user.run_phase or "")
+    if live is None:
+        live = frozenset().union(*run_service.LIVE_STATES_FOR_PHASE.values())
+    if run.status not in live:
         raise HTTPException(
             status_code=409,
-            detail=(f"Run is {run.status} — a finished run cannot mint cloud identity tokens."),
+            detail=(
+                f"Run is {run.status!r}, so it is not executing a "
+                f"{user.run_phase or 'runner'} phase and cannot mint cloud identity "
+                f"tokens. A plan-only run stays `planned` when it finishes, which is "
+                f"why a finished-run check is not enough."
+            ),
         )
 
     snapshot = run.oidc_audiences or {}
@@ -387,6 +444,62 @@ async def mint_cloud_identity_tokens(
         )
 
     phase = user.run_phase
+    if phase is None and settings.auth.oidc_issuer.require_phase:
+        # Also refused when the runner token is issued, which is the better
+        # place to meet it; this is the backstop for a token minted before the
+        # setting was turned on, still inside its TTL.
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "auth.oidc_issuer.require_phase is set and this run's token names no "
+                "phase, so the identity it would present carries no `phase` claim and "
+                "an unphased subject. Upgrade the listener image, or unset "
+                "require_phase until every listener is on v1.10 or later."
+            ),
+        )
+
+    # The pool that actually executed this run, not the workspace's first
+    # choice: `run.pool_id` is rewritten on claim. Claimed because moving a
+    # workspace to another pool -- or adding one, which `pool:assign` on the
+    # DESTINATION allows -- moves where its identity can be minted, and nothing
+    # in the token said so. A target that can read claims (GCP, OpenBao/Vault,
+    # anything with Rego) can now bind it; everywhere else it is at least in the
+    # cloud's own audit log beside the credential it bought.
+    pool = await db.get(AgentPool, run.pool_id) if run.pool_id else None
+
+    # `require_assigned_pool` (#2040). The run's candidate pools are snapshotted
+    # at creation, so detaching a pool from the workspace afterwards leaves this
+    # run claimable by a pool the workspace no longer has -- and which pool runs
+    # a workspace is which listeners its federated credential is reachable from.
+    #
+    # Deliberately NOT "the workspace's primary pool": there is none. The pool
+    # set is flat, `ordinal` is display order carrying no dispatch meaning, and a
+    # run is offered to every pool at once so which one claims it is a race. A
+    # first-pool rule would refuse at random on any multi-pool workspace. The
+    # question asked here is membership, which every legitimate executor passes.
+    #
+    # Queried only when the setting is on, so the default path costs nothing, and
+    # against the junction table rather than `workspace_pool_ids` -- that reads a
+    # lazy relationship `db.get` has not loaded, which raises under asyncio.
+    if settings.auth.oidc_issuer.require_assigned_pool and run.pool_id is not None:
+        still_assigned = await db.scalar(
+            select(WorkspaceAgentPool.agent_pool_id).where(
+                WorkspaceAgentPool.workspace_id == ws.id,
+                WorkspaceAgentPool.agent_pool_id == run.pool_id,
+            )
+        )
+        if still_assigned is None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"auth.oidc_issuer.require_assigned_pool is set and this run was "
+                    f"claimed by agent pool "
+                    f"{pool.name if pool is not None else run.pool_id!s}, which is no "
+                    f"longer assigned to this workspace. Re-assign the pool, or queue "
+                    f"a new run so it is dispatched to the workspace's current pools."
+                ),
+            )
+
     ttl = settings.auth.oidc_issuer.token_ttl_seconds
     pending: list[tuple[str, list[str], dict]] = []
     for target in wanted:
@@ -397,10 +510,19 @@ async def mint_cloud_identity_tokens(
             # Terraform and GitHub both use. It carries the phase as well as the
             # discrete claim below because Azure federated identity credentials
             # match on issuer, subject and audience ONLY -- no arbitrary claims
-            # -- so `sub` is the one place a phase condition can be expressed
-            # there. Clouds that can read arbitrary claims should condition on
-            # `workspace` and `phase` instead, which needs no wildcard.
-            "sub": f"workspace:{ws.name}" + (f":phase:{phase}" if phase else ""),
+            # -- and AWS is the same: a generic IAM OIDC provider conditions only
+            # on `aud`, `oaud`, `sub`, `amr` and `email`, so `workspace_id` and
+            # `phase` are not reachable there either. On both of the clouds most
+            # operators use, `sub` is the ONLY thing a trust policy can bind.
+            #
+            # Which is why it carries the workspace ID by default. A workspace
+            # NAME is mutable and reusable -- any authenticated user can create a
+            # workspace with a free name, an admin can rename one, and deleting a
+            # workspace frees its name -- so a name-only subject is satisfied by
+            # whatever workspace holds that name at the moment it runs. The id is
+            # immutable, and the name grammar excludes `@` and `:`, so the
+            # composite parses unambiguously and no name can forge it.
+            "sub": _subject(ws, phase),
             "aud": audiences,
             "workspace": ws.name,
             "workspace_id": str(ws.id),
@@ -414,6 +536,13 @@ async def mint_cloud_identity_tokens(
         }
         if phase:
             claims["phase"] = phase
+        # Omitted rather than null when a run has no pool -- a locally executed
+        # workspace has none, and a claim present with no value is worse than
+        # absent: a Rego rule testing `input.agent_pool == "prod"` fails either
+        # way, while one testing for presence would pass on a null.
+        if pool is not None:
+            claims["agent_pool"] = pool.name
+            claims["agent_pool_id"] = str(pool.id)
         pending.append((target, audiences, claims))
 
     # Rule 13: one RS256 signature is ~1ms and this signs once per target, so a

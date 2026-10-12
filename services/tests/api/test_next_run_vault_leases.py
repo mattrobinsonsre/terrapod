@@ -290,7 +290,11 @@ class TestJobLaunched:
 
 class TestJobStatusCarriesTerminal:
     async def _report(self, body):
-        run = MagicMock(id=uuid.uuid4())
+        # The pool is shared on purpose: `report_job_status` refuses a listener
+        # from a different pool than the run's, so a fixture leaving both as
+        # distinct auto-mocks would 403 before reaching what this class tests.
+        pool = uuid.uuid4()
+        run = MagicMock(id=uuid.uuid4(), pool_id=pool)
         lid = uuid.uuid4()
         with (
             patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
@@ -300,7 +304,7 @@ class TestJobStatusCarriesTerminal:
                 listener_id=f"listener-{lid}",
                 run_id=f"run-{run.id}",
                 body=body,
-                identity=MagicMock(listener_id=lid),
+                identity=MagicMock(listener_id=lid, pool_id=pool),
                 db=AsyncMock(),
             )
         return run, setter

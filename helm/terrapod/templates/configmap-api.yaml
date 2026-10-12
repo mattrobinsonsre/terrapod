@@ -122,10 +122,13 @@ data:
       legacy_callback_url: {{ .Values.api.config.auth.legacy_callback_url }}
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 | int64 }}
-      {{- /* Per-workspace cloud identity (#1901). `signing_key_pem` is
-             deliberately ABSENT here and always will be: it is a private key,
-             so it arrives via secretKeyRef on the Deployment
-             (api.oidcSigningKey) and must never reach a ConfigMap. */}}
+      {{- /* Per-workspace cloud identity (#1901). `signing_key_pem` and
+             `signing_key_pem_next` are deliberately ABSENT here and always will
+             be: they are private keys, so they arrive via secretKeyRef on the
+             Deployment (api.oidcSigningKey.existingSecret and
+             .nextExistingSecret) and must never reach a ConfigMap. They are
+             therefore not `api.config.*` values either, which is why neither
+             appears in values.yaml or values.schema.json. */}}
       oidc_issuer:
         enabled: {{ ((.Values.api.config.auth).oidc_issuer).enabled | default false }}
         public_url: {{ ((.Values.api.config.auth).oidc_issuer).public_url | default "" | quote }}
@@ -141,6 +144,9 @@ data:
                earlier. Same reasoning as the four auth keys below. */}}
         key_propagation_seconds: {{ ((.Values.api.config.auth).oidc_issuer).key_propagation_seconds | int64 }}
         retired_key_grace_seconds: {{ ((.Values.api.config.auth).oidc_issuer).retired_key_grace_seconds | int64 }}
+        subject_format: {{ ((.Values.api.config.auth).oidc_issuer).subject_format | default "name-and-id" | quote }}
+        require_phase: {{ ((.Values.api.config.auth).oidc_issuer).require_phase | default false }}
+        require_assigned_pool: {{ ((.Values.api.config.auth).oidc_issuer).require_assigned_pool | default false }}
         {{- with ((.Values.api.config.auth).oidc_issuer).audiences }}
         audiences:
           {{- range $target, $auds := . }}

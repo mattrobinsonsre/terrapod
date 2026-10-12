@@ -102,17 +102,24 @@ def set_auth(app: FastAPI, user: AuthenticatedUser) -> None:
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer runtok:"):
             token = auth_header.removeprefix("Bearer ")
-            from terrapod.auth.runner_tokens import verify_runner_token
+            # `verify_runner_token_claims`, matching `get_current_user`, NOT the
+            # older `verify_runner_token`. That one returns the run id alone, so
+            # this override silently dropped the phase and every integration test
+            # of a phase-dependent endpoint ran against an UNPHASED runner
+            # identity -- which is the form a listener predating the phase claim
+            # produces, and the form `auth.oidc_issuer.require_phase` refuses.
+            from terrapod.auth.runner_tokens import verify_runner_token_claims
 
-            run_id = verify_runner_token(token)
-            if run_id is not None:
+            claims = verify_runner_token_claims(token)
+            if claims is not None:
                 return AuthenticatedUser(
                     email="runner",
                     display_name="Runner Job",
                     roles=["everyone"],
                     provider_name="runner_token",
                     auth_method="runner_token",
-                    run_id=run_id,
+                    run_id=claims.run_id,
+                    run_phase=claims.phase,
                 )
         return user
 

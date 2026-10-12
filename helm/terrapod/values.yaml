@@ -91,6 +91,19 @@ api:
   oidcSigningKey:
     existingSecret: ""                      # name of a K8s Secret holding the PEM
     existingSecretKey: "oidc_signing_key"   # key within that Secret
+    # An optional SECOND key, published in the JWKS but never used to sign, so a
+    # BYO deployment can stage a key change the way a generated-key rotation
+    # does: set this to the incoming key, wait for every cloud to refetch the
+    # JWKS, then promote it to existingSecret and clear this.
+    #
+    # Without it a BYO deployment publishes exactly one key at a time, so there
+    # is no moment when both the outgoing and incoming public keys are published
+    # -- federated runs fail from the cutover until each cloud refetches on its
+    # own schedule. Ignored unless existingSecret is also set, and the two must
+    # be different keys (a kid is a thumbprint of the key material, so the same
+    # key twice would publish one JWK twice and stage nothing).
+    nextExistingSecret: ""
+    nextExistingSecretKey: "oidc_signing_key"
 
   # CA bundle for database TLS server-cert verification, used when
   # config.database.ssl_mode is "verify-ca"/"verify-full" (cloud-IAM DB auth).
@@ -364,6 +377,44 @@ api:
         # token_ttl_seconds, or a token signed moments before a rotation stops
         # verifying while it is still inside its own lifetime.
         retired_key_grace_seconds: 3600
+        # What the `sub` claim carries, and therefore what a cloud trust policy
+        # binds to. `name-and-id` is `workspace:<name>@<id>`; `name` is the
+        # v1.10.0 form, `workspace:<name>`.
+        #
+        # A workspace NAME is mutable and reusable -- any authenticated user can
+        # create one with a free name, an admin can rename, and a delete frees
+        # the name -- so a policy bound to a name is satisfied by whichever
+        # workspace holds it when the run happens. The id is immutable, which is
+        # why it is the default.
+        #
+        # Set this to `name` ONLY to migrate trust policies written against
+        # v1.10.0, and change them. It is removed in 2.0.
+        subject_format: name-and-id
+        # Refuse to mint an identity for a run whose runner token names no
+        # phase, and refuse to issue such a runner token at all.
+        #
+        # An unphased token exists only for a listener predating the phase claim.
+        # It yields an identity with no `phase` claim and an unphased `sub`,
+        # which is a form every trust policy then has to remember to exclude --
+        # and a wildcard that forgets to is how a plan-phase run reaches an
+        # apply-phase role. Off by default so an upgrade cannot break a lagging
+        # listener; set it once every listener is on v1.10 or later. It becomes
+        # the default in 2.0.
+        require_phase: false
+        # Refuse to mint an identity for a run whose executing agent pool is no
+        # longer in the workspace's pool set.
+        #
+        # A run snapshots its candidate pools at creation, so detaching a pool
+        # from a workspace mid-flight leaves that run claimable by a pool the
+        # workspace no longer has -- and which pool runs a workspace is which
+        # listeners its federated credential is reachable from. Off by default
+        # because the window is narrow and the refusal fails the run.
+        #
+        # It does NOT constrain multi-pool routing: a workspace's runs are
+        # offered to every pool in its set at once and whichever has a live
+        # listener claims first, so every pool in the set is a legitimate
+        # executor and passes this check.
+        require_assigned_pool: false
         # ── The audience catalogue: deployment defaults, per provider ──
         #
         # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`

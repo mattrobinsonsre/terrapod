@@ -33,15 +33,29 @@ def _a_key_is_loaded():
     pin paths and caching, which does not otherwise need a key. The guard is the
     point of a separate test, so here it just has to be satisfied -- a deployment
     serving either document always has one loaded.
+
+    A real `SigningKey`, not a MagicMock: `_live_keys` compares `retired_at`
+    against a datetime on every read, and a MagicMock attribute raises there
+    rather than standing in for "never retired". Using the dataclass also means
+    its default is the thing under test instead of something this fixture decided.
     """
-    with patch.object(oidc_signing, "_keys", [MagicMock(kid="k-test")]):
+    with patch.object(
+        oidc_signing,
+        "_keys",
+        [oidc_signing.SigningKey(kid="k-test", private_key_pem="")],
+    ):
         yield
 
 
-def _settings(*, public_url="", webhook="", external="", propagation=600):
+def _settings(*, public_url="", webhook="", external="", propagation=600, grace=3600):
     s = MagicMock()
     s.auth.oidc_issuer.public_url = public_url
     s.auth.oidc_issuer.key_propagation_seconds = propagation
+    # A real int: `_live_keys` builds a timedelta from it on every read, so the
+    # route's `_require_loaded` raises TypeError on a MagicMock. Same reason the
+    # audience catalogue is a real dict in the mint's fixture -- a MagicMock
+    # attribute is not a plausible value, it is a different failure.
+    s.auth.oidc_issuer.retired_key_grace_seconds = grace
     s.public_webhook_url = webhook
     s.external_url = external
     return s

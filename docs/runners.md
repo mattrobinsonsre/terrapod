@@ -583,6 +583,52 @@ No variable value — sensitive or not — ever appears in the Job spec, the lis
 
 ---
 
+## What a listener may and may not do
+
+A listener **reports outcomes; it does not decide them**. Three boundaries enforce
+that, and each closed a path that reached further than it looks.
+
+**A listener may only report the transitions its Job can have produced.** The
+status PATCH took a free `status`, and `planned -> confirmed` is a valid
+transition — so a listener could confirm its own pool's planned runs, which skips
+the `run:apply` capability check, the human confirmation itself, the staleness and
+plan-expiry guards, the cloud-identity staleness check, the
+CLI-configuration-version-on-a-VCS-workspace block and the mergeability gate. The
+allowed set is now keyed on the `(from, to)` pair:
+
+| from | to |
+|---|---|
+| `planning` | `planned`, `errored`, `queued` (the plan-phase unclaim) |
+| `applying` | `applied`, `errored`, `confirmed` (the apply-phase unclaim) |
+| `canceling` | `canceled`, `applied`, `errored` |
+
+Anything else answers **403**. The pair matters: `confirmed` is the bypass from
+`planned` and the legitimate unclaim from `applying`, so a rule keyed on the
+target alone would either reopen the first or break the second. Re-reporting a
+status a run already has is untouched, because that is a retry.
+
+**The runner-token endpoint checks the caller's certificate.** It compared only
+the path's listener id — which the caller chooses — so any holder of a valid
+listener certificate from **any** pool could name another pool's listener and one
+of its runs and be issued a runner token for it. Since per-workspace cloud
+identity that reached the target workspace's federated credentials with claims no
+cloud-side trust policy can distinguish from legitimate ones, so a low-trust pool
+reached a high-trust pool's apply identity. The certificate is checked first, and
+before the run-ownership check.
+
+**A runner token is issued, and mints cloud identity, only while its phase is
+running.** Both endpoints refused only terminal runs — and a **plan-only run
+never reaches a terminal state**: it finishes in `planned` and stays there.
+Speculative pull-request plans, module-impact plans and drift runs are all
+plan-only, and are exactly the runs executing unmerged code, so for them the check
+never engaged and an exfiltrated token kept working for its whole lifetime. The
+rule is now the run's state: `planning` for a plan-phase token, `confirmed` or
+`applying` for apply. Anything else answers **409**.
+
+A requested `ttl` must be a positive integer, and
+`runners.maxTokenTTLSeconds: 0` now means *the shipped default cap* rather than
+*no cap at all*.
+
 ## Listener Identity
 
 A listener is the long-lived Deployment that watches for runs and creates Job pods. It authenticates to the API with a short-lived X.509 certificate issued by the built-in CA. This section describes how that identity is bootstrapped, persisted, and renewed.

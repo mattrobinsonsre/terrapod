@@ -38,6 +38,9 @@ import uuid
 from dataclasses import dataclass
 
 from terrapod.auth.token_signing import get_token_signing_key
+from terrapod.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 #: The phases a Job runs, and so the only values a token may claim. One Job runs
 #: one phase (`TP_PHASE`, taken from the listener's own `phase`), which is what
@@ -60,6 +63,35 @@ class RunnerTokenClaims:
 def _get_signing_key() -> bytes:
     """Get the stable HMAC signing key (dedicated secret, or DB-URL fallback)."""
     return get_token_signing_key()
+
+
+def _effective_max_ttl(configured: int) -> int:
+    """The cap to clamp a requested TTL against. Never unbounded.
+
+    A non-positive `max_token_ttl_seconds` used to mean NO CAP -- the clamp was
+    `if max_ttl > 0 and ttl > max_ttl` -- so `0` minted a token of whatever
+    lifetime the caller asked for. A runner token reads and writes the run's
+    artifacts and state, and since per-workspace cloud identity it also converts
+    into the workspace's federated cloud credentials, so an unbounded one is not
+    a configuration an operator should be able to express by accident.
+
+    `0` now means "use the shipped default", read off the model's own field so
+    there is no second copy of the number to drift. An operator who genuinely
+    wants a long cap sets a large value explicitly, which is a readable choice
+    where a magic zero was not.
+    """
+    if configured > 0:
+        return configured
+    from terrapod.config import RunnerConfig
+
+    default = RunnerConfig.model_fields["max_token_ttl_seconds"].default
+    logger.warning(
+        "max_token_ttl_seconds is not positive; using the default cap rather than "
+        "minting an unbounded runner token",
+        configured=configured,
+        using=default,
+    )
+    return int(default)
 
 
 def _sign(message: str) -> str:
@@ -88,8 +120,8 @@ def generate_runner_token(
     from terrapod.config import load_runner_config
 
     config = load_runner_config()
-    max_ttl = config.max_token_ttl_seconds
-    if max_ttl > 0 and ttl > max_ttl:
+    max_ttl = _effective_max_ttl(config.max_token_ttl_seconds)
+    if ttl > max_ttl:
         ttl = max_ttl
 
     rid = str(run_id)

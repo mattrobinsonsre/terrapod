@@ -39,6 +39,7 @@ MANAGEMENT_WRITES = [
     ("POST", "/api/v1/catalog-items"),
     ("PUT", "/api/v2/state-versions/sv-1/content"),
     ("POST", "/oauth/token"),
+    ("POST", "/api/terrapod/v1/oidc/signing-keys/actions/rotate"),
 ]
 
 
@@ -98,6 +99,24 @@ class TestAFollowerRefusesWrites:
         resp = await _request("GET", "/api/v1/workspaces", leader=False)
 
         assert resp.status_code == 200
+
+    async def test_rotating_the_OIDC_SIGNING_KEY_is_refused(self):
+        """Not a new refusal -- the gate's allow-list has always excluded it --
+        but it has no test and the reason it matters changed.
+
+        `oidc_signing_keys` is replicated, so a follower now receives the
+        leader's keys rather than generating its own. A rotation here would
+        therefore write rows that FIGHT the leader's: the follower would publish
+        and sign with a key the leader has never heard of, until the next
+        reconciliation erased it -- and the clouds would have cached it in the
+        meantime. Before replication the failure was a follower with its own
+        unrelated key; now it is two nodes disagreeing about the trust root.
+        """
+        resp = await _request(
+            "POST", "/api/terrapod/v1/oidc/signing-keys/actions/rotate", leader=False
+        )
+
+        assert resp.status_code == 503
 
     async def test_the_token_mint_is_refused(self):
         """`api_tokens` is replicated, so a token minted here is erased at the
