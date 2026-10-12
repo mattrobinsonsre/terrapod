@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 from sqlalchemy import text
 
@@ -69,6 +70,20 @@ async def _row_count() -> int:
 
 def _kids(jwks: dict) -> set[str]:
     return {entry["kid"] for entry in jwks["keys"]}
+
+
+async def _unretired_kids() -> set[str]:
+    """Read from the ROW, not from the published set.
+
+    A key with no `retired_at` is one no grace window can ever expire, and that
+    is invisible in the JWKS -- which shows it exactly as it shows a key retired
+    one second ago. The defect this exists for lived in that gap.
+    """
+    async with get_db_session() as session:
+        rows = await session.execute(
+            text("SELECT kid FROM oidc_signing_keys WHERE retired_at IS NULL")
+        )
+        return {r[0] for r in rows}
 
 
 class TestTheInitRace:
@@ -203,6 +218,108 @@ class TestRotation:
             "tokens signed with it keep verifying indefinitely"
         )
         assert get_signing_key().kid == new.kid
+
+    async def test_a_SECOND_rotation_inside_the_window_orphans_nothing(self, app):
+        """The regression test for the orphaned-key defect.
+
+        Rotation used to retire only the key *currently signing*. During a
+        propagation window the signer is the PREVIOUS key, already retired
+        (tier 2 of `_choose_signing_kid`) -- so a second rotation in that window
+        found `retired_at` already set, retired nothing, and left the first
+        rotation's pending key unretired for ever. No `retired_at` means no
+        grace window to measure, so it stayed published until it eventually
+        began signing and some later rotation happened to catch it.
+
+        Rotating twice in quick succession is not an odd thing to do: it is what
+        an operator does during a key-compromise incident, which is precisely
+        when they believe a key has been revoked and need that to be true.
+
+        The property is stated as an invariant rather than as a count of this
+        scenario: **after any rotation exactly one key is unretired, and it is
+        the new one.**
+        """
+        await _clean_slate()
+        first_kid = await _init_once()
+
+        async with get_db_session() as session:
+            second = await rotate_signing_key(session)
+
+        # Mid-window: the incoming key is not yet active, so the retired first
+        # key is what signs. This is the state the defect needed.
+        assert get_signing_key().kid == first_kid
+
+        async with get_db_session() as session:
+            third = await rotate_signing_key(session)
+
+        assert await _row_count() == 3, "each rotation adds a key"
+        assert await _unretired_kids() == {third.kid}, (
+            "a key is published with no retirement date after a second rotation "
+            "inside the propagation window, so nothing can ever expire it -- "
+            "during a compromise the operator believes it is revoked and it is "
+            "still a live trust root"
+        )
+        # And the two retired ones are still published, because tokens minted
+        # before each rotation have to keep verifying for their grace window.
+        assert _kids(get_jwks()) == {first_kid, second.kid, third.kid}
+
+    async def test_two_replicas_rotating_at_once_still_leave_one_unretired_key(self, app):
+        """Rotation takes the same advisory lock as init, for the same reason.
+
+        Unserialised, both replicas read "the unretired set is {A}", both retire
+        A, and both insert their own key -- leaving TWO unretired keys and no
+        answer to "which one is current". That is the orphan defect arriving by
+        a second route, and it needs no propagation window to reach: two
+        operators, or one operator and a retry, are enough.
+
+        The lock makes the loser's read happen after the winner's write, so it
+        retires the winner's key and the invariant holds: exactly one unretired
+        key, and it is the newest.
+        """
+        await _clean_slate()
+        await _init_once()
+
+        async def _rotate() -> str:
+            async with get_db_session() as session:
+                return (await rotate_signing_key(session)).kid
+
+        kids = await asyncio.gather(*[_rotate() for _ in range(2)])
+
+        assert await _row_count() == 3, "each rotation adds exactly one key"
+        unretired = await _unretired_kids()
+        assert len(unretired) == 1, (
+            f"two concurrent rotations left {len(unretired)} unretired keys "
+            f"({unretired}) -- each one a trust root nothing can expire"
+        )
+        assert unretired <= set(kids)
+
+    async def test_the_emergency_zero_window_rotation_unpublishes_at_once(self, app):
+        """`key_propagation_seconds=0` with `retired_key_grace_seconds=0`.
+
+        This is the configuration the compromise runbook tells an operator to
+        set: sign with the new key now, stop publishing the old one now. Both
+        values accept 0 deliberately -- which is also why the chart renders them
+        with no `| default`, since a Go template treats 0 as empty and would
+        silently restore the ordinary windows at the worst possible moment.
+        """
+        await _clean_slate()
+        old_kid = await _init_once()
+
+        # Patched on the INSTANCE, not the class: these are Pydantic fields, so
+        # the class carries no such attribute and `patch.object(type(cfg), ...)`
+        # raises. Everything that reads them goes through this one singleton.
+        cfg = settings.auth.oidc_issuer
+        with (
+            patch.object(cfg, "key_propagation_seconds", 0),
+            patch.object(cfg, "retired_key_grace_seconds", 0),
+        ):
+            async with get_db_session() as session:
+                new = await rotate_signing_key(session)
+
+            assert _kids(get_jwks()) == {new.kid}, (
+                f"{old_kid} is still published after an emergency rotation, so "
+                "every cloud goes on trusting the compromised key"
+            )
+            assert get_signing_key().kid == new.kid
 
     async def test_a_rotation_reaches_another_replica_without_a_restart(self, app):
         """One replica rotates; another picks it up by re-reading the table.

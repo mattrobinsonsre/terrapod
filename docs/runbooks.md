@@ -2885,6 +2885,22 @@ curl -fsS -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
 Restore the defaults afterwards, in a separate change — zero windows make every
 later routine rotation break tokens in flight.
 
+**One rotation is enough, and rotating twice is safe.** A rotation retires *every*
+key that was not already retired, not only the one currently signing, so it cannot
+leave a key published with no retirement date for any grace window to measure. It
+also takes an advisory lock, so two replicas — or an operator and a retry —
+rotating at once cannot each leave their own key behind.
+
+**A replica that cannot reach the database stops serving expired keys**, rather
+than holding its last key set indefinitely. It filters the grace window every time
+it answers, so with `retired_key_grace_seconds: 0` the compromised key leaves its
+JWKS at once even on a replica that never saw the rotation. Such a replica then
+answers 503 on both issuer documents and refuses to mint, which is the correct
+direction during an incident: a run fails rather than presenting an identity you
+have withdrawn, and the thirty-second refresh task recovers the process as soon as
+the database is reachable. Note the cloud-side cache caveat below still applies —
+un-publishing a key is not the same as it being untrusted.
+
 **If the deployment signs with an operator-supplied key**
 (`api.oidcSigningKey.existingSecret`), the rotate endpoint answers **409**: the key
 is yours, and so is replacing it. Generate a new RSA key, update the Secret, and

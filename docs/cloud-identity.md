@@ -674,6 +674,15 @@ the claims below:
 > claim here — but if you ever see a condition evaluate against something you did
 > not expect, that precedence is why.
 
+**The issuer URL is validated at startup**, because every way of getting it wrong
+fails in the cloud rather than here. Whichever of `auth.oidc_issuer.public_url`,
+`public_webhook_url` or `external_url` resolves it, the result must be an absolute
+`https` URL with no query string or fragment -- note that `webhookIngress.tls=false`
+produces an `http` one, which the chart renders without complaint and no cloud will
+fetch. A trailing slash on `public_url` is refused too: Terrapod strips it, so the
+minted `iss` would not equal the string you configured the cloud with, and issuer
+matching is exact.
+
 An aliased configuration reads its own file:
 
 ```hcl
@@ -1066,8 +1075,20 @@ after a catalogue edit, and it only affects runs that were already planned.
 Terrapod signs with **RS256 over a 2048-bit RSA key**. Not the listener CA's
 Ed25519: at least one major cloud does not accept EdDSA for workload identity
 federation, and a federation path that works on two clouds out of three is not
-worth the elegance. A non-RSA key is refused by name at startup rather than
-published as a JWKS the clouds silently cannot use.
+worth the elegance.
+
+A key is refused **by name, and the API refuses to start** unless it is RSA, at
+least 2048 bits, and uses public exponent 65537. Those rules apply to a key you
+supply, since the one Terrapod generates satisfies them by construction. Refusing
+rather than warning is the point: a 1024-bit key produces a perfectly well-formed
+JWKS that every cloud verifies happily, so nothing downstream would ever complain
+and the weakness would be invisible until somebody factored it.
+
+> **This is the one startup failure that is NOT tolerant.** A database that is not
+> ready yet only warns -- a pod starting before the migration Job finishes must
+> still come up, and it recovers within thirty seconds. A key from a Secret is not
+> transient and no retry can fix it, so forgiving it would leave the pod Ready for
+> ever while both issuer routes answered 503.
 
 **By default the key is generated on first startup and persisted in the
 database**, the same model as the listener CA — one source of truth, loaded on
@@ -1115,7 +1136,19 @@ cloud has not had a chance to fetch:
 | | |
 |---|---|
 | The new key is **published immediately** | and starts signing only after `key_propagation_seconds` (default 600). **Until then the retired key keeps signing** — it is still in the published JWKS, so its tokens verify, whereas the incoming key is precisely the one the clouds lack |
-| The old key is **retired immediately** | but stays published for `retired_key_grace_seconds` (default 3600), because the tokens it already signed are still inside their own lifetime |
+| **Every** key that was not already retired is **retired immediately** | each staying published for `retired_key_grace_seconds` (default 3600), because the tokens they already signed are still inside their own lifetime |
+
+**Every** is load-bearing, and the normal case hides why. Rotating twice inside a
+propagation window -- which is what an operator does during an incident -- leaves
+the *previous* key signing at the moment of the second rotation, because that is
+what tier 2 above is for. A rotation that retired only the signer therefore
+retired nothing the second time, and the first rotation's incoming key stayed
+published with no retirement date for any grace window to measure. Retiring all of
+them is also the honest reading of what a rotation means: from here on, exactly
+one key is current.
+
+Rotation takes the same Postgres advisory lock as first-startup key creation, so
+two replicas rotating at once cannot each leave their own key unretired.
 
 `retired_key_grace_seconds` has to exceed `token_ttl_seconds`, or a token signed
 moments before a rotation stops verifying while still inside its own lifetime. It

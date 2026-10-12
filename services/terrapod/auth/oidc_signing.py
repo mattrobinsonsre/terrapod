@@ -56,10 +56,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
-#: Stable, arbitrary key for the Postgres advisory lock serialising issuer-key
-#: initialisation across replicas. Distinct from the CA's (#1060) — two different
-#: singletons must not queue behind each other.
-_OIDC_KEY_INIT_ADVISORY_LOCK = 776699001133
+#: Stable, arbitrary key for the Postgres advisory lock serialising WRITES to the
+#: issuer-key table across replicas -- initialisation and rotation alike. One lock
+#: for both on purpose: they contend for the same rows, and a rotation racing an
+#: init is the same hazard as two rotations racing. Distinct from the CA's (#1060)
+#: — two different singletons must not queue behind each other.
+_OIDC_KEY_WRITE_ADVISORY_LOCK = 776699001133
 
 #: 2048 is the floor every cloud accepts and the size every cloud's docs use.
 #: 4096 buys nothing here: the token lives minutes and the key rotates.
@@ -77,6 +79,13 @@ class SigningKey:
     #: None for an operator-supplied key, which has no row and cannot be rotated
     #: by us.
     row_id: uuid.UUID | None = None
+    #: When this key was retired, carried so a READ can drop it once its grace
+    #: window passes rather than relying on the next successful reload to do it.
+    #: A replica that cannot reach the database holds this set indefinitely, and
+    #: without the read-side filter it would keep publishing -- and signing with
+    #: -- a key the operator revoked during an incident. None for a key that was
+    #: never retired, and for an operator-supplied key.
+    retired_at: datetime | None = None
 
 
 #: Process-wide cache of the resolved set. Rebuilt by `init_oidc_signing` and by
@@ -123,10 +132,26 @@ def serialize_private_key(key: rsa.RSAPrivateKey) -> str:
 
 
 def load_private_key(pem: str) -> rsa.RSAPrivateKey:
-    """Load a PKCS8/PKCS1 PEM, refusing anything that is not an RSA key.
+    """Load a PKCS8/PKCS1 PEM, refusing anything we would not sign a trust root with.
 
-    An operator who supplies an Ed25519 or EC key gets a named error at startup
-    rather than a JWKS the clouds silently cannot use.
+    Three refusals, all of which an operator meets at startup rather than as a
+    JWKS the clouds silently cannot use, or -- worse -- one they happily can:
+
+    * **Not RSA.** EdDSA and EC are not accepted by every cloud's workload
+      identity federation, so Terrapod does not offer them.
+    * **Under 2048 bits.** A 1024-bit RSA key is not considered safe for a signing
+      key with a published trust root, and nothing downstream would complain: the
+      JWKS is well-formed, every cloud verifies happily, and the weakness is
+      invisible until someone factors it. 2048 is the floor NIST sets and what
+      `generate_private_key` produces, so this refuses only a key an operator
+      supplied.
+    * **Exponent other than 65537.** Small exponents (3, 17) have a history of
+      padding-oracle and Bleichenbacher-adjacent trouble with RSA signatures, and
+      there is no reason for an issuer key to use one.
+
+    The size and exponent rules apply to Terrapod's own generated keys as well --
+    they satisfy both by construction, which is the point: a single door means a
+    future change to `_RSA_KEY_SIZE` cannot quietly drop below the floor.
     """
     key = serialization.load_pem_private_key(pem.encode(), password=None)
     if not isinstance(key, rsa.RSAPrivateKey):
@@ -134,6 +159,20 @@ def load_private_key(pem: str) -> rsa.RSAPrivateKey:
             f"OIDC issuer signing key must be RSA (RS256), got {type(key).__name__}. "
             "EdDSA and EC keys are not accepted by every cloud's workload identity "
             "federation, so Terrapod does not offer them."
+        )
+    if key.key_size < _RSA_KEY_SIZE:
+        raise ValueError(
+            f"OIDC issuer signing key must be at least {_RSA_KEY_SIZE} bits, got "
+            f"{key.key_size}. This key signs tokens a cloud exchanges for real "
+            "credentials, and its public half is published for anyone to fetch. "
+            "Supply a stronger key in api.oidcSigningKey.existingSecret, or remove "
+            "it and let Terrapod generate one."
+        )
+    if key.public_key().public_numbers().e != _RSA_PUBLIC_EXPONENT:
+        raise ValueError(
+            f"OIDC issuer signing key must use public exponent {_RSA_PUBLIC_EXPONENT}, "
+            f"got {key.public_key().public_numbers().e}. Small exponents have a history "
+            "of trouble with RSA signature padding and no issuer key needs one."
         )
     return key
 
@@ -191,6 +230,47 @@ def _configured_key_pem() -> str | None:
     return pem or None
 
 
+def validate_configured_signing_key() -> None:
+    """Raise if the operator supplied a key we cannot sign with. No-op otherwise.
+
+    Exists so the lifespan can refuse to START, which `init_oidc_signing` cannot
+    do for it: that call is wrapped in a tolerant `except Exception` on purpose,
+    because a pod starting before the migration Job finishes must still come up
+    and the refresh task recovers it thirty seconds later.
+
+    That tolerance is right for a database and wrong for a PEM. The key comes
+    from a Secret, so nothing about it is transient and no retry can fix it --
+    without this the pod reports Ready for ever while both issuer routes answer
+    503 and the only evidence is one warning in the startup log. Separating the
+    two is possible precisely because the key's source is not the database.
+
+    It is NOT a config validator, though that is where it belongs on first
+    reading. `terrapod.config` must import nothing from Terrapod (#1151): its
+    validators run during its own module import, and the config-contract check
+    parses the real models in a container holding pydantic and pyyaml alone --
+    reaching `cryptography` from there is a `ModuleNotFoundError`.
+
+    Must be called OUTSIDE the lifespan's try, or it is simply another thing the
+    tolerant handler swallows. `test_the_supplied_key_check_is_outside_the_try`
+    pins the position, because no behavioural test can see it.
+    """
+    configured = _configured_key_pem()
+    if configured is None:
+        return
+    try:
+        load_private_key(configured)
+    except Exception as exc:
+        # One branch, deliberately. `load_private_key` raises ValueError for the
+        # rules it enforces and cryptography raises its own for a malformed or
+        # encrypted PEM; classifying them would only risk re-raising one bare,
+        # without saying which Secret to go and fix.
+        raise ValueError(
+            f"auth.oidc_issuer.signing_key_pem is not usable: {exc} (it comes from the "
+            f"Secret named by api.oidcSigningKey.existingSecret, key "
+            f"api.oidcSigningKey.existingSecretKey)"
+        ) from exc
+
+
 async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
     """Resolve the signing set at startup: operator's key, else the database.
 
@@ -211,7 +291,7 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
         logger.info("OIDC issuer using the operator-supplied signing key", kid=kid)
         return _keys
 
-    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _OIDC_KEY_INIT_ADVISORY_LOCK})
+    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _OIDC_KEY_WRITE_ADVISORY_LOCK})
 
     rows = (
         (await db.execute(select(OIDCSigningKey).order_by(OIDCSigningKey.created_at.asc())))
@@ -251,7 +331,12 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
             "retired_key_grace_seconds. Rotate to mint a new one."
         )
 
-    _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
+    _keys = [
+        SigningKey(
+            kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id, retired_at=r.retired_at
+        )
+        for r in live
+    ]
     _signing_kid = _choose_signing_kid(live, grace_seconds=grace)
     logger.info(
         "Loaded OIDC issuer signing keys",
@@ -322,16 +407,28 @@ def _choose_signing_kid(rows: list, *, grace_seconds: int) -> str:
 
 
 def get_signing_key() -> SigningKey:
-    """The key to sign with. Raises when nothing has been initialised."""
+    """The key to sign with. Raises when nothing usable is loaded.
+
+    Checked against `_live_keys` rather than `_keys`, so a replica that has not
+    been able to reload since a rotation stops signing once the chosen key ages
+    out of its grace window instead of minting tokens with a key the operator
+    revoked. Failing the mint is the right direction: the run fails rather than
+    presenting an identity the deployment has withdrawn, and the refresh task
+    recovers the process as soon as the database is reachable.
+    """
     if _keys is None or _signing_kid is None:
         raise RuntimeError(
             "OIDC issuer signing key not initialised — init_oidc_signing() runs in "
             "the app lifespan."
         )
-    for k in _keys:
+    for k in _live_keys():
         if k.kid == _signing_kid:
             return k
-    raise RuntimeError(f"OIDC signing key {_signing_kid} is not in the loaded set")
+    raise RuntimeError(
+        f"OIDC signing key {_signing_kid} is not in this process's live set — it is "
+        "either absent or retired beyond retired_key_grace_seconds. This process "
+        "cannot sign until it reloads from the database."
+    )
 
 
 async def refresh_signing_keys_cycle() -> None:
@@ -362,15 +459,51 @@ async def refresh_signing_keys_cycle() -> None:
             await init_oidc_signing(db)
 
 
+def _live_keys() -> list[SigningKey]:
+    """The loaded keys that are still published, judged NOW.
+
+    `reload_signing_keys` filters the grace window when it reads, which is
+    enough only while it keeps succeeding. It raises before assigning -- so a
+    database outage deliberately leaves the last good set in place -- and that
+    set keeps whatever retired keys it held, past their grace window, for as
+    long as the outage lasts. The replica goes on publishing them in its JWKS
+    and `_choose_signing_kid` can go on picking one to sign with.
+
+    During an ordinary blip that is the right trade. During a key-compromise
+    incident it is the failure the operator is specifically trying to prevent:
+    they rotate, set the grace to 0 to stop publishing the compromised key now,
+    and one unreachable replica keeps serving it as a trust root with no
+    expiry. Filtering on read bounds that by the grace window instead of by the
+    outage, which is the one thing the operator can reason about.
+
+    Returns [] rather than raising; the callers differ in what they do about it.
+    """
+    if _keys is None:
+        return []
+    from terrapod.config import settings
+
+    cutoff = datetime.now(UTC) - timedelta(
+        seconds=settings.auth.oidc_issuer.retired_key_grace_seconds
+    )
+    return [k for k in _keys if k.retired_at is None or k.retired_at > cutoff]
+
+
 def signing_keys_loaded() -> bool:
     """Whether a usable signing set is in this process.
 
     Exists so the refresh task can tell recovery from steady state without
-    reaching into the module global. `None` means initialisation has not
+    reaching into the module global. False means initialisation has not
     succeeded in this process -- not that the deployment has no key, which is
     the distinction the task turns on.
+
+    It also goes False when everything loaded has aged past its grace window,
+    which is what routes that recovery case into `init_oidc_signing` rather
+    than `reload_signing_keys`: `reload` would raise and leave the expired set
+    in place, while `init` re-reads and can mint. Both issuer documents then
+    answer 503 together, which is the existing intent -- a 200 discovery
+    document pointing at a JWKS that refuses is worse than neither.
     """
-    return _keys is not None
+    return bool(_live_keys())
 
 
 def get_jwks() -> dict[str, list[dict[str, str]]]:
@@ -393,11 +526,24 @@ def get_jwks() -> dict[str, list[dict[str, str]]]:
             "the app lifespan."
         )
 
-    kids = tuple(k.kid for k in _keys)
+    # `_live_keys`, not `_keys`: a key past its grace window is not published,
+    # and this is the document that decides what the clouds trust. The memo is
+    # keyed on the LIVE kids for the same reason -- the same `_keys` yields a
+    # different document once one of them ages out, so keying on `_keys` would
+    # serve a revoked key from cache for as long as the process ran.
+    live = _live_keys()
+    if not live:
+        raise RuntimeError(
+            "No live OIDC issuer signing key in this process — every loaded key is "
+            "retired beyond retired_key_grace_seconds. Refusing to publish an empty "
+            "key set, which a cloud would cache as a trust root of nothing."
+        )
+
+    kids = tuple(k.kid for k in live)
     if _jwks_cache is not None and _jwks_cache[0] == kids:
         return _jwks_cache[1]
 
-    jwks = {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
+    jwks = {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in live]}
     _jwks_cache = (kids, jwks)
     return jwks
 
@@ -426,6 +572,11 @@ async def rotate_signing_key(db: AsyncSession) -> SigningKey:
     cfg = settings.auth.oidc_issuer
     now = datetime.now(UTC)
 
+    # Serialise against init and against another replica's rotation. Held to
+    # commit, so the read of what to retire and the write that retires it cannot
+    # interleave with a second rotation reading the same rows.
+    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _OIDC_KEY_WRITE_ADVISORY_LOCK})
+
     # RSA-2048 keygen is hundreds of milliseconds and highly variable, and this
     # runs inside an `async def` route handler -- rule 13. Admin-only so the
     # frequency is low, but it is exactly the CPU work that rule names.
@@ -438,19 +589,41 @@ async def rotate_signing_key(db: AsyncSession) -> SigningKey:
     )
     db.add(row)
 
-    # Retire whatever is signing now. It keeps verifying for the grace window.
-    current = get_signing_key()
-    if current.row_id is not None:
-        existing = await db.get(OIDCSigningKey, current.row_id)
-        if existing is not None and existing.retired_at is None:
-            existing.retired_at = now
+    # Retire EVERY unretired key, not just the one currently signing.
+    #
+    # Retiring only the signer orphaned a key on the second rotation inside a
+    # propagation window, which is exactly when an operator rotates twice: during
+    # that window the signer is the PREVIOUS key, already retired (tier 2 of
+    # `_choose_signing_kid`), so `retired_at is None` was false and the first
+    # rotation's pending key was never retired at all. It stayed published, with
+    # no `retired_at` for any grace window to measure, until it eventually began
+    # signing and some later rotation happened to catch it. On a compromise the
+    # operator believes they have revoked a key and it is still a live trust root.
+    #
+    # Retiring all of them is also the honest reading of what a rotation means:
+    # from here on, exactly one key is current. The new row is excluded by `kid`
+    # rather than by id -- it has none until flush -- and the grace window keeps
+    # every retired key verifying for tokens already minted.
+    unretired = (
+        (
+            await db.execute(
+                select(OIDCSigningKey).where(
+                    OIDCSigningKey.retired_at.is_(None), OIDCSigningKey.kid != kid
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for existing in unretired:
+        existing.retired_at = now
 
     await db.commit()
     await reload_signing_keys(db)
     logger.info(
         "Rotated the OIDC issuer signing key",
         new_kid=kid,
-        retired_kid=current.kid,
+        retired_kids=[r.kid for r in unretired],
         signs_from=row.activates_at.isoformat(),
     )
     return SigningKey(kid=kid, private_key_pem=row.private_key_pem, row_id=row.id)
@@ -482,7 +655,12 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
     if not live:
         raise RuntimeError("No live OIDC issuer signing key after reload")
 
-    _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
+    _keys = [
+        SigningKey(
+            kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id, retired_at=r.retired_at
+        )
+        for r in live
+    ]
     _signing_kid = _choose_signing_kid(
         live, grace_seconds=settings.auth.oidc_issuer.retired_key_grace_seconds
     )

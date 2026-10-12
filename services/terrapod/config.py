@@ -7,6 +7,7 @@ Non-secret configuration loaded from YAML file, secrets from environment variabl
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import yaml
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn, field_validator, model_validator
@@ -3272,17 +3273,55 @@ class Settings(BaseSettings):
         if not self.auth.oidc_issuer.enabled:
             return self
 
-        if not (
-            (self.auth.oidc_issuer.public_url or "").strip()
-            or (self.public_webhook_url or "").strip()
-            or (self.external_url or "").strip()
-        ):
+        # Mirrors `issuer_url()`'s fallback chain. Validating the RESOLVED value
+        # rather than each setting is the point: two of the three serve other
+        # purposes as well, and what a cloud matches is whatever came out.
+        candidates = [
+            ("auth.oidc_issuer.public_url", (self.auth.oidc_issuer.public_url or "").strip()),
+            ("api.config.public_webhook_url", (self.public_webhook_url or "").strip()),
+            ("api.config.external_url", (self.external_url or "").strip()),
+        ]
+        chosen = next((pair for pair in candidates if pair[1]), None)
+        if chosen is None:
             raise ValueError(
                 "auth.oidc_issuer.enabled is true but no issuer URL resolves. Set "
                 "auth.oidc_issuer.public_url, or webhookIngress.hostname (which "
                 "derives api.config.public_webhook_url), or api.config.external_url. "
                 "It must be a URL the cloud provider can reach, not a private "
                 "management hostname."
+            )
+        source, resolved = chosen
+
+        parts = urlsplit(resolved)
+        lead = f"auth.oidc_issuer.enabled is true but the issuer URL resolved from {source} "
+
+        if parts.scheme != "https" or not parts.netloc:
+            raise ValueError(
+                f"{lead}({resolved!r}) is not an absolute https URL. Workload identity "
+                "federation requires https: AWS, Azure and GCP all refuse to fetch an "
+                "http issuer's discovery document, and the refusal surfaces at the "
+                "cloud's token exchange rather than here. Note webhookIngress.tls=false "
+                "produces an http URL."
+            )
+        if parts.query or parts.fragment:
+            raise ValueError(
+                f"{lead}({resolved!r}) carries a query string or fragment. An issuer is "
+                "a bare origin and path; the cloud appends "
+                "/.well-known/openid-configuration to it, which a query or fragment "
+                "would land in the wrong place."
+            )
+        # Only for `public_url`. `issuer_url()` strips a trailing slash from all
+        # three, so this changes nothing mechanically -- it refuses a value that
+        # does not equal what the operator must configure the cloud with, since
+        # OIDC issuer matching is exact and `https://x/` is not `https://x`. The
+        # two fallbacks are not issuer settings and are left to the strip.
+        if source == "auth.oidc_issuer.public_url" and resolved != resolved.rstrip("/"):
+            raise ValueError(
+                f"{lead}({resolved!r}) has a trailing slash. Terrapod strips it, so the "
+                f"minted `iss` would be {resolved.rstrip('/')!r} -- and OIDC issuer "
+                "matching is exact, so a cloud configured with the slash would reject "
+                "every token. Remove it here and configure the cloud with the same "
+                "string."
             )
 
         return self
