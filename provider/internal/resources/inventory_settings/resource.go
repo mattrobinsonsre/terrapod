@@ -29,6 +29,8 @@ var (
 
 type inventorySettingsResource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 // NewResource returns the terrapod_inventory_settings resource.
@@ -56,9 +58,16 @@ func (r *inventorySettingsResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"workspace_id": schema.StringAttribute{
 				Description: "The workspace whose inventory this configures (e.g. \"ws-abc123\"). It is the " +
-					"key, so pointing these settings at another workspace is a destroy and create.",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					"key, so pointing these settings at another workspace is a destroy and create." +
+					" Defaults to the provider's `workspace` attribute or TERRAPOD_WORKSPACE, which a " +
+					"run exports from its own workspace in both phases — so inside a run this can " +
+					"be left out.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"include_platform": schema.BoolAttribute{
 				Description: "Whether the hosts, groups and variables declared through Terrapod contribute to " +
@@ -132,6 +141,7 @@ func (r *inventorySettingsResource) Configure(_ context.Context, req resource.Co
 		return
 	}
 	r.tc = tc
+	r.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (r *inventorySettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -237,6 +247,9 @@ func (r *inventorySettingsResource) ImportState(ctx context.Context, req resourc
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
 func (r *inventorySettingsResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Before the keep-computed step, so an unconfigured workspace_id is already a
+	// known value by the time anything compares the plan against state (#2036).
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.defaultWorkspace)
 	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
 		[]string{
 			"workspace_id", "include_platform", "vcs_connection_id",

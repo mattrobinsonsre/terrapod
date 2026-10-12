@@ -74,6 +74,7 @@ type terrapodProviderModel struct {
 	Hostname      types.String `tfsdk:"hostname"`
 	Token         types.String `tfsdk:"token"`
 	SkipTLSVerify types.Bool   `tfsdk:"skip_tls_verify"`
+	Workspace     types.String `tfsdk:"workspace"`
 }
 
 // New returns a new provider.Provider.
@@ -116,6 +117,14 @@ func (p *terrapodProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Description: "Skip TLS certificate verification. Can also be set via TERRAPOD_SKIP_TLS_VERIFY.",
 				Optional:    true,
 			},
+			"workspace": schema.StringAttribute{
+				Description: "The workspace a resource uses when its own `workspace_id` is not set " +
+					"(e.g. \"ws-abc123\"). Can also be set via TERRAPOD_WORKSPACE, which a Terrapod run " +
+					"exports from its own workspace in both the plan and the apply phase — so inside a run " +
+					"`provider \"terrapod\" {}` needs nothing and inventory resources need no workspace id. " +
+					"Supply it yourself for a local apply, where there is no run to export it.",
+				Optional: true,
+			},
 		},
 	}
 }
@@ -150,7 +159,20 @@ func (p *terrapodProvider) Configure(ctx context.Context, req provider.Configure
 		skipTLS = config.SkipTLSVerify.ValueBool()
 	}
 
-	c := client.NewClient(hostname, token, skipTLS)
+	// No all-or-nothing rule here, unlike the hostname/token pair the runner
+	// exports. That rule exists because the token is a credential and the
+	// hostname decides where it is sent, so supplying one while deferring the
+	// other redirects the run's real token. A workspace id is neither: it is a
+	// request parameter the server authorises independently, and the inventory
+	// routes refuse a runner token on any workspace but its own run's — so a
+	// wrong value answers 403 rather than writing somewhere it should not.
+	// It is therefore plainly overridable (#2036).
+	workspace := os.Getenv("TERRAPOD_WORKSPACE")
+	if !config.Workspace.IsNull() {
+		workspace = config.Workspace.ValueString()
+	}
+
+	c := client.NewClient(hostname, token, skipTLS, workspace)
 
 	// Compatibility check (#550): warn — never block — if this provider build
 	// is incompatible with the target Terrapod API version (different major, or

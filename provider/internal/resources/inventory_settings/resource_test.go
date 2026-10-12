@@ -44,8 +44,13 @@ func TestSchemaRequirednessAndReplacement(t *testing.T) {
 		t.Errorf("unexpected attribute count %d: %v", len(attrs), attrs)
 	}
 
-	if !attrs["workspace_id"].IsRequired() {
-		t.Error("workspace_id is required: it is the key")
+	// It is still the key -- RequiresReplace below -- but Optional+Computed since
+	// #2036, so a run need not name it. Asserted together, because losing the
+	// replacement while gaining the default would silently move settings between
+	// workspaces in place.
+	if attrs["workspace_id"].IsRequired() || !attrs["workspace_id"].IsOptional() ||
+		!attrs["workspace_id"].IsComputed() {
+		t.Error("workspace_id must be Optional+Computed so it can default (#2036)")
 	}
 	// Optional and NOT computed: removing one of these from the configuration
 	// has to mean "clear it", which Computed + UseStateForUnknown would turn

@@ -38,6 +38,8 @@ var _ datasource.DataSource = &inventoryResolvedDataSource{}
 
 type inventoryResolvedDataSource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 type inventoryResolvedModel struct {
@@ -70,8 +72,11 @@ func (d *inventoryResolvedDataSource) Schema(_ context.Context, _ datasource.Sch
 			"empty host set. See docs/ansible-inventory.md.",
 		Attributes: map[string]schema.Attribute{
 			"workspace_id": schema.StringAttribute{
-				Description: "The workspace whose inventory to resolve (e.g. \"ws-abc123\").",
-				Required:    true,
+				Description: "The workspace whose inventory to resolve (e.g. \"ws-abc123\"). Defaults to " +
+					"the provider's `workspace` attribute or TERRAPOD_WORKSPACE, which a run exports from " +
+					"its own workspace in both phases — so inside a run this can be left out.",
+				Optional: true,
+				Computed: true,
 			},
 			"limit": schema.StringAttribute{
 				Description: "An optional `--limit` pattern, expanded by ansible itself, so it carries every " +
@@ -131,6 +136,7 @@ func (d *inventoryResolvedDataSource) Configure(_ context.Context, req datasourc
 		return
 	}
 	d.tc = tc
+	d.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (d *inventoryResolvedDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -140,7 +146,20 @@ func (d *inventoryResolvedDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
+	// A data source has no plan/apply comparison, so the default is resolved here
+	// rather than in a plan modifier -- and written back into the model, so state
+	// records which workspace was actually read (#2036).
 	workspaceID := config.WorkspaceID.ValueString()
+	if config.WorkspaceID.IsNull() || config.WorkspaceID.IsUnknown() {
+		workspaceID = d.defaultWorkspace
+	}
+	if workspaceID == "" {
+		resp.Diagnostics.AddError("Missing workspace",
+			"Set workspace_id on this data source, or the provider's `workspace` attribute, or "+
+				"TERRAPOD_WORKSPACE. Inside a Terrapod run the last is exported for you.")
+		return
+	}
+	config.WorkspaceID = types.StringValue(workspaceID)
 	limit := ""
 	if !config.Limit.IsNull() && !config.Limit.IsUnknown() {
 		limit = config.Limit.ValueString()

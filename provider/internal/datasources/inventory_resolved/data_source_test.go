@@ -37,8 +37,12 @@ func TestSchemaShape(t *testing.T) {
 		t.Errorf("unexpected attribute count %d: %v", len(attrs), attrs)
 	}
 
-	if !attrs["workspace_id"].IsRequired() {
-		t.Error("workspace_id is required")
+	// Optional+Computed since #2036: it defaults to the provider's `workspace`,
+	// which a run exports. Required would make `provider "terrapod" {}` unusable
+	// inside a run, which is the whole point of the default.
+	if attrs["workspace_id"].IsRequired() || !attrs["workspace_id"].IsOptional() ||
+		!attrs["workspace_id"].IsComputed() {
+		t.Error("workspace_id must be Optional+Computed so it can default (#2036)")
 	}
 	if !attrs["limit"].IsOptional() || attrs["limit"].IsRequired() {
 		t.Error("limit is optional")

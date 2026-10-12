@@ -48,8 +48,15 @@ func TestSchemaRequirednessAndReplacement(t *testing.T) {
 		}
 	}
 
-	if !attrs["workspace_id"].IsRequired() || !attrs["name"].IsRequired() {
-		t.Error("workspace_id and name are required")
+	if !attrs["name"].IsRequired() {
+		t.Error("name is required")
+	}
+
+	// Optional+Computed since #2036 so it can default to the provider's
+	// `workspace`, while RequiresReplace (below) keeps it the identity.
+	if attrs["workspace_id"].IsRequired() || !attrs["workspace_id"].IsOptional() ||
+		!attrs["workspace_id"].IsComputed() {
+		t.Error("workspace_id must be Optional+Computed so it can default (#2036)")
 	}
 	for _, name := range []string{"id", "created_at", "updated_at"} {
 		if !attrs[name].IsComputed() || attrs[name].IsOptional() || attrs[name].IsRequired() {

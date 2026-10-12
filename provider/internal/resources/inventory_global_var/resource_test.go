@@ -39,8 +39,15 @@ func TestSchemaRequirednessAndReplacement(t *testing.T) {
 		t.Errorf("unexpected attribute count %d: %v", len(attrs), attrs)
 	}
 
-	if !attrs["workspace_id"].IsRequired() || !attrs["key"].IsRequired() || !attrs["value"].IsRequired() {
-		t.Error("workspace_id, key and value are required")
+	if !attrs["key"].IsRequired() || !attrs["value"].IsRequired() {
+		t.Error("key and value are required")
+	}
+
+	// Optional+Computed since #2036 so it can default to the provider's
+	// `workspace`, while RequiresReplace (below) keeps it the identity.
+	if attrs["workspace_id"].IsRequired() || !attrs["workspace_id"].IsOptional() ||
+		!attrs["workspace_id"].IsComputed() {
+		t.Error("workspace_id must be Optional+Computed so it can default (#2036)")
 	}
 	// Redacted in plan output unconditionally: Terraform cannot vary an
 	// attribute's sensitivity per row, and a become password in an ordinary

@@ -28,6 +28,8 @@ var (
 
 type inventoryGlobalVarResource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 // NewResource returns the terrapod_inventory_global_var resource.
@@ -54,9 +56,16 @@ func (r *inventoryGlobalVarResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"workspace_id": schema.StringAttribute{
 				Description: "The workspace whose inventory this variable applies across (e.g. " +
-					"\"ws-abc123\"). A variable belongs to one workspace, so moving it is a destroy and create.",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					"\"ws-abc123\"). A variable belongs to one workspace, so moving it is a destroy and create." +
+					" Defaults to the provider's `workspace` attribute or TERRAPOD_WORKSPACE, which a " +
+					"run exports from its own workspace in both phases — so inside a run this can " +
+					"be left out.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"key": schema.StringAttribute{
 				Description: "The variable name, unique within the workspace's `all` scope. Renaming is done " +
@@ -121,6 +130,7 @@ func (r *inventoryGlobalVarResource) Configure(_ context.Context, req resource.C
 		return
 	}
 	r.tc = tc
+	r.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (r *inventoryGlobalVarResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -200,6 +210,9 @@ func (r *inventoryGlobalVarResource) ImportState(ctx context.Context, req resour
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
 func (r *inventoryGlobalVarResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Before the keep-computed step, so an unconfigured workspace_id is already a
+	// known value by the time anything compares the plan against state (#2036).
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.defaultWorkspace)
 	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
 		[]string{"workspace_id", "key", "value", "structured", "sensitive"},
 		[]string{"updated_at"},

@@ -39,6 +39,8 @@ var derivedGroups = map[string]bool{"all": true, "ungrouped": true}
 
 type inventoryGroupResource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 // NewResource returns the terrapod_inventory_group resource.
@@ -65,9 +67,16 @@ func (r *inventoryGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"workspace_id": schema.StringAttribute{
 				Description: "The workspace whose inventory declares this group (e.g. \"ws-abc123\"). A group " +
-					"belongs to one workspace, so moving it is a destroy and create.",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					"belongs to one workspace, so moving it is a destroy and create." +
+					" Defaults to the provider's `workspace` attribute or TERRAPOD_WORKSPACE, which a " +
+					"run exports from its own workspace in both phases — so inside a run this can " +
+					"be left out.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The group name, unique within the workspace. Renaming is done in place, so this " +
@@ -107,6 +116,7 @@ func (r *inventoryGroupResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 	r.tc = tc
+	r.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (r *inventoryGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -189,6 +199,9 @@ func (r *inventoryGroupResource) ImportState(ctx context.Context, req resource.I
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
 func (r *inventoryGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Before the keep-computed step, so an unconfigured workspace_id is already a
+	// known value by the time anything compares the plan against state (#2036).
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.defaultWorkspace)
 	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
 		[]string{"workspace_id", "name"},
 		[]string{"updated_at"},

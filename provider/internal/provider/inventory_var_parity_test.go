@@ -100,7 +100,15 @@ func TestEveryInventoryVarParentForcesReplacement(t *testing.T) {
 			t.Errorf("%s.%s is not a StringAttribute", typeName, parent)
 			continue
 		}
-		if !a.IsRequired() {
+		// `workspace_id` is the one parent that is Optional+Computed, because it
+		// defaults to the provider's `workspace` (#2036). `host_id` and `group_id`
+		// have no such default and stay required. The replacement check below is
+		// this test's actual subject and applies to all three either way.
+		if parent == "workspace_id" {
+			if a.IsRequired() || !a.IsOptional() || !a.IsComputed() {
+				t.Errorf("%s.%s must be Optional+Computed so it can default (#2036)", typeName, parent)
+			}
+		} else if !a.IsRequired() {
 			t.Errorf("%s.%s must be required", typeName, parent)
 		}
 		replaces := false
