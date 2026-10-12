@@ -222,5 +222,10 @@ class TestTheMintedTokenVerifiesAgainstThePublishedJWKS:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 200, resp.text
+        # Unverified on purpose: the assertions below are about the CLAIMS
+        # Terrapod put in the token, and the signature is covered by the
+        # verifying decodes earlier in this file. Verifying again here would
+        # test PyJWT rather than the mint.
+        # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
         claims = jwt.decode(resp.json()["tokens"][0]["token"], options={"verify_signature": False})
         assert claims["iss"] == issuer_url() == ISSUER
