@@ -259,7 +259,10 @@ resource "terrapod_inventory_group" "app" {
 resource "terrapod_inventory_host" "app" {
   for_each     = data.aws_instance.app
   workspace_id = var.workspace_id
-  name         = each.value.tags["Name"]
+
+  # The inventory hostname is unique per workspace, and a fleet selected by a
+  # shared tag shares its `Name` tag -- so the tag cannot be the identity.
+  name = each.value.private_dns
 }
 
 resource "terrapod_inventory_host_var" "app_address" {
@@ -281,6 +284,21 @@ configuration's management. It is ansible targeting over an existing fleet of
 long-lived machines, with no infrastructure change and no migration — which is
 the case that would otherwise have to wait for the whole estate to be brought
 under IaC first.
+
+Two things about the host name, because the obvious choice does not work. The
+inventory hostname is unique per workspace, so it has to be unique **per
+instance**: a `Name` tag is shared across every member of a fleet selected by
+that tag, and the second row would be refused with a 409. `private_dns` is
+unique and is what you would connect to anyway; where the VPC has DNS hostnames
+disabled it is empty, and `each.key` — the instance id — is the unique fallback.
+Keep the `Name` tag as a host variable or a group if you want it in the
+inventory; it is a label, not an identity.
+
+And `for_each` is keyed on instance id, so replacing an instance is a
+destroy-and-create of its host row rather than an update. That is the model
+working — the machine really did go away — but it means an autoscaling group
+produces inventory churn on every rotation, which is worth knowing before you
+read a plan that way.
 
 ---
 
