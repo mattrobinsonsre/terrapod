@@ -986,6 +986,29 @@ Two things follow for an AWS trust policy, and both are easy to get wrong:
   actual audience claim is exposed as **`oaud`**. Terrapod does not set `azp`, so
   the two agree today — but write `oaud` if you mean the audience.
 
+#### `TF_LOG=DEBUG` puts the token in the run log, on AWS
+
+Measured against each provider's source: **terraform-provider-aws logs the token**
+at `TF_LOG=DEBUG` and above. It logs the STS `AssumeRoleWithWebIdentity` request
+body, which carries `WebIdentityToken=<the whole JWT>`, and its only body
+redaction masks AWS access keys and a run of exactly 40 base64 characters — a
+base64url JWT matches neither. azurerm, google and vault do not log it (vault will
+if you set `TERRAFORM_VAULT_LOG_BODY`).
+
+**Terrapod strips its own tokens from the run log**, by exact value rather than by
+JWT shape: the runner knows the literal strings because it wrote them, so this
+cannot mangle a plan that legitimately contains a JWT and cannot miss the token it
+delivered. A redacted occurrence reads `[redacted: cloud identity token]`.
+
+That covers the tokens Terrapod minted for the run. It does **not** cover a
+credential of your own that a provider prints, so `TF_LOG` remains what HCP
+Terraform and Terraform Enterprise document it as: a debugging tool that can put
+sensitive values in logs. Note also that `google`'s `identity_token` and `vault`'s
+`auth_login_jwt.jwt` are not marked sensitive in their schemas, so nothing
+redacts them wherever Terraform surfaces provider configuration — and
+`TF_LOG_SDK_PROTO_DATA_DIR`, which is a separate switch from `TF_LOG`, writes
+whole RPC payloads to disk verbatim.
+
 #### Why the agent pool is claimed
 
 Which pool runs a workspace decides **where its identity can be minted**, and
