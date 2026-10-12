@@ -38,7 +38,13 @@ from terrapod.api.dependencies import (
     require_runner_for_run,
 )
 from terrapod.api.ids import parse_id
-from terrapod.db.models import AgentPool, OIDCSigningKey, Run, Workspace
+from terrapod.db.models import (
+    AgentPool,
+    OIDCSigningKey,
+    Run,
+    Workspace,
+    WorkspaceAgentPool,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import workspace_settings
@@ -341,6 +347,39 @@ async def mint_cloud_identity_tokens(
     # anything with Rego) can now bind it; everywhere else it is at least in the
     # cloud's own audit log beside the credential it bought.
     pool = await db.get(AgentPool, run.pool_id) if run.pool_id else None
+
+    # `require_assigned_pool` (#2040). The run's candidate pools are snapshotted
+    # at creation, so detaching a pool from the workspace afterwards leaves this
+    # run claimable by a pool the workspace no longer has -- and which pool runs
+    # a workspace is which listeners its federated credential is reachable from.
+    #
+    # Deliberately NOT "the workspace's primary pool": there is none. The pool
+    # set is flat, `ordinal` is display order carrying no dispatch meaning, and a
+    # run is offered to every pool at once so which one claims it is a race. A
+    # first-pool rule would refuse at random on any multi-pool workspace. The
+    # question asked here is membership, which every legitimate executor passes.
+    #
+    # Queried only when the setting is on, so the default path costs nothing, and
+    # against the junction table rather than `workspace_pool_ids` -- that reads a
+    # lazy relationship `db.get` has not loaded, which raises under asyncio.
+    if settings.auth.oidc_issuer.require_assigned_pool and run.pool_id is not None:
+        still_assigned = await db.scalar(
+            select(WorkspaceAgentPool.agent_pool_id).where(
+                WorkspaceAgentPool.workspace_id == ws.id,
+                WorkspaceAgentPool.agent_pool_id == run.pool_id,
+            )
+        )
+        if still_assigned is None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"auth.oidc_issuer.require_assigned_pool is set and this run was "
+                    f"claimed by agent pool "
+                    f"{pool.name if pool is not None else run.pool_id!s}, which is no "
+                    f"longer assigned to this workspace. Re-assign the pool, or queue "
+                    f"a new run so it is dispatched to the workspace's current pools."
+                ),
+            )
 
     ttl = settings.auth.oidc_issuer.token_ttl_seconds
     pending: list[tuple[str, list[str], dict]] = []

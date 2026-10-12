@@ -217,6 +217,21 @@ def compute_kid(key: rsa.RSAPrivateKey) -> str:
     return _b64url(hashlib.sha256(canonical.encode()).digest())
 
 
+def _configured_next_key_pem() -> str | None:
+    """The operator's INCOMING key, or None. Published, never signed with.
+
+    Only meaningful alongside `signing_key_pem`: there is nothing to stage
+    against otherwise, and reading it alone would publish a trust root nothing
+    ever signs with -- strictly worse than publishing none.
+    """
+    from terrapod.config import settings
+
+    if _configured_key_pem() is None:
+        return None
+    pem = (getattr(settings.auth.oidc_issuer, "signing_key_pem_next", "") or "").strip()
+    return pem or None
+
+
 def _configured_key_pem() -> str | None:
     """The operator's own key, or None.
 
@@ -254,7 +269,27 @@ def validate_configured_signing_key() -> None:
     tolerant handler swallows. `test_the_supplied_key_check_is_outside_the_try`
     pins the position, because no behavioural test can see it.
     """
-    configured = _configured_key_pem()
+    current = _configured_key_pem()
+    upcoming = _configured_next_key_pem()
+    _check_one_supplied_key("auth.oidc_issuer.signing_key_pem", current)
+    _check_one_supplied_key("auth.oidc_issuer.signing_key_pem_next", upcoming)
+
+    # Distinctness, checked HERE rather than where the two are loaded, so it
+    # fails startup for the same reason the rest of this does. A kid is a
+    # thumbprint OF the key material, so the same key twice would publish one
+    # JWK twice under one kid -- refused rather than de-duplicated, because it
+    # means the operator believes they have staged a key change and have not.
+    if current is not None and upcoming is not None:
+        if compute_kid(load_private_key(current)) == compute_kid(load_private_key(upcoming)):
+            raise ValueError(
+                "auth.oidc_issuer.signing_key_pem_next is the same key as "
+                "signing_key_pem, so nothing is staged. Supply the incoming key, or "
+                "unset it."
+            )
+
+
+def _check_one_supplied_key(setting: str, configured: str | None) -> None:
+    """One supplied key, or a no-op. Raises naming the setting it came from."""
     if configured is None:
         return
     try:
@@ -265,9 +300,8 @@ def validate_configured_signing_key() -> None:
         # encrypted PEM; classifying them would only risk re-raising one bare,
         # without saying which Secret to go and fix.
         raise ValueError(
-            f"auth.oidc_issuer.signing_key_pem is not usable: {exc} (it comes from the "
-            f"Secret named by api.oidcSigningKey.existingSecret, key "
-            f"api.oidcSigningKey.existingSecretKey)"
+            f"{setting} is not usable: {exc} (it comes from the Secret named by "
+            f"api.oidcSigningKey.existingSecret / nextExistingSecret)"
         ) from exc
 
 
@@ -288,6 +322,27 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
         kid = compute_kid(key)
         _keys = [SigningKey(kid=kid, private_key_pem=configured)]
         _signing_kid = kid
+
+        # An optional second supplied key, published and never signed with, so a
+        # BYO deployment can stage a change the way a generated rotation does.
+        # `_signing_kid` is set above and not touched here: the incoming key must
+        # not sign, because the whole point is that the clouds have not fetched
+        # it yet.
+        #
+        # Distinctness is enforced by `validate_configured_signing_key`, which
+        # the lifespan runs outside its tolerant try -- so by the time this
+        # executes the two keys are known to differ. Not re-checked here, because
+        # this call site IS inside that try and a raise would only become a
+        # warning.
+        upcoming = _configured_next_key_pem()
+        if upcoming is not None:
+            next_kid = compute_kid(load_private_key(upcoming))
+            _keys = [*_keys, SigningKey(kid=next_kid, private_key_pem=upcoming)]
+            logger.info(
+                "OIDC issuer publishing a second operator-supplied key, not signing with it",
+                signing_kid=kid,
+                published_kid=next_kid,
+            )
         logger.info("OIDC issuer using the operator-supplied signing key", kid=kid)
         return _keys
 

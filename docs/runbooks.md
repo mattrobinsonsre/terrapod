@@ -2904,14 +2904,21 @@ un-publishing a key is not the same as it being untrusted.
 **If the deployment signs with an operator-supplied key**
 (`api.oidcSigningKey.existingSecret`), the rotate endpoint answers **409**: the key
 is yours, and so is replacing it. Generate a new RSA key, update the Secret, and
-roll the API. **Roll it yourself** — do not rely on the `checksum/oidc-signing`
+roll the API. **Do not stage it through `nextExistingSecret` during a
+compromise** — that exists to publish an incoming key *alongside* the outgoing
+one, which during an incident means going on publishing the compromised key for
+as long as the staging lasts. Staging is for a planned change; a compromise wants
+the cutover, and the window it costs. **Roll it yourself** — do not rely on the
+`checksum/oidc-signing`
 annotation to do it for you. The annotation is computed inside a `lookup`, so it
 renders under `helm install`/`upgrade` and renders **nothing** under `helm
 template`, which is what Argo CD and Flux run; `deployment-api.yaml` says so in its
 own comment. And even where it does render, a rolling update serves two different
-single-key JWKS documents from different pods until the roll completes, because an
-operator-supplied key publishes exactly one key at a time. Expect a window, and
-plan the cutover around it rather than assuming there is none.
+JWKS documents from different pods until the roll completes — and in a cutover
+like this one, where you are deliberately not staging, each of those documents
+holds a single key, so which one a cloud fetches mid-roll decides whether it can
+verify. Expect a window, and plan the cutover around it rather than assuming
+there is none.
 
 ### What this cannot do
 

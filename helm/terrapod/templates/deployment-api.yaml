@@ -83,6 +83,11 @@ spec:
         checksum/oidc-signing: {{ .data | toYaml | sha256sum }}
         {{- end }}
         {{- end }}
+        {{- if .Values.api.oidcSigningKey.nextExistingSecret }}
+        {{- with (lookup "v1" "Secret" .Release.Namespace .Values.api.oidcSigningKey.nextExistingSecret) }}
+        checksum/oidc-signing-next: {{ .data | toYaml | sha256sum }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.api.config.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"
@@ -160,6 +165,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.api.oidcSigningKey.existingSecret }}
                   key: {{ .Values.api.oidcSigningKey.existingSecretKey | default "oidc_signing_key" }}
+            {{- end }}
+            {{- if .Values.api.oidcSigningKey.nextExistingSecret }}
+            # The INCOMING key, published and never signed with, so a BYO key
+            # change can be staged (#2045). Rendered independently of the key
+            # above: during the promotion step both name the same Secret for a
+            # moment, which is correct and not a mistake to guard against.
+            - name: TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM_NEXT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.oidcSigningKey.nextExistingSecret }}
+                  key: {{ .Values.api.oidcSigningKey.nextExistingSecretKey | default "oidc_signing_key" }}
             {{- end }}
             {{- if ((.Values.api.config.ha).peer).existingSecret }}
             # HA peer link (#960 phase 3) — the follower's client_credentials

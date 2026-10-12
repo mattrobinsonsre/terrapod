@@ -190,6 +190,12 @@
             },
             "existingSecretKey": {
               "type": "string"
+            },
+            "nextExistingSecret": {
+              "type": "string"
+            },
+            "nextExistingSecretKey": {
+              "type": "string"
             }
           }
         }
@@ -1781,6 +1787,9 @@
                   "enum": ["name-and-id", "name"]
                 },
                 "require_phase": {
+                  "type": "boolean"
+                },
+                "require_assigned_pool": {
                   "type": "boolean"
                 }
               }

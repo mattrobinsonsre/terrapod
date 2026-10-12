@@ -607,6 +607,20 @@ class OIDCIssuerConfig(BaseSettings):
             "persists it, which is what most deployments want."
         ),
     )
+    signing_key_pem_next: str = Field(
+        default="",
+        description=(
+            "A SECOND operator-supplied RSA private key, published in the JWKS but "
+            "never used to sign. It exists so a BYO deployment can stage a key "
+            "change the way a generated-key rotation does: publish the incoming key, "
+            "wait for every cloud to refetch, then promote it to signing_key_pem and "
+            "drop this. Without it a BYO deployment publishes exactly one key at a "
+            "time, so there is no moment when both the outgoing and incoming public "
+            "keys are published and federated runs fail from the cutover until each "
+            "cloud refetches. Ignored unless signing_key_pem is also set, since "
+            "there would be nothing to stage against."
+        ),
+    )
     subject_format: str = Field(
         default="name-and-id",
         description=(
@@ -631,6 +645,19 @@ class OIDCIssuerConfig(BaseSettings):
             "exclude. Default false so an upgrade cannot break a lagging listener; "
             "set it once every listener is on v1.10 or later. It becomes the "
             "default in 2.0."
+        ),
+    )
+    require_assigned_pool: bool = Field(
+        default=False,
+        description=(
+            "Refuse to mint an identity for a run whose executing agent pool is "
+            "no longer in the workspace's pool set. A run snapshots its candidate "
+            "pools at creation, so detaching a pool from a workspace mid-flight "
+            "leaves that run claimable by a pool the workspace no longer has -- and "
+            "which pool runs a workspace is which listeners its federated "
+            "credential is reachable from. Off by default because the window is "
+            "narrow and the refusal fails the run; it does NOT constrain multi-pool "
+            "routing, since every pool in the set is a legitimate executor."
         ),
     )
     token_ttl_seconds: int = Field(

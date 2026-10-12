@@ -250,6 +250,118 @@ class TestTheOperatorSuppliedKey:
                 asyncio.run(oidc_signing.rotate_signing_key(object()))
 
 
+class TestTheOverlappingSuppliedKey:
+    """`signing_key_pem_next`: published, never signed with (#2045).
+
+    It exists because a BYO deployment otherwise publishes exactly ONE key, so
+    there is no moment when both the outgoing and incoming public keys are in
+    the JWKS -- and for a cloud that fetches the JWKS, federated runs fail from
+    the cutover until each cloud refetches on its own schedule. A generated-key
+    rotation does not have that problem, because it adds rather than swaps; this
+    gives BYO the same staging, with the operator holding both keys.
+    """
+
+    def _configure(self, current, upcoming):
+        """Patch the two readers at their source.
+
+        `_configured_next_key_pem` reads `_configured_key_pem` itself -- it
+        returns None unless a current key is set -- so patching the attribute
+        would bypass the very dependency under test in one of these cases.
+        """
+        from terrapod.config import settings
+
+        return (
+            patch.object(settings.auth.oidc_issuer, "signing_key_pem", current),
+            patch.object(settings.auth.oidc_issuer, "signing_key_pem_next", upcoming),
+        )
+
+    def _init(self):
+        import asyncio
+
+        class _DB:
+            async def execute(self, *a, **k):
+                raise AssertionError("a BYO deployment must not read the key table")
+
+            async def commit(self):
+                return None
+
+        return asyncio.run(oidc_signing.init_oidc_signing(_DB()))
+
+    def test_both_keys_are_published_and_only_the_first_signs(self, key):
+        current = oidc_signing.serialize_private_key(key)
+        upcoming = oidc_signing.serialize_private_key(oidc_signing.generate_private_key())
+        a, b = self._configure(current, upcoming)
+        with a, b:
+            keys = self._init()
+            published = {k["kid"] for k in oidc_signing.get_jwks()["keys"]}
+
+        assert len(keys) == 2
+        assert published == {k.kid for k in keys}
+        assert oidc_signing.get_signing_key().kid == oidc_signing.compute_kid(key), (
+            "the incoming key is signing, which is the one thing it must not do -- "
+            "the clouds have not fetched it yet, which is the whole reason to stage"
+        )
+
+    def test_the_current_key_alone_still_publishes_one(self, key):
+        """The contrast. Nothing changes for a deployment that does not stage."""
+        a, b = self._configure(oidc_signing.serialize_private_key(key), "")
+        with a, b:
+            keys = self._init()
+        assert len(keys) == 1
+
+    def test_a_NEXT_key_alone_does_nothing(self, key):
+        """Ignored without a current key, rather than published on its own: a
+        trust root nothing ever signs with is strictly worse than none, and the
+        operator has not actually configured BYO at all.
+
+        `_init` would raise here (it refuses to read the table), so this drives
+        the reader directly -- which is the thing that decides it."""
+        a, b = self._configure("", oidc_signing.serialize_private_key(key))
+        with a, b:
+            assert oidc_signing._configured_next_key_pem() is None
+
+    def test_the_same_key_twice_is_refused_at_STARTUP(self, key):
+        """A kid is a thumbprint OF the key material, so this would publish one
+        JWK twice under one kid. Refused rather than de-duplicated, because it
+        means the operator believes they have staged a key change and have
+        not -- and they would discover it at the cutover.
+
+        Refused by the startup validator, not at load: the load site is inside
+        the lifespan's tolerant try, where a raise becomes a warning.
+        """
+        pem = oidc_signing.serialize_private_key(key)
+        a, b = self._configure(pem, pem)
+        with a, b:
+            with pytest.raises(ValueError, match="same key as"):
+                oidc_signing.validate_configured_signing_key()
+
+    def test_an_unusable_NEXT_key_fails_startup_and_is_named_as_such(self, key):
+        """The message has to name the second setting, or the operator edits the
+        wrong Secret -- and at that point both are in play."""
+        weak = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+        a, b = self._configure(
+            oidc_signing.serialize_private_key(key),
+            oidc_signing.serialize_private_key(weak),
+        )
+        with a, b:
+            with pytest.raises(ValueError) as exc:
+                oidc_signing.validate_configured_signing_key()
+        assert "signing_key_pem_next" in str(exc.value)
+        assert "at least 2048 bits" in str(exc.value)
+
+    def test_rotation_is_still_refused(self, key):
+        """Staging is the operator's, so rotation stays theirs. The endpoint must
+        not start working just because a second key exists."""
+        import asyncio
+
+        current = oidc_signing.serialize_private_key(key)
+        upcoming = oidc_signing.serialize_private_key(oidc_signing.generate_private_key())
+        a, b = self._configure(current, upcoming)
+        with a, b:
+            with pytest.raises(ValueError, match="does not"):
+                asyncio.run(oidc_signing.rotate_signing_key(MagicMock()))
+
+
 class TestWhichKeySigns:
     """`_choose_signing_kid`, and the rotation window it exists to honour.
 

@@ -75,6 +75,7 @@ def _enabled(**over):
     # this is set, and a MagicMock is truthy -- so every unphased-token test
     # would be asserting the refusal rather than the fall-through.
     cfg.require_phase = over.get("require_phase", False)
+    cfg.require_assigned_pool = over.get("require_assigned_pool", False)
     return cfg
 
 
@@ -118,8 +119,12 @@ def _pool(name="prod-eu"):
     return pool
 
 
-def _db(run, ws, *, looked_up: list | None = None):
+def _db(run, ws, *, looked_up: list | None = None, pool_still_assigned: bool = True):
     db = MagicMock()
+    # The membership query behind `require_assigned_pool`. A real value, because
+    # the route treats None as "detached" -- a MagicMock would read as assigned
+    # and the refusal could never be reached.
+    db.scalar = AsyncMock(return_value=run.pool_id if pool_still_assigned else None)
 
     async def _get(model, pk):
         from terrapod.db.models import AgentPool, Run, Workspace
@@ -169,6 +174,7 @@ async def _call(
     issuer="https://terrapod.example.com",
     cfg=None,
     looked_up=None,
+    pool_still_assigned=True,
 ):
     """Drive the batched mint.
 
@@ -202,7 +208,7 @@ async def _call(
             payload=payload,
             run_id=f"run-{run.id}",
             user=user,
-            db=_db(run, ws, looked_up=looked_up),
+            db=_db(run, ws, looked_up=looked_up, pool_still_assigned=pool_still_assigned),
         )
     return resp, captured
 
@@ -430,6 +436,80 @@ class TestTheAgentPoolIsClaimed:
         assert len(captured["all"]) == 2
         assert [c["agent_pool"] for c in captured["all"]] == ["shared", "shared"]
         assert {c["agent_pool_id"] for c in captured["all"]} == {str(pool.id)}
+
+
+class TestRequireAssignedPoolRefusesADetachedPool:
+    """`require_assigned_pool` (#2040).
+
+    A run's candidate pools are snapshotted at creation, so detaching a pool
+    from the workspace afterwards leaves that run claimable by a pool the
+    workspace no longer has -- and which pool runs a workspace is which
+    listeners its federated credential is reachable from.
+
+    It asks about MEMBERSHIP, not about a primary pool: there is none. The pool
+    set is flat, `ordinal` is display order with no dispatch meaning, and a run
+    is offered to every pool at once so which claims it is a race. A first-pool
+    rule would refuse at random on any multi-pool workspace, which is why this
+    one does not exist.
+    """
+
+    async def test_a_detached_pool_is_refused_when_it_is_set(self):
+        pool = _pool("retired-pool")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=pool)
+        cfg.require_assigned_pool = True
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="apply"),
+                run,
+                ws,
+                target="aws",
+                cfg=cfg,
+                pool_still_assigned=False,
+            )
+        assert exc.value.status_code == 403
+        assert "require_assigned_pool" in exc.value.detail
+        assert "retired-pool" in exc.value.detail, "the operator needs to know WHICH pool"
+
+    async def test_a_STILL_ASSIGNED_pool_mints_normally(self):
+        """The contrast, and the thing that makes this safe to turn on: every
+        pool in the set is a legitimate executor, so an ordinary multi-pool run
+        must pass."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=_pool("prod-eu"))
+        cfg.require_assigned_pool = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["agent_pool"] == "prod-eu"
+
+    async def test_a_detached_pool_mints_when_it_is_NOT_set(self):
+        """The default. The window is narrow and the refusal fails a run, so an
+        operator opts in rather than inheriting it."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=_pool("retired-pool"))
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            pool_still_assigned=False,
+        )
+        assert captured["claims"]["agent_pool"] == "retired-pool"
+
+    async def test_a_run_with_no_pool_is_not_refused(self):
+        """A locally executed workspace has no pool at all, so there is nothing
+        to be detached -- and refusing it would make this setting mean "agent
+        execution only", which it does not say."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_assigned_pool = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            pool_still_assigned=False,
+        )
+        assert "agent_pool" not in captured["claims"]
 
 
 class TestRequirePhaseRefusesAnUnphasedToken:

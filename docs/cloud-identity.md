@@ -1003,6 +1003,18 @@ The claim names the pool the run was **claimed by**, which is rewritten when a
 listener takes the run, rather than the workspace's first-choice pool. The first
 choice is not what ran.
 
+**`require_assigned_pool` refuses a mint from a pool the workspace has lost.** A
+run snapshots its candidate pools at creation, so detaching a pool from a
+workspace mid-flight leaves that run claimable by a pool the workspace no longer
+has. Set `api.config.auth.oidc_issuer.require_assigned_pool: true` and such a mint
+is refused, naming the pool.
+
+It asks about **membership, not precedence**, and there is deliberately no
+"primary pool" rule: the pool set is flat, `ordinal` is display order only, and a
+run is offered to every pool at once so which one claims it is a race. So this
+does not constrain multi-pool routing -- every pool in the set passes. Off by
+default, because the window is narrow and the refusal fails the run.
+
 #### A module publish can reach the apply phase without a human
 
 Publishing a module version queues a **standard, apply-capable** run on every linked
@@ -1151,6 +1163,27 @@ API** — Terrapod will not rotate it for you, and the rotate endpoint returns
 `409` on such a deployment. Storing a copy would mean the first value ever
 supplied won for ever and every later rotation was silently ignored, so a BYO
 deployment never writes to the key table at all.
+
+**You can still stage the change, with a second Secret.**
+`api.oidcSigningKey.nextExistingSecret` names a key that is **published in the
+JWKS and never used to sign**, which is the same shape as a generated rotation's
+propagation window with you holding both keys:
+
+```yaml
+api:
+  oidcSigningKey:
+    existingSecret: terrapod-oidc-signing-key        # signs
+    nextExistingSecret: terrapod-oidc-signing-key-2  # published only
+```
+
+Set the incoming key there, roll the API, wait for every cloud to refetch, then
+promote it to `existingSecret` and clear the second. Without that step one
+supplied key means one published key, so there is no moment when both the
+outgoing and incoming public keys are published and federated runs fail from the
+cutover until each cloud refetches. Both Secrets must hold **different** keys —
+the same key twice publishes one JWK under one `kid` and stages nothing, so it is
+refused at startup. See [Security Hardening: OIDC issuer signing
+key](security-hardening.md#oidc-issuer-signing-key) for the step-by-step.
 
 ### Rotation adds a key rather than swapping one
 
