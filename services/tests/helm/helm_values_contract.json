@@ -75,6 +75,7 @@
   "api.config.auth.oidc_issuer.key_propagation_seconds",
   "api.config.auth.oidc_issuer.public_url",
   "api.config.auth.oidc_issuer.retired_key_grace_seconds",
+  "api.config.auth.oidc_issuer.subject_format",
   "api.config.auth.oidc_issuer.token_ttl_seconds",
   "api.config.auth.require_external_sso_for_roles",
   "api.config.auth.service_token_max_ttl_hours",

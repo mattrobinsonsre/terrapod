@@ -659,7 +659,7 @@ the claims below:
       "Condition": {
         "StringEquals": {
           "terrapod-webhooks.example.com:aud": "sts.amazonaws.com",
-          "terrapod-webhooks.example.com:sub": "workspace:prod-dns:phase:apply"
+          "terrapod-webhooks.example.com:sub": "workspace:prod-dns@0f8b1c2d-3e4f-4a5b-8c9d-0e1f2a3b4c5d:phase:apply"
         }
       }
     }
@@ -902,7 +902,7 @@ Every token for every target carries the same claims; only `aud` differs.
 | Claim | Example | Notes |
 |---|---|---|
 | `iss` | `https://terrapod-webhooks.example.com` | Matched **exactly** by the cloud |
-| `sub` | `workspace:prod-dns:phase:apply` | Composite, colon-delimited, phase last. **`:phase:<phase>` is absent when the runner token made no phase claim** — the `sub` is then just `workspace:prod-dns`. See below |
+| `sub` | `workspace:prod-dns@0f8b1c2d-…:phase:apply` | Composite: `workspace:<name>@<id>`, then `:phase:<phase>` last. **The `@<id>` half is what a trust policy should rely on** — see below. **`:phase:<phase>` is absent when the runner token made no phase claim** |
 | `aud` | `["sts.amazonaws.com"]` | **This target's** audiences, verbatim and in order |
 | `workspace` | `prod-dns` | The workspace name |
 | `workspace_id` | `0f8b…` | The id — stable across a rename, where the name is readable |
@@ -934,12 +934,42 @@ The `workspace`, `workspace_id`, `phase` and `run_id` claims are **not** availab
 as condition keys there. So on AWS, as on Azure, `sub` is the only thing you can
 bind — which is why it repeats what the discrete claims say.
 
+#### Why `sub` carries the workspace id
+
+Because on AWS and Azure `sub` is the only thing a policy can bind, and a
+workspace **name** is not a stable identifier for anything:
+
+- any authenticated user with workspace-create permission can create a workspace
+  and choose its name;
+- a workspace admin can rename one, freeing the old name;
+- deleting a workspace frees its name immediately.
+
+So a policy bound to `workspace:prod-dns` is satisfied by whichever workspace
+holds that name at the moment the run happens — which is a role anyone who can
+name a workspace can assume. The id is immutable and is never reused, so
+`workspace:prod-dns@0f8b1c2d-…` names one workspace for its lifetime and nothing
+afterwards.
+
+The name stays in the subject because a policy nobody can read is a policy nobody
+reviews; the id is what makes it bind.
+
+> **Upgrading from v1.10.0.** v1.10.0 minted `workspace:<name>` with no id, so a
+> trust policy written against it stops matching on upgrade — the exchange is
+> refused, not widened. Update the policy to the id-bearing form (the `sub` of a
+> plan-phase run is the quickest way to read it, or take the workspace id from
+> the UI or `GET /api/terrapod/v1/workspaces/…`). If you need to stage that
+> across a fleet, `api.config.auth.oidc_issuer.subject_format: name` restores the
+> old form deployment-wide — it exists only to sequence the migration, it leaves
+> the window above open while it is set, and it is removed in 2.0.
+
 Two things follow for an AWS trust policy, and both are easy to get wrong:
 
 - **Condition on `sub` with `StringEquals`, never `StringLike`.** A wildcard such as
-  `workspace:prod*` also matches `prod-evil`, and matches the phaseless form that a
-  listener predating the phase claim produces — so it grants more than it reads as
-  granting.
+  `workspace:prod*` also matches `prod-evil`, matches the phaseless form that a
+  listener predating the phase claim produces, and — now that the subject carries
+  an id — matches every workspace whose name begins `prod` whatever its id, which
+  throws away the binding the id exists to provide. It grants more than it reads
+  as granting, in three separate directions.
 - **The condition key spelled `aud` is not the `aud` claim.** AWS maps it to `azp`
   when that claim is present and falls back to `aud` only when it is absent; the
   actual audience claim is exposed as **`oaud`**. Terrapod does not set `azp`, so
@@ -955,15 +985,16 @@ docs](registry.md#automatic-runs-on-version-publish).
 
 #### The phase suffix is conditional, and on Azure that matters
 
-`sub` is built as `workspace:<name>`, **plus** `:phase:<phase>` only when the runner token
-carried a phase claim. So a token minted without one — a listener image predating the claim,
-per [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)
-— has `sub: workspace:prod-dns`, with no suffix at all.
+`sub` is built as `workspace:<name>@<id>`, **plus** `:phase:<phase>` only when the runner
+token carried a phase claim. So a token minted without one — a listener image predating the
+claim, per [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)
+— has `sub: workspace:prod-dns@0f8b1c2d-…`, with no suffix at all.
 
 On a target that reads discrete claims this is benign: `phase` is simply absent, so a trust
 policy conditioning on it does not match and the credential is refused. **On Azure it is the
 same outcome by a different route, and it is the one to plan for**: a federated identity
-credential whose `subject` is pinned to the phased form (`workspace:prod-dns:phase:apply`)
+credential whose `subject` is pinned to the phased form
+(`workspace:prod-dns@0f8b1c2d-…:phase:apply`)
 stops matching an unphased `sub` entirely. The failure direction is safe — the exchange is
 refused rather than widened — but it presents as "Azure suddenly rejects every token from
 this workspace" with nothing wrong on the Terrapod side, so check the listener image before

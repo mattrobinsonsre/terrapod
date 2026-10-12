@@ -1775,6 +1775,10 @@
                 "retired_key_grace_seconds": {
                   "type": "integer",
                   "minimum": 0
+                },
+                "subject_format": {
+                  "type": "string",
+                  "enum": ["name-and-id", "name"]
                 }
               }
             }

@@ -606,6 +606,19 @@ class OIDCIssuerConfig(BaseSettings):
             "persists it, which is what most deployments want."
         ),
     )
+    subject_format: str = Field(
+        default="name-and-id",
+        description=(
+            "How `sub` identifies the workspace. `name-and-id` (the default) is "
+            "`workspace:<name>@<id>[:phase:<phase>]`; `name` is the v1.10.0 form, "
+            "`workspace:<name>[:phase:<phase>]`. The id is what makes the subject "
+            "stable: a workspace name is mutable and reusable, and on AWS and "
+            "Azure `sub` is the ONLY thing a trust policy can bind, so a name-only "
+            "subject is satisfied by whatever workspace holds that name when it "
+            "runs. Set `name` only to keep a v1.10.0 trust policy working while "
+            "you migrate it; it is removed in 2.0."
+        ),
+    )
     token_ttl_seconds: int = Field(
         default=900,
         ge=60,
@@ -636,6 +649,14 @@ class OIDCIssuerConfig(BaseSettings):
             "verifying while it is still inside its own lifetime."
         ),
     )
+
+    @field_validator("subject_format")
+    @classmethod
+    def _valid_subject_format(cls, v: str) -> str:
+        allowed = {"name-and-id", "name"}
+        if v not in allowed:
+            raise ValueError(f"auth.oidc_issuer.subject_format must be one of {sorted(allowed)}")
+        return v
 
     @model_validator(mode="after")
     def _check_rotation_windows(self) -> "OIDCIssuerConfig":

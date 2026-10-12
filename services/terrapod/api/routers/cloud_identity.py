@@ -53,6 +53,34 @@ MAX_TARGETS = 100
 logger = get_logger(__name__)
 
 
+def _subject(ws: Workspace, phase: str | None) -> str:
+    """The `sub` claim: `workspace:<name>@<id>[:phase:<phase>]`.
+
+    The id is the point. A workspace NAME is mutable and reusable, and on the two
+    clouds most operators use it is the only thing a trust policy can bind --
+    Azure federated identity credentials match on issuer, subject and audience
+    only, and a generic AWS IAM OIDC provider conditions only on `aud`, `oaud`,
+    `sub`, `amr` and `email`. So a name-only subject is satisfied by whatever
+    workspace holds that name when it runs, which is a window anyone who can
+    create or rename a workspace can open.
+
+    Safe to concatenate because the workspace-name grammar is
+    `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`: it admits neither `@` nor `:`, so the parts
+    cannot run together and no name can forge the id segment.
+
+    `name` is the v1.10.0 form, kept only so a trust policy written in the three
+    days it was the default can be migrated rather than broken at the upgrade. It
+    goes in 2.0.
+    """
+    from terrapod.config import settings
+
+    if settings.auth.oidc_issuer.subject_format == "name":
+        base = f"workspace:{ws.name}"
+    else:
+        base = f"workspace:{ws.name}@{ws.id}"
+    return base + (f":phase:{phase}" if phase else "")
+
+
 def _rfc3339(dt) -> str | None:
     if dt is None:
         return None
@@ -301,10 +329,19 @@ async def mint_cloud_identity_tokens(
             # Terraform and GitHub both use. It carries the phase as well as the
             # discrete claim below because Azure federated identity credentials
             # match on issuer, subject and audience ONLY -- no arbitrary claims
-            # -- so `sub` is the one place a phase condition can be expressed
-            # there. Clouds that can read arbitrary claims should condition on
-            # `workspace` and `phase` instead, which needs no wildcard.
-            "sub": f"workspace:{ws.name}" + (f":phase:{phase}" if phase else ""),
+            # -- and AWS is the same: a generic IAM OIDC provider conditions only
+            # on `aud`, `oaud`, `sub`, `amr` and `email`, so `workspace_id` and
+            # `phase` are not reachable there either. On both of the clouds most
+            # operators use, `sub` is the ONLY thing a trust policy can bind.
+            #
+            # Which is why it carries the workspace ID by default. A workspace
+            # NAME is mutable and reusable -- any authenticated user can create a
+            # workspace with a free name, an admin can rename one, and deleting a
+            # workspace frees its name -- so a name-only subject is satisfied by
+            # whatever workspace holds that name at the moment it runs. The id is
+            # immutable, and the name grammar excludes `@` and `:`, so the
+            # composite parses unambiguously and no name can forge it.
+            "sub": _subject(ws, phase),
             "aud": audiences,
             "workspace": ws.name,
             "workspace_id": str(ws.id),

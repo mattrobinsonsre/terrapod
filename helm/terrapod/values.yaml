@@ -288,6 +288,19 @@ api:
         # token_ttl_seconds, or a token signed moments before a rotation stops
         # verifying while it is still inside its own lifetime.
         retired_key_grace_seconds: 3600
+        # What the `sub` claim carries, and therefore what a cloud trust policy
+        # binds to. `name-and-id` is `workspace:<name>@<id>`; `name` is the
+        # v1.10.0 form, `workspace:<name>`.
+        #
+        # A workspace NAME is mutable and reusable -- any authenticated user can
+        # create one with a free name, an admin can rename, and a delete frees
+        # the name -- so a policy bound to a name is satisfied by whichever
+        # workspace holds it when the run happens. The id is immutable, which is
+        # why it is the default.
+        #
+        # Set this to `name` ONLY to migrate trust policies written against
+        # v1.10.0, and change them. It is removed in 2.0.
+        subject_format: name-and-id
         # ── The audience catalogue: deployment defaults, per provider ──
         #
         # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`

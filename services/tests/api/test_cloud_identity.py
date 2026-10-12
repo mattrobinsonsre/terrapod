@@ -67,6 +67,10 @@ def _enabled(**over):
     # A real dict, not a MagicMock attribute: the resolver reads it, and a
     # MagicMock would resolve to {} and turn every test into a 409.
     cfg.audiences = over.get("audiences", {})
+    # Likewise a real string: `_subject` compares it to "name", and a MagicMock
+    # would take the id branch by accident rather than by configuration -- so the
+    # default-path tests would pass without the default ever being modelled.
+    cfg.subject_format = over.get("subject_format", "name-and-id")
     return cfg
 
 
@@ -323,6 +327,55 @@ class TestTheConfigurationMovedUnderTheRun:
         assert captured["claims"]["aud"] == [AWS]
 
 
+class TestTheSubjectCarriesTheWorkspaceId:
+    """`sub` is the only thing an AWS or Azure trust policy can bind, and a
+    workspace NAME is mutable and reusable -- any authenticated user can create
+    one with a free name, an admin can rename, and a delete frees the name. So a
+    name-only subject is satisfied by whatever workspace holds that name when it
+    runs. The id is immutable, which is the whole point of putting it there.
+    """
+
+    async def test_two_workspaces_with_THE_SAME_NAME_get_different_subjects(self):
+        """The property, stated the way it matters. Asserting the literal string
+        would pass just as well with the id omitted from one of them."""
+        ws_a, run_a, cfg = _scenario(catalogue={"aws": [AWS]}, name="dns-prod")
+        ws_b, run_b, _ = _scenario(catalogue={"aws": [AWS]}, name="dns-prod")
+        assert ws_a.name == ws_b.name
+        assert ws_a.id != ws_b.id
+
+        _, cap_a = await _call(
+            _user(run_id=str(run_a.id), phase="apply"), run_a, ws_a, target="aws", cfg=cfg
+        )
+        _, cap_b = await _call(
+            _user(run_id=str(run_b.id), phase="apply"), run_b, ws_b, target="aws", cfg=cfg
+        )
+        assert cap_a["claims"]["sub"] != cap_b["claims"]["sub"], (
+            "a workspace that takes a trusted name must not inherit its subject"
+        )
+
+    async def test_a_name_cannot_forge_the_id_segment(self):
+        """Safe to concatenate only because the name grammar
+        (`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`) admits neither `@` nor `:`. If that ever
+        relaxes, the composite stops parsing unambiguously -- so pin it here,
+        beside the thing that depends on it."""
+        from terrapod.services.workspace_name import validate_workspace_name
+
+        for forged in ("dns-prod@11111111-1111-1111-1111-111111111111", "dns-prod:phase:apply"):
+            with pytest.raises(ValueError):
+                validate_workspace_name(forged)
+
+    async def test_the_legacy_name_only_form_is_still_reachable(self):
+        """Kept only so a trust policy written in the three days the name-only
+        form was the default can be migrated rather than broken at the upgrade.
+        It goes in 2.0."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.subject_format = "name"
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["sub"] == "workspace:dns-prod:phase:apply"
+
+
 class TestThePhaseComesFromTheToken:
     """The security property. A request body cannot influence it, because there
     is no request body — and the claim is built from `user.run_phase`, which is
@@ -336,7 +389,7 @@ class TestThePhaseComesFromTheToken:
         )
         assert resp.status_code == 200
         assert captured["claims"]["phase"] == phase
-        assert captured["claims"]["sub"] == f"workspace:dns-prod:phase:{phase}"
+        assert captured["claims"]["sub"] == f"workspace:dns-prod@{ws.id}:phase:{phase}"
 
     async def test_the_body_cannot_NAME_A_PHASE_or_anything_else(self):
         """The endpoint takes a body now, so the guarantee moves to its shape.
@@ -370,7 +423,7 @@ class TestThePhaseComesFromTheToken:
         assert resp.status_code == 200
         assert "phase" not in captured["claims"]
         # And `sub` falls back to the workspace alone rather than inventing one.
-        assert captured["claims"]["sub"] == "workspace:dns-prod"
+        assert captured["claims"]["sub"] == f"workspace:dns-prod@{ws.id}"
 
 
 class TestTheClaimSet:
