@@ -1203,9 +1203,11 @@ Set the incoming key there, roll the API, wait for every cloud to refetch, then
 promote it to `existingSecret` and clear the second. Without that step one
 supplied key means one published key, so there is no moment when both the
 outgoing and incoming public keys are published and federated runs fail from the
-cutover until each cloud refetches. Both Secrets must hold **different** keys —
-the same key twice publishes one JWK under one `kid` and stages nothing, so it is
-refused at startup. See [Security Hardening: OIDC issuer signing
+cutover until each cloud refetches. During the promotion step both Secrets name the same key for
+one `helm upgrade`, which is expected and supported. Outside that step they should
+hold **different** keys: a `kid` is a thumbprint of the key material, so the same
+key twice stages nothing — the API logs a warning saying so and publishes the key
+once rather than twice. See [Security Hardening: OIDC issuer signing
 key](security-hardening.md#oidc-issuer-signing-key) for the step-by-step.
 
 ### Rotation adds a key rather than swapping one
