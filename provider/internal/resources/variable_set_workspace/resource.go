@@ -17,6 +17,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 type variableSetWorkspaceModel struct {
@@ -28,6 +29,7 @@ type variableSetWorkspaceModel struct {
 var (
 	_ resource.Resource                = &variableSetWorkspaceResource{}
 	_ resource.ResourceWithImportState = &variableSetWorkspaceResource{}
+	_ resource.ResourceWithModifyPlan  = &variableSetWorkspaceResource{}
 )
 
 type variableSetWorkspaceResource struct {
@@ -54,8 +56,9 @@ func (r *variableSetWorkspaceResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID to assign the variable set to.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional: true, Computed: true,
+				Description:   "Workspace ID to assign the variable set to. Defaults to the provider's `workspace`.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -149,4 +152,11 @@ func (r *variableSetWorkspaceResource) ImportState(ctx context.Context, req reso
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("varset_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), parts[1])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+}
+
+// ModifyPlan fills workspace_id from the provider's `workspace` when the
+// configuration leaves it out, so a join declared inside a run needs no
+// workspace id at all (#2036).
+func (r *variableSetWorkspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 }

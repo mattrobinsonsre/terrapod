@@ -461,7 +461,9 @@ not resolve from inside the cluster at all, and a provider pointed at it could
 end up dialling the runner pod's own loopback. `TERRAPOD_HOSTNAME` is named for a
 hostname and accepts a full URL, so a complete URL passes through untouched.
 
-`TERRAPOD_WORKSPACE` is the reason the resources above carry no `workspace_id`.
+`TERRAPOD_WORKSPACE` is the reason the resources above carry no `workspace_id`, and it
+is not an inventory-specific arrangement — every resource that takes a workspace id
+defaults from it, so the same empty provider block serves a variable or a run task.
 The provider's `workspace` attribute defaults from it, and each resource defaults
 its own `workspace_id` from that — so inside a run the workspace is never written
 down, which is the point. Setting it explicitly still works and still wins: that

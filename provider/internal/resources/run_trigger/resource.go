@@ -13,9 +13,13 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
-var _ resource.Resource = &runTriggerResource{}
+var (
+	_ resource.Resource               = &runTriggerResource{}
+	_ resource.ResourceWithModifyPlan = &runTriggerResource{}
+)
 
 type runTriggerResource struct {
 	client *client.Client
@@ -39,8 +43,9 @@ func (r *runTriggerResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Destination workspace ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional: true, Computed: true,
+				Description:   "Destination workspace ID. Defaults to the provider's `workspace`.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
 			"source_workspace_id": schema.StringAttribute{
 				Required: true,
@@ -157,4 +162,12 @@ func readRunTriggerFromSDK(rt *terrapod.RunTrigger, m *runTriggerModel) {
 	if rt.SourceID != "" {
 		m.SourceWorkspaceID = types.StringValue(rt.SourceID)
 	}
+}
+
+// ModifyPlan fills workspace_id -- the DESTINATION workspace -- from the
+// provider's `workspace` when the configuration leaves it out (#2036).
+// source_workspace_id is deliberately untouched: it names ANOTHER workspace, and
+// defaulting it to self would declare a workspace that triggers itself.
+func (r *runTriggerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 }

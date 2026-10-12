@@ -27,6 +27,8 @@ var _ datasource.DataSource = &workspaceCostDataSource{}
 
 type workspaceCostDataSource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 type workspaceCostDataSourceModel struct {
@@ -133,8 +135,9 @@ func (d *workspaceCostDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"zeroed estimate with a null state_version.",
 		Attributes: map[string]schema.Attribute{
 			"workspace_id": schema.StringAttribute{
-				Description: "Workspace ID (ws-… or a bare UUID) to estimate.",
-				Required:    true,
+				Description: "Workspace ID (ws-… or a bare UUID) to estimate. Defaults to the provider's `workspace`.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"currency":     schema.StringAttribute{Description: "ISO currency code (e.g. USD).", Computed: true},
 			"total_min":    schema.Float64Attribute{Description: "Current monthly total, lower bound.", Computed: true},
@@ -209,6 +212,7 @@ func (d *workspaceCostDataSource) Configure(_ context.Context, req datasource.Co
 		return
 	}
 	d.tc = tc
+	d.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (d *workspaceCostDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -216,6 +220,19 @@ func (d *workspaceCostDataSource) Read(ctx context.Context, req datasource.ReadR
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// A data source has no plan/apply comparison, so the default is resolved here
+	// rather than in a plan modifier -- and written back into the model, so state
+	// records which workspace was actually read (#2036).
+	if config.WorkspaceID.IsNull() || config.WorkspaceID.IsUnknown() {
+		if d.defaultWorkspace == "" {
+			resp.Diagnostics.AddError("Missing workspace",
+				"Set workspace_id on this data source, or the provider's `workspace` attribute, or "+
+					"TERRAPOD_WORKSPACE. Inside a Terrapod run the last is exported for you.")
+			return
+		}
+		config.WorkspaceID = types.StringValue(d.defaultWorkspace)
 	}
 
 	est, err := d.tc.GetWorkspaceCostEstimate(ctx, config.WorkspaceID.ValueString())

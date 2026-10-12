@@ -17,11 +17,13 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 var (
 	_ resource.Resource                = &notificationConfigResource{}
 	_ resource.ResourceWithImportState = &notificationConfigResource{}
+	_ resource.ResourceWithModifyPlan  = &notificationConfigResource{}
 )
 
 type notificationConfigResource struct {
@@ -40,7 +42,7 @@ func (r *notificationConfigResource) Schema(_ context.Context, _ resource.Schema
 		Description: "Manages a notification configuration for a Terrapod workspace.",
 		Attributes: map[string]schema.Attribute{
 			"id":               schema.StringAttribute{Computed: true, Description: "Notification configuration ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"workspace_id":     schema.StringAttribute{Required: true, Description: "Workspace ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"workspace_id":     schema.StringAttribute{Optional: true, Computed: true, Description: "Workspace ID. Defaults to the provider's `workspace`.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}},
 			"name":             schema.StringAttribute{Required: true, Description: "Notification name."},
 			"destination_type": schema.StringAttribute{Required: true, Description: "Type: generic, slack, or email.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"url":              schema.StringAttribute{Optional: true, Description: "Webhook URL (required for generic/slack)."},
@@ -235,4 +237,11 @@ func readNCFromSDK(ctx context.Context, nc *terrapod.NotificationConfiguration, 
 	}
 
 	return diags
+}
+
+// ModifyPlan fills workspace_id from the provider's `workspace` when the
+// configuration leaves it out, so a resource declared inside a run needs no
+// workspace id at all (#2036).
+func (r *notificationConfigResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 }

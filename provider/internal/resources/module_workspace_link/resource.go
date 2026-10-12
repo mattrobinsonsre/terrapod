@@ -15,11 +15,13 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 var (
 	_ resource.Resource                = &moduleWorkspaceLinkResource{}
 	_ resource.ResourceWithImportState = &moduleWorkspaceLinkResource{}
+	_ resource.ResourceWithModifyPlan  = &moduleWorkspaceLinkResource{}
 )
 
 type moduleWorkspaceLinkResource struct {
@@ -52,8 +54,9 @@ func (r *moduleWorkspaceLinkResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID to link.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional: true, Computed: true,
+				Description:   "Workspace ID to link. Defaults to the provider's `workspace`.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_name": schema.StringAttribute{
 				Computed: true, Description: "Workspace name.",
@@ -182,4 +185,11 @@ func readMWLFromSDK(mwl *terrapod.ModuleWorkspaceLink, m *moduleWorkspaceLinkMod
 	m.WorkspaceName = types.StringValue(mwl.WorkspaceName)
 	m.CreatedAt = types.StringValue(mwl.CreatedAt)
 	m.CreatedBy = types.StringValue(mwl.CreatedBy)
+}
+
+// ModifyPlan fills workspace_id from the provider's `workspace` when the
+// configuration leaves it out, so a join declared inside a run needs no
+// workspace id at all (#2036).
+func (r *moduleWorkspaceLinkResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 }

@@ -53,8 +53,9 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID this variable belongs to.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional: true, Computed: true,
+				Description:   "Workspace ID this variable belongs to. Defaults to the provider's `workspace`.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
 			"key": schema.StringAttribute{
 				Required: true, Description: "Variable name.",
@@ -253,6 +254,9 @@ var _ resource.ResourceWithModifyPlan = &variableResource{}
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
 func (r *variableResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Before KeepComputedWhenUnchanged, which compares the PLANNED workspace_id
+	// against state -- it has to see the defaulted value, not the null one.
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
 		[]string{"workspace_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
 		[]string{"version_id", "updated_at"},

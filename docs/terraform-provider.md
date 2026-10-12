@@ -130,7 +130,20 @@ Configuration attributes (all also settable via environment variables):
 | `hostname` | `TERRAPOD_HOSTNAME` | The Terrapod instance hostname (e.g. `terrapod.example.com`). |
 | `token` | `TERRAPOD_TOKEN` | API token. Prefer `terraform login <host>` (writes `~/.terraform.d/credentials.tfrc.json`) or the env var over hard-coding it. |
 | `skip_tls_verify` | — | Skip TLS verification (local/dev only). |
-| `workspace` | `TERRAPOD_WORKSPACE` | The workspace a resource uses when its own `workspace_id` is not set. **A Terrapod run exports this from its own workspace, in both the plan and the apply phase** — so inside a run `provider "terrapod" {}` needs nothing and the inventory resources need no workspace id. Supply it for a local apply, where there is no run to export it. |
+| `workspace` | `TERRAPOD_WORKSPACE` | The workspace a resource uses when its own `workspace_id` is not set. **A Terrapod run exports this from its own workspace, in both the plan and the apply phase** — so inside a run `provider "terrapod" {}` needs nothing and no resource needs a workspace id. Supply it for a local apply, where there is no run to export it. |
+
+The default applies to **every** resource and data source that takes a workspace id —
+`terrapod_variable`, `terrapod_run_task`, `terrapod_notification_configuration`,
+`terrapod_run_trigger`, the three workspace joins, all eight inventory resources and
+the workspace-scoped data sources. A value you set always wins, which is how a
+configuration declares into a *different* workspace from the one its run belongs to.
+
+One deliberate exception: `terrapod_run_trigger.source_workspace_id` stays required.
+It names the *other* workspace in the relationship, and defaulting it to the run's own
+would declare a workspace that triggers itself.
+
+With no workspace from any source — no attribute, no provider `workspace`, no env var
+— a plan fails naming all three, rather than applying an empty id against the server.
 
 ### 2. Declare Terrapod objects
 

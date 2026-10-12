@@ -17,6 +17,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 type executionHookWorkspaceModel struct {
@@ -28,6 +29,7 @@ type executionHookWorkspaceModel struct {
 var (
 	_ resource.Resource                = &executionHookWorkspaceResource{}
 	_ resource.ResourceWithImportState = &executionHookWorkspaceResource{}
+	_ resource.ResourceWithModifyPlan  = &executionHookWorkspaceResource{}
 )
 
 type executionHookWorkspaceResource struct {
@@ -54,8 +56,9 @@ func (r *executionHookWorkspaceResource) Schema(_ context.Context, _ resource.Sc
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID to associate the hook with.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional: true, Computed: true,
+				Description:   "Workspace ID to associate the hook with. Defaults to the provider's `workspace`.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -149,4 +152,11 @@ func (r *executionHookWorkspaceResource) ImportState(ctx context.Context, req re
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("hook_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), parts[1])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+}
+
+// ModifyPlan fills workspace_id from the provider's `workspace` when the
+// configuration leaves it out, so a join declared inside a run needs no
+// workspace id at all (#2036).
+func (r *executionHookWorkspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
 }

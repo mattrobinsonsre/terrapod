@@ -20,8 +20,13 @@ import (
 //
 // A configured value always wins, and an existing resource keeps its state value
 // through UseStateForUnknown, so this only ever supplies a value nobody named.
-// With no default available it does nothing and the resource's own Create fails
-// with the server's error, which names the missing field.
+//
+// **With no workspace from any source it raises a plan-time error**, which is the
+// point rather than a nicety. Making a Required attribute Optional costs the
+// framework's own "argument is required" error, and without this the omission
+// would instead plan as "known after apply" and fail at apply against the server
+// with an empty id -- strictly worse than what it replaced. This names all three
+// sources, so it is better than what it replaced rather than merely as good.
 func DefaultWorkspaceID(
 	ctx context.Context,
 	req resource.ModifyPlanRequest,
@@ -29,7 +34,7 @@ func DefaultWorkspaceID(
 	defaultWorkspace string,
 ) {
 	// Destroy has no plan to fill.
-	if req.Plan.Raw.IsNull() || defaultWorkspace == "" {
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 	var planned types.String
@@ -37,7 +42,15 @@ func DefaultWorkspaceID(
 		// A resource without the attribute is not this helper's business.
 		return
 	}
+	// Already named, or carried over from state by UseStateForUnknown (whose
+	// attribute-level modifier has run by now), so there is nothing to supply.
 	if !planned.IsNull() && !planned.IsUnknown() {
+		return
+	}
+	if defaultWorkspace == "" {
+		resp.Diagnostics.AddError("Missing workspace",
+			"Set workspace_id on this resource, or the provider's `workspace` attribute, or "+
+				"TERRAPOD_WORKSPACE. Inside a Terrapod run the last is exported for you.")
 		return
 	}
 	resp.Diagnostics.Append(

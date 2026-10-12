@@ -32,6 +32,8 @@ var _ datasource.DataSource = &architectureCritiqueDataSource{}
 
 type architectureCritiqueDataSource struct {
 	tc *terrapod.Client
+	// defaultWorkspace is the provider's `workspace` (#2036); "" when unset.
+	defaultWorkspace string
 }
 
 type architectureCritiqueModel struct {
@@ -104,8 +106,9 @@ func (d *architectureCritiqueDataSource) Schema(_ context.Context, _ datasource.
 			"feature enabled and a critique generated for the workspace's current state.",
 		Attributes: map[string]schema.Attribute{
 			"workspace_id": schema.StringAttribute{
-				Description: "Workspace ID (ws-… or a bare UUID) to critique.",
-				Required:    true,
+				Description: "Workspace ID (ws-… or a bare UUID) to critique. Defaults to the provider's `workspace`.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"status":       schema.StringAttribute{Description: "ready | pending | skipped | errored.", Computed: true},
 			"state_serial": schema.Int64Attribute{Description: "Serial of the state version this critique was generated for.", Computed: true},
@@ -165,6 +168,7 @@ func (d *architectureCritiqueDataSource) Configure(_ context.Context, req dataso
 		return
 	}
 	d.tc = tc
+	d.defaultWorkspace = c.DefaultWorkspace
 }
 
 func (d *architectureCritiqueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -172,6 +176,19 @@ func (d *architectureCritiqueDataSource) Read(ctx context.Context, req datasourc
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// A data source has no plan/apply comparison, so the default is resolved here
+	// rather than in a plan modifier -- and written back into the model, so state
+	// records which workspace was actually read (#2036).
+	if config.WorkspaceID.IsNull() || config.WorkspaceID.IsUnknown() {
+		if d.defaultWorkspace == "" {
+			resp.Diagnostics.AddError("Missing workspace",
+				"Set workspace_id on this data source, or the provider's `workspace` attribute, or "+
+					"TERRAPOD_WORKSPACE. Inside a Terrapod run the last is exported for you.")
+			return
+		}
+		config.WorkspaceID = types.StringValue(d.defaultWorkspace)
 	}
 
 	cr, err := d.tc.GetArchitectureCritique(ctx, config.WorkspaceID.ValueString())
