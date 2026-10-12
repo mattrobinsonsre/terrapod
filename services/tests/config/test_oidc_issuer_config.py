@@ -97,27 +97,36 @@ class TestTheValidatorFollowsTheSAMEFALLBACKCHAINASIssuerURL:
 
 
 class TestTheTrailingSlashRule:
-    """Mechanically `issuer_url()` strips a trailing slash from all three, so
-    this changes no behaviour -- it refuses a value that does not EQUAL what the
-    operator must configure the cloud with. OIDC issuer matching is exact, so a
-    cloud configured with `https://x/` rejects a token claiming `https://x`, and
-    the operator reads the setting they wrote rather than the string we mint.
+    """A trailing slash is ACCEPTED, and warned about at startup instead.
+
+    Supersedes a version of this class that refused it. The reasoning it was
+    refused for is still true and still asserted: `issuer_url()` strips the
+    slash, OIDC issuer matching is exact, so a cloud configured with
+    `https://x/` rejects a token claiming `https://x`, and the operator reads
+    the setting they wrote rather than the string we mint.
+
+    But the penalty was wrong, for the reason the old class already gave about
+    the two FALLBACK settings -- that refusing a slash there "would break
+    deployments over a cosmetic difference in a value the strip already
+    handles". That applies with more force here, not less: `settings =
+    Settings()` is evaluated at `terrapod.config` import, so a raise is not a
+    refused feature but an API pod that will not start. `https://host/` is an
+    ordinary thing to paste and was a WORKING configuration, so a patch release
+    that refuses it is a hard-down upgrade for a value the code then strips
+    anyway.
+
+    The operator still has to be told, because their cloud-side trust policy is
+    the half that is actually wrong -- see
+    `oidc_signing.warn_about_issuer_url_cosmetics`, covered in
+    `tests/auth/test_oidc_signing.py`.
     """
 
-    def test_a_trailing_slash_on_public_url_is_refused(self):
-        with pytest.raises(ValidationError, match="trailing slash"):
-            _settings(issuer={"enabled": True, "public_url": "https://x.example.com/"})
-
-    def test_the_message_shows_what_would_actually_be_minted(self):
-        with pytest.raises(ValidationError, match="https://x.example.com'"):
-            _settings(issuer={"enabled": True, "public_url": "https://x.example.com/"})
+    def test_a_trailing_slash_on_public_url_is_accepted(self):
+        _settings(issuer={"enabled": True, "public_url": "https://x.example.com/"})
 
     def test_a_trailing_slash_on_a_FALLBACK_is_tolerated(self):
-        """`public_webhook_url` and `external_url` are not issuer settings --
-        they serve the webhook receiver and link generation as well -- so
-        refusing a slash there would break deployments over a cosmetic
-        difference in a value the strip already handles. The rule is about the
-        one setting whose only job is to be the issuer."""
+        """Unchanged: these serve the webhook receiver and link generation as
+        well, so they were never candidates for refusal."""
         _settings(issuer={"enabled": True}, webhook="https://hooks.example.com/")
         _settings(issuer={"enabled": True}, external="https://terrapod.example.com/")
 
@@ -125,6 +134,19 @@ class TestTheTrailingSlashRule:
         """An issuer may carry a path -- a deployment behind a shared hostname
         serves the two `/.well-known` documents under it."""
         _settings(issuer={"enabled": True, "public_url": "https://x.example.com/terrapod"})
+
+    def test_what_genuinely_cannot_WORK_is_still_refused(self):
+        """The line the downgrade must not cross.
+
+        A non-https or scheme-less issuer cannot be fetched by AWS, Azure or
+        GCP at all, so federation is broken however the cloud is configured --
+        that is a permanent configuration error and stays fatal. Only the
+        cosmetic case moved.
+        """
+        with pytest.raises(ValidationError, match="absolute https URL"):
+            _settings(issuer={"enabled": True, "public_url": "http://x.example.com"})
+        with pytest.raises(ValidationError, match="absolute https URL"):
+            _settings(issuer={"enabled": True, "public_url": "x.example.com"})
 
 
 class TestTheSubjectFormat:

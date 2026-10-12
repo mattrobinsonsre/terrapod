@@ -320,20 +320,47 @@ class TestTheOverlappingSuppliedKey:
         with a, b:
             assert oidc_signing._configured_next_key_pem() is None
 
-    def test_the_same_key_twice_is_refused_at_STARTUP(self, key):
-        """A kid is a thumbprint OF the key material, so this would publish one
-        JWK twice under one kid. Refused rather than de-duplicated, because it
-        means the operator believes they have staged a key change and have
-        not -- and they would discover it at the cutover.
+    def test_the_same_key_twice_WARNS_and_does_not_stop_the_pod(self, key):
+        """Supersedes a test that asserted this is refused at startup.
 
-        Refused by the startup validator, not at load: the load site is inside
-        the lifespan's tolerant try, where a raise becomes a warning.
+        Half of that reasoning still holds and is asserted below: a kid is a
+        thumbprint OF the key material, so publishing both would put one JWK
+        in the document twice under one kid, and an operator who believes they
+        have staged a key change has not. That is worth saying loudly.
+
+        What did not hold is the penalty. `deployment-api.yaml` renders the two
+        env vars independently and states in writing that "during the promotion
+        step both name the same Secret for a moment, which is correct and not a
+        mistake to guard against" -- so an operator promoting a staged key in
+        the order `values.yaml` describes passes through exactly this state, and
+        `validate_configured_signing_key` runs OUTSIDE the lifespan's tolerant
+        try. Raising therefore took every API pod down in the middle of a
+        documented procedure. The chart and the validator disagreed, and the
+        validator was the one that paged someone.
         """
         pem = oidc_signing.serialize_private_key(key)
         a, b = self._configure(pem, pem)
         with a, b:
-            with pytest.raises(ValueError, match="same key as"):
-                oidc_signing.validate_configured_signing_key()
+            with patch.object(oidc_signing.logger, "warning") as warned:
+                oidc_signing.validate_configured_signing_key()  # must NOT raise
+        assert warned.called, "the operator still has to be told nothing is staged"
+        assert "same key as" in str(warned.call_args)
+
+    def test_the_duplicate_is_published_ONCE(self, key):
+        """The property the raise used to buy, now bought by the load path.
+
+        Without this the JWKS carries the same kid twice, which is a malformed
+        document for any cloud that indexes the key set by kid.
+        """
+        pem = oidc_signing.serialize_private_key(key)
+        a, b = self._configure(pem, pem)
+        with a, b:
+            keys = self._init()
+            published = [k["kid"] for k in oidc_signing.get_jwks()["keys"]]
+
+        assert len(keys) == 1, "the incoming key is the key in use; it is not a second key"
+        assert published == [oidc_signing.compute_kid(key)]
+        assert len(published) == len(set(published)), "a kid must not appear twice"
 
     def test_an_unusable_NEXT_key_fails_startup_and_is_named_as_such(self, key):
         """The message has to name the second setting, or the operator edits the
@@ -735,3 +762,45 @@ class TestAnExhaustedKeyTableNeverPublishesAnEmptyTrustRoot:
         # The property the ordering exists for: NOT `{"keys": []}`.
         with pytest.raises(RuntimeError, match="not initialised"):
             oidc_signing.get_jwks()
+
+
+class TestTheIssuerUrlCosmeticWarning:
+    """`warn_about_issuer_url_cosmetics`: tell the operator, do not stop the pod.
+
+    A trailing slash on `auth.oidc_issuer.public_url` is stripped by
+    `issuer_url()`, so Terrapod works -- but issuer matching is exact, so a
+    cloud configured with the slash rejects every token. The configuration that
+    is wrong is the cloud's, which Terrapod cannot fix and must not die over.
+    This used to be a config-validator raise, i.e. a CrashLoopBackOff on an
+    ordinary value; see `tests/config/test_oidc_issuer_config.py`.
+    """
+
+    def _warn(self, *, enabled=True, public_url=""):
+        from terrapod.config import settings
+
+        with (
+            patch.object(settings.auth.oidc_issuer, "enabled", enabled),
+            patch.object(settings.auth.oidc_issuer, "public_url", public_url),
+            patch.object(oidc_signing.logger, "warning") as warned,
+        ):
+            oidc_signing.warn_about_issuer_url_cosmetics()
+        return warned
+
+    def test_a_trailing_slash_warns_and_names_both_strings(self):
+        warned = self._warn(public_url="https://x.example.com/")
+        assert warned.called
+        text = str(warned.call_args)
+        assert "https://x.example.com/" in text, "the operator must see what they wrote"
+        assert "https://x.example.com'" in text, "and what is actually minted"
+
+    def test_a_clean_url_is_silent(self):
+        assert not self._warn(public_url="https://x.example.com").called
+
+    def test_a_disabled_issuer_is_silent(self):
+        """Nothing is published, so there is no `iss` to mismatch."""
+        assert not self._warn(enabled=False, public_url="https://x.example.com/").called
+
+    def test_an_unset_public_url_is_silent(self):
+        """The fallbacks are stripped too, and they are not issuer settings --
+        warning about a slash on a webhook hostname would be noise."""
+        assert not self._warn(public_url="").called

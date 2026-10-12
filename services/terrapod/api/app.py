@@ -118,7 +118,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         from terrapod.auth.oidc_signing import (
             init_oidc_signing,
             validate_configured_signing_key,
+            warn_about_issuer_url_cosmetics,
         )
+
+        # Configurations that work but will not match on the cloud's side. A
+        # warning, not a refusal -- see the helper's docstring.
+        warn_about_issuer_url_cosmetics()
 
         # OUTSIDE the try, and that is the whole point: an operator-supplied key
         # that cannot be loaded is a permanent configuration error, so it should

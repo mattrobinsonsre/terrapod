@@ -3350,19 +3350,20 @@ class Settings(BaseSettings):
                 "/.well-known/openid-configuration to it, which a query or fragment "
                 "would land in the wrong place."
             )
-        # Only for `public_url`. `issuer_url()` strips a trailing slash from all
-        # three, so this changes nothing mechanically -- it refuses a value that
-        # does not equal what the operator must configure the cloud with, since
-        # OIDC issuer matching is exact and `https://x/` is not `https://x`. The
-        # two fallbacks are not issuer settings and are left to the strip.
-        if source == "auth.oidc_issuer.public_url" and resolved != resolved.rstrip("/"):
-            raise ValueError(
-                f"{lead}({resolved!r}) has a trailing slash. Terrapod strips it, so the "
-                f"minted `iss` would be {resolved.rstrip('/')!r} -- and OIDC issuer "
-                "matching is exact, so a cloud configured with the slash would reject "
-                "every token. Remove it here and configure the cloud with the same "
-                "string."
-            )
+        # A trailing slash is NOT refused here, deliberately. `issuer_url()`
+        # strips it from all three candidates, so the value is mechanically
+        # harmless -- and `settings = Settings()` is evaluated at this module's
+        # import, which means a raise is not a feature refusal but a pod that
+        # will not start. Refusing `https://host/` -- an entirely ordinary thing
+        # to paste, and a working configuration on every release that has one --
+        # would take the whole control plane down for a cosmetic value.
+        #
+        # What it was guarding is real but is the operator's half: issuer
+        # matching is exact, so a cloud configured WITH the slash rejects every
+        # token, because the minted `iss` has been stripped. That is warned
+        # about at startup by `warn_about_issuer_url_cosmetics`, where a logger
+        # exists -- nothing here can log, since `terrapod.config` imports
+        # nothing from Terrapod (#1151).
 
         return self
 

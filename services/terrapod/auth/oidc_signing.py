@@ -274,18 +274,57 @@ def validate_configured_signing_key() -> None:
     _check_one_supplied_key("auth.oidc_issuer.signing_key_pem", current)
     _check_one_supplied_key("auth.oidc_issuer.signing_key_pem_next", upcoming)
 
-    # Distinctness, checked HERE rather than where the two are loaded, so it
-    # fails startup for the same reason the rest of this does. A kid is a
-    # thumbprint OF the key material, so the same key twice would publish one
-    # JWK twice under one kid -- refused rather than de-duplicated, because it
-    # means the operator believes they have staged a key change and have not.
+    # Distinctness is WARNED about, not refused, and that is the whole point of
+    # the asymmetry with everything above. The chart renders the two env vars
+    # independently and says so in `deployment-api.yaml`: "during the promotion
+    # step both name the same Secret for a moment, which is correct and not a
+    # mistake to guard against". An operator promoting a staged key by pointing
+    # `existingSecret` at it first and clearing `nextExistingSecret` second --
+    # the order `values.yaml` describes -- passes through exactly this state, so
+    # raising here would make a documented procedure take every API pod down
+    # mid-rotation. A warning keeps the signal for the steady-state case it was
+    # written for (the operator believes they staged a change and did not)
+    # without the control plane being the thing that pays for it.
+    #
+    # `reload_signing_keys` skips the duplicate rather than publishing one kid
+    # twice, which is what the raise used to buy.
     if current is not None and upcoming is not None:
         if compute_kid(load_private_key(current)) == compute_kid(load_private_key(upcoming)):
-            raise ValueError(
+            logger.warning(
                 "auth.oidc_issuer.signing_key_pem_next is the same key as "
-                "signing_key_pem, so nothing is staged. Supply the incoming key, or "
-                "unset it."
+                "signing_key_pem, so nothing is staged. Expected briefly while "
+                "promoting a staged key; if it persists, supply the incoming key "
+                "or unset it."
             )
+
+
+def warn_about_issuer_url_cosmetics() -> None:
+    """Warn about an issuer URL that resolves correctly but will not match.
+
+    Separate from the config validator because `terrapod.config` cannot log
+    (#1151) and, more importantly, because `settings = Settings()` runs at that
+    module's import -- so anything raised there is a pod that will not start
+    rather than a refused feature. These are configurations that WORK; what is
+    wrong is on the cloud's side of the trust policy, and the operator needs to
+    be told, not stopped.
+
+    Called from the lifespan next to `validate_configured_signing_key`, which
+    does stop the pod, for things that genuinely cannot work.
+    """
+    from terrapod.config import settings
+
+    if not settings.auth.oidc_issuer.enabled:
+        return
+    configured = (settings.auth.oidc_issuer.public_url or "").strip()
+    if configured and configured != configured.rstrip("/"):
+        logger.warning(
+            "auth.oidc_issuer.public_url has a trailing slash; Terrapod strips it, so "
+            "the minted `iss` differs from what is configured here. OIDC issuer "
+            "matching is exact, so configure the cloud with the stripped form or it "
+            "will reject every token.",
+            configured=configured,
+            minted_iss=configured.rstrip("/"),
+        )
 
 
 def _check_one_supplied_key(setting: str, configured: str | None) -> None:
@@ -329,14 +368,20 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
         # not sign, because the whole point is that the clouds have not fetched
         # it yet.
         #
-        # Distinctness is enforced by `validate_configured_signing_key`, which
-        # the lifespan runs outside its tolerant try -- so by the time this
-        # executes the two keys are known to differ. Not re-checked here, because
-        # this call site IS inside that try and a raise would only become a
-        # warning.
+        # A kid is a thumbprint OF the key material, so two identical PEMs yield
+        # one kid and appending both would publish the same JWK twice. Skipped
+        # here rather than refused at startup, because the chart's documented
+        # promotion step passes through exactly that state for one `helm
+        # upgrade` -- see `validate_configured_signing_key`, which warns.
         upcoming = _configured_next_key_pem()
         if upcoming is not None:
             next_kid = compute_kid(load_private_key(upcoming))
+            if next_kid == kid:
+                logger.info(
+                    "OIDC issuer second supplied key is the key already in use; publishing it once",
+                    kid=kid,
+                )
+                return _keys
             _keys = [*_keys, SigningKey(kid=next_kid, private_key_pem=upcoming)]
             logger.info(
                 "OIDC issuer publishing a second operator-supplied key, not signing with it",
