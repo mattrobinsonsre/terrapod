@@ -264,9 +264,14 @@ Three properties follow from supplying it, and they are the whole trade:
   the first property true — and means a backup of the database does not contain it. Back the
   Secret up yourself.
 - **The rotate endpoint returns `409`.** The key is yours, so rotation is yours: replace the
-  Secret and restart the API. There is no propagation window doing the staging for you, so
-  roll the new public key out to your clouds' trust configuration before you cut over, or
-  every federated run fails at the cloud's token exchange in the meantime.
+  Secret and restart the API. There is no propagation window doing the staging for you,
+  **and for a cloud that fetches the JWKS you cannot stage it yourself either**: an
+  operator-supplied key publishes exactly one key, so there is never a moment when both
+  the outgoing and incoming public keys are published. Federated runs fail from the
+  cutover until each cloud refetches. Plan a maintenance window, or pin a trust
+  configuration that names the key directly (Azure federated credentials, an AWS IAM
+  provider with an explicit thumbprint) so you control when it changes. Generated keys
+  do not have this problem -- their rotation publishes the new key before it signs.
 
 It is injected as `TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM` from the Secret, never a
 ConfigMap. The same GitOps caveats as the token signing key above apply, for the same reasons.

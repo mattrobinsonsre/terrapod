@@ -923,8 +923,35 @@ condition can be expressed on Azure, which is why the phase is embedded in it as
 well as claimed discretely.
 
 **Targets that can read arbitrary claims should condition on the discrete claims
-instead**, which needs no wildcard and no string parsing. AWS, GCP and
-OpenBao/Vault can all do this, and the examples above do.
+instead**, which needs no wildcard and no string parsing. GCP and OpenBao/Vault
+can do this, and the examples above do.
+
+**AWS cannot, and this page previously said it could.** For a generic IAM OIDC
+identity provider, a role trust policy can condition only on `aud`, `oaud`, `sub`,
+`amr` and `email` ([IAM condition keys for OIDC
+federation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif)).
+The `workspace`, `workspace_id`, `phase` and `run_id` claims are **not** available
+as condition keys there. So on AWS, as on Azure, `sub` is the only thing you can
+bind — which is why it repeats what the discrete claims say.
+
+Two things follow for an AWS trust policy, and both are easy to get wrong:
+
+- **Condition on `sub` with `StringEquals`, never `StringLike`.** A wildcard such as
+  `workspace:prod*` also matches `prod-evil`, and matches the phaseless form that a
+  listener predating the phase claim produces — so it grants more than it reads as
+  granting.
+- **The condition key spelled `aud` is not the `aud` claim.** AWS maps it to `azp`
+  when that claim is present and falls back to `aud` only when it is absent; the
+  actual audience claim is exposed as **`oaud`**. Terrapod does not set `azp`, so
+  the two agree today — but write `oaud` if you mean the audience.
+
+#### A module publish can reach the apply phase without a human
+
+Publishing a module version queues a **standard, apply-capable** run on every linked
+workspace, so on a consumer with auto-apply it applies unconfirmed, under that
+workspace's apply-phase identity. Write access to a module repository is therefore
+apply access on its auto-applying consumers. See [the registry
+docs](registry.md#automatic-runs-on-version-publish).
 
 #### The phase suffix is conditional, and on Azure that matters
 

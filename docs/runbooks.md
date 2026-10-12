@@ -2888,9 +2888,14 @@ later routine rotation break tokens in flight.
 **If the deployment signs with an operator-supplied key**
 (`api.oidcSigningKey.existingSecret`), the rotate endpoint answers **409**: the key
 is yours, and so is replacing it. Generate a new RSA key, update the Secret, and
-roll the API. The `checksum/oidc-signing` annotation means changing the Secret rolls
-every replica together, so there is no window where replicas disagree about which
-key signs.
+roll the API. **Roll it yourself** — do not rely on the `checksum/oidc-signing`
+annotation to do it for you. The annotation is computed inside a `lookup`, so it
+renders under `helm install`/`upgrade` and renders **nothing** under `helm
+template`, which is what Argo CD and Flux run; `deployment-api.yaml` says so in its
+own comment. And even where it does render, a rolling update serves two different
+single-key JWKS documents from different pods until the roll completes, because an
+operator-supplied key publishes exactly one key at a time. Expect a window, and
+plan the cutover around it rather than assuming there is none.
 
 ### What this cannot do
 
