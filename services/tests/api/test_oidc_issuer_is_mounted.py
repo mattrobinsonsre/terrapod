@@ -294,8 +294,16 @@ class TestTheIssuerIgnoresTheREQUEST:
         app, _kid, _pem = issuer_app
         body = json.loads((await self._get_with(app, DISCOVERY_PATH, self.HOSTILE)).content)
 
+        # Exact, not a prefix. `startswith` on a URL is both weaker and flagged
+        # (`py/incomplete-url-substring-sanitization`, high) -- it passes on
+        # `https://issuer.example.test.evil.example`, which is precisely the
+        # value this test exists to refuse. Line 124 above already compares
+        # exactly; this was the odd one out.
         assert body["issuer"] == "https://issuer.example.test"
-        assert body["jwks_uri"].startswith("https://issuer.example.test")
+        assert body["jwks_uri"] == "https://issuer.example.test" + JWKS_PATH
+        # A NEGATIVE substring over the whole document, which is sound where the
+        # positive form is not: any occurrence anywhere fails, so there is no
+        # position the hostile host could hide in.
         assert "evil.example" not in json.dumps(body)
 
     async def test_the_clean_request_agrees_so_this_is_not_vacuous(self, issuer_app):
