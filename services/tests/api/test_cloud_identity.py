@@ -175,6 +175,7 @@ async def _call(
     cfg=None,
     looked_up=None,
     pool_still_assigned=True,
+    status=None,
 ):
     """Drive the batched mint.
 
@@ -183,6 +184,19 @@ async def _call(
     claim set signed, and `captured["all"]` every one -- so a single-target test
     reads as it always did and a batched test can check each.
     """
+    # The run's status is DERIVED from the token's phase unless a test pins it.
+    #
+    # The mint refuses a run that is not executing the phase its token names
+    # (GHSA-p9jh), so a MagicMock status fails every test for the wrong reason.
+    # Deriving it models production -- `claim_next_run` moves `queued ->
+    # planning` and `confirmed -> applying` atomically as it hands the run over,
+    # so a runner holding a plan-phase token is on a `planning` run by
+    # construction. `status=` is for the tests that are ABOUT the refusal.
+    if status is not None:
+        run.status = status
+    elif not isinstance(run.status, str):
+        run.status = "applying" if user.run_phase == "apply" else "planning"
+
     settings = MagicMock()
     settings.auth.oidc_issuer = cfg or _enabled()
     captured: dict = {"all": []}
@@ -1155,12 +1169,24 @@ class TestTheMintRecordsWhatItServed:
 
     async def test_a_second_batch_accumulates_rather_than_replacing(self):
         """The apply phase re-mints what the plan did, and may use more. The
-        confirm check reads the union, so the plan's identities must survive."""
+        confirm check reads the union, so the plan's identities must survive.
+
+        The run's status is ADVANCED between the two calls, because that is what
+        happens: a run plans, is confirmed, and is claimed into `applying`. It
+        used to be left alone, which only passed because nothing read it -- and
+        now that the mint checks the phase against the state, modelling the
+        sequence is the honest fixture.
+        """
         ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
         run.oidc_minted_targets = []
         await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws"], cfg=cfg)
         await _call(
-            _user(run_id=str(run.id), phase="apply"), run, ws, providers=["aws", "azure"], cfg=cfg
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            providers=["aws", "azure"],
+            cfg=cfg,
+            status="applying",
         )
         assert run.oidc_minted_targets == ["aws", "azure"]
 
@@ -1301,7 +1327,7 @@ class TestATargetCannotEscapeItsOwnDirectory:
         assert resp.status_code == 200
 
 
-class TestAFinishedRunCannotMint:
+class TestOnlyARunEXECUTINGThePhaseCanMint:
     """A runner token is good until it EXPIRES -- run state is not checked when
     it is verified, and the default TTL is an hour.
 
@@ -1311,11 +1337,24 @@ class TestAFinishedRunCannotMint:
     exfiltrates the token could keep POSTing after the run finished, drawing
     fresh short-lived credentials for the workspace's identity, from anywhere,
     for the remainder of the hour. `debug_mode`'s lingering pods widen the
-    window further. A finished run has no legitimate reason to mint.
+    window further.
+
+    **This class used to be `TestAFinishedRunCannotMint`, and the premise it
+    tested was wrong** (GHSA-p9jh). The check refused `TERMINAL_STATES`, and a
+    plan-only run never reaches one: it finishes in `planned` and stays there.
+    Speculative pull-request plans, module-impact plans and drift runs are ALL
+    plan-only -- and are exactly the runs executing the least-trusted code, an
+    unmerged branch. So the one class of run the guard most needed to cover was
+    the one it could never fire on, and every test here passed throughout.
+
+    The question is "is this run executing the phase its token names", which the
+    terminal set cannot express.
     """
 
     @pytest.mark.parametrize("status", ["applied", "errored", "discarded", "canceled"])
     async def test_a_terminal_run_is_refused(self, status):
+        """Still refused -- a terminal run executes nothing -- but now as a
+        consequence of the rule rather than as the rule itself."""
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
         run.status = status
         with pytest.raises(HTTPException) as e:
@@ -1323,13 +1362,78 @@ class TestAFinishedRunCannotMint:
         assert e.value.status_code == 409
         assert status in e.value.detail
 
+    async def test_a_PLANNED_run_is_refused_which_the_terminal_check_could_not_do(self):
+        """The finding, stated as the one case that distinguishes the two rules.
+
+        `planned` is in no terminal set, so the old check let this through --
+        and it is where every plan-only run comes to rest, which is where a
+        pull-request plan's exfiltrated token lived.
+        """
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status="planned",
+            )
+        assert e.value.status_code == 409
+        assert "plan-only" in e.value.detail, "the message must name why `planned` is the case"
+
+    @pytest.mark.parametrize("status", ["queued", "pending"])
+    async def test_a_run_not_yet_executing_is_refused_too(self, status):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status=status,
+            )
+        assert e.value.status_code == 409
+
+    async def test_a_PLAN_phase_token_cannot_mint_on_an_APPLYING_run(self):
+        """The phases are checked against each other, not merely against
+        liveness. A plan-phase token on an applying run is a token outliving its
+        own phase, which is the same residual-lifetime problem one state along."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                cfg=cfg,
+                target="aws",
+                status="applying",
+            )
+        assert e.value.status_code == 409
+
     async def test_a_live_run_still_mints(self):
-        """The negative path: the refusal is scoped to terminal states, and must
-        not refuse the states a run actually mints in."""
+        """The negative path. A refusal that caught a run actually executing its
+        phase would break every federated run in the estate."""
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
         run.status = "planning"
         resp, _ = await _call(
             _user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg, target="aws"
+        )
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize("status", ["confirmed", "applying"])
+    async def test_an_apply_phase_token_mints_in_both_apply_states(self, status):
+        """`confirmed` is kept on purpose; see `LIVE_STATES_FOR_PHASE`. A patch
+        must not fail every apply to buy a window in which no Job has launched."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"aws": [AWS]})
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            cfg=cfg,
+            target="aws",
+            status=status,
         )
         assert resp.status_code == 200
 

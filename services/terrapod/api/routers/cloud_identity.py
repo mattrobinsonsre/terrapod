@@ -224,11 +224,34 @@ async def mint_cloud_identity_tokens(
     # costs more here than elsewhere: code in the plan pod that exfiltrates the
     # token could keep POSTing here after the run finished, drawing fresh
     # short-lived credentials for the workspace's identity from anywhere, for the
-    # remainder of the hour. A finished run has no legitimate reason to mint.
-    if run.status in run_service.TERMINAL_STATES:
+    # remainder of the hour.
+    #
+    # **`TERMINAL_STATES` was the wrong set, and wrong for exactly the runs that
+    # matter.** A plan-only run never reaches one: it finishes in `planned` and
+    # stays there. A speculative pull-request plan, a module-impact plan and a
+    # drift-detection run are all plan-only -- and are precisely the runs
+    # executing the least-trusted code, an unmerged branch or an unmerged module
+    # PR inside a consumer workspace. So for every one of them the check never
+    # engaged, and the exfiltrated token went on minting the workspace's
+    # plan-phase identity for the rest of its own lifetime.
+    #
+    # The question is not "has this run finished" but "is this run executing the
+    # phase the presented token names". `claim_next_run` moves
+    # `queued -> planning` and `confirmed -> applying` atomically as part of the
+    # claim, and a runner only holds a token after that, so the strict answer
+    # costs the legitimate path nothing.
+    live = run_service.LIVE_STATES_FOR_PHASE.get(user.run_phase or "")
+    if live is None:
+        live = frozenset().union(*run_service.LIVE_STATES_FOR_PHASE.values())
+    if run.status not in live:
         raise HTTPException(
             status_code=409,
-            detail=(f"Run is {run.status} — a finished run cannot mint cloud identity tokens."),
+            detail=(
+                f"Run is {run.status!r}, so it is not executing a "
+                f"{user.run_phase or 'runner'} phase and cannot mint cloud identity "
+                f"tokens. A plan-only run stays `planned` when it finishes, which is "
+                f"why a finished-run check is not enough."
+            ),
         )
 
     snapshot = run.oidc_audiences or {}

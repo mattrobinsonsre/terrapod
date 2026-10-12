@@ -37,7 +37,16 @@ async def _call(
     body: dict,
     lid: uuid.UUID | None = None,
     require_phase: bool = False,
+    cert_lid: uuid.UUID | None = None,
 ):
+    """Drive the endpoint.
+
+    `cert_lid` is the listener the CALLER'S CERTIFICATE names, defaulting to the
+    one in the path. They are separate parameters because the whole of
+    GHSA-g4j5 is that the endpoint compared the path against the run and never
+    against the certificate, so a test that cannot make them differ cannot see
+    it.
+    """
     lid = lid or uuid.uuid4()
     run = MagicMock()
     run.id = uuid.uuid4()
@@ -70,18 +79,25 @@ async def _call(
             listener_id=f"listener-{lid}",
             run_id=f"run-{run.id}",
             body=body,
-            listener=_listener(lid),
+            identity=_listener(cert_lid or lid),
             db=db,
         )
     return resp, captured
 
 
 class TestAListenerCannotPromoteItsOwnPhase:
-    @pytest.mark.parametrize("status", ["planning", "planned", "queued", "pending"])
-    async def test_an_apply_claim_on_a_non_applying_run_is_downgraded(self, status):
+    async def test_an_apply_claim_on_a_PLANNING_run_is_downgraded(self):
         """The attack shape: a listener launching a plan Job asks for `apply`,
-        and the run then draws the apply cloud identity at plan time."""
-        _resp, captured = await _call(status=status, body={"phase": "apply"})
+        and the run then draws the apply cloud identity at plan time.
+
+        Downgraded rather than refused, because the run IS executing a plan and
+        failing the token would fail the run instead of correcting the listener.
+        Narrowed from a four-status parametrisation: the other three are runs
+        executing nothing at all, and those are now refused outright -- see
+        `TestATokenIsOnlyIssuedWhileThePhaseIsLIVE`. The ordering is what makes
+        both true, and it is asserted there.
+        """
+        _resp, captured = await _call(status="planning", body={"phase": "apply"})
         assert captured["phase"] == "plan"
 
     @pytest.mark.parametrize("status", ["confirmed", "applying"])
@@ -151,3 +167,153 @@ class TestRequirePhaseClosesOffTheUnphasedForm:
         strand it."""
         _, cap = await _call(status="planning", body={})
         assert cap["phase"] is None
+
+
+class TestTheCALLERSCERTIFICATEMustNameTheListenerInThePath:
+    """GHSA-g4j5. The endpoint resolved the certificate and never read it.
+
+    `get_listener_identity` authenticated the caller, the result was bound to a
+    parameter typed `object`, and the only ownership check compared
+    `run.listener_id` against the **path** segment -- which the caller chooses.
+    Every sibling listener endpoint compares the certificate too.
+
+    So a holder of any valid listener certificate, from ANY pool, could name
+    another pool's listener and one of its runs and be handed a runner token for
+    it: artifact and state write access, and since per-workspace cloud identity
+    the target workspace's federated identity with real `workspace` and `phase`
+    claims that no cloud-side trust policy can distinguish from a legitimate
+    token. Compromise of a low-trust pool reached a high-trust pool's apply
+    identity.
+    """
+
+    async def test_a_certificate_for_another_listener_is_refused(self):
+        mine, theirs = uuid.uuid4(), uuid.uuid4()
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "plan"}, lid=theirs, cert_lid=mine)
+        assert exc.value.status_code == 403
+        assert "Certificate does not match" in exc.value.detail
+
+    async def test_the_matching_certificate_still_works(self):
+        """The contrast. A refusal that caught the legitimate caller would take
+        down every run in the estate, which is worse than the finding."""
+        _resp, captured = await _call(status="planning", body={"phase": "plan"})
+        assert captured["phase"] == "plan"
+
+    async def test_the_certificate_is_checked_BEFORE_the_run_ownership(self):
+        """Order matters for what the attacker learns. Checking the run first
+        would answer "Run not assigned to this listener" for a path naming a
+        listener the caller has no certificate for -- which confirms whether that
+        listener owns that run, to a caller who should not get that far."""
+        mine, theirs = uuid.uuid4(), uuid.uuid4()
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "plan"}, lid=theirs, cert_lid=mine)
+        assert "Certificate does not match" in exc.value.detail
+        assert "Run not assigned" not in exc.value.detail
+
+    def test_the_parameter_is_typed_like_every_sibling(self):
+        """The weak type is why the missing check was invisible.
+
+        It was `listener: object`, so a reader never saw that `.listener_id` was
+        available to compare -- the parameter read as an opaque handle. Typed as
+        `ListenerIdentity` this endpoint is indistinguishable from its siblings,
+        which is what matters: the next listener endpoint gets written by copying
+        one of them.
+        """
+        import inspect
+
+        from terrapod.api.dependencies import ListenerIdentity
+
+        params = inspect.signature(router.create_runner_token).parameters
+        assert "identity" in params, "the certificate parameter was renamed again"
+        assert params["identity"].annotation is ListenerIdentity
+
+
+class TestATokenIsOnlyIssuedWhileThePhaseIsLIVE:
+    """GHSA-p9jh. `TERMINAL_STATES` was the wrong set.
+
+    A plan-only run never reaches a terminal state: it finishes in `planned` and
+    stays there. Speculative pull-request plans, module-impact plans and drift
+    runs are all plan-only -- and are precisely the runs executing the
+    least-trusted code, an unmerged branch. So the liveness check never engaged
+    for them, and fresh tokens could be issued for a finished plan indefinitely.
+    """
+
+    @pytest.mark.parametrize("status", ["planned", "queued", "pending", "applied"])
+    async def test_a_run_executing_nothing_is_refused(self, status):
+        with pytest.raises(HTTPException) as exc:
+            await _call(status=status, body={"phase": "plan"})
+        assert exc.value.status_code == 409
+        assert "not executing" in exc.value.detail
+
+    async def test_the_message_names_the_plan_only_case(self):
+        """`planned` is the state a plan-only run FINISHES in, so an operator
+        reading this needs to know that is the point rather than a transient."""
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planned", body={"phase": "plan"})
+        assert "plan-only" in exc.value.detail
+
+    async def test_a_planning_run_gets_a_plan_token(self):
+        _resp, captured = await _call(status="planning", body={"phase": "plan"})
+        assert captured["phase"] == "plan"
+
+    @pytest.mark.parametrize("status", ["confirmed", "applying"])
+    async def test_an_apply_phase_run_gets_an_apply_token(self, status):
+        """`confirmed` is kept deliberately. The claim is atomic, so in every
+        observed path the state is `applying` by the time a token is asked for --
+        but this ships in a patch, and if some path does ask at `confirmed` the
+        tighter rule would fail every apply on it while the looser one closes the
+        finding just as completely."""
+        _resp, captured = await _call(status=status, body={"phase": "apply"})
+        assert captured["phase"] == "apply"
+
+    async def test_the_downgrade_runs_BEFORE_the_liveness_check(self):
+        """Both fixes have to hold at once, and the order is what allows it.
+
+        A listener asking `apply` on a `planning` run is corrected to `plan` and
+        then issued, because the run is executing a plan. Liveness-first on the
+        REQUESTED phase would refuse it -- apply is not live in `planning` -- and
+        that is the legitimate path every plan Job takes when a listener
+        mis-reports.
+        """
+        _resp, captured = await _call(status="planning", body={"phase": "apply"})
+        assert captured["phase"] == "plan"
+
+
+class TestTheRequestedTTLIsValidated:
+    """#2044. `ttl` came straight off the body.
+
+    A non-integer reached `ttl > max_ttl` inside the minting helper and answered
+    500 on a TypeError; a negative value sailed past that same comparison and
+    minted an already-expired token, which fails the run with an authentication
+    error rather than a cause.
+    """
+
+    @pytest.mark.parametrize("bad", ["3600", None, 1.5, [], {}])
+    async def test_a_non_integer_is_a_422_not_a_500(self, bad):
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "plan", "ttl": bad})
+        assert exc.value.status_code == 422
+        assert "must be an integer" in exc.value.detail
+
+    async def test_a_bool_is_refused_too(self):
+        """`bool` is a subclass of `int`, so an isinstance check alone would let
+        `ttl: true` through and mint a one-second token."""
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "plan", "ttl": True})
+        assert exc.value.status_code == 422
+
+    @pytest.mark.parametrize("bad", [0, -1, -3600])
+    async def test_a_non_positive_ttl_is_refused(self, bad):
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "plan", "ttl": bad})
+        assert exc.value.status_code == 422
+        assert "at least 1 second" in exc.value.detail
+
+    async def test_a_valid_ttl_is_accepted(self):
+        """The contrast, and the shape every real listener sends."""
+        _resp, captured = await _call(status="planning", body={"phase": "plan", "ttl": 600})
+        assert captured["phase"] == "plan"
+
+    async def test_an_absent_ttl_takes_the_configured_default(self):
+        _resp, captured = await _call(status="planning", body={"phase": "plan"})
+        assert captured["phase"] == "plan"

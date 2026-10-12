@@ -179,6 +179,32 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
 
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
 
+#: The run states in which a runner token for each phase, and a cloud-identity
+#: mint presenting one, are still LIVE.
+#:
+#: Here beside the transition table rather than in a router, because it is the
+#: state machine's own vocabulary and two routers read it.
+#:
+#: **It replaces a `TERMINAL_STATES` check that could not do the job.** A
+#: plan-only run never reaches a terminal state at all -- it finishes in
+#: `planned` and stays there -- so a finished-run check never engaged for
+#: speculative pull-request plans, module-impact plans or drift runs, which are
+#: exactly the runs executing the least-trusted code: an unmerged branch
+#: (GHSA-p9jh). `planned` is in neither set below, which is the fix.
+#:
+#: **`apply` deliberately keeps `confirmed` as well as `applying`.** The claim is
+#: atomic -- `claim_next_run` moves `confirmed -> applying` as it hands the run
+#: over, and the listener asks for its token only afterwards -- so in every path
+#: observed the state is `applying` by then, and `{"applying"}` alone would be
+#: the tighter rule. It is not taken, because this ships in a patch to a line
+#: operators are running: if any path does request at `confirmed`, the tighter
+#: rule fails every apply on it, and the looser one closes the finding just as
+#: completely. A security fix must not cost a supported line its functionality.
+LIVE_STATES_FOR_PHASE: dict[str, frozenset[str]] = {
+    "plan": frozenset({"planning"}),
+    "apply": frozenset({"confirmed", "applying"}),
+}
+
 # How many gated runs one pre-plan pass will open stages for (#1837). The pass
 # runs on every listener poll, so it needs a ceiling: a workspace whose gate
 # never resolves keeps accumulating `queued` runs (a gated run does not count
