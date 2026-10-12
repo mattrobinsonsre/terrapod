@@ -2696,6 +2696,20 @@ async def report_job_status(
         )
     run = await _get_run(run_id, db)
 
+    # The cross-pool boundary (GHSA-g4j5, one endpoint over). Keyed on the
+    # POOL and deliberately NOT on `run.listener_id` the way the sibling
+    # listener endpoints are: the reconciler publishes `check_job_status` and
+    # `stream_logs` to `listener:events:{run.pool_id}` -- the POOL's channel --
+    # so any listener in the owning pool is entitled to answer, and a
+    # listener-identity check here would refuse a sibling listener doing
+    # exactly what it was asked to do. A run with no pool was never published
+    # to any channel, so a report for one is unsolicited and refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
+
     job_status = body.get("status", "")
     if not job_status:
         raise HTTPException(status_code=422, detail="status is required")
@@ -2777,6 +2791,19 @@ async def upload_log_stream(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+    # The cross-pool boundary (GHSA-g4j5, one endpoint over). Keyed on the
+    # POOL and deliberately NOT on `run.listener_id` the way the sibling
+    # listener endpoints are: the reconciler publishes `check_job_status` and
+    # `stream_logs` to `listener:events:{run.pool_id}` -- the POOL's channel --
+    # so any listener in the owning pool is entitled to answer, and a
+    # listener-identity check here would refuse a sibling listener doing
+    # exactly what it was asked to do. A run with no pool was never published
+    # to any channel, so a report for one is unsolicited and refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
     if phase not in ("plan", "apply"):
         phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()
