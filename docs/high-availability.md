@@ -291,6 +291,7 @@ semantics would only be needed in an active-active design, which this is not.
 | Variables and variable sets | Replicated |
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
 | Object-store content (state, registry, caches, logs) | Per-class policy — see [Choosing verify or copy](#choosing-verify-or-copy-per-class) |
+| The OIDC issuer signing keys | Replicated — including the private half, see [below](#private-keys-and-the-one-that-does-travel) |
 | The CA, the encryption keys | **Never** — node-local by design (see below) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
@@ -321,9 +322,10 @@ plan. The subtle half is precedence — *priority set → workspace variable →
 non-priority set*. A node that carries every value but disagrees about `priority`
 hands a run a **different** value than the leader would, and nothing reports it.
 
-### Private keys never travel
+### Private keys, and the one that does travel
 
-Two classes are deliberately outside the replication scope, for the same reason.
+Two classes are deliberately outside the replication scope, for the same reason —
+and one private key deliberately is not, for the opposite one.
 
 **`crypto_keys`** holds this node's data-encryption key wrapped by *this node's*
 KEK. It is meaningless to the peer, and putting it on the link would leak key
@@ -340,6 +342,32 @@ re-join path does not already deliver.
 The one real consequence: every listener re-joins at a failover, spending one
 join-token use each. That is exactly why join tokens for a shared fleet should be
 long-lived and generously reusable.
+
+**The OIDC issuer signing keys are the exception, and the contrast is the point.**
+The CA's own argument is that nothing's long-term verifiability depends on the pair
+sharing it, because a re-join rebuilds the chain. The issuer key is the opposite on
+both counts: what verifies against it is a published trust root that *third parties*
+cache — AWS, Entra, GCP and Vault each fetch the JWKS on their own schedule and hold
+it for hours — and there is no re-join path, because the thing that would have to
+re-enrol is the operator's cloud.
+
+So a promoted node without the keys does not degrade, it fails silently. It finds an
+empty table, generates a keypair, and signs with it immediately — logged at INFO,
+indistinguishable from ordinary startup. The issuer URL has not changed, so every
+cloud still trusts the issuer while the JWKS it cached names only the old key, and
+every federated run fails until those caches expire. The rotation machinery cannot
+cover it either: the propagation window works by continuing to sign with the
+*retired* key the clouds can still verify, and at a failover there is no retired key
+to fall back to.
+
+The key therefore travels, decrypted on send and re-encrypted under the receiving
+node's own key — the same path a workspace variable's cloud credential already
+takes. The accepted cost is that the peer link carries the private half of a
+published trust root; that is a real widening of what a compromised peer costs, and
+it buys the only thing that makes federation survive a failover at all.
+
+An operator-supplied key is unaffected and never travels: it wins on every startup
+from that node's own secret, so it is never in this table to replicate.
 
 A test fails if either class is ever registered — and another fails if the CA
 gains a new issuing method, since "everything it signs is short-lived" is the

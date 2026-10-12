@@ -32,6 +32,7 @@ from terrapod.db.models import (
     ModuleAutodiscoveryRule,
     ModuleWorkspaceLink,
     NotificationConfiguration,
+    OIDCSigningKey,
     PlatformRoleAssignment,
     Policy,
     PolicySet,
@@ -57,6 +58,45 @@ from terrapod.db.models import (
     WorkspaceRemoteStateConsumer,
 )
 from terrapod.services.replication import ReplicatedClass, register
+
+# The RSA keypair the OIDC issuer signs run identity tokens with (#1901).
+#
+# What breaks at a failover without it: `init_oidc_signing` generates a key when
+# the table is empty, and `activates_at` defaults to now, so a promoted node mints
+# a fresh keypair and signs with it IMMEDIATELY -- logging it at INFO, which reads
+# like ordinary startup. The issuer URL has not changed, so every cloud still
+# trusts the issuer while the JWKS it cached holds only the old `kid`: every
+# AssumeRoleWithWebIdentity, Entra federated credential, GCP WIF exchange and
+# Vault JWT login fails, and recovery waits on each cloud's cache expiring.
+#
+# The rotation machinery cannot cover this, which is the part worth knowing. Tier
+# 2 of `_choose_signing_kid` exists exactly for a propagation window -- keep
+# signing with the retired key the clouds can still verify -- and at a failover
+# there is no old row at all, so that tier is empty by construction.
+#
+# `private_key_pem` is NOT excluded, and that is the opposite call from
+# `gpg_keys` below. Read the two together or the asymmetry looks like an
+# oversight. There, the private key is excluded because the receiving node has no
+# use for it: the server never signs, so sending it would widen what a
+# compromised peer costs in exchange for a capability neither node uses. Here the
+# receiving node MUST sign -- that is the entire function of the row -- so
+# replicating the key without it would be worse than not replicating at all: the
+# follower would publish a JWKS advertising a trust root it cannot sign for.
+#
+# This is still not the `crypto_keys` case at the bottom of the file. That one can
+# never travel because it is wrapped by THIS node's KEK and the peer cannot unwrap
+# it. An `EncryptedText` column is decrypted on send and re-encrypted under the
+# receiver's own key, which is the mechanism that exists so the KEK never has to
+# move -- and it is how `variables.value` already carries cloud credentials.
+#
+# An operator-supplied key (BYO) never reaches this table and so never travels:
+# it wins on every startup from the operator's own secret, on each node.
+OIDC_SIGNING_KEYS = register(
+    ReplicatedClass(
+        name="oidc_signing_keys",
+        model=OIDCSigningKey,
+    )
+)
 
 # The pool itself: ordinary settings, no counters, no encrypted columns. It is
 # the proving case for the generic path.
