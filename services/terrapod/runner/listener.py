@@ -861,6 +861,7 @@ class RunnerListener:
                 execution_hooks=execution_hooks,
                 git_auth=git_auth,
                 vault_files=vault_file_mounts,
+                workspace_id=attrs.get("workspace-id", ""),
                 resource_cpu=attrs.get("resource-cpu", "1"),
                 resource_memory=attrs.get("resource-memory", "2Gi"),
                 ca_secret_name=ca_secret_name,

@@ -20,8 +20,8 @@ from types import SimpleNamespace
 from terrapod.runner.phases import provider_credentials as pc
 
 
-def _cfg(api_url="http://terrapod-api:8000", auth_token="runtok:abc"):
-    return SimpleNamespace(api_url=api_url, auth_token=auth_token)
+def _cfg(api_url="http://terrapod-api:8000", auth_token="runtok:abc", workspace_id=""):
+    return SimpleNamespace(api_url=api_url, auth_token=auth_token, workspace_id=workspace_id)
 
 
 class TestTheHappyPath:
@@ -96,6 +96,57 @@ class TestAllOrNothingDeference:
             pc.HOSTNAME_VAR: "http://terrapod-api:8000",
             pc.TOKEN_VAR: "runtok:abc",
         }
+
+
+class TestTheDefaultWorkspace:
+    """TERRAPOD_WORKSPACE, and why it is NOT part of the all-or-nothing rule.
+
+    The pair above is coupled because the token is a credential and the hostname
+    decides where it is sent. A workspace id is neither: the server authorises it
+    independently, and the inventory routes refuse a runner token on any
+    workspace but its own run's -- so a wrong value answers 403 rather than
+    writing somewhere it should not (#2036).
+    """
+
+    def test_it_exports_the_run_s_own_workspace(self):
+        out = pc.export_env(_cfg(workspace_id="ws-abc123"), env={})
+
+        assert out[pc.WORKSPACE_VAR] == "ws-abc123"
+        assert out[pc.HOSTNAME_VAR] == "http://terrapod-api:8000"
+
+    def test_a_listener_that_did_not_pass_one_still_gets_the_pair(self):
+        """The pre-#2036 listener shape. The provider then needs the id
+        configured, as it did before -- a degradation, not a failure."""
+        out = pc.export_env(_cfg(workspace_id=""), env={})
+
+        assert pc.WORKSPACE_VAR not in out
+        assert out[pc.HOSTNAME_VAR] and out[pc.TOKEN_VAR]
+
+    def test_an_operator_setting_it_keeps_control_of_it_ALONE(self):
+        """The decisive difference from the pair: overriding the workspace must
+        NOT suppress the hostname and token, because it is not a credential and
+        cannot redirect one."""
+        out = pc.export_env(_cfg(workspace_id="ws-ours"), env={pc.WORKSPACE_VAR: "ws-theirs"})
+
+        assert pc.WORKSPACE_VAR not in out, "the operator's value is left in place"
+        assert out[pc.HOSTNAME_VAR] == "http://terrapod-api:8000"
+        assert out[pc.TOKEN_VAR] == "runtok:abc"
+
+    def test_setting_only_the_workspace_does_not_trip_the_all_or_nothing_rule(self):
+        """Mutation-checking this one matters: folding WORKSPACE_VAR into
+        `operator_set` would make a workspace variable that names a workspace
+        silently withhold the run's own credentials."""
+        out = pc.export_env(_cfg(workspace_id="ws-ours"), env={pc.WORKSPACE_VAR: "ws-theirs"})
+
+        assert out != {}, "the pair must still be exported"
+
+    def test_whitespace_is_not_a_workspace_id(self):
+        assert pc.WORKSPACE_VAR not in pc.export_env(_cfg(workspace_id="   "), env={})
+
+    def test_a_config_without_the_attribute_is_not_an_error(self):
+        """A lagging RunnerConfig, or a unit test building its own namespace."""
+        cfg = SimpleNamespace(api_url="http://a", auth_token="t")
+        assert pc.WORKSPACE_VAR not in pc.export_env(cfg, env={})
 
 
 class TestNothingToDo:
@@ -195,6 +246,29 @@ class TestTheEntrypointActuallyEngagesTheGate:
         call_at = src.index("provider_credentials.export_env(")
         assert read_at < call_at, (
             "the export reads the engine, so it has to run after the engine is known"
+        )
+
+    def test_the_export_happens_in_BOTH_PHASES(self):
+        """The provider READS inventory during plan and WRITES it during apply --
+        which is the split `inventory._authorize` enforces, every write passing
+        `phase="apply"` and every read passing none. A variable present in only
+        one phase would make a plan fail to read what the apply is about to
+        write.
+
+        There is one Job per phase, each invoking this entrypoint, so what makes
+        it true is that the call sits ABOVE the `cfg.phase` branch. Pinned here
+        rather than left resting on that position (#2036).
+        """
+        src = self._main_source()
+        call_at = src.index("provider_credentials.export_env(")
+        # The COLON matters: `if cfg.phase == "apply" and not is_pulumi:` appears
+        # ~120 lines earlier and is not the dispatch branch. Anchoring without it
+        # measured the wrong thing -- found by mutating this test.
+        plan_branch = src.index('if cfg.phase == "plan":')
+        apply_branch = src.index('if cfg.phase == "apply":')
+        assert call_at < plan_branch and call_at < apply_branch, (
+            "the export must run before the phase branch, or only one of plan and "
+            "apply gets TERRAPOD_WORKSPACE"
         )
 
 

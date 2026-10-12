@@ -179,6 +179,7 @@ def build_job_spec(
     git_auth: list[dict] | None = None,
     vault_files: list[dict] | None = None,
     vars_secret_name: str = "",
+    workspace_id: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
     timeout_minutes: int = 60,
@@ -199,6 +200,9 @@ def build_job_spec(
 
     Args:
         run_id: The run UUID.
+        workspace_id: The run's own workspace, exported to the engine as
+            TERRAPOD_WORKSPACE so the Terrapod provider defaults to it (#2036).
+            Empty from a listener that predates it.
         phase: "plan" or "apply".
         runner_config: Global runner config (image, defaults, etc.).
         auth_secret_name: K8s Secret name containing the runner token.
@@ -245,6 +249,12 @@ def build_job_spec(
         # still get the right behaviour.
         {"name": "HOME", "value": "/home/runner"},
         {"name": "TP_RUN_ID", "value": run_id},
+        # The run's own workspace, so `provider_credentials` can export
+        # TERRAPOD_WORKSPACE and the Terrapod provider defaults to it (#2036).
+        # Safe in the Job spec, unlike the hostname and token: `TP_` is reserved
+        # (reserved_env), so a workspace variable cannot shadow it. Empty when a
+        # listener older than #2036 did not pass it, which the export tolerates.
+        {"name": "TP_WORKSPACE_ID", "value": workspace_id},
         {"name": "TP_PHASE", "value": phase},
         {"name": "TP_API_URL", "value": api_url},
         {

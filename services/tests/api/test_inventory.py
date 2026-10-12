@@ -275,7 +275,20 @@ class TestRunnerTokenGrant:
         assert res.status_code == 201, res.text
 
     async def test_a_runner_token_cannot_reach_another_workspace(self):
-        """The vulnerability case, pinned directly rather than inferred."""
+        """The vulnerability case, pinned directly rather than inferred.
+
+        It is also what makes TERRAPOD_WORKSPACE safe to leave plainly
+        overridable (#2036). The runner exports it so the Terrapod provider
+        defaults to the run's own workspace, and an operator may set it to
+        anything — because the server does NOT trust it. A wrong value reaches
+        this refusal, not another workspace's inventory.
+
+        So do not later fold TERRAPOD_WORKSPACE into `provider_credentials`'
+        all-or-nothing rule by analogy with the hostname and token. That rule
+        exists because the token is a credential and the hostname decides where
+        it is sent; a workspace id is a request parameter this test authorises.
+        Hardening it would cost clarity and buy nothing.
+        """
         ws = _mock_ws()
         other = uuid.uuid4()
         app, _ = _make_app(

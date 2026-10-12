@@ -51,6 +51,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "apply"
                 },
@@ -249,6 +253,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -456,6 +464,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -659,6 +671,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -866,6 +882,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -1069,6 +1089,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -1280,6 +1304,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -1487,6 +1515,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -1700,6 +1732,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -1923,6 +1959,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -2126,6 +2166,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -2337,6 +2381,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -2539,6 +2587,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -2746,6 +2798,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -2949,6 +3005,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -3164,6 +3224,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -3367,6 +3431,10 @@
                 {
                   "name": "TP_RUN_ID",
                   "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
                 },
                 {
                   "name": "TP_PHASE",
@@ -3586,6 +3654,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -3795,6 +3867,10 @@
                   "value": "run-0123456789abcdef"
                 },
                 {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
                   "name": "TP_PHASE",
                   "value": "plan"
                 },
@@ -3998,6 +4074,415 @@
                   {
                     "key": "vault-file-1",
                     "path": "vault-file-1"
+                  }
+                ],
+                "secretName": "tprun-0123-plan-vars"
+              }
+            }
+          ]
+        }
+      },
+      "ttlSecondsAfterFinished": 300
+    }
+  },
+  "workspace-id-apply": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "labels": {
+        "app.kubernetes.io/component": "runner",
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/phase": "apply",
+        "terrapod.io/run-id": "run-0123456789abcdef"
+      },
+      "name": "tprun-run-0123456789ab-apply",
+      "namespace": "terrapod-runners"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 3600,
+      "backoffLimit": 3,
+      "podFailurePolicy": {
+        "rules": [
+          {
+            "action": "FailJob",
+            "onExitCodes": {
+              "containerName": "runner",
+              "operator": "NotIn",
+              "values": [
+                0
+              ]
+            }
+          }
+        ]
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app.kubernetes.io/name": "terrapod-runner",
+            "terrapod.io/phase": "apply",
+            "terrapod.io/run-id": "run-0123456789abcdef"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": true,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/runner"
+                },
+                {
+                  "name": "TP_RUN_ID",
+                  "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": "ws-11111111"
+                },
+                {
+                  "name": "TP_PHASE",
+                  "value": "apply"
+                },
+                {
+                  "name": "TP_API_URL",
+                  "value": "http://terrapod-api:8000"
+                },
+                {
+                  "name": "TP_AUTH_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_VERSION",
+                  "value": "1.11"
+                },
+                {
+                  "name": "TP_BACKEND",
+                  "value": "tofu"
+                },
+                {
+                  "name": "TP_VERIFY_BINARIES",
+                  "value": "signature"
+                },
+                {
+                  "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_COST_DEFAULT_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "TP_TERMINATION_GRACE",
+                  "value": "120"
+                },
+                {
+                  "name": "TF_LOG",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "TF_LOG",
+                      "name": "tprun-0123-plan-vars"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runner",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                },
+                {
+                  "mountPath": "/home/runner",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/vars",
+                  "name": "tfvars",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "imagePullSecrets": [],
+          "restartPolicy": "Never",
+          "serviceAccountName": "terrapod-runner",
+          "terminationGracePeriodSeconds": 120,
+          "volumes": [
+            {
+              "emptyDir": {},
+              "name": "workspace"
+            },
+            {
+              "emptyDir": {},
+              "name": "tmp"
+            },
+            {
+              "emptyDir": {},
+              "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
+            },
+            {
+              "name": "tfvars",
+              "secret": {
+                "items": [
+                  {
+                    "key": "terraform.tfvars.json",
+                    "path": "terraform.tfvars.json"
+                  }
+                ],
+                "secretName": "tprun-0123-plan-vars"
+              }
+            }
+          ]
+        }
+      },
+      "ttlSecondsAfterFinished": 300
+    }
+  },
+  "workspace-id-plan": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "labels": {
+        "app.kubernetes.io/component": "runner",
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/phase": "plan",
+        "terrapod.io/run-id": "run-0123456789abcdef"
+      },
+      "name": "tprun-run-0123456789ab-plan",
+      "namespace": "terrapod-runners"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 3600,
+      "backoffLimit": 3,
+      "podFailurePolicy": {
+        "rules": [
+          {
+            "action": "Ignore",
+            "onPodConditions": [
+              {
+                "status": "True",
+                "type": "DisruptionTarget"
+              }
+            ]
+          },
+          {
+            "action": "FailJob",
+            "onExitCodes": {
+              "containerName": "runner",
+              "operator": "NotIn",
+              "values": [
+                0
+              ]
+            }
+          }
+        ]
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app.kubernetes.io/name": "terrapod-runner",
+            "terrapod.io/phase": "plan",
+            "terrapod.io/run-id": "run-0123456789abcdef"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": true,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/runner"
+                },
+                {
+                  "name": "TP_RUN_ID",
+                  "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": "ws-11111111"
+                },
+                {
+                  "name": "TP_PHASE",
+                  "value": "plan"
+                },
+                {
+                  "name": "TP_API_URL",
+                  "value": "http://terrapod-api:8000"
+                },
+                {
+                  "name": "TP_AUTH_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_VERSION",
+                  "value": "1.11"
+                },
+                {
+                  "name": "TP_BACKEND",
+                  "value": "tofu"
+                },
+                {
+                  "name": "TP_VERIFY_BINARIES",
+                  "value": "signature"
+                },
+                {
+                  "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_COST_DEFAULT_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "TP_TERMINATION_GRACE",
+                  "value": "120"
+                },
+                {
+                  "name": "TF_LOG",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "TF_LOG",
+                      "name": "tprun-0123-plan-vars"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runner",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                },
+                {
+                  "mountPath": "/home/runner",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/vars",
+                  "name": "tfvars",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "imagePullSecrets": [],
+          "restartPolicy": "Never",
+          "serviceAccountName": "terrapod-runner",
+          "terminationGracePeriodSeconds": 120,
+          "volumes": [
+            {
+              "emptyDir": {},
+              "name": "workspace"
+            },
+            {
+              "emptyDir": {},
+              "name": "tmp"
+            },
+            {
+              "emptyDir": {},
+              "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
+            },
+            {
+              "name": "tfvars",
+              "secret": {
+                "items": [
+                  {
+                    "key": "terraform.tfvars.json",
+                    "path": "terraform.tfvars.json"
                   }
                 ],
                 "secretName": "tprun-0123-plan-vars"

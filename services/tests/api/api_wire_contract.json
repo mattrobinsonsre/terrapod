@@ -40,7 +40,8 @@
     "timeout-minutes",
     "var-files",
     "vault-files",
-    "working-directory"
+    "working-directory",
+    "workspace-id"
   ],
   "listener_read_keys": [
     "allow-empty-apply",
@@ -91,7 +92,8 @@
     "value",
     "var-files",
     "vault-files",
-    "working-directory"
+    "working-directory",
+    "workspace-id"
   ],
   "policy_bundle_keys": [
     "context",

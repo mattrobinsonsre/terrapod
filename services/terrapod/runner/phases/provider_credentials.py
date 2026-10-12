@@ -63,11 +63,13 @@ environment, so anything the Terrapod provider can read, every other provider in
 the configuration can read too. A narrower credential is the real answer and is
 not built yet.
 
-What IS avoidable is exporting it where it cannot possibly be used. The
-`terrapod_inventory_item` resource is a **Terraform** resource; a Pulumi program
+What IS avoidable is exporting it where it cannot possibly be used. The eight
+`terrapod_inventory_*` resources are **Terraform** resources; a Pulumi program
 has no equivalent today (#1987), so a Pulumi run gets the exposure and none of
 the benefit. So the export is gated on the engine, and a new engine has to opt
-in here rather than inheriting it by default.
+in here rather than inheriting it by default -- which is why #1987 must add
+`pulumi` to SUPPORTED_ENGINES and rewrite this paragraph rather than leaving it
+asserting the opposite.
 """
 
 from __future__ import annotations
@@ -80,6 +82,15 @@ import structlog
 #: would not be in the Job spec.
 HOSTNAME_VAR = "TERRAPOD_HOSTNAME"
 TOKEN_VAR = "TERRAPOD_TOKEN"
+#: The workspace a resource uses when its own `workspace_id` is not configured
+#: (#2036). NOT part of the all-or-nothing rule below: that rule exists because
+#: the token is a credential and the hostname decides where it is sent, so
+#: supplying one while deferring the other redirects the run's own token. A
+#: workspace id is neither -- it is a request parameter the server authorises
+#: independently, and the inventory routes refuse a runner token on any
+#: workspace but its own run's, so a wrong value answers 403 rather than
+#: writing somewhere it should not. An operator may therefore override it alone.
+WORKSPACE_VAR = "TERRAPOD_WORKSPACE"
 
 # `structlog` directly rather than `terrapod.logging_config`: the runner image
 # ships only the modules `Dockerfile.runner` names, and that one is not among
@@ -150,5 +161,24 @@ def export_env(cfg, env: dict[str, str] | None = None, *, engine: str = "") -> d
         # provider's own "Missing hostname" with a message naming the variable.
         return {}
 
-    logger.info("provider credentials exported", hostname=api_url)
-    return {HOSTNAME_VAR: api_url, TOKEN_VAR: token}
+    exported = {HOSTNAME_VAR: api_url, TOKEN_VAR: token}
+
+    # Exported from the run's own workspace unless the operator named one.
+    # Separately from the pair above, per WORKSPACE_VAR's comment. Absent when
+    # the workspace id did not reach the Job -- a listener older than #2036 --
+    # in which case the provider needs it configured, as it did before.
+    workspace_id = (getattr(cfg, "workspace_id", "") or "").strip()
+    if present.get(WORKSPACE_VAR):
+        logger.info(
+            "provider default workspace left to the workspace",
+            reason="a workspace variable already sets it, and it is not a credential.",
+        )
+    elif workspace_id:
+        exported[WORKSPACE_VAR] = workspace_id
+
+    logger.info(
+        "provider credentials exported",
+        hostname=api_url,
+        default_workspace=exported.get(WORKSPACE_VAR, ""),
+    )
+    return exported

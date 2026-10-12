@@ -2623,6 +2623,13 @@ async def next_run(
     # A listener too old to read it is unaffected — it ignores unknown keys, and
     # its absence resolves to terraform on the far side.
     run_data["data"]["attributes"]["engine"] = ws.engine
+    # The workspace the run belongs to, so the runner can export
+    # TERRAPOD_WORKSPACE and the Terrapod provider defaults to its own
+    # workspace (#2036). Prefixed, as the house style has it; the provider is
+    # strip-tolerant either way. A listener too old to read it simply does not
+    # pass it on, and the provider then needs the id configured as before --
+    # which is the pre-#2036 behaviour rather than a failure.
+    run_data["data"]["attributes"]["workspace-id"] = f"ws-{ws.id}"
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = native_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks

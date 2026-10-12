@@ -65,6 +65,11 @@ SCENARIOS: dict[str, dict] = {
         "parallelism": 32,
         "timeout_minutes": 180,
     },
+    # Both phases, because TERRAPOD_WORKSPACE must be exported in plan AND
+    # apply -- the provider reads inventory in one and writes it in the other
+    # (#2036). The empty case is covered by every other scenario.
+    "workspace-id-plan": {"phase": "plan", "workspace_id": "ws-11111111"},
+    "workspace-id-apply": {"phase": "apply", "workspace_id": "ws-11111111"},
     "cost-off": {"phase": "plan", "cost_estimation": False},
     "cost-region": {"phase": "plan", "cost_default_region": "eu-west-2"},
     "hooks-and-git-auth": {
