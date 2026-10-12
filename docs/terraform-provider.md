@@ -134,8 +134,10 @@ Configuration attributes (all also settable via environment variables):
 
 The default applies to **every** resource and data source that takes a workspace id —
 `terrapod_variable`, `terrapod_run_task`, `terrapod_notification_configuration`,
-`terrapod_run_trigger`, the three workspace joins, all eight inventory resources and
-the workspace-scoped data sources. A value you set always wins, which is how a
+`terrapod_run_trigger`, the three workspace joins, the four inventory resources that
+carry a workspace id (`terrapod_inventory_settings`, `_host`, `_group`,
+`_global_var` — the other four are parented on a host or a group, not a workspace)
+and the workspace-scoped data sources. A value you set always wins, which is how a
 configuration declares into a *different* workspace from the one its run belongs to.
 
 Attributes that name a **role** in a relationship between two workspaces stay
