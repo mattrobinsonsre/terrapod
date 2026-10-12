@@ -71,10 +71,14 @@ def _enabled(**over):
     # would take the id branch by accident rather than by configuration -- so the
     # default-path tests would pass without the default ever being modelled.
     cfg.subject_format = over.get("subject_format", "name-and-id")
+    # A real bool for the same reason: the mint refuses an unphased token when
+    # this is set, and a MagicMock is truthy -- so every unphased-token test
+    # would be asserting the refusal rather than the fall-through.
+    cfg.require_phase = over.get("require_phase", False)
     return cfg
 
 
-def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod"):
+def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod", pool=None):
     """A workspace, its run and the deployment config, wired as production does.
 
     `snapshot` defaults to what the resolver produces from `catalogue` and
@@ -95,20 +99,48 @@ def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod"):
     run.oidc_audiences = (
         snapshot if snapshot is not None else cloud_identity_resolver.merge(catalogue, override)
     )
+    # A real None, not a MagicMock: the mint looks the pool up only when this is
+    # set, and a MagicMock is truthy -- so every test would make a pool query the
+    # fixture then answered None for, which is the shape of a locally executed
+    # run arriving by accident rather than by configuration. `pool` is the
+    # AgentPool the run was claimed by, which is what `run.pool_id` holds once a
+    # listener has taken it.
+    run.pool_id = pool.id if pool is not None else None
+    run._pool = pool
 
     return ws, run, _enabled(audiences=catalogue)
 
 
-def _db(run, ws):
+def _pool(name="prod-eu"):
+    pool = MagicMock()
+    pool.id = uuid.uuid4()
+    pool.name = name
+    return pool
+
+
+def _db(run, ws, *, looked_up: list | None = None):
     db = MagicMock()
 
     async def _get(model, pk):
-        from terrapod.db.models import Run, Workspace
+        from terrapod.db.models import AgentPool, Run, Workspace
 
+        if looked_up is not None:
+            looked_up.append(model)
         if model is Run:
             return run
         if model is Workspace:
             return ws
+        if model is AgentPool:
+            # Mirrors SQLAlchemy: a None primary key does NOT short-circuit. It
+            # warns `fully NULL primary key identity cannot load any object` and
+            # still issues the query -- "may raise an error in a future release".
+            # So returning None here would hide the very guard that stops a
+            # pointless round-trip on every locally executed run.
+            assert pk is not None, (
+                "the mint looked up an agent pool with a null id; SQLAlchemy "
+                "queries anyway and warns, and is documented to start raising"
+            )
+            return getattr(run, "_pool", None)
         return None
 
     db.get = AsyncMock(side_effect=_get)
@@ -136,6 +168,7 @@ async def _call(
     detail="",
     issuer="https://terrapod.example.com",
     cfg=None,
+    looked_up=None,
 ):
     """Drive the batched mint.
 
@@ -166,7 +199,10 @@ async def _call(
         patch("terrapod.api.routers.oidc_issuer.issuer_url", return_value=issuer),
     ):
         resp = await router.mint_cloud_identity_tokens(
-            payload=payload, run_id=f"run-{run.id}", user=user, db=_db(run, ws)
+            payload=payload,
+            run_id=f"run-{run.id}",
+            user=user,
+            db=_db(run, ws, looked_up=looked_up),
         )
     return resp, captured
 
@@ -325,6 +361,114 @@ class TestTheConfigurationMovedUnderTheRun:
         )
         assert resp.status_code == 200
         assert captured["claims"]["aud"] == [AWS]
+
+
+class TestTheAgentPoolIsClaimed:
+    """Which pool executed a run decides WHERE its identity can be minted, and
+    the token said nothing about it.
+
+    Moving a workspace to another pool -- or adding one, which `pool:assign` on
+    the DESTINATION pool allows -- moves that, and neither the cloud nor an
+    auditor could tell from the token that it had happened. The claim is the
+    pool the run was actually CLAIMED by (`run.pool_id` is rewritten on claim),
+    not the workspace's first choice, because the first choice is not what ran.
+    """
+
+    async def test_the_pool_name_and_id_are_both_claimed(self):
+        """Both, for the same reason `workspace` and `workspace_id` are both
+        there: the name is what a human reads in a policy and the id is what
+        survives a rename."""
+        pool = _pool("prod-eu")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, pool=pool)
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["agent_pool"] == "prod-eu"
+        assert captured["claims"]["agent_pool_id"] == str(pool.id)
+
+    async def test_a_run_with_no_pool_omits_both_rather_than_claiming_null(self):
+        """A locally executed workspace has no pool. A claim present with no
+        value is worse than absent: a Rego rule testing
+        `input.agent_pool == "prod"` fails either way, while one testing for
+        presence would pass on a null."""
+        from terrapod.db.models import AgentPool
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        looked_up: list = []
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            target="aws",
+            cfg=cfg,
+            looked_up=looked_up,
+        )
+        assert "agent_pool" not in captured["claims"]
+        assert "agent_pool_id" not in captured["claims"]
+        # And it must not ASK. `db.get(Model, None)` is not a short-circuit in
+        # SQLAlchemy -- it warns and queries anyway -- so without the `if
+        # run.pool_id` guard this is a wasted round-trip on every locally
+        # executed run, and a future SQLAlchemy is documented to raise.
+        assert AgentPool not in looked_up, (
+            "the mint queried for an agent pool on a run that has none"
+        )
+
+    async def test_every_target_in_a_batch_carries_it(self):
+        """The claim is built per target, so a batched mint is where a per-target
+        construction drops one."""
+        pool = _pool("shared")
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azurerm": [AZURE]}, pool=pool)
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"),
+            run,
+            ws,
+            providers=["aws", "azurerm"],
+            cfg=cfg,
+        )
+        # `captured["all"]` is every claim set signed, not only the last -- which
+        # is the only way to see a per-target construction that drops one.
+        assert len(captured["all"]) == 2
+        assert [c["agent_pool"] for c in captured["all"]] == ["shared", "shared"]
+        assert {c["agent_pool_id"] for c in captured["all"]} == {str(pool.id)}
+
+
+class TestRequirePhaseRefusesAnUnphasedToken:
+    """`require_phase` closes off the unphased form entirely (#2041).
+
+    An unphased runner token exists only for a listener predating the phase
+    claim. It mints an identity with no `phase` claim and an unphased subject,
+    which is a form every trust policy then has to remember to exclude -- and a
+    wildcard that forgets is how a plan-phase run reaches an apply-phase role.
+
+    Off by default, because an upgrade must not break a lagging listener.
+    """
+
+    async def test_an_unphased_token_is_refused_when_it_is_set(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_phase = True
+        with pytest.raises(HTTPException) as exc:
+            await _call(_user(run_id=str(run.id)), run, ws, target="aws", cfg=cfg)
+        assert exc.value.status_code == 403
+        assert "require_phase" in exc.value.detail
+
+    async def test_a_PHASED_token_is_unaffected(self):
+        """The contrast. A refusal that caught phased tokens too would break
+        every run on a deployment that set this, which is the opposite of what
+        it is for."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.require_phase = True
+        _, captured = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, target="aws", cfg=cfg
+        )
+        assert captured["claims"]["phase"] == "apply"
+
+    async def test_an_unphased_token_still_mints_when_it_is_NOT_set(self):
+        """The default, and it has to stay working: a listener predating the
+        phase claim is the only thing that produces an unphased token, and an
+        upgrade must not strand it."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        _, captured = await _call(_user(run_id=str(run.id)), run, ws, target="aws", cfg=cfg)
+        assert "phase" not in captured["claims"]
 
 
 class TestTheSubjectCarriesTheWorkspaceId:

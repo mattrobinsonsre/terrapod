@@ -20,6 +20,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from terrapod.api.routers import runs as router
 
@@ -30,7 +31,13 @@ def _listener(lid: uuid.UUID):
     return ident
 
 
-async def _call(*, status: str, body: dict, lid: uuid.UUID | None = None):
+async def _call(
+    *,
+    status: str,
+    body: dict,
+    lid: uuid.UUID | None = None,
+    require_phase: bool = False,
+):
     lid = lid or uuid.uuid4()
     run = MagicMock()
     run.id = uuid.uuid4()
@@ -48,10 +55,16 @@ async def _call(*, status: str, body: dict, lid: uuid.UUID | None = None):
         captured["phase"] = phase
         return f"runtok:{run_id}:{phase or 'none'}"
 
+    # Patched on the live singleton rather than replaced wholesale: the route
+    # reads one attribute off it and a MagicMock settings object would make
+    # `require_phase` truthy in every test that did not think about it.
+    from terrapod.config import settings as live
+
     with (
         patch.object(router, "_get_run", AsyncMock(return_value=run)),
         patch("terrapod.config.load_runner_config", return_value=cfg),
         patch("terrapod.auth.runner_tokens.generate_runner_token", _gen),
+        patch.object(live.auth.oidc_issuer, "require_phase", require_phase),
     ):
         resp = await router.create_runner_token(
             listener_id=f"listener-{lid}",
@@ -92,3 +105,49 @@ class TestAListenerCannotPromoteItsOwnPhase:
     async def test_an_unrecognised_phase_mints_the_unphased_form(self):
         _resp, captured = await _call(status="applying", body={"phase": "destroy"})
         assert captured["phase"] is None
+
+
+class TestRequirePhaseClosesOffTheUnphasedForm:
+    """`require_phase` refuses the unphased token outright (#2041).
+
+    Refused HERE as well as at the mint, and this is the better of the two
+    places to meet it: the listener sees the error and the run fails with a
+    cause it can report, where a refusal at the mint surfaces as the credential
+    phase failing for a reason the listener never saw.
+    """
+
+    async def test_an_absent_phase_is_refused_when_it_is_set(self):
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={}, require_phase=True)
+        assert exc.value.status_code == 400
+        assert "require_phase" in exc.value.detail
+        assert "upgrade the listener" in exc.value.detail.lower()
+
+    async def test_an_unrecognised_phase_is_refused_too(self):
+        """It is read as "makes no claim", so it reaches the same form and must
+        meet the same refusal -- otherwise `phase: "APPLY"` is a way round the
+        setting."""
+        with pytest.raises(HTTPException) as exc:
+            await _call(status="planning", body={"phase": "configure"}, require_phase=True)
+        assert exc.value.status_code == 400
+
+    async def test_a_named_phase_is_unaffected(self):
+        """The contrast. A refusal that caught named phases too would fail every
+        run on a deployment that set this."""
+        _, cap = await _call(status="planning", body={"phase": "plan"}, require_phase=True)
+        assert cap["phase"] == "plan"
+
+    async def test_a_DOWNGRADED_apply_claim_still_passes(self):
+        """The order matters, and this is the case that shows it. An `apply`
+        claim on a non-applying run is downgraded to `plan`, not to None, so it
+        must satisfy the requirement -- checking before the downgrade would
+        refuse a run the server had already corrected."""
+        _, cap = await _call(status="planning", body={"phase": "apply"}, require_phase=True)
+        assert cap["phase"] == "plan"
+
+    async def test_an_absent_phase_still_mints_when_it_is_NOT_set(self):
+        """The default, and it has to keep working: a listener predating the
+        phase claim is the only thing that sends none, and an upgrade must not
+        strand it."""
+        _, cap = await _call(status="planning", body={})
+        assert cap["phase"] is None

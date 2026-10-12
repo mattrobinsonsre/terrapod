@@ -38,7 +38,7 @@ from terrapod.api.dependencies import (
     require_runner_for_run,
 )
 from terrapod.api.ids import parse_id
-from terrapod.db.models import OIDCSigningKey, Run, Workspace
+from terrapod.db.models import AgentPool, OIDCSigningKey, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import workspace_settings
@@ -319,6 +319,29 @@ async def mint_cloud_identity_tokens(
         )
 
     phase = user.run_phase
+    if phase is None and settings.auth.oidc_issuer.require_phase:
+        # Also refused when the runner token is issued, which is the better
+        # place to meet it; this is the backstop for a token minted before the
+        # setting was turned on, still inside its TTL.
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "auth.oidc_issuer.require_phase is set and this run's token names no "
+                "phase, so the identity it would present carries no `phase` claim and "
+                "an unphased subject. Upgrade the listener image, or unset "
+                "require_phase until every listener is on v1.10 or later."
+            ),
+        )
+
+    # The pool that actually executed this run, not the workspace's first
+    # choice: `run.pool_id` is rewritten on claim. Claimed because moving a
+    # workspace to another pool -- or adding one, which `pool:assign` on the
+    # DESTINATION allows -- moves where its identity can be minted, and nothing
+    # in the token said so. A target that can read claims (GCP, OpenBao/Vault,
+    # anything with Rego) can now bind it; everywhere else it is at least in the
+    # cloud's own audit log beside the credential it bought.
+    pool = await db.get(AgentPool, run.pool_id) if run.pool_id else None
+
     ttl = settings.auth.oidc_issuer.token_ttl_seconds
     pending: list[tuple[str, list[str], dict]] = []
     for target in wanted:
@@ -355,6 +378,13 @@ async def mint_cloud_identity_tokens(
         }
         if phase:
             claims["phase"] = phase
+        # Omitted rather than null when a run has no pool -- a locally executed
+        # workspace has none, and a claim present with no value is worse than
+        # absent: a Rego rule testing `input.agent_pool == "prod"` fails either
+        # way, while one testing for presence would pass on a null.
+        if pool is not None:
+            claims["agent_pool"] = pool.name
+            claims["agent_pool_id"] = str(pool.id)
         pending.append((target, audiences, claims))
 
     # Rule 13: one RS256 signature is ~1ms and this signs once per target, so a

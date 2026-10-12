@@ -2421,6 +2421,25 @@ async def create_runner_token(
             run_status=run.status,
         )
         phase = "plan"
+
+    # `require_phase` closes the unphased form off entirely (#2041). Refused HERE
+    # as well as at the mint, and this is the better of the two places: the
+    # listener sees the error and the run fails with a cause, where a refusal at
+    # the mint surfaces as the credential phase failing for a reason the listener
+    # never saw. Off by default -- a lagging listener must keep working across an
+    # upgrade -- and the default in 2.0.
+    from terrapod.config import settings as _settings
+
+    if phase is None and _settings.auth.oidc_issuer.require_phase:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "auth.oidc_issuer.require_phase is set, so a runner token must name "
+                "a phase. This listener sent none, which means it predates the phase "
+                "claim -- upgrade the listener image, or unset require_phase until "
+                "every listener is on v1.10 or later."
+            ),
+        )
     token = generate_runner_token(run.id, ttl=requested_ttl, phase=phase)
 
     # Compute actual TTL (may have been clamped)

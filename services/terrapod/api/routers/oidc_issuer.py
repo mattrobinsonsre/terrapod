@@ -159,6 +159,8 @@ async def openid_configuration() -> JSONResponse:
                 "workspace_id",
                 "phase",
                 "run_id",
+                "agent_pool",
+                "agent_pool_id",
                 "terrapod_organization",
             ],
         },

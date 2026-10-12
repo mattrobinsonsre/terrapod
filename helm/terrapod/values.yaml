@@ -301,6 +301,17 @@ api:
         # Set this to `name` ONLY to migrate trust policies written against
         # v1.10.0, and change them. It is removed in 2.0.
         subject_format: name-and-id
+        # Refuse to mint an identity for a run whose runner token names no
+        # phase, and refuse to issue such a runner token at all.
+        #
+        # An unphased token exists only for a listener predating the phase claim.
+        # It yields an identity with no `phase` claim and an unphased `sub`,
+        # which is a form every trust policy then has to remember to exclude --
+        # and a wildcard that forgets to is how a plan-phase run reaches an
+        # apply-phase role. Off by default so an upgrade cannot break a lagging
+        # listener; set it once every listener is on v1.10 or later. It becomes
+        # the default in 2.0.
+        require_phase: false
         # ── The audience catalogue: deployment defaults, per provider ──
         #
         # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`

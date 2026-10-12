@@ -917,6 +917,8 @@ Every token for every target carries the same claims; only `aud` differs.
 | `workspace_id` | `0f8b…` | The id — stable across a rename, where the name is readable |
 | `phase` | `apply` | `plan` or `apply`. **Absent** when the runner token made no phase claim |
 | `run_id` | `3c71…` | The run, for correlating a cloud audit entry back to Terrapod |
+| `agent_pool` | `prod-eu` | The pool that **actually executed** this run, not the workspace's first choice. **Absent** on a locally executed workspace, which has no pool |
+| `agent_pool_id` | `9a2f…` | The same pool's id, for the same reason `workspace_id` sits beside `workspace` |
 | `terrapod_organization` | `default` | Always the literal `default` — Terrapod is single-organization |
 | `iat`, `nbf`, `exp`, `jti` | | Standard. `jti` is what makes two tokens for one run distinguishable in a cloud audit log |
 
@@ -984,6 +986,23 @@ Two things follow for an AWS trust policy, and both are easy to get wrong:
   actual audience claim is exposed as **`oaud`**. Terrapod does not set `azp`, so
   the two agree today — but write `oaud` if you mean the audience.
 
+#### Why the agent pool is claimed
+
+Which pool runs a workspace decides **where its identity can be minted**, and
+nothing in the token used to say which one did. A workspace admin can add a pool
+to a workspace with `pool:assign` on the *destination* pool, so the set of
+listeners that can execute it -- and therefore the hosts a federated credential is
+reachable from -- can change without touching the workspace's own permissions.
+
+A target that can read arbitrary claims (GCP, OpenBao/Vault, anything evaluating
+Rego) can bind the pool directly. On AWS and Azure it is not reachable as a
+condition, as above -- but it is in the cloud's own audit log beside the
+credential it bought, which is where you look after the fact.
+
+The claim names the pool the run was **claimed by**, which is rewritten when a
+listener takes the run, rather than the workspace's first-choice pool. The first
+choice is not what ran.
+
 #### A module publish can reach the apply phase without a human
 
 Publishing a module version queues a **standard, apply-capable** run on every linked
@@ -1008,6 +1027,19 @@ stops matching an unphased `sub` entirely. The failure direction is safe — the
 refused rather than widened — but it presents as "Azure suddenly rejects every token from
 this workspace" with nothing wrong on the Terrapod side, so check the listener image before
 the trust policy.
+
+**`require_phase` closes the unphased form off entirely.** Set
+`api.config.auth.oidc_issuer.require_phase: true` and a runner token with no phase
+is refused when the listener asks for it, and an identity mint presenting one is
+refused as a backstop. That removes the form a trust policy would otherwise have
+to remember to exclude -- and a `StringLike` wildcard that forgets to exclude it is
+exactly how a plan-phase run reaches an apply-phase role.
+
+It is **off by default**, because the only thing that produces an unphased token is
+a listener image predating the phase claim and an upgrade must not strand one. Set
+it once every listener is on v1.10 or later; it becomes the default in 2.0. The
+refusal names the listener upgrade, so the operator who meets it knows which image
+to move.
 
 Azure's "flexible federated identity credentials" would allow claim expressions,
 but they are gated to a hardcoded allow-list of issuers (GitHub, GitLab and

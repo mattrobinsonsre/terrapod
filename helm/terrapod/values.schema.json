@@ -1779,6 +1779,9 @@
                 "subject_format": {
                   "type": "string",
                   "enum": ["name-and-id", "name"]
+                },
+                "require_phase": {
+                  "type": "boolean"
                 }
               }
             }

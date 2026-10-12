@@ -139,6 +139,7 @@ data:
         key_propagation_seconds: {{ ((.Values.api.config.auth).oidc_issuer).key_propagation_seconds | int64 }}
         retired_key_grace_seconds: {{ ((.Values.api.config.auth).oidc_issuer).retired_key_grace_seconds | int64 }}
         subject_format: {{ ((.Values.api.config.auth).oidc_issuer).subject_format | default "name-and-id" | quote }}
+        require_phase: {{ ((.Values.api.config.auth).oidc_issuer).require_phase | default false }}
         {{- with ((.Values.api.config.auth).oidc_issuer).audiences }}
         audiences:
           {{- range $target, $auds := . }}

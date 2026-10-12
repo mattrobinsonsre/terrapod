@@ -124,6 +124,7 @@
   "auth.oidc_issuer.enabled",
   "auth.oidc_issuer.key_propagation_seconds",
   "auth.oidc_issuer.public_url",
+  "auth.oidc_issuer.require_phase",
   "auth.oidc_issuer.retired_key_grace_seconds",
   "auth.oidc_issuer.signing_key_pem",
   "auth.oidc_issuer.subject_format",

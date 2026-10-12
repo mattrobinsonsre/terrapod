@@ -620,6 +620,19 @@ class OIDCIssuerConfig(BaseSettings):
             "you migrate it; it is removed in 2.0."
         ),
     )
+    require_phase: bool = Field(
+        default=False,
+        description=(
+            "Refuse to mint an identity token for a run whose runner token carries "
+            "no phase, and refuse to issue such a runner token in the first place. "
+            "An unphased token exists only for a listener predating the phase "
+            "claim; it yields an identity with no `phase` claim and an unphased "
+            "`sub`, which is a form every trust policy then has to remember to "
+            "exclude. Default false so an upgrade cannot break a lagging listener; "
+            "set it once every listener is on v1.10 or later. It becomes the "
+            "default in 2.0."
+        ),
+    )
     token_ttl_seconds: int = Field(
         default=900,
         ge=60,
