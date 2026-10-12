@@ -787,11 +787,22 @@ class TestTheIssuerUrlCosmeticWarning:
         return warned
 
     def test_a_trailing_slash_warns_and_names_both_strings(self):
+        """Asserted on the structured kwargs, exactly, not by substring.
+
+        `"https://x.example.com/" in str(call_args)` is both weaker and
+        flagged: it passes on any longer host that contains it, and CodeQL
+        raises `py/incomplete-url-substring-sanitization` at high severity for
+        it, correctly, even in a test. Comparing the logged values is the
+        stronger assertion anyway -- it pins which kwarg carries which string,
+        so a fix that swapped them would fail.
+        """
         warned = self._warn(public_url="https://x.example.com/")
         assert warned.called
-        text = str(warned.call_args)
-        assert "https://x.example.com/" in text, "the operator must see what they wrote"
-        assert "https://x.example.com'" in text, "and what is actually minted"
+        kwargs = warned.call_args.kwargs
+        assert kwargs["configured"] == "https://x.example.com/", (
+            "the operator must see what they wrote"
+        )
+        assert kwargs["minted_iss"] == "https://x.example.com", "and what is actually minted"
 
     def test_a_clean_url_is_silent(self):
         assert not self._warn(public_url="https://x.example.com").called
