@@ -63,4 +63,5 @@ terraform apply
 |---|---|
 | `TERRAPOD_HOSTNAME` | Terrapod instance hostname |
 | `TERRAPOD_TOKEN` | API token (overrides terraform login) |
+| `TERRAPOD_WORKSPACE` | Default workspace for resources that do not set `workspace_id`. A Terrapod run exports its own |
 | `TERRAPOD_SKIP_TLS_VERIFY` | Skip TLS verification (`true`/`1`) |

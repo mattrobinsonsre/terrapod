@@ -454,11 +454,19 @@ The runner exports what the provider reads before the engine starts:
 |---|---|
 | `TERRAPOD_HOSTNAME` | The **internal** API URL the Job already holds |
 | `TERRAPOD_TOKEN` | **The run's own token.** Nothing new is minted |
+| `TERRAPOD_WORKSPACE` | **The run's own workspace.** What lets a resource omit `workspace_id` |
 
 The internal URL rather than the public one on purpose: the public hostname may
 not resolve from inside the cluster at all, and a provider pointed at it could
 end up dialling the runner pod's own loopback. `TERRAPOD_HOSTNAME` is named for a
 hostname and accepts a full URL, so a complete URL passes through untouched.
+
+`TERRAPOD_WORKSPACE` is the reason the resources above carry no `workspace_id`.
+The provider's `workspace` attribute defaults from it, and each resource defaults
+its own `workspace_id` from that — so inside a run the workspace is never written
+down, which is the point. Setting it explicitly still works and still wins: that
+is how a configuration declares into a *different* workspace, which is a thing you
+may legitimately want and nothing here prevents.
 
 What makes the run's own token sufficient is a single implicit grant: **a runner
 token may manage the inventory of its own run's workspace**, and nothing else. It
@@ -473,13 +481,20 @@ phase**.
 the runner runs, so the provider needs a host and a token configured exactly as it
 does today. The implicit grant is a property of running *inside* a run.
 
-**If you set either variable yourself, Terrapod exports neither.** A workspace
-`env` variable named `TERRAPOD_HOSTNAME` or `TERRAPOD_TOKEN` is a legitimate
-thing to have, so Terrapod stands aside and logs that it has done so. The two
-decisions are taken **together**, never separately: supplying one while deferring
-to a workspace variable for the other is the arrangement that would send the
-run's real credential to a host the variable chose. So it is all-or-nothing by
-design, not by omission.
+**If you set either half of the credential pair yourself, Terrapod exports
+neither half.** A workspace `env` variable named `TERRAPOD_HOSTNAME` or
+`TERRAPOD_TOKEN` is a legitimate thing to have, so Terrapod stands aside and logs
+that it has done so. Those two decisions are taken **together**, never separately:
+supplying one while deferring to a workspace variable for the other is the
+arrangement that would send the run's real credential to a host the variable chose.
+So it is all-or-nothing by design, not by omission.
+
+**`TERRAPOD_WORKSPACE` is not part of that rule**, and is filled in on its own
+whenever you have not set it. It is neither half of a credential nor a secret — it
+is a request parameter the server authorises independently, so a wrong value is
+refused with a 403 rather than writing somewhere it should not. Tying it to the
+pair would mean a workspace that set only `TERRAPOD_WORKSPACE` received no exports
+at all.
 
 ---
 
