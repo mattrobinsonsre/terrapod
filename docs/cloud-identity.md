@@ -1173,7 +1173,7 @@ propagation window with you holding both keys:
 api:
   oidcSigningKey:
     existingSecret: terrapod-oidc-signing-key        # signs
-    nextExistingSecret: terrapod-oidc-signing-key-2  # published only
+    nextExistingSecret: terrapod-oidc-signing-key-next  # published only
 ```
 
 Set the incoming key there, roll the API, wait for every cloud to refetch, then

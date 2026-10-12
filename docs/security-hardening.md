@@ -275,7 +275,7 @@ Three properties follow from supplying it, and they are the whole trade:
   api:
     oidcSigningKey:
       existingSecret: "terrapod-oidc-signing"        # signs
-      nextExistingSecret: "terrapod-oidc-signing-2"  # published only
+      nextExistingSecret: "terrapod-oidc-signing-next"  # published only
   ```
 
   Three steps, in this order, each one a roll of the API:
