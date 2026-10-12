@@ -28,6 +28,7 @@ matters; the API can.
 import json
 import stat
 import subprocess
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -684,3 +685,59 @@ class TestATargetFromTheAPIIsRefusedBeforeItBecomesAPath:
         assert ".." not in "..".split(".")
         assert "." not in ".".split(".")
         assert ".." not in "a..b".split(".")
+
+
+class TestEveryMintedTokenIsRegisteredForRedaction:
+    """The phase must REGISTER each token with the log redactor (#2047).
+
+    `register_secret` itself is covered in `tests/runner/test_exec_subprocess.py`
+    -- what was covered nowhere was that this phase calls it. Deleting the call
+    left the whole suite green, which is the documented failure mode: a test of
+    the helper says nothing about the call site.
+
+    It matters because the redaction is the only lever there is. Everything else
+    is mechanism -- the token is a 0600 file and `exec_subprocess` scrubs `TP_*`
+    from the child environment -- but the token is handed to a provider on
+    purpose, and a provider prints what it likes:
+    `terraform-provider-aws` logs the STS request body, token included, at
+    `TF_LOG=DEBUG`. Unregistered, that JWT reaches the run log a reviewer reads
+    and the artifact it is uploaded to.
+    """
+
+    def _run_registering(self, tmp_path, *, mint, phase="plan"):
+        """Drive the real phase, capturing what was registered."""
+        registered: list[str] = []
+        handler, _ = _api(mint=mint, phase=phase)
+        discover_fn, _ = _found(mint)
+        with patch.object(
+            cloud_identity.exec_subprocess,
+            "register_secret",
+            side_effect=lambda v: registered.append(v) or True,
+        ):
+            cloud_identity.run(
+                _cfg(),
+                binary="tofu",
+                cwd=tmp_path,
+                token_dir=tmp_path / "oidc",
+                client=_client(handler),
+                discover_fn=discover_fn,
+            )
+        return registered
+
+    def test_each_token_value_is_registered(self, tmp_path):
+        registered = self._run_registering(tmp_path, mint=["aws", "aws.west", "vault"])
+        assert sorted(registered) == sorted([f"jwt-for-{t}" for t in ("aws", "aws.west", "vault")])
+
+    def test_the_registered_value_is_exactly_what_is_written_to_disk(self, tmp_path):
+        """Exactness is what makes the redaction safe to apply at all: the
+        redactor matches literal bytes, so a value that differs from the token
+        the provider actually receives would redact nothing while looking as
+        though it did."""
+        registered = self._run_registering(tmp_path, mint=["aws"])
+        on_disk = (tmp_path / "oidc" / "aws" / "token").read_text()
+        assert registered == [on_disk]
+
+    def test_nothing_is_registered_when_nothing_is_minted(self, tmp_path):
+        """The contrast, so the test above cannot pass by registering
+        unconditionally."""
+        assert self._run_registering(tmp_path, mint=[]) == []

@@ -38,6 +38,7 @@ async def _call(
     lid: uuid.UUID | None = None,
     require_phase: bool = False,
     cert_lid: uuid.UUID | None = None,
+    run_lid: uuid.UUID | None = None,
 ):
     """Drive the endpoint.
 
@@ -46,12 +47,18 @@ async def _call(
     GHSA-g4j5 is that the endpoint compared the path against the run and never
     against the certificate, so a test that cannot make them differ cannot see
     it.
+
+    `run_lid` is the listener the RUN belongs to, defaulting to the one in the
+    path. It exists for the ordering test: with the run's owner pinned to the
+    path, the ownership check can never fire, so swapping the two checks over
+    produces the same message and the test cannot see the order it asserts.
+    Three distinct values are what make both checks live at once.
     """
     lid = lid or uuid.uuid4()
     run = MagicMock()
     run.id = uuid.uuid4()
     run.status = status
-    run.listener_id = lid
+    run.listener_id = run_lid if run_lid is not None else lid
 
     db = MagicMock()
     cfg = MagicMock()
@@ -204,11 +211,36 @@ class TestTheCALLERSCERTIFICATEMustNameTheListenerInThePath:
         would answer "Run not assigned to this listener" for a path naming a
         listener the caller has no certificate for -- which confirms whether that
         listener owns that run, to a caller who should not get that far."""
-        mine, theirs = uuid.uuid4(), uuid.uuid4()
+        mine, theirs, owner = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        # All three differ, so BOTH checks would fire and only their order
+        # decides which message comes back. With the run owned by `theirs` --
+        # as this test used to have it -- the ownership check cannot fire, and
+        # the assertion below passes under a deliberate reordering.
         with pytest.raises(HTTPException) as exc:
-            await _call(status="planning", body={"phase": "plan"}, lid=theirs, cert_lid=mine)
+            await _call(
+                status="planning",
+                body={"phase": "plan"},
+                lid=theirs,
+                cert_lid=mine,
+                run_lid=owner,
+            )
         assert "Certificate does not match" in exc.value.detail
         assert "Run not assigned" not in exc.value.detail
+
+    async def test_the_ownership_check_is_reached_when_the_certificate_matches(self):
+        """The other half, or the test above could pass with no ownership check
+        at all. A caller holding the right certificate for the path, naming a
+        run that belongs to someone else, must still be refused."""
+        mine, owner = uuid.uuid4(), uuid.uuid4()
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                status="planning",
+                body={"phase": "plan"},
+                lid=mine,
+                cert_lid=mine,
+                run_lid=owner,
+            )
+        assert "Certificate does not match" not in exc.value.detail
 
     def test_the_parameter_is_typed_like_every_sibling(self):
         """The weak type is why the missing check was invisible.
