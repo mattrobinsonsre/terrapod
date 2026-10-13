@@ -37,6 +37,10 @@ on:
         type: boolean
         required: false
         default: false
+      lines:
+        description: "How many of the newest release lines to cover (see `plan`)"
+        required: false
+        default: "3"
   schedule:
     - cron: "41 5 * * 2" # Tuesdays 05:41 UTC, ahead of the Wednesday release re-scan
 
@@ -81,13 +85,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_REPLACE: ${{ inputs.replace }}
+          INPUT_LINES: ${{ inputs.lines }}
         run: |
           set -euo pipefail
 
-          # Every line's pinned version, read off the remote refs the checkout
-          # already fetched — no branch switching.
+          # Every SUPPORTED line's pinned version, read off the remote refs the
+          # checkout already fetched — no branch switching.
+          #
+          # "Every release line" is not "every release branch that has ever
+          # existed": there are ten, back to v1.1, and the first run of this
+          # workflow cheerfully queued sixteen 60 MB PyInstaller builds for
+          # lines nobody can patch. SECURITY.md offers the current minor and the
+          # previous one, so the default of three is that plus a line of grace
+          # for one still inside a patch cycle. Sorted by VERSION, not by name —
+          # refname order puts release/v1.10 before release/v1.2.
+          LINES=${INPUT_LINES:-3}
+          REFS=$(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/release/*' \
+                   | sed 's#^origin/release/v##' | sort -rV | head -n "${LINES}" \
+                   | sed 's#^#origin/release/v#')
+          echo "Covering main plus the newest ${LINES} release lines:" ${REFS}
           : > pinned.txt
-          REFS=$(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/release/*')
           for REF in origin/main ${REFS}; do
             V=$(git show "${REF}:helm/terrapod/values.yaml" 2>/dev/null \
                   | sed -n 's/^[[:space:]]*checkov_version:[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}[[:space:]]*$/\1/p' \
