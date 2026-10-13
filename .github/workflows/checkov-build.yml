@@ -1,4 +1,4 @@
-name: Checkov mirror
+name: Checkov build
 
 # Terrapod builds and publishes the Checkov binaries its own binary cache serves
 # (#2066). Before this, `registry.platform_tools.checkov_mirror_url` pointed at
@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Checkov version to mirror (e.g. 3.3.26). Blank = the set the schedule picks."
+        description: "A single Checkov version to build (e.g. 3.3.26). Blank = the set the schedule picks."
         required: false
         default: ""
       replace:
@@ -42,11 +42,15 @@ on:
         description: "How many of the newest release lines to cover (see `plan`)"
         required: false
         default: "3"
+      recent:
+        description: "How many of the newest upstream Checkov releases to build (see `plan`)"
+        required: false
+        default: "12"
   schedule:
     - cron: "41 5 * * 2" # Tuesdays 05:41 UTC, ahead of the Wednesday release re-scan
 
 permissions:
-  contents: write # publish the mirror releases
+  contents: write # publish the built binaries
 
 env:
   # Upstream's own build interpreter, pinned to bookworm rather than the
@@ -63,14 +67,14 @@ env:
   UPSTREAM: bridgecrewio/checkov
 
 jobs:
-  # Which versions need mirroring, derived rather than listed: every version
+  # Which versions need building, derived rather than listed: every version
   # this repository PINS (on main and on each release line) plus the newest
   # upstream release. That makes the publisher's input the same source of truth
   # the pre-release artifact check reads, so a version we pin cannot be one the
-  # mirror lacks. Versions already fully published are dropped, so the weekly
+  # we have not built. Versions already published are dropped, so the weekly
   # run is normally a no-op.
   plan:
-    name: Plan the mirror set
+    name: Plan the build set
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.pick.outputs.versions }}
@@ -87,6 +91,7 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_REPLACE: ${{ inputs.replace }}
           INPUT_LINES: ${{ inputs.lines }}
+          INPUT_RECENT: ${{ inputs.recent }}
         run: |
           set -euo pipefail
 
@@ -119,14 +124,33 @@ jobs:
           echo "Pinned across the lines:"
           cat pinned.txt || true
 
-          LATEST=$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)
-          echo "Newest upstream release: ${LATEST}"
+          # The newest RECENT upstream releases, because checkov_version is an
+          # operator's choice and not ours. Building only what this repository
+          # pins would mean an operator who picks any other version gets a 404
+          # from a publisher that is now us — which is the original bug with a
+          # different culprit. So the window an operator can choose from is the
+          # window we build.
+          #
+          # 12 is roughly two months at upstream's cadence (14 releases in the
+          # ten weeks to 2026-10-12). Raise `recent` for a one-off if someone
+          # needs to pin something older.
+          RECENT=${INPUT_RECENT:-12}
+          gh api "repos/${UPSTREAM}/releases" --paginate \
+            --jq '.[] | select(.draft == false) | .tag_name' > upstream.txt
+          head -n "${RECENT}" upstream.txt > recent.txt
+          echo "Newest ${RECENT} upstream releases:" $(tr '\n' ' ' < recent.txt)
 
           if [ -n "${INPUT_VERSION}" ]; then
             printf '%s\n' "${INPUT_VERSION}" > candidates.txt
           else
-            { cut -f1 pinned.txt; echo "${LATEST}"; } | sort -uV > candidates.txt
+            # UNION with what the lines pin, deliberately. A line may pin
+            # something older than the recent window, and the pre-release
+            # artifact check asserts a pinned version exists — so the pinned
+            # set has to stay in regardless of how `recent` is set, or a
+            # release can be blocked by a gap this job chose not to fill.
+            { cut -f1 pinned.txt; cat recent.txt; } | sort -uV > candidates.txt
           fi
+          echo "Candidates:" $(tr '\n' ' ' < candidates.txt)
 
           # Drop anything already complete, unless told to replace it.
           # Replacing a published asset is the dangerous case, and the reason it
@@ -134,20 +158,34 @@ jobs:
           # (tool, version, os, arch), so a cold cache would fetch the new asset
           # while every warm cache keeps the old one — two deployments on the
           # same pin, running different binaries, with nothing to say so.
-          WANT="checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
+          # A SUPERSET test, not an equality one. Equality rebuilt every
+          # version whose release carried an asset we no longer publish --
+          # the four already built still hold a darwin zip from before
+          # Checkov was narrowed to linux -- and a rebuild means
+          # `--clobber` over bytes that are published and verified, which
+          # is the one thing the `replace` input exists to make deliberate.
+          # An extra asset is not a reason to rebuild; a MISSING one is.
+          WANT="checkov_linux_X86_64.zip checkov_linux_arm64.zip"
           : > need.txt
           while IFS= read -r V; do
             [ -n "${V}" ] || continue
             if ! gh api "repos/${UPSTREAM}/releases/tags/${V}" --jq .tag_name >/dev/null 2>&1; then
-              echo "::error::checkov ${V} is not an upstream release — refusing to mirror a version that does not exist."
+              echo "::error::checkov ${V} is not an upstream release — refusing to build a version that does not exist."
               exit 1
             fi
             HAVE=$(gh release view "${V}" --repo "${GITHUB_REPOSITORY}" --json assets \
-                     --jq '[.assets[].name] | map(select(startswith("checkov_"))) | sort | join(",")' 2>/dev/null || echo "")
-            if [ "${HAVE}" = "${WANT}" ] && [ "${INPUT_REPLACE}" != "true" ]; then
-              echo "  ${V} — already mirrored, skipping"
+                     --jq '[.assets[].name] | join(" ")' 2>/dev/null || echo "")
+            MISSING=""
+            for A in ${WANT}; do
+              case " ${HAVE} " in
+                *" ${A} "*) ;;
+                *) MISSING="${MISSING} ${A}" ;;
+              esac
+            done
+            if [ -z "${MISSING}" ] && [ "${INPUT_REPLACE}" != "true" ]; then
+              echo "  ${V} — already built, skipping"
             else
-              echo "  ${V} — to build (have: ${HAVE:-nothing})"
+              echo "  ${V} — to build (missing:${MISSING:- nothing, forced by replace})"
               printf '%s\n' "${V}" >> need.txt
             fi
           done < candidates.txt
@@ -335,7 +373,7 @@ jobs:
         with:
           subject-path: "checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
 
-      - name: Publish the mirror release
+      - name: Publish the built binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           V: ${{ matrix.version }}
@@ -375,11 +413,11 @@ jobs:
           # had never been proven to work.
           if ! gh release view "${V}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             # --latest=false is mandatory. GitHub picks "Latest release" by
-            # publish time, so a mirror release would otherwise take the badge
+            # publish time, so one of these releases would otherwise take the badge
             # off the current Terrapod version — front page, releases page,
             # /releases/latest, and every install snippet that reads it.
             gh release create "${V}" --repo "${GITHUB_REPOSITORY}" \
-              --title "Checkov ${V} binaries (Terrapod-built mirror)" \
+              --title "Checkov ${V} binaries (built by Terrapod)" \
               --notes-file notes.md \
               --latest=false
           else
