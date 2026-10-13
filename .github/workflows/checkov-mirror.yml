@@ -184,6 +184,14 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     container:
       image: ${{ matrix.image }}
+    # A CONTAINER job's default shell is `sh`, not bash, so `set -o pipefail`
+    # is an illegal option and the step dies with exit 2 before running
+    # anything. It killed all eight builds after the checkout was already
+    # fixed, and it reads as a script error rather than a shell-selection one.
+    # The image carries bash 5.2, so ask for it explicitly.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check out upstream at its release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
