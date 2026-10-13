@@ -1085,12 +1085,12 @@ class PlatformToolsConfig(BaseModel):
         "covering the release. A mirror must serve the same asset layout.",
     )
     checkov_mirror_url: str = Field(
-        default="https://github.com/bridgecrewio/checkov/releases/download",
+        default="https://github.com/mattrobinsonsre/terrapod/releases/download",
         description="Upstream download base for Checkov. Assets are per-platform "
         "zips containing a single self-contained dist/checkov executable.",
     )
     checkov_checksum_api_url: str = Field(
-        default="https://api.github.com/repos/bridgecrewio/checkov/releases/tags",
+        default="https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags",
         description="Where to obtain Checkov's expected SHA-256. Checkov publishes "
         "NO checksum file alongside its release assets, so the only material "
         "available is the digest the GitHub release API reports for the asset — a "
