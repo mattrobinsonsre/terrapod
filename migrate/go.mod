@@ -1,6 +1,6 @@
 module github.com/mattrobinsonsre/terrapod/migrate
 
-go 1.26.6
+go 1.26.9
 
 require (
 	cloud.google.com/go/storage v1.62.2
