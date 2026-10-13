@@ -99,10 +99,14 @@ jobs:
           # previous one, so the default of three is that plus a line of grace
           # for one still inside a patch cycle. Sorted by VERSION, not by name —
           # refname order puts release/v1.10 before release/v1.2.
+          # Via a file rather than `sort | head`, so this does not rely on
+          # `plan` having no explicit shell. Under pipefail `head` exiting
+          # early can SIGPIPE `sort` — latent here, and the same shape that
+          # broke the build job for real.
           LINES=${INPUT_LINES:-3}
-          REFS=$(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/release/*' \
-                   | sed 's#^origin/release/v##' | sort -rV | head -n "${LINES}" \
-                   | sed 's#^#origin/release/v#')
+          git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/release/*' \
+            | sed 's#^origin/release/v##' | sort -rV > all-lines.txt
+          REFS=$(head -n "${LINES}" all-lines.txt | sed 's#^#origin/release/v#')
           echo "Covering main plus the newest ${LINES} release lines:" ${REFS}
           : > pinned.txt
           for REF in origin/main ${REFS}; do
@@ -214,7 +218,12 @@ jobs:
           set -eux
           uname -m
           python --version
-          ldd --version | head -1
+          # NOT `| head -1`. `shell: bash` means GitHub invokes this as
+          # `bash --noprofile --norc -eo pipefail`, so `head` exiting after one
+          # line sends SIGPIPE to `ldd`, and pipefail promotes that to the
+          # pipeline's status: exit 141, build failed, in a step that only
+          # prints diagnostics. Four lines of version banner is a fine price.
+          ldd --version
           git rev-parse HEAD
           sha256sum Pipfile.lock checkov.spec
 
