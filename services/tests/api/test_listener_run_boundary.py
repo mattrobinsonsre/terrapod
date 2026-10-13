@@ -1,23 +1,23 @@
-"""`runner-token` must check the CALLER's certificate, not just the path.
+"""The listener protocol's authorization boundary on the run endpoints.
 
-The endpoint compared only ``run.listener_id`` against the path's listener id
-and never asked whether the caller's certificate named that listener. The path
-segment is chosen by the caller, so a valid listener certificate from ANY agent
-pool could name the owning listener in the path and mint a runner token for a
-run it has nothing to do with (GHSA-g4j5).
+Holes closed on this line, both reachable by anyone holding a VALID listener
+certificate for ANY agent pool -- the certificate authenticates a listener, it
+does not say which runs that listener may touch:
 
-The ORDER of the two checks is part of the fix: answering "Run not assigned to
-this listener" to a caller holding no certificate for that listener would
-confirm whether that listener owns that run to someone who should not have got
-that far. ``test_the_certificate_check_precedes_the_ownership_check`` is what
-pins it, and it needs THREE distinct listener ids -- the caller's certificate,
-the path, and the run's owner -- so that BOTH checks would fail and only their
-order decides the message.
+- ``runner-token`` compared only ``run.listener_id`` against the path, never
+  the caller's certificate. The path segment is chosen by the caller, so any
+  listener could name the owning listener in the path and mint a runner token
+  for a run in another pool (GHSA-g4j5).
+- ``PATCH /listeners/{id}/runs/{run_id}`` accepted any transition the state
+  machine allowed, including ``planned -> confirmed`` -- the confirm. That
+  skips the apply capability check, the human confirmation, the staleness and
+  plan-expiry guards and the mergeability gate (GHSA-3423).
 """
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -133,3 +133,133 @@ class TestRunnerTokenChecksTheCallersCertificate:
 
         assert res.status_code == 200, res.text
         assert res.json()["token"]
+
+
+# ── status PATCH: the (from, to) allowlist (GHSA-3423) ────────────────────
+
+
+class TestListenerReportableTransitions:
+    @staticmethod
+    async def _patch(identity, run, body, path_listener_id):
+        app = _app(identity, run)
+        transition = AsyncMock(return_value=run)
+        complete_plan = AsyncMock(return_value=run)
+        with (
+            patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
+            patch.object(runs_router.run_service, "transition_run", transition),
+            patch.object(runs_router.run_service, "complete_plan", complete_plan),
+            patch.object(runs_router.run_service, "blocked_by", AsyncMock(return_value=None)),
+            patch.object(runs_router, "_run_json", return_value={"data": {"id": "run-x"}}),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                res = await client.patch(
+                    f"/api/terrapod/v1/listeners/listener-{path_listener_id}/runs/run-{run.id}",
+                    json=body,
+                    headers=_CERT,
+                )
+        return res, transition, complete_plan
+
+    @pytest.mark.parametrize(
+        ("from_status", "to_status"),
+        [
+            ("planning", "planned"),
+            ("planning", "errored"),
+            ("planning", "queued"),
+            ("applying", "applied"),
+            ("applying", "errored"),
+            ("applying", "confirmed"),
+            ("canceling", "canceled"),
+            ("canceling", "applied"),
+            ("canceling", "errored"),
+        ],
+    )
+    async def test_every_legitimate_pair_is_allowed(self, from_status, to_status):
+        lid = uuid.uuid4()
+        run = _run(status=from_status, listener_id=lid, pool_id=uuid.uuid4())
+
+        res, transition, _ = await self._patch(
+            _identity(lid, uuid.uuid4()), run, {"status": to_status}, lid
+        )
+
+        assert res.status_code == 200, res.text
+        transition.assert_awaited_once()
+
+    async def test_planned_to_confirmed_is_refused(self):
+        """The vulnerability: the confirm, driven by a listener certificate.
+
+        A listener has no business confirming an apply -- that is the gate the
+        capability check, the human confirmation, the staleness/plan-expiry
+        guards and the mergeability check all hang off.
+        """
+        lid = uuid.uuid4()
+        run = _run(status="planned", listener_id=lid, pool_id=uuid.uuid4())
+
+        res, transition, complete_plan = await self._patch(
+            _identity(lid, uuid.uuid4()), run, {"status": "confirmed"}, lid
+        )
+
+        assert res.status_code == 403
+        assert res.json()["detail"] == "A listener may not report 'planned' -> 'confirmed'"
+        transition.assert_not_awaited()
+        complete_plan.assert_not_awaited()
+
+    @pytest.mark.parametrize(
+        ("from_status", "to_status"),
+        [
+            # Every other pair the state machine allows but a listener has no
+            # first-hand knowledge of -- the user-driven routes own these.
+            ("planned", "applied"),
+            ("planned", "discarded"),
+            ("planning", "discarded"),
+            ("planning", "canceled"),
+            ("confirmed", "applying"),
+            ("confirmed", "canceling"),
+            ("queued", "planning"),
+            ("pending", "queued"),
+        ],
+    )
+    async def test_other_state_machine_valid_pairs_are_refused(self, from_status, to_status):
+        lid = uuid.uuid4()
+        run = _run(status=from_status, listener_id=lid, pool_id=uuid.uuid4())
+
+        res, transition, complete_plan = await self._patch(
+            _identity(lid, uuid.uuid4()), run, {"status": to_status}, lid
+        )
+
+        assert res.status_code == 403
+        transition.assert_not_awaited()
+        complete_plan.assert_not_awaited()
+
+    @pytest.mark.parametrize("status", ["planned", "errored", "applied", "planning"])
+    async def test_an_identical_re_report_is_allowed(self, status):
+        """The listener retries this PATCH on timeout/5xx (`idempotent=True`).
+
+        A retry that lands after the first attempt committed sees
+        `run.status == target_status`, which is not in the pair allowlist --
+        refusing it would turn a successful-but-unacknowledged report into a
+        hard 403 on the retry.
+        """
+        lid = uuid.uuid4()
+        run = _run(status=status, listener_id=lid, pool_id=uuid.uuid4())
+
+        res, _, _ = await self._patch(_identity(lid, uuid.uuid4()), run, {"status": status}, lid)
+
+        assert res.status_code == 200, res.text
+
+    async def test_a_plan_completion_on_an_auto_apply_run_still_routes_through_complete_plan(self):
+        """`planning -> planned` is allowed, and still takes the GUARDED path.
+
+        The allowlist must not accidentally reroute the auto-apply plan
+        completion away from `complete_plan`, which is where the #646/#647
+        staleness and manual-lock guards live.
+        """
+        lid = uuid.uuid4()
+        run = _run(status="planning", listener_id=lid, pool_id=uuid.uuid4(), plan_only=False)
+
+        res, transition, complete_plan = await self._patch(
+            _identity(lid, uuid.uuid4()), run, {"status": "planned", "has_changes": True}, lid
+        )
+
+        assert res.status_code == 200, res.text
+        complete_plan.assert_awaited_once()
+        transition.assert_not_awaited()

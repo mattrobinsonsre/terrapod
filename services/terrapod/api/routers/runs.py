@@ -98,6 +98,39 @@ logger = get_logger(__name__)
 # here because there's nothing left running.
 _CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
 
+# The (from, to) status pairs a LISTENER is allowed to report on
+# `PATCH /listeners/{id}/runs/{run_id}`. Anything else is refused with 403.
+#
+# The listener's job is to launch a Job and say what became of it, so the only
+# transitions it has first-hand knowledge of are the ones out of a phase it
+# claimed. `run_service.VALID_TRANSITIONS` is the state machine and is much
+# wider than that on purpose -- it also describes the transitions a USER drives
+# through the guarded routes. Accepting the whole of it here let a listener
+# drive `planned -> confirmed`, which is the confirm, and so skipped the apply
+# capability check, the human confirmation, the #646/#647 staleness and
+# plan-expiry guards and the mergeability gate -- letting anyone holding a
+# listener certificate apply its own pool's planned runs unreviewed.
+#
+# Keyed on the PAIR, not the target: `confirmed` is the bypass when it comes
+# from `planned` and the legitimate apply-phase unclaim when it comes from
+# `applying`. A target-only rule would either reopen the bypass or break the
+# unclaim.
+_LISTENER_REPORTABLE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("planning", "planned"),
+        ("planning", "errored"),
+        ("planning", "queued"),  # the plan-phase unclaim
+        ("applying", "applied"),
+        ("applying", "errored"),
+        ("applying", "confirmed"),  # the apply-phase unclaim, NOT the bypass
+        # The `canceling` outcomes. A user asked for the cancel; the listener
+        # reports which terminal the Job actually reached.
+        ("canceling", "canceled"),
+        ("canceling", "applied"),
+        ("canceling", "errored"),
+    }
+)
+
 
 def _rfc3339(dt) -> str:
     if dt is None:
@@ -2307,6 +2340,16 @@ async def update_run_status(
 
     if not target_status:
         raise HTTPException(status_code=422, detail="status is required")
+
+    # A listener may only report the outcomes of a phase it claimed (see
+    # _LISTENER_REPORTABLE). An identical re-report is always allowed through:
+    # the listener retries this PATCH on timeout/5xx, so the second attempt can
+    # legitimately arrive after the first already committed the transition.
+    if target_status != run.status and (run.status, target_status) not in _LISTENER_REPORTABLE:
+        raise HTTPException(
+            status_code=403,
+            detail=f"A listener may not report {run.status!r} -> {target_status!r}",
+        )
 
     # Listener is reporting a pre-launch failure if it's transitioning a run
     # from planning/applying → errored while job_name is still NULL (no Job
