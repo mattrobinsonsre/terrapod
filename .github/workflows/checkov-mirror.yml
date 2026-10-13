@@ -311,6 +311,10 @@ jobs:
     needs: [plan, build]
     if: needs.plan.outputs.any == 'true'
     strategy:
+      # Independent releases, so one failing must not cancel the rest — which
+      # is what happened on the first run that got this far: 3.3.19 failed and
+      # took 3.3.21, 3.3.26 and 3.3.28 with it, hiding whether they were fine.
+      fail-fast: false
       max-parallel: 1 # one release at a time, so a partial set is never visible
       matrix:
         version: ${{ fromJson(needs.plan.outputs.versions) }}
@@ -392,19 +396,27 @@ jobs:
             echo "This is not a Terrapod release."
           } > notes.md
 
-          if ! gh release view "${V}" >/dev/null 2>&1; then
+          # --repo on every one of these: this job deliberately has no
+          # checkout (it needs the built artifacts, not the source), and
+          # `gh release` infers the repository from git, so without it every
+          # call dies with "fatal: not a git repository". Note what that cost
+          # here: the existence probe below redirects stderr, so the failure
+          # read as "the release does not exist" and the error only surfaced
+          # one line later at `create` — stderr hidden on an operation that
+          # had never been proven to work.
+          if ! gh release view "${V}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             # --latest=false is mandatory. GitHub picks "Latest release" by
             # publish time, so a mirror release would otherwise take the badge
             # off the current Terrapod version — front page, releases page,
             # /releases/latest, and every install snippet that reads it.
-            gh release create "${V}" \
+            gh release create "${V}" --repo "${GITHUB_REPOSITORY}" \
               --title "Checkov ${V} binaries (Terrapod-built mirror)" \
               --notes-file notes.md \
               --latest=false
           else
-            gh release edit "${V}" --notes-file notes.md --latest=false
+            gh release edit "${V}" --repo "${GITHUB_REPOSITORY}" --notes-file notes.md --latest=false
           fi
-          gh release upload "${V}" checkov_*.zip --clobber
+          gh release upload "${V}" --repo "${GITHUB_REPOSITORY}" checkov_*.zip --clobber
 
           echo "Published:"
-          gh release view "${V}" --json assets --jq '.assets[] | "  \(.name)  \(.size) bytes"'
+          gh release view "${V}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[] | "  \(.name)  \(.size) bytes"'
