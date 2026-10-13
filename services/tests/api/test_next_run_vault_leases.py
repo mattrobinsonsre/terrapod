@@ -284,7 +284,14 @@ class TestJobLaunched:
 
 class TestJobStatusCarriesTerminal:
     async def _report(self, body):
-        run = MagicMock(id=uuid.uuid4())
+        # `pool_id` is shared between the run and the identity on purpose.
+        # job-status is bounded by the POOL (the v1.9.2 security patch): the
+        # reconciler publishes `check_job_status` to the pool's channel, so any
+        # listener in the owning pool may answer. Left as auto-MagicMocks these
+        # would be two distinct objects that never compare equal, and every
+        # test here would 403 for a reason unrelated to the `terminal` flag.
+        pool = uuid.uuid4()
+        run = MagicMock(id=uuid.uuid4(), pool_id=pool)
         lid = uuid.uuid4()
         with (
             patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
@@ -294,7 +301,7 @@ class TestJobStatusCarriesTerminal:
                 listener_id=f"listener-{lid}",
                 run_id=f"run-{run.id}",
                 body=body,
-                identity=MagicMock(listener_id=lid),
+                identity=MagicMock(listener_id=lid, pool_id=pool),
                 db=AsyncMock(),
             )
         return run, setter

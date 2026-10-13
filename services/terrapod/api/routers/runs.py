@@ -2280,6 +2280,41 @@ async def next_run(
     return JSONResponse(content=run_data)
 
 
+# The (from, to) status pairs a listener may report on its own run (GHSA-3423).
+#
+# `update_run_status` used to accept any state-machine-valid transition, so a
+# listener could drive `planned -> confirmed` -- which is the APPLY DECISION.
+# That path bypasses the apply capability check, the human confirmation, the
+# staleness and plan-expiry guards and the mergeability gate, so any holder of
+# a listener certificate could confirm its own pool's planned runs.
+#
+# Keyed on the PAIR, never on the target alone: `confirmed` is the
+# vulnerability when it arrives from `planned` and a legitimate apply-phase
+# unclaim when it arrives from `applying`. A target-only rule either reopens
+# the bypass or breaks the unclaim.
+#
+# Everything a listener legitimately reports is here. The shipped listener on
+# this line has exactly one status PATCH -- `_report_launch_failed`, sending
+# `{"status": "errored"}` from inside `_launch_run`, which runs only after the
+# claim has committed -- so the pairs it can produce are (planning, errored),
+# (applying, errored) and (canceling, errored), all present.
+_LISTENER_REPORTABLE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("planning", "planned"),
+        ("planning", "errored"),
+        ("planning", "queued"),  # the plan-phase unclaim
+        ("applying", "applied"),
+        ("applying", "errored"),
+        ("applying", "confirmed"),  # the apply-phase unclaim, NOT the bypass
+        # The `canceling` outcomes. A user asked for the cancel; the listener
+        # reports which terminal the Job actually reached.
+        ("canceling", "canceled"),
+        ("canceling", "applied"),
+        ("canceling", "errored"),
+    }
+)
+
+
 @extensions_router.patch("/listeners/{listener_id}/runs/{run_id}")
 async def update_run_status(
     listener_id: str = Path(...),
@@ -2307,6 +2342,16 @@ async def update_run_status(
 
     if not target_status:
         raise HTTPException(status_code=422, detail="status is required")
+
+    # Refuse anything outside what a listener legitimately reports, pair-wise
+    # (GHSA-3423 -- see `_LISTENER_REPORTABLE`). The `!=` guard keeps an
+    # identical re-report allowed: these calls are retried, so a repeat of the
+    # status the run already holds must stay a no-op rather than a 403.
+    if target_status != run.status and (run.status, target_status) not in _LISTENER_REPORTABLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Listeners may not report this status transition",
+        )
 
     # Listener is reporting a pre-launch failure if it's transitioning a run
     # from planning/applying → errored while job_name is still NULL (no Job
@@ -2362,7 +2407,7 @@ async def create_runner_token(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(default={}),
-    listener: object = Depends(get_listener_identity),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Generate a short-lived runner token for a run.
@@ -2375,8 +2420,21 @@ async def create_runner_token(
 
     run = await _get_run(run_id, db)
 
-    # Verify this listener owns the run
+    # Verify the cert matches the path AND that this listener owns the run.
+    #
+    # The certificate check comes FIRST, and the order is the security
+    # property rather than a style choice: answering "Run not assigned to this
+    # listener" to a caller holding no certificate for that listener would
+    # confirm whether that listener owns that run to someone who should not
+    # have got that far. The path segment is caller-chosen, so without the
+    # certificate check a valid listener certificate from ANY pool could mint a
+    # runner token for a run it does not own.
     l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
@@ -2460,6 +2518,26 @@ async def report_job_status(
         )
     run = await _get_run(run_id, db)
 
+    # The run must belong to this listener's POOL -- NOT to this listener
+    # (GHSA, the job-status / log-stream half). Do not "correct" this to the
+    # `run.listener_id != l_uuid` check the sibling endpoints carry: it is
+    # wrong here and would break a legitimate path.
+    #
+    # `run_reconciler` publishes `check_job_status` and `stream_logs` with
+    # `publish_listener_event(str(run.pool_id), ...)` -- the POOL's channel --
+    # so EVERY listener in the owning pool receives the request and any of them
+    # may answer it. Which one answers first is a race, and listeners are
+    # deliberately stateless and interchangeable within a pool, so keying on
+    # the owning listener would 403 a sibling that legitimately replied.
+    #
+    # A run with no pool was never published to any channel, so a report for
+    # one is unsolicited and is refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
+
     job_status = body.get("status", "")
     if not job_status:
         raise HTTPException(status_code=422, detail="status is required")
@@ -2541,6 +2619,27 @@ async def upload_log_stream(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+
+    # The run must belong to this listener's POOL -- NOT to this listener
+    # (GHSA, the job-status / log-stream half). Do not "correct" this to the
+    # `run.listener_id != l_uuid` check the sibling endpoints carry: it is
+    # wrong here and would break a legitimate path.
+    #
+    # `run_reconciler` publishes `check_job_status` and `stream_logs` with
+    # `publish_listener_event(str(run.pool_id), ...)` -- the POOL's channel --
+    # so EVERY listener in the owning pool receives the request and any of them
+    # may answer it. Which one answers first is a race, and listeners are
+    # deliberately stateless and interchangeable within a pool, so keying on
+    # the owning listener would 403 a sibling that legitimately replied.
+    #
+    # A run with no pool was never published to any channel, so a report for
+    # one is unsolicited and is refused too.
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
+
     if phase not in ("plan", "apply"):
         phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()
