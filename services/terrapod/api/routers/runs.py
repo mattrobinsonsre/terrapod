@@ -2362,7 +2362,7 @@ async def create_runner_token(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(default={}),
-    listener: object = Depends(get_listener_identity),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Generate a short-lived runner token for a run.
@@ -2375,8 +2375,22 @@ async def create_runner_token(
 
     run = await _get_run(run_id, db)
 
-    # Verify this listener owns the run
+    # Verify the CALLER's cert matches the path, THEN that this listener owns
+    # the run. Both checks are required: the path segment is chosen by the
+    # caller, so without the first one a valid certificate from ANY pool could
+    # name the owning listener in the path and mint a runner token for a run it
+    # has nothing to do with.
+    #
+    # The ORDER is load-bearing. Checking the run first would answer "Run not
+    # assigned to this listener" to a caller holding no certificate for that
+    # listener -- confirming whether that listener owns that run to someone who
+    # should not have got that far.
     l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
