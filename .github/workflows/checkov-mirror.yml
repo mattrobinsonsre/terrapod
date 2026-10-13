@@ -1,0 +1,367 @@
+name: Checkov mirror
+
+# Terrapod builds and publishes the Checkov binaries its own binary cache serves
+# (#2066). Before this, `registry.platform_tools.checkov_mirror_url` pointed at
+# upstream's GitHub releases — and upstream stopped publishing
+# `checkov_linux_arm64.zip` at 3.3.21, because its arm build job waits on a
+# self-hosted arm64 pool that never has capacity (bridgecrewio/checkov#7729).
+# Every release from 3.3.21 on is x86_64 only, so on an arm64 agent pool every
+# security scan recorded `errored`, and an *enforced* workspace blocked every
+# run: the API turned a deterministic upstream 404 into a 502 and the runner
+# retried it as though it were transient.
+#
+# Waiting for upstream is not a fix. The build itself is fine and entirely
+# portable — their `checkov.spec` and `Pipfile.lock` are committed at every tag
+# — and GitHub's hosted arm64 runners are free for public repositories. So we
+# run THEIR recipe on OUR runners for every platform the binary cache serves,
+# and the mirror becomes ours.
+#
+# Faithfulness is the point, so this deviates from upstream's `nightly.yml` in
+# exactly one place, recorded below at the container pin. Everything else — the
+# checkout of their tag, `pipenv sync` against their lockfile,
+# `pyinstaller checkov.spec`, `zip dist/checkov` — is theirs verbatim, which is
+# what makes the result a build of their release rather than a build of our
+# opinion of it.
+#
+# Never on pull requests: it publishes artifacts and needs `contents: write`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Checkov version to mirror (e.g. 3.3.26). Blank = the set the schedule picks."
+        required: false
+        default: ""
+      replace:
+        description: "Replace assets already published for this version (read the warning in `plan`)"
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: "41 5 * * 2" # Tuesdays 05:41 UTC, ahead of the Wednesday release re-scan
+
+permissions:
+  contents: write # publish the mirror releases
+
+env:
+  # Upstream's own build interpreter, pinned to bookworm rather than the
+  # floating `3.9` tag. THIS IS THE ONE DEVIATION from upstream's recipe and it
+  # is not cosmetic: PyInstaller bundles the interpreter and its extension
+  # modules but NOT libc, so the build host's glibc is a hard floor for every
+  # image that has to execute the result. `arm64v8/python:3.9` now resolves to
+  # Debian 13 (glibc 2.41), and a bundle built there refuses to start on any
+  # runner image older than trixie. Bookworm drops the floor to the architecture
+  # baseline — measured at GLIBC_2.17 on aarch64 — so the bundle runs on every
+  # runner image we have published and on anything an operator plausibly runs.
+  # Only ever move this towards an OLDER Debian.
+  BUILD_IMAGE_TAG: "3.9-bookworm"
+  UPSTREAM: bridgecrewio/checkov
+
+jobs:
+  # Which versions need mirroring, derived rather than listed: every version
+  # this repository PINS (on main and on each release line) plus the newest
+  # upstream release. That makes the publisher's input the same source of truth
+  # the pre-release artifact check reads, so a version we pin cannot be one the
+  # mirror lacks. Versions already fully published are dropped, so the weekly
+  # run is normally a no-op.
+  plan:
+    name: Plan the mirror set
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.pick.outputs.versions }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick the versions
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REPLACE: ${{ inputs.replace }}
+        run: |
+          set -euo pipefail
+
+          # Every line's pinned version, read off the remote refs the checkout
+          # already fetched — no branch switching.
+          : > pinned.txt
+          REFS=$(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/release/*')
+          for REF in origin/main ${REFS}; do
+            V=$(git show "${REF}:helm/terrapod/values.yaml" 2>/dev/null \
+                  | sed -n 's/^[[:space:]]*checkov_version:[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}[[:space:]]*$/\1/p' \
+                  | head -1)
+            if [ -n "${V}" ]; then printf '%s\t%s\n' "${V}" "${REF}" >> pinned.txt; fi
+          done
+          echo "Pinned across the lines:"
+          cat pinned.txt || true
+
+          LATEST=$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)
+          echo "Newest upstream release: ${LATEST}"
+
+          if [ -n "${INPUT_VERSION}" ]; then
+            printf '%s\n' "${INPUT_VERSION}" > candidates.txt
+          else
+            { cut -f1 pinned.txt; echo "${LATEST}"; } | sort -uV > candidates.txt
+          fi
+
+          # Drop anything already complete, unless told to replace it.
+          # Replacing a published asset is the dangerous case, and the reason it
+          # is opt-in: the binary cache stores the first bytes it verified for a
+          # (tool, version, os, arch), so a cold cache would fetch the new asset
+          # while every warm cache keeps the old one — two deployments on the
+          # same pin, running different binaries, with nothing to say so.
+          WANT="checkov_darwin_X86_64.zip,checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
+          : > need.txt
+          while IFS= read -r V; do
+            [ -n "${V}" ] || continue
+            if ! gh api "repos/${UPSTREAM}/releases/tags/${V}" --jq .tag_name >/dev/null 2>&1; then
+              echo "::error::checkov ${V} is not an upstream release — refusing to mirror a version that does not exist."
+              exit 1
+            fi
+            HAVE=$(gh release view "${V}" --repo "${GITHUB_REPOSITORY}" --json assets \
+                     --jq '[.assets[].name] | map(select(startswith("checkov_"))) | sort | join(",")' 2>/dev/null || echo "")
+            if [ "${HAVE}" = "${WANT}" ] && [ "${INPUT_REPLACE}" != "true" ]; then
+              echo "  ${V} — already mirrored, skipping"
+            else
+              echo "  ${V} — to build (have: ${HAVE:-nothing})"
+              printf '%s\n' "${V}" >> need.txt
+            fi
+          done < candidates.txt
+
+          JSON=$(jq -R . < need.txt | jq -sc .)
+          echo "versions=${JSON}" >> "$GITHUB_OUTPUT"
+          if [ "${JSON}" = "[]" ]; then
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Selected: ${JSON}"
+
+  # One job per (version, platform): upstream's recipe, in upstream's container,
+  # against upstream's tag. The built bundle is EXECUTED before it is allowed
+  # near a release — upstream's own smoke test, plus the exact invocation
+  # `runner/phases/security_scan.py::_run_checkov` uses. A 60 MB bundle that was
+  # never run is not an artifact, it is a guess.
+  build:
+    name: Build checkov ${{ matrix.version }} (${{ matrix.arch }})
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.plan.outputs.versions) }}
+        arch: [amd64, arm64]
+        # These extend the combinations above rather than adding new ones,
+        # because each names an `arch` that already exists in the matrix.
+        include:
+          - arch: amd64
+            runs_on: ubuntu-latest
+            image: python:3.9-bookworm
+            asset: checkov_linux_X86_64.zip
+          - arch: arm64
+            runs_on: ubuntu-24.04-arm
+            image: arm64v8/python:3.9-bookworm
+            asset: checkov_linux_arm64.zip
+    runs-on: ${{ matrix.runs_on }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Check out upstream at its release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          repository: bridgecrewio/checkov
+          ref: ${{ matrix.version }}
+          fetch-depth: 0
+
+      - name: Record the build inputs
+        run: |
+          set -eux
+          uname -m
+          python --version
+          ldd --version | head -1
+          git rev-parse HEAD
+          sha256sum Pipfile.lock checkov.spec
+
+      # From here to the zip, these are upstream's own
+      # `build-release-artifact-*` steps.
+      - name: Install pipenv
+        run: python -m pip install --no-cache-dir --upgrade pipenv
+
+      - name: Install deps and run pyinstaller
+        run: |
+          pipenv sync
+          pipenv run pip install pyinstaller
+
+      - name: Build executable
+        run: pipenv run pyinstaller checkov.spec
+
+      - name: Test executable — upstream's own smoke test
+        run: ./dist/checkov -s -d tests/terraform/checks/resource/alicloud > /dev/null
+
+      - name: Test executable — Terrapod's own invocation
+        # The scan phase feeds a resolved plan JSON with `--framework
+        # terraform_plan`, which exercises a different parser and the graph
+        # checks (CKV2_*) that upstream's directory smoke test does not. A
+        # bundle missing a data file or a hidden import passes `--version` and
+        # fails here.
+        run: |
+          set -euo pipefail
+          cat > /tmp/plan.json <<'JSON'
+          {
+            "format_version": "1.2",
+            "terraform_version": "1.9.8",
+            "planned_values": { "root_module": { "resources": [
+              { "address": "aws_s3_bucket.public", "mode": "managed", "type": "aws_s3_bucket",
+                "name": "public", "provider_name": "registry.terraform.io/hashicorp/aws",
+                "schema_version": 0, "values": { "bucket": "example", "acl": "public-read" } },
+              { "address": "aws_security_group.open", "mode": "managed", "type": "aws_security_group",
+                "name": "open", "provider_name": "registry.terraform.io/hashicorp/aws",
+                "schema_version": 1, "values": { "name": "open", "ingress": [
+                  { "from_port": 22, "to_port": 22, "protocol": "tcp", "cidr_blocks": ["0.0.0.0/0"] } ] } }
+            ] } }
+          }
+          JSON
+          ./dist/checkov -f /tmp/plan.json --framework terraform_plan --output json \
+            --compact --soft-fail --quiet > /tmp/scan.json
+          python - <<'PY'
+          import json, sys
+
+          d = json.load(open("/tmp/scan.json"))
+          d = d[0] if isinstance(d, list) else d
+          s = d.get("summary") or d
+          failed = (d.get("results") or {}).get("failed_checks") or []
+          ids = {c.get("check_id") for c in failed}
+          print("summary:", {k: s.get(k) for k in ("resource_count", "passed", "failed", "parsing_errors")})
+          print("checks:", sorted(ids))
+          if s.get("parsing_errors"):
+              sys.exit("the plan JSON did not parse — the bundle is incomplete")
+          if s.get("resource_count") != 2:
+              sys.exit(f"expected 2 resources, scanned {s.get('resource_count')}")
+          # CKV_AWS_24 is the open-SSH check. CKV2_* are graph checks, which is
+          # the only path through the native graph dependency.
+          missing = {"CKV_AWS_24"} - ids
+          if missing:
+              sys.exit(f"expected checks did not fire: {sorted(missing)}")
+          if not any(i.startswith("CKV2_") for i in ids):
+              sys.exit("no graph check fired — the graph dependency is broken in this bundle")
+          PY
+
+      - name: Zip artifact
+        # The path inside the zip is a contract: `platform_tool.UNPACK` reads
+        # the member `dist/checkov`. Zip from the repo root, as upstream does.
+        run: |
+          apt-get update -qq && apt-get install -y --no-install-recommends zip >/dev/null
+          zip -q "${{ matrix.asset }}" dist/checkov
+          sha256sum "${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+        with:
+          name: checkov-${{ matrix.version }}-${{ matrix.arch }}
+          path: ${{ matrix.asset }}
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish checkov ${{ matrix.version }}
+    needs: [plan, build]
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      max-parallel: 1 # one release at a time, so a partial set is never visible
+      matrix:
+        version: ${{ fromJson(needs.plan.outputs.versions) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # build provenance
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4
+        with:
+          pattern: checkov-${{ matrix.version }}-*
+          merge-multiple: true
+
+      - name: Re-host upstream's darwin asset
+        # We build every platform the binary cache actually serves, which is
+        # linux/amd64 and linux/arm64 — a runner is a Kubernetes pod. Checkov's
+        # darwin build is still CLAIMED by `_CHECKOV_PLATFORM`, so the mirror
+        # has to carry it or that claim becomes a 404 for whoever asks; and it
+        # cannot be BUILT here, because PyInstaller does not cross-compile and
+        # there is no macOS leg. So it is re-hosted byte for byte, after
+        # verifying it against upstream's own digest. Narrowing the platform
+        # table to the two we build is the better answer, and belongs on main
+        # where removing a claim is allowed.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          NAME=checkov_darwin_X86_64.zip
+          WANT=$(gh api "repos/${UPSTREAM}/releases/tags/${V}" \
+                   --jq ".assets[] | select(.name == \"${NAME}\") | .digest" | sed 's/^sha256://')
+          if [ -z "${WANT}" ]; then
+            echo "::error::upstream publishes no ${NAME} for ${V}, so there is no digest to verify against."
+            exit 1
+          fi
+          curl -fsSL -o "${NAME}" \
+            "https://github.com/${UPSTREAM}/releases/download/${V}/${NAME}"
+          GOT=$(sha256sum "${NAME}" | cut -d' ' -f1)
+          if [ "${GOT}" != "${WANT}" ]; then
+            echo "::error::${NAME} digest mismatch — upstream says ${WANT}, downloaded ${GOT}"
+            exit 1
+          fi
+          echo "${NAME} verified against upstream's digest (${WANT})"
+
+      - name: Attest what we built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v2
+        with:
+          subject-path: "checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
+
+      - name: Publish the mirror release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Checkov **${V}** binaries, built by Terrapod for the platforms its binary cache serves (#2066)."
+            echo
+            echo "Upstream stopped publishing \`checkov_linux_arm64.zip\` at 3.3.21 (${UPSTREAM}#7729), which"
+            echo "made every security scan on an arm64 agent pool record \`errored\`. These are built from"
+            echo "upstream's own release tag, its committed \`Pipfile.lock\` and its committed \`checkov.spec\`,"
+            echo "on \`python:${BUILD_IMAGE_TAG}\` — the same recipe as its own \`nightly.yml\`, pinned to an"
+            echo "older glibc so the bundle runs on every runner image."
+            echo
+            echo "Each linux asset was executed before publication: upstream's own smoke test, plus the exact"
+            echo "\`--framework terraform_plan\` invocation the runner uses, asserting the graph checks fire."
+            echo "\`checkov_darwin_X86_64.zip\` is upstream's own asset, re-hosted after verifying its digest."
+            echo
+            echo "Build provenance is attested — \`gh attestation verify <asset> --repo ${GITHUB_REPOSITORY}\`."
+            echo
+            echo "| asset | sha256 |"
+            echo "|---|---|"
+            for f in checkov_*.zip; do
+              printf '| `%s` | `%s` |\n' "${f}" "$(sha256sum "${f}" | cut -d' ' -f1)"
+            done
+            echo
+            echo "Served to deployments through \`registry.platform_tools.checkov_mirror_url\`."
+            echo "This is not a Terrapod release."
+          } > notes.md
+
+          if ! gh release view "${V}" >/dev/null 2>&1; then
+            # --latest=false is mandatory. GitHub picks "Latest release" by
+            # publish time, so a mirror release would otherwise take the badge
+            # off the current Terrapod version — front page, releases page,
+            # /releases/latest, and every install snippet that reads it.
+            gh release create "${V}" \
+              --title "Checkov ${V} binaries (Terrapod-built mirror)" \
+              --notes-file notes.md \
+              --latest=false
+          else
+            gh release edit "${V}" --notes-file notes.md --latest=false
+          fi
+          gh release upload "${V}" checkov_*.zip --clobber
+
+          echo "Published:"
+          gh release view "${V}" --json assets --jq '.assets[] | "  \(.name)  \(.size) bytes"'
