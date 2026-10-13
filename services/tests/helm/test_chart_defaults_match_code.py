@@ -41,7 +41,16 @@ from pydantic import BaseModel
 
 from terrapod.config import Settings
 
-_VALUES = Path(__file__).resolve().parents[3] / "helm" / "terrapod" / "values.yaml"
+# The chart is copied into the test image at /app/helm (see
+# docker/Dockerfile.test), where `services/` is flattened to `/app` — so
+# parents[3] resolves to `/` in the container and only works in a checkout.
+# Same idiom as test_values_contract.py; getting it wrong errors at COLLECTION,
+# because the parametrize below reads the file at import time.
+_HELM_ROOT = Path("/app/helm/terrapod")
+if not _HELM_ROOT.exists():  # local checkout fallback (running outside the image)
+    _HELM_ROOT = Path(__file__).resolve().parents[3] / "helm" / "terrapod"
+
+_VALUES = _HELM_ROOT / "values.yaml"
 
 #: Settings whose two defaults differ ON PURPOSE, each with the reason. Adding an
 #: entry is a claim that the difference is intended — not a way past the gate.
