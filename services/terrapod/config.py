@@ -3063,7 +3063,7 @@ class AISummaryConfig(BaseModel):
         ),
     )
     plan_json_max_bytes: int = Field(
-        default=600_000,
+        default=500_000,
         description=(
             "Max bytes of plan JSON attached to the model request. This is a "
             "last-resort ceiling for the model's context window, not routine "

@@ -13,8 +13,10 @@ checkov **3.3.8** in `config.py` against the chart's **1.21.1**, **0.75.0** and
 **3.3.26** — because the release ritual that reviews those versions every minor
 updates the chart, and nothing has ever sent anyone to `config.py`. And
 `ai_summary.plan_json_max_bytes` was born disagreeing: one commit introduced
-600_000 in the code and 500_000 in the chart, and the docs eventually wrote the
-discrepancy down in three places rather than anyone reconciling it.
+600_000 in the code and 500_000 in the chart, and the docs ended up explaining
+the discrepancy in three places rather than anyone reconciling it. Both are
+500_000 now — the chart's number, because that is what every deployment that
+does not override it actually gets.
 
 **Why a disagreement is reachable rather than academic.** `configmap-api.yaml`
 renders most keys behind an `if`, so a value the operator blanks is simply
@@ -72,16 +74,6 @@ DELIBERATELY_DIFFERENT: dict[str, str] = {
     # Case only, and the consumer is case-insensitive —
     # `logging_config.configure_logging` does `getattr(logging, log_level.upper())`.
     "log_level": "case only; the consumer upper-cases it before use",
-    # NOT deliberate, and tracked rather than silently blessed: 600_000 in code
-    # against 500_000 in the chart, both introduced by the same commit.
-    # `docs/ai-plan-summary.md` states the discrepancy in three places rather
-    # than resolving it. Listed so this gate can land without changing a
-    # behaviour in the same breath; reconciling the two (and simplifying those
-    # three sentences) is a decision of its own.
-    "ai_summary.plan_json_max_bytes": (
-        "known, documented inconsistency from the commit that introduced both; "
-        "awaiting a decision on which cap is right"
-    ),
 }
 
 #: A floor, so a refactor that stops flattening either side fails loudly rather
