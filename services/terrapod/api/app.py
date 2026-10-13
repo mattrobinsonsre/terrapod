@@ -129,7 +129,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # still serve everything except the two issuer routes, which fail loudly on
     # their own when nothing is loaded.
     if _settings.auth.oidc_issuer.enabled:
-        from terrapod.auth.oidc_signing import init_oidc_signing
+        from terrapod.auth.oidc_signing import (
+            init_oidc_signing,
+            validate_configured_signing_key,
+            warn_about_issuer_url_cosmetics,
+        )
+
+        # Configurations that work but will not match on the cloud's side. A
+        # warning, not a refusal -- see the helper's docstring.
+        warn_about_issuer_url_cosmetics()
+
+        # OUTSIDE the try, and that is the whole point: an operator-supplied key
+        # that cannot be loaded is a permanent configuration error, so it should
+        # stop the pod rather than join the transient cases the handler below
+        # forgives. See the helper's docstring for why the two are separable.
+        validate_configured_signing_key()
 
         try:
             async with get_db_session() as db:

@@ -324,6 +324,28 @@ async def backfill_class(
             params={"after": after, "limit": 200},
             headers={"Authorization": f"Bearer {token}"},
         )
+        if resp.status_code == 404:
+            # The PEER does not know this class -- an OLDER peer across a
+            # version skew, which is the supported direction: a newer node may
+            # be paired with one up to N-2 behind, and `docs/ha-operations.md`
+            # tells operators to upgrade the FOLLOWER first, so this is the
+            # ordinary state during an upgrade rather than an edge case.
+            #
+            # This is the mirror of the receive-side skip in `_apply_event`,
+            # and it exists for the same reason spelled out there: failing
+            # would wedge the whole stream on one unknown class. Worse here,
+            # because `backfill_pending_classes` runs before the cycle's only
+            # commit and `sync_cycle` does not guard it -- so raising rolls the
+            # cycle back, the event cursor never advances, and replication
+            # stops for EVERY class until the peer is upgraded.
+            #
+            # `backfilling` stays set (claimed before the loop), so the class is
+            # retried each cycle and lands by itself once the peer catches up.
+            logger.info(
+                "Peer does not know this replication class yet; leaving it pending",
+                entity_class=entity_class,
+            )
+            return applied
         resp.raise_for_status()
         body = resp.json()
         for row in body["data"]:

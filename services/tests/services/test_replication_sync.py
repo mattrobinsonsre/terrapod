@@ -534,3 +534,83 @@ class TestBackfillIsRepeatable:
 
         assert cursor.position == "a", "an interrupted backfill must be resumable"
         assert cursor.backfilling is True
+
+
+class TestAPeerThatDoesNotKnowTheClass:
+    """A class the PEER has never heard of must not stop replication (#2051).
+
+    Registering a new replicated class is one line, and the follower's pull
+    loop walks `replication.registered()` -- so the moment a newer node is
+    paired with an older one, it asks for a class the older node's router
+    answers 404 for ("Unknown entity class"). `arequest_with_retry` retries
+    only 5xx, so the 404 comes back to us.
+
+    That direction is the SUPPORTED one and the documented one:
+    `docs/versioning-and-support.md` allows an N-2 skew across the pair, and
+    `docs/ha-operations.md` tells operators to upgrade the FOLLOWER first in
+    order to validate a release. So this is the ordinary state during an
+    upgrade, not an edge case.
+
+    Left to raise, the cost is far worse than the one class: the call sits in
+    `backfill_pending_classes`, which `sync_cycle` runs BEFORE its only
+    `db.commit()` and does not guard -- so the exception rolls back every delta
+    the cycle applied and the event cursor never advances. The next cycle
+    repeats identically. Replication stops for EVERY class, visible only as
+    climbing lag, until the peer is upgraded.
+
+    The receive side already does the mirror of this (`_apply_event` skips an
+    unknown class, with a comment saying failing "would wedge the whole stream
+    on one unknown row"). This is that, in the pull direction.
+    """
+
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_a_404_leaves_the_class_pending_rather_than_raising(
+        self, mock_settings, mock_request
+    ):
+        mock_settings.ha = _cfg()
+        mock_request.return_value = _resp(status=404, body={"detail": "Unknown entity class"})
+        db = _db_with_cursor("")
+
+        count = await replication_sync.backfill_class(db, MagicMock(), "tok", "agent_pools")
+
+        assert count == 0
+        # `backfilling` was claimed before the first page and is deliberately
+        # NOT cleared, so the next cycle tries again and the class lands by
+        # itself once the peer catches up.
+        assert mock_request.await_count == 1
+
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_raise_for_status_is_not_what_handles_it(self, mock_settings, mock_request):
+        """The 404 must be read before `raise_for_status`, not caught after.
+
+        `_resp` gives a MagicMock `raise_for_status`, so a test that only
+        asserted "no exception" would pass even if the branch were absent --
+        this asserts the response was never asked to raise at all.
+        """
+        mock_settings.ha = _cfg()
+        resp = _resp(status=404, body={"detail": "Unknown entity class"})
+        mock_request.return_value = resp
+        db = _db_with_cursor("")
+
+        await replication_sync.backfill_class(db, MagicMock(), "tok", "agent_pools")
+
+        resp.raise_for_status.assert_not_called()
+
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_other_errors_still_raise(self, mock_settings, mock_request):
+        """The tolerance is for one specific, expected skew. A 500 or a 403 is
+        a real fault and must still surface rather than being swallowed into a
+        silent no-op backfill."""
+        mock_settings.ha = _cfg()
+        resp = _resp(status=403)
+        resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "forbidden", request=MagicMock(), response=resp
+        )
+        mock_request.return_value = resp
+        db = _db_with_cursor("")
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await replication_sync.backfill_class(db, MagicMock(), "tok", "agent_pools")

@@ -701,7 +701,7 @@ the claims below:
       "Condition": {
         "StringEquals": {
           "terrapod-webhooks.example.com:aud": "sts.amazonaws.com",
-          "terrapod-webhooks.example.com:sub": "workspace:prod-dns:phase:apply"
+          "terrapod-webhooks.example.com:sub": "workspace:prod-dns@0f8b1c2d-3e4f-4a5b-8c9d-0e1f2a3b4c5d:phase:apply"
         }
       }
     }
@@ -715,6 +715,15 @@ the claims below:
 > **`oaud`** condition key. Terrapod mints no `azp`, so `…:aud` reads the `aud`
 > claim here — but if you ever see a condition evaluate against something you did
 > not expect, that precedence is why.
+
+**The issuer URL is validated at startup**, because every way of getting it wrong
+fails in the cloud rather than here. Whichever of `auth.oidc_issuer.public_url`,
+`public_webhook_url` or `external_url` resolves it, the result must be an absolute
+`https` URL with no query string or fragment -- note that `webhookIngress.tls=false`
+produces an `http` one, which the chart renders without complaint and no cloud will
+fetch. A trailing slash on `public_url` is refused too: Terrapod strips it, so the
+minted `iss` would not equal the string you configured the cloud with, and issuer
+matching is exact.
 
 An aliased configuration reads its own file:
 
@@ -1019,12 +1028,14 @@ Every token for every target carries the same claims; only `aud` differs.
 | Claim | Example | Notes |
 |---|---|---|
 | `iss` | `https://terrapod-webhooks.example.com` | Matched **exactly** by the cloud |
-| `sub` | `workspace:prod-dns:phase:apply` | Composite, colon-delimited, phase last. **`:phase:<phase>` is absent when the runner token made no phase claim** — the `sub` is then just `workspace:prod-dns`. See below |
+| `sub` | `workspace:prod-dns@0f8b1c2d-…:phase:apply` | Composite: `workspace:<name>@<id>`, then `:phase:<phase>` last. **The `@<id>` half is what a trust policy should rely on** — see below. **`:phase:<phase>` is absent when the runner token made no phase claim** |
 | `aud` | `["sts.amazonaws.com"]` | **This target's** audiences, verbatim and in order |
 | `workspace` | `prod-dns` | The workspace name |
 | `workspace_id` | `0f8b…` | The id — stable across a rename, where the name is readable |
 | `phase` | `apply` | `plan` or `apply`. **Absent** when the runner token made no phase claim |
 | `run_id` | `3c71…` | The run, for correlating a cloud audit entry back to Terrapod |
+| `agent_pool` | `prod-eu` | The pool that **actually executed** this run, not the workspace's first choice. **Absent** on a locally executed workspace, which has no pool |
+| `agent_pool_id` | `9a2f…` | The same pool's id, for the same reason `workspace_id` sits beside `workspace` |
 | `terrapod_organization` | `default` | Always the literal `default` — Terrapod is single-organization |
 | `iat`, `nbf`, `exp`, `jti` | | Standard. `jti` is what makes two tokens for one run distinguishable in a cloud audit log |
 
@@ -1040,24 +1051,147 @@ condition can be expressed on Azure, which is why the phase is embedded in it as
 well as claimed discretely.
 
 **Targets that can read arbitrary claims should condition on the discrete claims
-instead**, which needs no wildcard and no string parsing. AWS, GCP and
-OpenBao/Vault can all do this, and the examples above do.
+instead**, which needs no wildcard and no string parsing. GCP and OpenBao/Vault
+can do this, and the examples above do.
+
+**AWS cannot, and this page previously said it could.** For a generic IAM OIDC
+identity provider, a role trust policy can condition only on `aud`, `oaud`, `sub`,
+`amr` and `email` ([IAM condition keys for OIDC
+federation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif)).
+The `workspace`, `workspace_id`, `phase` and `run_id` claims are **not** available
+as condition keys there. So on AWS, as on Azure, `sub` is the only thing you can
+bind — which is why it repeats what the discrete claims say.
+
+#### Why `sub` carries the workspace id
+
+Because on AWS and Azure `sub` is the only thing a policy can bind, and a
+workspace **name** is not a stable identifier for anything:
+
+- any authenticated user with workspace-create permission can create a workspace
+  and choose its name;
+- a workspace admin can rename one, freeing the old name;
+- deleting a workspace frees its name immediately.
+
+So a policy bound to `workspace:prod-dns` is satisfied by whichever workspace
+holds that name at the moment the run happens — which is a role anyone who can
+name a workspace can assume. The id is immutable and is never reused, so
+`workspace:prod-dns@0f8b1c2d-…` names one workspace for its lifetime and nothing
+afterwards.
+
+The name stays in the subject because a policy nobody can read is a policy nobody
+reviews; the id is what makes it bind.
+
+> **Upgrading from v1.10.0.** v1.10.0 minted `workspace:<name>` with no id, so a
+> trust policy written against it stops matching on upgrade — the exchange is
+> refused, not widened. Update the policy to the id-bearing form (the `sub` of a
+> plan-phase run is the quickest way to read it, or take the workspace id from
+> the UI or `GET /api/terrapod/v1/workspaces/…`). If you need to stage that
+> across a fleet, `api.config.auth.oidc_issuer.subject_format: name` restores the
+> old form deployment-wide — it exists only to sequence the migration, it leaves
+> the window above open while it is set, and it is removed in 2.0.
+
+Two things follow for an AWS trust policy, and both are easy to get wrong:
+
+- **Condition on `sub` with `StringEquals`, never `StringLike`.** A wildcard such as
+  `workspace:prod*` also matches `prod-evil`, matches the phaseless form that a
+  listener predating the phase claim produces, and — now that the subject carries
+  an id — matches every workspace whose name begins `prod` whatever its id, which
+  throws away the binding the id exists to provide. It grants more than it reads
+  as granting, in three separate directions.
+- **The condition key spelled `aud` is not the `aud` claim.** AWS maps it to `azp`
+  when that claim is present and falls back to `aud` only when it is absent; the
+  actual audience claim is exposed as **`oaud`**. Terrapod does not set `azp`, so
+  the two agree today — but write `oaud` if you mean the audience.
+
+#### `TF_LOG=DEBUG` puts the token in the run log, on AWS
+
+Measured against each provider's source: **terraform-provider-aws logs the token**
+at `TF_LOG=DEBUG` and above. It logs the STS `AssumeRoleWithWebIdentity` request
+body, which carries `WebIdentityToken=<the whole JWT>`, and its only body
+redaction masks AWS access keys and a run of exactly 40 base64 characters — a
+base64url JWT matches neither. azurerm, google and vault do not log it (vault will
+if you set `TERRAFORM_VAULT_LOG_BODY`).
+
+**Terrapod strips its own tokens from the run log**, by exact value rather than by
+JWT shape: the runner knows the literal strings because it wrote them, so this
+cannot mangle a plan that legitimately contains a JWT and cannot miss the token it
+delivered. A redacted occurrence reads `[redacted: cloud identity token]`.
+
+That covers the tokens Terrapod minted for the run. It does **not** cover a
+credential of your own that a provider prints, so `TF_LOG` remains what HCP
+Terraform and Terraform Enterprise document it as: a debugging tool that can put
+sensitive values in logs. Note also that `google`'s `identity_token` and `vault`'s
+`auth_login_jwt.jwt` are not marked sensitive in their schemas, so nothing
+redacts them wherever Terraform surfaces provider configuration — and
+`TF_LOG_SDK_PROTO_DATA_DIR`, which is a separate switch from `TF_LOG`, writes
+whole RPC payloads to disk verbatim.
+
+#### Why the agent pool is claimed
+
+Which pool runs a workspace decides **where its identity can be minted**, and
+nothing in the token used to say which one did. A workspace admin can add a pool
+to a workspace with `pool:assign` on the *destination* pool, so the set of
+listeners that can execute it -- and therefore the hosts a federated credential is
+reachable from -- can change without touching the workspace's own permissions.
+
+A target that can read arbitrary claims (GCP, OpenBao/Vault, anything evaluating
+Rego) can bind the pool directly. On AWS and Azure it is not reachable as a
+condition, as above -- but it is in the cloud's own audit log beside the
+credential it bought, which is where you look after the fact.
+
+The claim names the pool the run was **claimed by**, which is rewritten when a
+listener takes the run, rather than the workspace's first-choice pool. The first
+choice is not what ran.
+
+**`require_assigned_pool` refuses a mint from a pool the workspace has lost.** A
+run snapshots its candidate pools at creation, so detaching a pool from a
+workspace mid-flight leaves that run claimable by a pool the workspace no longer
+has. Set `api.config.auth.oidc_issuer.require_assigned_pool: true` and such a mint
+is refused, naming the pool.
+
+It asks about **membership, not precedence**, and there is deliberately no
+"primary pool" rule: the pool set is flat, `ordinal` is display order only, and a
+run is offered to every pool at once so which one claims it is a race. So this
+does not constrain multi-pool routing -- every pool in the set passes. Off by
+default, because the window is narrow and the refusal fails the run.
+
+#### A module publish can reach the apply phase without a human
+
+Publishing a module version queues a **standard, apply-capable** run on every linked
+workspace, so on a consumer with auto-apply it applies unconfirmed, under that
+workspace's apply-phase identity. Write access to a module repository is therefore
+apply access on its auto-applying consumers. See [the registry
+docs](registry.md#automatic-runs-on-version-publish).
 
 #### The phase suffix is conditional, and on Azure that matters
 
-`sub` is built as `workspace:<name>`, **plus** `:phase:<phase>` only when the runner token
-carried a phase claim. So a token minted without one — a listener image predating the claim,
-per [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)
-— has `sub: workspace:prod-dns`, with no suffix at all.
+`sub` is built as `workspace:<name>@<id>`, **plus** `:phase:<phase>` only when the runner
+token carried a phase claim. So a token minted without one — a listener image predating the
+claim, per [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)
+— has `sub: workspace:prod-dns@0f8b1c2d-…`, with no suffix at all.
 
 On a target that reads discrete claims this is benign: `phase` is simply absent, so a trust
 policy conditioning on it does not match and the credential is refused. **On Azure it is the
 same outcome by a different route, and it is the one to plan for**: a federated identity
-credential whose `subject` is pinned to the phased form (`workspace:prod-dns:phase:apply`)
+credential whose `subject` is pinned to the phased form
+(`workspace:prod-dns@0f8b1c2d-…:phase:apply`)
 stops matching an unphased `sub` entirely. The failure direction is safe — the exchange is
 refused rather than widened — but it presents as "Azure suddenly rejects every token from
 this workspace" with nothing wrong on the Terrapod side, so check the listener image before
 the trust policy.
+
+**`require_phase` closes the unphased form off entirely.** Set
+`api.config.auth.oidc_issuer.require_phase: true` and a runner token with no phase
+is refused when the listener asks for it, and an identity mint presenting one is
+refused as a backstop. That removes the form a trust policy would otherwise have
+to remember to exclude -- and a `StringLike` wildcard that forgets to exclude it is
+exactly how a plan-phase run reaches an apply-phase role.
+
+It is **off by default**, because the only thing that produces an unphased token is
+a listener image predating the phase claim and an upgrade must not strand one. Set
+it once every listener is on v1.10 or later; it becomes the default in 2.0. The
+refusal names the listener upgrade, so the operator who meets it knows which image
+to move.
 
 Azure's "flexible federated identity credentials" would allow claim expressions,
 but they are gated to a hardcoded allow-list of issuers (GitHub, GitLab and
@@ -1125,8 +1259,20 @@ after a catalogue edit, and it only affects runs that were already planned.
 Terrapod signs with **RS256 over a 2048-bit RSA key**. Not the listener CA's
 Ed25519: at least one major cloud does not accept EdDSA for workload identity
 federation, and a federation path that works on two clouds out of three is not
-worth the elegance. A non-RSA key is refused by name at startup rather than
-published as a JWKS the clouds silently cannot use.
+worth the elegance.
+
+A key is refused **by name, and the API refuses to start** unless it is RSA, at
+least 2048 bits, and uses public exponent 65537. Those rules apply to a key you
+supply, since the one Terrapod generates satisfies them by construction. Refusing
+rather than warning is the point: a 1024-bit key produces a perfectly well-formed
+JWKS that every cloud verifies happily, so nothing downstream would ever complain
+and the weakness would be invisible until somebody factored it.
+
+> **This is the one startup failure that is NOT tolerant.** A database that is not
+> ready yet only warns -- a pod starting before the migration Job finishes must
+> still come up, and it recovers within thirty seconds. A key from a Secret is not
+> transient and no retry can fix it, so forgiving it would leave the pod Ready for
+> ever while both issuer routes answered 503.
 
 **By default the key is generated on first startup and persisted in the
 database**, the same model as the listener CA — one source of truth, loaded on
@@ -1158,6 +1304,29 @@ API** — Terrapod will not rotate it for you, and the rotate endpoint returns
 supplied won for ever and every later rotation was silently ignored, so a BYO
 deployment never writes to the key table at all.
 
+**You can still stage the change, with a second Secret.**
+`api.oidcSigningKey.nextExistingSecret` names a key that is **published in the
+JWKS and never used to sign**, which is the same shape as a generated rotation's
+propagation window with you holding both keys:
+
+```yaml
+api:
+  oidcSigningKey:
+    existingSecret: terrapod-oidc-signing-key        # signs
+    nextExistingSecret: terrapod-oidc-signing-key-next  # published only
+```
+
+Set the incoming key there, roll the API, wait for every cloud to refetch, then
+promote it to `existingSecret` and clear the second. Without that step one
+supplied key means one published key, so there is no moment when both the
+outgoing and incoming public keys are published and federated runs fail from the
+cutover until each cloud refetches. During the promotion step both Secrets name the same key for
+one `helm upgrade`, which is expected and supported. Outside that step they should
+hold **different** keys: a `kid` is a thumbprint of the key material, so the same
+key twice stages nothing — the API logs a warning saying so and publishes the key
+once rather than twice. See [Security Hardening: OIDC issuer signing
+key](security-hardening.md#oidc-issuer-signing-key) for the step-by-step.
+
 ### Rotation adds a key rather than swapping one
 
 A published trust root cannot be swapped atomically, because the clouds fetch the
@@ -1174,7 +1343,19 @@ cloud has not had a chance to fetch:
 | | |
 |---|---|
 | The new key is **published immediately** | and starts signing only after `key_propagation_seconds` (default 600). **Until then the retired key keeps signing** — it is still in the published JWKS, so its tokens verify, whereas the incoming key is precisely the one the clouds lack |
-| The old key is **retired immediately** | but stays published for `retired_key_grace_seconds` (default 3600), because the tokens it already signed are still inside their own lifetime |
+| **Every** key that was not already retired is **retired immediately** | each staying published for `retired_key_grace_seconds` (default 3600), because the tokens they already signed are still inside their own lifetime |
+
+**Every** is load-bearing, and the normal case hides why. Rotating twice inside a
+propagation window -- which is what an operator does during an incident -- leaves
+the *previous* key signing at the moment of the second rotation, because that is
+what tier 2 above is for. A rotation that retired only the signer therefore
+retired nothing the second time, and the first rotation's incoming key stayed
+published with no retirement date for any grace window to measure. Retiring all of
+them is also the honest reading of what a rotation means: from here on, exactly
+one key is current.
+
+Rotation takes the same Postgres advisory lock as first-startup key creation, so
+two replicas rotating at once cannot each leave their own key unretired.
 
 `retired_key_grace_seconds` has to exceed `token_ttl_seconds`, or a token signed
 moments before a rotation stops verifying while still inside its own lifetime. It

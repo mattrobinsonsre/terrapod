@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth import capabilities as cap
 from terrapod.auth.builtin_roles import BUILTIN_ROLE_NAMES
+from terrapod.config import settings
 from terrapod.db.models import Role
 from terrapod.services.rbac_service import first_matching_label, merge_labels
 
@@ -166,7 +167,20 @@ async def resolve_capabilities(
 
     # 4. Owner → full axis caps (the catalog clamp below reduces this to read on
     #    a catalog-managed workspace, matching scalar's owner→read branch there).
-    if owner_email and owner_email == user_email:
+    #
+    #    Gated on `rbac.owner_grants_admin` (#2042), which defaults TRUE so this is
+    #    unchanged for every existing deployment. It exists because this union is
+    #    the only grant in the whole resolver that label RBAC cannot take back:
+    #    steps 5 and 6 only ever `|=`, and the single subtraction in the function
+    #    is the catalog clamp at step 7. So revoking a principal's roles leaves
+    #    their admin on resources they own intact, and a deny label cannot reach
+    #    it. That matters more since per-workspace cloud identity, because
+    #    admin on a workspace reaches a cloud role bound to that workspace rather
+    #    than the agent pool's shared identity.
+    #
+    #    Read at call time, not import time, so a test can patch it and so a
+    #    config reload is not a process restart.
+    if owner_email and owner_email == user_email and settings.rbac.owner_grants_admin:
         caps |= all_caps
 
     # 5. Label-based RBAC from custom roles.

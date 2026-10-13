@@ -4192,7 +4192,8 @@ permissions behind a trust condition on `phase: apply` and a speculative
 pull-request plan structurally cannot assume that role, because every PR-driven
 run is plan-only.
 
-**Claims:** `iss`, `sub` (`workspace:<name>:phase:<plan|apply>`), `aud` (this
+**Claims:** `iss`, `sub` (`workspace:<name>@<id>:phase:<plan|apply>`), `agent_pool`
++ `agent_pool_id` (the pool that executed the run; absent when there is none), `aud` (this
 target's audiences only), `workspace`, `workspace_id`, `phase` (absent when the
 runner token made no phase claim), `run_id`, `terrapod_organization` (always the
 literal `default`), plus `iat`, `nbf`, `exp`, `jti`. The header carries `kid`. `sub` carries the phase

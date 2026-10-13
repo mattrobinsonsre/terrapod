@@ -487,6 +487,12 @@ class TestSavedPlanRunCreate:
         mock_db.execute.return_value = mock_result
         spec_cv = MagicMock()
         spec_cv.speculative = True
+        # `workspace_id` set, because run creation now refuses a configuration
+        # version belonging to another workspace (#2049). A MagicMock here is a
+        # foreign id, which is exactly what the guard refuses -- so without this
+        # the request 404s before it ever reaches the saved-plan contradiction
+        # this test is about.
+        spec_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=spec_cv)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -526,6 +532,10 @@ class TestSavedPlanRunCreate:
         mock_db.execute.return_value = mock_result
         real_cv = MagicMock()
         real_cv.speculative = False
+        # Same reason as the speculative fixture above: a MagicMock
+        # `workspace_id` is a foreign id, which run creation now refuses with a
+        # 404 (#2049) -- before this test reaches the 422 it is about.
+        real_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=real_cv)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -587,6 +597,10 @@ class TestVCSSpeculativePlan:
         mock_db.refresh = AsyncMock()
         spec_cv = MagicMock()
         spec_cv.speculative = True
+        # `workspace_id` set, because run creation now refuses a configuration
+        # version belonging to another workspace (#2049). A MagicMock here is a
+        # foreign id, which is exactly what the guard refuses.
+        spec_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=spec_cv)
 
         cv_id = uuid.uuid4()
@@ -626,6 +640,7 @@ class TestVCSSpeculativePlan:
         mock_db.execute.return_value = mock_result
         real_cv = MagicMock()
         real_cv.speculative = False
+        real_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=real_cv)
 
         cv_id = uuid.uuid4()
@@ -1306,6 +1321,7 @@ class TestCLIApplyGuard:
         # apply-capable, so the VCS apply guard must still fire.
         _apply_cv = MagicMock()
         _apply_cv.speculative = False
+        _apply_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=_apply_cv)
 
         cv_id = uuid.uuid4()
@@ -1343,6 +1359,7 @@ class TestCLIApplyGuard:
         mock_db.execute.return_value = mock_result
         _apply_cv = MagicMock()
         _apply_cv.speculative = False
+        _apply_cv.workspace_id = ws.id
         mock_db.get = AsyncMock(return_value=_apply_cv)
 
         cv_id = uuid.uuid4()
@@ -1387,7 +1404,11 @@ class TestCLIApplyGuard:
         mock_result.scalar_one_or_none.return_value = ws
         mock_db.execute.return_value = mock_result
         mock_db.refresh = AsyncMock()
-        mock_db.get.return_value = MagicMock(status="uploaded")
+        # `workspace_id=ws.id`: run creation refuses a configuration version
+        # belonging to another workspace (#2049), and a bare MagicMock id is a
+        # foreign one. Without it these tests 404 before reaching the guard
+        # they are about.
+        mock_db.get.return_value = MagicMock(status="uploaded", workspace_id=ws.id)
 
         cv_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -1430,7 +1451,11 @@ class TestCLIApplyGuard:
         mock_result.scalar_one_or_none.return_value = ws
         mock_db.execute.return_value = mock_result
         mock_db.refresh = AsyncMock()
-        mock_db.get.return_value = MagicMock(status="uploaded")
+        # `workspace_id=ws.id`: run creation refuses a configuration version
+        # belonging to another workspace (#2049), and a bare MagicMock id is a
+        # foreign one. Without it these tests 404 before reaching the guard
+        # they are about.
+        mock_db.get.return_value = MagicMock(status="uploaded", workspace_id=ws.id)
 
         cv_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -2336,3 +2361,112 @@ class TestExecutingPoolSerialisation:
         attrs = resp.json()["data"]["attributes"]
         assert attrs["agent-pool-id"] == f"apool-{primary}"
         assert set(attrs["candidate-agent-pool-ids"]) == {f"apool-{primary}", f"apool-{fallback}"}
+
+
+class TestAConfigurationVersionMustBelongToTheWorkspace:
+    """Run creation took the relationship on trust (#2049).
+
+    A run could be created pinning another workspace's configuration version, or
+    one that does not exist at all -- leaving `configuration_version_id` pointing
+    at nothing.
+
+    Not exploitable today, because the archive key is built from
+    `run.workspace_id` rather than from the CV, so a foreign id simply does not
+    resolve. It is one refactor away from executing another workspace's code
+    under this workspace's identity -- and since per-workspace cloud identity,
+    under its cloud credentials.
+
+    404 for both the missing and the foreign case rather than 422 for the
+    mismatch: a caller who may not read the other workspace should not learn
+    from the status code that the id exists.
+    """
+
+    def _ws(self):
+        return _mock_workspace()
+
+    async def _post(self, cv_row):
+        """POST a run pinning a CV, with `db.get` answering `cv_row`."""
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(
+                "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+                return_value=caps_for_level("write"),
+            ),
+        ):
+            ws = self._ws()
+            app, mock_db = _make_app(_user())
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = ws
+            mock_db.execute.return_value = mock_result
+            mock_db.refresh = AsyncMock()
+            mock_db.get = AsyncMock(return_value=cv_row(ws))
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                return await c.post(
+                    "/api/v2/runs",
+                    json={
+                        "data": {
+                            "attributes": {"plan-only": True},
+                            "relationships": {
+                                "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                                "configuration-version": {"data": {"id": f"cv-{uuid.uuid4()}"}},
+                            },
+                        }
+                    },
+                    headers=_AUTH,
+                )
+
+    async def test_a_configuration_version_from_another_workspace_is_refused(self):
+        other = uuid.uuid4()
+        resp = await self._post(
+            lambda ws: MagicMock(speculative=True, workspace_id=other, status="uploaded")
+        )
+        assert resp.status_code == 404
+        assert "not found for this workspace" in resp.json()["detail"]
+
+    async def test_a_configuration_version_that_does_not_exist_is_refused(self):
+        """It used to pass straight through, leaving the run's
+        `configuration_version_id` pointing at nothing -- which the runner then
+        404s on when it fetches the archive, one layer too late to say why."""
+        resp = await self._post(lambda _ws: None)
+        assert resp.status_code == 404
+
+    async def test_the_two_cases_are_INDISTINGUISHABLE(self):
+        """The reason it is 404 and not 422.
+
+        A different status for "exists but is not yours" would let a caller
+        enumerate configuration-version ids across workspaces one request at a
+        time.
+        """
+        other = uuid.uuid4()
+        foreign = await self._post(
+            lambda ws: MagicMock(speculative=True, workspace_id=other, status="uploaded")
+        )
+        missing = await self._post(lambda _ws: None)
+        assert foreign.status_code == missing.status_code == 404
+        assert foreign.json()["detail"] == missing.json()["detail"]
+
+    async def test_the_workspaces_own_configuration_version_is_accepted(self):
+        """The contrast, and the shape every CLI plan sends. A refusal that
+        caught this would break `tofu plan` against every workspace."""
+        with (
+            patch(
+                "terrapod.api.routers.runs.run_service.create_run", new_callable=AsyncMock
+            ) as create,
+            patch(
+                "terrapod.api.routers.runs.run_service.queue_run", new_callable=AsyncMock
+            ) as queue,
+        ):
+            ws_holder = {}
+
+            def _row(ws):
+                ws_holder["ws"] = ws
+                return MagicMock(speculative=True, workspace_id=ws.id, status="uploaded")
+
+            run = _mock_run(ws_id=uuid.uuid4(), plan_only=True, status="queued")
+            create.return_value = run
+            queue.return_value = run
+            resp = await self._post(_row)
+        assert resp.status_code == 201, resp.text

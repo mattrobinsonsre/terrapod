@@ -190,6 +190,12 @@
             },
             "existingSecretKey": {
               "type": "string"
+            },
+            "nextExistingSecret": {
+              "type": "string"
+            },
+            "nextExistingSecretKey": {
+              "type": "string"
             }
           }
         }
@@ -1814,6 +1820,16 @@
                 "retired_key_grace_seconds": {
                   "type": "integer",
                   "minimum": 0
+                },
+                "subject_format": {
+                  "type": "string",
+                  "enum": ["name-and-id", "name"]
+                },
+                "require_phase": {
+                  "type": "boolean"
+                },
+                "require_assigned_pool": {
+                  "type": "boolean"
                 }
               }
             }
@@ -2269,6 +2285,16 @@
             "retention_days": {
               "type": "integer",
               "minimum": 1
+            }
+          }
+        },
+        "rbac": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "owner_grants_admin": {
+              "type": "boolean",
+              "description": "Whether a resource's owner_email grants the full capability set on it, outside label RBAC. True keeps the behaviour of every release so far (#2042)."
             }
           }
         },

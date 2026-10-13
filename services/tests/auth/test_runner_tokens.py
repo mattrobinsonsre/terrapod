@@ -287,3 +287,61 @@ class TestThePhaseClaim:
         run_id = str(uuid.uuid4())
         assert verify_runner_token(generate_runner_token(run_id)) == run_id
         assert verify_runner_token(generate_runner_token(run_id, phase="plan")) == run_id
+
+
+class TestTheTTLCapIsNeverUnbounded:
+    """`max_token_ttl_seconds = 0` used to mean NO CAP (#2044).
+
+    The clamp was `if max_ttl > 0 and ttl > max_ttl`, so a non-positive
+    configuration minted a token of whatever lifetime the caller asked for. A
+    runner token reads and writes the run's artifacts and state, and since
+    per-workspace cloud identity it converts into the workspace's federated
+    cloud credentials -- so an unbounded one is not something an operator should
+    be able to express by accident, least of all with a zero.
+
+    `0` now means "use the shipped default", read off the model's own field so
+    there is no second copy of the number to drift from it.
+    """
+
+    def test_a_positive_cap_is_used_as_configured(self):
+        from terrapod.auth.runner_tokens import _effective_max_ttl
+
+        assert _effective_max_ttl(1800) == 1800
+
+    @pytest.mark.parametrize("configured", [0, -1, -7200])
+    def test_a_non_positive_cap_falls_back_to_the_default(self, configured):
+        from terrapod.auth.runner_tokens import _effective_max_ttl
+        from terrapod.config import RunnerConfig
+
+        default = RunnerConfig.model_fields["max_token_ttl_seconds"].default
+        assert _effective_max_ttl(configured) == default
+
+    def test_the_fallback_is_read_from_the_model_not_hardcoded(self):
+        """So a future change to the field's default moves this with it. A
+        literal here would silently stop matching the shipped value, and the
+        direction that fails is the one that mints longer tokens."""
+        import inspect
+
+        from terrapod.auth import runner_tokens
+        from terrapod.config import RunnerConfig
+
+        src = inspect.getsource(runner_tokens._effective_max_ttl)
+        assert 'model_fields["max_token_ttl_seconds"].default' in src
+        assert str(RunnerConfig.model_fields["max_token_ttl_seconds"].default) not in src
+
+    def test_a_requested_ttl_above_the_cap_is_clamped_even_with_a_zero_cap(self):
+        """The property, end to end through the real minting path: the token's
+        own encoded TTL must not exceed the cap, whatever the configuration
+        said."""
+        from unittest.mock import MagicMock, patch
+
+        from terrapod.auth.runner_tokens import generate_runner_token
+        from terrapod.config import RunnerConfig
+
+        default = RunnerConfig.model_fields["max_token_ttl_seconds"].default
+        cfg = MagicMock()
+        cfg.max_token_ttl_seconds = 0
+        with patch("terrapod.config.load_runner_config", return_value=cfg):
+            token = generate_runner_token(uuid.uuid4(), ttl=10**9, phase="plan")
+        encoded_ttl = int(token.split(":")[3])
+        assert encoded_ttl == default, "an unbounded cap minted an unbounded token"

@@ -260,3 +260,90 @@ class TestTheJWKSBodyCarriesNoPrivateKeyMaterial:
         for member in PRIVATE_JWK_MEMBERS:
             assert member not in doc
         assert "keys" not in doc
+
+
+class TestTheIssuerIgnoresTheREQUEST:
+    """The published `issuer` must come from configuration, never from a header.
+
+    This is the one injection a cloud cannot protect itself from. It is
+    CONFIGURED with an issuer string, fetches the discovery document anonymously
+    and then checks a token's `iss` equals what it was configured with -- so an
+    issuer derived from `Host` or `X-Forwarded-Host` would let whoever can set a
+    header decide what the deployment claims to be. On a deployment behind a
+    proxy those headers are attacker-controllable from outside.
+
+    Nothing in the current code reads them, and the point of these is that it
+    stays that way: the derivation is one line in `issuer_url()` and "use the
+    request host so it works behind a proxy" is a plausible-sounding change.
+    """
+
+    HOSTILE = {
+        "Host": "evil.example",
+        "X-Forwarded-Host": "evil.example",
+        "X-Forwarded-Proto": "http",
+        "X-Forwarded-Port": "1",
+        "X-Original-Host": "evil.example",
+        "Forwarded": "host=evil.example;proto=http",
+    }
+
+    async def _get_with(self, app, path, headers):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.get(path, headers=headers)
+
+    async def test_the_discovery_document_ignores_every_host_header(self, issuer_app):
+        app, _kid, _pem = issuer_app
+        body = json.loads((await self._get_with(app, DISCOVERY_PATH, self.HOSTILE)).content)
+
+        # Exact, not a prefix. `startswith` on a URL is both weaker and flagged
+        # (`py/incomplete-url-substring-sanitization`, high) -- it passes on
+        # `https://issuer.example.test.evil.example`, which is precisely the
+        # value this test exists to refuse. Line 124 above already compares
+        # exactly; this was the odd one out.
+        assert body["issuer"] == "https://issuer.example.test"
+        assert body["jwks_uri"] == "https://issuer.example.test" + JWKS_PATH
+        # A NEGATIVE substring over the whole document, which is sound where the
+        # positive form is not: any occurrence anywhere fails, so there is no
+        # position the hostile host could hide in.
+        assert "evil.example" not in json.dumps(body)
+
+    async def test_the_clean_request_agrees_so_this_is_not_vacuous(self, issuer_app):
+        """Both documents must still be served, and served the same, without the
+        headers -- otherwise a route that simply errored would pass above."""
+        app, _kid, _pem = issuer_app
+        clean = json.loads((await _get(app, DISCOVERY_PATH)).content)
+        hostile = json.loads((await self._get_with(app, DISCOVERY_PATH, self.HOSTILE)).content)
+
+        assert clean == hostile
+
+    def test_neither_HANDLER_CAN_read_the_request(self):
+        """Structural, and stronger than any header list.
+
+        The behavioural tests above cover the headers someone thought of. Neither
+        handler takes a `Request` at all, so there is nothing for a future edit to
+        read a header OUT of -- and adding the parameter is exactly the step such
+        an edit would start with, which is what this fails on.
+        """
+        import inspect
+
+        from fastapi import Request
+
+        from terrapod.api.routers import oidc_issuer as mod
+
+        for handler in (mod.openid_configuration, mod.jwks):
+            params = inspect.signature(handler).parameters
+            assert not params, (
+                f"{handler.__name__} now takes {list(params)}; a public document "
+                "whose content can depend on the request is one an attacker can "
+                "steer"
+            )
+            hints = inspect.get_annotations(handler, eval_str=False)
+            assert Request not in hints.values()
+
+    def test_issuer_url_reads_CONFIG_ONLY(self):
+        """The function the three consumers share. It takes no argument, so it
+        cannot see a request even if a handler obtained one."""
+        import inspect
+
+        from terrapod.api.routers import oidc_issuer as mod
+
+        assert not inspect.signature(mod.issuer_url).parameters

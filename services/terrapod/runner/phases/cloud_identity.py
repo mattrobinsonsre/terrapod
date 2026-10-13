@@ -103,6 +103,8 @@ from pathlib import Path
 import httpx
 import structlog
 
+from terrapod.runner import exec_subprocess
+
 # `structlog` directly, not `terrapod.logging_config`: the runner image ships
 # only the modules Dockerfile.runner names, and that one is not among them.
 # Importing it raises ModuleNotFoundError inside every runner Job while every
@@ -449,6 +451,16 @@ def run(
             ) from exc
 
         delivered.append(target)
+        # Strip this exact token from the engine's log stream (#2047).
+        #
+        # Everything above is mechanism: the token is a 0600 file and
+        # `exec_subprocess` scrubs `TP_*` from the child environment, so nothing
+        # on our side prints it. But we hand it to a provider deliberately, and a
+        # provider prints what it likes -- terraform-provider-aws logs the STS
+        # request body, token included, at `TF_LOG=DEBUG`. Registering the literal
+        # value is the only lever left, and being exact is what makes it safe to
+        # apply at all.
+        exec_subprocess.register_secret(token)
         # The audiences, not the token. Which identity a run presented is
         # exactly what a cloud audit log cannot tell you today, so it is worth
         # having on our side; the token itself never reaches a log, because the

@@ -596,6 +596,8 @@ When the runner downloads the module during `terraform init`, the download endpo
 
 When a new module version is published — either via manual upload or VCS tag auto-publish — Terrapod automatically queues **standard runs** (not plan-only) on all linked workspaces. This ensures consuming workspaces are updated when a new module version becomes available.
 
+**On a consuming workspace with auto-apply, that run applies without anyone confirming it**, under that workspace's own credentials — including its cloud identity, at the apply phase, where one is configured. So write access to a module repository, or the ability to push a tag to it, is effectively apply access on every auto-applying consumer of that module. That is the intended behaviour of the feature rather than a defect, but it is worth seeing plainly before linking a module to a workspace that auto-applies: the module's reviewers become, in practice, the reviewers for those applies. If that is not what you want, turn auto-apply off on the consuming workspace, or do not link it.
+
 ### Run Sources
 
 | Source | Trigger | Run Type |

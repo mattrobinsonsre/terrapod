@@ -190,6 +190,7 @@ When a user accesses a workspace, permissions are resolved in this order. The fi
    NO  --> continue
 
 3. Workspace owner? (ws.owner_email == user.email)
+   AND api.config.rbac.owner_grants_admin (default true)
    YES --> admin permission on this workspace
    NO  --> continue
 
@@ -766,6 +767,53 @@ The web UI hides or disables controls based on these permission flags:
 | Edit metadata | `can-update` | Hidden |
 
 ---
+
+## Making ownership informational
+
+`owner_email` grants the **full** capability set on a resource, and that grant is
+the only one label RBAC cannot take back. The resolver accumulates — each step
+unions capabilities in, and the single subtraction in the whole function is the
+clamp applied to a catalog-managed workspace. So a deny label cannot remove what
+ownership gave, and **revoking a principal's roles leaves their admin on
+resources they own intact**.
+
+Set `api.config.rbac.owner_grants_admin: false` to make ownership purely
+informational, so a resource is governed by its labels alone:
+
+```yaml
+api:
+  config:
+    rbac:
+      owner_grants_admin: false
+```
+
+It defaults to `true`, which is the behaviour of every release so far, so
+upgrading changes nothing until you set it.
+
+**When this matters.** It is not the answer to a departing employee —
+deactivating the user already revokes everything. It is for a principal who
+stays active and should lose access to specific resources: a team move, or a
+contractor whose scope narrows. The case sharpened with per-workspace cloud
+identity, because admin on a workspace now reaches a cloud role bound to *that
+workspace* rather than the agent pool's shared identity, so ownership became a
+path to a specific cloud role that labels could not revoke.
+
+**What it does not change.** Platform admins, the `audit` role, the
+`access: everyone` read floor, and label RBAC itself all behave exactly as
+before. It also does not affect **who may reference a VCS connection**: that is
+a claim to *name* a connection rather than a capability grant, it has its own
+four-way claim model (see above), and the workspace-ownership path within it is
+kept deliberately for deployments that upgraded on it.
+
+**Before turning it off**, check who would lose access, because an owner with no
+matching role loses it entirely:
+
+```sql
+SELECT name, owner_email, labels FROM workspaces WHERE owner_email <> '';
+```
+
+Give those owners a role whose labels reach their workspaces first, or the next
+plan they queue is refused.
 
 ## API Token Role Resolution
 

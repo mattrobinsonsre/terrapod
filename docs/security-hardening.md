@@ -315,9 +315,13 @@ only signing with it after `key_propagation_seconds`, because a cloud cannot ver
 signed by a key it has not fetched yet. That is the path to prefer unless you have a reason
 not to; there is no weak derived fallback here, so leaving it unset costs you nothing.
 
-To supply your own — an RSA private key in PKCS8 PEM form; an Ed25519 or EC key is refused by
-name at startup (as a logged error, not a failed start — the pod stays Ready and the issuer
-routes 503, so check those two documents rather than the pod's status), because workload identity federation does not accept EdDSA at every cloud:
+To supply your own — an RSA private key in PKCS8 PEM form, **at least 2048 bits, with public
+exponent 65537**. Anything else is refused by name and **the API does not start**: an Ed25519 or
+EC key because workload identity federation does not accept EdDSA at every cloud, and an
+undersized or odd-exponent RSA key because it would produce a JWKS every cloud verifies happily
+while the weakness stayed invisible. A failed start is deliberate here — the key comes from a
+Secret, so no retry can fix it, and the alternative is a pod that reports Ready for ever while
+both issuer routes answer 503:
 
 ```zsh
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out oidc.pem
@@ -339,10 +343,35 @@ Three properties follow from supplying it, and they are the whole trade:
 - **It is never persisted.** Terrapod does not copy it into the database, which is what makes
   the first property true — and means a backup of the database does not contain it. Back the
   Secret up yourself.
-- **The rotate endpoint returns `409`.** The key is yours, so rotation is yours: replace the
-  Secret and restart the API. There is no propagation window doing the staging for you, so
-  roll the new public key out to your clouds' trust configuration before you cut over, or
-  every federated run fails at the cloud's token exchange in the meantime.
+- **The rotate endpoint returns `409`.** The key is yours, so rotation is yours -- but you
+  can stage it the same way a generated rotation does, using a second Secret that is
+  **published and never signed with**:
+
+  ```yaml
+  api:
+    oidcSigningKey:
+      existingSecret: "terrapod-oidc-signing"        # signs
+      nextExistingSecret: "terrapod-oidc-signing-next"  # published only
+  ```
+
+  Three steps, in this order, each one a roll of the API:
+
+  1. set `nextExistingSecret` to the incoming key. Both public keys are now in the JWKS,
+     and the outgoing key is still the only one signing;
+  2. wait for every cloud to refetch -- their own cache schedule, which is why this is a
+     step and not an instant;
+  3. promote: move the incoming key to `existingSecret` and clear `nextExistingSecret`.
+
+  **Without step 1 there is no staging to be had.** One supplied key means one published
+  key, so there is never a moment when both the outgoing and incoming public keys are
+  published, and federated runs fail from the cutover until each cloud refetches. If you
+  would rather not stage, plan a maintenance window, or pin a trust configuration that
+  names the key directly (Azure federated credentials, an AWS IAM provider with an
+  explicit thumbprint) so you control when it changes.
+
+  The two must be different keys: a `kid` is a thumbprint of the key material, so the same
+  key in both would publish one JWK twice and stage nothing -- refused at startup rather
+  than quietly de-duplicated, because you would otherwise discover it at the cutover.
 
 It is injected as `TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM` from the Secret, never a
 ConfigMap. The same GitOps caveats as the token signing key above apply, for the same reasons.
