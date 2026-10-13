@@ -391,6 +391,31 @@ async def _get_run(run_id: str, db: AsyncSession) -> Run:
     return run
 
 
+def _require_pool_owns_run(identity: ListenerIdentity, run: Run) -> None:
+    """Refuse a listener report about a run outside the listener's own pool.
+
+    THE BOUNDARY HERE IS THE POOL, NOT THE OWNING LISTENER -- do NOT "correct"
+    this to the `run.listener_id != l_uuid` check the claim/launch/status-PATCH
+    endpoints carry. Those endpoints are driven by the listener that claimed
+    the run, so the owning listener is the right subject there. These two are
+    not: `run_reconciler._reconcile_one` publishes `check_job_status` and
+    `stream_logs` with `publish_listener_event(str(run.pool_id), ...)`, i.e. to
+    the POOL's channel, so EVERY listener in the owning pool receives the
+    request and any of them may answer it. Which one answers first is a race,
+    and listeners are deliberately stateless and interchangeable within a pool
+    (AGENTS.md principle 5) -- so keying on the owning listener would 403 a
+    sibling answering a request it was legitimately sent.
+
+    A run with no pool was never published to any listener channel, so a report
+    about one is unsolicited and refused too.
+    """
+    if run.pool_id is None or identity.pool_id != run.pool_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Listener does not belong to the agent pool this run is assigned to",
+        )
+
+
 async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
     ws_uuid = workspace_id.removeprefix("ws-")
     result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
@@ -2516,6 +2541,7 @@ async def report_job_status(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+    _require_pool_owns_run(identity, run)
 
     job_status = body.get("status", "")
     if not job_status:
@@ -2598,6 +2624,7 @@ async def upload_log_stream(
             detail="Certificate does not match the listener id in the path",
         )
     run = await _get_run(run_id, db)
+    _require_pool_owns_run(identity, run)
     if phase not in ("plan", "apply"):
         phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()

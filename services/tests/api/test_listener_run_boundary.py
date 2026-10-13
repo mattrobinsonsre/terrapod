@@ -1,8 +1,8 @@
 """The listener protocol's authorization boundary on the run endpoints.
 
-Holes closed on this line, both reachable by anyone holding a VALID listener
-certificate for ANY agent pool -- the certificate authenticates a listener, it
-does not say which runs that listener may touch:
+Three holes closed on this line, all reachable by anyone holding a VALID
+listener certificate for ANY agent pool -- the certificate authenticates a
+listener, it does not say which runs that listener may touch:
 
 - ``runner-token`` compared only ``run.listener_id`` against the path, never
   the caller's certificate. The path segment is chosen by the caller, so any
@@ -12,6 +12,18 @@ does not say which runs that listener may touch:
   machine allowed, including ``planned -> confirmed`` -- the confirm. That
   skips the apply capability check, the human confirmation, the staleness and
   plan-expiry guards and the mergeability gate (GHSA-3423).
+- ``job-status`` and ``log-stream`` checked the certificate against the path
+  and then never asked whether the run had anything to do with the caller, so
+  a certificate from any pool could drive ``set_job_status`` for ANY run id in
+  the deployment -- which the run reconciler reads back on its next cycle to
+  decide ``complete_plan`` / ``complete_apply`` / ``transition_run`` -- and
+  overwrite the live log a reviewer reads.
+
+The boundary on those last two is the POOL, not the owning listener: the
+reconciler publishes ``check_job_status`` and ``stream_logs`` to the pool's
+channel, so every listener in the owning pool is sent the request and any of
+them may answer. ``test_a_sibling_listener_in_the_same_pool_is_allowed`` is
+what distinguishes that fix from the plausible, wrong one.
 """
 
 import uuid
@@ -58,7 +70,7 @@ def _run(*, status="planning", listener_id=None, pool_id=None, plan_only=True):
     return run
 
 
-def _app(identity, run):
+def _app(identity):
     app = create_app()
     app.dependency_overrides[get_listener_identity] = lambda: identity
     app.dependency_overrides[get_db] = lambda: AsyncMock()
@@ -79,7 +91,7 @@ class TestRunnerTokenChecksTheCallersCertificate:
 
     @staticmethod
     async def _post(identity, run, path_listener_id):
-        app = _app(identity, run)
+        app = _app(identity)
         with patch.object(runs_router, "_get_run", AsyncMock(return_value=run)):
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
                 return await client.post(
@@ -141,7 +153,7 @@ class TestRunnerTokenChecksTheCallersCertificate:
 class TestListenerReportableTransitions:
     @staticmethod
     async def _patch(identity, run, body, path_listener_id):
-        app = _app(identity, run)
+        app = _app(identity)
         transition = AsyncMock(return_value=run)
         complete_plan = AsyncMock(return_value=run)
         with (
@@ -263,3 +275,139 @@ class TestListenerReportableTransitions:
         assert res.status_code == 200, res.text
         complete_plan.assert_awaited_once()
         transition.assert_not_awaited()
+
+
+# ── job-status + log-stream: the POOL boundary ────────────────────────────
+
+
+class TestJobStatusPoolBoundary:
+    @staticmethod
+    async def _post(identity, run, path_listener_id):
+        app = _app(identity)
+        setter = AsyncMock()
+        with (
+            patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
+            patch("terrapod.redis.client.set_job_status", setter),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                res = await client.post(
+                    f"/api/terrapod/v1/listeners/listener-{path_listener_id}"
+                    f"/runs/run-{run.id}/job-status",
+                    json={"status": "succeeded", "phase": "plan", "terminal": True},
+                    headers=_CERT,
+                )
+        return res, setter
+
+    async def test_a_sibling_listener_in_the_same_pool_is_allowed(self):
+        """THE test that distinguishes the right fix from the plausible one.
+
+        The reconciler publishes `check_job_status` to the POOL's channel, so
+        any listener in the owning pool may answer -- which one gets there
+        first is a race. Keying this guard on `run.listener_id` (the form the
+        claim/launch endpoints carry) would 403 a sibling answering a request
+        it was legitimately sent, and this is the ONLY test that would fail.
+        """
+        pool = uuid.uuid4()
+        owner, sibling = uuid.uuid4(), uuid.uuid4()
+        run = _run(listener_id=owner, pool_id=pool)
+
+        res, setter = await self._post(_identity(sibling, pool), run, sibling)
+
+        assert res.status_code == 200, res.text
+        setter.assert_awaited_once()
+
+    async def test_the_owning_listener_is_allowed(self):
+        pool = uuid.uuid4()
+        lid = uuid.uuid4()
+        run = _run(listener_id=lid, pool_id=pool)
+
+        res, setter = await self._post(_identity(lid, pool), run, lid)
+
+        assert res.status_code == 200, res.text
+        setter.assert_awaited_once()
+
+    async def test_a_listener_from_another_pool_is_refused_and_writes_nothing(self):
+        """The hole: any cert could drive set_job_status for ANY run id.
+
+        The reconciler reads that Redis key back on its next cycle to decide
+        complete_plan / complete_apply / transition_run, so the write is the
+        damage -- it must not happen at all, which is why the guard has to
+        PRECEDE the side effect rather than merely accompany it.
+        """
+        lid = uuid.uuid4()
+        run = _run(listener_id=uuid.uuid4(), pool_id=uuid.uuid4())
+
+        res, setter = await self._post(_identity(lid, uuid.uuid4()), run, lid)
+
+        assert res.status_code == 403
+        assert (
+            res.json()["detail"]
+            == "Listener does not belong to the agent pool this run is assigned to"
+        )
+        setter.assert_not_awaited()
+
+    async def test_a_run_with_no_pool_is_refused(self):
+        """A run with no pool was never published to any listener channel, so
+        a report about it is unsolicited."""
+        lid = uuid.uuid4()
+        run = _run(listener_id=lid, pool_id=None)
+
+        res, setter = await self._post(_identity(lid, uuid.uuid4()), run, lid)
+
+        assert res.status_code == 403
+        setter.assert_not_awaited()
+
+
+class TestLogStreamPoolBoundary:
+    @staticmethod
+    async def _put(identity, run, path_listener_id):
+        app = _app(identity)
+        redis = MagicMock()
+        redis.setex = AsyncMock()
+        with (
+            patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch("terrapod.redis.client.publish_event", AsyncMock()),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                res = await client.put(
+                    f"/api/terrapod/v1/listeners/listener-{path_listener_id}"
+                    f"/runs/run-{run.id}/log-stream?phase=plan",
+                    content=b"some log bytes",
+                    headers=_CERT,
+                )
+        return res, redis.setex
+
+    async def test_a_sibling_listener_in_the_same_pool_is_allowed(self):
+        """Same race as job-status: `stream_logs` goes to the pool's channel."""
+        pool = uuid.uuid4()
+        sibling = uuid.uuid4()
+        run = _run(listener_id=uuid.uuid4(), pool_id=pool)
+
+        res, setex = await self._put(_identity(sibling, pool), run, sibling)
+
+        assert res.status_code == 204, res.text
+        setex.assert_awaited_once()
+
+    async def test_a_listener_from_another_pool_is_refused_and_writes_nothing(self):
+        """The live log a reviewer reads must not be writable cross-pool."""
+        lid = uuid.uuid4()
+        run = _run(listener_id=uuid.uuid4(), pool_id=uuid.uuid4())
+
+        res, setex = await self._put(_identity(lid, uuid.uuid4()), run, lid)
+
+        assert res.status_code == 403
+        assert (
+            res.json()["detail"]
+            == "Listener does not belong to the agent pool this run is assigned to"
+        )
+        setex.assert_not_awaited()
+
+    async def test_a_run_with_no_pool_is_refused(self):
+        lid = uuid.uuid4()
+        run = _run(listener_id=lid, pool_id=None)
+
+        res, setex = await self._put(_identity(lid, uuid.uuid4()), run, lid)
+
+        assert res.status_code == 403
+        setex.assert_not_awaited()

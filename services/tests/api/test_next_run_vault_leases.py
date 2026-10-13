@@ -284,7 +284,13 @@ class TestJobLaunched:
 
 class TestJobStatusCarriesTerminal:
     async def _report(self, body):
-        run = MagicMock(id=uuid.uuid4())
+        # `pool_id` is set on BOTH the run and the identity, to the same value:
+        # job-status now refuses a listener outside the run's pool, and an
+        # auto-MagicMock attribute is a distinct object per access — so leaving
+        # either to the mock would 403 here for a reason that has nothing to do
+        # with the `terminal` flag under test.
+        pool = uuid.uuid4()
+        run = MagicMock(id=uuid.uuid4(), pool_id=pool)
         lid = uuid.uuid4()
         with (
             patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
@@ -294,7 +300,7 @@ class TestJobStatusCarriesTerminal:
                 listener_id=f"listener-{lid}",
                 run_id=f"run-{run.id}",
                 body=body,
-                identity=MagicMock(listener_id=lid),
+                identity=MagicMock(listener_id=lid, pool_id=pool),
                 db=AsyncMock(),
             )
         return run, setter
