@@ -1179,26 +1179,27 @@ class PlatformToolsConfig(BaseModel):
     """
 
     opa_version: str = Field(
-        default="1.19.0",
+        default="1.21.1",
         description="OPA version used for policy evaluation on the runner and Rego "
         "syntax validation on the API. Exact version — no partial resolution. "
         "Review this at every minor release.",
     )
     trivy_version: str = Field(
-        default="0.72.0",
+        default="0.75.0",
         description="Trivy version used for IaC security scanning on the runner "
         "(only fetched when trivy is the selected engine). Exact version.",
     )
     checkov_version: str = Field(
-        default="3.3.8",
+        default="3.3.26",
         description="Checkov version used for IaC security scanning on the runner "
         "(the default engine). Exact version.",
     )
     opa_mirror_url: str = Field(
         default="https://github.com/open-policy-agent/opa/releases/download",
         description="Upstream download base for OPA. Assets are bare per-platform "
-        "binaries (opa_<os>_<arch>_static) with a sibling .sha256 file. A mirror "
-        "must serve the same asset layout.",
+        "binaries (opa_linux_<arch>_static) with a sibling .sha256 file. Served "
+        "for linux only — the API and the runner both fetch it for themselves. "
+        "A mirror must serve the same asset layout.",
     )
     trivy_mirror_url: str = Field(
         default="https://github.com/aquasecurity/trivy/releases/download",
@@ -1207,18 +1208,25 @@ class PlatformToolsConfig(BaseModel):
         "covering the release. A mirror must serve the same asset layout.",
     )
     checkov_mirror_url: str = Field(
-        default="https://github.com/bridgecrewio/checkov/releases/download",
-        description="Upstream download base for Checkov. Assets are per-platform "
-        "zips containing a single self-contained dist/checkov executable.",
+        default="https://github.com/mattrobinsonsre/terrapod/releases/download",
+        description="Download base for Checkov. Assets are per-platform zips "
+        "containing a single self-contained dist/checkov executable. This defaults "
+        "to TERRAPOD's own releases, not Checkov's: upstream stopped publishing "
+        "checkov_linux_arm64.zip at 3.3.21 because its arm build job waits on a "
+        "self-hosted runner pool with no capacity, which made every security scan "
+        "on an arm64 agent pool record 'errored' (#2066). Terrapod builds the "
+        "linux assets from upstream's own release tag, lockfile and PyInstaller "
+        "spec and publishes them per version. A mirror must serve the same asset "
+        "layout.",
     )
     checkov_checksum_api_url: str = Field(
-        default="https://api.github.com/repos/bridgecrewio/checkov/releases/tags",
+        default="https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags",
         description="Where to obtain Checkov's expected SHA-256. Checkov publishes "
-        "NO checksum file alongside its release assets, so the only material "
-        "available is the digest the GitHub release API reports for the asset — a "
-        "registry-computed digest, not a publisher attestation, and weaker than "
-        "the sibling manifests OPA and Trivy publish. Set verify='off' if this "
-        "endpoint is unreachable (air-gapped mirrors), accepting that trade "
+        "no checksum file alongside its release assets, so the material is the "
+        "digest the GitHub release API reports for the asset. Pointed at the same "
+        "repository as checkov_mirror_url — the digest has to describe the asset "
+        "actually being served, so these two move together. Set verify='off' if "
+        "this endpoint is unreachable (air-gapped mirrors), accepting that trade "
         "knowingly.",
     )
     verify: Literal["off", "checksum"] = Field(

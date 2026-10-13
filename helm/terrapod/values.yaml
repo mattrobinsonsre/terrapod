@@ -778,14 +778,26 @@ api:
         checkov_version: "3.3.26"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
-        checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
-        # Checkov publishes NO checksum file next to its release assets, so the
-        # only verification material available is the digest the GitHub release
-        # API reports — registry-computed, not a publisher attestation, and
-        # weaker than the sibling manifests OPA and Trivy publish. Set verify to
-        # 'off' if this endpoint is unreachable (air-gapped mirrors), accepting
-        # that trade knowingly.
-        checkov_checksum_api_url: "https://api.github.com/repos/bridgecrewio/checkov/releases/tags"
+        # Checkov comes from TERRAPOD's releases, not Checkov's, and that is
+        # deliberate (#2066). Upstream stopped publishing
+        # checkov_linux_arm64.zip at 3.3.21 — its arm build job waits on a
+        # self-hosted runner pool that never has capacity — so on an arm64 agent
+        # pool every security scan recorded 'errored', and an enforced workspace
+        # blocked every run. Terrapod now builds the linux assets itself from
+        # upstream's own release tag, its committed Pipfile.lock and its
+        # committed checkov.spec, runs them before publishing, and attests the
+        # build. Only linux/amd64 and linux/arm64 are served, which is every
+        # platform a runner can be. Point this at an internal mirror serving
+        # the same layout ({base}/{version}/checkov_<platform>.zip) if you
+        # prefer.
+        checkov_mirror_url: "https://github.com/mattrobinsonsre/terrapod/releases/download"
+        # Checkov publishes no checksum file next to its release assets, so the
+        # verification material is the digest the GitHub release API reports for
+        # the asset. This must name the SAME repository as checkov_mirror_url —
+        # a digest has to describe the asset actually being served, so the two
+        # move together. Set verify to 'off' if this endpoint is unreachable
+        # (air-gapped mirrors), accepting that trade knowingly.
+        checkov_checksum_api_url: "https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags"
         # Integrity verification for platform tools. One of: off, checksum.
         # 'checksum' (default, fail-closed) checks the downloaded artifact's
         # SHA-256 against the publisher's published sum before caching. There is

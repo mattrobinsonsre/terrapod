@@ -110,16 +110,23 @@ _PULUMI_PLATFORM = {
 #: How each tool names the platform in its asset filenames. Terrapod speaks
 #: Go-style os/arch throughout; upstream does not always agree (Trivy uses
 #: "Linux-64bit", Checkov an inconsistent "linux_X86_64" / "linux_arm64").
+#: LINUX ONLY, deliberately narrower than what these publishers ship (#2066).
+#: A platform tool is fetched by the API (Rego validation) and by the runner
+#: (policy evaluation, scanning) — both linux, the runner's arch coming from
+#: `platform.machine()` inside a container. Nothing pulls one of these through
+#: the binary cache for a Mac, so a darwin entry is a claim with no consumer,
+#: and a claim with no consumer is just somewhere for a bug to live: checkov
+#: stopped publishing linux/arm64 while the table said otherwise, and the opa
+#: table asked for `opa_darwin_amd64_static`, which has never existed on any
+#: version. The per-workspace CLI tools below keep their full matrices, because
+#: an operator genuinely runs terraform, tofu and terragrunt locally.
 _TRIVY_PLATFORM = {
     ("linux", "amd64"): "Linux-64bit",
     ("linux", "arm64"): "Linux-ARM64",
-    ("darwin", "amd64"): "macOS-64bit",
-    ("darwin", "arm64"): "macOS-ARM64",
 }
 _CHECKOV_PLATFORM = {
     ("linux", "amd64"): "linux_X86_64",
     ("linux", "arm64"): "linux_arm64",
-    ("darwin", "amd64"): "darwin_X86_64",
 }
 
 
@@ -242,11 +249,11 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
     """
     base = _mirror(tool)
     if tool == "opa":
-        # OPA offers both dynamically- and statically-linked builds. Take the
-        # static one: the runner image is slim and the API image is Debian, and
-        # a binary with no libc expectations works on both without thought.
-        if os_ not in ("linux", "darwin") or arch not in ("amd64", "arm64"):
-            raise UnsupportedPlatformError(f"opa publishes no static asset for {os_}/{arch}")
+        if os_ != "linux" or arch not in ("amd64", "arm64"):
+            raise UnsupportedPlatformError(f"opa is served for linux only, not {os_}/{arch}")
+        # The statically-linked build: the runner image is slim and the API image
+        # is Debian, and a binary with no libc expectations works on both without
+        # thought.
         return f"{base}/v{version}/opa_{os_}_{arch}_static"
     if tool == "trivy":
         plat = _TRIVY_PLATFORM.get((os_, arch))

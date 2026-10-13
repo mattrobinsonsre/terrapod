@@ -144,6 +144,45 @@ you with a `helm upgrade` rather than waiting for a Terrapod release; the cost i
 a first-run download per runner (served from your own object storage after the
 first fetch, so it is a local read thereafter).
 
+### Terrapod builds the Checkov binaries
+
+Trivy and OPA are fetched from their publishers' releases. **Checkov is fetched
+from Terrapod's**, and that is deliberate.
+
+Checkov stopped publishing `checkov_linux_arm64.zip` at **3.3.21** — its arm
+build job waits on a self-hosted runner pool that does not have capacity
+([`bridgecrewio/checkov#7729`](https://github.com/bridgecrewio/checkov/issues/7729))
+— so every release from 3.3.21 to 3.3.28 is x86\_64 only. On an **arm64 agent
+pool** that made every scan fail to fetch its engine and record `errored`, which
+on an `enforced` workspace blocks every run. If you are on 1.9.0–1.10.1 and your
+pools are arm64, that is what you are seeing.
+
+So Terrapod builds the linux assets itself, from upstream's own release tag, its
+committed `Pipfile.lock` and its committed PyInstaller spec — the same recipe as
+Checkov's own release workflow, on a container pinned to an older glibc so the
+bundle runs on every runner image. Each one is executed before publication
+(upstream's own smoke test, plus the exact `--framework terraform_plan`
+invocation the runner uses) and the build is attested:
+
+```sh
+gh attestation verify checkov_linux_arm64.zip --repo mattrobinsonsre/terrapod
+```
+
+Only `linux/amd64` and `linux/arm64` are published, which is every platform a
+runner can be — a runner is a Kubernetes pod, and both the API and the runner
+fetch these for themselves. Nothing is re-hosted: every asset is one Terrapod
+built. Nothing about the scan itself changes either: same engine, same version,
+same `CKV_*` rule ids, same findings.
+
+For the same reason OPA and Trivy are served for linux only. A request for any
+other platform is refused outright rather than answered with a 404 from
+upstream.
+
+Point `checkov_mirror_url` at an internal mirror if you would rather serve it
+yourself — it needs the same layout, `{base}/{version}/checkov_<platform>.zip`
+— and move `checkov_checksum_api_url` with it, because the digest has to
+describe the asset actually being served.
+
 **A failed fetch is recorded, not raised.** It lands as an `errored` scan result,
 which for an `enforced` workspace the server turns into a block — the same
 fail-closed behaviour as a crashed scanner, and the same behaviour a runner image

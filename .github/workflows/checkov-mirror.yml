@@ -13,8 +13,9 @@ name: Checkov mirror
 # Waiting for upstream is not a fix. The build itself is fine and entirely
 # portable — their `checkov.spec` and `Pipfile.lock` are committed at every tag
 # — and GitHub's hosted arm64 runners are free for public repositories. So we
-# run THEIR recipe on OUR runners for every platform the binary cache serves,
-# and the mirror becomes ours.
+# run THEIR recipe on OUR runners for the two platforms the binary cache
+# serves — linux/amd64 and linux/arm64 — and those binaries become ours.
+# Nothing is re-hosted: every asset published here is one we built.
 #
 # Faithfulness is the point, so this deviates from upstream's `nightly.yml` in
 # exactly one place, recorded below at the container pin. Everything else — the
@@ -133,7 +134,7 @@ jobs:
           # (tool, version, os, arch), so a cold cache would fetch the new asset
           # while every warm cache keeps the old one — two deployments on the
           # same pin, running different binaries, with nothing to say so.
-          WANT="checkov_darwin_X86_64.zip,checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
+          WANT="checkov_linux_X86_64.zip,checkov_linux_arm64.zip"
           : > need.txt
           while IFS= read -r V; do
             [ -n "${V}" ] || continue
@@ -329,37 +330,6 @@ jobs:
           pattern: checkov-${{ matrix.version }}-*
           merge-multiple: true
 
-      - name: Re-host upstream's darwin asset
-        # We build every platform the binary cache actually serves, which is
-        # linux/amd64 and linux/arm64 — a runner is a Kubernetes pod. Checkov's
-        # darwin build is still CLAIMED by `_CHECKOV_PLATFORM`, so the mirror
-        # has to carry it or that claim becomes a 404 for whoever asks; and it
-        # cannot be BUILT here, because PyInstaller does not cross-compile and
-        # there is no macOS leg. So it is re-hosted byte for byte, after
-        # verifying it against upstream's own digest. Narrowing the platform
-        # table to the two we build is the better answer, and belongs on main
-        # where removing a claim is allowed.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V: ${{ matrix.version }}
-        run: |
-          set -euo pipefail
-          NAME=checkov_darwin_X86_64.zip
-          WANT=$(gh api "repos/${UPSTREAM}/releases/tags/${V}" \
-                   --jq ".assets[] | select(.name == \"${NAME}\") | .digest" | sed 's/^sha256://')
-          if [ -z "${WANT}" ]; then
-            echo "::error::upstream publishes no ${NAME} for ${V}, so there is no digest to verify against."
-            exit 1
-          fi
-          curl -fsSL -o "${NAME}" \
-            "https://github.com/${UPSTREAM}/releases/download/${V}/${NAME}"
-          GOT=$(sha256sum "${NAME}" | cut -d' ' -f1)
-          if [ "${GOT}" != "${WANT}" ]; then
-            echo "::error::${NAME} digest mismatch — upstream says ${WANT}, downloaded ${GOT}"
-            exit 1
-          fi
-          echo "${NAME} verified against upstream's digest (${WANT})"
-
       - name: Attest what we built
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v2
         with:
@@ -382,7 +352,6 @@ jobs:
             echo
             echo "Each linux asset was executed before publication: upstream's own smoke test, plus the exact"
             echo "\`--framework terraform_plan\` invocation the runner uses, asserting the graph checks fire."
-            echo "\`checkov_darwin_X86_64.zip\` is upstream's own asset, re-hosted after verifying its digest."
             echo
             echo "Build provenance is attested — \`gh attestation verify <asset> --repo ${GITHUB_REPOSITORY}\`."
             echo

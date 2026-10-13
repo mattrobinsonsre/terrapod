@@ -20,7 +20,7 @@ from terrapod.db.models import CachedBinary
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
-from terrapod.services.cache_errors import CacheOnlyError
+from terrapod.services.cache_errors import CacheOnlyError, UpstreamArtifactMissing
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.services.platform_tools import (
     DESCRIBED_TOOLS,
@@ -326,9 +326,24 @@ async def get_or_cache_binary(
     # Stream directly to object storage — never buffer the artifact in memory
     # (the checkov bundle alone is ~60MB).
     key = binary_cache_key(tool, version, os_, arch)
-    shasum, sha512, size_bytes = await _fetch_and_store_binary(
-        storage, key, download_url, content_type=content_type
-    )
+    try:
+        shasum, sha512, size_bytes = await _fetch_and_store_binary(
+            storage, key, download_url, content_type=content_type
+        )
+    except httpx.HTTPStatusError as exc:
+        # A 404 is the publisher saying this artifact does not exist, which is
+        # final. Left as a generic exception it became a 502, and a 502 is what
+        # the runner's download helper retries — so a deterministic absence was
+        # retried twice and then reported as a gateway error naming nothing
+        # (#2066). Distinguish it here, at the only place that knows both the
+        # coordinates and the upstream status.
+        if exc.response.status_code == 404:
+            raise UpstreamArtifactMissing(
+                f"{tool} {version} publishes no artifact for {os_}/{arch}: "
+                f"{download_url} returned 404. Pin a version whose publisher ships "
+                f"this platform, or point the mirror at one that does."
+            ) from exc
+        raise
 
     # Integrity gate (#607): verify the downloaded binary against the publisher's
     # signed SHA256SUMS before recording it. The DB row is what gates serving

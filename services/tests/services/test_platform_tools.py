@@ -71,12 +71,15 @@ class TestDownloadURL:
                 "https://github.com/aquasecurity/trivy/releases/download/"
                 "v0.72.0/trivy_0.72.0_Linux-ARM64.tar.gz",
             ),
+            # Checkov comes from Terrapod's own releases, not Checkov's (#2066):
+            # upstream stopped publishing checkov_linux_arm64.zip at 3.3.21, so
+            # we build the linux assets from its tag and publish them ourselves.
             (
                 "checkov",
                 "3.3.8",
                 "linux",
                 "amd64",
-                "https://github.com/bridgecrewio/checkov/releases/download/"
+                "https://github.com/mattrobinsonsre/terrapod/releases/download/"
                 "3.3.8/checkov_linux_X86_64.zip",
             ),
             (
@@ -84,7 +87,7 @@ class TestDownloadURL:
                 "3.3.8",
                 "linux",
                 "arm64",
-                "https://github.com/bridgecrewio/checkov/releases/download/"
+                "https://github.com/mattrobinsonsre/terrapod/releases/download/"
                 "3.3.8/checkov_linux_arm64.zip",
             ),
         ],
@@ -107,6 +110,18 @@ class TestDownloadURL:
             ("opa", "linux", "arm"),
             ("trivy", "windows", "arm64"),
             ("checkov", "linux", "386"),
+            # Platform tools are LINUX ONLY (#2066). The API and the runner
+            # fetch these for themselves and both are linux, so a darwin entry
+            # was a claim with no consumer — and claims with no consumer are
+            # where the bugs were: checkov's table asserted a linux/arm64 asset
+            # upstream had stopped publishing, and opa's asked for
+            # `opa_darwin_amd64_static`, which exists on no version.
+            ("opa", "darwin", "amd64"),
+            ("opa", "darwin", "arm64"),
+            ("trivy", "darwin", "amd64"),
+            ("trivy", "darwin", "arm64"),
+            ("checkov", "darwin", "amd64"),
+            ("checkov", "darwin", "arm64"),
         ],
     )
     def test_rejects_a_platform_the_publisher_does_not_build(

@@ -407,13 +407,28 @@ def run_and_post(
                     errors.append(f"trivy: {err}")
 
     outcome, summary = compute_outcome(findings, threshold, errored=any_errored)
-    logger.info(
-        "security scan complete",
-        engine=engine,
-        outcome=outcome,
-        total=summary.get("total"),
-        blocking=summary.get("blocking"),
-    )
+    # An errored scan is not an informational event. The server fails closed on
+    # it, so on an `enforced` workspace this line is the only local trace of why
+    # every run is being blocked — and for a year it was logged at the same
+    # level as a clean pass, which is how a fleet-wide arm64 outage read as
+    # routine (#2066). `errors` carries the engine's own reason; log it.
+    if outcome == "errored":
+        logger.error(
+            "security scan errored — no usable result was produced",
+            engine=engine,
+            outcome=outcome,
+            total=summary.get("total"),
+            blocking=summary.get("blocking"),
+            errors=errors or None,
+        )
+    else:
+        logger.info(
+            "security scan complete",
+            engine=engine,
+            outcome=outcome,
+            total=summary.get("total"),
+            blocking=summary.get("blocking"),
+        )
     post_scan_result(
         cfg,
         engine=engine,

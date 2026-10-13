@@ -978,6 +978,40 @@ jobs:
       - name: Peer-fairness review list
         run: python3 scripts/docs-audit/check_peer_fairness.py
 
+  # ── Platform-tool artifacts (#2066) ───────────────
+  # `platform_tools.py` holds a static table of the platforms each publisher
+  # ships, and the table cannot express the thing that actually varies:
+  # availability is a property of a (version, platform) pair. Checkov stopped
+  # publishing its linux/arm64 asset at 3.3.21 while the table went on claiming
+  # it, so from v1.9.0 every security scan on an arm64 agent pool recorded
+  # `errored` — and on an enforced workspace that blocks every run. Nothing in
+  # CI contradicted the claim, because nothing asked the publisher.
+  #
+  # This asks. Network-bound, so it is its own job rather than a pytest tier,
+  # and it needs the real `download_url()` rather than a copy of its rules —
+  # hence the slim install plus PYTHONPATH rather than a dependency-free script.
+  # It gates a release through `quality-gate`: shipping a version whose artifact
+  # does not exist is the failure this exists to prevent.
+  platform-tool-artifacts:
+    name: Platform Tool Artifacts
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      # Enough to import `terrapod.services.platform_tools`, which pulls
+      # `terrapod.config` (pydantic) and `artifact_verification` (pgpy, whose
+      # `imghdr` import needs the 3.13+ backport). A ModuleNotFoundError here
+      # means the import chain grew — add the package, do not fork the URL logic.
+      - run: pip install httpx pydantic pydantic-settings pyyaml structlog pgpy standard-imghdr
+      - name: Every artifact the platform tables claim exists
+        env:
+          PYTHONPATH: services
+        run: python3 scripts/check-platform-tool-artifacts.py
+
   # ── Helm Lint ──────────────────────────────────────────
   helm-lint:
     name: Helm Lint
@@ -3674,6 +3708,7 @@ jobs:
       - rescan-test
       - migration-check
       - docs-audit
+      - platform-tool-artifacts
       - python-audit
       - npm-audit
       - go-audit
@@ -3708,6 +3743,7 @@ jobs:
             rescan-test=${{ needs.rescan-test.result }}
             migration-check=${{ needs.migration-check.result }}
             docs-audit=${{ needs.docs-audit.result }}
+            platform-tool-artifacts=${{ needs.platform-tool-artifacts.result }}
             python-audit=${{ needs.python-audit.result }}
             npm-audit=${{ needs.npm-audit.result }}
             go-audit=${{ needs.go-audit.result }}
@@ -4506,6 +4542,7 @@ jobs:
       - pricegen-test
       - rescan-test
       - migration-check
+      - platform-tool-artifacts
       - python-audit
       - npm-audit
       - go-audit
@@ -4568,6 +4605,7 @@ jobs:
             "${{ needs.pricegen-test.result }}"
             "${{ needs.rescan-test.result }}"
             "${{ needs.migration-check.result }}"
+            "${{ needs.platform-tool-artifacts.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"
             "${{ needs.go-audit.result }}"
