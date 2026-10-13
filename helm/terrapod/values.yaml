@@ -1084,6 +1084,22 @@ api:
     audit:
       retention_days: 90
 
+    # Label-based RBAC (#2042).
+    #
+    # `owner_grants_admin` is the only grant in the capability resolver that
+    # label RBAC cannot take back: the resolver accumulates with `|=` and its
+    # single subtraction is the catalog clamp, so a deny label cannot remove
+    # what ownership gave. Leaving it true keeps the behaviour every release so
+    # far has had. Set it false to make ownership purely informational, so a
+    # resource is governed by its labels alone and revoking a principal's roles
+    # revokes their access to resources they own — worth considering now that
+    # admin on a workspace can reach a cloud role bound to that workspace.
+    #
+    # Platform admins, the audit role, the `access: everyone` floor and who may
+    # reference a VCS connection are all unaffected.
+    rbac:
+      owner_grants_admin: true
+
     # Agent pools — listener X.509 cert TTL + join-token defaults.
     agent_pools:
       # Listener cert lifetime in seconds. Listeners renew at 50% of this

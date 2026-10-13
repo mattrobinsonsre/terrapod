@@ -265,6 +265,7 @@
   "rate_limit.requests_per_minute",
   "rate_limit.runner_requests_per_minute",
   "rate_limit.trusted_proxy_cidrs",
+  "rbac.owner_grants_admin",
   "redis.auth_mode",
   "redis.aws_cache_name",
   "redis.aws_iam_region",

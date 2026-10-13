@@ -845,6 +845,24 @@ class AuthConfig(BaseSettings):
 # --- Audit Configuration ---
 
 
+class RBACConfig(BaseModel):
+    """Label-based RBAC behaviour that is a deployment-wide choice."""
+
+    owner_grants_admin: bool = Field(
+        default=True,
+        description=(
+            "Whether a resource's owner_email grants the full capability set on it, "
+            "outside label RBAC. True (the default) is the behaviour every release so "
+            "far has had: the owner holds every capability on the resource and no deny "
+            "label can remove it, because the resolver only ever unions. Set false to "
+            "make ownership purely informational, so a resource is governed by its "
+            "labels alone and revoking a principal's roles revokes their access to "
+            "resources they own. It does not affect platform admins, the audit role, "
+            "the access=everyone floor, or who may reference a VCS connection."
+        ),
+    )
+
+
 class AuditConfig(BaseModel):
     """Audit logging configuration."""
 
@@ -3575,6 +3593,9 @@ class Settings(BaseSettings):
 
     # Audit
     audit: AuditConfig = Field(default_factory=AuditConfig)
+
+    # Label-based RBAC (#2042)
+    rbac: RBACConfig = Field(default_factory=RBACConfig)
 
     # Registry
     registry: RegistryConfig = Field(default_factory=RegistryConfig)

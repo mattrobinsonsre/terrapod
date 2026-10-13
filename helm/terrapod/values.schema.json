@@ -2288,6 +2288,16 @@
             }
           }
         },
+        "rbac": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "owner_grants_admin": {
+              "type": "boolean",
+              "description": "Whether a resource's owner_email grants the full capability set on it, outside label RBAC. True keeps the behaviour of every release so far (#2042)."
+            }
+          }
+        },
         "agent_pools": {
           "type": "object",
           "additionalProperties": false,

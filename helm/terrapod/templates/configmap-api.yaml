@@ -593,6 +593,14 @@ data:
     audit:
       retention_days: {{ .Values.api.config.audit.retention_days | default 90 | int64 }}
     {{- end }}
+    {{/* hasKey, not `| default true`: the code default is TRUE and Go templates
+         treat `false` as empty, so `| default true` renders an operator's
+         explicit `false` back as `true` -- and `false` is the ONLY value anyone
+         sets this key to, so the swallow would discard every use of it. */}}
+    {{- if hasKey (.Values.api.config.rbac | default dict) "owner_grants_admin" }}
+    rbac:
+      owner_grants_admin: {{ .Values.api.config.rbac.owner_grants_admin }}
+    {{- end }}
     {{- if .Values.api.config.agent_pools }}
     agent_pools:
       listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
