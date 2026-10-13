@@ -192,6 +192,15 @@ jobs:
           ref: ${{ matrix.version }}
           fetch-depth: 0
 
+      # The job runs in a container as root while the workspace belongs to the
+      # runner's own uid, so every git call of OUR OWN refuses with "detected
+      # dubious ownership" — exit 128, before a single dependency is installed.
+      # `actions/checkout` is unaffected because it scopes its own invocations,
+      # which is exactly why this is easy to miss: the checkout succeeds, prints
+      # the right commit, and the next step that touches git dies.
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
       - name: Record the build inputs
         run: |
           set -eux
