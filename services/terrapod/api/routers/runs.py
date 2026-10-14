@@ -442,22 +442,17 @@ async def create_run(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Invalid configuration-version id",
             ) from exc
-    # A run against a speculative configuration version is ALWAYS plan-only
-    # (TFE/HCP parity). The cloud backend uploads a speculative CV for
-    # `tofu plan` and relies on the server to infer plan-only rather than
-    # always setting the run's `plan-only` attribute. Without honoring the CV
-    # flag, a CLI `plan` on a VCS-connected workspace is mis-read as an apply
-    # and rejected by the guard below (#661).
-    if cv_uuid is not None:
-        from terrapod.db.models import ConfigurationVersion
-
-        _spec_cv = await db.get(ConfigurationVersion, cv_uuid)
-        if _spec_cv is not None and _spec_cv.speculative:
-            plan_only = True
     # Config-managed guardrail (#535): a catalog-managed workspace runs only the
     # wrapper config the catalog generated for it. A run that pins a different
     # configuration version would diverge it from its catalog item — reject.
     # CV-less re-runs (re-plan/re-apply of the generated config) stay allowed.
+    #
+    # BEFORE the configuration-version lookup below, deliberately. Such a
+    # workspace may pin NO configuration version, so whose it is cannot matter,
+    # and this is the answer that tells the operator what to do -- where the
+    # ownership 404 would not. It also means a 404 and a 409 cannot be compared
+    # to learn whether a given id exists in this workspace, by a caller who may
+    # not pin one anyway. And it refuses without a database read.
     if ws.catalog_item_id is not None and has_cv:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -466,6 +461,36 @@ async def create_run(
                 "custom configuration version. Manage it through the catalog."
             ),
         )
+    if cv_uuid is not None:
+        from terrapod.db.models import ConfigurationVersion
+
+        _cv = await db.get(ConfigurationVersion, cv_uuid)
+        # The configuration version must belong to THIS workspace (#2049).
+        #
+        # Run creation took the relationship on trust, so a run could be created
+        # pinning another workspace's configuration version -- or one that does
+        # not exist at all, leaving `configuration_version_id` pointing at
+        # nothing. Not exploitable today, because the archive key is built from
+        # `run.workspace_id` rather than from the CV, so a foreign id simply does
+        # not resolve. It is one refactor away from executing another workspace's
+        # code under this workspace's identity.
+        #
+        # 404 for both cases rather than 422 for the mismatch: a caller who may
+        # not read the other workspace should not learn from the status code that
+        # the id exists.
+        if _cv is None or _cv.workspace_id != ws.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Configuration version not found for this workspace",
+            )
+        # A run against a speculative configuration version is ALWAYS plan-only
+        # (TFE/HCP parity). The cloud backend uploads a speculative CV for
+        # `tofu plan` and relies on the server to infer plan-only rather than
+        # always setting the run's `plan-only` attribute. Without honoring the CV
+        # flag, a CLI `plan` on a VCS-connected workspace is mis-read as an apply
+        # and rejected by the guard below (#661).
+        if _cv.speculative:
+            plan_only = True
     if ws.execution_mode == "agent" and ws.vcs_connection_id is not None and has_cv:
         if not plan_only:
             raise HTTPException(
@@ -2440,6 +2465,25 @@ async def create_runner_token(
 
     config = load_runner_config()
     requested_ttl = body.get("ttl", config.token_ttl_seconds)
+    # Validated here because this is the request boundary and 422 is the answer.
+    #
+    # Unvalidated, a non-integer reached `ttl > max_ttl` inside
+    # `generate_runner_token` and answered 500 on a TypeError, and a negative
+    # value sailed past that same comparison to mint an already-expired token --
+    # which fails the run with an authentication error rather than a cause.
+    #
+    # `bool` is excluded explicitly: it is a subclass of `int`, so `ttl: true`
+    # would otherwise pass an isinstance check and mint a one-second token.
+    if isinstance(requested_ttl, bool) or not isinstance(requested_ttl, int):
+        raise HTTPException(
+            status_code=422,
+            detail=f"ttl must be an integer number of seconds, got {type(requested_ttl).__name__}",
+        )
+    if requested_ttl < 1:
+        raise HTTPException(
+            status_code=422,
+            detail=f"ttl must be at least 1 second, got {requested_ttl}",
+        )
     token = generate_runner_token(run.id, ttl=requested_ttl)
 
     # Compute actual TTL (may have been clamped)
