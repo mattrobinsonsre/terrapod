@@ -270,7 +270,7 @@ they do different jobs:
 1. **The plugin is not installed.** `ansible-core` ships no collections, so a
    cloud inventory plugin does not exist in the environment at all. Decisive, and
    completely silent.
-2. **`enable_plugins = yaml, ini`** in the generated `ansible.cfg` — no `auto`,
+2. **`ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment** — no `auto`,
    which is the generic dispatcher that reads a file's `plugin:` key and runs
    whatever it names, and no `script`, which would execute a source.
 3. **An explicit pre-scan**, which is the layer that matters. Disabling the

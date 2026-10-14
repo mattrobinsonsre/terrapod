@@ -56,6 +56,7 @@ import yaml
 
 from terrapod.config import settings
 from terrapod.services.api_ansible import ansible_inventory_binary
+from terrapod.services.workspace_settings import effective_ansible_version
 
 logger = structlog.get_logger(__name__)
 
@@ -191,7 +192,7 @@ def _refuse_plugin_sources(root: Path) -> None:
 
     1. **The plugin is not installed.** `ansible-core` ships no collections, so
        `amazon.aws.aws_ec2` does not exist here. Decisive but silent.
-    2. **`enable_plugins = yaml, ini`** in the generated `ansible.cfg` -- no
+    2. **`ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment** -- no
        `auto`, which is the generic dispatcher that reads a file's `plugin:` key
        and runs whatever it names, and no `script`.
     3. **This.** Disabling the plugin does not make the file inert, it makes it
@@ -236,39 +237,81 @@ def _refuse_plugin_sources(root: Path) -> None:
             )
 
 
-def _write_ansible_cfg(directory: Path) -> Path:
-    """The `ansible.cfg` the resolution runs under.
-
-    `enable_plugins = yaml, ini` is layer 2 of the plugin refusal above: no
-    `auto` (the dispatcher) and no `script` (an executable source).
-
-    `any_unparsed_is_failed = True` is adopted from a production repository and
-    is exactly #1967's requirement -- a source that cannot be read must not
-    silently resolve to a partial host set. Without it an unreadable file is a
-    warning and the answer is a target set quietly missing whatever it held.
-    """
-    cfg = directory / "ansible.cfg"
-    cfg.write_text(
-        "[defaults]\n"
-        "# Nothing here should ever reach a remote host: this is a parse.\n"
-        "host_key_checking = False\n"
-        "retry_files_enabled = False\n"
-        "\n"
-        "[inventory]\n"
-        "# No `auto` and no `script`: see inventory_resolve._refuse_plugin_sources.\n"
-        "enable_plugins = yaml, ini\n"
-        "# A source that cannot be parsed fails the resolution rather than\n"
-        "# silently contributing nothing (#1967).\n"
-        "any_unparsed_is_failed = True\n"
-    )
-    return cfg
-
-
 # ── Running ansible ──────────────────────────────────────────────────────────
 
 
+def _ansible_env(scratch: Path) -> dict[str, str]:
+    """The environment `ansible-inventory` resolves under.
+
+    A named function rather than a literal inside the call so that the tests
+    that DRIVE real ansible run under exactly this, rather than rebuilding
+    their own and verifying a configuration production does not use.
+    """
+    # Every inherited `ANSIBLE_*` is REMOVED before ours are set, not merely
+    # overridden. Env beats `ansible.cfg`, so an inherited setting is not untidy
+    # but load-bearing: `ANSIBLE_CONFIG` would redirect the parse away from the
+    # repository's own config, and `ANSIBLE_INVENTORY_ENABLED=auto` would
+    # re-enable the plugin dispatcher layer 2 exists to disable. Overriding only
+    # the keys we happen to name leaves every other one live, and the set of
+    # ansible settings is far larger than the set we think about.
+    inherited = {k: v for k, v in os.environ.items() if not k.startswith("ANSIBLE_")}
+    return {
+        **inherited,
+        # ── Our non-negotiables, as ENV rather than a generated config ──
+        #
+        # **There is deliberately no `ANSIBLE_CONFIG` here (#2035).**
+        # `ansible.cfg` is single-file with no merging, so pointing
+        # `ANSIBLE_CONFIG` at one we wrote meant the operator's own file was
+        # not read at all -- measured: their `roles_path` and
+        # `inventory_ignore_extensions` vanished from
+        # `ansible-config dump`. Their `inventory_ignore_extensions` decides
+        # WHICH FILES IN A DIRECTORY ARE SOURCES, so discarding it makes the
+        # API resolve a different source set from the runner, which honours
+        # their file -- the same divergence shelling out exists to prevent,
+        # arriving by a route that has nothing to do with the version.
+        #
+        # Env beats `ansible.cfg` and leaves the rest of it standing, so
+        # these four win and nothing else of theirs is lost. Names taken
+        # from `ansible-config list`, not from memory.
+        #
+        # Layer 2 of the plugin refusal: no `auto` (the dispatcher that runs
+        # whatever a file's `plugin:` key names) and no `script` (an
+        # executable source). See `_refuse_plugin_sources`.
+        "ANSIBLE_INVENTORY_ENABLED": "yaml,ini",
+        # A source that cannot be parsed FAILS the resolution rather than
+        # silently contributing nothing (#1967). Measured as env: exit 1 on
+        # an unparseable source, 0 when False -- so the move off the
+        # generated file keeps the property rather than trading it away.
+        "ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED": "True",
+        # Nothing here should ever reach a remote host: this is a parse.
+        "ANSIBLE_HOST_KEY_CHECKING": "False",
+        "ANSIBLE_RETRY_FILES_ENABLED": "False",
+        # Ansible writes a few things of its own and the root filesystem is
+        # read-only, so it is pointed at the scratch directory.
+        #
+        # `ANSIBLE_HOME`, NOT `HOME`. Clobbering `HOME` moves where the
+        # interpreter looks for user site-packages, so an ansible installed
+        # there stops being importable -- `--version` still works, because
+        # it is answered before the import, and every real invocation dies
+        # with `ModuleNotFoundError: No module named 'ansible'`. Production
+        # installs into its own virtualenv and so would not have noticed;
+        # the test harness did it too and took eleven tests down with it.
+        "ANSIBLE_HOME": str(scratch / ".ansible"),
+        "ANSIBLE_LOCAL_TEMP": str(scratch / ".ansible-tmp"),
+        # Nothing is being connected to, so a missing interpreter on a
+        # host is not a thing that can happen -- and the warning would
+        # otherwise land in stderr and look like a failure.
+        "ANSIBLE_DEPRECATION_WARNINGS": "False",
+    }
+
+
 async def run_ansible_inventory(
-    sources: list[Path], *, cfg: Path, limit: str | None = None, cwd: Path | None = None
+    sources: list[Path],
+    *,
+    scratch: Path,
+    version: str,
+    limit: str | None = None,
+    cwd: Path | None = None,
 ) -> dict[str, Any]:
     """`ansible-inventory --list` over `sources`, in `-i` order.
 
@@ -286,7 +329,7 @@ async def run_ansible_inventory(
     catch. Relative paths in the operator's `ansible.cfg` also resolve against
     the cwd rather than against the config file.
     """
-    binary = await ansible_inventory_binary()
+    binary = await ansible_inventory_binary(version)
 
     argv = [binary, "--list"]
     if limit:
@@ -297,26 +340,7 @@ async def run_ansible_inventory(
     proc = await asyncio.create_subprocess_exec(
         *argv,
         cwd=str(cwd) if cwd else None,
-        env={
-            **os.environ,
-            "ANSIBLE_CONFIG": str(cfg),
-            # Ansible writes a few things of its own and the root filesystem is
-            # read-only, so it is pointed at the scratch directory.
-            #
-            # `ANSIBLE_HOME`, NOT `HOME`. Clobbering `HOME` moves where the
-            # interpreter looks for user site-packages, so an ansible installed
-            # there stops being importable -- `--version` still works, because
-            # it is answered before the import, and every real invocation dies
-            # with `ModuleNotFoundError: No module named 'ansible'`. Production
-            # installs into its own virtualenv and so would not have noticed;
-            # the test harness did it too and took eleven tests down with it.
-            "ANSIBLE_HOME": str(cfg.parent / ".ansible"),
-            "ANSIBLE_LOCAL_TEMP": str(cfg.parent / ".ansible-tmp"),
-            # Nothing is being connected to, so a missing interpreter on a
-            # host is not a thing that can happen -- and the warning would
-            # otherwise land in stderr and look like a failure.
-            "ANSIBLE_DEPRECATION_WARNINGS": "False",
-        },
+        env=_ansible_env(scratch),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -745,7 +769,12 @@ async def _resolve_uncached(
 
     workdir = Path(await asyncio.to_thread(make_tempdir))
     try:
-        cfg = await asyncio.to_thread(_write_ansible_cfg, workdir)
+        # The workspace's own ansible-core, not the deployment-wide default
+        # (#2035): one resolver, shared with every other consumer, because two
+        # sites deciding "which version" independently IS the skew that shelling
+        # out to `ansible-inventory` exists to prevent. `ws` may be None for a
+        # workspace with no row, which inherits the default like an unset pin.
+        version = effective_ansible_version(ws.ansible_version if ws else None)
         sources: list[Path] = []
 
         # The repository first, the declared rows second: a later `-i` wins a
@@ -774,7 +803,9 @@ async def _resolve_uncached(
             # no hosts, and saying so is the honest answer.
             return {"hosts": {}, "groups": {}, "children": {}}
 
-        document = await run_ansible_inventory(sources, cfg=cfg, limit=limit, cwd=cwd)
+        document = await run_ansible_inventory(
+            sources, scratch=workdir, version=version, limit=limit, cwd=cwd
+        )
         return normalise(document)
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)

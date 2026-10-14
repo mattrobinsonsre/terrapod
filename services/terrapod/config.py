@@ -3678,7 +3678,7 @@ class Settings(BaseSettings):
     )
     default_ansible_version: str = Field(
         default="2.21.5",
-        description="Default ansible-core version for new workspaces (#2010). A "
+        description="Default ansible-core version for a workspace that pins none (#2010). It is BOTH the value a new workspace is created with and the fallback at use time for a workspace whose pin is empty, resolved in one place by services.workspace_settings.effective_ansible_version (#2035) -- two sites deciding which version to use is the skew that shelling out to ansible-inventory exists to prevent. A "
         "workspace may override it, exactly as it overrides its engine version — "
         "collection compatibility is a per-workspace concern, so one version for the "
         "whole deployment would be the wrong shape. Deliberately NOT in "

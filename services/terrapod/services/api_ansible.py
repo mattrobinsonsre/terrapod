@@ -73,7 +73,16 @@ logger = structlog.get_logger(__name__)
 
 #: Serialises concurrent first-uses so two inventory reads do not both install.
 _lock = asyncio.Lock()
-_cached_bin: str | None = None
+
+#: version -> path of a verified `ansible-inventory`, NOT a single slot (#2035).
+#:
+#: One slot was correct only while every resolution used the deployment default.
+#: Now that a workspace pins its own version, a single slot would serve whichever
+#: workspace resolved first to every workspace after it -- the same version skew
+#: this module shells out to avoid, arriving from inside. Keyed by version, so
+#: two workspaces on two versions each get their own and neither waits for the
+#: other's install after the first time.
+_cached_bins: dict[str, str] = {}
 
 #: What a project name may be on the wire. PEP 503 normalisation allows letters,
 #: digits, `.`, `-` and `_`; anything else is refused rather than normalised,
@@ -352,8 +361,16 @@ async def _install(version: str, venv: Path) -> None:
         shim.shutdown()
 
 
-async def ansible_inventory_binary() -> str:
-    """Path to a usable `ansible-inventory`, installing it on first use.
+async def ansible_inventory_binary(version: str) -> str:
+    """Path to a usable `ansible-inventory` of `version`, installing on first use.
+
+    **`version` is required and is the WORKSPACE's effective version**, resolved
+    by `workspace_settings.effective_ansible_version` (#2035). It used to read
+    `api.config.default_ansible_version` here, which meant a workspace pinning
+    `ansible_version` had its inventory parsed by a different ansible-core than
+    the one that would run its playbook -- the precise skew #1407 point 10 says
+    shelling out exists to prevent. There is deliberately no default argument:
+    one would let a caller silently reintroduce the deployment-wide read.
 
     Raises `AnsibleUnavailable` rather than returning None -- see the module
     docstring for why this fails closed where `api_opa` degrades.
@@ -361,26 +378,27 @@ async def ansible_inventory_binary() -> str:
     Lazy on purpose: an install that never reads an inventory never pays for it,
     and a slow or unreachable proxy cannot delay the API becoming ready.
     """
-    global _cached_bin
-    if _cached_bin:
-        return _cached_bin
+    if not version:
+        raise AnsibleUnavailable(
+            "no ansible-core version was resolved for this inventory: the workspace "
+            "pins none and api.config.default_ansible_version is empty, so there is "
+            "no version to install"
+        )
+
+    cached = _cached_bins.get(version)
+    if cached:
+        return cached
 
     async with _lock:
-        if _cached_bin:  # another waiter won while we queued
-            return _cached_bin
-
-        version = settings.default_ansible_version
-        if not version:
-            raise AnsibleUnavailable(
-                "api.config.default_ansible_version is empty, so there is no version of "
-                "ansible-core to install for inventory resolution"
-            )
+        cached = _cached_bins.get(version)
+        if cached:  # another waiter won while we queued
+            return cached
 
         venv = _tool_dir() / f"ansible-{version}"
         binary = _bin_dir(venv) / "ansible-inventory"
         if binary.exists():
-            _cached_bin = str(binary)
-            return _cached_bin
+            _cached_bins[version] = str(binary)
+            return _cached_bins[version]
 
         await asyncio.to_thread(venv.parent.mkdir, parents=True, exist_ok=True)
         logger.info("installing ansible-core for inventory resolution", version=version)
@@ -392,11 +410,10 @@ async def ansible_inventory_binary() -> str:
             )
 
         logger.info("ansible-core ready", version=version, path=str(binary))
-        _cached_bin = str(binary)
-        return _cached_bin
+        _cached_bins[version] = str(binary)
+        return _cached_bins[version]
 
 
 def _reset_for_tests() -> None:
-    """Clear the memoised path. Tests only."""
-    global _cached_bin
-    _cached_bin = None
+    """Clear the memoised paths. Tests only."""
+    _cached_bins.clear()

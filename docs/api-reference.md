@@ -425,10 +425,20 @@ The refusal names the variable sets it would have pulled in — the names are no
 secret, the values are.
 ### `ansible-version`
 
-The ansible-core version this workspace's **configure** operations use — a
-deployment default that a workspace may override, exactly as it overrides its
-engine version. Collection compatibility is a per-workspace concern, so one
-version for the whole deployment would be the wrong shape.
+The ansible-core version this workspace runs — **both its configure operations
+and the resolution of its inventory** — a deployment default that a workspace may
+override, exactly as it overrides its engine version. Collection compatibility is
+a per-workspace concern, so one version for the whole deployment would be the
+wrong shape.
+
+**Inventory resolution honours it too (#2035), and that is the point rather than
+a side effect.** Terrapod resolves an inventory by shelling out to
+`ansible-inventory` instead of importing ansible as a library for one reason:
+version skew between the copy that parses an inventory and the copy that runs the
+playbook. Until #2035 the API installed the deployment-wide default whatever the
+workspace pinned, so a workspace on its own version had its inventory parsed by an
+ansible-core its playbooks would never run under — the exact divergence shelling
+out was chosen to avoid. One resolver now answers "which version" for both.
 
 | | |
 |---|---|

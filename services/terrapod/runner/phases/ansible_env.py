@@ -22,6 +22,15 @@ default is `api.config.default_ansible_version` and a workspace overrides it in
 resolved per run from the workspace, rather than being read from config by this
 module.
 
+**Resolve it with `services.workspace_settings.effective_ansible_version` and
+nothing else (#2035).** That is the single place the workspace-then-default
+fallback is written, and it is shared with the API's inventory resolution --
+which spent its first release installing the deployment-wide default instead,
+so a workspace with a pin had its inventory parsed by one ansible-core and
+would have run its playbook under another. Re-deriving the fallback here would
+recreate that, and `tests/services/test_ansible_version_resolution.py` fails if
+this module reads the config default itself.
+
 **Through Terrapod's own PyPI proxy, never upstream.** The runner reaches
 `/package-cache/pypi/simple` with the run's own token, which is what lets a
 sealed deployment work at all -- the proxy is the only thing on that side with
