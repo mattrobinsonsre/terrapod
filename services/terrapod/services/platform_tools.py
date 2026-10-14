@@ -188,6 +188,69 @@ def _mirror(tool: str) -> str:
     }[tool].rstrip("/")
 
 
+#: The shipped defaults for the Checkov pair, so a half-override is detectable.
+#:
+#: These two MUST describe the same publisher: the bytes come from the first and
+#: the digest from the second, and Terrapod builds the linux binaries, so its
+#: digests differ from upstream's by construction. They are separate Helm keys
+#: under separate `if` blocks, which is what makes overriding one and not the
+#: other possible.
+_CHECKOV_MIRROR_DEFAULT = "https://github.com/mattrobinsonsre/terrapod/releases/download"
+_CHECKOV_CHECKSUM_API_DEFAULT = (
+    "https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags"
+)
+
+
+def _checkov_checksum_api() -> str:
+    """The release API to read Checkov digests from, consistent with the mirror.
+
+    Precedence, and the reason for it:
+
+    1. An **explicitly set** checksum API wins. An operator who moved both keys
+       deliberately knows where their digests live, and silently overriding them
+       would be the worse failure.
+    2. Otherwise it is **derived from the mirror**, so moving the mirror alone
+       moves the digest source with it rather than leaving the two describing
+       different publishers.
+    3. A mirror we cannot derive a release API from is **refused by name**. That
+       is the whole point: the old behaviour was a digest mismatch that named
+       neither key, and an operator cannot act on that.
+
+    Raises:
+        VerificationError: when the mirror is customised, the checksum API is
+            not, and the mirror is not a shape we can derive from.
+    """
+    cfg = settings.registry.platform_tools
+    api = cfg.checkov_checksum_api_url.rstrip("/")
+    mirror = cfg.checkov_mirror_url.rstrip("/")
+
+    if api != _CHECKOV_CHECKSUM_API_DEFAULT.rstrip("/"):
+        return api
+    if mirror == _CHECKOV_MIRROR_DEFAULT.rstrip("/"):
+        return api
+
+    # A GitHub releases download base: .../OWNER/REPO/releases/download
+    suffix = "/releases/download"
+    if mirror.endswith(suffix):
+        base = mirror[: -len(suffix)]
+        for host in ("https://github.com/", "http://github.com/"):
+            if base.startswith(host):
+                owner_repo = base[len(host) :]
+                if owner_repo.count("/") == 1 and all(owner_repo.split("/")):
+                    return f"https://api.github.com/repos/{owner_repo}/releases/tags"
+
+    raise VerificationError(
+        "registry.platform_tools.checkov_mirror_url is set to "
+        f"{mirror!r} but checkov_checksum_api_url is still the default. The two "
+        "must describe the SAME publisher -- the bytes come from the mirror and "
+        "the digest from the checksum API, and Terrapod builds the linux Checkov "
+        "binaries, so its digests differ from upstream's. Set "
+        "registry.platform_tools.checkov_checksum_api_url to a release API for "
+        "that mirror, or set registry.platform_tools.verify=off to accept the "
+        "artifact unverified."
+    )
+
+
 def configured_version(tool: str) -> str:
     """The version this deployment pins for `tool`."""
     cfg = settings.registry.platform_tools
@@ -394,7 +457,7 @@ async def _expected_sha256(
     if tool == "checkov":
         # No checksum file exists; the release API's per-asset digest is the
         # only material there is. Weaker, and documented as such.
-        api = settings.registry.platform_tools.checkov_checksum_api_url.rstrip("/")
+        api = _checkov_checksum_api()
         resp = await arequest_with_retry(client, "GET", f"{api}/{version}")
         if resp.status_code != 200:
             raise VerificationError(
