@@ -695,6 +695,9 @@ So **every minor release checks and updates those three defaults in
 gh api repos/open-policy-agent/opa/releases/latest --jq .tag_name
 gh api repos/aquasecurity/trivy/releases/latest    --jq .tag_name
 gh api repos/bridgecrewio/checkov/releases/latest  --jq .tag_name
+# ...but Checkov is built and published by Terrapod, not taken from upstream, so
+# the version you pin MUST be one we have built. Check before bumping it:
+gh release list --repo mattrobinsonsre/terrapod | grep '^3\.'
 ```
 
 This is now the mechanism that clears a whole class of finding. Before #1208

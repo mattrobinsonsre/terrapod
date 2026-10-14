@@ -5,7 +5,7 @@
 | Version | Supported |
 |---------|-----------|
 | Latest release | Yes |
-| Previous minor | Security fixes only |
+| Previous minor | Security fixes, and obvious bug fixes |
 
 We recommend always running the latest release.
 
