@@ -1179,7 +1179,7 @@ class PlatformToolsConfig(BaseModel):
     """
 
     opa_version: str = Field(
-        default="1.21.1",
+        default="1.21.2",
         description="OPA version used for policy evaluation on the runner and Rego "
         "syntax validation on the API. Exact version — no partial resolution. "
         "Review this at every minor release.",
