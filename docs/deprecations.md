@@ -106,6 +106,19 @@ the environment variable directly. If you set it to `0` deliberately, set an
 explicit large value instead — which is a readable choice where a magic zero
 was not.
 
+### The default OPA version moves to 1.21.2
+
+`registry.platform_tools.opa_version` moves 1.21.1 -> 1.21.2, and the code
+default — which an operator who blanks the key falls through to — moves 1.19.0
+-> 1.21.2 with it.
+
+Same publisher as before, so **no egress-allowlist change**. If you mirror the
+binaries, seed yours with `opa_linux_amd64_static`, `opa_linux_arm64_static` and
+their sibling `.sha256` files for the new version first; the checksum gate is
+fail-closed, so an un-mirrored version errors rather than degrading.
+
+Pinning `opa_version` explicitly is unaffected.
+
 ## Active deprecations
 
 **None.** No public Terrapod surface is currently deprecated.
