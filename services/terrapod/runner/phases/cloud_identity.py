@@ -129,7 +129,11 @@ TOKEN_DIR_ENV = "TERRAPOD_OIDC_TOKEN_DIR"
 #: The run's phase, exported so a configuration can switch role by phase -- the
 #: only way to do that, because HCL cannot otherwise see which phase it is in.
 #: Also exported as a `TF_VAR_` so a configuration that declares
-#: `variable "terrapod_run_phase"` receives it with no wiring.
+#: `variable "terrapod_run_phase"` receives it. That variable MUST be declared
+#: `ephemeral = true` (#2078): the runner applies the SAVED plan, an ordinary
+#: variable's value is recorded in it, and the recorded `plan` then conflicts
+#: with the `apply` exported here -- refusing the apply whether or not the
+#: configuration uses the variable.
 PHASE_ENV = "TERRAPOD_RUN_PHASE"
 PHASE_TFVAR_ENV = "TF_VAR_terrapod_run_phase"
 

@@ -880,8 +880,9 @@ variable the runner delivers:
 
 ```hcl
 variable "terrapod_run_phase" {
-  type    = string
-  default = "plan"
+  type      = string
+  default   = "plan"
+  ephemeral = true
 }
 
 provider "aws" {
@@ -891,6 +892,27 @@ provider "aws" {
   }
 }
 ```
+
+**`ephemeral = true` is required, not stylistic.** The runner applies the
+*saved* plan, and an ordinary variable's value is recorded in it — so the `plan`
+recorded at plan time and the `apply` the runner exports at apply time differ,
+and the engine refuses the apply outright:
+
+```
+Error: Mismatch between input and plan variable value
+
+Value saved in the plan file for variable "terrapod_run_phase" is different
+from the one given to the current command.
+```
+
+That happens whether or not the configuration uses the variable, so declaring it
+as an ordinary variable breaks *every* apply on a run that was delivered a
+token. An ephemeral variable is not stored in the plan and is read afresh at
+apply, which is also the only way the apply phase can see `apply` at all.
+Ephemeral variables may be used in provider configuration from **OpenTofu 1.11**
+and **Terraform 1.10**; on an engine older than that, condition the role on the
+`phase` claim in the cloud's trust policy instead — which is the better answer
+anyway, below.
 
 The `default` matters for the same reason as above: the variable is only
 exported on a run that delivered at least one token.
