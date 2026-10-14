@@ -478,3 +478,74 @@ class TestLogStreamIsBoundedByThePool:
         assert err.status_code == 403
         getter.assert_not_called()
         redis.setex.assert_not_awaited()
+
+
+# ── create_runner_token: the requested TTL ─────────────────────────────────
+
+
+class TestTheRequestedTTLIsValidated:
+    """#2044. `ttl` came straight off the body with no validation.
+
+    A non-integer reached `ttl > max_ttl` inside the minting helper and answered
+    500 on a TypeError; a negative value sailed past that same comparison and
+    minted an already-expired token, which fails the run with an authentication
+    error rather than a cause.
+
+    Driven through the real handler on the legitimate path -- same listener id
+    in the certificate, the path and the run -- so a refusal here can only be
+    the TTL.
+    """
+
+    async def _mint(self, ttl_body):
+        lid = uuid.uuid4()
+        run = _run(listener_id=lid)
+        with (
+            patch.object(runs_router, "_get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.auth.runner_tokens.generate_runner_token",
+                MagicMock(return_value="runtok-x"),
+            ) as gen,
+        ):
+            resp = await runs_router.create_runner_token(
+                listener_id=f"listener-{lid}",
+                run_id=f"run-{run.id}",
+                body=ttl_body,
+                identity=_identity(listener_id=lid),
+                db=AsyncMock(),
+            )
+        return resp, gen
+
+    @pytest.mark.parametrize("bad", ["3600", None, 1.5, [], {}])
+    async def test_a_non_integer_is_a_422_not_a_500(self, bad):
+        with pytest.raises(HTTPException) as exc:
+            await self._mint({"ttl": bad})
+        assert exc.value.status_code == 422
+        assert "must be an integer" in exc.value.detail
+
+    async def test_a_bool_is_refused_too(self):
+        """`bool` is a subclass of `int`, so an isinstance check alone would let
+        `ttl: true` through and mint a one-second token."""
+        with pytest.raises(HTTPException) as exc:
+            await self._mint({"ttl": True})
+        assert exc.value.status_code == 422
+        assert "must be an integer" in exc.value.detail
+
+    @pytest.mark.parametrize("bad", [0, -1, -3600])
+    async def test_a_non_positive_ttl_is_refused(self, bad):
+        with pytest.raises(HTTPException) as exc:
+            await self._mint({"ttl": bad})
+        assert exc.value.status_code == 422
+        assert "at least 1 second" in exc.value.detail
+
+    async def test_a_valid_ttl_is_accepted(self):
+        """The contrast, and the shape every real listener sends. A refusal
+        that caught this would break every run."""
+        resp, gen = await self._mint({"ttl": 600})
+        assert resp.status_code == 200
+        gen.assert_called_once()
+
+    async def test_an_absent_ttl_takes_the_configured_default(self):
+        """An empty body is the common case and must not be refused."""
+        resp, gen = await self._mint({})
+        assert resp.status_code == 200
+        gen.assert_called_once()
