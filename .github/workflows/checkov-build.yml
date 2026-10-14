@@ -416,12 +416,20 @@ jobs:
             # publish time, so one of these releases would otherwise take the badge
             # off the current Terrapod version — front page, releases page,
             # /releases/latest, and every install snippet that reads it.
+            # --prerelease keeps these out of the repository's headline release
+            # list and out of /releases/latest entirely. They are download hosts
+            # for the binaries the binary cache fetches, not Terrapod releases,
+            # and 30 of them already crowd the releases page an operator reads.
+            # Assets and the release API digest the checksum gate reads are
+            # unaffected -- verified against a marked release.
             gh release create "${V}" --repo "${GITHUB_REPOSITORY}" \
+              --prerelease \
               --title "Checkov ${V} binaries (built by Terrapod)" \
               --notes-file notes.md \
               --latest=false
           else
-            gh release edit "${V}" --repo "${GITHUB_REPOSITORY}" --notes-file notes.md --latest=false
+            gh release edit "${V}" --repo "${GITHUB_REPOSITORY}" --notes-file notes.md \
+              --latest=false --prerelease
           fi
           gh release upload "${V}" --repo "${GITHUB_REPOSITORY}" checkov_*.zip --clobber
 

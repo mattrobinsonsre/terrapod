@@ -721,9 +721,12 @@ fails in the cloud rather than here. Whichever of `auth.oidc_issuer.public_url`,
 `public_webhook_url` or `external_url` resolves it, the result must be an absolute
 `https` URL with no query string or fragment -- note that `webhookIngress.tls=false`
 produces an `http` one, which the chart renders without complaint and no cloud will
-fetch. A trailing slash on `public_url` is refused too: Terrapod strips it, so the
-minted `iss` would not equal the string you configured the cloud with, and issuer
-matching is exact.
+fetch. A trailing slash on `public_url` is **not** refused, deliberately — `settings`
+is built at module import, so a raise there is a pod that will not start rather
+than a feature declining, and `https://host/` is an ordinary thing to paste.
+Terrapod strips it and logs a warning. Strip it yourself anyway: issuer matching
+is exact, so if you configure the cloud with the trailing slash the minted `iss`
+will not equal it and every token is rejected at the cloud.
 
 An aliased configuration reads its own file:
 

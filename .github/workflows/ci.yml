@@ -4440,12 +4440,22 @@ jobs:
           #
           # Compare versions, not branch names: a patch on the NEWEST line
           # (v1.5.1 over v1.5.0) should take the badge.
+          #
+          # Enumerated with `gh api --paginate`, NOT `gh release list --limit N`.
+          # The Checkov builder publishes its own non-`v` releases into this
+          # repository, and `gh release list` windows by PUBLISH TIME -- measured
+          # after the mirror backfill, 31 of the newest 100 releases were
+          # non-`v`, out of 274 in total. Once no `v` tag survives that window
+          # the grep leaves only the version being released, `highest` equals
+          # `version`, and an older line's patch silently takes the badge. That
+          # is #1374 again, from a direction nothing in this job could see.
           highest=$(
             {
-              gh release list --limit 100 --json tagName --jq '.[].tagName'
+              gh api "/repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[].tag_name'
               echo "$version"
             } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
           )
+          echo "::notice::newest released version is $highest (compared against every release, not a window)"
           if [ "$highest" = "$version" ]; then
             latest=true
           else

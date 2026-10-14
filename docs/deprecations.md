@@ -74,11 +74,13 @@ Terrapod's own releases instead of `github.com/bridgecrewio/checkov`.
 | left both keys at their defaults | nothing to do. The chart's pinned `checkov_version` is a version Terrapod publishes, and arm64 now works |
 | **mirror or allowlist by host** | **add `github.com/mattrobinsonsre` and `api.github.com` (or seed your mirror from Terrapod's releases) BEFORE upgrading** — otherwise the fetch fails and every scan errors |
 | **pin a `checkov_version` explicitly** | check it is a version Terrapod has built: `gh release list --repo mattrobinsonsre/terrapod \| grep '^3\.'`. Pinning one we have not built returns a 404, which lands as an `errored` scan — and on an `enforced` workspace that blocks every run |
-| **override `checkov_mirror_url`** | move `checkov_checksum_api_url` with it. Our digests differ from upstream's by construction, so a half-override fails the checksum gate; it is refused with a message naming both keys |
+| **override `checkov_mirror_url`** | our digests differ from upstream's by construction, so the checksum source must match the mirror. A GitHub-shaped mirror (`https://github.com/OWNER/REPO/releases/download`) has its checksum API **derived automatically**; anything else is refused with a message naming both keys, so set `checkov_checksum_api_url` too |
 
 A brand-new upstream Checkov release is not immediately pinnable — the builder
 runs weekly over the newest upstream releases, so one published mid-week becomes
 available on the next run.
+
+## Behaviour changes in v1.10.1 (carried to main)
 
 ### A run cannot pin another workspace's configuration version
 
@@ -107,6 +109,19 @@ chart value to `minimum: 1`, so this is reachable only by a deployment setting
 the environment variable directly. If you set it to `0` deliberately, set an
 explicit large value instead — which is a readable choice where a magic zero
 was not.
+
+### The default OPA version moves to 1.21.2
+
+`registry.platform_tools.opa_version` moves 1.21.1 -> 1.21.2, and the code
+default — which an operator who blanks the key falls through to — moves 1.19.0
+-> 1.21.2 with it.
+
+Same publisher as before, so **no egress-allowlist change**. If you mirror the
+binaries, seed yours with `opa_linux_amd64_static`, `opa_linux_arm64_static` and
+their sibling `.sha256` files for the new version first; the checksum gate is
+fail-closed, so an un-mirrored version errors rather than degrading.
+
+Pinning `opa_version` explicitly is unaffected.
 
 ## Active deprecations
 
