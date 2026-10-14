@@ -82,13 +82,6 @@ func (c *invCaptured) relID(name string) string {
 	return d.ID
 }
 
-// relIsExplicitNull says the relationship was sent as `{"data": null}` rather
-// than omitted.
-func (c *invCaptured) relIsExplicitNull(name string) bool {
-	raw, ok := c.rels[name]
-	return ok && string(raw) == "null"
-}
-
 // inventoryServer answers every request with (status, body) and records it.
 func inventoryServer(t *testing.T, status int, body string) (*Client, *invCaptured) {
 	t.Helper()

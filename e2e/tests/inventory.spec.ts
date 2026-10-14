@@ -378,13 +378,20 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
     await page
       .getByLabel('Ansible config directory')
       .selectOption({ label: 'Use a config directory' })
-    await page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click()
 
     await expect(
       page.getByText('Repository root').filter({ visible: true }).first()
     ).toBeVisible({ timeout: 15_000 })
     // The distinction survived the round trip: this must NOT read as "none".
-    await expect(page.getByText('No configure operation')).toHaveCount(0)
+    //
+    // Scoped to what is VISIBLE, not an unscoped count: the mode <select> may
+    // still be mounted and its own <option> carries this exact text, so an
+    // unscoped assertion would match the option and fail for a reason that has
+    // nothing to do with the property under test.
+    await expect(
+      page.getByText('No configure operation').filter({ visible: true })
+    ).toHaveCount(0)
   })
 
   test('a config directory, a playbook and a limit round-trip', async ({ page }) => {
@@ -403,7 +410,7 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
     // stores these unmodified, because rewriting a submitted value is what
     // makes a Terraform plan disagree with its own result.
     await page.getByPlaceholder('e.g. webservers').fill('web:!web-09')
-    await page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click()
 
     await expect(page.getByText('site.yml').filter({ visible: true }).first()).toBeVisible({
       timeout: 15_000,
@@ -423,7 +430,7 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
       .getByLabel('Ansible config directory')
       .selectOption({ label: 'Use a config directory' })
     await page.getByPlaceholder('e.g. ansible').fill('ansible')
-    await page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click()
 
     // The gate is "hosts, or groups, or a config directory" — this workspace has
     // no rows at all, so the config directory is the whole of its inventory and
