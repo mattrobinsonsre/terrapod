@@ -250,26 +250,33 @@ class TestTheCheckovMirrorAndChecksumApiStayConsistent:
     """
 
     @staticmethod
-    def _settings(mirror: str, api: str):
-        import types
+    def _patch(mirror: str, api: str):
+        """Override the two keys on the REAL settings object.
 
-        # Every mirror key, because `_expected_sha256` goes through `_mirror`,
-        # which reads all three. A checkov-only stand-in fails on opa's key for
-        # a reason that has nothing to do with the property under test.
-        cfg = types.SimpleNamespace(
-            checkov_mirror_url=mirror,
-            checkov_checksum_api_url=api,
-            opa_mirror_url="https://example.invalid/opa",
-            trivy_mirror_url="https://example.invalid/trivy",
-        )
-        return types.SimpleNamespace(registry=types.SimpleNamespace(platform_tools=cfg))
-
-    def _call(self, mirror: str, api: str) -> str:
+        Deliberately not a stand-in tree: `_mirror` reads every tool's URL, and
+        on the main line also `registry.binary_cache.*`, so a hand-built
+        namespace fails on whichever key that branch happens to need -- for a
+        reason that has nothing to do with the property under test, and
+        differently per release line.
+        """
         from unittest.mock import patch
 
         from terrapod.services import platform_tools as pt
 
-        with patch.object(pt, "settings", self._settings(mirror, api)):
+        cfg = pt.settings.registry.platform_tools
+        return (
+            patch.object(cfg, "checkov_mirror_url", mirror),
+            patch.object(cfg, "checkov_checksum_api_url", api),
+        )
+
+    def _call(self, mirror: str, api: str) -> str:
+        import contextlib
+
+        from terrapod.services import platform_tools as pt
+
+        with contextlib.ExitStack() as stack:
+            for p in self._patch(mirror, api):
+                stack.enter_context(p)
             return pt._checkov_checksum_api()
 
     def test_both_at_their_defaults_uses_the_default_api(self):
@@ -345,14 +352,16 @@ class TestTheCheckovMirrorAndChecksumApiStayConsistent:
             seen.append(url)
             return _Resp()
 
-        st = self._settings(
-            "https://github.com/acme/mirror/releases/download", _CHECKOV_CHECKSUM_API_DEFAULT
-        )
-        st.registry.platform_tools.verify = "checksum"
-        with (
-            patch.object(pt, "settings", st),
-            patch.object(pt, "arequest_with_retry", AsyncMock(side_effect=_req)),
-        ):
+        import contextlib
+
+        with contextlib.ExitStack() as stack:
+            for p in self._patch(
+                "https://github.com/acme/mirror/releases/download", _CHECKOV_CHECKSUM_API_DEFAULT
+            ):
+                stack.enter_context(p)
+            stack.enter_context(
+                patch.object(pt, "arequest_with_retry", AsyncMock(side_effect=_req))
+            )
             got = await pt._expected_sha256(None, "checkov", "3.3.26", "linux", "amd64")
 
         assert got == "abcdef"
