@@ -214,7 +214,7 @@ Two consequences:
 
 Taking Checkov from upstream instead is supported — set `checkov_mirror_url` to
 `https://github.com/bridgecrewio/checkov/releases/download` — but read
-[Pointing the cache at an internal mirror](registry.md#pointing-the-cache-at-an-internal-mirror)
+[the platform-tool mirror layout](registry.md#the-platform-tools-and-the-one-pair-that-must-move-together)
 first, because **the checksum source has to move with it**. Note that arm64 will
 404 on any version after 3.3.21, which is the problem this arrangement exists to
 solve.
