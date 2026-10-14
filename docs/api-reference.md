@@ -2431,7 +2431,7 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) |
+| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
 
 **Response:**
 ```json
