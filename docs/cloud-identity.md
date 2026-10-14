@@ -474,7 +474,7 @@ uses, mints one token per matching target, and writes each to its own path:
 | `/var/run/terrapod/oidc/<target>/token` | **One JWT per provider configuration**, mode `0600`. `<target>` is the map key — `aws`, or `aws.west` | **file** |
 | `TERRAPOD_OIDC_TOKEN_DIR` | `/var/run/terrapod/oidc` — the **directory**, for a configuration that would rather not hard-code it | env |
 | `TERRAPOD_RUN_PHASE` | `plan` or `apply` | env |
-| `TF_VAR_terrapod_run_phase` | The same value as a Terraform variable. The variable **must be declared `ephemeral = true`** — see [switching role per phase](#switching-role-per-phase) — or the apply is refused | env |
+| `TF_VAR_terrapod_run_phase` | The same value as a Terraform variable. The variable **must be declared `ephemeral = true`** — see [switching on the phase inside HCL](#switching-on-the-phase-inside-hcl) — or the apply is refused | env |
 
 A provider block names the path directly:
 
