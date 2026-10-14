@@ -834,7 +834,7 @@ Tune token lifetimes based on your typical run duration:
 ```yaml
 runners:
   tokenTTLSeconds: 3600       # Default token lifetime (1 hour)
-  maxTokenTTLSeconds: 7200    # Hard ceiling — API rejects requests above this
+  maxTokenTTLSeconds: 7200    # Ceiling — a longer request is CLAMPED to this
 ```
 
 For environments with fast runs, reduce the TTL to minimize the window of token validity. For long-running applies (large infrastructure), increase as needed.

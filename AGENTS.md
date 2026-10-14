@@ -885,6 +885,9 @@ It takes a minute:
 gh api repos/open-policy-agent/opa/releases/latest --jq .tag_name
 gh api repos/aquasecurity/trivy/releases/latest    --jq .tag_name
 gh api repos/bridgecrewio/checkov/releases/latest  --jq .tag_name
+# ...but Checkov is built and published by Terrapod, not taken from upstream, so
+# the version you pin MUST be one we have built. Check before bumping it:
+gh release list --repo mattrobinsonsre/terrapod | grep '^3\.'
 # ansible-core is a PyPI package, not a GitHub release, so ask PyPI
 curl -s https://pypi.org/pypi/ansible-core/json | jq -r .info.version
 ```
