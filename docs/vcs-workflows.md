@@ -186,33 +186,52 @@ one poll interval rather than immediately.
 
 ## Status comment
 
-One Terrapod-authored comment per workspace **per commit**, edited in place as
-that commit's run progresses:
+**Exactly one Terrapod-authored comment per pull request, edited in place** for
+the life of the PR. Not one per workspace, not one per commit, not one per
+status change — one comment, however many workspaces the PR affects and however
+many times you push:
 
 ```
-| Workspace             | Mode             | Plan      | Apply       | Mergeable |
+### Terrapod — all affected workspaces
+
+| Workspace | Plan | Cost Δ | Apply | Mergeable |
 |---|---|---|---|---|
-| accounts-alpha-net    | apply_then_merge | + 3 ~ 1   | applied     | yes       |
-| accounts-beta-compute | apply_then_merge | + 0 ~ 2   | not applied | yes       |
-| shared-network        | merge_then_apply | + 0 ~ 0   | will apply on merge | yes |
+| accounts-alpha-net | + 3 ~ 1 | +$12.40 | applied | yes |
+| accounts-beta-compute | + 0 ~ 2 | +$0.00 | not applied | yes |
+| shared-network | + 0 ~ 0 | — | will apply on merge | yes |
 
-Comment `terrapod apply -W accounts-beta-compute` to apply remaining changes.
-Auto-merge will fire when all workspaces are applied.
+Comment `terrapod apply` to apply `accounts-beta-compute`.
+
+<details><summary><code>accounts-beta-compute</code> — policy: passed · scan: passed</summary>
+… every gate that can block this workspace, and how each ruled …
+</details>
+
+*Updated 2026-01-01T00:00:00Z*
 ```
 
-The table covers every workspace whose runs reference this PR, regardless of mode. `merge_then_apply` workspaces show "will apply on merge" in the Apply column to make the mode distinction explicit.
+The table covers every workspace whose runs reference this PR, in both modes.
+`merge_then_apply` workspaces read "will apply on merge" in the Apply column, so
+the mode distinction stays visible without a column of its own. **Cost Δ is the
+monthly delta this run introduces, not the projected total.** The `Updated`
+timestamp is there because refreshes are best-effort.
 
-**A push gets a new comment rather than a silent edit.** The comment's identity
-includes the commit it describes, so a plan triggered by pushing appears at the
-foot of the thread next to that push. Within one commit the comment is edited in
-place, so `queued → planning → planned → applied` stays a single comment: one
-comment per push, not one per status change. Previously a single comment was
-edited for the life of the PR, which meant a push-triggered plan produced no
-visible change in the thread at all — the edit was often far above the commit
-that caused it.
+Each workspace gets a collapsed block naming every gate that can block it —
+mandatory policy sets, enforced security scans, post-plan run tasks — and how
+each ruled, passes included, in the order the run evaluates them. So the first
+failing gate matches the run's `blocked-by` attribute. A workspace whose gate
+failed is not offered a `terrapod apply` that would be refused.
 
-Comments written before the upgrade carry the older identity and are left
-where they are; the next status posts one fresh comment.
+A **module** pull request gets the same single comment, one row per consuming
+workspace, rather than a comment each.
+
+**Finding the comment does not depend on stored state.** The body carries a
+hidden `<!-- terrapod:status-comment -->` marker, so Terrapod edits its own
+comment even when the recorded id is lost — a rebuilt PR session, or a comment
+posted before the id was tracked. That is what makes "exactly one" hold rather
+than merely being the intent.
+
+Comments posted by older versions are left where they are; the next status edits
+the one it finds, or posts one if there is none.
 
 ## Monorepo behaviour
 
