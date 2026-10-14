@@ -36,6 +36,11 @@ def _resp(status: int = 200, text: str = ""):
 
 
 class TestDownloadURL:
+    # Checkov's expected base is TERRAPOD's releases, not Checkov's (#2066):
+    # upstream stopped publishing checkov_linux_arm64.zip at 3.3.21, so
+    # Terrapod builds the linux binaries from upstream's own tag, lockfile and
+    # PyInstaller spec and publishes them itself. OPA and Trivy still come
+    # from their own publishers, which is why only these two cases differ.
     @pytest.mark.parametrize(
         "tool,version,os_,arch,expected",
         [
@@ -76,7 +81,7 @@ class TestDownloadURL:
                 "3.3.8",
                 "linux",
                 "amd64",
-                "https://github.com/bridgecrewio/checkov/releases/download/"
+                "https://github.com/mattrobinsonsre/terrapod/releases/download/"
                 "3.3.8/checkov_linux_X86_64.zip",
             ),
             (
@@ -84,7 +89,7 @@ class TestDownloadURL:
                 "3.3.8",
                 "linux",
                 "arm64",
-                "https://github.com/bridgecrewio/checkov/releases/download/"
+                "https://github.com/mattrobinsonsre/terrapod/releases/download/"
                 "3.3.8/checkov_linux_arm64.zip",
             ),
         ],
