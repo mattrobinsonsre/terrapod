@@ -334,7 +334,14 @@ class TestReplay:
     async def test_a_short_window_still_gets_a_floor(self, idp_keys):
         """Clock skew between us and the IDP must not shrink the record away."""
         key, cert = idp_keys
-        response, _ = saml_response(key, cert, lifetime=1)
+        # Well under REPLAY_TTL_FLOOR_SECONDS (300) so the floor still applies,
+        # but NOT one second: `lifetime` sets `SubjectConfirmationData
+        # NotOnOrAfter`, and the signature verification below happens inside
+        # that window. At 1s a loaded CI runner walks past it and the assertion
+        # fails with "A valid SubjectConfirmation was not found" -- a stopwatch
+        # dressed as a SAML regression.
+        short = saml_module.REPLAY_TTL_FLOOR_SECONDS // 10
+        response, _ = saml_response(key, cert, lifetime=short)
         store = _ReplayStore()
         await _login(_connector(cert), response, store=store)
         (expiry,) = store.entries.values()
