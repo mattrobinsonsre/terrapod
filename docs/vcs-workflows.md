@@ -196,9 +196,9 @@ many times you push:
 
 | Workspace | Plan | Cost Δ | Apply | Mergeable |
 |---|---|---|---|---|
-| accounts-alpha-net | + 3 ~ 1 | +$12.40 | applied | yes |
-| accounts-beta-compute | + 0 ~ 2 | +$0.00 | not applied | yes |
-| shared-network | + 0 ~ 0 | — | will apply on merge | yes |
+| [`accounts-alpha-net`](…) | + 3 ~ 1 | +12.40 USD/mo | applied | yes |
+| [`accounts-beta-compute`](…) | + 0 ~ 2 | no change | not applied | yes |
+| [`shared-network`](…) | + 0 ~ 0 | — | will apply on merge | yes |
 
 Comment `terrapod apply` to apply `accounts-beta-compute`.
 

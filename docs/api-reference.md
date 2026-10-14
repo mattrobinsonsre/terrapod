@@ -2805,7 +2805,7 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) |
+| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
 | `phase` | string | — | The Job's phase, `plan` or `apply`. Bound into the token so it cannot drive the other phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
 
 **Response:**
@@ -4145,7 +4145,7 @@ because a shortened token set looks complete and is not.
 
 | Status | Meaning | What the runner does |
 |---|---|---|
-| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
+| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` (a configuration declaring that variable **must** mark it `ephemeral = true`, or the saved-plan apply is refused — see [cloud identity](cloud-identity.md)) |
 | **204** | The workspace maps nothing; the issuer is not enabled deployment-wide; the configuration declares no provider; or nothing it uses is mapped | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
 | **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
 | **409** | The resolved audiences changed since the run was created; discovery was not `ok` for a workspace that maps targets **and** whose engine discovers; or a non-discovering engine's workspace resolves more than 100 targets | **Fails the run**, carrying the reason |

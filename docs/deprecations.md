@@ -57,6 +57,57 @@ This is a wider use of the exception than its own wording allows — it covers
 tightening a permission, "never removing a route, an attribute, or a config key",
 and a comment verb is a command surface. Named rather than quietly stretched.
 
+## Behaviour changes in the next release
+
+### Checkov is fetched from Terrapod's releases, not upstream's
+
+**Act before upgrading if you run air-gapped or allowlist egress by host.**
+
+Upstream stopped publishing `checkov_linux_arm64.zip` after 3.3.21, so every
+security scan on an arm64 runner errored. Terrapod now builds the Linux Checkov
+binaries from upstream's own tag, lockfile and PyInstaller spec and publishes
+them itself, and `checkov_mirror_url` / `checkov_checksum_api_url` default to
+Terrapod's own releases instead of `github.com/bridgecrewio/checkov`.
+
+| if you | then |
+|---|---|
+| left both keys at their defaults | nothing to do. The chart's pinned `checkov_version` is a version Terrapod publishes, and arm64 now works |
+| **mirror or allowlist by host** | **add `github.com/mattrobinsonsre` and `api.github.com` (or seed your mirror from Terrapod's releases) BEFORE upgrading** — otherwise the fetch fails and every scan errors |
+| **pin a `checkov_version` explicitly** | check it is a version Terrapod has built: `gh release list --repo mattrobinsonsre/terrapod \| grep '^3\.'`. Pinning one we have not built returns a 404, which lands as an `errored` scan — and on an `enforced` workspace that blocks every run |
+| **override `checkov_mirror_url`** | move `checkov_checksum_api_url` with it. Our digests differ from upstream's by construction, so a half-override fails the checksum gate; it is refused with a message naming both keys |
+
+A brand-new upstream Checkov release is not immediately pinnable — the builder
+runs weekly over the newest upstream releases, so one published mid-week becomes
+available on the next run.
+
+### A run cannot pin another workspace's configuration version
+
+`POST /runs` now answers **404 `Configuration version not found for this
+workspace`** when the `configuration-version` relationship names a version
+belonging to another workspace, or one that does not exist. Previously both were
+accepted, leaving `configuration_version_id` pointing at something the run could
+never resolve.
+
+404 for both cases deliberately, rather than 422 for the mismatch: a caller who
+may not read the other workspace should not learn from the status code that the
+id exists.
+
+This is not reachable from `terraform`/`tofu` or any Terrapod component — the
+cloud backend creates its configuration version in the workspace it then runs
+against, and every internal creation path constructs the version server-side.
+A caller that previously succeeded with a foreign or stale id now fails, which
+is the point.
+
+### `runners.maxTokenTTLSeconds: 0` no longer means "no cap"
+
+A non-positive value used to disable the clamp entirely, so a runner token was
+minted with whatever lifetime was asked for. It now falls back to the shipped
+default (7200) and logs a warning. `values.schema.json` already constrains the
+chart value to `minimum: 1`, so this is reachable only by a deployment setting
+the environment variable directly. If you set it to `0` deliberately, set an
+explicit large value instead — which is a readable choice where a magic zero
+was not.
+
 ## Active deprecations
 
 | Surface | Deprecated in | Sunset (removed no earlier than) | Replacement | Notes |

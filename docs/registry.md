@@ -911,6 +911,44 @@ A mirror **must serve the same response shape** as the upstream it replaces, bec
 
 The provider network mirror has the equivalent override: `registry.provider_cache.upstream_registries` (see [Provider Caching](#provider-caching-network-mirror) above) — point it at an internal provider registry that implements the provider network-mirror protocol.
 
+#### The platform tools, and the one pair that must move together
+
+`opa`, `trivy` and `checkov` are fetched the same way and have their own
+overrides:
+
+```yaml
+api:
+  config:
+    registry:
+      platform_tools:
+        opa_mirror_url: "https://mirror.internal/opa/releases/download"
+        trivy_mirror_url: "https://mirror.internal/trivy/releases/download"
+        checkov_mirror_url: "https://mirror.internal/checkov/releases/download"
+        checkov_checksum_api_url: "https://mirror.internal/api/repos/checkov/releases/tags"
+```
+
+The asset layout a mirror must serve, under `<mirror_url>/<version>/`:
+
+| tool | asset | checksum material |
+|---|---|---|
+| `opa` | `opa_linux_amd64_static`, `opa_linux_arm64_static` | a sibling `<asset>.sha256` |
+| `trivy` | `trivy_<version>_Linux-64bit.tar.gz`, `..._Linux-ARM64.tar.gz` | one checksums manifest per release |
+| `checkov` | `checkov_linux_X86_64.zip`, `checkov_linux_arm64.zip` | a release-API digest per asset |
+
+Note **`X86_64` is capitalised** in Checkov's asset name and `arm64` is not —
+that is upstream's own naming, which Terrapod's build preserves, and the URLs are
+case-sensitive.
+
+**`checkov_mirror_url` and `checkov_checksum_api_url` must move together.**
+Terrapod builds the Linux Checkov binaries itself, so its digests differ from
+upstream's by construction — the bytes come from the mirror and the digest from
+the checksum API, and if those name different publishers every fetch fails the
+checksum gate. Overriding only the mirror is refused with a message naming both
+keys; if your mirror is a GitHub releases base
+(`https://github.com/OWNER/REPO/releases/download`) the checksum API is derived
+from it automatically. Set `registry.platform_tools.verify: off` only if your
+mirror genuinely has no digest source.
+
 All of these fetches go through the [forward proxy and custom CA](deployment-proxy.md) when configured (the API's HTTP client honours `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` / the mounted CA bundle), so an internal mirror reached only via a corporate egress proxy works without further changes. Integrity verification ([supply-chain verification](supply-chain-verification.md)) still applies to mirror-served artifacts — if the mirror re-signs binaries with its own key, supply the key via `binary_cache.signing_keys`.
 
 > This section covers pointing the pull-through caches at internal sources; the caches still fall through to those configured sources on a miss. To pre-fill the caches up front see [Cache pre-population](#cache-pre-population) below, and to forbid any upstream fall-through entirely (cache-miss must never reach upstream) see [Sealed (cache-only) mode](#sealed-cache-only-mode).

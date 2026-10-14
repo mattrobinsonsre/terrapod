@@ -126,8 +126,8 @@ reference.
 ## Where the engines come from
 
 Neither engine is bundled in the runner image. Both are pulled through the
-binary cache at run time, checksum-verified against what the publisher
-publishes, and their versions are Helm values:
+binary cache at run time, checksum-verified before they are stored, and their
+versions are Helm values:
 
 ```yaml
 api:
@@ -139,8 +139,8 @@ api:
 ```
 
 Only the engine a run actually selects is fetched — a Checkov workspace never
-downloads Trivy. The benefit over baking them in is that an upstream fix reaches
-you with a `helm upgrade` rather than waiting for a Terrapod release; the cost is
+downloads Trivy. The benefit over baking them in is that a fix reaches you with a
+`helm upgrade` rather than waiting for a Terrapod release; the cost is
 a first-run download per runner (served from your own object storage after the
 first fetch, so it is a local read thereafter).
 
@@ -182,6 +182,42 @@ Point `checkov_mirror_url` at an internal mirror if you would rather serve it
 yourself — it needs the same layout, `{base}/{version}/checkov_<platform>.zip`
 — and move `checkov_checksum_api_url` with it, because the digest has to
 describe the asset actually being served.
+
+### Trivy comes from its publisher; Checkov comes from us
+
+**Trivy** is fetched from `aquasecurity/trivy`'s own releases and verified
+against the checksums manifest Trivy publishes beside them. An upstream Trivy
+fix is a `helm upgrade` away.
+
+**Checkov is different, and it is the thing to know before pinning a version.**
+Upstream stopped publishing `checkov_linux_arm64.zip` after 3.3.21, so every scan
+on an arm64 runner errored. Terrapod therefore **builds the Linux Checkov
+binaries itself** — from upstream's own tag, lockfile and PyInstaller spec — and
+publishes them on its own releases, which is where `checkov_mirror_url` points by
+default.
+
+Two consequences:
+
+- **`checkov_version` can only name a version Terrapod has built.** Pinning one
+  we have not published returns a 404, which lands as an `errored` scan — and on
+  an `enforced` workspace that blocks every run. The published set is visible at
+  any time, and the default (`3.3.26`) is always one of them:
+
+  ```sh
+  gh release list --repo mattrobinsonsre/terrapod | grep '^3\.'
+  ```
+
+- **A brand-new upstream Checkov release is not immediately pinnable.** The
+  builder runs weekly, over the newest upstream releases, so one published
+  mid-week becomes available on the next run. For an urgent Checkov fix, ask for
+  a build rather than pinning a version that does not exist yet.
+
+Taking Checkov from upstream instead is supported — set `checkov_mirror_url` to
+`https://github.com/bridgecrewio/checkov/releases/download` — but read
+[Pointing the cache at an internal mirror](registry.md#pointing-the-cache-at-an-internal-mirror)
+first, because **the checksum source has to move with it**. Note that arm64 will
+404 on any version after 3.3.21, which is the problem this arrangement exists to
+solve.
 
 **A failed fetch is recorded, not raised.** It lands as an `errored` scan result,
 which for an `enforced` workspace the server turns into a block — the same
