@@ -102,18 +102,6 @@ def _mock_var(*, workspace_id, parent_attr, parent_id, key="ansible_user", sensi
     return var
 
 
-def _mock_settings(*, workspace_id, vcs_connection_id=None):
-    s = _ts(MagicMock())
-    s.workspace_id = workspace_id
-    s.include_platform = True
-    s.vcs_connection_id = vcs_connection_id
-    s.repo_url = ""
-    s.branch = ""
-    s.working_directory = ""
-    s.ignore_paths = []
-    return s
-
-
 def _make_app(user):
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: user
@@ -618,27 +606,6 @@ class TestTheWireShape:
         assert attrs["variable-count"] == 2
         assert "groups" not in attrs and "vars" not in attrs
 
-    async def test_the_settings_are_identified_by_the_workspace(self):
-        """One inventory per workspace, so there is no surrogate id to carry and
-        the workspace id is the only honest identifier."""
-        ws = _mock_ws()
-        settings = _mock_settings(workspace_id=ws.id)
-        app, _ = _make_app(_user())
-        with _Patches(
-            {
-                f"{_R}._get_workspace": AsyncMock(return_value=ws),
-                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
-                    return_value=caps_for_level("read")
-                ),
-                f"{_R}.inv.get_settings": AsyncMock(return_value=settings),
-            }
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/settings", headers=_AUTH)
-        data = res.json()["data"]
-        assert data["id"] == f"ws-{ws.id}"
-        assert data["relationships"]["vcs-connection"]["data"] is None
-
 
 class TestPayNothing:
     """A terraform/tofu-only workspace sees nothing, keyed on DATA not a flag.
@@ -647,25 +614,6 @@ class TestPayNothing:
     delivered by there being no rows rather than by a setting an operator could
     get wrong.
     """
-
-    async def test_a_workspace_with_no_inventory_has_no_settings(self):
-        ws = _mock_ws()
-        app, _ = _make_app(_user())
-        with _Patches(
-            {
-                f"{_R}._get_workspace": AsyncMock(return_value=ws),
-                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
-                    return_value=caps_for_level("read")
-                ),
-                f"{_R}.inv.get_settings": AsyncMock(return_value=None),
-            }
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/settings", headers=_AUTH)
-        assert res.status_code == 404, res.text
-        # And it says the absence is the default, so a reader does not go
-        # looking for what they did wrong.
-        assert "default" in res.json()["detail"]
 
     async def test_an_empty_host_list_is_an_empty_list_not_an_error(self):
         ws = _mock_ws()

@@ -174,10 +174,15 @@ these tools **write** as well as read — a row an agent creates that a
 configuration later claims collides with a `409`, and the practitioner imports
 it, which is how every other Terraform-managed thing behaves.
 
+The inventory's **roots and defaults** — where the Ansible configuration lives,
+which inventory sources to read, the default playbook and limit, and whether the
+declared rows take part at all — are **workspace attributes**, so they are read
+and written through the workspace tools rather than through an inventory tool of
+their own. A workspace whose `config-directory` is unset has no configure
+operation, which is the ordinary default rather than a problem.
+
 | Tool | Safety | What it does |
 |---|---|---|
-| `terrapod_inventory_settings` | read-only | The workspace's inventory settings. `configured: false` means no git source is bound, which is the normal default rather than a problem. |
-| `terrapod_inventory_settings_set` | — | Create or change them — bind a repository directory, or turn the declared rows off. Patches, falling back to a full write on first use. |
 | `terrapod_inventory_list` | read-only | A workspace's hosts, groups and the variables under `all`, each carrying counts rather than the rows themselves. |
 | `terrapod_inventory_detail` | read-only | One host or group with its variables and links. Dispatches on the typed id prefix, so there is no `kind` argument to get wrong. |
 | `terrapod_inventory_resolved` | read-only | The merged resolution — every host with its variables, each group's **direct** membership, and the nesting. An optional `limit` is expanded by ansible itself, **through** the nesting, which is the authoritative "what would this target". |

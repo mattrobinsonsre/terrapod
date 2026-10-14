@@ -57,9 +57,12 @@ class TestEveryInventoryWriteIsPhaseBound:
         calls = _authorize_calls()
         writes = [c for c in calls if c[1] == "INVENTORY_WRITE"]
         # A floor, so a renamed helper fails here rather than matching nothing
-        # and passing. Twenty when written; re-count from this test's own
-        # output rather than from the comment if it ever trips.
-        assert len(writes) >= 20, (
+        # and passing. Seventeen since #1929 removed the four inventory-settings
+        # routes (three of them writes) -- the fields they carried are workspace
+        # columns now, set through the workspace's own PATCH, which carries its
+        # own authorization. Re-count from this test's own output rather than
+        # from the comment if it ever trips.
+        assert len(writes) >= 17, (
             f"found only {len(writes)} INVENTORY_WRITE call sites; the derivation has broken"
         )
         unbound = [(line, phase) for line, _req, phase in writes if phase != "apply"]

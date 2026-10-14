@@ -73,6 +73,8 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		m.TriggerPrefixes = types.ListNull(types.StringType)
 		m.DriftIgnoreRules = types.ListNull(types.StringType)
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+		m.InventoryPaths = types.ListNull(types.StringType)
+		m.InventoryIgnorePaths = types.ListNull(types.StringType)
 		m.OIDCAudiences = types.MapNull(audienceElemType)
 
 		switch target.name {
@@ -86,6 +88,10 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 			m.DriftIgnoreRules = strList("aws_iam_role.foo")
 		case "security_scan_skip_rules":
 			m.SecurityScanSkipRules = strList("CKV_AWS_24")
+		case "inventory_paths":
+			m.InventoryPaths = strList("inventory/production")
+		case "inventory_ignore_paths":
+			m.InventoryIgnorePaths = strList("archive/")
 		case "oidc_audiences":
 			// A map of lists since #1901, not a list — the one entry in
 			// unmanagedCollections whose shape differs.

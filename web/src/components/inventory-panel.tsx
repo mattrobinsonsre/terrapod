@@ -1,24 +1,27 @@
 'use client'
 
-// Ansible inventory tab (#1967, #1968, #1969) — eight structures, each its own
+// Ansible inventory tab (#1967, #1968, #1969) — seven structures, each its own
 // addressable row, each editable here.
 //
 // ## Per-row editing is the premise, not a feature of it
 //
-// The inventory is eight tables — settings, hosts, groups, membership, nesting,
-// and a variable table per scope — and every one of them is a resource with its
-// own routes. So an operator edits ONE host, ONE membership, ONE variable; the
-// earlier single read-only panel was the shape of a model that no longer
-// exists, and its "declared by Terraform, so read-only here" copy is gone with
-// it. Terraform is still *a* writer (`terrapod_inventory_*`), and it is no
-// longer the only one.
+// The inventory is seven tables — hosts, groups, membership, nesting, and a
+// variable table per scope — plus workspace columns, and every one of the seven
+// is a resource with its own routes. (An eighth table, a 1:1 settings row
+// carrying its own VCS binding, is gone: what it held is now workspace
+// attributes edited on the Configuration tab, and the inventory reads the
+// workspace's own `vcs-*` binding — #1929.) So an operator edits ONE host, ONE
+// membership, ONE variable; the earlier single read-only panel was the shape of
+// a model that no longer exists, and its "declared by Terraform, so read-only
+// here" copy is gone with it. Terraform is still *a* writer
+// (`terrapod_inventory_*`), and it is no longer the only one.
 //
 // ## This tab is DATA-GATED, and the gate is the design
 //
-// No hosts, no groups and no settings ⇒ no tab. A terraform/tofu-only workspace
-// therefore has nothing to see and nothing to turn off — runtime adaptation
-// rather than a flag, the same mechanism the Cost, Security and Architecture
-// surfaces already use (#1986).
+// No hosts, no groups and no Ansible config directory ⇒ no tab. A
+// terraform/tofu-only workspace therefore has nothing to see and nothing to
+// turn off — runtime adaptation rather than a flag, the same mechanism the
+// Cost, Security and Architecture surfaces already use (#1986).
 //
 // The consequence is worth saying out loud: because the gate reads rows, the
 // FIRST row cannot be created from here. It arrives through the provider, the
@@ -98,20 +101,6 @@ interface InventoryVar {
   }
 }
 
-interface InventorySettings {
-  id: string
-  attributes: {
-    'include-platform': boolean
-    'repo-url': string
-    branch: string
-    'working-directory': string
-    'ignore-paths': string[]
-  }
-  relationships: {
-    'vcs-connection': { data: { id: string } | null }
-  }
-}
-
 interface ResolvedAttrs {
   hosts: Record<string, Record<string, unknown>>
   /** DIRECT membership per group. Nesting lives in `group-children`. */
@@ -120,11 +109,6 @@ interface ResolvedAttrs {
   'host-count': number
   'group-count': number
   limit?: string
-}
-
-interface VcsConnection {
-  id: string
-  attributes: { name: string; provider: string }
 }
 
 /* ── Styling tokens ─────────────────────────────────────────────────────────
@@ -150,10 +134,20 @@ const MONO = 'font-mono text-xs break-words text-slate-200'
  * Whether this workspace has an inventory at all — the tab's gate.
  *
  * Three probes, because there is no single question that answers it: a
- * workspace may hold hosts, or only groups, or only settings binding a VCS
- * source with every row still to be fetched. The host and group probes ask for
- * one row and read `meta.pagination.total-count`, so the gate costs three small
- * requests rather than three lists.
+ * workspace may hold hosts, or only groups, or neither yet and only an Ansible
+ * config directory, with every row still to be fetched from the repository. The
+ * host and group probes ask for one row and read
+ * `meta.pagination.total-count`, so the gate costs three small requests rather
+ * than two lists and a workspace read it would otherwise have to page.
+ *
+ * The third probe reads `config-directory` off the workspace itself (#1929,
+ * which removed the settings row this used to ask about). It MUST go through
+ * `/api/v1`: the attribute is deliberately absent from `/api/tfe/v2`, so the
+ * compatibility prefix would answer 200 with the key missing — a gate that
+ * silently never opens on the config-directory-only case. And `null` is a
+ * value here rather than an absence: it means this workspace has no configure
+ * operation, where `''` means its config root is the repository root and does
+ * count.
  *
  * Every failure leaves the gate shut. A 403 from a role without
  * `inventory:read` and a transport blip both mean "do not offer a surface this
@@ -174,17 +168,23 @@ export function useInventoryPresence(workspaceId: string): boolean {
       return typeof total === 'number' ? total > 0 : Array.isArray(body?.data) && body.data.length > 0
     }
 
+    // A null `config-directory` is the ORDINARY state: most workspaces have no
+    // Ansible at all, so its absence is the default rather than an error.
+    const configured = async (): Promise<boolean> => {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`)
+      if (!res.ok) return false
+      const dir = (await res.json())?.data?.attributes?.['config-directory']
+      // `!= null` on purpose, covering both null and an older API that omits
+      // the key; `''` is a real value — the repository root — and passes.
+      return dir != null
+    }
+
     Promise.all([
       counted(`/api/v1/workspaces/${workspaceId}/inventory/hosts`).catch(() => false),
       counted(`/api/v1/workspaces/${workspaceId}/inventory/groups`).catch(() => false),
-      // 404 is the ORDINARY state here: the settings row exists only to bind a
-      // VCS source or to switch the declared rows off, so its absence is the
-      // default rather than an error.
-      apiFetch(`/api/v1/workspaces/${workspaceId}/inventory/settings`)
-        .then((r) => r.ok)
-        .catch(() => false),
-    ]).then(([hosts, groups, settings]) => {
-      if (!cancelled) setPresent(hosts || groups || settings)
+      configured().catch(() => false),
+    ]).then(([hosts, groups, configDir]) => {
+      if (!cancelled) setPresent(hosts || groups || configDir)
     })
 
     return () => {
@@ -1637,294 +1637,9 @@ function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadK
   )
 }
 
-function SettingsView({
-  workspaceId,
-  settings,
-  loading,
-  onReload,
-}: {
-  workspaceId: string
-  settings: InventorySettings | null
-  loading: boolean
-  onReload: () => void
-}) {
-  const t = useTranslations('workspaceDetail.inventory')
-  const { confirmDelete } = useConfirm()
-
-  const [editing, setEditing] = useState(false)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [conns, setConns] = useState<VcsConnection[]>([])
-
-  const [includePlatform, setIncludePlatform] = useState(true)
-  const [vcsId, setVcsId] = useState('')
-  const [repoUrl, setRepoUrl] = useState('')
-  const [branch, setBranch] = useState('')
-  const [workingDirectory, setWorkingDirectory] = useState('')
-  const [ignorePaths, setIgnorePaths] = useState('')
-
-  useEffect(() => {
-    fetchAllPages<VcsConnection>('/api/v1/vcs-connections')
-      .then(setConns)
-      .catch(() => {
-        /* a reader without `vcs:read` simply gets no picker */
-      })
-  }, [])
-
-  const reset = useCallback(() => {
-    const a = settings?.attributes
-    setIncludePlatform(a ? a['include-platform'] : true)
-    setVcsId(settings?.relationships['vcs-connection']?.data?.id ?? '')
-    setRepoUrl(a?.['repo-url'] ?? '')
-    setBranch(a?.branch ?? '')
-    setWorkingDirectory(a?.['working-directory'] ?? '')
-    setIgnorePaths((a?.['ignore-paths'] ?? []).join('\n'))
-  }, [settings])
-
-  useEffect(() => {
-    reset()
-  }, [reset])
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError('')
-    // PUT rather than PATCH: the form holds every field, so the body IS the
-    // complete intended state — and the same call creates the row when the
-    // workspace has none, which is the ordinary starting point.
-    try {
-      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inventory/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              'include-platform': includePlatform,
-              'repo-url': repoUrl.trim(),
-              branch: branch.trim(),
-              'working-directory': workingDirectory.trim(),
-              'ignore-paths': ignorePaths
-                .split('\n')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            },
-            relationships: {
-              'vcs-connection': {
-                data: vcsId ? { id: vcsId, type: 'vcs-connections' } : null,
-              },
-            },
-          },
-        }),
-      })
-      if (!res.ok) {
-        setError(await parseApiError(res, t('errors.settings')))
-        return
-      }
-      setEditing(false)
-      onReload()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('errors.settings'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function clear() {
-    if (!confirmDelete(t('settings.confirmClear'))) return
-    setError('')
-    const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inventory/settings`, {
-      method: 'DELETE',
-    })
-    if (!res.ok && res.status !== 404) {
-      setError(await parseApiError(res, t('errors.settings')))
-      return
-    }
-    setEditing(false)
-    onReload()
-  }
-
-  if (loading) return <LoadingSpinner />
-
-  const conn = settings
-    ? conns.find((c) => c.id === settings.relationships['vcs-connection']?.data?.id)
-    : undefined
-
-  return (
-    <Section heading={t('settings.heading')} body={t('settings.body')}>
-      <ErrorText message={error} />
-
-      {!editing && (
-        <>
-          {!settings && <p className="mt-3 text-sm text-slate-400">{t('settings.absent')}</p>}
-          {settings && (
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500">{t('settings.includePlatform')}</dt>
-                <dd className="text-slate-200">
-                  {settings.attributes['include-platform']
-                    ? t('settings.included')
-                    : t('settings.excluded')}
-                </dd>
-              </div>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500">{t('settings.vcsConnection')}</dt>
-                <dd className="min-w-0 break-words text-slate-200">
-                  {conn
-                    ? conn.attributes.name
-                    : settings.relationships['vcs-connection']?.data?.id || t('settings.vcsNone')}
-                </dd>
-              </div>
-              {(['repo-url', 'branch', 'working-directory'] as const).map((field) => (
-                <div key={field} className="flex flex-wrap items-baseline gap-2">
-                  <dt className="text-slate-500">{t(`settings.field.${field}`)}</dt>
-                  <dd className="min-w-0 font-mono text-xs break-all text-slate-300" dir="ltr">
-                    {settings.attributes[field] || t('settings.unset')}
-                  </dd>
-                </div>
-              ))}
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500">{t('settings.ignorePaths')}</dt>
-                <dd className="min-w-0 font-mono text-xs break-all text-slate-300" dir="ltr">
-                  {settings.attributes['ignore-paths'].length === 0
-                    ? t('settings.unset')
-                    : settings.attributes['ignore-paths'].join(', ')}
-                </dd>
-              </div>
-            </dl>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setEditing(true)} className={`${BTN} py-2.5`}>
-              {settings ? t('actions.edit') : t('settings.create')}
-            </button>
-            {settings && (
-              <button type="button" onClick={clear} className={`${BTN_DANGER} py-2.5`}>
-                {t('settings.clear')}
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      {editing && (
-        // `min-w-0` is required on a fieldset: it defaults to
-        // `min-inline-size: min-content`, so without this it refuses to shrink
-        // below its content and pushes the page sideways at phone width however
-        // narrow its children are.
-        <form onSubmit={save} className="mt-3">
-          <fieldset className="min-w-0 space-y-3 border-0 p-0">
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={includePlatform}
-                onChange={(e) => setIncludePlatform(e.target.checked)}
-                className="rounded border-slate-600 bg-slate-900"
-              />
-              {t('settings.includePlatform')}
-            </label>
-            <p className="text-xs text-slate-500">{t('settings.includePlatformHelp')}</p>
-
-            <div className="min-w-0">
-              <label htmlFor="inventory-vcs" className="block text-xs text-slate-500">
-                {t('settings.vcsConnection')}
-              </label>
-              <select
-                id="inventory-vcs"
-                value={vcsId}
-                onChange={(e) => setVcsId(e.target.value)}
-                className={`mt-1 ${INPUT}`}
-              >
-                <option value="">{t('settings.vcsNone')}</option>
-                {conns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.attributes.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="min-w-0">
-              <label htmlFor="inventory-repo" className="block text-xs text-slate-500">
-                {t('settings.field.repo-url')}
-              </label>
-              <input
-                id="inventory-repo"
-                type="text"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                dir="ltr"
-                className={`mt-1 ${INPUT} font-mono`}
-              />
-            </div>
-
-            <div className="min-w-0">
-              <label htmlFor="inventory-branch" className="block text-xs text-slate-500">
-                {t('settings.field.branch')}
-              </label>
-              <input
-                id="inventory-branch"
-                type="text"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                dir="ltr"
-                className={`mt-1 ${INPUT} font-mono`}
-              />
-              <p className="mt-1 text-xs text-slate-500">{t('settings.branchHelp')}</p>
-            </div>
-
-            <div className="min-w-0">
-              <label htmlFor="inventory-workdir" className="block text-xs text-slate-500">
-                {t('settings.field.working-directory')}
-              </label>
-              <input
-                id="inventory-workdir"
-                type="text"
-                value={workingDirectory}
-                onChange={(e) => setWorkingDirectory(e.target.value)}
-                dir="ltr"
-                className={`mt-1 ${INPUT} font-mono`}
-              />
-            </div>
-
-            <div className="min-w-0">
-              <label htmlFor="inventory-ignore" className="block text-xs text-slate-500">
-                {t('settings.ignorePaths')}
-              </label>
-              <textarea
-                id="inventory-ignore"
-                value={ignorePaths}
-                onChange={(e) => setIgnorePaths(e.target.value)}
-                rows={3}
-                dir="ltr"
-                className={`mt-1 ${INPUT} font-mono`}
-              />
-              <p className="mt-1 text-xs text-slate-500">{t('settings.ignorePathsHelp')}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" disabled={saving} className={BTN_PRIMARY}>
-                {saving ? t('actions.saving') : t('actions.save')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(false)
-                  reset()
-                }}
-                className={`${BTN} py-2.5`}
-              >
-                {t('actions.cancel')}
-              </button>
-            </div>
-          </fieldset>
-        </form>
-      )}
-    </Section>
-  )
-}
-
 /* ── The tab ────────────────────────────────────────────────────────────────- */
 
-const VIEWS = ['hosts', 'groups', 'vars', 'resolved', 'settings'] as const
+const VIEWS = ['hosts', 'groups', 'vars', 'resolved'] as const
 type View = (typeof VIEWS)[number]
 
 /**
@@ -1949,7 +1664,6 @@ export function InventoryPanel({ workspaceId }: { workspaceId: string }) {
 
   const [hosts, setHosts] = useState<InventoryHost[]>([])
   const [groups, setGroups] = useState<InventoryGroup[]>([])
-  const [settings, setSettings] = useState<InventorySettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // Bumped by every write, so the resolved view re-resolves against the rows as
@@ -1968,14 +1682,6 @@ export function InventoryPanel({ workspaceId }: { workspaceId: string }) {
       setGroups(g)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
-    }
-    try {
-      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inventory/settings`)
-      // 404 is the default state, not a failure: the settings row exists only
-      // to bind a VCS source or to switch the declared rows off.
-      setSettings(res.ok ? ((await res.json()).data ?? null) : null)
-    } catch {
-      setSettings(null)
     }
     setLoading(false)
   }, [workspaceId, t])
@@ -2010,7 +1716,7 @@ export function InventoryPanel({ workspaceId }: { workspaceId: string }) {
         <p className={BODY}>{t('scope.body')}</p>
       </div>
 
-      {/* A wrapping button row rather than a scrolling strip: five entries fit
+      {/* A wrapping button row rather than a scrolling strip: four entries fit
           at phone width once they are allowed to wrap, and an inner scroller
           would hide whichever one the reader needs. */}
       <nav aria-label={t('nav.label')} className="flex flex-wrap gap-2">
@@ -2092,15 +1798,6 @@ export function InventoryPanel({ workspaceId }: { workspaceId: string }) {
 
       {!hostId && !groupId && view === 'resolved' && (
         <ResolvedView workspaceId={workspaceId} reloadKey={generation} />
-      )}
-
-      {!hostId && !groupId && view === 'settings' && (
-        <SettingsView
-          workspaceId={workspaceId}
-          settings={settings}
-          loading={loading}
-          onReload={reload}
-        />
       )}
     </div>
   )

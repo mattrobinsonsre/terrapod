@@ -245,6 +245,110 @@ def sanitize_working_directory(raw: str) -> str:
     return v
 
 
+#: The Ansible roots and run defaults (#1929). `inventory_paths` is the same
+#: shape as a trigger prefix -- a short ordered list of repo-relative paths --
+#: so it takes the same bound; `inventory_ignore_paths` holds globs rather than
+#: roots and a real repository accumulates more of them.
+MAX_INVENTORY_PATHS = 20
+MAX_INVENTORY_IGNORE_PATHS = 50
+MAX_ANSIBLE_PATH_LEN = 500
+
+
+def _check_relative_path(value: str, field: str) -> str:
+    """Refuse what a repo-relative path may not be. Returns it UNCHANGED.
+
+    Deliberately not `sanitize_working_directory`, which strips slashes: see
+    this module's note on why these refuse instead of normalising.
+    """
+    if len(value) > MAX_ANSIBLE_PATH_LEN:
+        raise ValueError(f"{field}: maximum {MAX_ANSIBLE_PATH_LEN} characters")
+    if ".." in value:
+        raise ValueError(f"{field}: path traversal not allowed")
+    if value.startswith("/") or value.endswith("/"):
+        raise ValueError(
+            f"{field}: write the path without a leading or trailing slash "
+            f"(it is relative to the repository root)"
+        )
+    if value != value.strip():
+        raise ValueError(f"{field}: leading or trailing whitespace is not allowed")
+    return value
+
+
+def validate_config_directory(raw: object) -> str | None:
+    """The Ansible config root. **`None` and `""` mean different things.**
+
+    `None` means this workspace has no configure operation at all; `""` means
+    the configure operation's root is the top of the repository. Collapsing
+    them would make "no Ansible here" unsayable, so `None` passes through as
+    `None` and is never turned into `""`.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise ValueError("config-directory must be a string or null")
+    return _check_relative_path(raw, "config-directory")
+
+
+def _validate_path_list(raw: object, field: str, cap: int) -> list[str]:
+    if not isinstance(raw, list):
+        raise ValueError(f"{field} must be a list of strings")
+    if len(raw) > cap:
+        raise ValueError(f"{field}: maximum {cap} entries")
+    out: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise ValueError(f"{field} entries must be strings")
+        if not entry:
+            raise ValueError(f"{field} entries must be non-empty")
+        out.append(_check_relative_path(entry, field))
+    return out
+
+
+def validate_inventory_paths(raw: object) -> list[str]:
+    """Inventory sources, in order. **The order is precedence.**
+
+    Each entry may name a file as well as a directory, so nothing here checks
+    for one or the other: ansible's own documented layout puts `production` and
+    `staging` side by side as files, and pointing at the containing directory
+    instead merges them.
+    """
+    if raw is None:
+        return []
+    return _validate_path_list(raw, "inventory-paths", MAX_INVENTORY_PATHS)
+
+
+def validate_inventory_ignore_paths(raw: object) -> list[str]:
+    """Globs pruned from a fetched inventory source before ansible reads it.
+
+    The trailing-slash refusal earns its keep here rather than merely being
+    consistent: `_apply_ignore_paths` matches against a path relative to the
+    config root, and that path carries **no trailing slash even for a
+    directory**. So `cache/` is a pattern that reads as "exclude this
+    directory" and excludes nothing -- which fails in the direction that looks
+    harmless, leaving the source wider than the operator asked for.
+    """
+    if raw is None:
+        return []
+    return _validate_path_list(raw, "inventory-ignore-paths", MAX_INVENTORY_IGNORE_PATHS)
+
+
+def validate_ansible_run_default(raw: object, field: str) -> str:
+    """`default_playbook` / `default_limit`: a plain string, length-capped.
+
+    Stored byte for byte. A `--limit` pattern is ansible's own syntax -- `:`,
+    `!`, `&`, `~` and wildcards are all meaningful in it -- so there is no
+    format rule to impose here beyond the column's width, and guessing at one
+    would refuse patterns ansible accepts.
+    """
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError(f"{field} must be a string")
+    if len(raw) > MAX_ANSIBLE_PATH_LEN:
+        raise ValueError(f"{field}: maximum {MAX_ANSIBLE_PATH_LEN} characters")
+    return raw
+
+
 def validate_trigger_prefixes(raw: object) -> list[str]:
     """Each entry is normalised like a working directory; at most 20."""
     if not isinstance(raw, list):

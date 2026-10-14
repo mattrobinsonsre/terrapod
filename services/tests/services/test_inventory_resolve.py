@@ -639,7 +639,7 @@ class TestTheFetchPathReadsIgnorePaths:
                 out.append((ast.unparse(node.func), " ".join(ast.unparse(a) for a in node.args)))
         return out
 
-    def test_the_fetch_passes_the_settings_rows_own_ignore_paths(self):
+    def test_the_fetch_passes_the_workspaces_own_ignore_paths(self):
         calls = self._calls()
         pruning = [
             args for callee, args in calls if "_apply_ignore_paths" in (callee, *args.split())
@@ -656,7 +656,7 @@ class TestTheFetchPathReadsIgnorePaths:
             "the fetch path does not prune the source, so `ignore_paths` is "
             "stored and honoured by nothing"
         )
-        assert any("settings_row.ignore_paths" in args for args in (*pruning, *threaded)), (
+        assert any("ws.inventory_ignore_paths" in args for args in (*pruning, *threaded)), (
             "the pruner is called with something other than the settings row's "
             "own list, so what an operator configured is not what is applied"
         )

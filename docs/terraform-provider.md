@@ -31,7 +31,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Governance | `terrapod_policy_set`, `terrapod_policy`, `terrapod_run_task`, `terrapod_run_trigger`, `terrapod_notification_configuration`, `terrapod_execution_hook`, `terrapod_execution_hook_workspace` |
 | Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
-| [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_settings`, `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var` |
+| [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var` (the inventory's roots and defaults are attributes on `terrapod_workspace` itself) |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`
 (each entry reports its `engine`, and an optional `engine` argument returns only
@@ -134,9 +134,9 @@ Configuration attributes (all also settable via environment variables):
 
 The default applies to **every** resource and data source that takes a workspace id —
 `terrapod_variable`, `terrapod_run_task`, `terrapod_notification_configuration`,
-`terrapod_run_trigger`, the three workspace joins, the four inventory resources that
-carry a workspace id (`terrapod_inventory_settings`, `_host`, `_group`,
-`_global_var` — the other four are parented on a host or a group, not a workspace)
+`terrapod_run_trigger`, the three workspace joins, the three inventory resources that
+carry a workspace id (`terrapod_inventory_host`, `_group`, `_global_var` — the
+other four are parented on a host or a group, not a workspace)
 and the workspace-scoped data sources. A value you set always wins, which is how a
 configuration declares into a *different* workspace from the one its run belongs to.
 

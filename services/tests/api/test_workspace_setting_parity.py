@@ -355,3 +355,97 @@ class TestBooleanSettingsAreCheckedNotCoerced:
             "these boolean attributes are coerced rather than validated, so a "
             f"stringified 'false' would enable them: {sorted(set(offenders))}"
         )
+
+
+class TestTheOtherDirectionOfParity:
+    """A setting reachable from bulk update is reachable on the workspace API.
+
+    The gate above asks "can a fleet set this". It does not ask the converse,
+    and that is the gap #1929's six Ansible settings fell through: they were in
+    `_FIELD_MAP`, so bulk update wrote them and the parity gate passed, while
+    `tfe_v2`'s workspace create and PATCH read neither — so a
+    `terrapod_workspace` declaring `config_directory` planned it, sent it, and
+    had it silently ignored.
+
+    That is the "settable but not readable" defect in mirror image, and it is
+    worse for a Terraform provider than the original: the practitioner's
+    configuration says one thing, the server stores another, and the only
+    symptom is the value never taking effect.
+
+    The subject is **derived** from `_FIELD_MAP` rather than listed, so a
+    seventh setting is in scope the moment it is added, and there is **no
+    exemption ledger** — measured across all 41 keys, every one is read by
+    `tfe_v2`, so the invariant holds universally and a ledger would only be
+    somewhere for the next gap to hide.
+    """
+
+    @staticmethod
+    def _attr_keys_read_by_tfe_v2() -> set[str]:
+        """Every string key `tfe_v2` reads out of an `attrs` mapping.
+
+        AST rather than a regex: the three idioms in that module are
+        `"k" in attrs`, `attrs["k"]` and `attrs.get("k", ...)`, and a regex
+        over them would also match the same strings inside docstrings and
+        comments — of which that file has many, several naming attributes it
+        deliberately does not accept.
+        """
+        import ast
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        tree = ast.parse(inspect.getsource(tfe_v2))
+        found: set[str] = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Compare)
+                and node.ops
+                and isinstance(node.ops[0], ast.In)
+                and isinstance(node.left, ast.Constant)
+                and isinstance(node.left.value, str)
+                and isinstance(node.comparators[0], ast.Name)
+                and node.comparators[0].id == "attrs"
+            ):
+                found.add(node.left.value)
+            if (
+                isinstance(node, ast.Subscript)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "attrs"
+                and isinstance(node.slice, ast.Constant)
+                and isinstance(node.slice.value, str)
+            ):
+                found.add(node.slice.value)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "get"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "attrs"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)
+            ):
+                found.add(node.args[0].value)
+        return found
+
+    def test_the_walker_finds_something(self):
+        """A floor, so a renamed parameter cannot make the gate below pass by
+        finding nothing at all — the shape that makes an introspection test
+        green and meaningless."""
+        found = self._attr_keys_read_by_tfe_v2()
+        assert len(found) >= 30, (
+            f"only {len(found)} attribute keys found in tfe_v2 — the walker has "
+            "probably stopped matching the module's idioms rather than the "
+            "module having stopped reading attributes"
+        )
+
+    def test_every_bulk_settable_key_is_read_by_the_workspace_api(self):
+        keys = set(_FIELD_MAP) | set(_FIELDS_HANDLED_SEPARATELY)
+        assert keys, "nothing to check — _FIELD_MAP is empty"
+        unreachable = sorted(keys - self._attr_keys_read_by_tfe_v2())
+        assert unreachable == [], (
+            "these settings are writable by bulk update but are never read from "
+            "the request body by the workspace create or PATCH path, so a client "
+            "that sends one — a Terraform provider, most consequentially — has it "
+            f"silently ignored: {unreachable}"
+        )

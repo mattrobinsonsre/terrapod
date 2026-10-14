@@ -21,7 +21,7 @@ neither -- and neither is a defined empty result rather than an error.
 `platform_rev` is a cheap aggregate over the row tables and `git_sha` is the
 resolved commit, so a write changes the key and the old entry simply expires.
 The alternative -- invalidate on write -- is a call site in every one of the
-eight structures' writers, and missing one is a silent stale read. A TTL still
+seven structures' writers, and missing one is a silent stale read. A TTL still
 bounds the entry, because a git sha is only knowable by fetching.
 
 **`platform_rev` is a count AND a maximum timestamp, not a timestamp alone.** A
@@ -268,13 +268,23 @@ def _write_ansible_cfg(directory: Path) -> Path:
 
 
 async def run_ansible_inventory(
-    sources: list[Path], *, cfg: Path, limit: str | None = None
+    sources: list[Path], *, cfg: Path, limit: str | None = None, cwd: Path | None = None
 ) -> dict[str, Any]:
     """`ansible-inventory --list` over `sources`, in `-i` order.
 
     The sources are passed in the order given, which is the order that decides a
     conflicting variable -- see the module docstring. `--limit` is passed
     straight through, so the expansion is ansible's own, `~regex` included.
+
+    `cwd` is NOT cosmetic and must be the config root (#1929). Measured against
+    ansible-core 2.18.3, `group_vars`/`host_vars` are found in exactly two
+    places: inside the inventory directory, or **at the working directory** --
+    never merely beside the inventory directory. A real repository layout puts
+    `group_vars/` at the config root beside the inventory, so without this the
+    resolution returns the right hosts, the right groups, exit 0 and **every
+    variable missing**, with nothing unparsed for `any_unparsed_is_failed` to
+    catch. Relative paths in the operator's `ansible.cfg` also resolve against
+    the cwd rather than against the config file.
     """
     binary = await ansible_inventory_binary()
 
@@ -286,6 +296,7 @@ async def run_ansible_inventory(
 
     proc = await asyncio.create_subprocess_exec(
         *argv,
+        cwd=str(cwd) if cwd else None,
         env={
             **os.environ,
             "ANSIBLE_CONFIG": str(cfg),
@@ -443,7 +454,7 @@ async def platform_rev(db, workspace_id: uuid.UUID) -> str:
         InventoryHost,
         InventoryHostGroup,
         InventoryHostVar,
-        InventorySettings,
+        Workspace,
     )
 
     parts: list[str] = []
@@ -463,15 +474,28 @@ async def platform_rev(db, workspace_id: uuid.UUID) -> str:
         count, stamp = result.one()
         parts.append(f"{int(count or 0)}@{stamp.isoformat() if stamp else '-'}")
 
-    # The settings too: flipping `include_platform` changes the resolution
-    # without touching a single row.
+    # The workspace's own inventory settings too (#1929): flipping
+    # `inventory_include_platform`, or moving a root, changes the resolution
+    # without touching a single inventory row. `updated_at` moves on any
+    # workspace edit, which is wider than needed and safe in the only direction
+    # that matters -- a spurious miss costs one resolution, a missed change
+    # serves a stale host set.
     result = await db.execute(
-        select(InventorySettings.include_platform, InventorySettings.updated_at).where(
-            InventorySettings.workspace_id == workspace_id
-        )
+        select(
+            Workspace.inventory_include_platform,
+            Workspace.config_directory,
+            Workspace.inventory_paths,
+            Workspace.updated_at,
+        ).where(Workspace.id == workspace_id)
     )
     row = result.first()
-    parts.append(f"s{int(bool(row[0]))}@{row[1].isoformat()}" if row else "s-")
+    if row:
+        parts.append(
+            f"s{int(bool(row[0]))}:{row[1] or '-'}:{','.join(row[2] or [])}"
+            f"@{row[3].isoformat() if row[3] else '-'}"
+        )
+    else:
+        parts.append("s-")
 
     # Hashed so the key stays a sensible length whatever the table count grows
     # to. Opaque by design: nothing parses it, orders it or reads a time out of
@@ -560,11 +584,20 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
     from terrapod.redis.client import get_redis_client
     from terrapod.services import inventory_service as inv
 
-    settings_row = await inv.get_settings(db, workspace_id)
-    include_platform = settings_row.include_platform if settings_row else True
+    ws = await inv.get_inventory_workspace(db, workspace_id)
+    include_platform = ws.inventory_include_platform if ws else True
     git_sha = ""
-    if settings_row is not None and settings_row.vcs_connection_id and settings_row.repo_url:
-        git_sha = await _resolve_git_sha(db, settings_row)
+    # A git source needs a binding AND a config root: `config_directory` being
+    # NULL is the declaration that this workspace has no configure operation, so
+    # there is nothing to fetch even when the workspace has a repository for its
+    # Terraform.
+    if (
+        ws is not None
+        and ws.vcs_connection_id
+        and ws.vcs_repo_url
+        and ws.config_directory is not None
+    ):
+        git_sha = await _resolve_git_sha(db, ws)
 
     rev = await platform_rev(db, workspace_id)
     key = cache_key(workspace_id, rev, git_sha, limit)
@@ -577,7 +610,7 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
     resolved = await _resolve_uncached(
         db,
         workspace_id,
-        settings_row=settings_row,
+        ws=ws,
         include_platform=include_platform,
         git_sha=git_sha,
         limit=limit,
@@ -586,7 +619,7 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
     return resolved
 
 
-async def _resolve_git_sha(db, settings_row) -> str:  # type: ignore[no-untyped-def]
+async def _resolve_git_sha(db, ws) -> str:  # type: ignore[no-untyped-def]
     """The commit the bound branch currently points at.
 
     The one input that cannot be derived from rows we hold, which is why the
@@ -597,9 +630,7 @@ async def _resolve_git_sha(db, settings_row) -> str:  # type: ignore[no-untyped-
     from terrapod.db.models import VCSConnection
     from terrapod.services import vcs_provider
 
-    result = await db.execute(
-        select(VCSConnection).where(VCSConnection.id == settings_row.vcs_connection_id)
-    )
+    result = await db.execute(select(VCSConnection).where(VCSConnection.id == ws.vcs_connection_id))
     conn = result.scalar_one_or_none()
     if conn is None:
         raise InventoryResolutionFailed(
@@ -607,14 +638,14 @@ async def _resolve_git_sha(db, settings_row) -> str:  # type: ignore[no-untyped-
             "repository half cannot be fetched. Rebind it or clear the binding."
         )
 
-    parsed = vcs_provider.parse_repo_url(conn, settings_row.repo_url)
+    parsed = vcs_provider.parse_repo_url(conn, ws.vcs_repo_url)
     if parsed is None:
         raise InventoryResolutionFailed(
-            f"could not parse {settings_row.repo_url!r} as a repository for this "
+            f"could not parse {ws.vcs_repo_url!r} as a repository for this "
             f"{conn.provider} connection"
         )
     owner, repo = parsed
-    branch = settings_row.branch or await vcs_provider.get_default_branch(conn, owner, repo)
+    branch = ws.vcs_branch or await vcs_provider.get_default_branch(conn, owner, repo)
     if not branch:
         raise InventoryResolutionFailed(
             f"could not determine a branch for {owner}/{repo}: the inventory sets none "
@@ -626,11 +657,85 @@ async def _resolve_git_sha(db, settings_row) -> str:  # type: ignore[no-untyped-
     return sha
 
 
+def _operator_inventory_paths(root: Path) -> list[str]:
+    """The `inventory` pathlist from the operator's own `ansible.cfg`, if any.
+
+    Read rather than overridden so our `-i` cannot disagree with what ansible
+    itself would do from the same repository. `inventory` is `type: pathlist`
+    -- a comma-separated list, measured against ansible-core 2.18.3 -- and the
+    order is precedence, so it is preserved exactly.
+
+    Deliberately tolerant: a malformed or absent config is not an error here,
+    it just means there is nothing to default from. The resolution then falls
+    back to the config root, which is what happened before this existed.
+    """
+    import configparser
+
+    cfg = root / "ansible.cfg"
+    if not cfg.is_file():
+        return []
+    parser = configparser.ConfigParser()
+    try:
+        parser.read(cfg)
+    except configparser.Error:
+        return []
+    raw = parser.get("defaults", "inventory", fallback="") or parser.get(
+        "inventory", "inventory", fallback=""
+    )
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def _inventory_sources(ws, root: Path) -> list[Path]:
+    """The `-i` arguments for a git source, in precedence order.
+
+    Three tiers, and the order is the point:
+
+    1. The workspace's `inventory_paths`, when set. Explicit beats inferred.
+    2. Otherwise the operator's own `ansible.cfg` `inventory` pathlist, so the
+       common case needs no configuration at all.
+    3. Otherwise the config root itself, which is the behaviour that predates
+       this and remains correct for a repository whose inventory is one
+       directory.
+
+    An entry may name a FILE, and that is why this is a list rather than a
+    single root: ansible's own documented layout puts `production` and
+    `staging` side by side, and pointing at the containing directory instead
+    MERGES them -- measured -- so a staging workspace would resolve production
+    hosts.
+
+    An entry naming a path the repository does not have at this commit is
+    refused rather than skipped: a silently-dropped source resolves a partial
+    inventory, which is the failure mode this whole issue exists to remove.
+    """
+    declared = [e.strip() for e in (ws.inventory_paths or []) if e and e.strip()]
+    entries = declared or _operator_inventory_paths(root)
+    if not entries:
+        return [root]
+
+    resolved: list[Path] = []
+    for entry in entries:
+        candidate = (root / entry.lstrip("/")).resolve()
+        # Refuse an entry that escapes the fetched root rather than reading
+        # whatever happens to be there.
+        if not str(candidate).startswith(str(root.resolve())):
+            raise InventoryResolutionFailed(
+                f"inventory path {entry!r} escapes the workspace's config directory"
+            )
+        if not candidate.exists():
+            raise InventoryResolutionFailed(
+                f"inventory path {entry!r} does not exist under the config directory "
+                f"at this commit -- a source that cannot be read would resolve a "
+                f"partial inventory rather than failing"
+            )
+        resolved.append(candidate)
+    return resolved
+
+
 async def _resolve_uncached(
     db,
     workspace_id: uuid.UUID,
     *,
-    settings_row,
+    ws,
     include_platform: bool,
     git_sha: str,
     limit: str | None,
@@ -646,8 +751,16 @@ async def _resolve_uncached(
         # The repository first, the declared rows second: a later `-i` wins a
         # conflicting variable, so the declared row overrides the committed
         # baseline. See the module docstring.
+        # The cwd for the ansible run. `group_vars`/`host_vars` are found at the
+        # working directory as well as inside the inventory directory, and the
+        # operator's relative `ansible.cfg` paths resolve against it, so it has
+        # to be the config root (#1929).
+        cwd: Path | None = None
+
         if git_sha:
-            sources.append(await _fetch_vcs_source(db, settings_row, git_sha, workdir))
+            config_root = await _fetch_vcs_source(db, ws, git_sha, workdir)
+            cwd = config_root
+            sources.extend(_inventory_sources(ws, config_root))
 
         if include_platform:
             rendered = await _declared_sources(db, workspace_id)
@@ -661,18 +774,28 @@ async def _resolve_uncached(
             # no hosts, and saying so is the honest answer.
             return {"hosts": {}, "groups": {}, "children": {}}
 
-        document = await run_ansible_inventory(sources, cfg=cfg, limit=limit)
+        document = await run_ansible_inventory(sources, cfg=cfg, limit=limit, cwd=cwd)
         return normalise(document)
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
 
 
-async def _fetch_vcs_source(db, settings_row, git_sha: str, workdir: Path) -> Path:
-    """The repository's inventory directory, fetched and made inert.
+async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
+    """The repository's **config root**, fetched whole and made inert.
 
-    Narrowed to `working_directory` where one is set, so a monorepo does not
-    ship its whole tree to resolve an inventory -- the archive cache already
-    supports that and two callers agreeing on the path set share an entry.
+    Narrowed to `config_directory`, not to the inventory directory, and that
+    distinction is the bug this replaced (#1929). The config root contains the
+    inventory directory, `group_vars`, `host_vars`, `roles/` and their
+    submodules; the inventory directory alone contains none of those, and
+    fetching it gave the right hosts, the right groups, exit 0 and every
+    variable missing -- silently, because nothing was unparsed. It also left
+    `roles/` empty where roles are submodules, since `_submodules_under`
+    initialises only submodules inside the sparse set, so the first
+    `include_role` would fail.
+
+    A monorepo still does not ship its whole tree: `config_directory` IS the
+    narrowing, and it is the smallest subtree that is correct rather than the
+    smallest one that parses.
 
     Everything fetched goes through `_refuse_plugin_sources` before ansible sees
     it: the exec bit comes off and a plugin configuration is refused by name.
@@ -683,13 +806,14 @@ async def _fetch_vcs_source(db, settings_row, git_sha: str, workdir: Path) -> Pa
     from terrapod.services import vcs_provider
     from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 
-    result = await db.execute(
-        select(VCSConnection).where(VCSConnection.id == settings_row.vcs_connection_id)
-    )
+    result = await db.execute(select(VCSConnection).where(VCSConnection.id == ws.vcs_connection_id))
     conn = result.scalar_one()
-    owner, repo = vcs_provider.parse_repo_url(conn, settings_row.repo_url)  # type: ignore[misc]
+    owner, repo = vcs_provider.parse_repo_url(conn, ws.vcs_repo_url)  # type: ignore[misc]
 
-    subdir = (settings_row.working_directory or "").strip("/")
+    # `config_directory` is the fetch scope AND the cwd. NULL is refused before
+    # we get here -- a workspace with no config root has no configure operation
+    # and therefore no git inventory source to fetch.
+    subdir = (ws.config_directory or "").strip("/")
     paths = [subdir] if subdir else None
 
     # A fresh instance per resolution. Its own docstring says one per logical
@@ -708,14 +832,14 @@ async def _fetch_vcs_source(db, settings_row, git_sha: str, workdir: Path) -> Pa
     if not root.is_dir():
         raise InventoryResolutionFailed(
             f"{subdir or '/'} is not a directory in {owner}/{repo} at {git_sha[:8]} -- "
-            f"the inventory's working directory names a path the repository does not "
+            f"the workspace's config directory names a path the repository does not "
             f"have at that commit"
         )
 
     # BEFORE the plugin scan, not after: an ignored file should not be read at
     # all, and scanning one would refuse the resolution over a file the
     # operator had already taken out of the source.
-    await asyncio.to_thread(_apply_ignore_paths, root, list(settings_row.ignore_paths or []))
+    await asyncio.to_thread(_apply_ignore_paths, root, list(ws.inventory_ignore_paths or []))
     await asyncio.to_thread(_refuse_plugin_sources, root)
     return root
 
@@ -732,11 +856,17 @@ def _apply_ignore_paths(root: Path, patterns: list[str]) -> None:
     disappearing, and far less alarming to look at.
 
     Patterns are globs against the path RELATIVE TO `root`, so they are
-    relative to `working_directory` where one is set. That is the only coherent
-    reading -- the two are configured together and one names the source the
-    other narrows -- and it means an operator never writes a prefix they did
-    not choose. Same matcher as an autodiscovery rule's `ignore_patterns`
-    (`_match_glob`), so the two mean the same thing.
+    relative to `config_directory` (#1929) -- the config root this fetched, not
+    the Terraform `working_directory`. That is the only coherent reading: the
+    two are configured together and one names the source the other narrows, and
+    it means an operator never writes a prefix they did not choose. Same matcher
+    as an autodiscovery rule's `ignore_patterns` (`_match_glob`), so the two
+    mean the same thing.
+
+    Note `rel` carries NO trailing slash even for a directory, so a pattern
+    written `cache/` would match nothing at all. `validate_inventory_ignore_paths`
+    refuses a trailing slash for exactly that reason -- it is a pattern that
+    looks like it excludes a directory and silently excludes nothing.
 
     Synchronous, called through `asyncio.to_thread`: a directory walk and
     unlinks are blocking I/O over something that could realistically be large.

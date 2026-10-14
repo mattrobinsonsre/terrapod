@@ -111,6 +111,27 @@ export default function BulkUpdatePage() {
   // ---- Update form state ----
   const [uTfVersion, setUTfVersion] = useState('')
   const [uAnsibleVersion, setUAnsibleVersion] = useState('')
+  // The Ansible roots and run defaults (#1929).
+  //
+  // `config-directory` CANNOT use this form's `if (value.trim())` idiom. That
+  // idiom reads an empty box as "the operator did not touch this", which is
+  // only sound where the empty string is not itself a value. Here both falsy
+  // values are real and they mean opposite things: null declares that a
+  // workspace has NO configure operation, and '' declares that its config
+  // root IS the repository root. A plain text input can express neither, so
+  // the decision is carried explicitly by a tri-state mode — '' sends no key
+  // at all, 'clear' sends null, 'set' sends the box verbatim including ''.
+  const [uConfigDirectoryMode, setUConfigDirectoryMode] = useState('')
+  const [uConfigDirectory, setUConfigDirectory] = useState('')
+  // Checkbox-gated for the same reason one step smaller: '' is a real value
+  // on both of these (no default playbook; the whole inventory), so there is
+  // no in-band way to say "leave this alone" — same shape as var-files.
+  const [uSetDefaultPlaybook, setUSetDefaultPlaybook] = useState(false)
+  const [uDefaultPlaybook, setUDefaultPlaybook] = useState('')
+  const [uSetDefaultLimit, setUSetDefaultLimit] = useState(false)
+  const [uDefaultLimit, setUDefaultLimit] = useState('')
+  // A tri-state '' | 'true' | 'false', as terragrunt-enabled below.
+  const [uInventoryIncludePlatform, setUInventoryIncludePlatform] = useState('')
   const [uExecBackend, setUExecBackend] = useState('')
   const [uExecMode, setUExecMode] = useState('')
   // '' means "leave unchanged"; anything else is an auto-apply mode (#1276).
@@ -141,6 +162,13 @@ export default function BulkUpdatePage() {
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
   const [uVarFiles, setUVarFiles] = useState<string[]>([])
+  // An EMPTY list is a meaningful value on both of these — it clears every
+  // inventory source / ignore entry — so, as with var-files, the checkbox is
+  // what says "touch this at all" (#1929).
+  const [uSetInventoryPaths, setUSetInventoryPaths] = useState(false)
+  const [uInventoryPaths, setUInventoryPaths] = useState<string[]>([])
+  const [uSetInventoryIgnorePaths, setUSetInventoryIgnorePaths] = useState(false)
+  const [uInventoryIgnorePaths, setUInventoryIgnorePaths] = useState<string[]>([])
   // Only to tell the operator when the deployment publishes no issuer, so an
   // entry added here could never be minted for. No partition on this surface:
   // the value IS the override — unlike a workspace read, nothing is merged
@@ -211,6 +239,15 @@ export default function BulkUpdatePage() {
     // keeps the UI off a deprecated spelling.
     if (uTfVersion.trim()) u['engine-version'] = uTfVersion.trim()
     if (uAnsibleVersion.trim()) u['ansible-version'] = uAnsibleVersion.trim()
+    // Not `if (uConfigDirectory.trim())` — see the state comment: that would
+    // collapse null and '', the two values this setting deliberately keeps
+    // apart, and leave no way to express either. The mode decides.
+    if (uConfigDirectoryMode === 'clear') u['config-directory'] = null
+    else if (uConfigDirectoryMode === 'set') u['config-directory'] = uConfigDirectory.trim()
+    if (uSetDefaultPlaybook) u['default-playbook'] = uDefaultPlaybook.trim()
+    if (uSetDefaultLimit) u['default-limit'] = uDefaultLimit.trim()
+    if (uInventoryIncludePlatform)
+      u['inventory-include-platform'] = uInventoryIncludePlatform === 'true'
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
     // Send the mode, never the boolean — the endpoint 422s if both are set.
@@ -241,6 +278,10 @@ export default function BulkUpdatePage() {
     if (uAllowForkPrPlans) u['allow-fork-pr-plans'] = uAllowForkPrPlans === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
+    if (uSetInventoryPaths)
+      u['inventory-paths'] = uInventoryPaths.map((s) => s.trim()).filter(Boolean)
+    if (uSetInventoryIgnorePaths)
+      u['inventory-ignore-paths'] = uInventoryIgnorePaths.map((s) => s.trim()).filter(Boolean)
     // Blank audience rows are refused by the server rather than dropped, and
     // so is a provider whose list came out empty — removing the key is the way
     // to stop overriding one. An empty row left in the editor would otherwise
@@ -873,6 +914,157 @@ export default function BulkUpdatePage() {
               />
               <p className="mt-1 text-xs text-slate-400">{tAi('contextHint')}</p>
             </div>
+          </div>
+
+          {/* The Ansible roots and run defaults (#1929) */}
+          <div className="pt-3 border-t border-slate-800">
+            <h3 className="text-sm font-medium text-slate-200 mb-1">{tAd('ansibleConfigure')}</h3>
+            <p className="text-xs text-slate-500 mb-3">{tAd('ansibleConfigureHint')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* min-w-0: a grid item has min-width:auto, so a select whose
+                  longest option is a long translated string can push the row
+                  past the viewport however w-full the control is. */}
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-config-directory-mode">
+                  {tWs('fields.configDirectory')}
+                </label>
+                {/* Three options, not a text box: this setting's null and its
+                    empty string are DIFFERENT values and both are falsy, so
+                    "leave alone", "no configure operation" and "the repository
+                    root" cannot all come out of one input. */}
+                <select
+                  id="bu-config-directory-mode"
+                  value={uConfigDirectoryMode}
+                  onChange={(e) => setUConfigDirectoryMode(e.target.value)}
+                  title={tWs('fields.configDirectoryTitle')}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="clear">{tWs('fields.configDirectoryModeNone')}</option>
+                  <option value="set">{tWs('fields.configDirectoryModeSet')}</option>
+                </select>
+                {uConfigDirectoryMode === 'set' && (
+                  <>
+                    <input
+                      type="text"
+                      value={uConfigDirectory}
+                      onChange={(e) => setUConfigDirectory(e.target.value)}
+                      placeholder={tWs('fields.configDirectoryPlaceholder')}
+                      aria-label={tWs('fields.configDirectory')}
+                      className={`mt-2 ${inputCls}`}
+                    />
+                    <p className="mt-1 text-xs text-slate-400">
+                      {tWs('fields.configDirectoryRootHint')}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-inventory-include-platform">
+                  {tWs('fields.inventoryIncludePlatform')}
+                </label>
+                <select
+                  id="bu-inventory-include-platform"
+                  value={uInventoryIncludePlatform}
+                  onChange={(e) => setUInventoryIncludePlatform(e.target.value)}
+                  title={tWs('fields.inventoryIncludePlatformTitle')}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.inventoryIncludePlatformHint')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+                <input
+                  type="checkbox"
+                  checked={uSetDefaultPlaybook}
+                  onChange={(e) => setUSetDefaultPlaybook(e.target.checked)}
+                />
+                {t('update.setDefaultPlaybook')}
+              </label>
+              {uSetDefaultPlaybook && (
+                <input
+                  type="text"
+                  value={uDefaultPlaybook}
+                  onChange={(e) => setUDefaultPlaybook(e.target.value)}
+                  placeholder={tWs('fields.defaultPlaybookPlaceholder')}
+                  aria-label={tWs('fields.defaultPlaybook')}
+                  title={tWs('fields.defaultPlaybookTitle')}
+                  className={inputCls}
+                />
+              )}
+            </div>
+            <div className="mt-3">
+              <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+                <input
+                  type="checkbox"
+                  checked={uSetDefaultLimit}
+                  onChange={(e) => setUSetDefaultLimit(e.target.checked)}
+                />
+                {t('update.setDefaultLimit')}
+              </label>
+              {uSetDefaultLimit && (
+                <input
+                  type="text"
+                  value={uDefaultLimit}
+                  onChange={(e) => setUDefaultLimit(e.target.value)}
+                  placeholder={tWs('fields.defaultLimitPlaceholder')}
+                  aria-label={tWs('fields.defaultLimit')}
+                  title={tWs('fields.defaultLimitTitle')}
+                  className={inputCls}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-800">
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+              <input
+                type="checkbox"
+                checked={uSetInventoryPaths}
+                onChange={(e) => setUSetInventoryPaths(e.target.checked)}
+              />
+              {t('update.setInventoryPaths')}
+            </label>
+            {uSetInventoryPaths && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">{tWs('fields.inventoryPathsHint')}</p>
+                <StringListEditor
+                  values={uInventoryPaths}
+                  onChange={setUInventoryPaths}
+                  placeholder={tWs('fields.inventoryPathsPlaceholder')}
+                  addLabel={tWs('fields.inventoryPathsAdd')}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-slate-800">
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+              <input
+                type="checkbox"
+                checked={uSetInventoryIgnorePaths}
+                onChange={(e) => setUSetInventoryIgnorePaths(e.target.checked)}
+              />
+              {t('update.setInventoryIgnorePaths')}
+            </label>
+            {uSetInventoryIgnorePaths && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">{tWs('fields.inventoryIgnorePathsHint')}</p>
+                <StringListEditor
+                  values={uInventoryIgnorePaths}
+                  onChange={setUInventoryIgnorePaths}
+                  placeholder={tWs('fields.inventoryIgnorePathsPlaceholder')}
+                  addLabel={tWs('fields.inventoryIgnorePathsAdd')}
+                />
+              </div>
+            )}
           </div>
 
           <div className="pt-3 border-t border-slate-800">

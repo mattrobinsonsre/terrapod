@@ -27,7 +27,6 @@ from terrapod.db.models import (
     InventoryHost,
     InventoryHostGroup,
     InventoryHostVar,
-    InventorySettings,
     ModuleAutodiscoveryRepository,
     ModuleAutodiscoveryRule,
     ModuleWorkspaceLink,
@@ -528,16 +527,6 @@ WORKSPACE_REMOTE_STATE_CONSUMERS = register(
 # `vcs_connection_id` is a nullable FK with ON DELETE SET NULL, and
 # `vcs_connections` is registered above, so it carries rather than being
 # excluded the way `state_versions.run_id` is.
-
-INVENTORY_SETTINGS = register(
-    ReplicatedClass(
-        name="inventory_settings",
-        model=InventorySettings,
-        # The workspace IS the key -- one inventory per workspace, so there is
-        # no surrogate id to replicate on.
-        pk_attrs=("workspace_id",),
-    )
-)
 
 INVENTORY_HOSTS = register(ReplicatedClass(name="inventory_hosts", model=InventoryHost))
 

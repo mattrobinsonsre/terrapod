@@ -163,7 +163,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable, ws- a workspace's inventory settings",
+          "description": "the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update",
           "type": "string"
         }
       },
@@ -185,76 +185,6 @@
         },
         "workspace_id": {
           "description": "the workspace id (ws-...) whose inventory to resolve",
-          "type": "string"
-        }
-      },
-      "required": [
-        "workspace_id"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "name": "terrapod_inventory_settings",
-    "read_only": true,
-    "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-        "workspace_id": {
-          "description": "the workspace id (ws-...)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "workspace_id"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "name": "terrapod_inventory_settings_set",
-    "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-        "branch": {
-          "description": "the branch to read; empty means the repository default",
-          "type": "string"
-        },
-        "clear_vcs_connection": {
-          "description": "remove the git binding entirely, leaving the declared rows as the whole inventory",
-          "type": "boolean"
-        },
-        "ignore_paths": {
-          "description": "paths within the source to skip",
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "include_platform": {
-          "description": "whether the declared rows contribute to the resolution; default true",
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
-        "repo_url": {
-          "description": "the repository holding the inventory",
-          "type": "string"
-        },
-        "vcs_connection_id": {
-          "description": "the VCS connection to fetch the git inventory source with. Pass an empty string with clear_vcs_connection to remove the binding",
-          "type": "string"
-        },
-        "working_directory": {
-          "description": "the DIRECTORY within the repository that ansible reads as one source; empty means the root",
-          "type": "string"
-        },
-        "workspace_id": {
-          "description": "the workspace id (ws-...)",
           "type": "string"
         }
       },
@@ -1269,6 +1199,21 @@
             "string"
           ]
         },
+        "config_directory": {
+          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_limit": {
+          "description": "the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan",
+          "type": "string"
+        },
+        "default_playbook": {
+          "description": "the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook",
+          "type": "string"
+        },
         "engine": {
           "description": "the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI",
           "type": "string"
@@ -1284,6 +1229,33 @@
         "execution_mode": {
           "description": "local or agent (default: server default)",
           "type": "string"
+        },
+        "inventory_ignore_paths": {
+          "description": "paths excluded from the inventory resolution. Pass an empty list to remove every one",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "inventory_include_platform": {
+          "description": "whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "inventory_paths": {
+          "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "labels": {
           "additionalProperties": {
@@ -1447,6 +1419,31 @@
             "string"
           ]
         },
+        "clear_config_directory": {
+          "description": "turn the ansible configure operation OFF for this workspace. Distinct from config_directory=\"\", which roots it at the repository root; this removes it entirely. Wins if both are passed",
+          "type": "boolean"
+        },
+        "config_directory": {
+          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories. On an update, OMITTING it leaves the stored value alone; pass clear_config_directory to turn the configure operation off",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_limit": {
+          "description": "the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_playbook": {
+          "description": "the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "engine_version": {
           "description": "version of the engine this workspace runs; partial like 1.15 (means 1.15.*)",
           "type": "string"
@@ -1458,6 +1455,33 @@
         "execution_mode": {
           "description": "local or agent",
           "type": "string"
+        },
+        "inventory_ignore_paths": {
+          "description": "paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "inventory_include_platform": {
+          "description": "whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "inventory_paths": {
+          "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "labels": {
           "additionalProperties": {

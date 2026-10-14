@@ -77,6 +77,32 @@ class TestTheNativeSurfaceServesEveryEngine:
     #: nobody had to write down is a difference nobody notices growing.
     NATIVE_ONLY_ATTRS = {
         "pulumi-bind-plan": "a Pulumi concept, and this surface serves Terraform alone (#1911)",
+        # The Ansible roots and run defaults (#1929). Native-only for the same
+        # reason as the entry above, and deliberately: `/api/tfe/v2` is the
+        # frozen surface that `terraform`, `tofu` and `tfci` consume, no
+        # invocation of any of them reads these, and
+        # `docs/tfe-cli-surface.md` is what decides what belongs there.
+        #
+        # They are POPPED from the shared literal in `_workspace_json` rather
+        # than built conditionally, because the attribute-contract gate
+        # AST-reads that literal and cannot see through a `**spread` -- so
+        # building it the other way would take the keys out of the snapshot
+        # entirely and un-freeze them for the native consumers that DO read
+        # them.
+        #
+        # Note the WRITE path is shared: create and PATCH accept all six on
+        # either prefix. That asymmetry follows `pulumi-bind-plan` exactly --
+        # the representation is gated on the door, the parsing is not.
+        "config-directory": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        "default-limit": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        "inventory-include-platform": (
+            "an Ansible concept; the TFE surface serves Terraform alone (#1929)"
+        ),
+        "inventory-ignore-paths": (
+            "an Ansible concept; the TFE surface serves Terraform alone (#1929)"
+        ),
     }
 
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):

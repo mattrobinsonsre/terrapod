@@ -72,6 +72,17 @@ _FIELD_MAP: dict[str, str] = {
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
     "ansible-version": "ansible_version",
+    # The Ansible roots and run defaults (#1929). `config-directory` is the one
+    # that carries a meaning in its NULL: absent means this workspace has no
+    # configure operation, where "" means the repository root -- so a bulk
+    # update can both turn configure ON for a fleet and turn it OFF, which is
+    # exactly the fleet-wide operation the parity gate exists to guarantee.
+    "config-directory": "config_directory",
+    "inventory-paths": "inventory_paths",
+    "default-playbook": "default_playbook",
+    "default-limit": "default_limit",
+    "inventory-include-platform": "inventory_include_platform",
+    "inventory-ignore-paths": "inventory_ignore_paths",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     # Per-workspace cloud identity (#1901). An ordinary mapped field: one input
@@ -363,6 +374,19 @@ _SETTING_RULES: dict[str, Any] = {
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "ansible-version": workspace_settings.validate_ansible_version,
+    # The Ansible roots and run defaults (#1929). Shared with the
+    # single-workspace PATCH rather than restated here -- restating one is how
+    # the two surfaces come to disagree about what is valid (#1763).
+    "config-directory": workspace_settings.validate_config_directory,
+    "inventory-paths": workspace_settings.validate_inventory_paths,
+    "inventory-ignore-paths": workspace_settings.validate_inventory_ignore_paths,
+    "default-playbook": lambda v: workspace_settings.validate_ansible_run_default(
+        v, "default-playbook"
+    ),
+    "default-limit": lambda v: workspace_settings.validate_ansible_run_default(v, "default-limit"),
+    "inventory-include-platform": lambda v: workspace_settings.validate_bool(
+        v, "inventory-include-platform"
+    ),
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,

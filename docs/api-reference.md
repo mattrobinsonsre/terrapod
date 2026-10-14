@@ -447,6 +447,50 @@ practitioner declared.
 Settable on workspace create, workspace update, bulk update, and as an
 autodiscovery rule template field.
 
+### The configure-operation attributes
+
+Six attributes name where a workspace's Ansible configuration lives and what a
+configure operation does by default. All six are on the **native surface only**
+(`/api/v1` and the deprecated `/api/terrapod/v1` alias) and are deliberately
+**not** on the TFE-compatible prefix — no `terraform`, `tofu` or `tfci`
+invocation consumes them.
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `config-directory` | string or `null` | The Ansible config root — `ansible.cfg`, playbooks, `roles/`, `group_vars/`, `host_vars/` — relative to the repository root. Also the directory the resolver and the executor **run in** |
+| `inventory-paths` | list of strings | The inventory sources, in order, each a file or a directory, relative to `config-directory`. Empty falls through to the `inventory` pathlist in the operator's own `ansible.cfg` |
+| `default-playbook` | string | The playbook a configure runs when the run names none |
+| `default-limit` | string | The default `--limit`. Empty is the whole inventory |
+| `inventory-include-platform` | bool | Whether the declared inventory rows take part in resolution. Default `true`; `false` resolves the repository source alone |
+| `inventory-ignore-paths` | list of strings | Paths pruned from a fetched inventory source before ansible reads it. Ansible takes every file in a directory, so this is the only way to leave one out |
+
+**`null` and `""` mean different things on `config-directory`.** `null` means
+this workspace has **no configure operation at all**; `""` means the configure
+operation's root is the top of the repository. This is deliberately unlike
+`working-directory`, which is non-nullable with `""` meaning root: every
+workspace has a Terraform root even when it is the top of the repo, whereas most
+workspaces have no Ansible at all and that absence has to be expressible. A
+client that collapses the two will silently turn "no Ansible here" into "Ansible
+at the repository root".
+
+**The VCS binding is the workspace's own.** There is no separate binding for the
+inventory: it uses `vcs-connection-id`, `vcs-repo-url` and `vcs-branch` like
+everything else. Terraform and Ansible in different repositories is not
+supported, so what differs between the two concerns is the **root** —
+`working-directory` against `config-directory` — not the repository.
+
+**`config-directory` is fetched whole, and that is not an optimisation to
+reverse.** Measured against ansible-core 2.18.3, `group_vars` and `host_vars`
+are found in exactly two places: inside the inventory directory, or at the
+working directory — never merely *beside* the inventory directory, which is where
+a conventional repository puts them. Narrowing the fetch to the inventory
+directory therefore returns the right hosts, the right groups, exit `0` and
+**every variable missing**, with nothing unparsed to raise an error.
+
+Settable on workspace create, workspace update, bulk update, and as
+autodiscovery rule template fields. See
+[Ansible Inventory](ansible-inventory.md) for the model they configure.
+
 ### `engine-version`, and its older name `terraform-version`
 
 A workspace pins the version of whichever engine it runs — OpenTofu, Terraform
@@ -5521,53 +5565,9 @@ Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read
 
 **Configure operations do not exist yet.** These endpoints build an inventory and make it observable; they do not run playbooks.
 
-Typed id prefixes: `invhost-` (host), `invgroup-` (group), `invhg-` (host membership), `invgc-` (group nesting), `invhvar-` (host variable), `invgvar-` (group variable), `invvar-` (inventory variable). The settings are identified by the **workspace id**, because one inventory per workspace means there is no surrogate id to carry.
+Typed id prefixes: `invhost-` (host), `invgroup-` (group), `invhg-` (host membership), `invgc-` (group nesting), `invhvar-` (host variable), `invgvar-` (group variable), `invvar-` (inventory variable). The inventory's roots and defaults are **workspace attributes** rather than a resource here — see [The configure-operation attributes](#the-configure-operation-attributes).
 
 Common statuses across every write here: **409** on a duplicate (a second host of the same name in the workspace, a second variable with the same key on the same parent, a membership or nesting that already exists) — which is what makes a Terraform import the next step; **422** on a parent that is absent or in another workspace, on a name ansible cannot use, and on a ceiling, with the limit named in the message.
-
-### Show / Replace / Update / Delete Inventory Settings
-
-```
-GET    /api/v1/workspaces/{id}/inventory/settings
-PUT    /api/v1/workspaces/{id}/inventory/settings
-PATCH  /api/v1/workspaces/{id}/inventory/settings
-DELETE /api/v1/workspaces/{id}/inventory/settings
-```
-
-`GET` requires `inventory:read`; the rest require `inventory:write` (apply phase for a runner token). `DELETE` returns `204` and clears the VCS binding without touching a single row.
-
-**`GET` answers `404` when there are none, and that is the default** — not an error. It means no VCS source is bound and the declared rows are the whole inventory.
-
-`PUT` is a full replace, because the route is a singleton: the body is the complete intended state, so an attribute left out takes its default rather than keeping the stored value. `PATCH` changes only what it names, so a caller does not have to read the row to change one field.
-
-On a `PATCH`, **an omitted `vcs-connection` relationship means "leave it alone" and an explicit `{"data": null}` means "remove it"** — the distinction a partial update depends on, since collapsing the two would make a binding impossible to clear without a full `PUT`. Clearing it while leaving a `repo-url` behind is the same incoherent row as setting both at once, so the check runs against the **merged** state and refuses it with `422`.
-
-```json
-{
-  "data": {
-    "type": "inventory-settings",
-    "attributes": {
-      "include-platform": true,
-      "repo-url": "https://github.com/acme/ansible",
-      "branch": "main",
-      "working-directory": "inventory"
-    },
-    "relationships": {
-      "vcs-connection": {"data": {"id": "vcs-...", "type": "vcs-connections"}}
-    }
-  }
-}
-```
-
-| Attribute | Meaning |
-|---|---|
-| `include-platform` | Whether the declared rows take part in resolution. Default `true`. `false` resolves the repository alone, which is how a committed inventory is moved in before anything is declared |
-| `repo-url` | The repository holding the inventory. **A repository needs a VCS connection to fetch it with** — `repo-url` with no `vcs-connection` relationship is a `422` naming the field, checked against the merged state on a `PATCH` so clearing the connection and leaving the repository behind is refused too |
-| `branch` | The branch to read. Empty means the repository's default branch |
-| `working-directory` | The **directory** ansible reads as one source. A directory rather than a file, because ansible reads a directory lexically, so one binding already carries arbitrarily many inventory files in an order the operator controls through filenames |
-| `ignore-paths` | Globs matched against paths **relative to `working-directory`**, pruned from the fetched source before anything reads it. Ansible takes every file in a directory, so this is the only way to leave one out |
-
-The `vcs-connection` relationship is the binding, and it is **independent of the workspace's own Terraform VCS binding**: even in one repository the root directory differs, and a workspace with no infrastructure of its own has no Terraform binding at all.
 
 ### List / Create Inventory Hosts
 

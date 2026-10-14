@@ -2,7 +2,6 @@ package terrapod
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,20 +9,6 @@ import (
 	"net/url"
 	"testing"
 )
-
-const settingsJSON = `{"data":{"id":"ws-abc","type":"inventory-settings","attributes":{
-  "include-platform":true,"repo-url":"https://example.invalid/org/ansible",
-  "branch":"main","working-directory":"inventory","ignore-paths":["archive/"],
-  "created-at":"2026-01-01T00:00:00Z","updated-at":"2026-01-01T00:00:00Z"},
-  "relationships":{"workspace":{"data":{"id":"ws-abc","type":"workspaces"}},
-    "vcs-connection":{"data":{"id":"vcs-9999","type":"vcs-connections"}}}}}`
-
-const settingsNoVCSJSON = `{"data":{"id":"ws-abc","type":"inventory-settings","attributes":{
-  "include-platform":true,"repo-url":"","branch":"","working-directory":"",
-  "ignore-paths":[],"created-at":"2026-01-01T00:00:00Z",
-  "updated-at":"2026-01-01T00:00:00Z"},
-  "relationships":{"workspace":{"data":{"id":"ws-abc","type":"workspaces"}},
-    "vcs-connection":{"data":null}}}}`
 
 const hostJSON = `{"data":{"id":"invhost-1111","type":"inventory-hosts","attributes":{
   "name":"web-01","group-count":3,"variable-count":2,
@@ -155,180 +140,6 @@ func wantReq(t *testing.T, got *invCaptured, method, path string) {
 	if got.method != method || got.path != path {
 		t.Errorf("wrong request: got %s %s, want %s %s", got.method, got.path, method, path)
 	}
-}
-
-// ── Settings ─────────────────────────────────────────────────────────────────
-
-func TestGetInventorySettings(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsJSON)
-
-	s, err := c.GetInventorySettings(t.Context(), "ws-abc")
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantReq(t, got, http.MethodGet, "/api/v1/workspaces/ws-abc/inventory/settings")
-
-	if s.ID != "ws-abc" || s.WorkspaceID != "ws-abc" {
-		t.Errorf("settings are identified by the workspace: %+v", s)
-	}
-	if s.VCSConnectionID != "vcs-9999" {
-		t.Errorf("vcs connection: got %q", s.VCSConnectionID)
-	}
-	if !s.IncludePlatform || s.Branch != "main" || s.WorkingDirectory != "inventory" {
-		t.Errorf("attributes not parsed: %+v", s)
-	}
-	if len(s.IgnorePaths) != 1 || s.IgnorePaths[0] != "archive/" {
-		t.Errorf("ignore paths: %v", s.IgnorePaths)
-	}
-}
-
-func TestGetInventorySettingsWithNoVCSBinding(t *testing.T) {
-	c, _ := inventoryServer(t, http.StatusOK, settingsNoVCSJSON)
-
-	s, err := c.GetInventorySettings(t.Context(), "ws-abc")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// A null relationship is an UNBOUND source, not a parse failure.
-	if s.VCSConnectionID != "" {
-		t.Errorf("a null vcs-connection must read as empty, got %q", s.VCSConnectionID)
-	}
-}
-
-// A workspace with no settings row is the normal default state, so the error a
-// caller gets back has to be recognisable as "none" rather than a failure.
-func TestGetInventorySettingsIsNotFoundWhenAbsent(t *testing.T) {
-	c, _ := inventoryServer(t, http.StatusNotFound,
-		`{"errors":[{"detail":"Not found","status":"404"}]}`)
-
-	_, err := c.GetInventorySettings(t.Context(), "ws-abc")
-	if err == nil {
-		t.Fatal("expected an error")
-	}
-	var nf *NotFoundError
-	if !errors.As(err, &nf) {
-		t.Errorf("want a NotFoundError a caller can test for, got %T: %v", err, err)
-	}
-}
-
-func TestPutInventorySettingsSendsTheWholeState(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsJSON)
-
-	_, err := c.PutInventorySettings(t.Context(), "ws-abc", PutInventorySettingsRequest{
-		IncludePlatform:  true,
-		VCSConnectionID:  "vcs-9999",
-		RepoURL:          "https://example.invalid/org/ansible",
-		Branch:           "main",
-		WorkingDirectory: "inventory",
-		IgnorePaths:      []string{"archive/"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantReq(t, got, http.MethodPut, "/api/v1/workspaces/ws-abc/inventory/settings")
-
-	// A PUT is a replace, so every attribute is present even at its default --
-	// an omitted one would be indistinguishable from "leave it alone", which
-	// is what the PATCH is for.
-	for _, key := range []string{
-		"include-platform", "repo-url", "branch", "working-directory", "ignore-paths",
-	} {
-		if _, ok := got.attrs[key]; !ok {
-			t.Errorf("a PUT must send %q even at its default", key)
-		}
-	}
-	if got.relID("vcs-connection") != "vcs-9999" {
-		t.Errorf("vcs-connection relationship: %q", got.relID("vcs-connection"))
-	}
-}
-
-func TestPutInventorySettingsWithNoConnectionSendsExplicitNull(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsNoVCSJSON)
-
-	_, err := c.PutInventorySettings(t.Context(), "ws-abc", PutInventorySettingsRequest{
-		IncludePlatform: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Omitting the relationship would leave a previously-bound source in
-	// place, which is the opposite of what a replace means.
-	if !got.relIsExplicitNull("vcs-connection") {
-		t.Errorf("a PUT with no connection must send data:null, got %v",
-			got.rels["vcs-connection"])
-	}
-}
-
-func TestUpdateInventorySettingsOmitsWhatItIsNotChanging(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsJSON)
-
-	_, err := c.UpdateInventorySettings(t.Context(), "ws-abc",
-		UpdateInventorySettingsRequest{Branch: invStr("release")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantReq(t, got, http.MethodPatch, "/api/v1/workspaces/ws-abc/inventory/settings")
-
-	if got.attrs["branch"] != "release" {
-		t.Errorf("branch not sent: %v", got.attrs)
-	}
-	for _, key := range []string{
-		"include-platform", "repo-url", "working-directory", "ignore-paths",
-	} {
-		if _, ok := got.attrs[key]; ok {
-			t.Errorf("a patch must not send %q it was not given", key)
-		}
-	}
-	// No relationship at all, so the binding is left alone.
-	if _, ok := got.rels["vcs-connection"]; ok {
-		t.Errorf("an untouched binding must send no relationship, got %v",
-			got.rels["vcs-connection"])
-	}
-}
-
-func TestUpdateInventorySettingsClearsTheBindingWithAnExplicitNull(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsNoVCSJSON)
-
-	_, err := c.UpdateInventorySettings(t.Context(), "ws-abc",
-		UpdateInventorySettingsRequest{ClearVCSConnection: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !got.relIsExplicitNull("vcs-connection") {
-		t.Errorf("clearing needs data:null, got %v", got.rels["vcs-connection"])
-	}
-}
-
-func TestUpdateInventorySettingsClearsIgnorePathsWithAnEmptyList(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusOK, settingsNoVCSJSON)
-
-	// A pointer to a NIL slice means "clear", so it has to arrive as `[]`.
-	// Dereferencing straight into the body marshals as JSON null, which the
-	// server reads as absent -- so the one request that removes every ignore
-	// path would silently do nothing.
-	var none []string
-	_, err := c.UpdateInventorySettings(t.Context(), "ws-abc",
-		UpdateInventorySettingsRequest{IgnorePaths: &none})
-	if err != nil {
-		t.Fatal(err)
-	}
-	paths, ok := got.attrs["ignore-paths"]
-	if !ok {
-		t.Fatal("ignore-paths was not sent at all")
-	}
-	list, ok := paths.([]any)
-	if !ok || len(list) != 0 {
-		t.Errorf("want an empty list, got %#v", paths)
-	}
-}
-
-func TestDeleteInventorySettings(t *testing.T) {
-	c, got := inventoryServer(t, http.StatusNoContent, "")
-
-	if err := c.DeleteInventorySettings(t.Context(), "ws-abc"); err != nil {
-		t.Fatal(err)
-	}
-	wantReq(t, got, http.MethodDelete, "/api/v1/workspaces/ws-abc/inventory/settings")
 }
 
 // ── Hosts ────────────────────────────────────────────────────────────────────

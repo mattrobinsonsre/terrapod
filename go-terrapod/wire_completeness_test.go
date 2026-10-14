@@ -159,7 +159,22 @@ func TestEveryWorkspaceFieldIsDecoded(t *testing.T) {
 		case reflect.Int64, reflect.Int:
 			attrs[name] = 7
 		case reflect.Pointer:
-			attrs[name] = 7
+			// Synthesise by the pointed-to kind, not a bare 7. Every pointer
+			// field on Workspace was an *int64 until `config-directory`
+			// (#1929) arrived as a *string, and `7` cannot be unmarshalled
+			// into one -- so the decoder returned nil, the field read as zero,
+			// and this gate reported a field it DOES decode as undecoded.
+			// A harness that only synthesises the types it has already seen
+			// fails on the next one, in the direction that looks like a bug in
+			// the code rather than in the harness.
+			switch f.Type.Elem().Kind() {
+			case reflect.String:
+				attrs[name] = "x"
+			case reflect.Bool:
+				attrs[name] = true
+			default:
+				attrs[name] = 7
+			}
 		}
 	}
 	res := resourceWithAttrs("ws-1", "workspaces", attrs)

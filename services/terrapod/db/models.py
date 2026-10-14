@@ -365,6 +365,68 @@ class Workspace(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
+    #: The Ansible config root -- `ansible.cfg`, playbooks, `roles/`,
+    #: `group_vars/`, `host_vars/` -- relative to the repository root (#1929).
+    #:
+    #: **NULL and `""` mean different things here, unlike `working_directory`
+    #: above.** NULL means this workspace has no configure operation at all;
+    #: `""` means the configure operation's root is the top of the repository.
+    #: Every workspace has a Terraform root even when it is the repo root, so
+    #: `working_directory` can be non-nullable with `""` meaning root; most
+    #: workspaces have no Ansible at all, and that absence has to be sayable.
+    #:
+    #: It is also the resolver's and the executor's **working directory**, which
+    #: is load-bearing twice over: `group_vars`/`host_vars` are found at the cwd
+    #: as well as inside the inventory directory, and relative paths in
+    #: `ansible.cfg` resolve against the cwd rather than against the config file.
+    config_directory: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    #: Inventory sources, in order, each a file OR a directory, relative to
+    #: `config_directory` (#1929).
+    #:
+    #: A LIST because `inventory` in `ansible.cfg` is `type: pathlist` and the
+    #: order is precedence -- a later source wins per variable -- so reading one
+    #: entry would resolve a partial inventory and silently change the
+    #: operator's merge. Entries may name a FILE because ansible's own
+    #: documented layout puts `production` and `staging` side by side: pointing
+    #: at the containing directory instead MERGES them, which for a staging
+    #: workspace means holding production hosts.
+    #:
+    #: Empty defaults to the operator's own `ansible.cfg` `inventory` pathlist
+    #: at resolution time, so the common case needs no configuration and our
+    #: `-i` cannot disagree with what ansible itself would do.
+    inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+
+    #: The playbook a configure runs when the run names none (#1929).
+    #:
+    #: `vcs_branch`/`vcs-ref` in its exact shape: the workspace carries the
+    #: default, a run may name something else, and nobody is prompted. Hitting
+    #: Configure runs this against `default_limit`.
+    default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: The default `--limit` for a configure; empty is the whole inventory.
+    #:
+    #: `--limit` is a run option in the shape of `-target` -- both narrow what
+    #: the operation touches, both optional -- and this is its workspace
+    #: default. It matters more than it looks: measured, 96 of 180 plays in a
+    #: production repository target `hosts: all`, so targeting really is done
+    #: per run rather than in the playbook.
+    default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: Whether the declared inventory rows take part in resolution (#1929).
+    #:
+    #: False resolves the git source alone, which is how an operator moves a
+    #: repository's existing inventory in before declaring anything.
+    inventory_include_platform: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    #: Paths to drop from a fetched git inventory source before ansible sees it.
+    #:
+    #: Ansible reads a directory as ONE source, taking every file in it, so this
+    #: is the only way to leave a file out of a source that is a directory.
+    #: Without it the source stays WIDER than the operator asked for, which is
+    #: the direction that reads as harmless and is not.
+    inventory_ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+
     #: The Pulumi stack this workspace is, when it is one (#1570). NULL for
     #: Terraform, and for any Pulumi workspace created before this column.
     #:
@@ -1665,6 +1727,21 @@ class AutodiscoveryRule(Base):
     #: as this column's `engine_version` sibling mirrors
     #: `default_terraform_version`.
     ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
+
+    #: The Ansible roots and run defaults a materialised workspace inherits
+    #: (#1929), mirroring the workspace columns of the same names. A rule
+    #: without these could only ever produce plan/apply workspaces, so a fleet
+    #: of configure-capable ones would have to be edited one at a time.
+    #:
+    #: `config_directory` keeps its NULL-is-not-"" meaning here too: a rule that
+    #: leaves it NULL materialises workspaces with no configure operation, which
+    #: is every rule that exists today.
+    config_directory: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    inventory_include_platform: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    inventory_ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: Templated onto workspaces this rule materialises (#1431), alongside the
@@ -4124,75 +4201,6 @@ def subject_matches(model, identity_subject: str | None):
 # foreign key. Referential integrity is the whole reason for the composite keys
 # above, so three tables with three honest FKs it is. Worth saying here because
 # it reads as duplication to anyone later tempted to merge them.
-
-
-class InventorySettings(Base):
-    """A workspace's inventory configuration: at most one row (#1967).
-
-    **One inventory per workspace.** Disjoint targeting is what groups and
-    `--limit` are for, which is ansible's own answer, so there is no named
-    inventory object and nothing has to choose between several.
-
-    A 1:1 row rather than columns on `Workspace`, deliberately. Six inventory
-    columns there would flow through `test_workspace_setting_parity` and
-    therefore the bulk-update ledger, the autodiscovery rule template, the
-    provider's workspace resource and every surface that gate checks -- and a
-    terraform/tofu-only deployment would pay for all of it. Here the absence of
-    a row *is* "this workspace has no ansible", which costs nothing.
-    """
-
-    __tablename__ = "inventory_settings"
-
-    #: The workspace IS the key. No surrogate id: there can only be one.
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    #: Whether the declared rows take part in resolution. False resolves the VCS
-    #: source alone, which is how an operator moves a repo's inventory in before
-    #: declaring anything.
-    include_platform: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-    #: The VCS source. NULL means there is none, and the rows are the whole
-    #: inventory.
-    #:
-    #: **Not the workspace's own Terraform binding**, and that is the reason
-    #: these are columns here rather than a reference to it: even in one
-    #: repository the root directory differs (`terraform/` versus `ansible/`),
-    #: and a configure-only workspace has no Terraform binding at all.
-    vcs_connection_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("vcs_connections.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    #: The directory ansible reads as ONE source. A directory, not a file, on
-    #: purpose: ansible reads a directory lexically, so a single binding already
-    #: carries arbitrarily many inventory files in an order the operator
-    #: controls through filenames.
-    working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=now_utc, nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
-    )
-
-    workspace: Mapped[Workspace] = relationship()
-
-    __table_args__ = (
-        # A repo with no connection could never be fetched, so it is refused
-        # rather than stored as a configuration that silently does nothing.
-        CheckConstraint(
-            "vcs_connection_id IS NOT NULL OR repo_url = ''",
-            name="ck_inventory_settings_repo_needs_connection",
-        ),
-        Index("ix_inventory_settings_vcs_connection_id", "vcs_connection_id"),
-    )
 
 
 class InventoryHost(Base):

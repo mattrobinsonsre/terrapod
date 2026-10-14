@@ -1,14 +1,20 @@
-"""Inventory persistence: the eight structures and their rows (#1967, #1968).
+"""Inventory persistence: the seven structures and their rows (#1967, #1968, #1929).
 
 Name validation is `inventory_resolution` -- pure, no database. This module is
-the database half, and it is deliberately thin: eight structures, each with
+the database half, and it is deliberately thin: seven structures, each with
 create / read / list / delete, and update only where a row has a mutable field.
 
 ## One inventory per workspace
 
 There is no named inventory object. Disjoint targeting is what groups and
 `--limit` are for, which is ansible's own answer, so nothing has to choose
-between several and `inventory_settings` is a 1:1 row that may simply be absent.
+between several.
+
+There is no settings row either (#1929). The inventory's roots and defaults
+are columns on the workspace, because the settings row would have carried its
+own VCS binding and a workspace has exactly one -- a differing ROOT does not
+require a differing BINDING. `config_directory IS NULL` is now what "this
+workspace has no configure operation" means.
 
 ## Why the counts are queries rather than columns
 
@@ -43,7 +49,6 @@ from terrapod.db.models import (
     InventoryHost,
     InventoryHostGroup,
     InventoryHostVar,
-    InventorySettings,
 )
 from terrapod.services.inventory_resolution import (
     InventoryValidationError,
@@ -81,126 +86,24 @@ class InventoryLimitExceeded(Exception):
 # ── Settings ─────────────────────────────────────────────────────────────────
 
 
-async def get_settings(db: AsyncSession, workspace_id: uuid.UUID) -> InventorySettings | None:
-    """The workspace's inventory settings, or None when it has none.
+async def get_inventory_workspace(db: AsyncSession, workspace_id: uuid.UUID):
+    """The workspace row, for its inventory roots and binding (#1929).
 
-    None is a real and common state -- it means "no VCS source, resolve the
-    declared rows alone" -- so callers treat it as a default rather than an
-    error.
+    There is no settings object any more. The roots (`config_directory`,
+    `inventory_paths`), the run defaults (`default_playbook`, `default_limit`)
+    and the resolution switches (`inventory_include_platform`,
+    `inventory_ignore_paths`) are all workspace columns, and the VCS binding is
+    the workspace's own -- one binding per workspace, because Terraform and
+    Ansible in different repositories is not supported (#1407 point 11).
+
+    Returns None when the workspace does not exist. Callers treat that as the
+    default -- resolve the declared rows alone -- rather than as an error,
+    exactly as they treated an absent settings row before.
     """
-    result = await db.execute(
-        select(InventorySettings).where(InventorySettings.workspace_id == workspace_id)
-    )
+    from terrapod.db.models import Workspace
+
+    result = await db.execute(select(Workspace).where(Workspace.id == workspace_id))
     return result.scalar_one_or_none()
-
-
-async def put_settings(
-    db: AsyncSession,
-    workspace_id: uuid.UUID,
-    *,
-    include_platform: bool = True,
-    vcs_connection_id: uuid.UUID | None = None,
-    repo_url: str = "",
-    branch: str = "",
-    working_directory: str = "",
-    ignore_paths: list[str] | None = None,
-) -> InventorySettings:
-    """Create or replace the settings row.
-
-    A full replace rather than a patch, because the route is a `PUT` on a
-    singleton: there is one of these per workspace, so "the settings are now
-    this" is the only coherent write. A caller wanting to change one field reads
-    first -- which it has to do anyway to know what the others are.
-    """
-    if repo_url and vcs_connection_id is None:
-        # The CHECK constraint says this too; refusing here names the field
-        # instead of surfacing a constraint name.
-        raise InventoryValidationError(
-            "a repository needs a VCS connection to fetch it with: set "
-            "vcs-connection-id, or clear repo-url to resolve the declared rows alone"
-        )
-
-    settings = await get_settings(db, workspace_id)
-    if settings is None:
-        settings = InventorySettings(workspace_id=workspace_id)
-        db.add(settings)
-
-    settings.include_platform = include_platform
-    settings.vcs_connection_id = vcs_connection_id
-    settings.repo_url = repo_url
-    settings.branch = branch
-    settings.working_directory = working_directory
-    settings.ignore_paths = list(ignore_paths or [])
-    await db.flush()
-    return settings
-
-
-async def patch_settings(
-    db: AsyncSession,
-    settings: InventorySettings,
-    *,
-    include_platform: bool | None = None,
-    vcs_connection_id: uuid.UUID | None = None,
-    clear_vcs_connection: bool = False,
-    repo_url: str | None = None,
-    branch: str | None = None,
-    working_directory: str | None = None,
-    ignore_paths: list[str] | None = None,
-) -> InventorySettings:
-    """Change some of the settings and leave the rest alone.
-
-    Alongside `put_settings` rather than instead of it, because the two answer
-    different questions and a caller should not have to read a row to change one
-    field. A `PUT` says "the settings are now this"; a `PATCH` says "change this
-    much". Terraform wants the first, a person or a script usually wants the
-    second, and offering only one makes the other party do extra work for no
-    benefit.
-
-    `clear_vcs_connection` exists because `None` already means "not supplied"
-    here, so there would otherwise be no way to express "remove the binding" --
-    the same reason the provider distinguishes an omitted attribute from an
-    explicit null.
-    """
-    if include_platform is not None:
-        settings.include_platform = include_platform
-    if clear_vcs_connection:
-        settings.vcs_connection_id = None
-    elif vcs_connection_id is not None:
-        settings.vcs_connection_id = vcs_connection_id
-    if repo_url is not None:
-        settings.repo_url = repo_url
-    if branch is not None:
-        settings.branch = branch
-    if working_directory is not None:
-        settings.working_directory = working_directory
-    if ignore_paths is not None:
-        settings.ignore_paths = list(ignore_paths)
-
-    # Re-checked against the MERGED state, not against what was supplied: a
-    # patch that clears the connection while leaving a repo behind is the same
-    # incoherent row as setting both at once, and only the merge can see it.
-    if settings.repo_url and settings.vcs_connection_id is None:
-        raise InventoryValidationError(
-            "a repository needs a VCS connection to fetch it with: these settings would "
-            "be left with a repo-url and no connection"
-        )
-
-    await db.flush()
-    return settings
-
-
-async def delete_settings(db: AsyncSession, settings: InventorySettings) -> None:
-    """Remove the settings row, which clears the VCS binding.
-
-    It does not touch a single declared row: the rows belong to the workspace,
-    not to the settings, so clearing the binding leaves the inventory intact
-    with only its declared half.
-    """
-    await db.delete(settings)
-    await db.flush()
-
-
-# ── Hosts and groups ─────────────────────────────────────────────────────────
 
 
 async def list_hosts(db: AsyncSession, workspace_id: uuid.UUID) -> list[InventoryHost]:
@@ -617,17 +520,23 @@ async def count_groups(db: AsyncSession, workspace_id: uuid.UUID) -> int:
 async def has_anything(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
     """Whether this workspace has an inventory at all.
 
-    What a data-gated surface keys on (#1986): no rows and no settings means no
-    tab and no nav entry, so a terraform/tofu-only deployment sees nothing. It
-    is deliberately three cheap counts rather than a cached flag -- a flag would
+    What a data-gated surface keys on (#1986): no rows and no config root means
+    no tab and no nav entry, so a terraform/tofu-only deployment sees nothing.
+    It is deliberately cheap counts rather than a cached flag -- a flag would
     need maintaining by every writer, and one that drifted would hide a real
     inventory or show an empty tab.
+
+    `config_directory IS NOT NULL` is the third test, and it is the declaration
+    that this workspace has a configure operation at all (#1929). A workspace
+    with a config root but no rows yet still has an inventory -- the git source
+    is the whole of it -- so the tab belongs there.
     """
     if await count_hosts(db, workspace_id):
         return True
     if await count_groups(db, workspace_id):
         return True
-    return await get_settings(db, workspace_id) is not None
+    ws = await get_inventory_workspace(db, workspace_id)
+    return ws is not None and ws.config_directory is not None
 
 
 async def group_member_counts(db: AsyncSession, workspace_id: uuid.UUID) -> dict[uuid.UUID, int]:
@@ -728,7 +637,6 @@ __all__ = [
     "delete_group_child",
     "delete_host",
     "delete_host_group",
-    "delete_settings",
     "delete_var",
     "get_global_var",
     "get_group",
@@ -737,7 +645,7 @@ __all__ = [
     "get_host",
     "get_host_group",
     "get_host_var",
-    "get_settings",
+    "get_inventory_workspace",
     "group_child_counts",
     "group_member_counts",
     "group_var_counts",
@@ -751,7 +659,6 @@ __all__ = [
     "list_host_groups",
     "list_host_vars",
     "list_hosts",
-    "put_settings",
     "rename_group",
     "rename_host",
     "update_var",

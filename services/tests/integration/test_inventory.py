@@ -324,13 +324,11 @@ class TestTheCascades:
             InventoryHost,
             InventoryHostGroup,
             InventoryHostVar,
-            InventorySettings,
         )
         from terrapod.db.session import get_db_session
 
         async with get_db_session() as db:
             for model in (
-                InventorySettings,
                 InventoryHost,
                 InventoryGroup,
                 InventoryHostGroup,
@@ -563,28 +561,6 @@ class TestTheOptionsAreSymmetric:
         assert rels["parent-group"]["data"]["id"] == parent
         assert rels["child-group"]["data"]["id"] == child
 
-    async def test_settings_can_be_patched_as_well_as_replaced(self, client, app):
-        set_auth(app, admin_user())
-        ws = await _workspace(client)
-
-        put = await client.put(
-            f"{V1}/workspaces/{ws}/inventory/settings",
-            json={"data": {"attributes": {"include-platform": True, "branch": "main"}}},
-            headers=AUTH,
-        )
-        assert put.status_code == 200, put.text
-
-        # One field, without resending the rest.
-        patch = await client.patch(
-            f"{V1}/workspaces/{ws}/inventory/settings",
-            json={"data": {"attributes": {"include-platform": False}}},
-            headers=AUTH,
-        )
-        assert patch.status_code == 200, patch.text
-        attrs = patch.json()["data"]["attributes"]
-        assert attrs["include-platform"] is False
-        assert attrs["branch"] == "main", "a patch must not clobber what it did not mention"
-
     async def test_a_variable_key_can_be_renamed(self, client, app):
         """Refusing this would only make a caller delete and recreate to get the
         same result, losing the row id for nothing."""
@@ -647,30 +623,6 @@ class TestDerivedGroupNamesAreRefused:
         assert [v["attributes"]["key"] for v in listed.json()["data"]] == [
             "ansible_python_interpreter"
         ]
-
-
-class TestTheSettingsCheckConstraint:
-    async def test_a_repo_without_a_connection_is_refused(self, client, app):
-        """The CHECK says this too; the service refuses first so the message
-        names the field rather than surfacing a constraint name."""
-        set_auth(app, admin_user())
-        ws = await _workspace(client)
-        resp = await client.put(
-            f"{V1}/workspaces/{ws}/inventory/settings",
-            json={"data": {"attributes": {"repo-url": "https://example.com/r.git"}}},
-            headers=AUTH,
-        )
-        assert resp.status_code == 422, resp.text
-        assert "VCS connection" in resp.json()["detail"]
-
-    async def test_settings_are_absent_until_written(self, client, app):
-        """A 404 rather than a defaults object, so a client can tell "unset"
-        from "set to the defaults" -- which is the distinction the provider
-        needs to decide whether it owns the row."""
-        set_auth(app, admin_user())
-        ws = await _workspace(client)
-        resp = await client.get(f"{V1}/workspaces/{ws}/inventory/settings", headers=AUTH)
-        assert resp.status_code == 404, resp.text
 
 
 class TestTheResolvedRead:

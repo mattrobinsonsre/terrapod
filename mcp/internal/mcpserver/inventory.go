@@ -32,6 +32,16 @@ import (
 // behaves. Declining to offer the write did not prevent the collision; it just
 // made the API the only place to cause it.
 //
+// # The ROOTS are workspace settings, not an object here (#1929)
+//
+// There was once a `terrapod_inventory_settings` pair of tools over a 1:1 row
+// carrying its own VCS binding. That row is gone: the config directory, the
+// inventory paths, the run defaults and the include-platform switch are
+// WORKSPACE fields, read with `terrapod_workspace_get` and set with
+// `terrapod_workspace_update`, and the workspace's own `vcs_*` settings are the
+// single VCS binding. The tools here declare the rows that are merged with
+// that source; they do not configure where it is.
+//
 // # There is no refresh, because a read is live
 //
 // Dynamic inventory was declined (#1970), so every source is static and
@@ -45,41 +55,6 @@ func registerInventory(s *mcp.Server, c *terrapod.Client) {
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
-	// ── terrapod_inventory_settings ──────────────────────────────────
-	type settingsIn struct {
-		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
-	}
-	type settingsOut struct {
-		// Configured is false when the workspace has no settings row, which is
-		// the NORMAL default rather than a failure: it means no VCS source is
-		// bound and the declared rows are the whole inventory. Reporting that
-		// as a tool error would have an agent relay a problem where there is
-		// none.
-		Configured bool                        `json:"configured"`
-		Settings   *terrapod.InventorySettings `json:"settings,omitempty"`
-	}
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "terrapod_inventory_settings",
-		Description: "Read a workspace's ansible inventory settings: whether its declared rows contribute (`include_platform`), and the git source merged with them. " +
-			"`configured: false` is the normal default and means no git source is bound — the declared hosts and groups are the whole inventory. It is not an error. " +
-			"This binding is SEPARATE from the workspace's terraform VCS binding: even in one repository the root directories differ, and a configure-only workspace has no terraform binding at all. " +
-			"`working_directory` points at a DIRECTORY, which ansible reads as one source in lexical filename order — so one binding already carries arbitrarily many inventory files, and their ordering is the operator's business via filenames.",
-		Annotations: readOnly,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in settingsIn) (*mcp.CallToolResult, settingsOut, error) {
-		if in.WorkspaceID == "" {
-			return errText("workspace_id is required"), settingsOut{}, nil
-		}
-		settings, err := c.GetInventorySettings(ctx, in.WorkspaceID)
-		if err != nil {
-			var nf *terrapod.NotFoundError
-			if errors.As(err, &nf) {
-				return nil, settingsOut{Configured: false}, nil
-			}
-			return errResult(err), settingsOut{}, nil
-		}
-		return nil, settingsOut{Configured: true, Settings: settings}, nil
-	})
-
 	// ── terrapod_inventory_list ──────────────────────────────────────
 	type listIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose inventory to list"`
@@ -98,7 +73,7 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_inventory_list",
 		Description: "List a workspace's declared ansible inventory: every host, every group, and the variables under `all`. " +
 			"Each host and group carries COUNTS of its variables and links rather than the rows — a listing must not grow with the whole inventory — so follow up with terrapod_inventory_detail on whichever one matters. " +
-			"These are what the workspace declares. The INVENTORY is these merged with any git source (terrapod_inventory_settings), and terrapod_inventory_resolved is the merged answer. " +
+			"These are what the workspace declares. The INVENTORY is these merged with any git source, which the workspace's own `inventory_paths` names (read it with terrapod_workspace_get, set it with terrapod_workspace_update), and terrapod_inventory_resolved is the merged answer. " +
 			"Pages through every host and group, so this is the full declared set rather than one page. " +
 			"Empty for a workspace that declares none — most workspaces manage infrastructure and no hosts.",
 		Annotations: readOnly,
@@ -257,78 +232,6 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 // ── Writes ───────────────────────────────────────────────────────────────────
 
 func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
-	// ── terrapod_inventory_settings_set ──────────────────────────────
-	type settingsSetIn struct {
-		WorkspaceID        string   `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
-		IncludePlatform    *bool    `json:"include_platform,omitempty" jsonschema:"whether the declared rows contribute to the resolution; default true"`
-		VCSConnectionID    string   `json:"vcs_connection_id,omitempty" jsonschema:"the VCS connection to fetch the git inventory source with. Pass an empty string with clear_vcs_connection to remove the binding"`
-		RepoURL            string   `json:"repo_url,omitempty" jsonschema:"the repository holding the inventory"`
-		Branch             string   `json:"branch,omitempty" jsonschema:"the branch to read; empty means the repository default"`
-		WorkingDirectory   string   `json:"working_directory,omitempty" jsonschema:"the DIRECTORY within the repository that ansible reads as one source; empty means the root"`
-		IgnorePaths        []string `json:"ignore_paths,omitempty" jsonschema:"paths within the source to skip"`
-		ClearVCSConnection bool     `json:"clear_vcs_connection,omitempty" jsonschema:"remove the git binding entirely, leaving the declared rows as the whole inventory"`
-	}
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "terrapod_inventory_settings_set",
-		Description: "Create or change a workspace's ansible inventory settings. Only the fields you pass are changed; the rest are left alone. " +
-			"`working_directory` is a DIRECTORY, not a file: ansible reads it as one source in lexical filename order, so one binding carries every inventory file in it. " +
-			"A repository needs a `vcs_connection_id` to fetch it with, and setting one without the other is refused. Pass `clear_vcs_connection` to remove the git source and leave the declared rows as the whole inventory. " +
-			"The git source is merged BENEATH the declared rows, so a variable declared here wins a conflict with the committed inventory — the committed file is the baseline and what the platform declares overrides it.",
-		Annotations: mutating,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in settingsSetIn) (*mcp.CallToolResult, *terrapod.InventorySettings, error) {
-		if in.WorkspaceID == "" {
-			return errText("workspace_id is required"), nil, nil
-		}
-		req := terrapod.UpdateInventorySettingsRequest{
-			IncludePlatform:    in.IncludePlatform,
-			ClearVCSConnection: in.ClearVCSConnection,
-		}
-		if in.VCSConnectionID != "" {
-			req.VCSConnectionID = &in.VCSConnectionID
-		}
-		if in.RepoURL != "" {
-			req.RepoURL = &in.RepoURL
-		}
-		if in.Branch != "" {
-			req.Branch = &in.Branch
-		}
-		if in.WorkingDirectory != "" {
-			req.WorkingDirectory = &in.WorkingDirectory
-		}
-		if in.IgnorePaths != nil {
-			req.IgnorePaths = &in.IgnorePaths
-		}
-
-		settings, err := c.UpdateInventorySettings(ctx, in.WorkspaceID, req)
-		if err == nil {
-			return nil, settings, nil
-		}
-		// The patch route answers 404 when there is no row to patch, so the
-		// first call for a workspace has to create one. Falling back rather
-		// than asking the agent to know which it is: an agent cannot tell
-		// "configure this" from "reconfigure this" without a read it should
-		// not need, and the two produce the same intent.
-		var nf *terrapod.NotFoundError
-		if !errors.As(err, &nf) {
-			return errResult(err), nil, nil
-		}
-		put := terrapod.PutInventorySettingsRequest{
-			IncludePlatform:  in.IncludePlatform == nil || *in.IncludePlatform,
-			RepoURL:          in.RepoURL,
-			Branch:           in.Branch,
-			WorkingDirectory: in.WorkingDirectory,
-			IgnorePaths:      in.IgnorePaths,
-		}
-		if !in.ClearVCSConnection {
-			put.VCSConnectionID = in.VCSConnectionID
-		}
-		settings, err = c.PutInventorySettings(ctx, in.WorkspaceID, put)
-		if err != nil {
-			return errResult(err), nil, nil
-		}
-		return nil, settings, nil
-	})
-
 	// ── terrapod_inventory_host_declare ──────────────────────────────
 	type hostDeclareIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) to declare the host in"`
@@ -531,7 +434,7 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_inventory_remove ────────────────────────────────────
 	type removeIn struct {
-		ID string `json:"id" jsonschema:"the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable, ws- a workspace's inventory settings"`
+		ID string `json:"id" jsonschema:"the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update"`
 	}
 	type removeOut struct {
 		Removed string `json:"removed"`
@@ -541,7 +444,6 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_inventory_remove",
 		Description: "Remove one ansible inventory row. The typed id prefix says what it is, so there is no kind to pass and no way to delete a different kind than intended. " +
 			"CASCADES, and this is the part to show a user before confirming: removing a HOST removes its variables and its group memberships; removing a GROUP removes its variables, its memberships and its nestings in both directions, though the hosts themselves remain. Removing a membership or a nesting removes only that link. " +
-			"Removing a workspace's inventory settings (a ws- id) clears its git binding and leaves the declared rows as the whole inventory. " +
 			"Call terrapod_inventory_resolved first if the blast radius matters: a host removed here leaves every configure that targeted it.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in removeIn) (*mcp.CallToolResult, removeOut, error) {
@@ -559,7 +461,6 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 			{"invvar-", "variable under all", c.DeleteInventoryGlobalVar},
 			{"invhg-", "group membership", c.DeleteInventoryHostGroup},
 			{"invgc-", "group nesting", c.DeleteInventoryGroupChild},
-			{"ws-", "inventory settings", c.DeleteInventorySettings},
 		}
 		if in.ID == "" {
 			return errText("id is required"), removeOut{}, nil
@@ -574,7 +475,10 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 			return nil, removeOut{Removed: k.label, ID: in.ID}, nil
 		}
 		return errText("id is not an inventory row: expected one of invhost-, invgroup-, " +
-			"invhvar-, invgvar-, invvar-, invhg-, invgc- or ws-, got " + in.ID), removeOut{}, nil
+			"invhvar-, invgvar-, invvar-, invhg- or invgc-, got " + in.ID +
+			". A workspace id is not an inventory row: the inventory roots " +
+			"(config_directory, inventory_paths and the run defaults) are workspace " +
+			"settings, changed with terrapod_workspace_update"), removeOut{}, nil
 	})
 }
 

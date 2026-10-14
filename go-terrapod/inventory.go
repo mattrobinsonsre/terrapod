@@ -20,9 +20,14 @@ import (
 // rather than a map on their parent.
 //
 // There is no inventory object to create: there is one inventory per workspace,
-// and `InventorySettings` is the 1:1 row carrying its VCS binding. A workspace
-// with no settings row and no declared rows has no ansible inventory, which is
-// the normal state of a terraform/tofu-only workspace.
+// and the roots that feed it -- the config directory, the inventory paths, and
+// the run defaults -- are WORKSPACE fields (#1929), read and written through
+// Workspace/CreateWorkspaceRequest/UpdateWorkspaceRequest rather than through
+// anything here. There was once a 1:1 `InventorySettings` row carrying its own
+// VCS binding; it is gone, and the workspace's own `vcs-*` fields are the
+// single binding. A workspace with a nil ConfigDirectory and no declared rows
+// has no ansible inventory, which is the normal state of a terraform/tofu-only
+// workspace.
 //
 // # Paths use the canonical /api/v1 prefix with no legacy fallback
 //
@@ -57,33 +62,6 @@ import (
 // value. Compare against it rather than against a literal: a round-trip that
 // writes back what it read would otherwise store the mask as the secret.
 const MaskedValue = "***"
-
-// InventorySettings is a workspace's inventory configuration: whether its
-// declared rows contribute, and the VCS source merged with them.
-//
-// Identified by the workspace id, because that is the key -- one inventory per
-// workspace, so there is no surrogate id to carry.
-//
-// The binding is NOT the workspace's terraform binding. Even in one repository
-// the root directories differ, and a configure-only workspace has no terraform
-// binding at all. A binding points at a DIRECTORY, which ansible reads as one
-// source in lexical filename order, so one binding already carries arbitrarily
-// many files and ordering within it is the operator's business via filenames.
-type InventorySettings struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace-id,omitempty"`
-	// IncludePlatform is whether the rows declared through this API contribute
-	// to the resolution. False resolves the VCS source alone.
-	IncludePlatform bool `json:"include-platform"`
-	// VCSConnectionID is empty when no VCS source is bound.
-	VCSConnectionID  string   `json:"vcs-connection-id,omitempty"`
-	RepoURL          string   `json:"repo-url,omitempty"`
-	Branch           string   `json:"branch,omitempty"`
-	WorkingDirectory string   `json:"working-directory,omitempty"`
-	IgnorePaths      []string `json:"ignore-paths,omitempty"`
-	CreatedAt        string   `json:"created-at,omitempty"`
-	UpdatedAt        string   `json:"updated-at,omitempty"`
-}
 
 // InventoryHost is one host. `Name` is ansible's inventory_hostname, and it is
 // the only field a host has -- `ansible_host` is a variable like any other,
@@ -207,39 +185,6 @@ type ResolvedInventory struct {
 	Limit string `json:"limit,omitempty"`
 }
 
-// PutInventorySettingsRequest is the complete intended state of a workspace's
-// inventory settings.
-//
-// A full replace, not a patch: an absent field takes its default rather than
-// keeping the stored value. That is the right shape for Terraform, which always
-// knows the whole intended state. A caller changing one field wants
-// UpdateInventorySettingsRequest.
-type PutInventorySettingsRequest struct {
-	IncludePlatform  bool
-	VCSConnectionID  string
-	RepoURL          string
-	Branch           string
-	WorkingDirectory string
-	IgnorePaths      []string
-}
-
-// UpdateInventorySettingsRequest changes some of the settings and leaves the
-// rest alone.
-//
-// Pointers distinguish "leave alone" from "set or clear". ClearVCSConnection
-// is a separate flag rather than an empty VCSConnectionID, because a
-// relationship is removed by sending it explicitly as null and omitting it
-// means something different -- the whole distinction a patch exists to draw.
-type UpdateInventorySettingsRequest struct {
-	IncludePlatform    *bool
-	VCSConnectionID    *string
-	ClearVCSConnection bool
-	RepoURL            *string
-	Branch             *string
-	WorkingDirectory   *string
-	IgnorePaths        *[]string
-}
-
 // CreateInventoryVarRequest declares one variable.
 type CreateInventoryVarRequest struct {
 	Key string
@@ -263,110 +208,6 @@ type UpdateInventoryVarRequest struct {
 	Value      *string
 	Structured *bool
 	Sensitive  *bool
-}
-
-// ── Settings ─────────────────────────────────────────────────────────────────
-
-// GetInventorySettings reads a workspace's inventory settings.
-//
-// A NotFoundError means the workspace has no settings row, which is the normal
-// default state and reads as "no VCS source bound" -- not as an error. Treat it
-// with IsNotFound rather than propagating it.
-func (c *Client) GetInventorySettings(
-	ctx context.Context, workspaceID string,
-) (*InventorySettings, error) {
-	data, err := c.Get(ctx, inventoryWorkspacePath(workspaceID, "settings"))
-	if err != nil {
-		return nil, err
-	}
-	return parseInventorySettings(data)
-}
-
-// PutInventorySettings creates or replaces a workspace's inventory settings.
-func (c *Client) PutInventorySettings(
-	ctx context.Context, workspaceID string, req PutInventorySettingsRequest,
-) (*InventorySettings, error) {
-	attrs := map[string]any{
-		"include-platform":  req.IncludePlatform,
-		"repo-url":          req.RepoURL,
-		"branch":            req.Branch,
-		"working-directory": req.WorkingDirectory,
-	}
-	if req.IgnorePaths != nil {
-		attrs["ignore-paths"] = req.IgnorePaths
-	} else {
-		attrs["ignore-paths"] = []string{}
-	}
-	rels := map[string]any{"vcs-connection": relOrNull("vcs-connections", req.VCSConnectionID)}
-	body, err := MarshalResource("inventory-settings", attrs, rels)
-	if err != nil {
-		return nil, fmt.Errorf("marshal put inventory-settings: %w", err)
-	}
-	data, err := c.Put(ctx, inventoryWorkspacePath(workspaceID, "settings"), body)
-	if err != nil {
-		return nil, err
-	}
-	return parseInventorySettings(data)
-}
-
-// UpdateInventorySettings changes part of a workspace's inventory settings.
-//
-// A NotFoundError means there is nothing to patch; PutInventorySettings creates
-// the row.
-func (c *Client) UpdateInventorySettings(
-	ctx context.Context, workspaceID string, req UpdateInventorySettingsRequest,
-) (*InventorySettings, error) {
-	attrs := map[string]any{}
-	if req.IncludePlatform != nil {
-		attrs["include-platform"] = *req.IncludePlatform
-	}
-	if req.RepoURL != nil {
-		attrs["repo-url"] = *req.RepoURL
-	}
-	if req.Branch != nil {
-		attrs["branch"] = *req.Branch
-	}
-	if req.WorkingDirectory != nil {
-		attrs["working-directory"] = *req.WorkingDirectory
-	}
-	if req.IgnorePaths != nil {
-		paths := *req.IgnorePaths
-		if paths == nil {
-			// A pointer to a NIL slice still means "clear", so it has to send
-			// `[]`. Dereferencing straight into the map marshals as JSON null,
-			// which the server reads as absent -- so the one request that
-			// removes every ignore path would silently do nothing.
-			paths = []string{}
-		}
-		attrs["ignore-paths"] = paths
-	}
-
-	var rels map[string]any
-	switch {
-	case req.ClearVCSConnection:
-		rels = map[string]any{"vcs-connection": map[string]any{"data": nil}}
-	case req.VCSConnectionID != nil:
-		rels = map[string]any{
-			"vcs-connection": relOrNull("vcs-connections", *req.VCSConnectionID),
-		}
-	}
-
-	body, err := MarshalResourceWithIDAndRels(
-		workspaceID, "inventory-settings", attrs, rels)
-	if err != nil {
-		return nil, fmt.Errorf("marshal patch inventory-settings: %w", err)
-	}
-	data, err := c.Patch(ctx, inventoryWorkspacePath(workspaceID, "settings"), body)
-	if err != nil {
-		return nil, err
-	}
-	return parseInventorySettings(data)
-}
-
-// DeleteInventorySettings removes a workspace's inventory settings, which
-// clears its VCS binding. Declared rows are untouched.
-func (c *Client) DeleteInventorySettings(ctx context.Context, workspaceID string) error {
-	return c.Delete(ctx, inventoryWorkspacePath(workspaceID, "settings"))
 }
 
 // ── Hosts ────────────────────────────────────────────────────────────────────
@@ -939,26 +780,6 @@ func (c *Client) updateInventoryVar(
 		return nil, err
 	}
 	return parseInventoryVar(data)
-}
-
-func parseInventorySettings(body []byte) (*InventorySettings, error) {
-	res, err := ParseResource(body)
-	if err != nil {
-		return nil, fmt.Errorf("parse inventory-settings response: %w", err)
-	}
-	out := &InventorySettings{
-		ID:               res.ID,
-		WorkspaceID:      GetRelationshipID(res, "workspace"),
-		IncludePlatform:  GetBoolAttr(res, "include-platform"),
-		VCSConnectionID:  GetRelationshipID(res, "vcs-connection"),
-		RepoURL:          GetStringAttr(res, "repo-url"),
-		Branch:           GetStringAttr(res, "branch"),
-		WorkingDirectory: GetStringAttr(res, "working-directory"),
-		IgnorePaths:      GetListAttr(res, "ignore-paths"),
-		CreatedAt:        GetStringAttr(res, "created-at"),
-		UpdatedAt:        GetStringAttr(res, "updated-at"),
-	}
-	return out, nil
 }
 
 func parseInventoryHost(body []byte) (*InventoryHost, error) {

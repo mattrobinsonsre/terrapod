@@ -87,6 +87,16 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "ansible-version": rule.ansible_version,
+            # The Ansible roots and run defaults a materialised workspace
+            # inherits (#1929). `config-directory` serialises None as null
+            # rather than "": the distinction is the declaration that a
+            # materialised workspace has no configure operation.
+            "config-directory": rule.config_directory,
+            "inventory-paths": list(rule.inventory_paths or []),
+            "default-playbook": rule.default_playbook,
+            "default-limit": rule.default_limit,
+            "inventory-include-platform": rule.inventory_include_platform,
+            "inventory-ignore-paths": list(rule.inventory_ignore_paths or []),
             "resource-memory": rule.resource_memory,
             "oidc-audiences": dict(rule.oidc_audiences or {}),
             "auto-apply": rule.auto_apply,
@@ -287,6 +297,43 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             out["ansible_version"] = validate_ansible_version(attrs["ansible-version"])
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+    # `in attrs` rather than truthiness, deliberately (#2010's rule): for
+    # `config-directory` an explicit "" means the repository root and None means
+    # no configure operation, so a truthiness test would collapse the two and
+    # leave no way to say "the root".
+    if "config-directory" in attrs:
+        # Validated, never normalised: a server that rewrites a submitted value
+        # makes a provider's plan disagree with the result. A leading or
+        # trailing slash is REFUSED with a message saying so, rather than
+        # stripped.
+        try:
+            out["config_directory"] = workspace_settings.validate_config_directory(
+                attrs["config-directory"]
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    for _key, _col in (
+        ("inventory-paths", "inventory_paths"),
+        ("inventory-ignore-paths", "inventory_ignore_paths"),
+    ):
+        if _key in attrs:
+            value = attrs[_key]
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise HTTPException(status_code=422, detail=f"{_key} must be a list of strings")
+            out[_col] = [v.strip() for v in value if v.strip()]
+    for _key, _col in (
+        ("default-playbook", "default_playbook"),
+        ("default-limit", "default_limit"),
+    ):
+        if _key in attrs:
+            out[_col] = str(attrs[_key] or "")
+    if "inventory-include-platform" in attrs:
+        value = attrs["inventory-include-platform"]
+        if not isinstance(value, bool):
+            raise HTTPException(
+                status_code=422, detail="inventory-include-platform must be a boolean"
+            )
+        out["inventory_include_platform"] = value
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
@@ -718,6 +765,15 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         ansible_version=fields.get("ansible_version", "2.21.5"),
+        # These literals are checked against the model's own column defaults by
+        # a gate: a preview that invents its own would show workspaces that are
+        # not what saving the rule produces.
+        config_directory=fields.get("config_directory", None),
+        inventory_paths=fields.get("inventory_paths", []),
+        default_playbook=fields.get("default_playbook", ""),
+        default_limit=fields.get("default_limit", ""),
+        inventory_include_platform=fields.get("inventory_include_platform", True),
+        inventory_ignore_paths=fields.get("inventory_ignore_paths", []),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
         auto_apply=fields.get("auto_apply", False),

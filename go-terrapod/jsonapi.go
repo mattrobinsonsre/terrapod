@@ -138,6 +138,28 @@ func GetStringAttr(r *Resource, key string) string {
 	return s
 }
 
+// GetStringPtrAttr returns a string-typed attribute from r, or nil where the
+// attribute is absent or JSON null.
+//
+// Distinct from GetStringAttr, which collapses both of those to "". Reach for
+// this one wherever the server uses null and "" to mean DIFFERENT things, so
+// that collapsing them would corrupt the value rather than merely lose it. A
+// workspace's `config-directory` is the case it was added for: null means the
+// workspace has no configure operation at all and "" means the repository
+// root, so a consumer that read null as "" and wrote it back would give every
+// workspace a configure operation rooted at the top of its repository.
+func GetStringPtrAttr(r *Resource, key string) *string {
+	raw, ok := r.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return nil
+	}
+	return &s
+}
+
 // GetBoolAttr returns a bool-typed attribute from r.
 func GetBoolAttr(r *Resource, key string) bool {
 	raw, ok := r.Attributes[key]

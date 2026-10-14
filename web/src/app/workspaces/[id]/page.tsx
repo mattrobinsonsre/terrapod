@@ -38,6 +38,7 @@ import {
 } from '@/components/vault-reference-fields'
 import {
   OidcAudiencesEditor,
+  StringListEditor,
   sanitizeOidcAudiences,
   partitionOidcAudiences,
   type OidcAudiences,
@@ -81,6 +82,20 @@ interface WorkspaceAttrs {
   'terragrunt-enabled': boolean
   'terragrunt-version': string
   'working-directory': string
+  // The Ansible roots and the configure run defaults (#1929). Native-only:
+  // they are deliberately absent from `/api/tfe/v2`, which is why this page
+  // reads and writes the workspace through `/api/v1`.
+  //
+  // `config-directory` is `string | null` and its two falsy values are
+  // DIFFERENT. `null` says this workspace has no configure operation at all;
+  // `''` says the configure operation's root is the top of the repository.
+  // Optional only because an older API omits the key, which reads as null.
+  'config-directory'?: string | null
+  'inventory-paths'?: string[]
+  'default-playbook'?: string
+  'default-limit'?: string
+  'inventory-include-platform'?: boolean
+  'inventory-ignore-paths'?: string[]
   locked: boolean
   // Why the workspace is locked and who locked it (#1705). Null when unlocked,
   // and absent from an older API.
@@ -376,10 +391,10 @@ function WorkspaceDetailContent() {
   // Resolved once here so the loaders, the SSE handler, the tab strip and the
   // render sites all agree on which tab is showing.
   // The Inventory tab is DATA-gated, not configuration-gated (#1967, #1968,
-  // #1969). A workspace with no hosts, no groups and no inventory settings has
-  // nothing to show, so the tab is simply absent — there is nothing for a
-  // terraform/tofu-only deployment to turn off, which is the mechanism rather
-  // than a flag (#1986).
+  // #1969). A workspace with no hosts, no groups and no Ansible config
+  // directory has nothing to show, so the tab is simply absent — there is
+  // nothing for a terraform/tofu-only deployment to turn off, which is the
+  // mechanism rather than a flag (#1986).
   //
   // The probe lives with the panel because the three questions it asks are the
   // panel's own; on any failure it answers false and the tab stays hidden, so a
@@ -435,6 +450,23 @@ function WorkspaceDetailContent() {
   // which the API treats as leave-alone.
   const [editOidcAudiences, setEditOidcAudiences] = useState<OidcAudiences | null>(null)
   const [editWorkingDir, setEditWorkingDir] = useState('')
+  // The Ansible roots and the configure run defaults (#1929).
+  //
+  // `config-directory` is edited as a MODE plus a path rather than as one text
+  // box, because both of its falsy values are real and they mean opposite
+  // things: `none` sends `null` -- no configure operation -- while `set` sends
+  // the box verbatim, the empty string (the repository root) included. A single
+  // input could express only one of the two, and collapsing them would silently
+  // give every workspace a configure operation rooted at the top of its repo.
+  const [editConfigDirMode, setEditConfigDirMode] = useState<'none' | 'set'>('none')
+  const [editConfigDir, setEditConfigDir] = useState('')
+  const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
+  const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
+  const [editDefaultLimit, setEditDefaultLimit] = useState('')
+  // Matches the column default: the hosts and groups declared in Terrapod take
+  // part in resolution unless the workspace deliberately turns them off.
+  const [editInventoryIncludePlatform, setEditInventoryIncludePlatform] = useState(true)
+  const [editInventoryIgnorePaths, setEditInventoryIgnorePaths] = useState<string[]>([])
   const [editBindPlan, setEditBindPlan] = useState(false)
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -1228,6 +1260,17 @@ function WorkspaceDetailContent() {
     setNewDriftIgnoreRule('')
     setEditOidcAudiences(null)
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
+    // `=== undefined || === null` rather than `|| ''`: a workspace storing ''
+    // means the repository ROOT and has to come back as a set directory, not as
+    // 'no configure operation' (#1929).
+    const cfgDir = workspace.attributes['config-directory']
+    setEditConfigDirMode(cfgDir === undefined || cfgDir === null ? 'none' : 'set')
+    setEditConfigDir(cfgDir ?? '')
+    setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
+    setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
+    setEditDefaultLimit(workspace.attributes['default-limit'] || '')
+    setEditInventoryIncludePlatform(workspace.attributes['inventory-include-platform'] ?? true)
+    setEditInventoryIgnorePaths(workspace.attributes['inventory-ignore-paths'] || [])
     setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1290,6 +1333,26 @@ function WorkspaceDetailContent() {
               // both, and the singular would replace the whole set.
               'agent-pool-ids': editPoolIds,
               'working-directory': editWorkingDir,
+              // The Ansible roots and the configure run defaults (#1929). The
+              // mode decides between the two falsy values the server keeps
+              // apart: `none` sends null -- no configure operation -- and `set`
+              // sends the box verbatim, '' (the repository root) included.
+              //
+              // NOT trimmed, and no slash is stripped. The server REFUSES a
+              // path carrying leading or trailing whitespace, a leading or
+              // trailing slash, or a `..` segment, rather than normalising it
+              // -- so normalising here would hide a refusal the operator needs
+              // to read, and would store something other than what they typed.
+              'config-directory': editConfigDirMode === 'set' ? editConfigDir : null,
+              // Blank-free but NOT trimmed, exactly as `oidc-audiences` below:
+              // the list editor appends an empty row when Add is pressed and
+              // the server refuses an empty entry, so a row left blank would
+              // 422 the whole save; a kept entry is sent byte-for-byte.
+              'inventory-paths': editInventoryPaths.filter((entry) => entry !== ''),
+              'default-playbook': editDefaultPlaybook,
+              'default-limit': editDefaultLimit,
+              'inventory-include-platform': editInventoryIncludePlatform,
+              'inventory-ignore-paths': editInventoryIgnorePaths.filter((entry) => entry !== ''),
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
@@ -2552,6 +2615,257 @@ function WorkspaceDetailContent() {
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
                   )}
+                </div>
+                {/* The Ansible roots and the configure run defaults (#1929),
+                    sat beside `working-directory` because they answer the same
+                    question for the configure half of a run: where in the
+                    repository this workspace's code lives.
+                    `inventory_settings` and its own VCS binding are gone — the
+                    inventory now uses the workspace's `vcs-*` attributes
+                    edited in the VCS section below. */}
+                <div className="sm:col-span-2 border-t border-slate-800 pt-4">
+                  <dt className="text-sm text-slate-300">{t('fields.ansibleConfigure')}</dt>
+                  {/* One `dd` for the whole group, so the nested fields can use
+                      plain `label`/`p` — a `dd` three divs down from the `dl`
+                      is not a conforming description list. */}
+                  <dd className="mt-1">
+                    <p className="text-xs text-slate-500">{t('fields.ansibleConfigureHint')}</p>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* min-w-0 on every grid item: a grid item's min-width is
+                          `auto`, so a select whose longest option is a long
+                          translated string pushes the row past the viewport
+                          however `w-full` the control itself is. */}
+                      <div className="min-w-0">
+                        <label
+                          htmlFor="ws-config-directory-mode"
+                          className="block text-xs text-slate-500"
+                        >
+                          {t('fields.configDirectory')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <>
+                            {/* A NAMED mode rather than a checkbox: both states
+                                are real values and both need saying out loud. An
+                                unticked box reads as "nothing filled in yet",
+                                which is exactly what the absent case is not —
+                                `null` is the deliberate "this workspace has no
+                                configure operation". */}
+                            <select
+                              id="ws-config-directory-mode"
+                              value={editConfigDirMode}
+                              onChange={(e) => setEditConfigDirMode(e.target.value as 'none' | 'set')}
+                              title={t('fields.configDirectoryTitle')}
+                              className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                              <option value="none">{t('fields.configDirectoryModeNone')}</option>
+                              <option value="set">{t('fields.configDirectoryModeSet')}</option>
+                            </select>
+                            {editConfigDirMode === 'set' && (
+                              <>
+                                <input
+                                  type="text"
+                                  value={editConfigDir}
+                                  onChange={(e) => setEditConfigDir(e.target.value)}
+                                  placeholder={t('fields.configDirectoryPlaceholder')}
+                                  aria-label={t('fields.configDirectory')}
+                                  data-testid="ws-config-directory-input"
+                                  className="mt-2 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {t('fields.configDirectoryRootHint')}
+                                </p>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          // Three states, rendered as three different things.
+                          // Falling back to `/` for both of the first two — the
+                          // way `working-directory` legitimately does, having no
+                          // absent state — is the collapse this setting exists to
+                          // prevent.
+                          <p
+                            className="mt-1 text-sm text-slate-200"
+                            data-testid="ws-config-directory"
+                          >
+                            {attrs['config-directory'] === undefined ||
+                            attrs['config-directory'] === null ? (
+                              <span className="text-slate-500">
+                                {t('fields.configDirectoryModeNone')}
+                              </span>
+                            ) : attrs['config-directory'] === '' ? (
+                              t('fields.configDirectoryRoot')
+                            ) : (
+                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                                {attrs['config-directory']}
+                              </code>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <label
+                          htmlFor="ws-inventory-include-platform"
+                          className="block text-xs text-slate-500"
+                          title={t('fields.inventoryIncludePlatformTitle')}
+                        >
+                          {t('fields.inventoryIncludePlatform')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <>
+                            <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                              <input
+                                id="ws-inventory-include-platform"
+                                type="checkbox"
+                                checked={editInventoryIncludePlatform}
+                                onChange={(e) => setEditInventoryIncludePlatform(e.target.checked)}
+                                className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                              />
+                              <span className="text-sm text-slate-200">
+                                {editInventoryIncludePlatform
+                                  ? t('common.enabled')
+                                  : t('common.disabled')}
+                              </span>
+                            </label>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {t('fields.inventoryIncludePlatformHint')}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-200">
+                            {(attrs['inventory-include-platform'] ?? true)
+                              ? t('common.enabled')
+                              : t('common.disabled')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <label htmlFor="ws-default-playbook" className="block text-xs text-slate-500">
+                          {t('fields.defaultPlaybook')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <input
+                            id="ws-default-playbook"
+                            type="text"
+                            value={editDefaultPlaybook}
+                            onChange={(e) => setEditDefaultPlaybook(e.target.value)}
+                            placeholder={t('fields.defaultPlaybookPlaceholder')}
+                            title={t('fields.defaultPlaybookTitle')}
+                            className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          />
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-200">
+                            {attrs['default-playbook'] ? (
+                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                                {attrs['default-playbook']}
+                              </code>
+                            ) : (
+                              <span className="text-slate-500">{t('common.none')}</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <label htmlFor="ws-default-limit" className="block text-xs text-slate-500">
+                          {t('fields.defaultLimit')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <input
+                            id="ws-default-limit"
+                            type="text"
+                            value={editDefaultLimit}
+                            onChange={(e) => setEditDefaultLimit(e.target.value)}
+                            placeholder={t('fields.defaultLimitPlaceholder')}
+                            title={t('fields.defaultLimitTitle')}
+                            className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          />
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-200">
+                            {attrs['default-limit'] ? (
+                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                                {attrs['default-limit']}
+                              </code>
+                            ) : (
+                              <span className="text-slate-500">{t('common.none')}</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2 min-w-0">
+                        <label className="block text-xs text-slate-500">
+                          {t('fields.inventoryPaths')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <div className="mt-1 space-y-2">
+                            <p className="text-xs text-slate-400">{t('fields.inventoryPathsHint')}</p>
+                            {/* The shared editor rather than this page's older
+                                inline list: its row actions are real buttons with
+                                a background and a 44px tap target, which bare
+                                coloured text is not. */}
+                            <StringListEditor
+                              values={editInventoryPaths}
+                              onChange={setEditInventoryPaths}
+                              placeholder={t('fields.inventoryPathsPlaceholder')}
+                              addLabel={t('fields.inventoryPathsAdd')}
+                            />
+                          </div>
+                        ) : (
+                          // An ORDERED list, because the order is the precedence
+                          // order — a later source wins per variable — so a
+                          // read that lost it would misreport the merge.
+                          <div className="mt-1 text-sm text-slate-200">
+                            {(attrs['inventory-paths'] || []).length > 0 ? (
+                              <ol className="flex flex-col gap-1">
+                                {(attrs['inventory-paths'] || []).map((path) => (
+                                  <li key={path}>
+                                    <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                                      {path}
+                                    </code>
+                                  </li>
+                                ))}
+                              </ol>
+                            ) : (
+                              <span className="text-slate-500">{t('common.none')}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2 min-w-0">
+                        <label className="block text-xs text-slate-500">
+                          {t('fields.inventoryIgnorePaths')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <div className="mt-1 space-y-2">
+                            <p className="text-xs text-slate-400">
+                              {t('fields.inventoryIgnorePathsHint')}
+                            </p>
+                            <StringListEditor
+                              values={editInventoryIgnorePaths}
+                              onChange={setEditInventoryIgnorePaths}
+                              placeholder={t('fields.inventoryIgnorePathsPlaceholder')}
+                              addLabel={t('fields.inventoryIgnorePathsAdd')}
+                            />
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-sm text-slate-200">
+                            {(attrs['inventory-ignore-paths'] || []).length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {(attrs['inventory-ignore-paths'] || []).map((path) => (
+                                  <code
+                                    key={path}
+                                    className="bg-slate-700 px-2 py-0.5 rounded text-xs"
+                                  >
+                                    {path}
+                                  </code>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">{t('common.none')}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.agentPools')}</dt>
@@ -5159,10 +5473,13 @@ function WorkspaceDetailContent() {
           </div>
         )}
 
-        {/* Inventory Tab — the eight structures an ansible inventory has, each
-            editable per row (#1967, #1968, #1969). Rendered only when the
-            workspace actually has one; the panel owns its own data and its own
-            `?inv=` sub-view, so the page passes nothing but the id. */}
+        {/* Inventory Tab — the seven structures an ansible inventory has, each
+            editable per row (#1967, #1968, #1969). The eighth was a settings
+            row with its own VCS binding; it is gone, and what it held is now
+            workspace columns edited on the Configuration tab (#1929).
+            Rendered only when the workspace actually has an inventory; the
+            panel owns its own data and its own `?inv=` sub-view, so the page
+            passes nothing but the id. */}
         {activeTab === 'inventory' && <InventoryPanel workspaceId={workspaceId} />}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}

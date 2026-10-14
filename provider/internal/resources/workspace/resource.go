@@ -120,6 +120,8 @@ var unmanagedCollections = []struct {
 	{"trigger_prefixes", "[]", func(m *workspaceModel) attr.Value { return m.TriggerPrefixes }},
 	{"drift_ignore_rules", "[]", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
 	{"security_scan_skip_rules", "[]", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
+	{"inventory_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryPaths }},
+	{"inventory_ignore_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryIgnorePaths }},
 	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
 }
 
@@ -484,6 +486,91 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"config_directory": schema.StringAttribute{
+				Description: "Repository-root-relative directory the ansible configure " +
+					"operation runs in: its fetch scope and the working directory the " +
+					"inventory resolver and the playbook executor both run from. " +
+					"**Leaving this unset means the workspace has no configure operation " +
+					"at all**; setting it to the empty string (`config_directory = \"\"`) " +
+					"roots the operation at the top of the repository. Those are different " +
+					"states, which is why this attribute is Optional and not computed — " +
+					"removing it from the configuration turns the configure operation off.",
+				// Optional ONLY, deliberately. Every neighbour here is
+				// Optional+Computed with UseStateForUnknown so an unmanaged
+				// server-side value survives, but that pattern cannot express
+				// this attribute: a config that omits it would plan as the
+				// prior state, so "no configure operation" would be
+				// unreachable from HCL once one had ever been set. Optional
+				// alone makes a removal plan as null, which Update sends as an
+				// explicit JSON null.
+				//
+				// It also round-trips exactly, which is what makes Optional
+				// safe here where it is not for `ansible_version`: the server
+				// default is NULL and it never substitutes a value, so a null
+				// config reads back null and an empty-string config reads back
+				// an empty string.
+				Optional: true,
+			},
+			"inventory_paths": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "Inventory sources, each a file or a directory relative to the " +
+					"repository root. **Ordered — the order is the precedence ansible " +
+					"applies**, so this is a list and not a set. Name the files or " +
+					"directories you mean rather than a parent: `-i` over a directory " +
+					"containing both `production` and `staging` merges them into one " +
+					"inventory. Omitting this attribute leaves any existing server-side " +
+					"value untouched — it does not clear it; set `inventory_paths = []` to clear.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"default_playbook": schema.StringAttribute{
+				Description: "The playbook a configure run executes unless the run names " +
+					"another, the way `vcs_ref` overrides `vcs_branch` on a run. Relative " +
+					"to `config_directory`. Empty means the workspace has no default and " +
+					"every configure run must name its playbook.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"default_limit": schema.StringAttribute{
+				Description: "The default `--limit` for a configure run, overridable per " +
+					"run. Empty means the whole inventory, which is ansible's own default. " +
+					"This narrows which hosts a run touches and is the configure " +
+					"operation's equivalent of `-target` on a terraform plan.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"inventory_include_platform": schema.BoolAttribute{
+				Description: "Whether the inventory rows declared through Terrapod (the " +
+					"`terrapod_inventory_host`, `_group`, `_host_group`, `_group_child` " +
+					"and `_*_var` resources) contribute to the resolved inventory. " +
+					"**Defaults to true.** Set it false to resolve the git source in " +
+					"`inventory_paths` alone.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"inventory_ignore_paths": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "Paths excluded from the inventory resolution. Omitting this " +
+					"attribute leaves any existing server-side value untouched — it does " +
+					"not clear it; set `inventory_ignore_paths = []` to clear.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"working_directory": schema.StringAttribute{
@@ -1090,6 +1177,42 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
 	}
+	// #1929's six. `config_directory` is handled per-operation below, because
+	// create omits a null and update has to CLEAR it.
+	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
+		// A non-nil empty slice, not nil: an empty list is how the operator
+		// removes every source, so it has to reach the wire as `[]`.
+		paths := []string{}
+		for _, v := range m.InventoryPaths.Elements() {
+			paths = append(paths, v.(types.String).ValueString())
+		}
+		req.InventoryPaths = paths
+	}
+	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
+		ignore := []string{}
+		for _, v := range m.InventoryIgnorePaths.Elements() {
+			ignore = append(ignore, v.(types.String).ValueString())
+		}
+		req.InventoryIgnorePaths = ignore
+	}
+	if !m.InventoryIncludePlatform.IsNull() && !m.InventoryIncludePlatform.IsUnknown() {
+		v := m.InventoryIncludePlatform.ValueBool()
+		req.InventoryIncludePlatform = &v
+	}
+	// Null means "no configure operation", which is the server-side default,
+	// so create omits it rather than sending an explicit null. An empty
+	// string is a real value -- the repository root -- and must travel, which
+	// is why this is not guarded on ValueString() != "".
+	if !m.ConfigDirectory.IsNull() && !m.ConfigDirectory.IsUnknown() {
+		v := m.ConfigDirectory.ValueString()
+		req.ConfigDirectory = &v
+	}
+	if !m.DefaultPlaybook.IsNull() && !m.DefaultPlaybook.IsUnknown() {
+		req.DefaultPlaybook = m.DefaultPlaybook.ValueString()
+	}
+	if !m.DefaultLimit.IsNull() && !m.DefaultLimit.IsUnknown() {
+		req.DefaultLimit = m.DefaultLimit.ValueString()
+	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
@@ -1254,6 +1377,51 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
+	}
+	// #1929's six. `config_directory` is handled per-operation below, because
+	// create omits a null and update has to CLEAR it.
+	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
+		// A non-nil empty slice, not nil: an empty list is how the operator
+		// removes every source, so it has to reach the wire as `[]`.
+		paths := []string{}
+		for _, v := range m.InventoryPaths.Elements() {
+			paths = append(paths, v.(types.String).ValueString())
+		}
+		req.InventoryPaths = paths
+	}
+	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
+		ignore := []string{}
+		for _, v := range m.InventoryIgnorePaths.Elements() {
+			ignore = append(ignore, v.(types.String).ValueString())
+		}
+		req.InventoryIgnorePaths = ignore
+	}
+	if !m.InventoryIncludePlatform.IsNull() && !m.InventoryIncludePlatform.IsUnknown() {
+		v := m.InventoryIncludePlatform.ValueBool()
+		req.InventoryIncludePlatform = &v
+	}
+	// On update a null is not "leave it alone" -- this attribute is
+	// Optional-only, so a null plan value means the operator removed it from
+	// the configuration, and the matching request is an explicit JSON null
+	// that turns the configure operation off. An unknown is left alone; only
+	// a known null clears.
+	switch {
+	case m.ConfigDirectory.IsUnknown():
+		// nothing: let the server keep what it holds
+	case m.ConfigDirectory.IsNull():
+		req.ClearConfigDirectory = true
+	default:
+		v := m.ConfigDirectory.ValueString()
+		req.ConfigDirectory = &v
+	}
+	// Pointers, so &"" can clear either one.
+	if !m.DefaultPlaybook.IsNull() && !m.DefaultPlaybook.IsUnknown() {
+		v := m.DefaultPlaybook.ValueString()
+		req.DefaultPlaybook = &v
+	}
+	if !m.DefaultLimit.IsNull() && !m.DefaultLimit.IsUnknown() {
+		v := m.DefaultLimit.ValueString()
+		req.DefaultLimit = &v
 	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
@@ -1423,6 +1591,38 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.AnsibleVersion = types.StringNull()
 	}
+
+	// #1929's six, read side.
+	//
+	// `config_directory` is the one that must NOT collapse null and "": nil
+	// from the SDK is "no configure operation" and reads as Terraform null,
+	// while a pointer to "" is the repository root and reads as the empty
+	// string. Writing `if *ws.ConfigDirectory != ""` here would make the
+	// repository-root case read back as null and fail every apply that uses
+	// it with "Provider produced inconsistent result after apply".
+	if ws.ConfigDirectory != nil {
+		m.ConfigDirectory = types.StringValue(*ws.ConfigDirectory)
+	} else {
+		m.ConfigDirectory = types.StringNull()
+	}
+	// Empty is the server's own default for both, and these two are
+	// Optional+Computed, so an empty value reads as null and keeps a workspace
+	// that declares no default out of the diff -- the same arrangement as
+	// `ansible_version` above.
+	if ws.DefaultPlaybook != "" {
+		m.DefaultPlaybook = types.StringValue(ws.DefaultPlaybook)
+	} else {
+		m.DefaultPlaybook = types.StringNull()
+	}
+	if ws.DefaultLimit != "" {
+		m.DefaultLimit = types.StringValue(ws.DefaultLimit)
+	} else {
+		m.DefaultLimit = types.StringNull()
+	}
+	// No empty-means-null treatment: false is a real value here, and the
+	// SDK already resolves an absent attribute to the column default (true),
+	// so this is a straight projection.
+	m.InventoryIncludePlatform = types.BoolValue(ws.InventoryIncludePlatform)
 	if ws.VCSRepoURL != "" {
 		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
 	} else {
@@ -1625,6 +1825,24 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		ssVal, ssDiag := types.ListValueFrom(ctx, types.StringType, ws.SecurityScanSkipRules)
 		diags.Append(ssDiag...)
 		m.SecurityScanSkipRules = ssVal
+	}
+
+	// Inventory paths and ignore paths (#1929) -- same null-vs-empty
+	// preservation rule as the four lists above. Order is precedence for
+	// inventory_paths, which ListValueFrom preserves.
+	if m.InventoryPaths.IsNull() && len(ws.InventoryPaths) == 0 {
+		m.InventoryPaths = types.ListNull(types.StringType)
+	} else {
+		ipVal, ipDiag := types.ListValueFrom(ctx, types.StringType, ws.InventoryPaths)
+		diags.Append(ipDiag...)
+		m.InventoryPaths = ipVal
+	}
+	if m.InventoryIgnorePaths.IsNull() && len(ws.InventoryIgnorePaths) == 0 {
+		m.InventoryIgnorePaths = types.ListNull(types.StringType)
+	} else {
+		iipVal, iipDiag := types.ListValueFrom(ctx, types.StringType, ws.InventoryIgnorePaths)
+		diags.Append(iipDiag...)
+		m.InventoryIgnorePaths = iipVal
 	}
 
 	// OIDC audiences (#1901) — a SELECTIVE read, unlike every other collection

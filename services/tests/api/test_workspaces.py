@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -69,6 +70,17 @@ def _mock_workspace(
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""
+    # The Ansible roots and run defaults (#1929). Set explicitly because
+    # `_workspace_json` serialises them, and an auto-MagicMock attribute reaches
+    # `json.dumps` and dies with a message that names neither the attribute nor
+    # this fixture. `config_directory` is None, which is the real default: no
+    # configure operation.
+    ws.config_directory = None
+    ws.inventory_paths = []
+    ws.default_playbook = ""
+    ws.default_limit = ""
+    ws.inventory_include_platform = True
+    ws.inventory_ignore_paths = []
     ws.locked = locked
     ws.lock_id = lock_id
     ws.lock_reason = lock_reason
@@ -2623,3 +2635,294 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
 
         assert resp.status_code == 422
         assert ws.ansible_version == "2.19.3", "the refused value was written anyway"
+
+
+class TestTheConfigureAttributesOnTheWorkspaceRoutes:
+    """The six Ansible roots and run defaults, as REQUESTS (#1929).
+
+    Driven through the routes rather than by calling the parsers, because the
+    defect these exist to catch is a route that does not read the attribute at
+    all: the six were in `workspace_bulk._FIELD_MAP` and absent from create and
+    PATCH, so a client could send `config-directory` and have it silently
+    ignored. A test that hands a value to the validator cannot see that.
+
+    Reads use the native prefix. The six are popped from the TFE surface, which
+    is deliberate and follows `pulumi-bind-plan`: the write path is shared, the
+    representation is gated on the door.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_stores_all_six(self, _mock_publish, *mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        added: list = []
+        mock_db.add = added.append
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={
+                    "data": {
+                        "attributes": {
+                            "name": "cfg-ws",
+                            "config-directory": "ansible",
+                            "inventory-paths": ["inventory/production", "inventory/extra"],
+                            "default-playbook": "site.yml",
+                            "default-limit": "web:!web-09",
+                            "inventory-include-platform": False,
+                            "inventory-ignore-paths": ["*.bak"],
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        ws = next(w for w in added if getattr(w, "name", None) == "cfg-ws")
+        assert ws.config_directory == "ansible"
+        assert ws.inventory_paths == ["inventory/production", "inventory/extra"]
+        assert ws.default_playbook == "site.yml"
+        # Stored byte for byte: `--limit` is ansible's own syntax and `!` is
+        # meaningful in it, so nothing here may rewrite the pattern.
+        assert ws.default_limit == "web:!web-09"
+        assert ws.inventory_include_platform is False
+        assert ws.inventory_ignore_paths == ["*.bak"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_without_them_leaves_no_configure_operation(self, _mock_publish, *mocks):
+        """Absent means NULL, not `""`.
+
+        The two are different: NULL is "this workspace has no configure
+        operation", `""` is "the configure root is the top of the repository".
+        A create that defaulted to `""` would give every workspace in the
+        deployment an Ansible root it never asked for.
+        """
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        added: list = []
+        mock_db.add = added.append
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={"data": {"attributes": {"name": "plain-ws"}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        ws = next(w for w in added if getattr(w, "name", None) == "plain-ws")
+        assert ws.config_directory is None
+        assert ws.inventory_include_platform is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_accepts_an_explicit_empty_config_directory(self, _mock_publish, *mocks):
+        """`""` is the repository root, and must survive as itself."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        added: list = []
+        mock_db.add = added.append
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={"data": {"attributes": {"name": "root-ws", "config-directory": ""}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        ws = next(w for w in added if getattr(w, "name", None) == "root-ws")
+        assert ws.config_directory == "", "an explicit empty root became None"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_native_read_returns_all_six(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="cfg-ws")
+        ws.config_directory = "ansible"
+        ws.inventory_paths = ["inventory/production"]
+        ws.default_playbook = "site.yml"
+        ws.default_limit = "web"
+        ws.inventory_include_platform = False
+        ws.inventory_ignore_paths = ["*.bak"]
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        a = resp.json()["data"]["attributes"]
+        assert a["config-directory"] == "ansible"
+        assert a["inventory-paths"] == ["inventory/production"]
+        assert a["default-playbook"] == "site.yml"
+        assert a["default-limit"] == "web"
+        assert a["inventory-include-platform"] is False
+        assert a["inventory-ignore-paths"] == ["*.bak"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_null_config_directory_reads_back_as_null_not_empty(self, mock_resolve, *mocks):
+        """The distinction has to survive the wire, not just the column.
+
+        Serialising NULL as `""` would tell every client that every workspace
+        has a configure operation rooted at the repository top.
+        """
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="plain-ws")
+        ws.config_directory = None
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["config-directory"] is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_the_tfe_surface_does_not_carry_them(self, mock_resolve, *mocks):
+        """Native-only, popped on the frozen surface — like `pulumi-bind-plan`."""
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="cfg-ws")
+        ws.config_directory = "ansible"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        a = resp.json()["data"]["attributes"]
+        for key in (
+            "config-directory",
+            "inventory-paths",
+            "default-playbook",
+            "default-limit",
+            "inventory-include-platform",
+            "inventory-ignore-paths",
+        ):
+            assert key not in a, f"{key} reached the TFE-compatible wire"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_sets_them_and_an_explicit_null_clears_the_root(
+        self, mock_resolve, _mock_publish, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="cfg-ws")
+        ws.config_directory = "ansible"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"default-playbook": "deploy.yml"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.default_playbook == "deploy.yml"
+        assert ws.config_directory == "ansible", "an untouched attribute was rewritten"
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"config-directory": None}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.config_directory is None, "an explicit null did not clear the root"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @pytest.mark.parametrize(
+        "attrs,because",
+        [
+            ({"config-directory": "/ansible"}, "a leading slash is refused, not stripped"),
+            ({"config-directory": "ansible/"}, "a trailing slash is refused, not stripped"),
+            ({"config-directory": "../etc"}, "traversal"),
+            ({"config-directory": 7}, "a non-string answers 422, not 500"),
+            ({"inventory-paths": "inventory"}, "a bare string is not a list"),
+            ({"inventory-paths": [1]}, "entries must be strings"),
+            ({"inventory-paths": ["../x"]}, "traversal in an entry"),
+            ({"inventory-include-platform": "false"}, "a stringified bool is refused"),
+            ({"default-playbook": 7}, "a non-string answers 422, not 500"),
+            ({"inventory-ignore-paths": {"a": 1}}, "a mapping is not a list"),
+        ],
+    )
+    async def test_a_bad_value_is_422_not_500(
+        self,
+        _mock_publish,
+        _mock_init_db,
+        _mock_init_redis,
+        _mock_init_storage,
+        attrs,
+        because,
+    ):
+        """A 500 here would be a DataError at commit, which is the shape these
+        validators exist to replace.
+
+        The slash cases are the interesting ones: the value is **refused**
+        rather than normalised, because a server that silently rewrites what a
+        provider sent makes the plan disagree with the result.
+        """
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={"data": {"attributes": {"name": "bad-ws", **attrs}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, f"{because}: got {resp.status_code} {resp.text[:200]}"

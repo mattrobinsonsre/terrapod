@@ -1,10 +1,10 @@
-"""Ansible inventory: the eight structures, each addressable (#1967, #1968).
+"""Ansible inventory: the seven structures, each addressable (#1967, #1968, #1929).
 
 Native surface only. None of this is on the TFE-compatible prefix: no
 `terraform`, `tofu` or `tfci` invocation consumes it, so by the rule in
 `docs/tfe-cli-surface.md` it belongs under the Terrapod-native prefix.
 
-## One route shape, eight structures
+## One route shape, seven structures
 
 Ansible's inventory has one-to-many and many-to-many mappings, so each
 structure is its own addressable resource: hosts, groups, the memberships
@@ -75,7 +75,6 @@ from terrapod.db.models import (
     InventoryHost,
     InventoryHostGroup,
     InventoryHostVar,
-    InventorySettings,
     Run,
     Workspace,
 )
@@ -123,40 +122,6 @@ def _rfc3339(dt) -> str:
 
 def _ws_rel(workspace_id: uuid.UUID) -> dict:
     return {"workspace": {"data": {"id": f"ws-{workspace_id}", "type": "workspaces"}}}
-
-
-def _settings_json(settings: InventorySettings) -> dict:
-    """The settings, identified by the workspace because that IS the key.
-
-    One inventory per workspace, so there is no surrogate id to carry and the
-    workspace id is the only honest identifier.
-    """
-    return {
-        "id": f"ws-{settings.workspace_id}",
-        "type": "inventory-settings",
-        "attributes": {
-            "include-platform": settings.include_platform,
-            "repo-url": settings.repo_url or "",
-            "branch": settings.branch or "",
-            "working-directory": settings.working_directory or "",
-            "ignore-paths": list(settings.ignore_paths or []),
-            "created-at": _rfc3339(settings.created_at),
-            "updated-at": _rfc3339(settings.updated_at),
-        },
-        "relationships": {
-            **_ws_rel(settings.workspace_id),
-            "vcs-connection": {
-                "data": (
-                    {
-                        "id": f"vcs-{settings.vcs_connection_id}",
-                        "type": "vcs-connections",
-                    }
-                    if settings.vcs_connection_id
-                    else None
-                )
-            },
-        },
-    }
 
 
 def _host_json(host: InventoryHost, *, groups: int = 0, variables: int = 0) -> dict:
@@ -500,168 +465,6 @@ async def _fail(db: AsyncSession, exc: HTTPException) -> HTTPException:
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────
-
-
-@router.get("/workspaces/{workspace_id}/inventory/settings")
-async def show_inventory_settings(
-    workspace_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """The workspace's inventory settings.
-
-    `404` when there are none, which is the ordinary state for a workspace whose
-    inventory is entirely declared: the settings row exists only to bind a VCS
-    source or to turn the declared rows off.
-    """
-    ws = await _get_workspace(workspace_id, db)
-    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
-
-    settings = await inv.get_settings(db, ws.id)
-    if settings is None:
-        raise HTTPException(
-            status_code=404,
-            detail="This workspace has no inventory settings. That is the default: the "
-            "declared hosts and groups are the whole inventory until a VCS source is bound.",
-        )
-    return JSONResponse(content={"data": _settings_json(settings)})
-
-
-@router.put("/workspaces/{workspace_id}/inventory/settings")
-async def put_inventory_settings(
-    workspace_id: str = Path(...),
-    body: dict = Body(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Create or replace the settings. A full replace, not a patch.
-
-    `PUT` on a singleton, so the body is the complete intended state: an absent
-    attribute takes its default rather than keeping the stored value. A caller
-    changing one field reads first, which it has to do anyway to know the rest.
-    """
-    ws = await _get_workspace(workspace_id, db)
-    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
-
-    attrs = _attrs(body)
-    try:
-        settings = await inv.put_settings(
-            db,
-            ws.id,
-            include_platform=_as_bool(attrs.get("include-platform"), "include-platform", True),
-            vcs_connection_id=_rel_id(body, "vcs-connection", "vcs-connections"),
-            repo_url=attrs.get("repo-url") or "",
-            branch=attrs.get("branch") or "",
-            working_directory=attrs.get("working-directory") or "",
-            ignore_paths=_as_str_list(attrs.get("ignore-paths"), "ignore-paths"),
-        )
-    except InventoryValidationError as exc:
-        raise await _fail(db, HTTPException(status_code=422, detail=str(exc))) from exc
-    except IntegrityError as exc:
-        raise await _fail(
-            db,
-            _integrity_error(
-                exc,
-                duplicate="These inventory settings already exist",
-                parent="That VCS connection does not exist",
-                check="A repository needs a VCS connection to fetch it with",
-            ),
-        ) from exc
-
-    await db.commit()
-    logger.info("Inventory settings written", workspace=ws.name, by=user.email)
-    return JSONResponse(content={"data": _settings_json(settings)})
-
-
-@router.patch("/workspaces/{workspace_id}/inventory/settings")
-async def patch_inventory_settings(
-    workspace_id: str = Path(...),
-    body: dict = Body(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Change some of the settings and leave the rest alone.
-
-    Beside the `PUT` rather than instead of it. A `PUT` is the right shape for
-    Terraform, which always knows the whole intended state; a `PATCH` is the
-    right shape for a person or a script changing one thing, and making them
-    read the row first to avoid clobbering the others is work with nothing
-    behind it.
-
-    To REMOVE the VCS binding, send the relationship explicitly as null:
-    `{"relationships": {"vcs-connection": {"data": null}}}`. Omitting it leaves
-    the binding alone, which is the distinction a patch exists to draw.
-    """
-    ws = await _get_workspace(workspace_id, db)
-    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
-
-    settings = await inv.get_settings(db, ws.id)
-    if settings is None:
-        raise HTTPException(
-            status_code=404,
-            detail="This workspace has no inventory settings to patch. PUT creates them.",
-        )
-
-    attrs = _attrs(body)
-    try:
-        settings = await inv.patch_settings(
-            db,
-            settings,
-            include_platform=(
-                _as_bool(attrs.get("include-platform"), "include-platform", True)
-                if "include-platform" in attrs
-                else None
-            ),
-            vcs_connection_id=_rel_id(body, "vcs-connection", "vcs-connections"),
-            clear_vcs_connection=_rel_is_explicit_null(body, "vcs-connection"),
-            repo_url=attrs.get("repo-url") if "repo-url" in attrs else None,
-            branch=attrs.get("branch") if "branch" in attrs else None,
-            working_directory=(
-                attrs.get("working-directory") if "working-directory" in attrs else None
-            ),
-            ignore_paths=(
-                _as_str_list(attrs.get("ignore-paths"), "ignore-paths")
-                if "ignore-paths" in attrs
-                else None
-            ),
-        )
-    except InventoryValidationError as exc:
-        raise await _fail(db, HTTPException(status_code=422, detail=str(exc))) from exc
-    except IntegrityError as exc:
-        raise await _fail(
-            db,
-            _integrity_error(
-                exc,
-                duplicate="These inventory settings already exist",
-                parent="That VCS connection does not exist",
-                check="A repository needs a VCS connection to fetch it with",
-            ),
-        ) from exc
-
-    await db.commit()
-    return JSONResponse(content={"data": _settings_json(settings)})
-
-
-@router.delete("/workspaces/{workspace_id}/inventory/settings", status_code=204)
-async def delete_inventory_settings(
-    workspace_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    """Clear the settings, and with them the VCS binding.
-
-    Declared hosts and groups are untouched: they belong to the workspace, so
-    unbinding a repository leaves the inventory with its declared half.
-    """
-    ws = await _get_workspace(workspace_id, db)
-    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
-
-    settings = await inv.get_settings(db, ws.id)
-    if settings is None:
-        raise HTTPException(status_code=404, detail="This workspace has no inventory settings")
-    await inv.delete_settings(db, settings)
-    await db.commit()
-    logger.info("Inventory settings cleared", workspace=ws.name, by=user.email)
 
 
 # ── Hosts ────────────────────────────────────────────────────────────────────

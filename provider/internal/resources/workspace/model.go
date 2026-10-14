@@ -22,6 +22,12 @@
 //	"engine-version"                    → engine_version      (string, optional; `terraform_version` is its deprecated alias)
 //	"terraform-version"                 → terraform_version   (string, optional, deprecated)
 //	"ansible-version"                   → ansible_version     (string, optional; empty inherits the deployment default)
+//	"config-directory"                  → config_directory    (string, optional; NULL and "" differ — see below)
+//	"inventory-paths"                   → inventory_paths     (list,   optional+computed; ordered)
+//	"default-playbook"                  → default_playbook    (string, optional+computed)
+//	"default-limit"                     → default_limit       (string, optional+computed)
+//	"inventory-include-platform"        → inventory_include_platform (bool, optional+computed; defaults true)
+//	"inventory-ignore-paths"            → inventory_ignore_paths (list, optional+computed)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
@@ -74,18 +80,33 @@ type workspaceModel struct {
 	ID types.String `tfsdk:"id"`
 
 	// Writable attributes
-	Name                          types.String `tfsdk:"name"`
-	ExecutionMode                 types.String `tfsdk:"execution_mode"`
-	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
-	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
-	ExecutionBackend              types.String `tfsdk:"execution_backend"`
-	Engine                        types.String `tfsdk:"engine"`
-	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
-	EngineVersion                 types.String `tfsdk:"engine_version"`
-	TerraformVersion              types.String `tfsdk:"terraform_version"`
-	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
-	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
-	AnsibleVersion                types.String `tfsdk:"ansible_version"`
+	Name              types.String `tfsdk:"name"`
+	ExecutionMode     types.String `tfsdk:"execution_mode"`
+	AutoApply         types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode     types.String `tfsdk:"auto_apply_mode"`
+	ExecutionBackend  types.String `tfsdk:"execution_backend"`
+	Engine            types.String `tfsdk:"engine"`
+	PulumiBindPlan    types.Bool   `tfsdk:"pulumi_bind_plan"`
+	EngineVersion     types.String `tfsdk:"engine_version"`
+	TerraformVersion  types.String `tfsdk:"terraform_version"`
+	TerragruntEnabled types.Bool   `tfsdk:"terragrunt_enabled"`
+	TerragruntVersion types.String `tfsdk:"terragrunt_version"`
+	AnsibleVersion    types.String `tfsdk:"ansible_version"`
+	// The ansible configure operation's roots and run defaults (#1929).
+	//
+	// ConfigDirectory is Optional-only, NOT Optional+Computed like its
+	// neighbours, and that is the whole point: Terraform distinguishes null
+	// from "" natively and so does the server, where null means this
+	// workspace has NO configure operation and "" means the repository ROOT.
+	// Optional-only is what makes a removal from the config plan as null and
+	// so reach Update as an explicit clear; Computed would fall back to prior
+	// state and the operation could never be turned off from HCL.
+	ConfigDirectory               types.String `tfsdk:"config_directory"`
+	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
+	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
+	DefaultLimit                  types.String `tfsdk:"default_limit"`
+	InventoryIncludePlatform      types.Bool   `tfsdk:"inventory_include_platform"`
+	InventoryIgnorePaths          types.List   `tfsdk:"inventory_ignore_paths"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`

@@ -31,11 +31,9 @@ from terrapod.db.models import (
     InventoryHost,
     InventoryHostGroup,
     InventoryHostVar,
-    InventorySettings,
 )
 from terrapod.services import replication, replication_registry
 
-SETTINGS = replication_registry.INVENTORY_SETTINGS
 HOSTS = replication_registry.INVENTORY_HOSTS
 GROUPS = replication_registry.INVENTORY_GROUPS
 HOST_GROUPS = replication_registry.INVENTORY_HOST_GROUPS
@@ -80,21 +78,6 @@ def _keys_db(keys):
 def _stamps():
     now = datetime.now(UTC)
     return {"created_at": now, "updated_at": now}
-
-
-def _settings(**kw):
-    base = {
-        "workspace_id": WS_ID,
-        "include_platform": True,
-        "vcs_connection_id": VCS_ID,
-        "repo_url": "https://example.invalid/org/ansible",
-        "branch": "main",
-        "working_directory": "inventory",
-        "ignore_paths": ["archive/"],
-        **_stamps(),
-    }
-    base.update(kw)
-    return InventorySettings(**base)
 
 
 def _host(host_id=HOST_ID, **kw):
@@ -180,16 +163,7 @@ def _global_var(var_id=VAR_ID, **kw):
 class TestRegistration:
     """The two structural facts a reader would otherwise have to derive."""
 
-    def test_the_settings_replicate_on_the_workspace_not_a_surrogate_id(self):
-        """One inventory per workspace, so the workspace IS the key.
-
-        A spec that assumed `id` would encode every settings row's entity id as
-        `None` and apply nothing -- and the failure would be an empty inventory
-        configuration on the promoted node rather than an error.
-        """
-        assert SETTINGS.pk_attrs == ("workspace_id",)
-
-    def test_the_eight_are_registered_after_the_workspace_they_hang_off(self):
+    def test_the_seven_are_registered_after_the_workspace_they_hang_off(self):
         """A follower applies a backfill page in registration order, so a child
         whose parent is not there yet fails its insert.
 
@@ -199,7 +173,6 @@ class TestRegistration:
         """
         names = list(replication.registered())
         inventory = [
-            "inventory_settings",
             "inventory_hosts",
             "inventory_groups",
             "inventory_host_groups",
@@ -218,79 +191,7 @@ class TestRegistration:
         # is registered well before `workspaces` and a single ordering would
         # read as a constraint between those two that does not exist.
         parents = max(names.index("workspaces"), names.index("vcs_connections"))
-        assert positions[0] > parents, (
-            f"inventory_settings is at {positions[0]}, before "
-            f"workspaces/vcs_connections at {parents}"
-        )
-
-
-class TestInventorySettings:
-    @pytest.mark.replication_matrix("inventory_settings", "backfill-from-empty")
-    async def test_backfill_carries_the_binding_and_both_narrowing_fields(self):
-        """`include_platform` and `ignore_paths` are the two that look like
-        node-local operational state and are not.
-
-        `include_platform: False` means "resolve the VCS source alone", which is
-        how an operator moves a repo's inventory in before declaring anything --
-        a node that defaults it back to True resolves rows deliberately taken
-        out of play. `ignore_paths` is part of what the source IS, so dropping
-        it widens the source and hosts APPEAR, which is as wrong as hosts
-        disappearing.
-        """
-        db = _rows_db([_settings(include_platform=False)])
-
-        page = await replication.read_backfill(db, SETTINGS)
-
-        assert page[0]["workspace_id"] == str(WS_ID)
-        assert page[0]["include_platform"] is False
-        assert page[0]["ignore_paths"] == ["archive/"]
-        assert page[0]["working_directory"] == "inventory"
-
-    @pytest.mark.replication_matrix("inventory_settings", "delta-apply")
-    async def test_a_rebound_source_reaches_the_peer(self):
-        db = AsyncMock()
-        existing = _settings(branch="main")
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(
-            db, SETTINGS, {"workspace_id": str(WS_ID), "branch": "release"}
-        )
-
-        assert existing.branch == "release"
-
-    @pytest.mark.replication_matrix("inventory_settings", "idempotent-reapply")
-    async def test_reapplying_changes_nothing(self):
-        db = AsyncMock()
-        existing = _settings()
-        db.scalar.return_value = existing
-        payload = replication.serialize_row(SETTINGS, existing)
-
-        await replication.apply_upsert(db, SETTINGS, payload)
-
-        assert existing.branch == "main"
-        assert existing.include_platform is True
-        db.add.assert_not_called()
-
-    @pytest.mark.replication_matrix("inventory_settings", "delete")
-    async def test_delete_applies_on_the_workspace_id(self):
-        db = AsyncMock()
-
-        await replication.apply_delete(db, SETTINGS, str(WS_ID))
-
-        db.execute.assert_awaited()
-
-    @pytest.mark.replication_matrix("inventory_settings", "backfill-converges-deletion")
-    async def test_an_unbound_source_does_not_come_back(self):
-        """Removing the settings row is how an operator unbinds a git source.
-
-        A row that survives a backfill re-binds it, so the promoted node fetches
-        and merges a repository the leader had deliberately stopped reading.
-        """
-        db = _keys_db([(WS_ID,), (OTHER_WS_ID,)])
-
-        removed = await replication.reconcile_deletions(db, SETTINGS, {str(WS_ID)})
-
-        assert removed == [str(OTHER_WS_ID)]
+        assert positions[0] > parents, f"workspaces/vcs_connections at {parents}"
 
 
 class TestInventoryHosts:

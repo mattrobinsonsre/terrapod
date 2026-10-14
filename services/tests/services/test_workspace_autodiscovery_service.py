@@ -515,6 +515,16 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "execution_backend",
         "engine_version",
         "ansible_version",
+        # The Ansible roots and run defaults (#1929). A rule carries them so a
+        # fleet of configure-capable workspaces can be materialised rather than
+        # edited one at a time afterwards -- the user's call when the parity
+        # gate named autodiscovery as a missing surface.
+        "config_directory",
+        "inventory_paths",
+        "default_playbook",
+        "default_limit",
+        "inventory_include_platform",
+        "inventory_ignore_paths",
         "resource_cpu",
         "resource_memory",
         "parallelism",

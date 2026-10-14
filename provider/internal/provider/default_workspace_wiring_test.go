@@ -89,9 +89,12 @@ func TestEverySurfaceTakingAWorkspaceIDDefaultsIt(t *testing.T) {
 	// A floor, so a renamed helper or a changed layout fails here instead of
 	// matching nothing and passing. 14 when written: 11 resources (the 7 that
 	// already took a workspace id, plus the 4 inventory ones) and 3 data
-	// sources. Derived by the test itself, so re-count from its own log line
-	// rather than from this comment if it ever trips.
-	if len(subjects) < 14 {
+	// sources. Now 13: terrapod_inventory_settings was one of those four and
+	// is gone (#1929) -- its six fields are workspace columns, so the roots
+	// are set on terrapod_workspace itself and there is no separate resource
+	// to default a workspace id on. Derived by the test itself, so re-count
+	// from its own log line rather than from this comment if it ever trips.
+	if len(subjects) < 13 {
 		t.Fatalf("found only %d surfaces with an optional workspace_id; the derivation has broken", len(subjects))
 	}
 
@@ -183,9 +186,10 @@ func TestTheWorkspaceDefaultRunsBeforeKeepComputed(t *testing.T) {
 		}
 	}
 	// Five at the time of writing (terrapod_variable and the four inventory
-	// resources that carry a workspace_id). A floor, so a renamed helper fails
-	// here rather than matching nothing and passing.
-	if checked < 5 {
+	// resources that carry a workspace_id); four since terrapod_inventory_settings
+	// was removed in #1929. A floor, so a renamed helper fails here rather than
+	// matching nothing and passing.
+	if checked < 4 {
 		t.Fatalf("found only %d call sites using both modifiers; the derivation has broken", checked)
 	}
 	t.Logf("checked %d call sites that use both modifiers", checked)

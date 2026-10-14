@@ -38,6 +38,12 @@ type workspaceDataSourceModel struct {
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	AnsibleVersion                types.String `tfsdk:"ansible_version"`
+	ConfigDirectory               types.String `tfsdk:"config_directory"`
+	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
+	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
+	DefaultLimit                  types.String `tfsdk:"default_limit"`
+	InventoryIncludePlatform      types.Bool   `tfsdk:"inventory_include_platform"`
+	InventoryIgnorePaths          types.List   `tfsdk:"inventory_ignore_paths"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
@@ -116,6 +122,12 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"ansible_version":                  computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
+			"config_directory":                 computedString("Repository-root-relative directory the ansible configure operation runs in. **Null means the workspace has no configure operation at all**; the empty string means it is rooted at the top of the repository. The two are different states, so do not treat a null as an empty path."),
+			"inventory_paths":                  computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
+			"default_playbook":                 computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
+			"default_limit":                    computedString("The default `--limit` for a configure run. Null means the whole inventory."),
+			"inventory_include_platform":       computedBool("Whether the inventory rows declared through Terrapod contribute to the resolved inventory. Defaults to true."),
+			"inventory_ignore_paths":           computedList("Paths excluded from the inventory resolution."),
 			"working_directory":                computedString("Working directory."),
 			"parallelism":                      computedInt64("How many operations the engine performs at once."),
 			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
@@ -257,6 +269,28 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	// rather than pinning one (#2010); the server does not substitute the
 	// resolved default, so null is the honest reading.
 	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
+	// #1929's six. `config-directory` reads through GetStringPtrAttr, NOT
+	// setOptionalString: that helper maps "" to null, which is exactly the
+	// collapse this field cannot survive -- null is "no configure operation"
+	// and "" is the repository root, so a data source using it would report
+	// every root-rooted workspace as having no configure operation at all.
+	if cd := terrapod.GetStringPtrAttr(res, "config-directory"); cd != nil {
+		m.ConfigDirectory = types.StringValue(*cd)
+	} else {
+		m.ConfigDirectory = types.StringNull()
+	}
+	setOptionalString(&m.DefaultPlaybook, terrapod.GetStringAttr(res, "default-playbook"))
+	setOptionalString(&m.DefaultLimit, terrapod.GetStringAttr(res, "default-limit"))
+	// Absent is TRUE, not false: the column defaults to true, so a server
+	// predating #1929 -- or a workspace read through /api/tfe/v2, which drops
+	// all six -- would otherwise report the declared rows as excluded. The
+	// same rule the SDK's own decoder applies; it is restated here because
+	// this data source reads attributes off the Resource directly rather than
+	// through workspaceFromResource.
+	m.InventoryIncludePlatform = types.BoolValue(true)
+	if ip := terrapod.GetBoolPtrAttr(res, "inventory-include-platform"); ip != nil {
+		m.InventoryIncludePlatform = types.BoolValue(*ip)
+	}
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
@@ -308,6 +342,22 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.PlanExpirySeconds = types.Int64Value(v)
 	} else {
 		m.PlanExpirySeconds = types.Int64Null()
+	}
+
+	if invPaths := terrapod.GetListAttr(res, "inventory-paths"); len(invPaths) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, invPaths)
+		diags.Append(d...)
+		m.InventoryPaths = val
+	} else {
+		m.InventoryPaths = types.ListNull(types.StringType)
+	}
+
+	if ignore := terrapod.GetListAttr(res, "inventory-ignore-paths"); len(ignore) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, ignore)
+		diags.Append(d...)
+		m.InventoryIgnorePaths = val
+	} else {
+		m.InventoryIgnorePaths = types.ListNull(types.StringType)
 	}
 
 	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {

@@ -225,6 +225,18 @@ def _validate_trigger_prefixes(raw: object) -> list[str]:
     return _422(workspace_settings.validate_trigger_prefixes, raw)
 
 
+def _validate_config_directory(raw: object) -> str | None:
+    return _422(workspace_settings.validate_config_directory, raw)
+
+
+def _validate_inventory_paths(raw: object) -> list[str]:
+    return _422(workspace_settings.validate_inventory_paths, raw)
+
+
+def _validate_inventory_ignore_paths(raw: object) -> list[str]:
+    return _422(workspace_settings.validate_inventory_ignore_paths, raw)
+
+
 def _validate_drift_ignore_rules(raw: object) -> list[str]:
     return _422(workspace_settings.validate_drift_ignore_rules, raw)
 
@@ -714,6 +726,22 @@ def _workspace_json(
                 # after this literal rather than inside it — see the `tfe` pop at
                 # the end of this function.
                 "pulumi-bind-plan": ws.pulumi_bind_plan,
+                # The Ansible roots and run defaults (#1929). Native-only, and
+                # dropped from the compatibility surface by the same `tfe` pop
+                # below for the same reason: `/api/tfe/v2` is engine-filtered to
+                # Terraform and `go-tfe` switches on a fixed attribute set.
+                #
+                # `config-directory` serialises None as null rather than "": the
+                # two mean different things -- no configure operation versus the
+                # repository root -- and a client that wrote a read straight back
+                # would otherwise give every workspace a configure operation
+                # rooted at the top of its repository.
+                "config-directory": ws.config_directory,
+                "inventory-paths": list(ws.inventory_paths or []),
+                "default-playbook": ws.default_playbook,
+                "default-limit": ws.default_limit,
+                "inventory-include-platform": ws.inventory_include_platform,
+                "inventory-ignore-paths": list(ws.inventory_ignore_paths or []),
                 # One version, two spellings (#1559). `engine-version` is the
                 # canonical one now that the column pins whichever engine the
                 # workspace runs. `terraform-version` is not deprecated and is
@@ -916,6 +944,15 @@ def _workspace_json(
         # is unchanged for every engine: a consumer already reading this key on a
         # Terraform workspace keeps getting it.
         payload["data"]["attributes"].pop("pulumi-bind-plan", None)
+        for _native_only in (
+            "config-directory",
+            "inventory-paths",
+            "default-playbook",
+            "default-limit",
+            "inventory-include-platform",
+            "inventory-ignore-paths",
+        ):
+            payload["data"]["attributes"].pop(_native_only, None)
     return payload
 
 
@@ -1504,6 +1541,35 @@ async def _create_workspace_impl(
             attrs.get("terragrunt-version") or "1.0",
         ),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
+        # The Ansible roots and run defaults (#1929). `config-directory` is
+        # tested for MEMBERSHIP, not truthiness: `""` is a value meaning the
+        # repository root, and its absence means this workspace has no
+        # configure operation -- which is the column's default, so the key
+        # simply not being here is the right outcome.
+        config_directory=(
+            _validate_config_directory(attrs["config-directory"])
+            if "config-directory" in attrs
+            else None
+        ),
+        inventory_paths=_validate_inventory_paths(attrs.get("inventory-paths")),
+        default_playbook=_422(
+            workspace_settings.validate_ansible_run_default,
+            attrs.get("default-playbook"),
+            "default-playbook",
+        ),
+        default_limit=_422(
+            workspace_settings.validate_ansible_run_default,
+            attrs.get("default-limit"),
+            "default-limit",
+        ),
+        inventory_include_platform=_422(
+            workspace_settings.validate_bool,
+            attrs.get("inventory-include-platform", True),
+            "inventory-include-platform",
+        ),
+        inventory_ignore_paths=_validate_inventory_ignore_paths(
+            attrs.get("inventory-ignore-paths")
+        ),
         resource_cpu=attrs.get("resource-cpu", "1"),
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
         pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
@@ -2179,6 +2245,36 @@ async def update_workspace(
         )
     if "working-directory" in attrs:
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
+    # The Ansible roots and run defaults (#1929). An explicit null on
+    # `config-directory` CLEARS the configure operation; `""` sets its root to
+    # the repository root. The two are not the same, so neither is folded into
+    # the other.
+    if "config-directory" in attrs:
+        ws.config_directory = _validate_config_directory(attrs["config-directory"])
+    if "inventory-paths" in attrs:
+        ws.inventory_paths = _validate_inventory_paths(attrs["inventory-paths"])
+    if "default-playbook" in attrs:
+        ws.default_playbook = _422(
+            workspace_settings.validate_ansible_run_default,
+            attrs["default-playbook"],
+            "default-playbook",
+        )
+    if "default-limit" in attrs:
+        ws.default_limit = _422(
+            workspace_settings.validate_ansible_run_default,
+            attrs["default-limit"],
+            "default-limit",
+        )
+    if "inventory-include-platform" in attrs:
+        ws.inventory_include_platform = _422(
+            workspace_settings.validate_bool,
+            attrs["inventory-include-platform"],
+            "inventory-include-platform",
+        )
+    if "inventory-ignore-paths" in attrs:
+        ws.inventory_ignore_paths = _validate_inventory_ignore_paths(
+            attrs["inventory-ignore-paths"]
+        )
     if "parallelism" in attrs:
         ws.parallelism = _validate_parallelism(attrs["parallelism"])
     if "pulumi-bind-plan" in attrs:

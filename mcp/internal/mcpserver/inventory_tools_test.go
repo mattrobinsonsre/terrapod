@@ -132,59 +132,6 @@ const invGroupListBody = `{"data":[{"id":"invgroup-1","type":"inventory-groups",
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-// A workspace with no settings row is the NORMAL default, so the tool must
-// report it rather than relaying a 404 as a problem.
-func TestInventorySettingsReportsAnUnconfiguredWorkspaceWithoutAnError(t *testing.T) {
-	sess := inventoryToolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"errors":[{"detail":"Not found","status":"404"}]}`))
-	})
-
-	res := callInventoryTool(t, sess, "terrapod_inventory_settings",
-		map[string]any{"workspace_id": "ws-1"})
-
-	var out struct {
-		Configured bool `json:"configured"`
-	}
-	invStructured(t, res, &out)
-	if out.Configured {
-		t.Error("an absent settings row must read as unconfigured")
-	}
-}
-
-func TestInventorySettingsReadsTheBinding(t *testing.T) {
-	sess, seen := inventoryRouter(t, map[string]string{
-		"/api/v1/workspaces/ws-1/inventory/settings": `{"data":{"id":"ws-1",
-		  "type":"inventory-settings","attributes":{"include-platform":true,
-		  "repo-url":"https://example.invalid/org/ansible","branch":"main",
-		  "working-directory":"inventory","ignore-paths":["archive/"]},
-		  "relationships":{"workspace":{"data":{"id":"ws-1","type":"workspaces"}},
-		    "vcs-connection":{"data":{"id":"vcs-7","type":"vcs-connections"}}}}}`,
-	})
-
-	res := callInventoryTool(t, sess, "terrapod_inventory_settings",
-		map[string]any{"workspace_id": "ws-1"})
-
-	var out struct {
-		Configured bool `json:"configured"`
-		Settings   struct {
-			VCSConnectionID  string `json:"vcs-connection-id"`
-			WorkingDirectory string `json:"working-directory"`
-		} `json:"settings"`
-	}
-	invStructured(t, res, &out)
-	if !out.Configured || out.Settings.VCSConnectionID != "vcs-7" {
-		t.Errorf("binding not surfaced: %+v", out)
-	}
-	if out.Settings.WorkingDirectory != "inventory" {
-		t.Errorf("working directory: %q", out.Settings.WorkingDirectory)
-	}
-	if len(seen.paths) != 1 {
-		t.Errorf("one call expected, got %v", seen.paths)
-	}
-}
-
 func TestInventoryListReadsHostsGroupsAndTheVarsUnderAll(t *testing.T) {
 	sess, seen := inventoryRouter(t, map[string]string{
 		"/api/v1/workspaces/ws-1/inventory/hosts":  invHostListBody,
@@ -631,7 +578,6 @@ func TestInventoryRemoveDispatchesEveryPrefix(t *testing.T) {
 		{"invvar-1", "/api/v1/inventory-global-vars/invvar-1", "variable under all"},
 		{"invhg-1", "/api/v1/inventory-host-groups/invhg-1", "group membership"},
 		{"invgc-1", "/api/v1/inventory-group-children/invgc-1", "group nesting"},
-		{"ws-1", "/api/v1/workspaces/ws-1/inventory/settings", "inventory settings"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {
@@ -659,8 +605,13 @@ func TestInventoryRemoveDispatchesEveryPrefix(t *testing.T) {
 // `invgvar-` and `invgroup-` and `invgc-` all begin `invg`, so the prefixes are
 // matched in order rather than by a shortest match. An id of no inventory kind
 // must be refused before anything is called.
+//
+// A WORKSPACE id is in that set since #1929, and it is the interesting case:
+// `ws-` used to dispatch to the settings row, so an agent that learnt the old
+// behaviour will still try it. It must be refused rather than matched by some
+// other prefix, and the refusal names where the roots live now.
 func TestInventoryRemoveRefusesAnIDOfNoInventoryKind(t *testing.T) {
-	for _, id := range []string{"", "run-1", "invg", "var-1"} {
+	for _, id := range []string{"", "run-1", "invg", "var-1", "ws-1"} {
 		var called int
 		sess := inventoryToolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
 			called++
@@ -788,11 +739,15 @@ func TestTheInventoryToolsDoNotTellAnAgentAReadIsStale(t *testing.T) {
 // that an agent can observe or drive what the platform can. A structure with no
 // tool is a gap nothing else would report: the catalogue golden pins the tools
 // that exist, not the ones that should.
+//
+// The inventory ROOTS are not in this list and must not be added back: they are
+// workspace settings since #1929, reachable through terrapod_workspace_get and
+// terrapod_workspace_update, which TestTheInventoryRootsAreReachableOnTheWorkspaceTools
+// below pins. A `terrapod_inventory_settings*` tool reappearing here would mean
+// the 1:1 row had come back.
 func TestEveryInventoryStructureIsReachable(t *testing.T) {
 	tools := liveToolsByName(t)
 	for _, name := range []string{
-		"terrapod_inventory_settings",
-		"terrapod_inventory_settings_set",
 		"terrapod_inventory_list",
 		"terrapod_inventory_detail",
 		"terrapod_inventory_resolved",
@@ -804,6 +759,74 @@ func TestEveryInventoryStructureIsReachable(t *testing.T) {
 	} {
 		if _, ok := tools[name]; !ok {
 			t.Errorf("%s is not registered", name)
+		}
+	}
+}
+
+// The roots moved onto the workspace tools (#1929), so "reachable" has to be
+// asserted THERE -- the list above cannot see them, and a catalogue golden
+// records the tools that exist rather than the fields they carry. This reads
+// the live server's own input schemas, so a field dropped from the struct
+// fails here instead of shipping as a capability an agent cannot drive.
+func TestTheInventoryRootsAreReachableOnTheWorkspaceTools(t *testing.T) {
+	schemas := liveInputSchemasByName(t)
+
+	roots := []string{
+		"config_directory",
+		"inventory_paths",
+		"default_playbook",
+		"default_limit",
+		"inventory_include_platform",
+		"inventory_ignore_paths",
+	}
+	for _, tool := range []string{"terrapod_workspace_create", "terrapod_workspace_update"} {
+		raw, ok := schemas[tool]
+		if !ok {
+			t.Fatalf("%s is not registered", tool)
+		}
+		var doc struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("%s schema: %v", tool, err)
+		}
+		for _, root := range roots {
+			if _, present := doc.Properties[root]; !present {
+				t.Errorf("%s does not accept %q — the inventory roots are workspace "+
+					"settings since #1929, so this tool is the only way an agent can "+
+					"set one", tool, root)
+			}
+		}
+		// Only the update can turn the configure operation off; on create
+		// there is nothing to clear, so the flag would be noise.
+		_, hasClear := doc.Properties["clear_config_directory"]
+		if tool == "terrapod_workspace_update" && !hasClear {
+			t.Error("terrapod_workspace_update does not accept clear_config_directory — " +
+				"an agent could root the configure operation at the repository root " +
+				"(config_directory = \"\") but never turn it off, and the two are " +
+				"different states")
+		}
+		if tool == "terrapod_workspace_create" && hasClear {
+			t.Error("terrapod_workspace_create accepts clear_config_directory, which has " +
+				"nothing to clear: a created workspace has no configure operation unless " +
+				"config_directory says so")
+		}
+	}
+}
+
+// The retired 1:1 row must not come back as a tool. Asserted by absence
+// because nothing else can see it: removing a tool is the kind of change the
+// catalogue golden reports as BREAKING, so a reader checking the golden sees
+// the removal -- and a REappearance would read as an ordinary addition.
+func TestTheRetiredInventorySettingsToolsAreGone(t *testing.T) {
+	tools := liveToolsByName(t)
+	for _, name := range []string{
+		"terrapod_inventory_settings",
+		"terrapod_inventory_settings_set",
+	} {
+		if _, ok := tools[name]; ok {
+			t.Errorf("%s is registered again; the inventory roots are workspace fields "+
+				"since #1929 and a settings object would be a second home for them", name)
 		}
 	}
 }

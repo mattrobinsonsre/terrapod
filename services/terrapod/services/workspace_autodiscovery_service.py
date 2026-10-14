@@ -395,6 +395,15 @@ async def find_or_autocreate_workspace(
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         ansible_version=rule.ansible_version,
+        # The Ansible roots and run defaults the rule declares (#1929). A rule
+        # that leaves `config_directory` NULL materialises workspaces with no
+        # configure operation, which is every rule that existed before this.
+        config_directory=rule.config_directory,
+        inventory_paths=list(rule.inventory_paths or []),
+        default_playbook=rule.default_playbook,
+        default_limit=rule.default_limit,
+        inventory_include_platform=rule.inventory_include_platform,
+        inventory_ignore_paths=list(rule.inventory_ignore_paths or []),
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,
         # Inherit the rule's conditional mode too (#1274) — carrying only

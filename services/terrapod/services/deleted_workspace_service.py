@@ -108,6 +108,16 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
         "ansible_version": ws.ansible_version,
+        # The Ansible roots and run defaults (#1929). `config_directory` is
+        # snapshotted as None-or-string rather than coerced: restoring "" where
+        # it was NULL would give the workspace a configure operation it never
+        # had, rooted at the top of the repository.
+        "config_directory": ws.config_directory,
+        "inventory_paths": list(ws.inventory_paths or []),
+        "default_playbook": ws.default_playbook,
+        "default_limit": ws.default_limit,
+        "inventory_include_platform": ws.inventory_include_platform,
+        "inventory_ignore_paths": list(ws.inventory_ignore_paths or []),
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
@@ -569,6 +579,23 @@ async def restore_workspace(
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",
+        # `.get(...)` with NO `or ""` fallback, deliberately (#1929). NULL and
+        # "" mean different things for this column: NULL is "no configure
+        # operation", "" is "the repository root". A snapshot predating the
+        # column yields None, which is the opted-OUT direction and the right
+        # one -- restoring a workspace must not hand it a configure operation
+        # rooted at the top of the repository that nobody asked for. This is the
+        # same trap as `oidc_audiences` below, which is why that comment exists.
+        config_directory=settings.get("config_directory"),
+        inventory_paths=list(settings.get("inventory_paths") or []),
+        default_playbook=settings.get("default_playbook") or "",
+        default_limit=settings.get("default_limit") or "",
+        # `is not False` rather than `or True`: the stored value is the one that
+        # matters and False is a real choice, so a truthiness fallback would
+        # silently turn the declared rows back on for a workspace that had
+        # resolved the git source alone.
+        inventory_include_platform=settings.get("inventory_include_platform") is not False,
+        inventory_ignore_paths=list(settings.get("inventory_ignore_paths") or []),
         stack=settings.get("stack"),
         var_files=list(settings.get("var_files") or []),
         # Empty for a snapshot taken before this column existed, which is the

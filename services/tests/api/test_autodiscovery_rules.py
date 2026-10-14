@@ -53,6 +53,13 @@ def _mock_rule(
     r.pulumi_bind_plan = False
     r.engine_version = "1.11"
     r.ansible_version = "2.21.5"
+    # #1929's six, which `_rule_json` serialises.
+    r.config_directory = None
+    r.inventory_paths = []
+    r.default_playbook = ""
+    r.default_limit = ""
+    r.inventory_include_platform = True
+    r.inventory_ignore_paths = []
     r.resource_cpu = "1"
     r.parallelism = 10
     r.resource_memory = "2Gi"

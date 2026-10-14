@@ -28,11 +28,10 @@ and the expansion of `--limit`. There is no second implementation of any of it.
 
 ---
 
-## The eight structures
+## The seven structures
 
 | Structure | Id prefix | What it is in ansible's terms |
 |---|---|---|
-| Inventory settings | the workspace id | Whether the declared rows take part, plus the optional VCS binding |
 | Host | `invhost-` | One `inventory_hostname` |
 | Group | `invgroup-` | One group. `all` and `ungrouped` are **refused** as declared names |
 | Host membership | `invhg-` | One `[groupname]` line. Many-to-many |
@@ -56,7 +55,7 @@ a way round it.
 ### Why a variable is a row and not a map
 
 Each variable is a row with **one writer**. That is the whole reason the shape is
-eight structures rather than a host object carrying its groups in a list and its
+seven structures rather than a host object carrying its groups in a list and its
 variables in a map.
 
 With rows, a second concern can contribute a variable to a host or a group it
@@ -72,10 +71,25 @@ There is no named inventory object, and no collection of them. Disjoint
 targeting is what groups and `--limit` are for, which is ansible's own answer, so
 nothing has to choose between several.
 
-The settings row is 1:1 with the workspace and may simply be absent — which is
-the ordinary state. `GET …/inventory/settings` answers **404** when there is
-none, and that is a default rather than an error: it means "no VCS source is
-bound, and the declared rows are the whole inventory".
+The inventory's roots and defaults are **columns on the workspace**, not a
+structure of their own, and `config_directory` being unset is the ordinary
+state: it means this workspace has no configure operation at all.
+
+| Column | What it names |
+|---|---|
+| `config_directory` | The Ansible config root — `ansible.cfg`, playbooks, `roles/`, `group_vars/`, `host_vars/` |
+| `inventory_paths` | The inventory sources, in order, each a file or a directory, relative to the config root |
+| `default_playbook` | The playbook a configure runs when the run names none |
+| `default_limit` | The default `--limit`; empty is the whole inventory |
+| `inventory_include_platform` | Whether the declared rows take part in resolution |
+| `inventory_ignore_paths` | Paths to drop from a fetched source before ansible reads it |
+
+**Unset and empty mean different things on `config_directory`**, deliberately
+unlike `working_directory` beside it. Unset means no configure operation; `""`
+means the configure operation's root is the top of the repository. Every
+workspace has a Terraform root even when it is the top of the repo, so
+`working_directory` can be non-nullable with `""` meaning root — but most
+workspaces have no Ansible at all, and that absence has to be expressible.
 
 ---
 
@@ -84,14 +98,58 @@ bound, and the declared rows are the whole inventory".
 | Source | What it holds | Where it comes from |
 |---|---|---|
 | **platform** | The rows above | Whatever writes them — OpenTofu or Terraform, the API, the UI, the MCP tools |
-| **VCS** | A directory of inventory files in a repository | The binding on the settings row |
+| **VCS** | Inventory files in the workspace's repository | The workspace's own VCS binding, under `config_directory` |
 
 Either may be absent: the declared rows alone, a repository alone, both, or
 neither — and neither is a defined empty result rather than an error.
 
-Set `include-platform` to `false` to resolve the repository alone, which is how
-an operator moves a committed inventory in before declaring anything of their
-own.
+Set `inventory_include_platform` to `false` to resolve the repository alone,
+which is how an operator moves a committed inventory in before declaring
+anything of their own.
+
+### There is one VCS binding, and it is the workspace's
+
+Terraform and Ansible in different repositories is not supported, so the
+inventory has no binding of its own — it uses the workspace's `vcs_connection_id`,
+`vcs_repo_url` and `vcs_branch`. What differs between the two concerns is the
+**root**, not the repository: `working_directory` for Terraform,
+`config_directory` for Ansible.
+
+### The config root is fetched whole, and is the working directory
+
+`config_directory` is both what gets fetched and the directory ansible runs in,
+and that is not a detail. Measured against ansible-core 2.18.3,
+`group_vars` and `host_vars` are found in exactly two places: **inside** the
+inventory directory, or **at the working directory** — never merely *beside* the
+inventory directory, which is where a conventional repository puts them.
+
+So narrowing the fetch to the inventory directory and pointing `-i` at it gives
+the right hosts, the right groups, exit 0 and **every variable missing** — with
+nothing unparsed, so `any_unparsed_is_failed` has nothing to catch. It also
+leaves `roles/` empty where roles are submodules, because only submodules inside
+the fetched subtree are initialised, so the first `include_role` fails.
+
+A monorepo still does not ship its whole tree. `config_directory` *is* the
+narrowing; it is just the smallest subtree that is correct rather than the
+smallest one that parses. Relative paths in the operator's own `ansible.cfg`
+also resolve against the working directory rather than against the config file,
+which is the second reason it has to be the config root.
+
+### Inventory sources are an ordered list, and may be files
+
+`inventory_paths` is a list because `inventory` in `ansible.cfg` is
+`type: pathlist` and **the order is precedence** — a later source wins a
+conflicting variable. Reading one entry would resolve a partial inventory and
+silently change the operator's own merge.
+
+Each entry may name a **file** as well as a directory, because ansible's own
+documented layout puts `production` and `staging` side by side. Pointing at the
+containing directory instead *merges* them, which for a staging workspace means
+holding production hosts.
+
+Left empty, it falls through to the `inventory` pathlist in the operator's own
+`ansible.cfg` at resolution time — so the common case needs no configuration,
+and Terrapod's `-i` cannot disagree with what ansible itself would do.
 
 ### A VCS source is a directory, read as one source
 
@@ -154,7 +212,7 @@ A Redis entry does back it, and it is deliberately invisible. The key is
 content-addressed — an equality token over the rows, plus the resolved commit —
 so a write **supersedes** the entry rather than needing to invalidate it. There
 is nothing for an operator to tune and nothing to flush. Invalidating on write
-would instead mean a call site in every one of the eight structures' writers, and
+would instead mean a call site in every one of the seven structures' writers, and
 missing one is a silent stale read.
 
 **It fails closed.** A resolution that cannot be performed is refused, never
@@ -563,7 +621,6 @@ alias and serves all of these too. None of it is on the TFE-compatible prefix �
 no `terraform`, `tofu` or `tfci` invocation consumes it.
 
 ```
-GET  PUT  PATCH  DELETE   /api/v1/workspaces/{id}/inventory/settings
 GET  POST                 /api/v1/workspaces/{id}/inventory/hosts
 GET  PATCH  DELETE        /api/v1/inventory-hosts/{id}
 GET  POST                 /api/v1/inventory-hosts/{id}/vars
@@ -605,12 +662,12 @@ Request and response shapes for every route are in
 
 ## Managing it as code
 
-Eight resources and one data source, in
-[the Terrapod provider](terraform-provider.md):
+Seven resources and one data source, in
+[the Terrapod provider](terraform-provider.md). The roots and defaults are
+attributes on `terrapod_workspace` itself:
 
 | Resource | What it declares |
 |---|---|
-| `terrapod_inventory_settings` | The VCS binding, and whether the declared rows take part |
 | `terrapod_inventory_host` | One host |
 | `terrapod_inventory_group` | One group |
 | `terrapod_inventory_host_group` | A host's membership of a group |

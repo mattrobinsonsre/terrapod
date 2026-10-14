@@ -1,8 +1,15 @@
-"""ansible inventory: settings, hosts, groups, memberships and variables (#1967, #1968)
+"""ansible inventory: hosts, groups, memberships and variables (#1967, #1968, #1929)
 
-Eight new tables, nothing touched. Expand-only in the strongest sense: a replica
-running the previous release neither reads nor writes any of them, so a rolling
-upgrade is unaffected in both directions.
+Seven new tables and six new workspace columns, nothing dropped or retyped.
+Expand-only in the strongest sense: a replica running the previous release
+neither reads nor writes any of them, so a rolling upgrade is unaffected in
+both directions.
+
+The inventory's roots and defaults are **workspace columns**, not a table
+(#1929): the settings row would have carried its own VCS binding, and a
+workspace has exactly one (#1407 point 11), so a differing ROOT does not
+require a differing BINDING. With the binding gone the table held two columns,
+and those fold onto the workspace too.
 
 **One table per structure ansible's inventory actually has.** Group membership
 and group nesting are many-to-many, and variables hang off a host, a group or
@@ -11,7 +18,10 @@ That is what lets a second concern contribute to a group it does not own, and it
 is what makes `group_vars` and `[group:children]` expressible at all.
 
 **Nothing is created for a workspace that does not use this.** There is no row
-anywhere until something declares a host or binds a repository, so a deployment
+anywhere until something declares a host, and `config_directory` stays NULL --
+which is the column's whole reason for being nullable: NULL means no configure
+operation at all, where `''` would mean one rooted at the top of the
+repository. So a deployment
 running only terraform/tofu carries zero rows here -- which is how "those users
 pay nothing" is delivered now that the engine on/off switch is withdrawn (#1986)
 -- by data rather than by a flag an operator could set wrongly.
@@ -109,38 +119,111 @@ def _named_entity(name: str) -> None:
 
 
 def upgrade() -> None:
-    op.create_table(
-        "inventory_settings",
-        # The workspace IS the key: one inventory per workspace, so there is no
-        # surrogate id and no way to create a second row.
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("include_platform", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("vcs_connection_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("repo_url", sa.String(length=500), nullable=False, server_default=""),
-        sa.Column("branch", sa.String(length=255), nullable=False, server_default=""),
-        sa.Column("working_directory", sa.String(length=500), nullable=False, server_default=""),
+    # The inventory's roots and defaults are WORKSPACE columns (#1929). There is
+    # no `inventory_settings` table: it carried its own VCS binding, and a
+    # workspace has one binding (#1407 point 11) -- Terraform and Ansible in
+    # different repositories is not supported, so a differing ROOT does not
+    # require a differing BINDING. With that gone the table held two columns, and
+    # those fold onto the workspace as well.
+    op.add_column(
+        "workspaces",
+        # NULLABLE, and NULL is not ''. NULL means this workspace has no
+        # configure operation; '' means the repository root. Deliberately unlike
+        # `working_directory`, which is non-nullable with '' meaning root: every
+        # workspace has a Terraform root even when it is the top of the repo,
+        # whereas most have no Ansible at all and that absence must be sayable.
+        sa.Column("config_directory", sa.String(length=500), nullable=True),
+    )
+    op.add_column(
+        "workspaces",
+        # An ORDERED list, each entry a file or a directory. Order is precedence:
+        # `inventory` in `ansible.cfg` is `type: pathlist` and a later source
+        # wins per variable. A list rather than one path because a source may be
+        # a FILE -- pointing at the containing directory instead MERGES sibling
+        # environments, so a staging workspace would hold production hosts.
         sa.Column(
-            "ignore_paths",
+            "inventory_paths",
             postgresql.JSONB(),
             nullable=False,
             server_default=sa.text("'[]'::jsonb"),
         ),
-        *_timestamps(),
-        sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
-        # SET NULL rather than CASCADE: deleting a VCS connection must not
-        # silently delete a workspace's whole inventory configuration along with
-        # it. The CHECK then makes the resulting state visible -- a repo with no
-        # connection -- rather than letting it look configured.
-        sa.ForeignKeyConstraint(["vcs_connection_id"], ["vcs_connections.id"], ondelete="SET NULL"),
-        sa.PrimaryKeyConstraint("workspace_id"),
-        sa.CheckConstraint(
-            "vcs_connection_id IS NOT NULL OR repo_url = ''",
-            name="ck_inventory_settings_repo_needs_connection",
+    )
+    op.add_column(
+        "workspaces",
+        # The playbook a configure runs when the run names none. Overridden per
+        # run exactly as `vcs-ref` overrides `vcs_branch` -- there is always a
+        # default and nobody is prompted for it.
+        sa.Column("default_playbook", sa.String(length=500), nullable=False, server_default=""),
+    )
+    op.add_column(
+        "workspaces",
+        # Empty means the whole inventory. `--limit` is a run option in the shape
+        # of `-target`, and this is its workspace default.
+        sa.Column("default_limit", sa.String(length=500), nullable=False, server_default=""),
+    )
+    op.add_column(
+        "workspaces",
+        # Whether the declared rows take part in resolution. False resolves the
+        # git source alone, which is how an operator moves a repository's
+        # inventory in before declaring anything.
+        sa.Column(
+            "inventory_include_platform",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.true(),
         ),
     )
-    op.create_index(
-        "ix_inventory_settings_vcs_connection_id", "inventory_settings", ["vcs_connection_id"]
+    op.add_column(
+        "workspaces",
+        # Ansible reads a directory as ONE source, taking every file in it, so
+        # this is the only way to leave a file out of a directory source.
+        sa.Column(
+            "inventory_ignore_paths",
+            postgresql.JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+        ),
     )
+
+    # And the same six on autodiscovery rules, which materialise workspaces from
+    # their template fields (#1929). A rule without them could only ever produce
+    # plan/apply workspaces, so a fleet of configure-capable ones would have to
+    # be edited one at a time after the fact. `165edbf3177c` is the precedent:
+    # one column added to both tables in one migration.
+    for _table in ("autodiscovery_rules",):
+        op.add_column(_table, sa.Column("config_directory", sa.String(length=500), nullable=True))
+        op.add_column(
+            _table,
+            sa.Column(
+                "inventory_paths",
+                postgresql.JSONB(),
+                nullable=False,
+                server_default=sa.text("'[]'::jsonb"),
+            ),
+        )
+        op.add_column(
+            _table,
+            sa.Column("default_playbook", sa.String(length=500), nullable=False, server_default=""),
+        )
+        op.add_column(
+            _table,
+            sa.Column("default_limit", sa.String(length=500), nullable=False, server_default=""),
+        )
+        op.add_column(
+            _table,
+            sa.Column(
+                "inventory_include_platform", sa.Boolean(), nullable=False, server_default=sa.true()
+            ),
+        )
+        op.add_column(
+            _table,
+            sa.Column(
+                "inventory_ignore_paths",
+                postgresql.JSONB(),
+                nullable=False,
+                server_default=sa.text("'[]'::jsonb"),
+            ),
+        )
 
     _named_entity("inventory_hosts")
     _named_entity("inventory_groups")
@@ -242,6 +325,16 @@ def downgrade() -> None:
         "inventory_host_groups",
         "inventory_groups",
         "inventory_hosts",
-        "inventory_settings",
     ):
         op.drop_table(table)
+
+    for _table in ("autodiscovery_rules", "workspaces"):
+        for _col in (
+            "inventory_ignore_paths",
+            "inventory_include_platform",
+            "default_limit",
+            "default_playbook",
+            "inventory_paths",
+            "config_directory",
+        ):
+            op.drop_column(_table, _col)

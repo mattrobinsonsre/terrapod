@@ -60,12 +60,22 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		OwnerEmail       string              `json:"owner_email,omitempty" jsonschema:"workspace owner email (defaults to the caller)"`
 		Labels           map[string]string   `json:"labels,omitempty" jsonschema:"key/value labels for RBAC + filtering (reserved keys rejected)"`
 		PulumiBindPlan   *bool               `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine"`
+		// The ansible configure operation's roots and run defaults (#1929).
+		// config_directory is a POINTER because its null is a value: absent
+		// means no configure operation, "" means the repository root.
+		ConfigDirectory          *string  `json:"config_directory,omitempty" jsonschema:"the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
+		InventoryPaths           []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
+		DefaultPlaybook          string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
+		DefaultLimit             string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
+		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
+		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_create",
 		Description: "Create a workspace. Only `name` is required; everything else falls back to the instance default. " +
 			"For agent execution set execution_mode=agent + agent_pool_id; for VCS-driven runs set vcs_connection_id + vcs_repo_url. " +
-			"For a Pulumi workspace set engine=pulumi, and pulumi_bind_plan to bind its update to the approved preview. Returns the created workspace.",
+			"For a Pulumi workspace set engine=pulumi, and pulumi_bind_plan to bind its update to the approved preview. " +
+			"For an ansible CONFIGURE operation set config_directory, which is what turns one on at all — a workspace without it has none — plus inventory_paths and the run defaults; there is no separate inventory-settings object, these are workspace settings. Returns the created workspace.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceCreateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Name == "" {
@@ -105,6 +115,16 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// is OFF — rather than asserting a value over whatever the operator
 			// chose.
 			AllowForkPRPlans: in.AllowForkPRPlans,
+			// #1929's six. ConfigDirectory passes the pointer straight
+			// through, so an omitted field stays omitted and an explicit ""
+			// travels -- a `!= ""` guard here would make "root the configure
+			// operation at the repository root" unexpressible.
+			ConfigDirectory:          in.ConfigDirectory,
+			InventoryPaths:           in.InventoryPaths,
+			DefaultPlaybook:          in.DefaultPlaybook,
+			DefaultLimit:             in.DefaultLimit,
+			InventoryIncludePlatform: in.InventoryIncludePlatform,
+			InventoryIgnorePaths:     in.InventoryIgnorePaths,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
@@ -130,11 +150,23 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		PulumiBindPlan   *bool               `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine"`
 		AllowForkPRPlans *bool               `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
 		OIDCAudiences    map[string][]string `json:"oidc_audiences,omitempty" jsonschema:"replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do."`
+		// The ansible configure operation's roots and run defaults (#1929).
+		// On an update config_directory needs THREE states plus a clear, so
+		// the pointer says "set this" and the flag says "turn it off" --
+		// omitting both leaves the stored value alone.
+		ConfigDirectory          *string  `json:"config_directory,omitempty" jsonschema:"the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories. On an update, OMITTING it leaves the stored value alone; pass clear_config_directory to turn the configure operation off"`
+		ClearConfigDirectory     bool     `json:"clear_config_directory,omitempty" jsonschema:"turn the ansible configure operation OFF for this workspace. Distinct from config_directory=\"\", which roots it at the repository root; this removes it entirely. Wins if both are passed"`
+		InventoryPaths           []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
+		DefaultPlaybook          *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
+		DefaultLimit             *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
+		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
+		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
 		Description: "Update a workspace's settings. Only the fields you pass change; omitted fields are left alone. " +
-			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run.",
+			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run. " +
+			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit, inventory_include_platform, inventory_ignore_paths) — there is no separate inventory-settings object to configure; use clear_config_directory to turn the configure operation off.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceUpdateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.WorkspaceID == "" {
@@ -159,6 +191,17 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			PulumiBindPlan:   in.PulumiBindPlan,
 			OIDCAudiences:    in.OIDCAudiences,
 			AllowForkPRPlans: in.AllowForkPRPlans,
+			// #1929's six. The clear flag and the pointer are both passed
+			// through: the SDK sends an explicit JSON null for the clear and
+			// the value otherwise, which is the only way to distinguish
+			// "no configure operation" from "rooted at the repository root".
+			ConfigDirectory:          in.ConfigDirectory,
+			ClearConfigDirectory:     in.ClearConfigDirectory,
+			InventoryPaths:           in.InventoryPaths,
+			DefaultPlaybook:          in.DefaultPlaybook,
+			DefaultLimit:             in.DefaultLimit,
+			InventoryIncludePlatform: in.InventoryIncludePlatform,
+			InventoryIgnorePaths:     in.InventoryIgnorePaths,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

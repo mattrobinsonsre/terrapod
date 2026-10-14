@@ -44,6 +44,16 @@ interface AutodiscoveryRule {
     'agent-pool-id': string | null
     'terraform-version': string
     'ansible-version'?: string
+    // The Ansible roots and run defaults a materialised workspace inherits
+    // (#1929). `config-directory` is `string | null` on purpose: null is a
+    // value in its own right — no configure operation at all — where '' is
+    // the repository root.
+    'config-directory'?: string | null
+    'inventory-paths'?: string[]
+    'default-playbook'?: string
+    'default-limit'?: string
+    'inventory-include-platform'?: boolean
+    'inventory-ignore-paths'?: string[]
     'resource-cpu': string
     parallelism: number
     'resource-memory': string
@@ -137,6 +147,23 @@ export default function AutodiscoveryPage() {
   // happened to be the day it was created -- which is the thing that goes
   // stale. An operator who wants a pin types one.
   const [ansibleVersion, setAnsibleVersion] = useState('')
+  // The Ansible roots and run defaults every workspace this rule
+  // materialises inherits (#1929). `config-directory` is a two-state
+  // control rather than a plain text box because BOTH of its falsy values
+  // are real and they mean opposite things: absent/null declares that the
+  // workspace has no configure operation at all, while an EMPTY STRING
+  // declares that its config root IS the repository root. One text input
+  // could express only one of the two, so the mode carries the decision
+  // and the box supplies the directory.
+  const [configDirectoryMode, setConfigDirectoryMode] = useState<'none' | 'set'>('none')
+  const [configDirectory, setConfigDirectory] = useState('')
+  const [inventoryPaths, setInventoryPaths] = useState<string[]>([])
+  const [defaultPlaybook, setDefaultPlaybook] = useState('')
+  const [defaultLimit, setDefaultLimit] = useState('')
+  // Matches the column default: the rows declared in Terrapod take part in
+  // resolution unless a rule deliberately turns them off.
+  const [inventoryIncludePlatform, setInventoryIncludePlatform] = useState(true)
+  const [inventoryIgnorePaths, setInventoryIgnorePaths] = useState<string[]>([])
   const [resourceCpu, setResourceCpu] = useState('1')
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
@@ -261,6 +288,13 @@ export default function AutodiscoveryPage() {
     setExecutionBackend('tofu')
     setTerraformVersion('1.13')
     setAnsibleVersion('')
+    setConfigDirectoryMode('none')
+    setConfigDirectory('')
+    setInventoryPaths([])
+    setDefaultPlaybook('')
+    setDefaultLimit('')
+    setInventoryIncludePlatform(true)
+    setInventoryIgnorePaths([])
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setAutoApplyMode('never')
@@ -310,6 +344,17 @@ export default function AutodiscoveryPage() {
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
     setAnsibleVersion(a['ansible-version'] || '')
+    // `=== undefined || === null` rather than `|| ''`: a rule that stores ''
+    // means the repository root and must come back as a SET directory, not
+    // as 'no configure operation' (#1929).
+    const cfgDir = a['config-directory']
+    setConfigDirectoryMode(cfgDir === undefined || cfgDir === null ? 'none' : 'set')
+    setConfigDirectory(cfgDir ?? '')
+    setInventoryPaths(a['inventory-paths'] || [])
+    setDefaultPlaybook(a['default-playbook'] || '')
+    setDefaultLimit(a['default-limit'] || '')
+    setInventoryIncludePlatform(a['inventory-include-platform'] ?? true)
+    setInventoryIgnorePaths(a['inventory-ignore-paths'] || [])
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
     setEngine(a.engine || 'terraform')
@@ -371,6 +416,16 @@ export default function AutodiscoveryPage() {
       'agent-pool-id': agentPoolId || null,
       'engine-version': terraformVersion,
       'ansible-version': ansibleVersion.trim(),
+      // The mode decides between the two falsy values the server keeps
+      // apart (#1929): 'none' sends null — no configure operation — and
+      // 'set' sends the box verbatim, the empty string (the repository
+      // root) included.
+      'config-directory': configDirectoryMode === 'set' ? configDirectory.trim() : null,
+      'inventory-paths': inventoryPaths.map(s => s.trim()).filter(Boolean),
+      'default-playbook': defaultPlaybook.trim(),
+      'default-limit': defaultLimit.trim(),
+      'inventory-include-platform': inventoryIncludePlatform,
+      'inventory-ignore-paths': inventoryIgnorePaths.map(s => s.trim()).filter(Boolean),
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
       engine,
@@ -877,6 +932,120 @@ export default function AutodiscoveryPage() {
                   addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
                 />
               </div>
+              {/* The Ansible roots and run defaults every workspace this rule
+                  materialises inherits (#1929). */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">{t('form.ansibleConfigure')}</label>
+                <p className="text-xs text-slate-500 mb-2">{t('form.ansibleConfigureHint')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* min-w-0: a grid item has min-width:auto, so a select
+                      whose longest option is a long translated string can
+                      push the row past the viewport however w-full it is. */}
+                  <div className="min-w-0">
+                    <label htmlFor="ad-config-directory-mode" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.configDirectory')}
+                    </label>
+                    {/* A mode select, not a bare text box: null and '' are
+                        different values the server keeps apart, and both are
+                        falsy, so a text box alone could express only one. */}
+                    <select
+                      id="ad-config-directory-mode"
+                      value={configDirectoryMode}
+                      onChange={e => setConfigDirectoryMode(e.target.value as 'none' | 'set')}
+                      title={tWs('fields.configDirectoryTitle')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="none">{tWs('fields.configDirectoryModeNone')}</option>
+                      <option value="set">{tWs('fields.configDirectoryModeSet')}</option>
+                    </select>
+                    {configDirectoryMode === 'set' && (
+                      <>
+                        <input
+                          value={configDirectory}
+                          onChange={e => setConfigDirectory(e.target.value)}
+                          placeholder={tWs('fields.configDirectoryPlaceholder')}
+                          aria-label={tWs('fields.configDirectory')}
+                          className="mt-2 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          {tWs('fields.configDirectoryRootHint')}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-inventory-include-platform" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.inventoryIncludePlatform')}
+                    </label>
+                    <select
+                      id="ad-inventory-include-platform"
+                      value={inventoryIncludePlatform ? 'true' : 'false'}
+                      onChange={e => setInventoryIncludePlatform(e.target.value === 'true')}
+                      title={tWs('fields.inventoryIncludePlatformTitle')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.inventoryIncludePlatformHint')}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-default-playbook" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.defaultPlaybook')}
+                    </label>
+                    <input
+                      id="ad-default-playbook"
+                      value={defaultPlaybook}
+                      onChange={e => setDefaultPlaybook(e.target.value)}
+                      placeholder={tWs('fields.defaultPlaybookPlaceholder')}
+                      title={tWs('fields.defaultPlaybookTitle')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-default-limit" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.defaultLimit')}
+                    </label>
+                    <input
+                      id="ad-default-limit"
+                      value={defaultLimit}
+                      onChange={e => setDefaultLimit(e.target.value)}
+                      placeholder={tWs('fields.defaultLimitPlaceholder')}
+                      title={tWs('fields.defaultLimitTitle')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {tWs('fields.inventoryPaths')}
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">{tWs('fields.inventoryPathsHint')}</p>
+                  <StringListEditor
+                    values={inventoryPaths}
+                    onChange={setInventoryPaths}
+                    placeholder={tWs('fields.inventoryPathsPlaceholder')}
+                    addLabel={tWs('fields.inventoryPathsAdd')}
+                  />
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {tWs('fields.inventoryIgnorePaths')}
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    {tWs('fields.inventoryIgnorePathsHint')}
+                  </p>
+                  <StringListEditor
+                    values={inventoryIgnorePaths}
+                    onChange={setInventoryIgnorePaths}
+                    placeholder={tWs('fields.inventoryIgnorePathsPlaceholder')}
+                    addLabel={tWs('fields.inventoryIgnorePathsAdd')}
+                  />
+                </div>
+              </div>
+
               {/* The rest of the templated workspace settings (#1763) */}
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">{t('form.execution')}</label>

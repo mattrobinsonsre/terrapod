@@ -358,7 +358,10 @@ field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field CreateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
+field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
+field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -366,6 +369,9 @@ field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
 field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field CreateWorkspaceRequest.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
+field CreateWorkspaceRequest.InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
+field CreateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
 field CreateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
@@ -521,16 +527,6 @@ field InventoryHostGroup.GroupID string `json:"group-id,omitempty"`
 field InventoryHostGroup.HostID string `json:"host-id,omitempty"`
 field InventoryHostGroup.ID string `json:"id"`
 field InventoryHostGroup.WorkspaceID string `json:"workspace-id,omitempty"`
-field InventorySettings.Branch string `json:"branch,omitempty"`
-field InventorySettings.CreatedAt string `json:"created-at,omitempty"`
-field InventorySettings.ID string `json:"id"`
-field InventorySettings.IgnorePaths []string `json:"ignore-paths,omitempty"`
-field InventorySettings.IncludePlatform bool `json:"include-platform"`
-field InventorySettings.RepoURL string `json:"repo-url,omitempty"`
-field InventorySettings.UpdatedAt string `json:"updated-at,omitempty"`
-field InventorySettings.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
-field InventorySettings.WorkingDirectory string `json:"working-directory,omitempty"`
-field InventorySettings.WorkspaceID string `json:"workspace-id,omitempty"`
 field InventoryVar.CreatedAt string `json:"created-at,omitempty"`
 field InventoryVar.GroupID string `json:"group-id,omitempty"`
 field InventoryVar.HostID string `json:"host-id,omitempty"`
@@ -814,12 +810,6 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
-field PutInventorySettingsRequest.Branch string
-field PutInventorySettingsRequest.IgnorePaths []string
-field PutInventorySettingsRequest.IncludePlatform bool
-field PutInventorySettingsRequest.RepoURL string
-field PutInventorySettingsRequest.VCSConnectionID string
-field PutInventorySettingsRequest.WorkingDirectory string
 field RegisteredModuleRef.Name string `json:"name"`
 field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
@@ -1106,13 +1096,6 @@ field UpdateExecutionHookRequest.HookPoint *string
 field UpdateExecutionHookRequest.Name string
 field UpdateExecutionHookRequest.Priority *int64
 field UpdateExecutionHookRequest.Script *string
-field UpdateInventorySettingsRequest.Branch *string
-field UpdateInventorySettingsRequest.ClearVCSConnection bool
-field UpdateInventorySettingsRequest.IgnorePaths *[]string
-field UpdateInventorySettingsRequest.IncludePlatform *bool
-field UpdateInventorySettingsRequest.RepoURL *string
-field UpdateInventorySettingsRequest.VCSConnectionID *string
-field UpdateInventorySettingsRequest.WorkingDirectory *string
 field UpdateInventoryVarRequest.Key *string
 field UpdateInventoryVarRequest.Sensitive *bool
 field UpdateInventoryVarRequest.Structured *bool
@@ -1208,13 +1191,20 @@ field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field UpdateWorkspaceRequest.ClearConfigDirectory bool `json:"-"`
+field UpdateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
+field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
+field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
 field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field UpdateWorkspaceRequest.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
+field UpdateWorkspaceRequest.InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
+field UpdateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
 field UpdateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
@@ -1404,8 +1394,11 @@ field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field Workspace.ConfigDirectory *string `json:"config-directory,omitempty"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`
+field Workspace.DefaultLimit string `json:"default-limit,omitempty"`
+field Workspace.DefaultPlaybook string `json:"default-playbook,omitempty"`
 field Workspace.DriftDetectionEnabled bool `json:"drift-detection-enabled"`
 field Workspace.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1417,6 +1410,9 @@ field Workspace.EngineVersion string `json:"engine-version,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
 field Workspace.ID string `json:"id"`
+field Workspace.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
+field Workspace.InventoryIncludePlatform bool `json:"inventory-include-platform"`
+field Workspace.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field Workspace.Labels map[string]string `json:"labels,omitempty"`
 field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
@@ -1523,6 +1519,7 @@ func GetObjectAttr(r *Resource, key string) map[string]any
 func GetRelationshipID(r *Resource, name string) string
 func GetStringAttr(r *Resource, key string) string
 func GetStringListMapAttr(r *Resource, key string) map[string][]string
+func GetStringPtrAttr(r *Resource, key string) *string
 func IsAuth(err error) bool
 func IsConflict(err error) bool
 func IsNotFound(err error) bool
@@ -1601,7 +1598,6 @@ method (*Client) DeleteInventoryGroupVar(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHost(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHostGroup(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHostVar(ctx context.Context, id string) error
-method (*Client) DeleteInventorySettings(ctx context.Context, workspaceID string) error
 method (*Client) DeleteModuleAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
 method (*Client) DeleteNotificationConfiguration(ctx context.Context, id string) error
@@ -1650,7 +1646,6 @@ method (*Client) GetInventoryGroupVar(ctx context.Context, id string) (*Inventor
 method (*Client) GetInventoryHost(ctx context.Context, id string) (*InventoryHost, error)
 method (*Client) GetInventoryHostGroup( ctx context.Context, id string, ) (*InventoryHostGroup, error)
 method (*Client) GetInventoryHostVar(ctx context.Context, id string) (*InventoryVar, error)
-method (*Client) GetInventorySettings( ctx context.Context, workspaceID string, ) (*InventorySettings, error)
 method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryRule, error)
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
@@ -1782,7 +1777,6 @@ method (*Client) PreviewUnsavedModuleAutodiscoveryRuleWithOptions(ctx context.Co
 method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
-method (*Client) PutInventorySettings( ctx context.Context, workspaceID string, req PutInventorySettingsRequest, ) (*InventorySettings, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
 method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
@@ -1816,7 +1810,6 @@ method (*Client) UpdateInventoryGroup( ctx context.Context, id, name string, ) (
 method (*Client) UpdateInventoryGroupVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) UpdateInventoryHost( ctx context.Context, id, name string, ) (*InventoryHost, error)
 method (*Client) UpdateInventoryHostVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
-method (*Client) UpdateInventorySettings( ctx context.Context, workspaceID string, req UpdateInventorySettingsRequest, ) (*InventorySettings, error)
 method (*Client) UpdateModuleAutodiscoveryRule(ctx context.Context, id string, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) UpdateNotificationConfiguration(ctx context.Context, id string, req UpdateNotificationConfigurationRequest) (*NotificationConfiguration, error)
 method (*Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePolicyRequest) (*Policy, error)
@@ -1928,7 +1921,6 @@ type InventoryGroup struct
 type InventoryGroupChild struct
 type InventoryHost struct
 type InventoryHostGroup struct
-type InventorySettings struct
 type InventoryVar struct
 type LabelEntity struct
 type LabelKey struct
@@ -1971,7 +1963,6 @@ type PolicyCheckSummary struct
 type PolicyEvaluationDetail struct
 type PolicySet struct
 type ProviderTemplate struct
-type PutInventorySettingsRequest struct
 type RegisteredModuleRef struct
 type RegistryModule struct
 type RegistryProvider struct
@@ -2010,7 +2001,6 @@ type StateVersion struct
 type UnpricedResource struct
 type UpdateAgentPoolRequest struct
 type UpdateExecutionHookRequest struct
-type UpdateInventorySettingsRequest struct
 type UpdateInventoryVarRequest struct
 type UpdateNotificationConfigurationRequest struct
 type UpdatePolicyRequest struct

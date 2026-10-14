@@ -1716,14 +1716,57 @@ test.describe('Per-workspace run identity (#1901)', () => {
 // The inventory tab is its own feature, not part of the run-identity work the
 // block above covers; it was sitting in that describe by accident.
 test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
+  test('the Ansible configure fields hold up at phone width (#1929)', async ({ page }) => {
+    // The six roots and run defaults moved onto the workspace Configuration tab
+    // (#1929), and they arrived as a nested grid inside a `dd` — a grid item's
+    // `min-width` is `auto`, so a `<select>` whose longest option is a long
+    // translated string pushes the row past the viewport however `w-full` it is.
+    // That is the `min-inline-size` lesson in its other costume, and the reason
+    // this is driven in EDIT mode: a read-only `dl` of short values cannot
+    // overflow and so proves nothing about the controls.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespcfg'))
+
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+
+    // The mode select is the widest new control, and the one whose options are
+    // whole translated sentences in some locales.
+    const mode = page.getByLabel('Ansible config directory')
+    await expect(mode).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // Choosing a config directory reveals the path input and the list editors,
+    // which is the widest the block ever gets.
+    await mode.selectOption({ label: 'Use a config directory' })
+    await expect(page.getByPlaceholder('e.g. ansible')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // A long value in the list editor is the realistic overflow case: an
+    // inventory path has no spaces to wrap on.
+    await page.getByRole('button', { name: 'Add inventory path' }).click()
+    await page
+      .getByPlaceholder('e.g. inventories/production')
+      .first()
+      .fill('inventories/production/group_vars/all/very-long-unbroken-path-segment')
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('the Inventory tab holds up at phone width (#1967, #1968, #1969)', async ({ page }) => {
-    // Five sub-views, and every one of them is a phone-width hazard: two
+    // Four sub-views, and every one of them is a phone-width hazard: two
     // multi-column tables of rows, a variable table whose values have no spaces
-    // to wrap on, a text input beside its button, a run of resolved host
-    // variables, and a form built on a `<fieldset>` — which defaults to
+    // to wrap on, a text input beside its button, and a run of resolved host
+    // variables. All four are walked here.
+    //
+    // The fifth used to be the settings form, a `<fieldset>` — which defaults to
     // `min-inline-size: min-content` and will not shrink below its content
-    // unless it is told to, which is how /admin/bulk-update once overflowed by
-    // 122px. All five are walked here.
+    // unless told to, which is how /admin/bulk-update once overflowed by 122px.
+    // That form is gone (#1929); the application's only remaining fieldset is on
+    // /admin/bulk-update, which this suite drives separately, so the case is
+    // still covered.
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2erespinv'))
     const web = await seedInventoryGroup(token, wsId, 'web')
@@ -1758,17 +1801,15 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
 
     // The sub-view nav wraps rather than scrolling inside itself: an inner
     // scroller hides whichever entry the reader needs.
-    for (const view of ['Groups', 'Variables', 'Resolved', 'Settings']) {
+    for (const view of ['Groups', 'Variables', 'Resolved']) {
       await page.getByRole('button', { name: view, exact: true }).click()
       await expectNoHorizontalPageScroll(page)
     }
 
-    // The settings form — the `<fieldset>` case. Opened, because a collapsed
-    // form cannot overflow and so proves nothing.
-    await expect(page.getByRole('button', { name: 'Add settings', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Add settings', exact: true }).click()
-    await expect(page.getByLabel('Repository')).toBeVisible()
-    await expectNoHorizontalPageScroll(page)
+    // The `<fieldset>` case used to be driven here, via the inventory settings
+    // form. That form is gone (#1929) and the application's only remaining
+    // fieldset is on `/admin/bulk-update`, which this suite already drives —
+    // so no coverage is lost by removing this block rather than relocating it.
 
     // The variable table, whose values are unbroken identifier-ish runs.
     await page.getByRole('button', { name: 'Variables', exact: true }).click()

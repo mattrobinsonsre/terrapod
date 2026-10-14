@@ -63,6 +63,37 @@ type Workspace struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// ConfigDirectory is the repository-root-relative directory the ansible
+	// configure operation runs in (#1929): its fetch scope and the resolver's
+	// and executor's working directory.
+	//
+	// A POINTER, because null and "" mean different things and the difference
+	// is load-bearing. **nil means this workspace has NO configure operation**;
+	// a pointer to "" means the repository ROOT. A plain string would collapse
+	// the two, and a consumer writing a read back would then give every
+	// terraform-only workspace a configure operation rooted at the top of its
+	// repository.
+	//
+	// Not served on /api/tfe/v2 — that surface is engine-filtered to Terraform
+	// and go-tfe switches on a fixed attribute set — so a workspace read
+	// through the compatibility route reads this as nil whatever it holds.
+	ConfigDirectory *string `json:"config-directory,omitempty"`
+	// InventoryPaths are the inventory sources, each a file or a directory
+	// relative to the repository root. ORDERED: the order IS the precedence
+	// ansible applies, so it is not a set.
+	InventoryPaths []string `json:"inventory-paths,omitempty"`
+	// DefaultPlaybook is the playbook a configure run executes unless the run
+	// overrides it, the way `vcs-ref` overrides `vcs-branch`.
+	DefaultPlaybook string `json:"default-playbook,omitempty"`
+	// DefaultLimit is the default `--limit` for a configure run. Empty means
+	// the whole inventory, which is ansible's own default.
+	DefaultLimit string `json:"default-limit,omitempty"`
+	// InventoryIncludePlatform is whether the rows declared through the
+	// inventory API contribute to the resolution. **Defaults to true**, so an
+	// absent value is NOT false — see the read in workspaceFromResource.
+	InventoryIncludePlatform bool `json:"inventory-include-platform"`
+	// InventoryIgnorePaths are paths excluded from the resolution.
+	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901), keyed
 	// on the provider configuration a token is for: `aws`, or `aws.west` for
 	// one aliased configuration. Empty means this workspace mints nothing and
@@ -226,6 +257,37 @@ type CreateWorkspaceRequest struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// ConfigDirectory turns the ansible configure operation ON and says where
+	// it is rooted (#1929). A POINTER with three states, because null and ""
+	// are different values on this field:
+	//
+	//	nil        -- omitted; the workspace is created with NO configure
+	//	              operation, which is the server-side default
+	//	&""        -- the repository ROOT is the config directory
+	//	&"ansible" -- that subdirectory is
+	//
+	// A plain string could not express the middle case at all: "" would be
+	// indistinguishable from "not set" and there would be no way to root a
+	// configure operation at the top of a repository.
+	ConfigDirectory *string `json:"config-directory,omitempty"`
+	// InventoryPaths are the inventory sources, each a file or a directory
+	// relative to the repository root. ORDERED -- the order is the precedence
+	// ansible applies. A nil slice is omitted; an empty non-nil slice
+	// (`[]string{}`) is sent, which declares no sources.
+	InventoryPaths []string `json:"inventory-paths,omitempty"`
+	// DefaultPlaybook and DefaultLimit are the configure run's defaults, each
+	// overridable per run. Empty is the server-side default for both, so an
+	// empty value here is omitted rather than sent.
+	DefaultPlaybook string `json:"default-playbook,omitempty"`
+	DefaultLimit    string `json:"default-limit,omitempty"`
+	// InventoryIncludePlatform is whether rows declared through the inventory
+	// API contribute to the resolution. A POINTER because the server-side
+	// default is **true**: a plain bool could not send false, so the one
+	// request that resolves the git source alone would silently not apply.
+	InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
+	// InventoryIgnorePaths are paths excluded from the resolution. Same
+	// nil-versus-empty rule as InventoryPaths.
+	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -322,6 +384,43 @@ type UpdateWorkspaceRequest struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// ConfigDirectory moves where the ansible configure operation is rooted
+	// (#1929). ClearConfigDirectory turns the operation OFF.
+	//
+	// Three states, and a PATCH needs all three -- which is why there is a
+	// separate flag rather than an empty ConfigDirectory, exactly as
+	// ClearVCSConnection is a flag on a relationship:
+	//
+	//	nil, false            -- leave the stored value alone
+	//	&"ansible", false     -- root the operation at that subdirectory
+	//	&"", false            -- root it at the repository ROOT
+	//	_, true               -- send explicit null: NO configure operation
+	//
+	// ClearConfigDirectory wins when both are set. Collapsing the last two
+	// into one field is the trap this shape exists to avoid: "the repository
+	// root" and "no configure operation at all" would become the same request.
+	ConfigDirectory *string `json:"config-directory,omitempty"`
+	// ClearConfigDirectory carries no attribute of its own -- it changes what
+	// `config-directory` is sent AS -- so it is `json:"-"`, exactly like
+	// VCSConnectionID above. Tagging it would make the reflective wire gate
+	// demand a `clear-config-directory` key no server has ever served.
+	ClearConfigDirectory bool `json:"-"`
+	// InventoryPaths are the ordered inventory sources. A nil slice is
+	// omitted and leaves the stored list alone; an empty non-nil slice
+	// (`[]string{}`) is sent as `[]`, which is how every source is removed.
+	InventoryPaths []string `json:"inventory-paths,omitempty"`
+	// DefaultPlaybook and DefaultLimit are POINTERS so a caller can clear
+	// either with &"". A plain string would drop the empty value and "stop
+	// defaulting to a playbook" would be a silent no-op -- the same defect
+	// `debug-mode` and `ai-policy-mode` shipped with.
+	DefaultPlaybook *string `json:"default-playbook,omitempty"`
+	DefaultLimit    *string `json:"default-limit,omitempty"`
+	// InventoryIncludePlatform is a pointer for the same reason: the default
+	// is true, so false has to be able to travel.
+	InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
+	// InventoryIgnorePaths excludes paths from the resolution. Same
+	// nil-versus-empty rule as InventoryPaths.
+	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -645,6 +744,30 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
 	}
+	// #1929's six. `config-directory` is the only one whose null carries a
+	// meaning, so it is the only one guarded on a pointer rather than on an
+	// empty value: a non-nil pointer travels even when it points at "",
+	// because "" is the repository root and nil is "no configure operation".
+	if req.ConfigDirectory != nil {
+		attrs["config-directory"] = *req.ConfigDirectory
+	}
+	if req.InventoryPaths != nil {
+		// `!= nil` not `len() > 0`: an explicit empty slice is a real value,
+		// so it has to travel.
+		attrs["inventory-paths"] = req.InventoryPaths
+	}
+	if req.DefaultPlaybook != "" {
+		attrs["default-playbook"] = req.DefaultPlaybook
+	}
+	if req.DefaultLimit != "" {
+		attrs["default-limit"] = req.DefaultLimit
+	}
+	if req.InventoryIncludePlatform != nil {
+		attrs["inventory-include-platform"] = *req.InventoryIncludePlatform
+	}
+	if req.InventoryIgnorePaths != nil {
+		attrs["inventory-ignore-paths"] = req.InventoryIgnorePaths
+	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
@@ -781,6 +904,36 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
+	}
+	// #1929's six. The clear flag is checked FIRST and sends an explicit JSON
+	// null, which is the only way to say "this workspace has no configure
+	// operation" -- `*req.ConfigDirectory == ""` means the repository root.
+	switch {
+	case req.ClearConfigDirectory:
+		attrs["config-directory"] = nil
+	case req.ConfigDirectory != nil:
+		attrs["config-directory"] = *req.ConfigDirectory
+	}
+	if req.InventoryPaths != nil {
+		// `!= nil` not `len() > 0`: an explicit empty slice is how every
+		// source is removed, so it has to travel as `[]`.
+		attrs["inventory-paths"] = req.InventoryPaths
+	}
+	if req.DefaultPlaybook != nil {
+		// *string so a caller can explicitly stop defaulting to a playbook
+		// with &"".
+		attrs["default-playbook"] = *req.DefaultPlaybook
+	}
+	if req.DefaultLimit != nil {
+		// *string so &"" can widen a configure run back to the whole
+		// inventory.
+		attrs["default-limit"] = *req.DefaultLimit
+	}
+	if req.InventoryIncludePlatform != nil {
+		attrs["inventory-include-platform"] = *req.InventoryIncludePlatform
+	}
+	if req.InventoryIgnorePaths != nil {
+		attrs["inventory-ignore-paths"] = req.InventoryIgnorePaths
 	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
@@ -929,15 +1082,25 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoApplyMode:    GetStringAttr(res, "auto-apply-mode"),
 		// Both fields carry the resolved value, so a caller reading either one
 		// gets the right answer whichever name the server used (#1559).
-		EngineVersion:                 version,
-		TerraformVersion:              version,
-		TerragruntEnabled:             GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion:             GetStringAttr(res, "terragrunt-version"),
-		WorkingDirectory:              GetStringAttr(res, "working-directory"),
-		ResourceCPU:                   GetStringAttr(res, "resource-cpu"),
-		Parallelism:                   GetIntAttr(res, "parallelism"),
-		AnsibleVersion:                GetStringAttr(res, "ansible-version"),
-		ResourceMemory:                GetStringAttr(res, "resource-memory"),
+		EngineVersion:     version,
+		TerraformVersion:  version,
+		TerragruntEnabled: GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
+		WorkingDirectory:  GetStringAttr(res, "working-directory"),
+		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
+		Parallelism:       GetIntAttr(res, "parallelism"),
+		AnsibleVersion:    GetStringAttr(res, "ansible-version"),
+		ResourceMemory:    GetStringAttr(res, "resource-memory"),
+		// #1929's six. `config-directory` reads through GetStringPtrAttr so a
+		// JSON null lands as nil -- the absent state -- rather than as "",
+		// which on this field means the repository root. GetStringAttr would
+		// collapse the two and a consumer writing a read back would root a
+		// configure operation at the top of every repository.
+		ConfigDirectory:               GetStringPtrAttr(res, "config-directory"),
+		InventoryPaths:                GetListAttr(res, "inventory-paths"),
+		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
+		DefaultLimit:                  GetStringAttr(res, "default-limit"),
+		InventoryIgnorePaths:          GetListAttr(res, "inventory-ignore-paths"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:                     GetStringAttr(res, "vcs-branch"),
 		VCSWorkflow:                   GetStringAttr(res, "vcs-workflow"),
@@ -981,6 +1144,15 @@ func workspaceFromResource(res *Resource) *Workspace {
 		SlackChannel:                  GetStringAttr(res, "slack-channel"),
 		CreatedAt:                     GetStringAttr(res, "created-at"),
 		UpdatedAt:                     GetStringAttr(res, "updated-at"),
+	}
+	// `inventory-include-platform` defaults to TRUE, so an absent key is not
+	// false -- it is a server that predates #1929, or the TFE-compatible route,
+	// which drops all six. Reading it as false would report the declared rows
+	// as excluded on every workspace of every older server, and a provider
+	// would then show drift on a setting nobody had touched.
+	ws.InventoryIncludePlatform = true
+	if v := GetBoolPtrAttr(res, "inventory-include-platform"); v != nil {
+		ws.InventoryIncludePlatform = *v
 	}
 	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		ws.DriftDetectionIntervalSeconds = &v

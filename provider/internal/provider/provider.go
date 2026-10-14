@@ -41,7 +41,6 @@ import (
 	inventoryHostRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host"
 	inventoryHostGroupRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_group"
 	inventoryHostVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_var"
-	inventorySettingsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_settings"
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
@@ -225,7 +224,6 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		// resource each (#1968), so a second concern can contribute a host to
 		// a group, or a variable to a host, without owning the thing it
 		// attaches to.
-		inventorySettingsRes.NewResource,
 		inventoryHostRes.NewResource,
 		inventoryGroupRes.NewResource,
 		inventoryHostGroupRes.NewResource,
