@@ -195,12 +195,30 @@ class GCSStore:
         thread = threading.Thread(target=_upload_in_thread, daemon=True)
         thread.start()
 
+        async def _put(item: object) -> bool:
+            """Hand an item to the upload thread; False once it has stopped.
+
+            A plain put on a full queue would wait forever if the thread had
+            died, since nothing would drain it (#2106).
+            """
+            while thread.is_alive():
+                try:
+                    await asyncio.to_thread(chunk_queue.put, item, True, 1.0)
+                    return True
+                except queue.Full:
+                    continue
+            return False
+
+        delivered = True
         try:
             async for chunk in chunks:
                 md5_hasher.update(chunk)
                 total_size += len(chunk)
-                await asyncio.to_thread(chunk_queue.put, chunk)
-            await asyncio.to_thread(chunk_queue.put, None)  # signal EOF
+                if not await _put(chunk):
+                    delivered = False
+                    break
+            else:
+                delivered = await _put(None)  # signal EOF
         except BaseException:
             # Abandon the upload — do not end it. Ending it (None) let the
             # thread complete the resumable upload with whatever had been
@@ -225,6 +243,10 @@ class GCSStore:
             if "403" in str(exc):
                 raise ObjectStorePermissionError(str(exc)) from exc
             raise ObjectStoreError(str(exc)) from exc
+        # Feeding stopped because the thread had returned, so it did not take
+        # the whole stream and did not store it whole.
+        if not delivered:
+            raise ObjectStoreError("GCS upload stopped before the stream ended")
 
         # Update metadata if provided
         if metadata:
