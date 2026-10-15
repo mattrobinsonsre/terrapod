@@ -1,17 +1,136 @@
 """
 Tests for the GCS storage backend.
 
-Unit tests with mocked GCS SDK. No live GCS integration tests.
+Unit tests with a mocked GCS SDK, or with the real SDK over a fake HTTP
+session. No live GCS integration tests.
 """
 
 from __future__ import annotations
 
+import ast
+import asyncio
+import base64
+import inspect
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import google_crc32c
 import pytest
+import requests
+from google.auth.credentials import AnonymousCredentials
+from google.auth.transport.requests import AuthorizedSession
+from google.cloud import storage
+from google.cloud.storage import blob as blob_module
+from google.cloud.storage.blob import Blob
 
 from terrapod.storage.gcs import GCSStore
 from terrapod.storage.protocol import ObjectNotFoundError
+
+
+class TestGCSLibraryContract:
+    """The upload_from_file call is checked against the installed library.
+
+    A fake accepts whatever it was written to accept, so the `num_retries`
+    keyword removed in 3.x went unnoticed (#2106). Reading the keywords from
+    `gcs.py` itself means nothing has to be kept in step by hand.
+    """
+
+    def test_upload_from_file_accepts_the_keywords_gcs_py_passes(self) -> None:
+        source = Path(inspect.getsourcefile(GCSStore))
+        calls = [
+            node
+            for node in ast.walk(ast.parse(source.read_text()))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "upload_from_file"
+        ]
+        assert calls, "no upload_from_file call found in gcs.py"
+
+        parameters = inspect.signature(Blob.upload_from_file).parameters.values()
+        # A **kwargs parameter would accept any keyword and make this vacuous.
+        assert all(p.kind is not inspect.Parameter.VAR_KEYWORD for p in parameters)
+        accepted = {p.name for p in parameters}
+        for call in calls:
+            passed = {kw.arg for kw in call.keywords if kw.arg is not None}
+            assert passed <= accepted, (
+                f"gcs.py:{call.lineno} passes {sorted(passed - accepted)}, "
+                "which Blob.upload_from_file does not accept"
+            )
+
+
+class _FakeResumableGCS(AuthorizedSession):
+    """Answers a resumable upload the way GCS does: 200 and a Location to start,
+    308 and a Range for each intermediate chunk, 200 and the object for the last.
+    Only `request` is replaced; the rest is the real session the client expects."""
+
+    def __init__(self) -> None:
+        super().__init__(AnonymousCredentials())
+        self.received = b""
+        self.finalized: list[bytes] = []
+
+    def request(self, method, url, data=None, headers=None, **kwargs):  # noqa: ARG002
+        response = requests.Response()
+        response.url = url
+        response._content = b""
+        if method == "POST" and "uploadType=resumable" in url:
+            response.status_code = 200
+            response.headers["location"] = "https://upload.test/session?upload_id=1"
+        elif method == "PUT" and "upload_id=1" in url:
+            self.received += data
+            if headers["content-range"].endswith("/*"):
+                response.status_code = 308
+                response.headers["range"] = f"bytes=0-{len(self.received) - 1}"
+            else:
+                self.finalized.append(self.received)
+                crc32c = google_crc32c.Checksum(self.received).digest()
+                response.status_code = 200
+                response._content = json.dumps(
+                    {
+                        "name": "k",
+                        "size": str(len(self.received)),
+                        "crc32c": base64.b64encode(crc32c).decode(),
+                    }
+                ).encode()
+        else:
+            raise AssertionError(f"unexpected request: {method} {url}")
+        return response
+
+
+class TestGCSPutStreamThroughTheLibrary:
+    """put_stream driven through google-cloud-storage's real resumable upload.
+
+    Only the HTTP session is fake, so the library's own code decides what it
+    needs from the stream. A fake `upload_from_file` cannot see that it calls
+    `tell()` on it, which `_QueueReader` did not support (#2106). The client's
+    `_http` argument and `_DEFAULT_CHUNKSIZE` are private to the library, so a
+    library upgrade may need these tests adjusting.
+    """
+
+    @staticmethod
+    async def _pieces(n: int):
+        for i in range(n):
+            yield bytes([i]) * 64 * 1024
+
+    # 64 KiB pieces against a 256 KiB chunk: 1 and 3 pieces fit in the queue and
+    # one chunk; 20 pieces overrun the queue and span five chunks, each of which
+    # takes its byte range from tell().
+    @pytest.mark.parametrize("pieces", [1, 3, 20])
+    @pytest.mark.usefixtures("gcs_queue_puts_are_bounded")
+    async def test_a_stream_is_uploaded_whole(self, monkeypatch, pieces: int) -> None:
+        # The smallest chunk size the library accepts, so a small stream still
+        # goes through the multi-chunk path.
+        monkeypatch.setattr(blob_module, "_DEFAULT_CHUNKSIZE", 256 * 1024)
+        session = _FakeResumableGCS()
+        client = storage.Client(project="test", credentials=AnonymousCredentials(), _http=session)
+        store = GCSStore(bucket="test-bucket", prefix="")
+
+        with patch.object(store, "_get_sync_client", return_value=client):
+            meta = await asyncio.wait_for(store.put_stream("k", self._pieces(pieces)), timeout=10)
+
+        expected = b"".join([bytes([i]) * 64 * 1024 for i in range(pieces)])
+        assert session.finalized == [expected]
+        assert meta.size_bytes == len(expected)
 
 
 class TestGCSStoreUnit:

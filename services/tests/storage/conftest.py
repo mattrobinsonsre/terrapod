@@ -5,12 +5,15 @@ Shared fixtures for storage tests.
 from __future__ import annotations
 
 import os
+import queue
 import tempfile
 from collections.abc import AsyncGenerator
+from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
 
+from terrapod.storage import gcs
 from terrapod.storage.filesystem import FilesystemStore
 
 
@@ -26,6 +29,27 @@ async def fs_store() -> AsyncGenerator[FilesystemStore]:
         )
         yield store
         await store.close()
+
+
+class _BoundedPutQueue(queue.Queue):
+    """A queue whose untimed blocking put gives up instead of waiting forever."""
+
+    def put(self, item, block=True, timeout=None):  # type: ignore[no-untyped-def]
+        if block and timeout is None:
+            timeout = 5.0
+        super().put(item, block, timeout)
+
+
+@pytest.fixture
+def gcs_queue_puts_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bound every untimed put on the GCS backend's queues.
+
+    A put that nothing will drain blocks an executor thread for good, and
+    the event loop waits for that thread at teardown, so a regression in
+    put_stream would stall the run rather than fail it. With this, it fails
+    with queue.Full (#2106).
+    """
+    monkeypatch.setattr(gcs, "queue", SimpleNamespace(Queue=_BoundedPutQueue, Full=queue.Full))
 
 
 @pytest.fixture
