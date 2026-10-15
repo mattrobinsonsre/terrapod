@@ -1200,7 +1200,7 @@
           ]
         },
         "config_directory": {
-          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
+          "description": "the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": "string"
         },
         "configure_enabled": {
@@ -1431,7 +1431,7 @@
           ]
         },
         "config_directory": {
-          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
+          "description": "the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": [
             "null",
             "string"
