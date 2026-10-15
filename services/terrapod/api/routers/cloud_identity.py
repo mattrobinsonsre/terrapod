@@ -59,6 +59,56 @@ MAX_TARGETS = 100
 logger = get_logger(__name__)
 
 
+def _own_targets(ws: Workspace) -> list[str]:
+    """The targets this workspace declares for itself (#2108).
+
+    Membership only. The audiences come from the run's snapshot, so this says
+    WHICH keys are the workspace's own and never what they are worth -- which is
+    the whole reason no migration was needed: the merged snapshot cannot answer
+    the first question and the live row cannot be trusted for the second.
+
+    **The same two guards the discovered list gets, and they are not
+    redundant.** A key written before `validate_oidc_audiences` grew its
+    path-safety check could hold `/` or `..`, and that key is now minted without
+    the graph having to name it -- so this is the first path on which a stored
+    key reaches `<token dir>/<target>/token` without a provider in a `tofu
+    graph` having vouched for its shape. An unsafe one is DROPPED rather than
+    refused, because a run failing outright over a legacy row the operator
+    cannot see from here is worse than it running with the identity it had
+    yesterday; it is logged at warning with the key named, so it is not a silent
+    skip.
+    """
+    # Imported in-function, as the route below does: this module is imported at
+    # app build time and the resolver pulls in the settings tree.
+    from terrapod.services import cloud_identity_resolver
+
+    raw = getattr(ws, "oidc_audiences", None)
+    if not isinstance(raw, dict):
+        return []
+    out: list[str] = []
+    for key in raw:
+        if not isinstance(key, str) or not key:
+            continue
+        if len(key) > workspace_settings.MAX_OIDC_TARGET_LEN:
+            logger.warning(
+                "workspace cloud identity key is too long to mint; skipping",
+                workspace_id=str(ws.id),
+                length=len(key),
+            )
+            continue
+        unsafe = cloud_identity_resolver.unsafe_target_reason(key)
+        if unsafe:
+            logger.warning(
+                "workspace cloud identity key is unsafe as a token path; skipping",
+                workspace_id=str(ws.id),
+                target=key,
+                reason=unsafe,
+            )
+            continue
+        out.append(key)
+    return out
+
+
 def _subject(ws: Workspace, phase: str | None) -> str:
     """The `sub` claim: `workspace:<name>@<id>[:phase:<phase>]`.
 
@@ -261,12 +311,35 @@ async def mint_cloud_identity_tokens(
         # run that is not using this feature. See the docstring.
         return Response(status_code=204)
 
-    if payload.discovery != "ok":
+    # Loaded HERE rather than after the loop below, because which keys are the
+    # WORKSPACE'S OWN decides both the discovery gate and what gets minted
+    # (#2108). The merged snapshot cannot answer that -- it is the catalogue and
+    # the workspace folded together, and a workspace key that overrides a
+    # catalogue key to the same value is indistinguishable in it. The live row
+    # can, and using it for MEMBERSHIP only keeps the snapshot authoritative for
+    # every VALUE.
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    own = _own_targets(ws)
+    # A key only the CATALOGUE answers. These are the ones that still need the
+    # graph, because the catalogue is deployment-wide and minting all of it on
+    # every run is what the graph check exists to prevent.
+    catalogue_only = [t for t in snapshot if t not in own]
+
+    if payload.discovery != "ok" and catalogue_only:
         # 409, not 422: the request is well formed and the caller is entitled to
         # it. The runner could not determine which identities to present, and
         # this workspace has some, so there is no safe answer -- falling through
         # would hand the run the agent pool's broader identity under the name of
         # a workspace that was moved off it.
+        #
+        # Gated on `catalogue_only` (#2108): where every key the run resolves is
+        # the workspace's own, the graph decides nothing, so refusing on its
+        # failure costs the run and buys nothing. The hazard above does not
+        # apply either -- we are not falling through to the pool identity, we are
+        # minting the keys the operator named on this workspace.
         raise HTTPException(
             status_code=409,
             detail=(
@@ -323,13 +396,26 @@ async def mint_cloud_identity_tokens(
         audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
         if audiences is not None:
             resolved[t] = audiences
+
+    # And every key the WORKSPACE declares, whether or not the graph found a
+    # provider by that name (#2108). Setting one is an explicit statement that
+    # this workspace needs that token; the graph cannot know about a credential
+    # exchanged by an exec plugin, a hook or an `external` program, so letting it
+    # veto the key means the operator's only recourse is to key the override on
+    # some unrelated provider that does appear.
+    #
+    # Taken from the SNAPSHOT, so the audiences are the ones this run was
+    # created with. A key added since then is absent from the snapshot and
+    # resolves to None here, which is the right direction: it is not in the
+    # identity this run's plan was reviewed under.
+    for t in own:
+        audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
+        if audiences is not None:
+            resolved[t] = audiences
+
     wanted = sorted(resolved)
     if not wanted:
         return Response(status_code=204)
-
-    ws = await db.get(Workspace, run.workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
 
     live = cloud_identity_resolver.resolve_for_workspace(ws, settings=settings)
     changed = [t for t in wanted if cloud_identity_resolver.target_changed(snapshot, live, t)]
