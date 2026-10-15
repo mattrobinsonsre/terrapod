@@ -4,9 +4,14 @@
  * The first test is the one that matters most. The tab is DATA-gated, not
  * configuration-gated: there is no Helm flag and no config key to turn it off,
  * because a terraform/tofu-only workspace simply holds no hosts, no groups and
- * no Ansible config directory and so has no tab. A regression that made the tab
- * unconditional would be invisible to every other test here — they all seed
+ * no declared configure operation and so has no tab. A regression that made the
+ * tab unconditional would be invisible to every other test here — they all seed
  * something first — so the absence is asserted on its own.
+ *
+ * That absence is load-bearing in a way #1966 made sharp: the gate used to read
+ * `config-directory != null`, and that column is now non-nullable, so the old
+ * test became TRUE for every workspace in the deployment. The gate is
+ * `configure-enabled` now, and this is the test that catches it going wrong.
  *
  * The rest cover what the tab is now for. The inventory is seven structures,
  * each its own addressable resource, so the premise is PER-ROW EDITING: one
@@ -51,8 +56,10 @@ function acceptNextDialog(page: import('@playwright/test').Page): { message: () 
 test.describe('Workspace Inventory tab', () => {
   test('no inventory, no tab — and a stale deep link still renders a page', async ({ page }) => {
     const token = getStoredToken()
-    // Deliberately seeds NOTHING: no host, no group and no config directory,
-    // which is every terraform/tofu-only workspace.
+    // Deliberately seeds NOTHING: no host, no group and no declared configure
+    // operation, which is every terraform/tofu-only workspace. `plan-apply` is
+    // on and `configure` off by default, so this is also what a workspace that
+    // predates #1966 reads back as.
     const wsId = await createWorkspace(token, uniqueName('e2einvgate'))
 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)
@@ -342,21 +349,38 @@ test.describe('Workspace Inventory tab', () => {
   // drove `?inv=settings` was removed with the view rather than rewritten.
 })
 
-test.describe('The configure attributes on the workspace Configuration tab', () => {
+test.describe('The operations and configure attributes on the workspace Configuration tab', () => {
   /**
-   * The six Ansible roots and run defaults are WORKSPACE attributes (#1929), so
-   * they are edited here rather than on the Inventory tab — the inventory
-   * settings view that used to hold them is gone.
+   * A workspace declares its operations with TWO BOOLEANS (#1966), and the
+   * Ansible roots beside them are WORKSPACE attributes (#1929) — so both are
+   * edited here rather than on the Inventory tab, whose settings view is gone.
    *
-   * What these assert that a unit test cannot: that the control actually
-   * renders, that it round-trips through the real BFF proxy chain, and above all
-   * that **"no configure operation" and "the repository root" stay
-   * distinguishable in the UI**. They are `null` and `""` on the wire, and a
-   * control that collapsed them — or a read-only view that rendered both as `/`,
-   * the way `working-directory` does — would be invisible to any fixture holding
-   * a concrete path. So the empty case is driven explicitly.
+   * What these assert that a unit test cannot: that the controls actually
+   * render, that they round-trip through the real BFF proxy chain, and that the
+   * three properties the server enforces are reachable from the UI at all —
+   * that `configure-enabled` is what brings the Inventory tab into existence,
+   * that an empty config directory reads as the repository root rather than as
+   * absent, and that the both-false state is refused before a save is sent.
+   *
+   * The empty-path case is driven explicitly because it is invisible to any
+   * fixture holding a concrete path: a read-only view that rendered `''` as `/`
+   * — the way `working-directory` legitimately does, having no declaration to
+   * carry — would pass every other test here.
    */
-  test('the config directory distinguishes "none" from "the repository root"', async ({
+  test('a fresh workspace plans and applies, and does not configure', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eops'))
+
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+
+    // The column defaults, which ARE the compatibility story: every workspace
+    // that predates #1966 reads back exactly like this.
+    await expect(page.getByTestId('ws-plan-apply-enabled')).toHaveText('Enabled')
+    await expect(page.getByTestId('ws-configure-enabled')).toHaveText('Disabled')
+  })
+
+  test('enabling configure round-trips, and an empty path reads as the repository root', async ({
     page,
   }) => {
     const token = getStoredToken()
@@ -364,34 +388,20 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
-
-    // A fresh workspace has no configure operation at all, and says so rather
-    // than showing an empty path that would read as "the repository root".
-    await expect(
-      page.getByText('No configure operation').filter({ visible: true }).first()
-    ).toBeVisible()
-
     await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
 
-    // Choosing the mode without typing a path means the repository root — the
-    // state that is one keystroke away from "none" and means something else.
-    await page
-      .getByLabel('Ansible config directory')
-      .selectOption({ label: 'Use a config directory' })
+    // Turning configure on without typing a path: the config root is the
+    // repository root, which is a real value and the common case.
+    await page.getByLabel('Configure', { exact: true }).check()
     await page.getByRole('button', { name: 'Save changes', exact: true }).click()
 
-    await expect(
-      page.getByText('Repository root').filter({ visible: true }).first()
-    ).toBeVisible({ timeout: 15_000 })
-    // The distinction survived the round trip: this must NOT read as "none".
-    //
-    // Scoped to what is VISIBLE, not an unscoped count: the mode <select> may
-    // still be mounted and its own <option> carries this exact text, so an
-    // unscoped assertion would match the option and fail for a reason that has
-    // nothing to do with the property under test.
-    await expect(
-      page.getByText('No configure operation').filter({ visible: true })
-    ).toHaveCount(0)
+    await expect(page.getByTestId('ws-configure-enabled')).toHaveText('Enabled', {
+      timeout: 15_000,
+    })
+    // `''` says "the repository root" rather than reading as absent. Scoped to
+    // the testid rather than page text, because the edit form's own hint
+    // carries the same words.
+    await expect(page.getByTestId('ws-config-directory')).toHaveText('Repository root')
   })
 
   test('a config directory, a playbook and a limit round-trip', async ({ page }) => {
@@ -401,9 +411,8 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)
     await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
 
-    await page
-      .getByLabel('Ansible config directory')
-      .selectOption({ label: 'Use a config directory' })
+    // A plain text box now — #1966 retired the mode select, because the path
+    // stopped carrying the "no configure operation" declaration.
     await page.getByPlaceholder('e.g. ansible').fill('ansible')
     await page.getByPlaceholder('e.g. site.yml').fill('site.yml')
     // `!` is a --limit operator and must survive byte for byte: the server
@@ -418,7 +427,7 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
     await expect(page.getByText('web:!web-09').filter({ visible: true }).first()).toBeVisible()
   })
 
-  test('a config directory alone brings the Inventory tab into existence', async ({ page }) => {
+  test('turning configure on brings the Inventory tab into existence', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2ecfggate'))
 
@@ -426,18 +435,39 @@ test.describe('The configure attributes on the workspace Configuration tab', () 
     await expect(page.getByRole('button', { name: 'Inventory', exact: true })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
-    await page
-      .getByLabel('Ansible config directory')
-      .selectOption({ label: 'Use a config directory' })
-    await page.getByPlaceholder('e.g. ansible').fill('ansible')
+    // No path typed, deliberately: the gate is the BOOLEAN, not the path. A
+    // gate keyed on `config-directory` being non-empty would fail here, which
+    // is the half of #1966 an emptiness test gets wrong.
+    await page.getByLabel('Configure', { exact: true }).check()
     await page.getByRole('button', { name: 'Save changes', exact: true }).click()
 
-    // The gate is "hosts, or groups, or a config directory" — this workspace has
-    // no rows at all, so the config directory is the whole of its inventory and
-    // the tab must appear on its own account.
+    // The gate is "hosts, or groups, or a declared configure operation" — this
+    // workspace has no rows at all, so the declaration is the whole of its
+    // inventory and the tab must appear on its own account.
     await page.reload()
     await expect(page.getByRole('button', { name: 'Inventory', exact: true })).toBeVisible({
       timeout: 15_000,
     })
+  })
+
+  test('a workspace cannot be left with no operation at all', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2enoops'))
+
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+
+    // Configure is already off, so turning plan/apply off reaches the one pair
+    // the server refuses. Save must be blocked BEFORE the request, with the
+    // reason beside the controls rather than as a 422 after the fact.
+    await page.getByLabel('Plan and apply', { exact: true }).uncheck()
+    await expect(page.getByTestId('ws-operations-none')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled()
+
+    // Turning the other one on clears it: the refusal is about the PAIR, not
+    // about either boolean on its own.
+    await page.getByLabel('Configure', { exact: true }).check()
+    await expect(page.getByTestId('ws-operations-none')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled()
   })
 })

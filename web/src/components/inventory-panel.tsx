@@ -134,20 +134,29 @@ const MONO = 'font-mono text-xs break-words text-slate-200'
  * Whether this workspace has an inventory at all — the tab's gate.
  *
  * Three probes, because there is no single question that answers it: a
- * workspace may hold hosts, or only groups, or neither yet and only an Ansible
- * config directory, with every row still to be fetched from the repository. The
+ * workspace may hold hosts, or only groups, or neither yet and only a declared
+ * configure operation, with every row still to be fetched from the repository. The
  * host and group probes ask for one row and read
  * `meta.pagination.total-count`, so the gate costs three small requests rather
  * than two lists and a workspace read it would otherwise have to page.
  *
- * The third probe reads `config-directory` off the workspace itself (#1929,
- * which removed the settings row this used to ask about). It MUST go through
- * `/api/v1`: the attribute is deliberately absent from `/api/tfe/v2`, so the
- * compatibility prefix would answer 200 with the key missing — a gate that
- * silently never opens on the config-directory-only case. And `null` is a
- * value here rather than an absence: it means this workspace has no configure
- * operation, where `''` means its config root is the repository root and does
- * count.
+ * The third probe reads `configure-enabled` off the workspace itself, which is
+ * the server's own third test in `inventory_service.has_anything` (#1966) — a
+ * workspace that has declared a configure operation but holds no rows yet
+ * still has an inventory, because the git source is the whole of it.
+ *
+ * It MUST go through `/api/v1`: the attribute is deliberately absent from
+ * `/api/tfe/v2`, so the compatibility prefix would answer 200 with the key
+ * missing — a gate that silently never opens on the declared-but-empty case.
+ *
+ * It is deliberately NOT `config-directory`, which #1929 shipped as the test
+ * and #1966 made unusable for it. That column is now a non-nullable path whose
+ * `''` means the configuration version's root, so it is present on EVERY
+ * workspace: `dir != null` became true for all of them, which would have put
+ * an Inventory tab on every terraform-only workspace in the deployment. An
+ * emptiness test on it is wrong in the other direction — `''` is the ordinary
+ * way to say "at the root", so it would hide the inventory of exactly the
+ * workspaces that use it. The declaration is the boolean.
  *
  * Every failure leaves the gate shut. A 403 from a role without
  * `inventory:read` and a transport blip both mean "do not offer a surface this
@@ -168,23 +177,24 @@ export function useInventoryPresence(workspaceId: string): boolean {
       return typeof total === 'number' ? total > 0 : Array.isArray(body?.data) && body.data.length > 0
     }
 
-    // A null `config-directory` is the ORDINARY state: most workspaces have no
-    // Ansible at all, so its absence is the default rather than an error.
+    // `configure-enabled` false is the ORDINARY state: most workspaces have no
+    // Ansible at all, so a shut gate here is the default rather than an error.
     const configured = async (): Promise<boolean> => {
       const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`)
       if (!res.ok) return false
-      const dir = (await res.json())?.data?.attributes?.['config-directory']
-      // `!= null` on purpose, covering both null and an older API that omits
-      // the key; `''` is a real value — the repository root — and passes.
-      return dir != null
+      const attrs = (await res.json())?.data?.attributes
+      // `=== true` rather than truthiness, so an older API that omits the key
+      // leaves the gate shut — which matches the column default and is the
+      // same direction every other failure here takes (#1966).
+      return attrs?.['configure-enabled'] === true
     }
 
     Promise.all([
       counted(`/api/v1/workspaces/${workspaceId}/inventory/hosts`).catch(() => false),
       counted(`/api/v1/workspaces/${workspaceId}/inventory/groups`).catch(() => false),
       configured().catch(() => false),
-    ]).then(([hosts, groups, configDir]) => {
-      if (!cancelled) setPresent(hosts || groups || configDir)
+    ]).then(([hosts, groups, configureEnabled]) => {
+      if (!cancelled) setPresent(hosts || groups || configureEnabled)
     })
 
     return () => {

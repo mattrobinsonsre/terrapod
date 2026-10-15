@@ -44,11 +44,14 @@ interface AutodiscoveryRule {
     'agent-pool-id': string | null
     'terraform-version': string
     'ansible-version'?: string
-    // The Ansible roots and run defaults a materialised workspace inherits
-    // (#1929). `config-directory` is `string | null` on purpose: null is a
-    // value in its own right — no configure operation at all — where '' is
-    // the repository root.
-    'config-directory'?: string | null
+    // Which operations a materialised workspace has (#1966), and the roots
+    // each one uses (#1929). `configure-enabled` defaults false, so a rule
+    // written before #1966 goes on producing plan/apply workspaces.
+    'plan-apply-enabled'?: boolean
+    'configure-enabled'?: boolean
+    // An ordinary templated path, '' meaning the configuration version's root.
+    // No null state: the declaration is `configure-enabled` above (#1966).
+    'config-directory'?: string
     'inventory-paths'?: string[]
     'default-playbook'?: string
     'default-limit'?: string
@@ -147,16 +150,23 @@ export default function AutodiscoveryPage() {
   // happened to be the day it was created -- which is the thing that goes
   // stale. An operator who wants a pin types one.
   const [ansibleVersion, setAnsibleVersion] = useState('')
-  // The Ansible roots and run defaults every workspace this rule
-  // materialises inherits (#1929). `config-directory` is a two-state
-  // control rather than a plain text box because BOTH of its falsy values
-  // are real and they mean opposite things: absent/null declares that the
-  // workspace has no configure operation at all, while an EMPTY STRING
-  // declares that its config root IS the repository root. One text input
-  // could express only one of the two, so the mode carries the decision
-  // and the box supplies the directory.
-  const [configDirectoryMode, setConfigDirectoryMode] = useState<'none' | 'set'>('none')
+  // Which operations every workspace this rule materialises has (#1966).
+  // These initial values are the model's own column defaults, so a rule
+  // created through this form without touching them produces exactly what
+  // every rule produced before #1966: plan/apply on, configure off.
+  const [planApplyEnabled, setPlanApplyEnabled] = useState(true)
+  const [configureEnabled, setConfigureEnabled] = useState(false)
+  // Where the configure operation runs in each materialised workspace
+  // (#1929) — a plain text box, because the path is just a path and '' is the
+  // configuration version's root. #1929 had a mode select here because NULL
+  // meant "no configure operation"; that declaration is `configureEnabled`
+  // above now (#1966).
   const [configDirectory, setConfigDirectory] = useState('')
+  // The one combination the materialised workspace could not hold (#1966).
+  // Blocked here because a rule carrying it would produce inert workspaces on
+  // every future scan, one per matched directory, with nothing in the rule
+  // form to say why.
+  const ruleHasNoOperations = !planApplyEnabled && !configureEnabled
   const [inventoryPaths, setInventoryPaths] = useState<string[]>([])
   const [defaultPlaybook, setDefaultPlaybook] = useState('')
   const [defaultLimit, setDefaultLimit] = useState('')
@@ -288,7 +298,10 @@ export default function AutodiscoveryPage() {
     setExecutionBackend('tofu')
     setTerraformVersion('1.13')
     setAnsibleVersion('')
-    setConfigDirectoryMode('none')
+    // Back to the model's column defaults (#1966), which is what a brand-new
+    // rule means by not mentioning them.
+    setPlanApplyEnabled(true)
+    setConfigureEnabled(false)
     setConfigDirectory('')
     setInventoryPaths([])
     setDefaultPlaybook('')
@@ -344,12 +357,16 @@ export default function AutodiscoveryPage() {
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
     setAnsibleVersion(a['ansible-version'] || '')
-    // `=== undefined || === null` rather than `|| ''`: a rule that stores ''
-    // means the repository root and must come back as a SET directory, not
-    // as 'no configure operation' (#1929).
-    const cfgDir = a['config-directory']
-    setConfigDirectoryMode(cfgDir === undefined || cfgDir === null ? 'none' : 'set')
-    setConfigDirectory(cfgDir ?? '')
+    // `?? default` rather than `|| default` on both booleans: a stored `false`
+    // is a value, and `||` would read it as absent and seed the column default
+    // — so editing a rule that had plan/apply turned off would silently offer
+    // to turn it back on (#1966).
+    setPlanApplyEnabled(a['plan-apply-enabled'] ?? true)
+    setConfigureEnabled(a['configure-enabled'] ?? false)
+    // `?? ''` and nothing to decide: a stored '' is the configuration
+    // version's root and seeds an empty box, which is the same box an older
+    // API's missing key seeds (#1966).
+    setConfigDirectory(a['config-directory'] ?? '')
     setInventoryPaths(a['inventory-paths'] || [])
     setDefaultPlaybook(a['default-playbook'] || '')
     setDefaultLimit(a['default-limit'] || '')
@@ -416,11 +433,15 @@ export default function AutodiscoveryPage() {
       'agent-pool-id': agentPoolId || null,
       'engine-version': terraformVersion,
       'ansible-version': ansibleVersion.trim(),
-      // The mode decides between the two falsy values the server keeps
-      // apart (#1929): 'none' sends null — no configure operation — and
-      // 'set' sends the box verbatim, the empty string (the repository
-      // root) included.
-      'config-directory': configDirectoryMode === 'set' ? configDirectory.trim() : null,
+      // Which operations the materialised workspaces have (#1966). Always
+      // sent, like every other attribute in this form: the rule holds a
+      // concrete value for each, so there is no "leave alone" to express.
+      'plan-apply-enabled': planApplyEnabled,
+      'configure-enabled': configureEnabled,
+      // Where the configure operation runs (#1929). Sent verbatim and never
+      // null — an explicit null is a 422 naming the field (#1966) — with ''
+      // meaning the configuration version's root.
+      'config-directory': configDirectory.trim(),
       'inventory-paths': inventoryPaths.map(s => s.trim()).filter(Boolean),
       'default-playbook': defaultPlaybook.trim(),
       'default-limit': defaultLimit.trim(),
@@ -932,8 +953,65 @@ export default function AutodiscoveryPage() {
                   addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
                 />
               </div>
-              {/* The Ansible roots and run defaults every workspace this rule
-                  materialises inherits (#1929). */}
+              {/* Which operations every workspace this rule materialises has
+                  (#1966). Its own block above the Ansible one, because
+                  `configure-enabled` is the declaration and the roots below
+                  are only where that operation runs.
+
+                  Yes/no selects rather than checkboxes, matching every other
+                  boolean on this form — `inventory-include-platform` below is
+                  the immediate sibling. */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">{tWs('fields.operations')}</label>
+                <p className="text-xs text-slate-500 mb-2">{tWs('fields.operationsHint')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <label htmlFor="ad-plan-apply-enabled" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.planApplyEnabled')}
+                    </label>
+                    <select
+                      id="ad-plan-apply-enabled"
+                      value={planApplyEnabled ? 'true' : 'false'}
+                      onChange={e => setPlanApplyEnabled(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.planApplyEnabledHint')}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-configure-enabled" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.configureEnabled')}
+                    </label>
+                    <select
+                      id="ad-configure-enabled"
+                      value={configureEnabled ? 'true' : 'false'}
+                      onChange={e => setConfigureEnabled(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.configureEnabledHint')}
+                    </p>
+                  </div>
+                </div>
+                {ruleHasNoOperations && (
+                  // Save is disabled below; this is the sentence that says why.
+                  <p
+                    className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+                    data-testid="ad-operations-none"
+                  >
+                    {tWs('fields.operationsNone')}
+                  </p>
+                )}
+              </div>
+              {/* Where the configure operation runs in every workspace this
+                  rule materialises, and what it does by default (#1929). */}
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">{t('form.ansibleConfigure')}</label>
                 <p className="text-xs text-slate-500 mb-2">{t('form.ansibleConfigureHint')}</p>
@@ -942,36 +1020,24 @@ export default function AutodiscoveryPage() {
                       whose longest option is a long translated string can
                       push the row past the viewport however w-full it is. */}
                   <div className="min-w-0">
-                    <label htmlFor="ad-config-directory-mode" className="block text-xs text-slate-500 mb-1">
+                    <label htmlFor="ad-config-directory" className="block text-xs text-slate-500 mb-1">
                       {tWs('fields.configDirectory')}
                     </label>
-                    {/* A mode select, not a bare text box: null and '' are
-                        different values the server keeps apart, and both are
-                        falsy, so a text box alone could express only one. */}
-                    <select
-                      id="ad-config-directory-mode"
-                      value={configDirectoryMode}
-                      onChange={e => setConfigDirectoryMode(e.target.value as 'none' | 'set')}
+                    {/* A plain text box: the path is just a path and '' is the
+                        configuration version's root. #1929's mode select chose
+                        between null and '' — that declaration is
+                        `configure-enabled` above now (#1966). */}
+                    <input
+                      id="ad-config-directory"
+                      value={configDirectory}
+                      onChange={e => setConfigDirectory(e.target.value)}
+                      placeholder={tWs('fields.configDirectoryPlaceholder')}
                       title={tWs('fields.configDirectoryTitle')}
                       className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="none">{tWs('fields.configDirectoryModeNone')}</option>
-                      <option value="set">{tWs('fields.configDirectoryModeSet')}</option>
-                    </select>
-                    {configDirectoryMode === 'set' && (
-                      <>
-                        <input
-                          value={configDirectory}
-                          onChange={e => setConfigDirectory(e.target.value)}
-                          placeholder={tWs('fields.configDirectoryPlaceholder')}
-                          aria-label={tWs('fields.configDirectory')}
-                          className="mt-2 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                          {tWs('fields.configDirectoryRootHint')}
-                        </p>
-                      </>
-                    )}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.configDirectoryRootHint')}
+                    </p>
                   </div>
                   <div className="min-w-0">
                     <label htmlFor="ad-inventory-include-platform" className="block text-xs text-slate-500 mb-1">
@@ -1375,7 +1441,10 @@ export default function AutodiscoveryPage() {
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
-                disabled={submitting}
+                // A rule that declares neither operation would materialise
+                // inert workspaces on every scan (#1966), so saving it is
+                // blocked and the banner beside the controls says why.
+                disabled={submitting || ruleHasNoOperations}
                 className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium disabled:opacity-50"
               >
                 {submitting ? t('form.saving') : (editingId ? t('actions.update') : t('actions.create'))}
@@ -1383,7 +1452,7 @@ export default function AutodiscoveryPage() {
               <button
                 type="button"
                 onClick={previewFormRule}
-                disabled={submitting}
+                disabled={submitting || ruleHasNoOperations}
                 className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 text-sm disabled:opacity-50"
                 title={t('form.previewTitle')}
               >

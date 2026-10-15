@@ -1716,14 +1716,17 @@ test.describe('Per-workspace run identity (#1901)', () => {
 // The inventory tab is its own feature, not part of the run-identity work the
 // block above covers; it was sitting in that describe by accident.
 test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
-  test('the Ansible configure fields hold up at phone width (#1929)', async ({ page }) => {
+  test('the operations and Ansible configure fields hold up at phone width (#1929, #1966)', async ({
+    page,
+  }) => {
     // The six roots and run defaults moved onto the workspace Configuration tab
-    // (#1929), and they arrived as a nested grid inside a `dd` — a grid item's
-    // `min-width` is `auto`, so a `<select>` whose longest option is a long
-    // translated string pushes the row past the viewport however `w-full` it is.
-    // That is the `min-inline-size` lesson in its other costume, and the reason
-    // this is driven in EDIT mode: a read-only `dl` of short values cannot
-    // overflow and so proves nothing about the controls.
+    // (#1929), and the two operation booleans joined them above (#1966). Both
+    // arrived as nested grids inside a `dd` — a grid item's `min-width` is
+    // `auto`, so a control whose label is a long translated string pushes the
+    // row past the viewport however `w-full` it is. That is the
+    // `min-inline-size` lesson in its other costume, and the reason this is
+    // driven in EDIT mode: a read-only `dl` of short values cannot overflow and
+    // so proves nothing about the controls.
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2erespcfg'))
 
@@ -1733,15 +1736,29 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
 
     await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
 
-    // The mode select is the widest new control, and the one whose options are
-    // whole translated sentences in some locales.
-    const mode = page.getByLabel('Ansible config directory')
-    await expect(mode).toBeVisible()
+    // The two operation checkboxes and their hints, which are full sentences in
+    // every locale. Their rows carry `min-h-11` so the tap target is 44px at
+    // this width — a bare 20px checkbox would not be one.
+    const planApply = page.getByLabel('Plan and apply', { exact: true })
+    const configure = page.getByLabel('Configure', { exact: true })
+    await expect(planApply).toBeVisible()
+    await expect(configure).toBeVisible()
+    for (const box of [planApply, configure]) {
+      const h = (await box.locator('xpath=ancestor::label[1]').boundingBox())?.height ?? 0
+      expect(h).toBeGreaterThanOrEqual(44)
+    }
     await expectNoHorizontalPageScroll(page)
 
-    // Choosing a config directory reveals the path input and the list editors,
-    // which is the widest the block ever gets.
-    await mode.selectOption({ label: 'Use a config directory' })
+    // The both-false banner is the widest thing this block can show, and it
+    // only exists while the pair is refused — so it is driven rather than
+    // waited for.
+    await planApply.uncheck()
+    await expect(page.getByTestId('ws-operations-none')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    await planApply.check()
+
+    // The config directory is a plain text box since #1966 retired its mode
+    // select, and it is always present rather than revealed.
     await expect(page.getByPlaceholder('e.g. ansible')).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 

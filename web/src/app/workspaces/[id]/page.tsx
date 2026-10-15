@@ -82,15 +82,21 @@ interface WorkspaceAttrs {
   'terragrunt-enabled': boolean
   'terragrunt-version': string
   'working-directory': string
-  // The Ansible roots and the configure run defaults (#1929). Native-only:
-  // they are deliberately absent from `/api/tfe/v2`, which is why this page
-  // reads and writes the workspace through `/api/v1`.
+  // Which operations this workspace HAS (#1966) and, below, where the
+  // configure one runs (#1929). Native-only: both are deliberately absent from
+  // `/api/tfe/v2`, which is why this page reads and writes the workspace
+  // through `/api/v1`.
   //
-  // `config-directory` is `string | null` and its two falsy values are
-  // DIFFERENT. `null` says this workspace has no configure operation at all;
-  // `''` says the configure operation's root is the top of the repository.
-  // Optional only because an older API omits the key, which reads as null.
-  'config-directory'?: string | null
+  // Optional only because an older API omits the keys; the fallbacks below
+  // mirror the column defaults, which ARE the compatibility story -- plan/apply
+  // on, configure off.
+  'plan-apply-enabled'?: boolean
+  'configure-enabled'?: boolean
+  // An ordinary repo-relative path, `''` meaning the configuration version's
+  // root -- `working-directory`'s shape exactly. It has NO null state: whether
+  // there is a configure operation is `configure-enabled` above (#1966), not
+  // the absence of a path. Optional only for an older API.
+  'config-directory'?: string
   'inventory-paths'?: string[]
   'default-playbook'?: string
   'default-limit'?: string
@@ -450,16 +456,26 @@ function WorkspaceDetailContent() {
   // which the API treats as leave-alone.
   const [editOidcAudiences, setEditOidcAudiences] = useState<OidcAudiences | null>(null)
   const [editWorkingDir, setEditWorkingDir] = useState('')
-  // The Ansible roots and the configure run defaults (#1929).
-  //
-  // `config-directory` is edited as a MODE plus a path rather than as one text
-  // box, because both of its falsy values are real and they mean opposite
-  // things: `none` sends `null` -- no configure operation -- while `set` sends
-  // the box verbatim, the empty string (the repository root) included. A single
-  // input could express only one of the two, and collapsing them would silently
-  // give every workspace a configure operation rooted at the top of its repo.
-  const [editConfigDirMode, setEditConfigDirMode] = useState<'none' | 'set'>('none')
+  // Which operations this workspace has (#1966). Two checkboxes because the
+  // two are independent: all four combinations are meaningful except
+  // both-false, which the server refuses -- so the pair cannot be a radio
+  // group or a single select without inventing a state the column does not
+  // have. The initial values mirror the column defaults, which is what a
+  // workspace that predates these attributes reads back as.
+  const [editPlanApplyEnabled, setEditPlanApplyEnabled] = useState(true)
+  const [editConfigureEnabled, setEditConfigureEnabled] = useState(false)
+  // Where the configure operation runs (#1929) -- a plain text box now, because
+  // the path is just a path: `''` is the configuration version's root, the way
+  // it is for `working-directory` beside it, and there is no third state to
+  // carry. #1929 shipped this as a mode plus a path because NULL meant "no
+  // configure operation"; that declaration moved to `editConfigureEnabled`
+  // above (#1966), so the mode had nothing left to decide.
   const [editConfigDir, setEditConfigDir] = useState('')
+  // The one combination the server refuses (#1966), caught here so the operator
+  // reads it beside the checkboxes rather than as a 422 after a save. Derived,
+  // never stored: a second copy of the rule is a second thing to keep in step,
+  // and the server's check against the merged row is still the authority.
+  const editHasNoOperations = !editPlanApplyEnabled && !editConfigureEnabled
   const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
@@ -1260,12 +1276,16 @@ function WorkspaceDetailContent() {
     setNewDriftIgnoreRule('')
     setEditOidcAudiences(null)
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
-    // `=== undefined || === null` rather than `|| ''`: a workspace storing ''
-    // means the repository ROOT and has to come back as a set directory, not as
-    // 'no configure operation' (#1929).
-    const cfgDir = workspace.attributes['config-directory']
-    setEditConfigDirMode(cfgDir === undefined || cfgDir === null ? 'none' : 'set')
-    setEditConfigDir(cfgDir ?? '')
+    // `?? default` rather than `|| default` on both booleans: a stored `false`
+    // is a value, and `||` would read it as absent and seed the column default
+    // instead -- which for `plan-apply-enabled` means the editor would offer to
+    // turn back on exactly the operation the operator turned off (#1966).
+    setEditPlanApplyEnabled(workspace.attributes['plan-apply-enabled'] ?? true)
+    setEditConfigureEnabled(workspace.attributes['configure-enabled'] ?? false)
+    // `?? ''` and nothing else to decide: the stored `''` is the configuration
+    // version's root and seeds an empty box, which is the same box an older
+    // API's missing key seeds (#1966).
+    setEditConfigDir(workspace.attributes['config-directory'] ?? '')
     setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
@@ -1333,17 +1353,23 @@ function WorkspaceDetailContent() {
               // both, and the singular would replace the whole set.
               'agent-pool-ids': editPoolIds,
               'working-directory': editWorkingDir,
-              // The Ansible roots and the configure run defaults (#1929). The
-              // mode decides between the two falsy values the server keeps
-              // apart: `none` sends null -- no configure operation -- and `set`
-              // sends the box verbatim, '' (the repository root) included.
+              // Which operations this workspace has (#1966). Both are always
+              // sent, because both are always shown: the form holds the
+              // workspace's own values, so there is no "did not touch this" to
+              // express, and the server checks the pair it ends up with.
+              'plan-apply-enabled': editPlanApplyEnabled,
+              'configure-enabled': editConfigureEnabled,
+              // Where the configure operation runs (#1929). Sent verbatim, and
+              // never `null` -- an explicit null is a 422 naming the field
+              // (#1966), and `''` is the value that means the configuration
+              // version's root.
               //
               // NOT trimmed, and no slash is stripped. The server REFUSES a
               // path carrying leading or trailing whitespace, a leading or
               // trailing slash, or a `..` segment, rather than normalising it
               // -- so normalising here would hide a refusal the operator needs
               // to read, and would store something other than what they typed.
-              'config-directory': editConfigDirMode === 'set' ? editConfigDir : null,
+              'config-directory': editConfigDir,
               // Blank-free but NOT trimmed, exactly as `oidc-audiences` below:
               // the list editor appends an empty row when Add is pressed and
               // the server refuses an empty entry, so a row left blank would
@@ -2429,7 +2455,10 @@ function WorkspaceDetailContent() {
                     </button>
                     <button
                       onClick={() => handleSave()}
-                      disabled={saving}
+                      // A workspace with neither operation is refused by the
+                      // server (#1966), so the save is blocked here rather than
+                      // sent to fail. The banner below says why.
+                      disabled={saving || editHasNoOperations}
                       className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                     >
                       {saving ? t('actions.saving') : t('settings.saveChanges')}
@@ -2616,10 +2645,129 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
                   )}
                 </div>
-                {/* The Ansible roots and the configure run defaults (#1929),
-                    sat beside `working-directory` because they answer the same
-                    question for the configure half of a run: where in the
-                    repository this workspace's code lives.
+                {/* Which operations this workspace HAS (#1966). Sat
+                    immediately above the Ansible group because
+                    `configure-enabled` is what brings that group's whole
+                    subject — and the Inventory tab — into existence. Reading
+                    them the other way round is what left the config directory
+                    looking like the declaration, which is the shape #1929
+                    shipped and #1966 undid.
+
+                    Two checkboxes, not one select or a radio group: the two
+                    are independent, all four combinations are meaningful
+                    except both-false, and anything that collapsed them into a
+                    single control would have to invent a state the columns do
+                    not have. */}
+                <div className="sm:col-span-2 border-t border-slate-800 pt-4">
+                  <dt className="text-sm text-slate-300">{t('fields.operations')}</dt>
+                  {/* One `dd` for the whole group, so the nested fields can use
+                      plain `label`/`p` — a `dd` three divs down from the `dl`
+                      is not a conforming description list. */}
+                  <dd className="mt-1">
+                    <p className="text-xs text-slate-500">{t('fields.operationsHint')}</p>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="min-w-0">
+                        <label
+                          htmlFor="ws-plan-apply-enabled"
+                          className="block text-xs text-slate-500"
+                        >
+                          {t('fields.planApplyEnabled')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <>
+                            {/* The wrapping label IS the tap target: a bare
+                                20px checkbox is not one at phone width, and
+                                `min-h-11` on the row gives the whole thing 44px
+                                while collapsing on a precise pointer. */}
+                            <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                              {/* An explicit `aria-label`, as `bindPlan` above
+                                  does. Without it the accessible name is the
+                                  CONCATENATION of the field label and this
+                                  row's own Enabled/Disabled text, which makes
+                                  the control ambiguous to name — and the state
+                                  word would change the name as it toggles. */}
+                              <input
+                                id="ws-plan-apply-enabled"
+                                type="checkbox"
+                                checked={editPlanApplyEnabled}
+                                onChange={(e) => setEditPlanApplyEnabled(e.target.checked)}
+                                aria-label={t('fields.planApplyEnabled')}
+                                className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                              />
+                              <span className="text-sm text-slate-200">
+                                {editPlanApplyEnabled ? t('common.enabled') : t('common.disabled')}
+                              </span>
+                            </label>
+                          </>
+                        ) : (
+                          // `?? true` mirrors the column default, so a
+                          // workspace read from an API that predates the
+                          // attribute reads as what it actually does.
+                          <p
+                            className="mt-1 text-sm text-slate-200"
+                            data-testid="ws-plan-apply-enabled"
+                          >
+                            {(attrs['plan-apply-enabled'] ?? true)
+                              ? t('common.enabled')
+                              : t('common.disabled')}
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs text-slate-400">
+                          {t('fields.planApplyEnabledHint')}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <label
+                          htmlFor="ws-configure-enabled"
+                          className="block text-xs text-slate-500"
+                        >
+                          {t('fields.configureEnabled')}
+                        </label>
+                        {editing && perms['can-update'] ? (
+                          <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                            <input
+                              id="ws-configure-enabled"
+                              type="checkbox"
+                              checked={editConfigureEnabled}
+                              onChange={(e) => setEditConfigureEnabled(e.target.checked)}
+                              aria-label={t('fields.configureEnabled')}
+                              className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                            />
+                            <span className="text-sm text-slate-200">
+                              {editConfigureEnabled ? t('common.enabled') : t('common.disabled')}
+                            </span>
+                          </label>
+                        ) : (
+                          <p
+                            className="mt-1 text-sm text-slate-200"
+                            data-testid="ws-configure-enabled"
+                          >
+                            {(attrs['configure-enabled'] ?? false)
+                              ? t('common.enabled')
+                              : t('common.disabled')}
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs text-slate-400">
+                          {t('fields.configureEnabledHint')}
+                        </p>
+                      </div>
+                    </div>
+                    {editing && perms['can-update'] && editHasNoOperations && (
+                      // The server refuses this pair (#1966); Save is disabled
+                      // above, and this is the sentence that says why.
+                      <p
+                        className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+                        data-testid="ws-operations-none"
+                      >
+                        {t('fields.operationsNone')}
+                      </p>
+                    )}
+                  </dd>
+                </div>
+                {/* Where the configure operation runs, and what it does by
+                    default (#1929) — sat beside `working-directory` because
+                    they answer the same question for the configure half of a
+                    run: where in the repository this workspace's code lives.
                     `inventory_settings` and its own VCS binding are gone — the
                     inventory now uses the workspace's `vcs-*` attributes
                     edited in the VCS section below. */}
@@ -2637,67 +2785,55 @@ function WorkspaceDetailContent() {
                           however `w-full` the control itself is. */}
                       <div className="min-w-0">
                         <label
-                          htmlFor="ws-config-directory-mode"
+                          htmlFor="ws-config-directory"
                           className="block text-xs text-slate-500"
                         >
                           {t('fields.configDirectory')}
                         </label>
                         {editing && perms['can-update'] ? (
                           <>
-                            {/* A NAMED mode rather than a checkbox: both states
-                                are real values and both need saying out loud. An
-                                unticked box reads as "nothing filled in yet",
-                                which is exactly what the absent case is not —
-                                `null` is the deliberate "this workspace has no
-                                configure operation". */}
-                            <select
-                              id="ws-config-directory-mode"
-                              value={editConfigDirMode}
-                              onChange={(e) => setEditConfigDirMode(e.target.value as 'none' | 'set')}
+                            {/* A plain text box, exactly as `working-directory`
+                                above: the path is just a path, and `''` is the
+                                configuration version's root. #1929's mode select
+                                existed because NULL meant "no configure
+                                operation" — that declaration is
+                                `configure-enabled` above now (#1966), so the
+                                mode had nothing left to choose between.
+
+                                No `aria-label`: the `htmlFor` label above names
+                                this input, and an aria-label would override it
+                                with the same words for no gain. */}
+                            <input
+                              id="ws-config-directory"
+                              type="text"
+                              value={editConfigDir}
+                              onChange={(e) => setEditConfigDir(e.target.value)}
+                              placeholder={t('fields.configDirectoryPlaceholder')}
                               title={t('fields.configDirectoryTitle')}
+                              data-testid="ws-config-directory-input"
                               className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            >
-                              <option value="none">{t('fields.configDirectoryModeNone')}</option>
-                              <option value="set">{t('fields.configDirectoryModeSet')}</option>
-                            </select>
-                            {editConfigDirMode === 'set' && (
-                              <>
-                                <input
-                                  type="text"
-                                  value={editConfigDir}
-                                  onChange={(e) => setEditConfigDir(e.target.value)}
-                                  placeholder={t('fields.configDirectoryPlaceholder')}
-                                  aria-label={t('fields.configDirectory')}
-                                  data-testid="ws-config-directory-input"
-                                  className="mt-2 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                />
-                                <p className="mt-1 text-xs text-slate-400">
-                                  {t('fields.configDirectoryRootHint')}
-                                </p>
-                              </>
-                            )}
+                            />
+                            <p className="mt-1 text-xs text-slate-400">
+                              {t('fields.configDirectoryRootHint')}
+                            </p>
                           </>
                         ) : (
-                          // Three states, rendered as three different things.
-                          // Falling back to `/` for both of the first two — the
-                          // way `working-directory` legitimately does, having no
-                          // absent state — is the collapse this setting exists to
-                          // prevent.
+                          // TWO states now, not three. The absent one went with
+                          // the nullable column (#1966), so an empty value is
+                          // the configuration version's root and says so —
+                          // rendering it as `/` the way `working-directory`
+                          // does would be true but less legible for a path
+                          // whose being empty is a deliberate choice.
                           <p
                             className="mt-1 text-sm text-slate-200"
                             data-testid="ws-config-directory"
                           >
-                            {attrs['config-directory'] === undefined ||
-                            attrs['config-directory'] === null ? (
-                              <span className="text-slate-500">
-                                {t('fields.configDirectoryModeNone')}
-                              </span>
-                            ) : attrs['config-directory'] === '' ? (
-                              t('fields.configDirectoryRoot')
-                            ) : (
+                            {attrs['config-directory'] ? (
                               <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
                                 {attrs['config-directory']}
                               </code>
+                            ) : (
+                              t('fields.configDirectoryRoot')
                             )}
                           </p>
                         )}

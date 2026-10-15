@@ -111,21 +111,37 @@ export default function BulkUpdatePage() {
   // ---- Update form state ----
   const [uTfVersion, setUTfVersion] = useState('')
   const [uAnsibleVersion, setUAnsibleVersion] = useState('')
+  // Which operations the matched workspaces have (#1966). Tri-state
+  // '' | 'true' | 'false', as terragrunt-enabled below: a plain checkbox
+  // cannot say "leave this alone", and the endpoint type-checks booleans
+  // rather than coercing them.
+  //
+  // Fleet-settable deliberately: turning configure on across a matched set is
+  // the operation an operator adopting Ansible actually performs, and doing it
+  // one workspace at a time is what this page exists to avoid.
+  const [uPlanApplyEnabled, setUPlanApplyEnabled] = useState('')
+  const [uConfigureEnabled, setUConfigureEnabled] = useState('')
+  // BOTH explicitly false is the only combination that can never succeed for
+  // any matched workspace, so it is the only one blocked here. Turning just
+  // plan/apply off is legitimate for a set that has configure on, and the
+  // endpoint answers that against each row — guessing at it client-side would
+  // refuse a real fleet operation on a rule the client cannot evaluate.
+  const uWouldLeaveNoOperations = uPlanApplyEnabled === 'false' && uConfigureEnabled === 'false'
   // The Ansible roots and run defaults (#1929).
   //
   // `config-directory` CANNOT use this form's `if (value.trim())` idiom. That
   // idiom reads an empty box as "the operator did not touch this", which is
-  // only sound where the empty string is not itself a value. Here both falsy
-  // values are real and they mean opposite things: null declares that a
-  // workspace has NO configure operation, and '' declares that its config
-  // root IS the repository root. A plain text input can express neither, so
-  // the decision is carried explicitly by a tri-state mode — '' sends no key
-  // at all, 'clear' sends null, 'set' sends the box verbatim including ''.
-  const [uConfigDirectoryMode, setUConfigDirectoryMode] = useState('')
+  // only sound where the empty string is not itself a value — and '' is a
+  // value here: it means the configuration version's root (#1966). So the
+  // checkbox is what says "touch this at all", exactly as it is for the two
+  // run defaults below. #1929 needed a THIRD state here, because null then
+  // meant "no configure operation"; that declaration is `configure-enabled`
+  // above now, so two states are all there are.
+  const [uSetConfigDirectory, setUSetConfigDirectory] = useState(false)
   const [uConfigDirectory, setUConfigDirectory] = useState('')
-  // Checkbox-gated for the same reason one step smaller: '' is a real value
-  // on both of these (no default playbook; the whole inventory), so there is
-  // no in-band way to say "leave this alone" — same shape as var-files.
+  // Checkbox-gated for the same reason: '' is a real value on both of these
+  // (no default playbook; the whole inventory), so there is no in-band way to
+  // say "leave this alone" — same shape as var-files.
   const [uSetDefaultPlaybook, setUSetDefaultPlaybook] = useState(false)
   const [uDefaultPlaybook, setUDefaultPlaybook] = useState('')
   const [uSetDefaultLimit, setUSetDefaultLimit] = useState(false)
@@ -239,11 +255,18 @@ export default function BulkUpdatePage() {
     // keeps the UI off a deprecated spelling.
     if (uTfVersion.trim()) u['engine-version'] = uTfVersion.trim()
     if (uAnsibleVersion.trim()) u['ansible-version'] = uAnsibleVersion.trim()
-    // Not `if (uConfigDirectory.trim())` — see the state comment: that would
-    // collapse null and '', the two values this setting deliberately keeps
-    // apart, and leave no way to express either. The mode decides.
-    if (uConfigDirectoryMode === 'clear') u['config-directory'] = null
-    else if (uConfigDirectoryMode === 'set') u['config-directory'] = uConfigDirectory.trim()
+    // Which operations the matched workspaces have (#1966). Either may be sent
+    // on its own: the endpoint checks the MERGE against each matched
+    // workspace's own row, so turning plan/apply off is legitimate across a set
+    // that already has configure on, and only the pair that survives the write
+    // being empty is refused.
+    if (uPlanApplyEnabled) u['plan-apply-enabled'] = uPlanApplyEnabled === 'true'
+    if (uConfigureEnabled) u['configure-enabled'] = uConfigureEnabled === 'true'
+    // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
+    // value here (the configuration version's root), so the checkbox is what
+    // says whether to write this at all. Never `null`: an explicit null on
+    // this attribute is a 422 naming the field (#1966).
+    if (uSetConfigDirectory) u['config-directory'] = uConfigDirectory.trim()
     if (uSetDefaultPlaybook) u['default-playbook'] = uDefaultPlaybook.trim()
     if (uSetDefaultLimit) u['default-limit'] = uDefaultLimit.trim()
     if (uInventoryIncludePlatform)
@@ -916,7 +939,65 @@ export default function BulkUpdatePage() {
             </div>
           </div>
 
-          {/* The Ansible roots and run defaults (#1929) */}
+          {/* Which operations the matched workspaces have (#1966). Its own
+              block above the Ansible one, because `configure-enabled` is the
+              declaration and the roots below are only where that operation
+              runs — the ordering #1929 did not have, and #1966 introduced. */}
+          <div className="pt-3 border-t border-slate-800">
+            <h3 className="text-sm font-medium text-slate-200 mb-1">{tWs('fields.operations')}</h3>
+            <p className="text-xs text-slate-500 mb-3">{tWs('fields.operationsHint')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-plan-apply-enabled">
+                  {tWs('fields.planApplyEnabled')}
+                </label>
+                <select
+                  id="bu-plan-apply-enabled"
+                  value={uPlanApplyEnabled}
+                  onChange={(e) => setUPlanApplyEnabled(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.planApplyEnabledHint')}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-configure-enabled">
+                  {tWs('fields.configureEnabled')}
+                </label>
+                <select
+                  id="bu-configure-enabled"
+                  value={uConfigureEnabled}
+                  onChange={(e) => setUConfigureEnabled(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.configureEnabledHint')}
+                </p>
+              </div>
+            </div>
+            {uWouldLeaveNoOperations && (
+              // Guaranteed 422 for every matched workspace, so both submits are
+              // blocked below and this is the sentence that explains it.
+              <p
+                className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+                data-testid="bu-operations-none"
+              >
+                {t('update.operationsNone')}
+              </p>
+            )}
+          </div>
+
+          {/* Where the configure operation runs, and what it does by
+              default (#1929) */}
           <div className="pt-3 border-t border-slate-800">
             <h3 className="text-sm font-medium text-slate-200 mb-1">{tAd('ansibleConfigure')}</h3>
             <p className="text-xs text-slate-500 mb-3">{tAd('ansibleConfigureHint')}</p>
@@ -925,25 +1006,20 @@ export default function BulkUpdatePage() {
                   longest option is a long translated string can push the row
                   past the viewport however w-full the control is. */}
               <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-config-directory-mode">
-                  {tWs('fields.configDirectory')}
+                <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={uSetConfigDirectory}
+                    onChange={(e) => setUSetConfigDirectory(e.target.checked)}
+                  />
+                  {t('update.setConfigDirectory')}
                 </label>
-                {/* Three options, not a text box: this setting's null and its
-                    empty string are DIFFERENT values and both are falsy, so
-                    "leave alone", "no configure operation" and "the repository
-                    root" cannot all come out of one input. */}
-                <select
-                  id="bu-config-directory-mode"
-                  value={uConfigDirectoryMode}
-                  onChange={(e) => setUConfigDirectoryMode(e.target.value)}
-                  title={tWs('fields.configDirectoryTitle')}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="clear">{tWs('fields.configDirectoryModeNone')}</option>
-                  <option value="set">{tWs('fields.configDirectoryModeSet')}</option>
-                </select>
-                {uConfigDirectoryMode === 'set' && (
+                {/* A checkbox plus a box, not a select: '' is a real value
+                    (the configuration version's root), so the gate has to be
+                    out of band — the same shape as the two run defaults
+                    below. The third option #1929 needed here went with the
+                    nullable column (#1966). */}
+                {uSetConfigDirectory && (
                   <>
                     <input
                       type="text"
@@ -951,7 +1027,8 @@ export default function BulkUpdatePage() {
                       onChange={(e) => setUConfigDirectory(e.target.value)}
                       placeholder={tWs('fields.configDirectoryPlaceholder')}
                       aria-label={tWs('fields.configDirectory')}
-                      className={`mt-2 ${inputCls}`}
+                      title={tWs('fields.configDirectoryTitle')}
+                      className={inputCls}
                     />
                     <p className="mt-1 text-xs text-slate-400">
                       {tWs('fields.configDirectoryRootHint')}
@@ -1167,7 +1244,7 @@ export default function BulkUpdatePage() {
                 setConfirmApply(false)
                 runBulkUpdate(true)
               }}
-              disabled={submitting}
+              disabled={submitting || uWouldLeaveNoOperations}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 transition-colors"
             >
               {submitting ? t('update.working') : t('update.previewDryRun')}
@@ -1177,7 +1254,7 @@ export default function BulkUpdatePage() {
                 <span className="text-sm text-amber-300">{t('update.confirmWarning')}</span>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || uWouldLeaveNoOperations}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white transition-colors"
                 >
                   {submitting ? t('update.applying') : t('update.confirmApply')}
@@ -1193,7 +1270,7 @@ export default function BulkUpdatePage() {
             ) : (
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || uWouldLeaveNoOperations}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white transition-colors"
               >
                 {t('update.applyChanges')}
