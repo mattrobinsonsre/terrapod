@@ -136,6 +136,7 @@ class GCSStore:
             def __init__(self) -> None:
                 self._buffer = b""
                 self._done = False
+                self._pos = 0
 
             def read(self, n: int = -1) -> bytes:
                 if self._done and not self._buffer:
@@ -155,6 +156,7 @@ class GCSStore:
                 else:
                     result = self._buffer[:n]
                     self._buffer = self._buffer[n:]
+                self._pos += len(result)
                 return result
 
             # Stubs required by IO protocol
@@ -164,8 +166,10 @@ class GCSStore:
             def seek(self, offset: int, whence: int = 0) -> int:
                 raise NotImplementedError
 
+            # Not a stub: the resumable upload requires the stream to start at 0
+            # and determines each chunk's byte range from tell() (#2106).
             def tell(self) -> int:
-                raise NotImplementedError
+                return self._pos
 
             def readable(self) -> bool:
                 return True
@@ -184,7 +188,6 @@ class GCSStore:
                 blob.upload_from_file(
                     reader,
                     content_type=content_type,
-                    num_retries=2,
                 )
             except Exception as e:
                 upload_error.append(e)

@@ -76,7 +76,7 @@ class TestGCSPutStream:
         """A client whose upload, like a resumable upload, completes when the
         reader reports end of stream."""
 
-        def upload_from_file(reader, content_type=None, num_retries=None):  # noqa: ARG001
+        def upload_from_file(reader, **_):
             data = b""
             while piece := reader.read(512):
                 data += piece
