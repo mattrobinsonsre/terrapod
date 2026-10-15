@@ -1377,9 +1377,18 @@ class TestAnEngineThatCannotDiscover:
     async def test_a_terraform_workspace_still_intersects(self):
         """The regression guard. An empty list from a DISCOVERING engine still
         means "this configuration declares no provider" and answers 204 — the
-        meaning of the same request must not have changed for Terraform."""
+        meaning of the same request must not have changed for Terraform.
+
+        **Stated with CATALOGUE keys, and that is the point of the change in
+        #2108 rather than an accident of the fixture.** It used to use the
+        workspace's own `oidc_audiences`, which now bypass the graph
+        deliberately — so expressing the property that way would assert the very
+        rule #2108 removed. The property itself is unchanged and still worth
+        guarding: a discovering engine's empty list does not mean "mint
+        everything", for the catalogue.
+        """
         ws, run, cfg = _scenario(
-            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
+            catalogue={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
             engine="terraform",
         )
         resp, _ = await _call(
@@ -1388,8 +1397,11 @@ class TestAnEngineThatCannotDiscover:
         assert resp.status_code == 204
 
     async def test_only_the_discovered_subset_for_terraform(self):
+        """Catalogue keys, for the reason given above (#2108): the workspace's
+        own are minted whether the graph names them or not, so only the
+        catalogue can express "the discovered subset"."""
         ws, run, cfg = _scenario(
-            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
+            catalogue={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
             engine="terraform",
         )
         resp, _ = await _call(
@@ -1419,8 +1431,14 @@ class TestAnEngineThatCannotDiscover:
 
     async def test_a_discovering_engine_is_still_refused_on_a_bad_outcome(self):
         """The other side of the gate, so narrowing it to `discovers` did not
-        quietly disable the refusal it was introduced for."""
-        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="terraform")
+        quietly disable the refusal it was introduced for.
+
+        A CATALOGUE key, because #2108 narrowed the gate again: a workspace
+        whose every target is its own is minted even on a failed graph, since
+        the graph decided nothing for it. One catalogue key is what still makes
+        the outcome matter.
+        """
+        ws, run, cfg = _scenario(catalogue={"aws": ["sts.example.com"]}, engine="terraform")
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as err:
@@ -1771,3 +1789,247 @@ class TestTheSignaturesDoNotRunOnTheEventLoop:
             and n.value.func.attr == "to_thread"
         ]
         assert awaited, "nothing is handed to asyncio.to_thread any more"
+
+
+class TestAWorkspacesOwnKeysAreAlwaysMinted:
+    """#2108. The graph selects from the CATALOGUE; it does not veto a workspace.
+
+    The deployment catalogue is deployment-wide, so without the graph every run
+    would mint every catalogue token -- that check earns its place. A
+    workspace's own `oidc_audiences` is the opposite case: an operator who adds
+    a key to one workspace has said that workspace needs that token, so the
+    graph can only ever drop it, and when it did, nothing reported it.
+
+    It matters because federation does not always go through a provider block
+    named after the target. A `kubernetes` provider reaching AKS through an exec
+    plugin that swaps this token for an Entra one has no `azurerm` block for an
+    `azurerm` key to match -- and cannot add one, because azurerm logs in as
+    soon as it is configured even where every resource using it is `count = 0`.
+    Hooks and `external` programs are the same shape.
+
+    **Every test here is a CONTRAST between the two provenances**, because that
+    is what the property is. A fixture with only a workspace key cannot tell
+    "workspace keys are always minted" from "the graph check was removed", and
+    removing it would mint the whole catalogue on every run.
+    """
+
+    async def test_a_workspace_key_the_graph_never_named_is_minted(self):
+        ws, run, cfg = _scenario(override={"entra": ["api://AzureADTokenExchange"]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 200, resp.body
+        targets = [t["target"] for t in _tokens(resp)]
+        assert targets == ["entra"], (
+            "a key the operator set on this workspace was dropped because no provider "
+            "of that name appeared in the graph -- which is the whole of #2108"
+        )
+
+    async def test_a_catalogue_only_key_the_graph_never_named_is_not_minted(self):
+        """The other half, and the reason the graph check stays.
+
+        Same request, same absent provider -- the only difference is that the
+        key is the deployment's rather than this workspace's.
+        """
+        ws, run, cfg = _scenario(catalogue={"entra": ["api://AzureADTokenExchange"]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 204, resp.body
+        assert "claims" not in captured, (
+            "a deployment-wide catalogue key was minted for a run whose graph never "
+            "named it -- the catalogue would then be minted in full on every run"
+        )
+
+    async def test_an_override_of_a_catalogue_KEY_counts_as_the_workspaces_own(self):
+        """Even when it sets the SAME audiences as the catalogue.
+
+        This is the case no provenance-by-value scheme can get right, and the
+        reason membership is read off the workspace row rather than inferred by
+        diffing the snapshot against the catalogue: an override that happens to
+        agree with the catalogue is indistinguishable from not overriding at
+        all, while the operator's act of writing it is the statement of intent.
+        """
+        same = ["api://AzureADTokenExchange"]
+        ws, run, cfg = _scenario(catalogue={"entra": same}, override={"entra": list(same)})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 200, resp.body
+        assert [t["target"] for t in _tokens(resp)] == ["entra"]
+
+    async def test_the_audiences_come_from_the_RUNS_SNAPSHOT_not_the_live_row(self):
+        """Membership from the live row, values from the snapshot.
+
+        The split is what makes this fix need no migration, and it has to be
+        exactly this way round: taking the values live would hand the run an
+        identity its plan was never reviewed under, which is what the staleness
+        409 exists to prevent.
+        """
+        ws, run, cfg = _scenario(
+            override={"entra": ["api://live"]},
+            snapshot={"entra": ["api://snapshot"]},
+        )
+        # The configuration moved under the run, so the existing guard fires --
+        # which is itself the proof that the snapshot is what is being served.
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                providers=["kubernetes"],
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 409
+        assert "entra" in exc.value.detail
+
+    async def test_a_key_added_since_the_run_was_created_is_not_minted(self):
+        """Fails safe. It is not part of the identity this run was reviewed under."""
+        ws, run, cfg = _scenario(override={"entra": ["api://x"]}, snapshot={})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 204, resp.body
+        assert "claims" not in captured
+
+    async def test_a_stored_key_unsafe_as_a_path_is_dropped(self):
+        """A row predating `validate_oidc_audiences`' path check.
+
+        `_scenario` assigns the mapping straight onto the workspace, which is
+        exactly that legacy shape. This is the first path on which a stored key
+        reaches `<token dir>/<target>/token` without a provider in the graph
+        having vouched for its shape, so the guard is not redundant with the
+        write-path one.
+        """
+        ws, run, cfg = _scenario(override={"../evil": ["api://x"]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 204, resp.body
+        assert "claims" not in captured, "an unsafe stored key was minted into a token path"
+
+
+class TestADiscoveryFailureOnlyMattersWhenTheCATALOGUEIsInPlay:
+    """The 409 narrows, and only where it decided nothing (#2108).
+
+    It exists because falling through would hand the run the agent pool's
+    broader identity under the name of a workspace that had been moved off it.
+    That hazard needs the fall-through: where every key the run resolves is the
+    workspace's own, there is no fall-through -- the keys are minted -- so
+    refusing costs the run and buys nothing.
+    """
+
+    async def test_it_still_refuses_when_a_catalogue_key_is_in_play(self):
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                providers=["kubernetes"],
+                discovery="failed",
+                detail="graph exited 1",
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 409
+        assert "failed" in exc.value.detail
+
+    async def test_it_does_not_refuse_when_every_key_is_the_workspaces_own(self):
+        ws, run, cfg = _scenario(override={"entra": ["api://AzureADTokenExchange"]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["kubernetes"],
+            discovery="failed",
+            detail="graph exited 1",
+            cfg=cfg,
+        )
+        assert resp.status_code == 200, resp.body
+        assert [t["target"] for t in _tokens(resp)] == ["entra"]
+
+    async def test_a_mixed_workspace_still_refuses(self):
+        """One catalogue key is enough. The graph decided something, and it failed."""
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, override={"entra": [AZURE]})
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                providers=["kubernetes"],
+                discovery="failed",
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 409
+
+
+class TestAnEngineThatCannotDiscoverIsUnaffected:
+    """#2108 is a no-op on the `else` branch, and that is worth pinning.
+
+    An engine that cannot enumerate its own provider configurations already
+    mints everything the workspace resolves (#2006), so a workspace key was
+    never vetoed there -- the veto only ever existed on the discovered branch.
+    Pinned because the obvious way to implement #2108 is to move the always-mint
+    pass above the `if discovers:` split, which would make the two branches mint
+    the same set and quietly delete the #2006 distinction.
+    """
+
+    async def test_a_pulumi_workspace_mints_both_provenances(self):
+        ws, run, cfg = _scenario(
+            catalogue={"aws": [AWS]},
+            override={"entra": [AZURE]},
+            engine="pulumi",
+        )
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=None,
+            cfg=cfg,
+        )
+        assert resp.status_code == 200, resp.body
+        assert sorted(t["target"] for t in _tokens(resp)) == ["aws", "entra"], (
+            "an engine that cannot discover must still get the whole resolved set"
+        )
+
+    async def test_a_discovery_outcome_is_ignored_for_such_an_engine(self):
+        """Its runner never runs a graph command, so an outcome describing one
+        carries no information about this run -- which is why the 409 is gated
+        on `discovers` and why narrowing it further cannot have touched this."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, engine="pulumi")
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=None,
+            discovery="failed",
+            cfg=cfg,
+        )
+        assert resp.status_code == 200, resp.body
+        assert [t["target"] for t in _tokens(resp)] == ["aws"]

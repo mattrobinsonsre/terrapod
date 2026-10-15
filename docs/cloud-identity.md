@@ -533,8 +533,41 @@ explains:
    for a missing required variable.
 2. **Ask the API for the tokens, once.** `POST
    /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens`, carrying the
-   discovered list, returns one token per provider configuration that is both
-   discovered and mapped. `204` means there is nothing to deliver.
+   discovered list, returns one token per provider configuration it should
+   mint for. `204` means there is nothing to deliver.
+
+**Which targets those are depends on where the audiences came from, and the
+difference matters.**
+
+| the audiences are set in | minted |
+|---|---|
+| the deployment catalogue (`auth.oidcIssuer.audiences`) | only when the graph names a provider configuration that answers to the key |
+| a workspace's own `oidc_audiences` | **always**, whether or not the graph names one |
+
+The catalogue is deployment-wide, so without the graph every run would mint
+every token in it. A workspace's own mapping is the opposite case: setting a key
+there is a statement that *this workspace* needs *that token*, so the graph can
+only ever take it away.
+
+That is not a theoretical difference. Federation does not always go through a
+provider block named after the target — a `kubernetes` provider reaching AKS
+through an exec plugin that exchanges this token for an Entra one has no
+`azurerm` block, and often cannot add one, because `azurerm` authenticates as
+soon as it is configured even where every resource using it is `count = 0`. The
+same is true of a `pre_apply` hook or an `external` program that exchanges the
+token itself, and of any provider whose name has nothing to do with the cloud it
+authenticates to.
+
+**So a workspace key does not have to be named after a provider.** `entra` or
+`aks` is as valid as `azurerm`, and the token lands at
+`/var/run/terrapod/oidc/<key>/token` under whichever name you chose — which is
+worth choosing for its purpose, since the path is what your configuration reads.
+A key may contain at most one `.` (the `provider.alias` form), no whitespace and
+no path separators, because it becomes a directory name.
+
+**An override of a catalogue key is a workspace key.** Setting `aws` on the
+workspace makes it always-minted even if the audiences you set are the same ones
+the catalogue already had — the act of setting it is what counts.
 
 **This runs on every run, not only on federated ones**, and that is deliberate.
 Which providers a run uses is a property of the configuration, so only the runner
@@ -633,9 +666,11 @@ be failed for a non-local backend should not mint credentials first.
 | The issuer is not enabled deployment-wide (`204`) | The same outcome — an operator who has not published an issuer has not opted this deployment in |
 | The API does not serve the endpoint (`404`) | Read as "nothing to do". An API older than this runner image, and in agent mode the control plane and a runner in another cluster upgrade independently |
 | The configuration declares no provider (`204`) | Nothing to mint. It cannot reach a cloud, so it needs no token |
-| The run maps targets, but the root module uses none of them (`204`) | No token is written, and no environment variable is exported. The run uses the pool's identity — a mapped target a configuration never uses is not an error |
+| The root module uses none of the **catalogue's** targets (`204`) | No token is written, and no environment variable is exported. The run uses the pool's identity — a catalogue target a configuration never uses is not an error |
+| The root module uses none of the **workspace's own** targets | They are minted anyway. The workspace declared them, and the graph cannot see a token exchanged by an exec plugin, a hook or an `external` program |
 | The graph fails or cannot be read, and the workspace maps **nothing** | Nothing happens. The outcome is reported and ignored, because it cannot matter to a run that was not going to mint anything |
-| The graph fails or cannot be read, and the workspace **maps targets** (`409`) | **The run fails**, carrying the engine's own error. There is no way to tell which identity to present, and falling through would hand the run the pool's broader credentials |
+| The graph fails or cannot be read, and every target is the **workspace's own** | The tokens are minted. The graph decided nothing for this run, so its failure costs nothing — and this is not a fall-through to the pool's identity, it is the identity the operator named |
+| The graph fails or cannot be read, and a **catalogue** target is in play (`409`) | **The run fails**, carrying the engine's own error. There is no way to tell which of the catalogue's identities to present, and falling through would hand the run the pool's broader credentials |
 | The configuration moved since the run was created (`409`) | **The run fails**, naming the targets whose audiences changed. Queue a new run |
 | The run maps targets and **anything else fails** | **The run fails.** Credentials were asked for and could not be had |
 | The runner image predates the feature | Nothing is asked for. The run uses the pool's identity and reports success. **See [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)** |

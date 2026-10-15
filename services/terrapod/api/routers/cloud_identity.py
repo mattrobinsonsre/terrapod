@@ -59,6 +59,58 @@ MAX_TARGETS = 100
 logger = get_logger(__name__)
 
 
+def _own_targets(ws: Workspace) -> list[str]:
+    """The targets this workspace declares for itself (#2108).
+
+    Membership only. The audiences come from the run's snapshot, so this says
+    WHICH keys are the workspace's own and never what they are worth -- which is
+    why no migration was needed: the merged snapshot cannot answer the first
+    question (the catalogue and the workspace are folded together in it, and an
+    override setting the same value is invisible) and the live row must not
+    answer the second.
+
+    **The same two guards the discovered list gets, and they are not
+    redundant.** A key written before `validate_oidc_audiences` grew its
+    path-safety check could hold `/` or `..`, and that key is now minted without
+    the graph having to name it -- so this is the first path on which a stored
+    key reaches `<token dir>/<target>/token` without a provider in a `tofu
+    graph` having vouched for its shape. An unsafe one is DROPPED rather than
+    refused, because failing a run outright over a legacy row the operator
+    cannot see from here is worse than running with the identity it had
+    yesterday; it is logged at warning with the key named, so it is not a silent
+    skip.
+    """
+    # Imported in-function, as the route below does: this module is imported at
+    # app build time and the resolver pulls in the settings tree.
+    from terrapod.services import cloud_identity_resolver
+
+    raw = getattr(ws, "oidc_audiences", None)
+    if not isinstance(raw, dict):
+        return []
+    out: list[str] = []
+    for key in raw:
+        if not isinstance(key, str) or not key:
+            continue
+        if len(key) > workspace_settings.MAX_OIDC_TARGET_LEN:
+            logger.warning(
+                "workspace cloud identity key is too long to mint; skipping",
+                workspace_id=str(ws.id),
+                length=len(key),
+            )
+            continue
+        unsafe = cloud_identity_resolver.unsafe_target_reason(key)
+        if unsafe:
+            logger.warning(
+                "workspace cloud identity key is unsafe as a token path; skipping",
+                workspace_id=str(ws.id),
+                target=key,
+                reason=unsafe,
+            )
+            continue
+        out.append(key)
+    return out
+
+
 def _subject(ws: Workspace, phase: str | None) -> str:
     """The `sub` claim: `workspace:<name>@<id>[:phase:<phase>]`.
 
@@ -294,7 +346,16 @@ async def mint_cloud_identity_tokens(
     # would be the runner's own, where this is the platform's.
     discovers = discovers_provider_configurations(ws.engine)
 
-    if discovers and payload.discovery != "ok":
+    # Which keys are the WORKSPACE'S OWN, and which only the catalogue answers
+    # (#2108). The split decides both the discovery gate below and what the
+    # discovered branch mints: the catalogue is deployment-wide, so without the
+    # graph every run would mint all of it, while a key set on this workspace is
+    # a statement that this workspace needs that token and the graph can only
+    # ever take it away.
+    own = _own_targets(ws)
+    catalogue_only = [t for t in snapshot if t not in own]
+
+    if discovers and payload.discovery != "ok" and catalogue_only:
         # 409, not 422: the request is well formed and the caller is entitled to
         # it. The runner could not determine which identities to present, and
         # this workspace has some, so there is no safe answer -- falling through
@@ -371,8 +432,27 @@ async def mint_cloud_identity_tokens(
             audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
             if audiences is not None:
                 resolved[t] = audiences
+
+        # And every key the WORKSPACE declares, whether or not the graph found a
+        # provider by that name (#2108). The graph cannot know about a
+        # credential exchanged by an exec plugin, a hook or an `external`
+        # program, so letting it veto the key leaves the operator keying the
+        # override on some unrelated provider that does appear -- which names
+        # the token's file after that provider rather than its purpose and hands
+        # a token to every alias of it.
+        #
+        # Taken from the SNAPSHOT, so the audiences are the ones this run was
+        # created with. A key added since then is absent from it and resolves to
+        # None here, which is the right direction: it is not part of the
+        # identity this run's plan was reviewed under.
+        for t in own:
+            audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
+            if audiences is not None:
+                resolved[t] = audiences
     else:
-        # Mint everything this workspace resolves (#2006). The engine cannot say
+        # Mint everything this workspace resolves (#2006) -- which already
+        # includes every key the workspace declares, so #2108 changes nothing on
+        # this branch. The engine cannot say
         # which subset its program will use, so narrowing would mean guessing,
         # and a guess that comes out short fails inside the engine at the cloud's
         # token exchange -- after the program has started, with an error naming
