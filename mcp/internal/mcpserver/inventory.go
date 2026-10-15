@@ -42,6 +42,12 @@ import (
 // single VCS binding. The tools here declare the rows that are merged with
 // that source; they do not configure where it is.
 //
+// Whether a workspace has an ansible inventory at all is `configure_enabled`
+// (#1966), which is a workspace field beside them — NOT an empty
+// `config_directory`. "" is the ordinary way to say "at the configuration
+// version's root", so an emptiness test would read a configure-capable
+// workspace as having no inventory.
+//
 // # There is no refresh, because a read is live
 //
 // Dynamic inventory was declined (#1970), so every source is static and

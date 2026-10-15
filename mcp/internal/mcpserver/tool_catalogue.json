@@ -1200,10 +1200,14 @@
           ]
         },
         "config_directory": {
-          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
+          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
+          "type": "string"
+        },
+        "configure_enabled": {
+          "description": "whether this workspace has an ansible CONFIGURE operation. DEFAULTS TO FALSE, so the operation is opt-in and this is what turns it on -- setting config_directory alone does NOT (#1966), and a workspace with configure_enabled false has no configure operation and no ansible inventory however its roots are set. With it true, config_directory says WHERE the operation runs and inventory_paths says what it targets. Independent of plan_apply_enabled, so a workspace may have both; both off is refused (422)",
           "type": [
             "null",
-            "string"
+            "boolean"
           ]
         },
         "default_limit": {
@@ -1284,6 +1288,13 @@
         "owner_email": {
           "description": "workspace owner email (defaults to the caller)",
           "type": "string"
+        },
+        "plan_apply_enabled": {
+          "description": "whether this workspace has a PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle. DEFAULTS TO TRUE, so omit it for an ordinary infrastructure workspace. Pass false only for a configure-only workspace, and pass configure_enabled=true in the same call when you do: both operations off is refused (422), because a workspace that can do nothing is not a state anyone wants -- lock the workspace instead, which parks it reversibly. Independent of configure_enabled, so a workspace may have both",
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "pulumi_bind_plan": {
           "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine",
@@ -1419,15 +1430,18 @@
             "string"
           ]
         },
-        "clear_config_directory": {
-          "description": "turn the ansible configure operation OFF for this workspace. Distinct from config_directory=\"\", which roots it at the repository root; this removes it entirely. Wins if both are passed",
-          "type": "boolean"
-        },
         "config_directory": {
-          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. Three states, and they are not interchangeable: omit it and the workspace has NO configure operation at all; pass an empty string and the operation is rooted at the TOP of the repository; pass a subdirectory and it is rooted there. Do not pass \"\" meaning \"I do not know\" -- that turns the configure operation on. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories. On an update, OMITTING it leaves the stored value alone; pass clear_config_directory to turn the configure operation off",
+          "description": "the repository-root-relative directory the ansible CONFIGURE operation runs in: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": [
             "null",
             "string"
+          ]
+        },
+        "configure_enabled": {
+          "description": "turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "default_limit": {
@@ -1506,6 +1520,13 @@
           },
           "description": "replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do.",
           "type": "object"
+        },
+        "plan_apply_enabled": {
+          "description": "turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled",
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "pulumi_bind_plan": {
           "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine",

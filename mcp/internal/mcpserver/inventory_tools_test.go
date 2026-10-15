@@ -797,19 +797,26 @@ func TestTheInventoryRootsAreReachableOnTheWorkspaceTools(t *testing.T) {
 					"set one", tool, root)
 			}
 		}
-		// Only the update can turn the configure operation off; on create
-		// there is nothing to clear, so the flag would be noise.
-		_, hasClear := doc.Properties["clear_config_directory"]
-		if tool == "terrapod_workspace_update" && !hasClear {
-			t.Error("terrapod_workspace_update does not accept clear_config_directory — " +
-				"an agent could root the configure operation at the repository root " +
-				"(config_directory = \"\") but never turn it off, and the two are " +
-				"different states")
+		// The operation declarations (#1966) are on BOTH tools, unlike the
+		// clear flag they replaced. `configure_enabled` is what turns the
+		// operation on and off, so a tool missing it can set every root of
+		// an operation the workspace does not have.
+		for _, decl := range []string{"plan_apply_enabled", "configure_enabled"} {
+			if _, present := doc.Properties[decl]; !present {
+				t.Errorf("%s does not accept %q — a workspace declares which operations "+
+					"it has (#1966), and without this an agent can set the configure "+
+					"operation's roots but never give the workspace the operation", tool, decl)
+			}
 		}
-		if tool == "terrapod_workspace_create" && hasClear {
-			t.Error("terrapod_workspace_create accepts clear_config_directory, which has " +
-				"nothing to clear: a created workspace has no configure operation unless " +
-				"config_directory says so")
+		// The retired flag must not come back. `configure_enabled: false` is
+		// the whole of turning the operation off, and it deliberately leaves
+		// config_directory alone; a clear that also wiped the path would
+		// lose where a re-enabled operation should resume.
+		if _, hasClear := doc.Properties["clear_config_directory"]; hasClear {
+			t.Errorf("%s accepts clear_config_directory again — config_directory is an "+
+				"ordinary path since #1966 with \"\" meaning the configuration version's "+
+				"root, so there is no third state to clear and configure_enabled is what "+
+				"turns the operation off", tool)
 		}
 	}
 }

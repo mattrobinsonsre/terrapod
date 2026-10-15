@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -320,6 +321,263 @@ func liveInputSchemasByName(t *testing.T) map[string]json.RawMessage {
 	}
 	if len(out) == 0 {
 		t.Fatal("no tools registered")
+	}
+	return out
+}
+
+// ── The workspace-operations description guard (#1966) ───────────────────────
+
+// TestWorkspaceToolsDoNotDescribeConfigDirectoryAsTheDeclaration guards the
+// claim an agent acts on when it is asked to give a workspace an ansible
+// configure operation, or to take one away.
+//
+// This is the same gap as TestTheInventoryToolsDoNotTellAnAgentAReadIsStale in
+// inventory_tools_test.go, on the tools next door: the catalogue golden freezes
+// names, annotations and input schemas and NOT descriptions, so every sentence
+// below can go false with the whole suite green. It is not hypothetical on this
+// surface — four inventory descriptions told agents a live read was stale for a
+// release, and the reason MCP was the surface that shipped it is that the docs
+// had a gate quoting the API's own literals and the web tab had an e2e
+// assertion, while MCP had neither.
+//
+// What changed here is the shape of `config_directory`. It used to carry THREE
+// states, with an absent value meaning "this workspace has no configure
+// operation at all", so one field answered both where the operation runs and
+// whether there is one. It is an ordinary path now — "" is the configuration
+// version's root — and the declaration moved to the `configure_enabled` boolean
+// beside it. The stale prose is dangerous in two specific directions, and
+// neither is something an agent can sanity-check from a response: told that
+// setting `config_directory` turns a configure operation on, it will set it,
+// get a success, and report a configure-capable workspace that cannot run a
+// playbook; told to omit the field to turn the operation off, it will send a
+// PATCH that changes nothing and believe it worked.
+//
+// Deliberately NOT a golden of description text. A golden catches an unreviewed
+// EDIT, and nobody edits these — they go stale underneath. What is pinned is
+// the property, in both directions: the retired phrasings must be absent AND
+// the replacement must be stated, because asserting absence alone would pass on
+// a description that said nothing at all, which is the same disservice more
+// quietly.
+func TestWorkspaceToolsDoNotDescribeConfigDirectoryAsTheDeclaration(t *testing.T) {
+	tools := liveToolsByName(t)
+	schemas := liveInputSchemasByName(t)
+	const create, update = "terrapod_workspace_create", "terrapod_workspace_update"
+
+	// Phrasings that were true while `config_directory` was the declaration
+	// and are now the wrong answer. Compared lowercased so a reintroduction in
+	// any casing is caught.
+	retired := []string{
+		// The three-state model itself.
+		"three states",
+		"no configure operation at all",
+		"the workspace has no configure operation",
+		// config_directory as the switch.
+		"which is what turns one on at all",
+		"a workspace without it has none",
+		"that turns the configure operation on",
+		// The flag that used to reach the retired null. Naming it in a
+		// description is worse than merely stale: an agent will try to pass
+		// it, and the input schema refuses unknown properties.
+		"clear_config_directory",
+	}
+
+	t.Run("retired phrasings appear nowhere", func(t *testing.T) {
+		for _, tool := range []string{create, update} {
+			desc, ok := tools[tool]
+			if !ok {
+				t.Fatalf("%s is not registered", tool)
+			}
+			// The tool description AND every one of its field descriptions,
+			// because the three-state prose lived in the fields.
+			haystacks := map[string]string{"(tool description)": desc}
+			for field, fdesc := range fieldDescriptions(t, schemas, tool) {
+				haystacks[field] = fdesc
+			}
+			for where, text := range haystacks {
+				lower := strings.ToLower(text)
+				for _, phrase := range retired {
+					if strings.Contains(lower, phrase) {
+						t.Errorf("%s %s carries a retired claim (%q): config_directory is an "+
+							"ordinary path since #1966 with \"\" meaning the configuration "+
+							"version's root, and configure_enabled is what declares the "+
+							"operation:\n%s", tool, where, phrase, text)
+					}
+				}
+			}
+		}
+	})
+
+	// config_directory must say what it is NOT and name what is. An agent that
+	// has only ever seen the three-state shape will otherwise carry it
+	// forward, and nothing in the field's own text would contradict it.
+	t.Run("config_directory disclaims the declaration", func(t *testing.T) {
+		for _, tool := range []string{create, update} {
+			desc := fieldDescriptions(t, schemas, tool)["config_directory"]
+			if desc == "" {
+				t.Fatalf("%s has no config_directory field", tool)
+			}
+			if !strings.Contains(desc, "configure_enabled") {
+				t.Errorf("%s config_directory never names configure_enabled, so an agent "+
+					"cannot tell what declares the operation:\n%s", tool, desc)
+			}
+			if !strings.Contains(desc, "does NOT") && !strings.Contains(desc, "cannot turn") {
+				t.Errorf("%s config_directory does not disclaim being the declaration; an "+
+					"agent reading it as the switch would set it and report a "+
+					"configure-capable workspace with no configure operation:\n%s", tool, desc)
+			}
+			// The empty value is the trap in the other direction: read as a
+			// missing value rather than "at the root", an agent would fill it
+			// in, or report the workspace as misconfigured.
+			//
+			// A bare Contains("root") would NOT do here, and the reason is
+			// worth keeping: every one of these descriptions says
+			// "working_directory, which is the terraform/pulumi root" a
+			// sentence later, so the word is present however little the
+			// field says about its own empty value. The relationship has to
+			// be matched, which means one sentence carrying both.
+			if !emptyMeansRoot.MatchString(desc) {
+				t.Errorf("%s config_directory does not say, in one sentence, that an EMPTY "+
+					"value means the root, so \"\" reads as a gap rather than the "+
+					"configuration version's root:\n%s", tool, desc)
+			}
+		}
+	})
+
+	// plan_apply_enabled defaults to TRUE, which is the most consequential
+	// fact about it: an agent that thinks the default is false will set it on
+	// every create, and one that thinks passing false is a no-op will retire a
+	// workspace.
+	t.Run("plan_apply_enabled states its default", func(t *testing.T) {
+		for _, tool := range []string{create, update} {
+			desc := fieldDescriptions(t, schemas, tool)[planApplyField]
+			if desc == "" {
+				t.Fatalf("%s has no %s field", tool, planApplyField)
+			}
+			if !strings.Contains(strings.ToLower(desc), "plan") {
+				t.Errorf("%s %s never says which operation it governs:\n%s",
+					tool, planApplyField, desc)
+			}
+		}
+		// The default belongs on create, where omitting the field is the
+		// normal case and the value it lands on is the whole question. On
+		// update the equivalent fact is that omitting it leaves the stored
+		// value alone, which the subtest below pins.
+		//
+		// Matched as the CLAIM and not as the word: a bare Contains("true")
+		// passed with the default sentence deleted, because the same
+		// description says "pass configure_enabled=true in the same call"
+		// two sentences later. Found by mutation, which is the only thing
+		// that could have found it.
+		desc := fieldDescriptions(t, schemas, create)[planApplyField]
+		if !defaultsTrue.MatchString(desc) {
+			t.Errorf("%s %s does not state that the default is TRUE; an agent that assumed "+
+				"false would set it on every workspace it created:\n%s",
+				create, planApplyField, desc)
+		}
+	})
+
+	// configure_enabled must claim the declaration config_directory disclaims,
+	// or the two descriptions together point at nothing.
+	t.Run("configure_enabled claims the declaration", func(t *testing.T) {
+		for _, tool := range []string{create, update} {
+			desc := fieldDescriptions(t, schemas, tool)["configure_enabled"]
+			if desc == "" {
+				t.Fatalf("%s has no configure_enabled field", tool)
+			}
+			if !strings.Contains(desc, "config_directory") {
+				t.Errorf("%s configure_enabled never mentions config_directory, so an agent "+
+					"cannot tell which of the two is the switch:\n%s", tool, desc)
+			}
+		}
+		// On create the operation is opt-in; on update this field is the only
+		// way off, and an agent that does not know that goes looking for
+		// another one.
+		if desc := fieldDescriptions(t, schemas, create)["configure_enabled"]; !defaultsFalse.MatchString(desc) &&
+			!strings.Contains(desc, "opt-in") {
+			t.Errorf("%s configure_enabled does not say the operation is off by "+
+				"default:\n%s", create, desc)
+		}
+		if desc := fieldDescriptions(t, schemas, update)["configure_enabled"]; !strings.Contains(desc, "off") {
+			t.Errorf("%s configure_enabled does not say it is how the operation is turned "+
+				"off, so an agent will go looking for a field that does:\n%s", update, desc)
+		}
+	})
+
+	// A PATCH that omits a declaration must be described as leaving it alone.
+	// Silence here reads as "unset means false" on a field whose default is
+	// TRUE, so an agent renaming a workspace would retire it.
+	t.Run("the update describes omission as leaving a declaration alone", func(t *testing.T) {
+		for _, field := range []string{planApplyField, "configure_enabled"} {
+			desc := fieldDescriptions(t, schemas, update)[field]
+			if !omissionLeavesItAlone.MatchString(desc) {
+				t.Errorf("%s %s does not say that omitting it leaves the stored value "+
+					"alone:\n%s", update, field, desc)
+			}
+		}
+	})
+
+	// Both operations off is refused, and the refusal has to be visible BEFORE
+	// the call. An agent meeting it as a bare 422 will retry it, or conclude
+	// the workspace is broken; told in advance, it pairs the two booleans or
+	// reaches for the lock instead.
+	t.Run("the both-off refusal is stated before the call", func(t *testing.T) {
+		for _, tool := range []string{create, update} {
+			text := tools[tool]
+			for field, fdesc := range fieldDescriptions(t, schemas, tool) {
+				if field == planApplyField || field == "configure_enabled" {
+					text += "\n" + fdesc
+				}
+			}
+			if !strings.Contains(text, "422") && !strings.Contains(strings.ToLower(text), "refused") {
+				t.Errorf("%s never warns that turning both operations off is refused, so an "+
+					"agent meets it as a bare error:\n%s", tool, text)
+			}
+		}
+	})
+}
+
+// planApplyField is named once so a rename of the field is one edit here
+// rather than a scatter of string literals that can drift apart.
+const planApplyField = "plan_apply_enabled"
+
+// Each of these matches a CLAIM rather than a word, and each replaced a
+// Contains() that a mutation walked straight through. These descriptions are
+// long and say several things, so any single word in them is likely to appear
+// somewhere for an unrelated reason: "true" in `configure_enabled=true`,
+// "root" in "working_directory, which is the terraform/pulumi root". Requiring
+// the two halves of the claim within one sentence (`[^.]`, so the match cannot
+// span a full stop) is what makes deleting the claim fail the test.
+//
+// Case-insensitive on purpose: the assertion is about the fact being stated,
+// not about shouting it, so a later rewrite from "DEFAULTS TO TRUE" to
+// "defaults to true" is not a regression and must not read as one.
+var (
+	defaultsTrue          = regexp.MustCompile(`(?i)default(s|ing)? (to |is )?true`)
+	defaultsFalse         = regexp.MustCompile(`(?i)default(s|ing)? (to |is )?false`)
+	emptyMeansRoot        = regexp.MustCompile(`(?i)empt(y|ied)[^.]{0,120}root`)
+	omissionLeavesItAlone = regexp.MustCompile(`(?i)omitt(ing|ed)[^.]{0,120}(leaves|alone|unchanged)`)
+)
+
+// fieldDescriptions returns one tool's property descriptions keyed by field
+// name — the per-field sibling of liveToolsByName, for the text an agent reads
+// about an individual argument. The catalogue golden freezes neither.
+func fieldDescriptions(t *testing.T, schemas map[string]json.RawMessage, tool string) map[string]string {
+	t.Helper()
+	raw, ok := schemas[tool]
+	if !ok {
+		t.Fatalf("tool %s is not registered", tool)
+	}
+	var doc struct {
+		Properties map[string]struct {
+			Description string `json:"description"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("decode %s input schema: %v", tool, err)
+	}
+	out := make(map[string]string, len(doc.Properties))
+	for name, prop := range doc.Properties {
+		out[name] = prop.Description
 	}
 	return out
 }

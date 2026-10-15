@@ -23,15 +23,24 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		Engine   string `json:"engine,omitempty" jsonschema:"return only workspaces on this execution engine: terraform or pulumi. Omit for every engine. Narrow with this before doing anything that assumes one engine — the tools differ by engine"`
 	}
 	type workspaceSummary struct {
-		ID            string            `json:"id"`
-		Name          string            `json:"name"`
-		Engine        string            `json:"engine,omitempty"`
-		ExecutionMode string            `json:"execution_mode"`
-		Locked        bool              `json:"locked"`
-		LockReason    string            `json:"lock_reason,omitempty"`
-		LockedBy      string            `json:"locked_by,omitempty"`
-		DriftStatus   string            `json:"drift_status,omitempty"`
-		Labels        map[string]string `json:"labels,omitempty"`
+		ID            string `json:"id"`
+		Name          string `json:"name"`
+		Engine        string `json:"engine,omitempty"`
+		ExecutionMode string `json:"execution_mode"`
+		// Which operations the workspace has (#1966). In the summary for the
+		// same reason `engine` is: both decide which tools answer for this
+		// workspace at all, so an agent that has to `get` each one to find
+		// out is being made to pay per workspace for an orientation read.
+		// NEITHER carries `omitempty` -- a false is the informative value
+		// here (plan/apply off is the whole point of a configure-only
+		// workspace) and dropping it would read as "not applicable".
+		PlanApplyEnabled bool              `json:"plan_apply_enabled"`
+		ConfigureEnabled bool              `json:"configure_enabled"`
+		Locked           bool              `json:"locked"`
+		LockReason       string            `json:"lock_reason,omitempty"`
+		LockedBy         string            `json:"locked_by,omitempty"`
+		DriftStatus      string            `json:"drift_status,omitempty"`
+		Labels           map[string]string `json:"labels,omitempty"`
 	}
 	type workspaceListOut struct {
 		// Returned is how many workspaces this response contains; Total is the
@@ -44,7 +53,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_list",
-		Description: "List workspaces on this Terrapod instance with their engine, status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Each workspace reports its `engine` — `terraform` (OpenTofu/Terraform) or `pulumi` — and several tools answer for one engine only, so read it before choosing one; `engine` also narrows the list server-side. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search` or `engine`).",
+		Description: "List workspaces on this Terrapod instance with their engine, declared operations, status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Each workspace reports its `engine` — `terraform` (OpenTofu/Terraform) or `pulumi` — and several tools answer for one engine only, so read it before choosing one; `engine` also narrows the list server-side. Each also reports which OPERATIONS it has as two independent booleans: `plan_apply_enabled` (the terraform/tofu/pulumi lifecycle) and `configure_enabled` (the ansible configure operation). Read them for the same reason as `engine`: they decide which tools apply, so queueing a plan on a workspace with `plan_apply_enabled` false, or reaching for the inventory tools where `configure_enabled` is false, is a refusal you can see coming. A workspace may have both; it can never have neither. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search` or `engine`).",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceListIn) (*mcp.CallToolResult, workspaceListOut, error) {
 		size := in.PageSize
@@ -68,6 +77,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			w := &list.Items[i]
 			out.Workspaces = append(out.Workspaces, workspaceSummary{
 				ID: w.ID, Name: w.Name, Engine: w.Engine, ExecutionMode: w.ExecutionMode,
+				PlanApplyEnabled: w.PlanApplyEnabled, ConfigureEnabled: w.ConfigureEnabled,
 				Locked: w.Locked, LockReason: w.LockReason, LockedBy: w.LockedBy, DriftStatus: w.DriftStatus, Labels: w.Labels,
 			})
 		}
@@ -80,7 +90,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_get",
-		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing. One field is not what it looks like: `oidc-audiences` is returned as the MERGED view of the deployment's cloud identity catalogue with this workspace's own override, so an entry appearing here does NOT mean the workspace set it. Writing this value back through terrapod_workspace_update would promote every inherited entry into a permanent override. Read terrapod_oidc_audience_defaults and subtract it to get what the workspace actually owns.",
+		Description: "Get one workspace's full configuration and status by id (ws-...) or name — execution mode/backend, VCS wiring, labels, drift, lock, resource sizing. Which OPERATIONS it has are two independent booleans: `plan-apply-enabled` (the terraform/tofu/pulumi lifecycle) and `configure-enabled` (the ansible configure operation). A workspace may have both and can never have neither, so read them before choosing a tool. `config-directory` is only WHERE a configure operation runs, never whether there is one: it is an ordinary path whose empty value means the configuration version's root, so an empty `config-directory` on a workspace with `configure-enabled` true is rooted at the top of the repository and not misconfigured. One field is not what it looks like: `oidc-audiences` is returned as the MERGED view of the deployment's cloud identity catalogue with this workspace's own override, so an entry appearing here does NOT mean the workspace set it. Writing this value back through terrapod_workspace_update would promote every inherited entry into a permanent override. Read terrapod_oidc_audience_defaults and subtract it to get what the workspace actually owns.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceGetIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Workspace == "" {
