@@ -346,7 +346,8 @@ class TestGCSStoreUnit:
 
     async def test_put_stream_uses_sync_client(self, store: GCSStore) -> None:
         mock_blob = MagicMock()
-        mock_blob.upload_from_file = MagicMock()
+        # Like the real upload, read the stream to its end.
+        mock_blob.upload_from_file = MagicMock(side_effect=lambda reader, **_: reader.read())
         mock_bucket = MagicMock()
         mock_bucket.blob.return_value = mock_blob
         mock_client = MagicMock()
