@@ -178,8 +178,10 @@ The inventory's **roots and defaults** — where the Ansible configuration lives
 which inventory sources to read, the default playbook and limit, and whether the
 declared rows take part at all — are **workspace attributes**, so they are read
 and written through the workspace tools rather than through an inventory tool of
-their own. A workspace whose `config-directory` is unset has no configure
-operation, which is the ordinary default rather than a problem.
+their own. Whether a workspace has a configure operation at all is a boolean of
+its own, `configure-enabled`, which defaults to `false` — so a workspace with no
+Ansible is the ordinary default rather than a problem, and
+`config-directory` is just a path (`""` being the configuration version's root).
 
 | Tool | Safety | What it does |
 |---|---|---|

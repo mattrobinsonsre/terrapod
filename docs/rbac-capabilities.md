@@ -94,7 +94,7 @@ capabilities).
 | `run-task:read` | GET workspace run-tasks; GET run-task; GET task-stages; GET task-stage |
 | `notification:read` | GET workspace notification-configurations; GET notification-configuration |
 | `run-trigger:read` | GET workspace run-triggers; GET run-trigger |
-| `inventory:read` | GET workspace inventory settings / hosts / groups / vars; GET inventory host, group, membership, nesting and variable by id; GET group members, children, parents; GET resolved inventory (incl. `?limit=`) |
+| `inventory:read` | GET workspace inventory hosts / groups / vars; GET inventory host, group, membership, nesting and variable by id; GET group members, children, parents; GET resolved inventory (incl. `?limit=`) |
 
 ### `plan` preset (adds)
 
@@ -135,7 +135,7 @@ capabilities).
 | `var:write` | POST/PATCH/DELETE workspace vars |
 | `state:write` | POST workspaces/{id}/state-versions; POST state-versions actions/upload; POST state-versions/{id}/actions/rollback |
 | `config:upload` | POST workspaces/{id}/configuration-versions |
-| `inventory:write` | PUT/PATCH/DELETE workspace inventory settings; POST/PATCH/DELETE inventory hosts, groups, memberships, nestings and variables. Write tier rather than admin because the Terraform that declares a host runs under an apply, so a stricter API gate than the path every row arrives by would be incoherent. A **runner token** is handled separately — scoped to its own run's workspace, writes bound to the apply phase |
+| `inventory:write` | POST/PATCH/DELETE inventory hosts, groups, memberships, nestings and variables. The inventory's roots and defaults — and the two booleans declaring which operations the workspace has — are workspace attributes, so they are governed by `workspace:settings` on the workspace surface rather than here. Write tier rather than admin because the Terraform that declares a host runs under an apply, so a stricter API gate than the path every row arrives by would be incoherent. A **runner token** is handled separately — scoped to its own run's workspace, writes bound to the apply phase |
 
 ### `admin` preset (adds)
 

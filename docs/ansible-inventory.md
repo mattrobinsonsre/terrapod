@@ -15,7 +15,9 @@ and the expansion of `--limit`. There is no second implementation of any of it.
 >
 > **This release delivers the inventory — its structures, its two sources, what
 > they resolve to, and the surfaces that make all of it observable. It does not
-> run playbooks.** There is no configure operation and no playbook reference.
+> run playbooks.** A workspace can *declare* that it has a configure operation,
+> with `configure_enabled`, and name the playbook one would run by default — but
+> nothing executes ansible yet.
 >
 > What you can do now is **build** an inventory and **see what it resolves to**,
 > including which hosts a `--limit` pattern would select. That ordering is
@@ -72,8 +74,7 @@ targeting is what groups and `--limit` are for, which is ansible's own answer, s
 nothing has to choose between several.
 
 The inventory's roots and defaults are **columns on the workspace**, not a
-structure of their own, and `config_directory` being unset is the ordinary
-state: it means this workspace has no configure operation at all.
+structure of their own.
 
 | Column | What it names |
 |---|---|
@@ -84,12 +85,26 @@ state: it means this workspace has no configure operation at all.
 | `inventory_include_platform` | Whether the declared rows take part in resolution |
 | `inventory_ignore_paths` | Paths to drop from a fetched source before ansible reads it |
 
-**Unset and empty mean different things on `config_directory`**, deliberately
-unlike `working_directory` beside it. Unset means no configure operation; `""`
-means the configure operation's root is the top of the repository. Every
-workspace has a Terraform root even when it is the top of the repo, so
-`working_directory` can be non-nullable with `""` meaning root — but most
-workspaces have no Ansible at all, and that absence has to be expressible.
+**`config_directory` is an ordinary path**, the same shape as
+`working_directory` beside it: `""` means the configuration version's root, and
+it carries no meaning beyond where the files are.
+
+**Whether a workspace has a configure operation is its own boolean.** A
+workspace declares which operations it has with `plan_apply_enabled` (default
+`true`) and `configure_enabled` (default `false`); a workspace with neither is
+refused. So a configure operation is opt-in, and every workspace that predates
+those columns keeps exactly the behaviour it had.
+
+That separation was not the original shape. `config_directory` shipped nullable,
+with unset standing for "no configure operation" — one column answering both
+where the configure operation runs and whether there is one. A path's natural
+default is the root of the tree it is relative to, so the capability moved to the
+boolean that is actually about capability. The practical consequence is worth
+knowing if you are reading the resolver: the inventory surfaces gate on
+`configure_enabled`, never on `config_directory` being non-empty, because `""` is
+the ordinary way to say "at the root" — an emptiness test would hide the
+inventory of exactly the workspaces that keep their Ansible at the top of the
+repository.
 
 ---
 

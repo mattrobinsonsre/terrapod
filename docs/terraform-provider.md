@@ -324,3 +324,44 @@ resource "terrapod_workspace" "app" {
 
 Both attributes are `Optional + Computed`, so a configuration that manages
 neither will not drift when the server projects one from the other.
+
+## `plan_apply_enabled` and `configure_enabled`
+
+`terrapod_workspace` and `terrapod_autodiscovery_rule` each declare which
+operations the workspace has — or, for a rule, which operations the workspaces it
+materialises will have — with two independent booleans:
+
+| Attribute | Default | The workspace has |
+|---|---|---|
+| `plan_apply_enabled` | `true` | a plan/apply operation: the ordinary OpenTofu, Terraform or Pulumi run |
+| `configure_enabled` | `false` | a configure operation: an Ansible run against the workspace's [inventory](ansible-inventory.md) |
+
+Omit both and you get today's behaviour — a plan/apply workspace with no Ansible
+— which is why adding these attributes drifts nothing on an existing
+configuration.
+
+**Setting both to `false` is refused by the API with a 422**, so it fails at
+apply rather than silently creating a workspace that can never produce a run.
+These booleans are not the way to park a workspace: `locked` is read-only here
+(the provider projects it, and locking is an action on the API or in the UI), so
+if you want a workspace to stop running without giving up an operation, lock it
+there rather than trying to express it in HCL.
+
+```hcl
+resource "terrapod_workspace" "fleet" {
+  name              = "fleet-prod"
+  configure_enabled = true    # Ansible as well as plan/apply
+  config_directory  = "ansible"
+}
+```
+
+The refusal is evaluated against the row the write would produce, not against
+what the configuration sends, so turning `plan_apply_enabled` off is accepted on
+a workspace that has `configure_enabled` set and refused on one that does not.
+
+**`config_directory` is an ordinary path and does not declare anything.** `""`
+is its default and means the configuration version's root, exactly as it does
+for `working_directory`. It was briefly nullable, with `null` meaning "no
+configure operation"; that meaning now lives in `configure_enabled`, and the API
+refuses an explicit `null` rather than coercing it — which is what keeps a plan
+agreeing with its result.

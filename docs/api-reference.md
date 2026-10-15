@@ -457,31 +457,84 @@ practitioner declared.
 Settable on workspace create, workspace update, bulk update, and as an
 autodiscovery rule template field.
 
+### The operations a workspace has
+
+A workspace declares which operations it has with two independent booleans.
+
+| Attribute | Type | Default | Meaning |
+|---|---|---|---|
+| `plan-apply-enabled` | bool | `true` | The workspace has a plan/apply operation — the ordinary OpenTofu, Terraform or Pulumi run |
+| `configure-enabled` | bool | `false` | The workspace has a configure operation — an Ansible run against the workspace's inventory |
+
+**The defaults are the compatibility story.** Plan/apply on and configure off
+means every workspace that predates these attributes behaves exactly as it did,
+with no data step, and a configure operation is something an operator opts into.
+
+**Two booleans rather than one enum or a delimited string**, because the states
+are genuinely independent and all the useful combinations are reachable without
+anything having to be parsed. A value that must be parsed and kept in step
+across the API, the provider, MCP and the UI eventually gets mistyped into a
+third meaning; a pair of booleans cannot be.
+
+**Both false is refused with a 422** — on create, on update, and in bulk update.
+A workspace with neither operation can never produce a run, so the state's only
+honest meaning is "I did not mean to do that". To park a workspace, use
+[Lock Workspace](#lock-workspace) — that is reversible and says what it means.
+The refusal names both attributes:
+
+```
+a workspace must have at least one operation: set plan-apply-enabled or configure-enabled (or both)
+```
+
+On **update** and **bulk update** the rule is evaluated against the row the write
+would produce, not against the submitted attributes alone — so turning
+`plan-apply-enabled` off is accepted on a workspace that already has
+`configure-enabled` set and refused on one that does not. Bulk update evaluates
+each matched workspace's own merged row, which is what stops a fleet-wide change
+from being legitimate for some of the matched workspaces and a silent
+no-op-forever for the rest.
+
+Both are on the **native surface only** (`/api/v1` and the deprecated
+`/api/terrapod/v1` alias). They are deliberately absent from the TFE-compatible
+prefix, which is engine-filtered to Terraform and never learns about the other
+engines — and the name `operations` was unavailable there in any case: it is
+TFE's own frozen boolean for whether a workspace uses remote operations, served
+from `execution-mode`.
+
+Settable on workspace create, workspace update, bulk update, and as autodiscovery
+rule template fields. A rule's `configure-enabled` is what decides whether the
+workspaces it materialises have a configure operation.
+
 ### The configure-operation attributes
 
-Six attributes name where a workspace's Ansible configuration lives and what a
-configure operation does by default. All six are on the **native surface only**
+These attributes name where a workspace's Ansible configuration lives and what a
+configure operation does by default. They are on the **native surface only**
 (`/api/v1` and the deprecated `/api/terrapod/v1` alias) and are deliberately
 **not** on the TFE-compatible prefix — no `terraform`, `tofu` or `tfci`
 invocation consumes them.
 
 | Attribute | Type | Meaning |
 |---|---|---|
-| `config-directory` | string or `null` | The Ansible config root — `ansible.cfg`, playbooks, `roles/`, `group_vars/`, `host_vars/` — relative to the repository root. Also the directory the resolver and the executor **run in** |
+| `config-directory` | string | The Ansible config root — `ansible.cfg`, playbooks, `roles/`, `group_vars/`, `host_vars/` — relative to the configuration version's root, with `""` meaning that root. Also the directory the resolver and the executor **run in** |
 | `inventory-paths` | list of strings | The inventory sources, in order, each a file or a directory, relative to `config-directory`. Empty falls through to the `inventory` pathlist in the operator's own `ansible.cfg` |
 | `default-playbook` | string | The playbook a configure runs when the run names none |
 | `default-limit` | string | The default `--limit`. Empty is the whole inventory |
 | `inventory-include-platform` | bool | Whether the declared inventory rows take part in resolution. Default `true`; `false` resolves the repository source alone |
 | `inventory-ignore-paths` | list of strings | Paths pruned from a fetched inventory source before ansible reads it. Ansible takes every file in a directory, so this is the only way to leave one out |
 
-**`null` and `""` mean different things on `config-directory`.** `null` means
-this workspace has **no configure operation at all**; `""` means the configure
-operation's root is the top of the repository. This is deliberately unlike
-`working-directory`, which is non-nullable with `""` meaning root: every
-workspace has a Terraform root even when it is the top of the repo, whereas most
-workspaces have no Ansible at all and that absence has to be expressible. A
-client that collapses the two will silently turn "no Ansible here" into "Ansible
-at the repository root".
+**`config-directory` is an ordinary path with no null state**, exactly like
+`working-directory` beside it: `""` means the configuration version's root, and
+that is its default. Whether the workspace *has* a configure operation is
+[`configure-enabled`](#the-operations-a-workspace-has), not the absence of a
+path.
+
+It was nullable when it shipped, with `null` standing for "this workspace has no
+configure operation". That made one field answer both where the configure
+operation runs and whether there is one, and left `""` and `null` as two
+distinguishable values for a path whose natural default is the root it is
+relative to. **Sending `null` is now a 422 naming the field, not a clear** — it
+is refused rather than coerced to `""`, because a server that silently rewrites a
+submitted value makes a Terraform provider's plan disagree with its result.
 
 **The VCS binding is the workspace's own.** There is no separate binding for the
 inventory: it uses `vcs-connection-id`, `vcs-repo-url` and `vcs-branch` like
