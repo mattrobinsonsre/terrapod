@@ -72,11 +72,14 @@ _FIELD_MAP: dict[str, str] = {
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
     "ansible-version": "ansible_version",
-    # The Ansible roots and run defaults (#1929). `config-directory` is the one
-    # that carries a meaning in its NULL: absent means this workspace has no
-    # configure operation, where "" means the repository root -- so a bulk
-    # update can both turn configure ON for a fleet and turn it OFF, which is
-    # exactly the fleet-wide operation the parity gate exists to guarantee.
+    # Which operations a workspace has (#1966). Fleet-settable on purpose:
+    # turning configure on across a matched set is the operation an operator
+    # adopting Ansible actually performs, and doing it one workspace at a time
+    # is what bulk update exists to avoid.
+    "plan-apply-enabled": "plan_apply_enabled",
+    "configure-enabled": "configure_enabled",
+    # The Ansible roots and run defaults (#1929). `config-directory` is an
+    # ordinary path, `""` meaning the configuration version's root.
     "config-directory": "config_directory",
     "inventory-paths": "inventory_paths",
     "default-playbook": "default_playbook",
@@ -377,6 +380,8 @@ _SETTING_RULES: dict[str, Any] = {
     # The Ansible roots and run defaults (#1929). Shared with the
     # single-workspace PATCH rather than restated here -- restating one is how
     # the two surfaces come to disagree about what is valid (#1763).
+    "plan-apply-enabled": lambda v: workspace_settings.validate_bool(v, "plan-apply-enabled"),
+    "configure-enabled": lambda v: workspace_settings.validate_bool(v, "configure-enabled"),
     "config-directory": workspace_settings.validate_config_directory,
     "inventory-paths": workspace_settings.validate_inventory_paths,
     "inventory-ignore-paths": workspace_settings.validate_inventory_ignore_paths,
@@ -564,6 +569,46 @@ def _reject_bind_plan_on_non_pulumi_engines(fields: dict[str, Any], workspaces: 
             f"pulumi-bind-plan applies only to Pulumi workspaces, and {len(offenders)} "
             f"matched workspace(s) use another engine: {shown}{more}. "
             "Narrow the filter to exclude them."
+        ),
+    )
+
+
+def _reject_leaving_a_workspace_with_no_operations(
+    fields: dict[str, Any], workspaces: list
+) -> None:
+    """Refuse a bulk update that would leave a matched workspace inert (#1966).
+
+    The invariant is over the MERGE of the payload with each workspace's own
+    row, so it cannot be judged from the payload alone -- which is why it runs
+    here against the matched set rather than in `_validate_fields`. Turning
+    `plan-apply-enabled` off across a fleet is a legitimate operation for
+    workspaces that have configure on, and a silent no-op-forever for every
+    workspace that does not; without this the one path that reaches a hundred
+    workspaces at once is the one that can quietly do it to all of them.
+
+    All-or-nothing and naming the offenders, matching
+    `_reject_scan_enforcement_on_unscannable_engines` below and the endpoint's
+    own contract.
+    """
+    if "plan_apply_enabled" not in fields and "configure_enabled" not in fields:
+        return
+    offenders = [
+        w.name
+        for w in workspaces
+        if not fields.get("plan_apply_enabled", w.plan_apply_enabled)
+        and not fields.get("configure_enabled", w.configure_enabled)
+    ]
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"this update would leave {len(offenders)} matched workspace(s) with no "
+            f"operation at all: {shown}{more}. A workspace must keep plan-apply-enabled "
+            "or configure-enabled. Set the other one in the same update, or narrow the "
+            "filter to the workspaces that already have it."
         ),
     )
 
@@ -840,6 +885,7 @@ async def bulk_update_workspaces(
 
     workspaces = list((await db.execute(query)).scalars().all())
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
+    _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
     _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
     _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)
     _reject_bind_plan_on_non_pulumi_engines(plan["fields"], workspaces)

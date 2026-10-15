@@ -1,6 +1,6 @@
 """ansible inventory: hosts, groups, memberships and variables (#1967, #1968, #1929)
 
-Seven new tables and six new workspace columns, nothing dropped or retyped.
+Seven new tables and eight new workspace columns, nothing dropped or retyped.
 Expand-only in the strongest sense: a replica running the previous release
 neither reads nor writes any of them, so a rolling upgrade is unaffected in
 both directions.
@@ -17,14 +17,26 @@ and group nesting are many-to-many, and variables hang off a host, a group or
 That is what lets a second concern contribute to a group it does not own, and it
 is what makes `group_vars` and `[group:children]` expressible at all.
 
+**The workspace DECLARES its operations; a path does not carry that meaning**
+(#1966). `plan_apply_enabled` defaults TRUE and `configure_enabled` defaults
+FALSE, so every workspace that exists keeps exactly today's behaviour with no
+data step and configure is opt-in. Two independent booleans rather than an enum
+or a delimited string, because a value that must be parsed and kept in step
+across the API, the provider, MCP and the UI gets mistyped into a third meaning
+eventually, and two booleans cannot be.
+
+`config_directory` is therefore an ordinary non-nullable path with `''` meaning
+the configuration version's root -- `working_directory`'s exact shape. #1929
+shipped it nullable with NULL meaning "no configure operation", which made one
+column carry both a path and a capability; the declaration now lives in the
+boolean that is actually about capability, and the path defaults to the root of
+the tree it is relative to, as a path should.
+
 **Nothing is created for a workspace that does not use this.** There is no row
-anywhere until something declares a host, and `config_directory` stays NULL --
-which is the column's whole reason for being nullable: NULL means no configure
-operation at all, where `''` would mean one rooted at the top of the
-repository. So a deployment
-running only terraform/tofu carries zero rows here -- which is how "those users
-pay nothing" is delivered now that the engine on/off switch is withdrawn (#1986)
--- by data rather than by a flag an operator could set wrongly.
+anywhere until something declares a host, so a deployment running only
+terraform/tofu carries zero rows here -- which is how "those users pay nothing"
+is delivered now that the engine on/off switch is withdrawn (#1986): by data
+rather than by a flag an operator could set wrongly.
 
 **The composite foreign keys are the point, not boilerplate.** Each link is
 `(workspace_id, <parent>_id)` against a `UNIQUE (workspace_id, id)` on the
@@ -127,12 +139,14 @@ def upgrade() -> None:
     # those fold onto the workspace as well.
     op.add_column(
         "workspaces",
-        # NULLABLE, and NULL is not ''. NULL means this workspace has no
-        # configure operation; '' means the repository root. Deliberately unlike
-        # `working_directory`, which is non-nullable with '' meaning root: every
-        # workspace has a Terraform root even when it is the top of the repo,
-        # whereas most have no Ansible at all and that absence must be sayable.
-        sa.Column("config_directory", sa.String(length=500), nullable=True),
+        # An ordinary path: non-nullable, '' meaning the configuration version's
+        # root, exactly like `working_directory`. It carries NO capability
+        # meaning -- whether this workspace HAS a configure operation is
+        # `configure_enabled` below (#1966). #1929 shipped this nullable with
+        # NULL standing for "no configure operation", which made one column mean
+        # both a location and a capability; a path's natural default is the root
+        # of the tree it is relative to.
+        sa.Column("config_directory", sa.String(length=500), nullable=False, server_default=""),
     )
     op.add_column(
         "workspaces",
@@ -185,13 +199,61 @@ def upgrade() -> None:
         ),
     )
 
-    # And the same six on autodiscovery rules, which materialise workspaces from
-    # their template fields (#1929). A rule without them could only ever produce
-    # plan/apply workspaces, so a fleet of configure-capable ones would have to
-    # be edited one at a time after the fact. `165edbf3177c` is the precedent:
-    # one column added to both tables in one migration.
+    # The DECLARATION: which operations this workspace has (#1966). Two
+    # independent booleans, not an enum and not a delimited string -- the user's
+    # reason is that a string has to be got right, and these cannot be mistyped
+    # into a third meaning.
+    #
+    # The defaults ARE the compatibility story: every existing row keeps today's
+    # behaviour without a data step, and configure is opt-in. Both false is
+    # refused at the write boundary rather than stored, because a workspace that
+    # can do nothing is not a state anyone wants and accepting it would make
+    # every consumer -- dispatcher, reconciler, autodiscovery, UI -- carry a
+    # "nothing to do" branch. Not a CHECK constraint: the refusal belongs where
+    # it can name the field and answer 422, and a constraint violation here
+    # would surface as a bare 409 naming neither.
+    op.add_column(
+        "workspaces",
+        sa.Column("plan_apply_enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
+    )
+    op.add_column(
+        "workspaces",
+        sa.Column("configure_enabled", sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
+
+    # And the same eight on autodiscovery rules, which materialise workspaces
+    # from their template fields (#1929). A rule without them could only ever
+    # produce plan/apply workspaces, so a fleet of configure-capable ones would
+    # have to be edited one at a time after the fact. `165edbf3177c` is the
+    # precedent: one column added to both tables in one migration.
     for _table in ("autodiscovery_rules",):
-        op.add_column(_table, sa.Column("config_directory", sa.String(length=500), nullable=True))
+        op.add_column(
+            _table,
+            sa.Column(
+                "config_directory",
+                sa.String(length=500),
+                nullable=False,
+                server_default="",
+            ),
+        )
+        op.add_column(
+            _table,
+            sa.Column(
+                "plan_apply_enabled",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.true(),
+            ),
+        )
+        op.add_column(
+            _table,
+            sa.Column(
+                "configure_enabled",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.false(),
+            ),
+        )
         op.add_column(
             _table,
             sa.Column(
@@ -203,16 +265,29 @@ def upgrade() -> None:
         )
         op.add_column(
             _table,
-            sa.Column("default_playbook", sa.String(length=500), nullable=False, server_default=""),
-        )
-        op.add_column(
-            _table,
-            sa.Column("default_limit", sa.String(length=500), nullable=False, server_default=""),
+            sa.Column(
+                "default_playbook",
+                sa.String(length=500),
+                nullable=False,
+                server_default="",
+            ),
         )
         op.add_column(
             _table,
             sa.Column(
-                "inventory_include_platform", sa.Boolean(), nullable=False, server_default=sa.true()
+                "default_limit",
+                sa.String(length=500),
+                nullable=False,
+                server_default="",
+            ),
+        )
+        op.add_column(
+            _table,
+            sa.Column(
+                "inventory_include_platform",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.true(),
             ),
         )
         op.add_column(
@@ -252,7 +327,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("host_id", "group_id", name="uq_inventory_host_groups_pair"),
     )
     op.create_index(
-        "ix_inventory_host_groups_workspace_id", "inventory_host_groups", ["workspace_id"]
+        "ix_inventory_host_groups_workspace_id",
+        "inventory_host_groups",
+        ["workspace_id"],
     )
     op.create_index("ix_inventory_host_groups_group_id", "inventory_host_groups", ["group_id"])
 
@@ -283,14 +360,19 @@ def upgrade() -> None:
         # The one-step cycle. A longer one needs a graph walk, which is the
         # service's job because a CHECK cannot do it.
         sa.CheckConstraint(
-            "parent_group_id <> child_group_id", name="ck_inventory_group_children_not_self"
+            "parent_group_id <> child_group_id",
+            name="ck_inventory_group_children_not_self",
         ),
     )
     op.create_index(
-        "ix_inventory_group_children_workspace_id", "inventory_group_children", ["workspace_id"]
+        "ix_inventory_group_children_workspace_id",
+        "inventory_group_children",
+        ["workspace_id"],
     )
     op.create_index(
-        "ix_inventory_group_children_child_group_id", "inventory_group_children", ["child_group_id"]
+        "ix_inventory_group_children_child_group_id",
+        "inventory_group_children",
+        ["child_group_id"],
     )
 
     _var_table("inventory_host_vars", "inventory_hosts", "host_id")
@@ -310,7 +392,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("workspace_id", "key", name="uq_inventory_global_vars_workspace_key"),
     )
     op.create_index(
-        "ix_inventory_global_vars_workspace_id", "inventory_global_vars", ["workspace_id"]
+        "ix_inventory_global_vars_workspace_id",
+        "inventory_global_vars",
+        ["workspace_id"],
     )
 
 
@@ -330,6 +414,8 @@ def downgrade() -> None:
 
     for _table in ("autodiscovery_rules", "workspaces"):
         for _col in (
+            "configure_enabled",
+            "plan_apply_enabled",
             "inventory_ignore_paths",
             "inventory_include_platform",
             "default_limit",

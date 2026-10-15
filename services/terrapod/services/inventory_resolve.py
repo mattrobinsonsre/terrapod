@@ -612,15 +612,12 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
     include_platform = ws.inventory_include_platform if ws else True
     git_sha = ""
     # A git source needs a binding AND a config root: `config_directory` being
-    # NULL is the declaration that this workspace has no configure operation, so
-    # there is nothing to fetch even when the workspace has a repository for its
-    # Terraform.
-    if (
-        ws is not None
-        and ws.vcs_connection_id
-        and ws.vcs_repo_url
-        and ws.config_directory is not None
-    ):
+    # `configure_enabled` is the declaration (#1966): a workspace that has not
+    # declared a configure operation has nothing to fetch here even when it has
+    # a repository for its Terraform. Not an emptiness test on
+    # `config_directory` -- `""` is the ordinary way to say "at the root", so
+    # that would skip the fetch for exactly the workspaces that want it most.
+    if ws is not None and ws.vcs_connection_id and ws.vcs_repo_url and ws.configure_enabled:
         git_sha = await _resolve_git_sha(db, ws)
 
     rev = await platform_rev(db, workspace_id)
@@ -841,10 +838,12 @@ async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
     conn = result.scalar_one()
     owner, repo = vcs_provider.parse_repo_url(conn, ws.vcs_repo_url)  # type: ignore[misc]
 
-    # `config_directory` is the fetch scope AND the cwd. NULL is refused before
-    # we get here -- a workspace with no config root has no configure operation
-    # and therefore no git inventory source to fetch.
-    subdir = (ws.config_directory or "").strip("/")
+    # `config_directory` is the fetch scope AND the cwd. `""` is legitimate and
+    # means the configuration version's root, so an empty value fetches the
+    # whole tree rather than being treated as "nothing to do" -- the caller's
+    # `configure_enabled` gate is what decides whether we are here at all
+    # (#1966).
+    subdir = ws.config_directory.strip("/")
     paths = [subdir] if subdir else None
 
     # A fresh instance per resolution. Its own docstring says one per logical

@@ -395,9 +395,12 @@ async def find_or_autocreate_workspace(
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         ansible_version=rule.ansible_version,
-        # The Ansible roots and run defaults the rule declares (#1929). A rule
-        # that leaves `config_directory` NULL materialises workspaces with no
-        # configure operation, which is every rule that existed before this.
+        # Which operations the materialised workspace has, and the roots each
+        # one uses (#1966, #1929). `configure_enabled` defaults FALSE on the
+        # rule, so every rule that existed before this goes on producing
+        # plan/apply workspaces.
+        plan_apply_enabled=rule.plan_apply_enabled,
+        configure_enabled=rule.configure_enabled,
         config_directory=rule.config_directory,
         inventory_paths=list(rule.inventory_paths or []),
         default_playbook=rule.default_playbook,

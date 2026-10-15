@@ -73,9 +73,12 @@ def _mock_workspace(
     # The Ansible roots and run defaults (#1929). Set explicitly because
     # `_workspace_json` serialises them, and an auto-MagicMock attribute reaches
     # `json.dumps` and dies with a message that names neither the attribute nor
-    # this fixture. `config_directory` is None, which is the real default: no
-    # configure operation.
-    ws.config_directory = None
+    # this fixture. `config_directory` is `""`, the real default: the
+    # configuration version's root. Whether there IS a configure operation is
+    # `configure_enabled` (#1966), which defaults False.
+    ws.plan_apply_enabled = True
+    ws.configure_enabled = False
+    ws.config_directory = ""
     ws.inventory_paths = []
     ws.default_playbook = ""
     ws.default_limit = ""
@@ -2724,8 +2727,11 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
 
         assert resp.status_code == 201, resp.text
         ws = next(w for w in added if getattr(w, "name", None) == "plain-ws")
-        assert ws.config_directory is None
+        assert ws.config_directory == ""
         assert ws.inventory_include_platform is True
+        # The declaration's defaults are the compatibility story (#1966).
+        assert ws.plan_apply_enabled is True
+        assert ws.configure_enabled is False
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2750,7 +2756,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
 
         assert resp.status_code == 201, resp.text
         ws = next(w for w in added if getattr(w, "name", None) == "root-ws")
-        assert ws.config_directory == "", "an explicit empty root became None"
+        assert ws.config_directory == "", "an explicit empty root was not stored"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2788,15 +2794,21 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
-    async def test_a_null_config_directory_reads_back_as_null_not_empty(self, mock_resolve, *mocks):
-        """The distinction has to survive the wire, not just the column.
+    async def test_config_directory_has_no_null_state_on_the_wire(self, mock_resolve, *mocks):
+        """`config-directory` is a path, and a path is never null (#1966).
 
-        Serialising NULL as `""` would tell every client that every workspace
-        has a configure operation rooted at the repository top.
+        It used to serialise `None` to mean "no configure operation". That made
+        one field answer two questions; the question is now
+        `configure-enabled`, and a workspace that has not declared a configure
+        operation still has an ordinary `config-directory` of `""` — the
+        configuration version's root, which is where it would run if it were
+        enabled. A client writing a read straight back therefore cannot change
+        anything, which is the property the three-state shape was protecting
+        and gets more cheaply this way.
         """
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(name="plain-ws")
-        ws.config_directory = None
+        ws.config_directory = ""
         app, mock_db = _make_app(_user(roles=["admin"]))
         ws_result = MagicMock()
         ws_result.scalar_one_or_none.return_value = ws
@@ -2808,7 +2820,10 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}", headers=_AUTH)
 
         assert resp.status_code == 200, resp.text
-        assert resp.json()["data"]["attributes"]["config-directory"] is None
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["config-directory"] == ""
+        assert attrs["configure-enabled"] is False
+        assert attrs["plan-apply-enabled"] is True
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2846,7 +2861,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
-    async def test_patch_sets_them_and_an_explicit_null_clears_the_root(
+    async def test_patch_sets_one_root_and_leaves_the_others_alone(
         self, mock_resolve, _mock_publish, *mocks
     ):
         mock_resolve.return_value = caps_for_level("admin")
@@ -2868,14 +2883,19 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         assert ws.default_playbook == "deploy.yml"
         assert ws.config_directory == "ansible", "an untouched attribute was rewritten"
 
+        # A null is now a type error rather than a clear (#1966): the field is
+        # a path and there is nothing to clear it to. Refused with a 422 naming
+        # the field, not silently coerced to `""` — a server that rewrote a
+        # submitted value would make a provider's plan disagree with its result.
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
                 f"/api/v1/workspaces/ws-{ws.id}",
                 json={"data": {"attributes": {"config-directory": None}}},
                 headers=_AUTH,
             )
-        assert resp.status_code == 200, resp.text
-        assert ws.config_directory is None, "an explicit null did not clear the root"
+        assert resp.status_code == 422, resp.text
+        assert "config-directory" in resp.json()["detail"]
+        assert ws.config_directory == "ansible", "a refused PATCH still mutated the row"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

@@ -13,8 +13,9 @@ between several.
 There is no settings row either (#1929). The inventory's roots and defaults
 are columns on the workspace, because the settings row would have carried its
 own VCS binding and a workspace has exactly one -- a differing ROOT does not
-require a differing BINDING. `config_directory IS NULL` is now what "this
-workspace has no configure operation" means.
+require a differing BINDING. **`configure_enabled` is what "this workspace has
+a configure operation" means** (#1966); `config_directory` is just the path
+that operation runs in, with `""` meaning the configuration version's root.
 
 ## Why the counts are queries rather than columns
 
@@ -526,17 +527,20 @@ async def has_anything(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
     need maintaining by every writer, and one that drifted would hide a real
     inventory or show an empty tab.
 
-    `config_directory IS NOT NULL` is the third test, and it is the declaration
-    that this workspace has a configure operation at all (#1929). A workspace
-    with a config root but no rows yet still has an inventory -- the git source
-    is the whole of it -- so the tab belongs there.
+    `configure_enabled` is the third test, and it is the declaration that this
+    workspace has a configure operation at all (#1966). A workspace that has
+    declared one but has no rows yet still has an inventory -- the git source is
+    the whole of it -- so the tab belongs there. It is deliberately NOT keyed on
+    `config_directory` being non-empty: `""` is the legitimate, and common, way
+    to say "the configure operation runs at the root", so an emptiness test
+    would hide the inventory of every workspace that uses it.
     """
     if await count_hosts(db, workspace_id):
         return True
     if await count_groups(db, workspace_id):
         return True
     ws = await get_inventory_workspace(db, workspace_id)
-    return ws is not None and ws.config_directory is not None
+    return ws is not None and ws.configure_enabled
 
 
 async def group_member_counts(db: AsyncSession, workspace_id: uuid.UUID) -> dict[uuid.UUID, int]:

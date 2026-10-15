@@ -311,19 +311,44 @@ def _check_relative_path(value: str, field: str) -> str:
     return value
 
 
-def validate_config_directory(raw: object) -> str | None:
-    """The Ansible config root. **`None` and `""` mean different things.**
+def validate_config_directory(raw: object) -> str:
+    """The Ansible config root -- an ordinary repo-relative path.
 
-    `None` means this workspace has no configure operation at all; `""` means
-    the configure operation's root is the top of the repository. Collapsing
-    them would make "no Ansible here" unsayable, so `None` passes through as
-    `None` and is never turned into `""`.
+    `""` means the configuration version's root, exactly as it does for
+    `working-directory`. There is no third state: whether the workspace HAS a
+    configure operation is `configure-enabled` (#1966), not the absence of a
+    path. #1929 shipped this nullable with `None` carrying that meaning, which
+    made one field answer two questions and left `""` and `null` distinguishable
+    for a path whose natural default is the root it is relative to.
     """
-    if raw is None:
-        return None
     if not isinstance(raw, str):
-        raise ValueError("config-directory must be a string or null")
+        raise ValueError("config-directory must be a string")
     return _check_relative_path(raw, "config-directory")
+
+
+def validate_operations(*, plan_apply: bool, configure: bool) -> None:
+    """Refuse a workspace that declares no operations at all (#1966).
+
+    The one combination two independent booleans permit and nobody wants. A
+    workspace with neither operation can never produce a run, so accepting it
+    would push a "nothing to do" branch into the dispatcher, the reconciler,
+    autodiscovery materialisation and every UI surface -- to represent a state
+    whose only honest meaning is "I did not mean to do that". `locked` already
+    expresses "park this workspace", reversibly.
+
+    **Takes the RESULTING values, not the submitted ones**, so it must be
+    called with the merge of what the caller sent over what is stored. That is
+    deliberately unlike the format validators either side of it: those check
+    only what the caller supplied, because re-validating a stored value is how
+    a row written by a migration becomes uneditable (#316). A cross-field
+    invariant is the exception that proves the rule -- it is about the state the
+    write produces, so it cannot be answered from the submitted fields alone.
+    """
+    if not plan_apply and not configure:
+        raise ValueError(
+            "a workspace must have at least one operation: set plan-apply-enabled "
+            "or configure-enabled (or both)"
+        )
 
 
 def _validate_path_list(raw: object, field: str, cap: int) -> list[str]:

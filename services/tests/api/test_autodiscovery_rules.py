@@ -54,7 +54,9 @@ def _mock_rule(
     r.engine_version = "1.11"
     r.ansible_version = "2.21.5"
     # #1929's six, which `_rule_json` serialises.
-    r.config_directory = None
+    r.plan_apply_enabled = True
+    r.configure_enabled = False
+    r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""
     r.default_limit = ""

@@ -515,6 +515,12 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "execution_backend",
         "engine_version",
         "ansible_version",
+        # Which operations a materialised workspace has (#1966). Templated for
+        # the same reason as the roots below: turning configure on for a fleet
+        # the rule discovers is the operation, and doing it per workspace
+        # afterwards is what the rule exists to avoid.
+        "plan_apply_enabled",
+        "configure_enabled",
         # The Ansible roots and run defaults (#1929). A rule carries them so a
         # fleet of configure-capable workspaces can be materialised rather than
         # edited one at a time afterwards -- the user's call when the parity

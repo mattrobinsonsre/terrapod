@@ -363,23 +363,49 @@ class Workspace(Base):
     # engine_version; empty → latest stable.
     terragrunt_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
+    #: Which operations this workspace HAS: plan/apply, configure, or both
+    #: (#1966). Two independent booleans, and the independence is the point --
+    #: all four combinations are meaningful except one, and both-false is
+    #: refused at the write boundary rather than stored (see
+    #: `workspace_settings.validate_operations`).
+    #:
+    #: **Two booleans rather than an enum or a delimited string**, on the user's
+    #: reasoning: a value that has to be parsed and kept in step across the API,
+    #: the provider, MCP and the UI gets mistyped into a third meaning
+    #: eventually, and a pair of booleans cannot be. Reach for booleans over an
+    #: enum whenever the states are genuinely independent.
+    #:
+    #: The defaults ARE the compatibility story -- plan/apply on, configure off
+    #: -- so every row that predates these columns keeps exactly today's
+    #: behaviour with no data step, and configure is opt-in.
+    #:
+    #: **Not surfaced on `/api/tfe/v2`**, which never learns about the other
+    #: engines (#1407 §2); and the name `operations` was unavailable there in
+    #: any case -- it is TFE's frozen boolean for whether the workspace uses
+    #: remote operations, served from `execution_mode` and pinned by the
+    #: attribute contract.
+    plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
     #: The Ansible config root -- `ansible.cfg`, playbooks, `roles/`,
-    #: `group_vars/`, `host_vars/` -- relative to the repository root (#1929).
+    #: `group_vars/`, `host_vars/` -- relative to the configuration version's
+    #: root (#1929), with `""` meaning that root. `working_directory`'s exact
+    #: shape, deliberately: it is a PATH and carries no capability meaning.
     #:
-    #: **NULL and `""` mean different things here, unlike `working_directory`
-    #: above.** NULL means this workspace has no configure operation at all;
-    #: `""` means the configure operation's root is the top of the repository.
-    #: Every workspace has a Terraform root even when it is the repo root, so
-    #: `working_directory` can be non-nullable with `""` meaning root; most
-    #: workspaces have no Ansible at all, and that absence has to be sayable.
+    #: #1929 shipped it nullable, with NULL standing for "this workspace has no
+    #: configure operation". That made one column mean both a location and a
+    #: capability, and left `""` and NULL as two different things for a path
+    #: whose natural default is the root of the tree it is relative to. The
+    #: declaration is `configure_enabled` above (#1966); this is just where the
+    #: configure operation's files are.
     #:
     #: It is also the resolver's and the executor's **working directory**, which
     #: is load-bearing twice over: `group_vars`/`host_vars` are found at the cwd
     #: as well as inside the inventory directory, and relative paths in
     #: `ansible.cfg` resolve against the cwd rather than against the config file.
-    config_directory: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    config_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
     #: Inventory sources, in order, each a file OR a directory, relative to
     #: `config_directory` (#1929).
@@ -1733,10 +1759,13 @@ class AutodiscoveryRule(Base):
     #: without these could only ever produce plan/apply workspaces, so a fleet
     #: of configure-capable ones would have to be edited one at a time.
     #:
-    #: `config_directory` keeps its NULL-is-not-"" meaning here too: a rule that
-    #: leaves it NULL materialises workspaces with no configure operation, which
-    #: is every rule that exists today.
-    config_directory: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: `configure_enabled` is what decides whether a rule materialises
+    #: configure-capable workspaces, and it defaults FALSE -- so every rule that
+    #: exists today keeps producing plan/apply workspaces exactly as it does
+    #: now. `config_directory` is an ordinary templated path alongside it.
+    plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    config_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")

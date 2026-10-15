@@ -87,10 +87,12 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "ansible-version": rule.ansible_version,
-            # The Ansible roots and run defaults a materialised workspace
-            # inherits (#1929). `config-directory` serialises None as null
-            # rather than "": the distinction is the declaration that a
-            # materialised workspace has no configure operation.
+            # Which operations a materialised workspace has (#1966), and the
+            # roots each one uses (#1929). `configure-enabled` defaults false,
+            # so a rule written before this goes on producing plan/apply
+            # workspaces.
+            "plan-apply-enabled": rule.plan_apply_enabled,
+            "configure-enabled": rule.configure_enabled,
             "config-directory": rule.config_directory,
             "inventory-paths": list(rule.inventory_paths or []),
             "default-playbook": rule.default_playbook,
@@ -297,10 +299,21 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             out["ansible_version"] = validate_ansible_version(attrs["ansible-version"])
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-    # `in attrs` rather than truthiness, deliberately (#2010's rule): for
-    # `config-directory` an explicit "" means the repository root and None means
-    # no configure operation, so a truthiness test would collapse the two and
-    # leave no way to say "the root".
+    # Which operations a materialised workspace has (#1966). Membership-tested
+    # like everything else here, so an explicit `false` is honoured rather than
+    # read as "not supplied".
+    for _key, _col in (
+        ("plan-apply-enabled", "plan_apply_enabled"),
+        ("configure-enabled", "configure_enabled"),
+    ):
+        if _key in attrs:
+            try:
+                out[_col] = workspace_settings.validate_bool(attrs[_key], _key)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
+    # `in attrs` rather than truthiness, deliberately (#2010's rule): `""` is a
+    # value meaning the configuration version's root, so a truthiness test would
+    # read it as "not supplied" and leave no way to say "the root".
     if "config-directory" in attrs:
         # Validated, never normalised: a server that rewrites a submitted value
         # makes a provider's plan disagree with the result. A leading or
@@ -768,7 +781,9 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         # These literals are checked against the model's own column defaults by
         # a gate: a preview that invents its own would show workspaces that are
         # not what saving the rule produces.
-        config_directory=fields.get("config_directory", None),
+        plan_apply_enabled=fields.get("plan_apply_enabled", True),
+        configure_enabled=fields.get("configure_enabled", False),
+        config_directory=fields.get("config_directory", ""),
         inventory_paths=fields.get("inventory_paths", []),
         default_playbook=fields.get("default_playbook", ""),
         default_limit=fields.get("default_limit", ""),

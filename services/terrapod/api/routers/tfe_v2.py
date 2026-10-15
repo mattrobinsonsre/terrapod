@@ -241,14 +241,19 @@ def _validate_drift_ignore_rules(raw: object) -> list[str]:
     return _422(workspace_settings.validate_drift_ignore_rules, raw)
 
 
-def _422(validate: Callable[..., Any], *args: Any) -> Any:
+def _422(validate: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     """Call a `services.workspace_settings` rule, surfacing its ValueError as a 422.
 
     The rules themselves live in the service because four paths write these
     settings (#1763) — this is only the HTTP skin over them.
+
+    Keyword arguments are forwarded too, because a rule over several fields
+    wants them keyword-only: `validate_operations(False, True)` reads as either
+    order at the call site, and getting it backwards would refuse exactly the
+    workspaces it should accept.
     """
     try:
-        return validate(*args)
+        return validate(*args, **kwargs)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -731,11 +736,17 @@ def _workspace_json(
                 # below for the same reason: `/api/tfe/v2` is engine-filtered to
                 # Terraform and `go-tfe` switches on a fixed attribute set.
                 #
-                # `config-directory` serialises None as null rather than "": the
-                # two mean different things -- no configure operation versus the
-                # repository root -- and a client that wrote a read straight back
-                # would otherwise give every workspace a configure operation
-                # rooted at the top of its repository.
+                # Which operations the workspace has (#1966), beside the roots
+                # each one uses. Native-only for the same reason as the roots,
+                # and additionally because `operations` was never available on
+                # the compatibility surface: it is TFE's own boolean there for
+                # whether the workspace uses remote operations.
+                "plan-apply-enabled": ws.plan_apply_enabled,
+                "configure-enabled": ws.configure_enabled,
+                # An ordinary path, `""` meaning the configuration version's
+                # root -- `working-directory`'s shape exactly. It has no null
+                # state any more: whether there is a configure operation is
+                # `configure-enabled` above (#1966).
                 "config-directory": ws.config_directory,
                 "inventory-paths": list(ws.inventory_paths or []),
                 "default-playbook": ws.default_playbook,
@@ -945,6 +956,8 @@ def _workspace_json(
         # Terraform workspace keeps getting it.
         payload["data"]["attributes"].pop("pulumi-bind-plan", None)
         for _native_only in (
+            "plan-apply-enabled",
+            "configure-enabled",
             "config-directory",
             "inventory-paths",
             "default-playbook",
@@ -1541,16 +1554,27 @@ async def _create_workspace_impl(
             attrs.get("terragrunt-version") or "1.0",
         ),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
-        # The Ansible roots and run defaults (#1929). `config-directory` is
-        # tested for MEMBERSHIP, not truthiness: `""` is a value meaning the
-        # repository root, and its absence means this workspace has no
-        # configure operation -- which is the column's default, so the key
-        # simply not being here is the right outcome.
-        config_directory=(
-            _validate_config_directory(attrs["config-directory"])
-            if "config-directory" in attrs
-            else None
+        # Which operations this workspace has (#1966). Membership-tested, so
+        # an explicit `false` is honoured and an absent key takes the column
+        # default -- plan/apply on, configure off, which is what every existing
+        # caller means by not mentioning them.
+        plan_apply_enabled=(
+            _422(
+                workspace_settings.validate_bool, attrs["plan-apply-enabled"], "plan-apply-enabled"
+            )
+            if "plan-apply-enabled" in attrs
+            else True
         ),
+        configure_enabled=(
+            _422(workspace_settings.validate_bool, attrs["configure-enabled"], "configure-enabled")
+            if "configure-enabled" in attrs
+            else False
+        ),
+        # The Ansible roots and run defaults (#1929). `config-directory` is an
+        # ordinary path now, so `.get(..., "")` is right: an absent key and `""`
+        # both mean the configuration version's root, which is also the column
+        # default.
+        config_directory=_validate_config_directory(attrs.get("config-directory", "")),
         inventory_paths=_validate_inventory_paths(attrs.get("inventory-paths")),
         default_playbook=_422(
             workspace_settings.validate_ansible_run_default,
@@ -1625,6 +1649,14 @@ async def _create_workspace_impl(
         ),
         # Slack opt-in channel (#556): empty = silent for this workspace.
         slack_channel=(attrs.get("slack-channel") or "").strip()[:128],
+    )
+    # A workspace must have at least one operation (#1966). Checked on the
+    # CONSTRUCTED row rather than on `attrs`, so the defaults are included and
+    # the only way to reach it is to send `false` for both deliberately.
+    _422(
+        workspace_settings.validate_operations,
+        plan_apply=ws.plan_apply_enabled,
+        configure=ws.configure_enabled,
     )
     pool_set.set_workspace_pools(ws, requested_pool_ids)
     db.add(ws)
@@ -2245,10 +2277,29 @@ async def update_workspace(
         )
     if "working-directory" in attrs:
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
-    # The Ansible roots and run defaults (#1929). An explicit null on
-    # `config-directory` CLEARS the configure operation; `""` sets its root to
-    # the repository root. The two are not the same, so neither is folded into
-    # the other.
+    # Which operations this workspace has (#1966). The both-false invariant is
+    # checked against the RESULT of the merge, further down, not here -- a
+    # caller may legitimately send only one of the two.
+    if "plan-apply-enabled" in attrs:
+        ws.plan_apply_enabled = _422(
+            workspace_settings.validate_bool, attrs["plan-apply-enabled"], "plan-apply-enabled"
+        )
+    if "configure-enabled" in attrs:
+        ws.configure_enabled = _422(
+            workspace_settings.validate_bool, attrs["configure-enabled"], "configure-enabled"
+        )
+    # On the MERGED row, which is why it sits here rather than inside either
+    # branch above: turning plan/apply off is legitimate on a workspace that
+    # already has configure on, and the only state to refuse is the one where
+    # neither survives the write (#1966).
+    _422(
+        workspace_settings.validate_operations,
+        plan_apply=ws.plan_apply_enabled,
+        configure=ws.configure_enabled,
+    )
+    # The Ansible roots and run defaults (#1929). `config-directory` is an
+    # ordinary repo-relative path, `""` meaning the configuration version's
+    # root; it no longer has a null state to clear (#1966).
     if "config-directory" in attrs:
         ws.config_directory = _validate_config_directory(attrs["config-directory"])
     if "inventory-paths" in attrs:
