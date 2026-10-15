@@ -65,10 +65,9 @@ func roundTripIsConsistent(
 
 	ws := server(req)
 
-	var state workspaceModel
 	// The read starts from the plan, as Create does: the plan value is what a
 	// null-preserving read consults.
-	state = planned
+	state := planned
 	if diags := readWorkspaceIntoModel(ctx, ws, &state); diags.HasError() {
 		t.Fatalf("%s: read: %v", name, diags)
 	}

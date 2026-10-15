@@ -93,6 +93,23 @@ class TestTheNativeSurfaceServesEveryEngine:
         # Note the WRITE path is shared: create and PATCH accept all six on
         # either prefix. That asymmetry follows `pulumi-bind-plan` exactly --
         # the representation is gated on the door, the parsing is not.
+        # Which operations the workspace has (#1966). Native-only for the
+        # reason above AND for one of their own: the name `operations` was
+        # never available on the compatibility surface, because that is TFE's
+        # own boolean there for whether the workspace uses remote operations,
+        # served from `execution_mode` and pinned by the attribute contract. So
+        # these could not have gone on `/api/tfe/v2` under their natural name
+        # even if the engine filter allowed it.
+        "plan-apply-enabled": (
+            "the workspace's operation declaration; `/api/tfe/v2` serves Terraform "
+            "alone and already uses `operations` for TFE's own execution-mode "
+            "boolean (#1966)"
+        ),
+        "configure-enabled": (
+            "the workspace's operation declaration; `/api/tfe/v2` serves Terraform "
+            "alone and already uses `operations` for TFE's own execution-mode "
+            "boolean (#1966)"
+        ),
         "config-directory": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
