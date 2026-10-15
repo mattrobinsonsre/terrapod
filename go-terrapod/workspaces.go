@@ -63,21 +63,32 @@ type Workspace struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
-	// ConfigDirectory is the repository-root-relative directory the ansible
-	// configure operation runs in (#1929): its fetch scope and the resolver's
-	// and executor's working directory.
+	// PlanApplyEnabled and ConfigureEnabled are which operations this
+	// workspace HAS (#1966). Independent, and the server refuses both false.
 	//
-	// A POINTER, because null and "" mean different things and the difference
-	// is load-bearing. **nil means this workspace has NO configure operation**;
-	// a pointer to "" means the repository ROOT. A plain string would collapse
-	// the two, and a consumer writing a read back would then give every
-	// terraform-only workspace a configure operation rooted at the top of its
-	// repository.
+	// No `omitempty` on either, as on AutoApply above: a false must survive a
+	// round trip, and `omitempty` drops it.
 	//
 	// Not served on /api/tfe/v2 — that surface is engine-filtered to Terraform
-	// and go-tfe switches on a fixed attribute set — so a workspace read
-	// through the compatibility route reads this as nil whatever it holds.
-	ConfigDirectory *string `json:"config-directory,omitempty"`
+	// and go-tfe switches on a fixed attribute set — so both read as false
+	// through the compatibility route whatever they hold. Note the name
+	// `operations` was never available there in any case: it is TFE's own
+	// boolean for whether the workspace uses remote operations.
+	PlanApplyEnabled bool `json:"plan-apply-enabled"`
+	ConfigureEnabled bool `json:"configure-enabled"`
+	// ConfigDirectory is the directory the ansible configure operation runs in
+	// (#1929), relative to the configuration version's root: its fetch scope
+	// and the resolver's and executor's working directory.
+	//
+	// A plain string, with "" meaning that root -- WorkingDirectory's exact
+	// shape. It used to be a pointer whose nil meant "no configure operation"
+	// (#1929), which made one field answer both where the operation runs and
+	// whether there is one; the second question is ConfigureEnabled above
+	// (#1966).
+	//
+	// Not served on /api/tfe/v2, for the reason given above, so a workspace
+	// read through the compatibility route reads this as "" whatever it holds.
+	ConfigDirectory string `json:"config-directory,omitempty"`
 	// InventoryPaths are the inventory sources, each a file or a directory
 	// relative to the repository root. ORDERED: the order IS the precedence
 	// ansible applies, so it is not a set.
@@ -257,19 +268,29 @@ type CreateWorkspaceRequest struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
-	// ConfigDirectory turns the ansible configure operation ON and says where
-	// it is rooted (#1929). A POINTER with three states, because null and ""
-	// are different values on this field:
+	// PlanApplyEnabled and ConfigureEnabled declare which operations the new
+	// workspace has (#1966). POINTERS, like AutoApply above and for the same
+	// reason: a plain bool's false is indistinguishable from unset, and on
+	// PlanApplyEnabled -- whose server-side default is TRUE -- that failure
+	// would be silent and in the dangerous direction, every caller that left
+	// the field alone disabling plan/apply.
 	//
-	//	nil        -- omitted; the workspace is created with NO configure
-	//	              operation, which is the server-side default
-	//	&""        -- the repository ROOT is the config directory
-	//	&"ansible" -- that subdirectory is
+	//	nil        -- omitted; the server default applies (plan/apply on,
+	//	              configure off)
+	//	&true      -- explicitly on
+	//	&false      -- explicitly off
 	//
-	// A plain string could not express the middle case at all: "" would be
-	// indistinguishable from "not set" and there would be no way to root a
-	// configure operation at the top of a repository.
-	ConfigDirectory *string `json:"config-directory,omitempty"`
+	// The server refuses both false with a 422.
+	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
+	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+	// ConfigDirectory says where the ansible configure operation is rooted
+	// (#1929), relative to the configuration version's root. It does NOT turn
+	// the operation on -- ConfigureEnabled does (#1966).
+	//
+	// A plain string now that "" and omitted mean the same thing: both leave
+	// the operation rooted at that root, which is the server-side default. It
+	// was a three-state pointer while nil meant "no configure operation".
+	ConfigDirectory string `json:"config-directory,omitempty"`
 	// InventoryPaths are the inventory sources, each a file or a directory
 	// relative to the repository root. ORDERED -- the order is the precedence
 	// ansible applies. A nil slice is omitted; an empty non-nil slice
@@ -384,27 +405,31 @@ type UpdateWorkspaceRequest struct {
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// PlanApplyEnabled and ConfigureEnabled turn an operation on or off
+	// (#1966). POINTERS so that nil leaves the stored value alone -- a plain
+	// bool would flip the field to false on every PATCH that did not mention
+	// it, which is the trap AutoApply's own comment above records.
+	//
+	// The server checks the both-false invariant against the MERGE of what is
+	// sent with what is stored, so turning plan/apply off on a workspace that
+	// already has configure on succeeds, and turning it off on one that does
+	// not is a 422 rather than an inert workspace.
+	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
+	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 	// ConfigDirectory moves where the ansible configure operation is rooted
-	// (#1929). ClearConfigDirectory turns the operation OFF.
+	// (#1929). Still a POINTER here, and for a different reason from the two
+	// fields above: a PATCH needs to distinguish "leave it alone" from "set it
+	// to the configuration version's root".
 	//
-	// Three states, and a PATCH needs all three -- which is why there is a
-	// separate flag rather than an empty ConfigDirectory, exactly as
-	// ClearVCSConnection is a flag on a relationship:
+	//	nil               -- leave the stored value alone
+	//	&"ansible"        -- root the operation at that subdirectory
+	//	&""               -- root it at the configuration version's root
 	//
-	//	nil, false            -- leave the stored value alone
-	//	&"ansible", false     -- root the operation at that subdirectory
-	//	&"", false            -- root it at the repository ROOT
-	//	_, true               -- send explicit null: NO configure operation
-	//
-	// ClearConfigDirectory wins when both are set. Collapsing the last two
-	// into one field is the trap this shape exists to avoid: "the repository
-	// root" and "no configure operation at all" would become the same request.
+	// There is no fourth state and no Clear flag any more: an explicit null is
+	// a 422 from the server, because the field is a path and a path has
+	// nothing to be cleared to. Whether the workspace HAS a configure
+	// operation is ConfigureEnabled above (#1966).
 	ConfigDirectory *string `json:"config-directory,omitempty"`
-	// ClearConfigDirectory carries no attribute of its own -- it changes what
-	// `config-directory` is sent AS -- so it is `json:"-"`, exactly like
-	// VCSConnectionID above. Tagging it would make the reflective wire gate
-	// demand a `clear-config-directory` key no server has ever served.
-	ClearConfigDirectory bool `json:"-"`
 	// InventoryPaths are the ordered inventory sources. A nil slice is
 	// omitted and leaves the stored list alone; an empty non-nil slice
 	// (`[]string{}`) is sent as `[]`, which is how every source is removed.
@@ -748,8 +773,14 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	// meaning, so it is the only one guarded on a pointer rather than on an
 	// empty value: a non-nil pointer travels even when it points at "",
 	// because "" is the repository root and nil is "no configure operation".
-	if req.ConfigDirectory != nil {
-		attrs["config-directory"] = *req.ConfigDirectory
+	if req.PlanApplyEnabled != nil {
+		attrs["plan-apply-enabled"] = *req.PlanApplyEnabled
+	}
+	if req.ConfigureEnabled != nil {
+		attrs["configure-enabled"] = *req.ConfigureEnabled
+	}
+	if req.ConfigDirectory != "" {
+		attrs["config-directory"] = req.ConfigDirectory
 	}
 	if req.InventoryPaths != nil {
 		// `!= nil` not `len() > 0`: an explicit empty slice is a real value,
@@ -905,13 +936,18 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
 	}
-	// #1929's six. The clear flag is checked FIRST and sends an explicit JSON
-	// null, which is the only way to say "this workspace has no configure
-	// operation" -- `*req.ConfigDirectory == ""` means the repository root.
-	switch {
-	case req.ClearConfigDirectory:
-		attrs["config-directory"] = nil
-	case req.ConfigDirectory != nil:
+	// #1966's two, then #1929's six. Each is sent only when the caller set it,
+	// so a PATCH that mentions none of them leaves all eight alone.
+	if req.PlanApplyEnabled != nil {
+		attrs["plan-apply-enabled"] = *req.PlanApplyEnabled
+	}
+	if req.ConfigureEnabled != nil {
+		attrs["configure-enabled"] = *req.ConfigureEnabled
+	}
+	// A pointer so that `&""` can root the operation at the configuration
+	// version's root while nil leaves the stored value alone. There is no null
+	// case: the server refuses one with a 422 (#1966).
+	if req.ConfigDirectory != nil {
 		attrs["config-directory"] = *req.ConfigDirectory
 	}
 	if req.InventoryPaths != nil {
@@ -1096,7 +1132,9 @@ func workspaceFromResource(res *Resource) *Workspace {
 		// which on this field means the repository root. GetStringAttr would
 		// collapse the two and a consumer writing a read back would root a
 		// configure operation at the top of every repository.
-		ConfigDirectory:               GetStringPtrAttr(res, "config-directory"),
+		PlanApplyEnabled:              GetBoolAttr(res, "plan-apply-enabled"),
+		ConfigureEnabled:              GetBoolAttr(res, "configure-enabled"),
+		ConfigDirectory:               GetStringAttr(res, "config-directory"),
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
 		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
 		DefaultLimit:                  GetStringAttr(res, "default-limit"),

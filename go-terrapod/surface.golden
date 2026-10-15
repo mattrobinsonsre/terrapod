@@ -358,7 +358,8 @@ field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
-field CreateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
+field CreateWorkspaceRequest.ConfigDirectory string `json:"config-directory,omitempty"`
+field CreateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
 field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omitempty"`
@@ -377,6 +378,7 @@ field CreateWorkspaceRequest.Name string `json:"name"`
 field CreateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
+field CreateWorkspaceRequest.PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -1191,8 +1193,8 @@ field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
-field UpdateWorkspaceRequest.ClearConfigDirectory bool `json:"-"`
 field UpdateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
+field UpdateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
 field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omitempty"`
@@ -1209,6 +1211,7 @@ field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
 field UpdateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field UpdateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
+field UpdateWorkspaceRequest.PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -1394,7 +1397,8 @@ field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
-field Workspace.ConfigDirectory *string `json:"config-directory,omitempty"`
+field Workspace.ConfigDirectory string `json:"config-directory,omitempty"`
+field Workspace.ConfigureEnabled bool `json:"configure-enabled"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`
 field Workspace.DefaultLimit string `json:"default-limit,omitempty"`
@@ -1423,6 +1427,7 @@ field Workspace.Name string `json:"name"`
 field Workspace.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.Parallelism int64 `json:"parallelism,omitempty"`
+field Workspace.PlanApplyEnabled bool `json:"plan-apply-enabled"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`

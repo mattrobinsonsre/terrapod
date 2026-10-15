@@ -7,20 +7,31 @@ import (
 	"testing"
 )
 
-// The six ansible roots and run defaults a workspace carries (#1929):
-// config-directory, inventory-paths, default-playbook, default-limit,
-// inventory-include-platform and inventory-ignore-paths.
+// The two operation declarations a workspace carries (#1966) and the six
+// ansible roots and run defaults beside them (#1929): plan-apply-enabled,
+// configure-enabled, config-directory, inventory-paths, default-playbook,
+// default-limit, inventory-include-platform and inventory-ignore-paths.
 //
 // The reflective gates in wire_completeness_test.go already prove each of the
-// six reaches the wire and decodes. They cannot see the three properties below,
-// each of which is a RELATIONSHIP between two values rather than the presence
-// of one -- and each of which corrupts data rather than merely losing it:
+// eight reaches the wire and decodes. They cannot see the three properties
+// below, each of which is a RELATIONSHIP between two values rather than the
+// presence of one -- and each of which corrupts data rather than merely
+// losing it:
 //
-//  1. `config-directory` has THREE states, not two. null means the workspace
-//     has no configure operation; "" means the repository ROOT. A gate that
-//     fills a field with one non-zero value cannot distinguish them, and a
-//     consumer that collapsed them would give every terraform-only workspace a
-//     configure operation rooted at the top of its repository.
+//  1. `plan-apply-enabled` DEFAULTS TO TRUE, and on create and update it is a
+//     *bool for that reason. A plain bool's false is indistinguishable from
+//     unset, so every caller that left the field alone would disable
+//     plan/apply -- silently, and on the workspaces least expecting it. The
+//     read struct carries plain bools with no `omitempty`, so a false survives
+//     a round trip.
+//
+//     `config-directory` used to head this list with three states, null
+//     meaning "no configure operation". It has two now: "" is the
+//     configuration version's root and anything else is a subdirectory. The
+//     declaration moved to `configure-enabled`, so the field is an ordinary
+//     path -- which is why the create request takes a plain string while the
+//     update request still takes a pointer, to tell "leave it alone" from "set
+//     it to the root".
 //
 //  2. `inventory-include-platform` DEFAULTS TO TRUE, so an absent key is not
 //     false. `IsZero()` on a bool that defaults to true is false either way,
@@ -30,20 +41,105 @@ import (
 //     request that removes every inventory path. A nil slice must not travel
 //     at all, or a PATCH overwrites a list the caller never mentioned.
 
-// ── 1. config-directory: null, "" and a value are three different things ─────
+// ── 1. the operation declarations, and config-directory as a plain path ──────
 
-func TestConfigDirectoryNullAndEmptyDecodeDifferently(t *testing.T) {
-	// The whole reason Workspace.ConfigDirectory is a *string. If these two
-	// ever read the same, the field has stopped carrying its meaning.
+func TestPlanApplyEnabledDefaultsTrueAndSurvivesAFalse(t *testing.T) {
+	// The field whose default is TRUE, which is what makes it the dangerous
+	// one: a decoder that lost a false would silently re-enable plan/apply on
+	// a configure-only workspace, and a read struct with `omitempty` would
+	// drop it on the way back out.
+	cases := []struct {
+		name     string
+		raw      string
+		wantPlan bool
+		wantCfg  bool
+	}{
+		{"both absent", ``, false, false},
+		{"plan/apply on, configure off", `true`, true, false},
+		{"plan/apply off", `false`, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := map[string]json.RawMessage{"name": json.RawMessage(`"api"`)}
+			if tc.raw != "" {
+				attrs["plan-apply-enabled"] = json.RawMessage(tc.raw)
+			}
+			ws := workspaceFromResource(&Resource{ID: "ws-1", Type: "workspaces", Attributes: attrs})
+			if ws.PlanApplyEnabled != tc.wantPlan {
+				t.Errorf("PlanApplyEnabled = %v, want %v", ws.PlanApplyEnabled, tc.wantPlan)
+			}
+			if ws.ConfigureEnabled != tc.wantCfg {
+				t.Errorf("ConfigureEnabled = %v, want %v", ws.ConfigureEnabled, tc.wantCfg)
+			}
+		})
+	}
+
+	// And a false must survive being marshalled back, which is the half
+	// `omitempty` would break. Asserted on the bytes, because a struct field
+	// reading false proves nothing about what leaves the process.
+	body, err := json.Marshal(Workspace{Name: "api", PlanApplyEnabled: false, ConfigureEnabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"plan-apply-enabled":false`) {
+		t.Errorf("a false plan-apply-enabled did not survive marshalling: %s", body)
+	}
+}
+
+func TestCreateDistinguishesAnUnsetBoolFromAnExplicitFalse(t *testing.T) {
+	// The whole reason the create request takes *bool. Omitted means "take the
+	// server default"; &false means "off". A plain bool could only say one of
+	// them, and would say the wrong one.
+	t.Run("omitted sends neither key", func(t *testing.T) {
+		attrs := workspaceCreateAttrs(CreateWorkspaceRequest{Name: "api"})
+		for _, k := range []string{"plan-apply-enabled", "configure-enabled"} {
+			if _, present := attrs[k]; present {
+				t.Errorf("create sent %s when the caller set none — the server "+
+					"default is what an unset field means", k)
+			}
+		}
+	})
+	t.Run("an explicit false is sent", func(t *testing.T) {
+		attrs := workspaceCreateAttrs(CreateWorkspaceRequest{
+			Name:             "api",
+			PlanApplyEnabled: boolPtr(false),
+			ConfigureEnabled: boolPtr(true),
+		})
+		if got, ok := attrs["plan-apply-enabled"]; !ok || got != false {
+			t.Errorf("create sent plan-apply-enabled = %#v (present %v), want false", got, ok)
+		}
+		if got, ok := attrs["configure-enabled"]; !ok || got != true {
+			t.Errorf("create sent configure-enabled = %#v (present %v), want true", got, ok)
+		}
+	})
+}
+
+func TestUpdateOmitsABoolTheCallerDidNotMention(t *testing.T) {
+	// A plain bool here would flip the field to false on every PATCH that did
+	// not mention it — the trap AutoApply's own comment records.
+	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{Name: "api"})
+	for _, k := range []string{"plan-apply-enabled", "configure-enabled"} {
+		if _, present := attrs[k]; present {
+			t.Errorf("update sent %s when the caller never mentioned it — a PATCH "+
+				"would turn an operation off behind the caller's back", k)
+		}
+	}
+}
+
+func TestConfigDirectoryDecodesAsAPlainPath(t *testing.T) {
+	// Two states, not three (#1966). An absent or null key and "" all mean the
+	// configuration version's root, because the field is a path and the
+	// question it used to answer — does this workspace have a configure
+	// operation — is `configure-enabled` now.
 	cases := []struct {
 		name string
 		raw  string
-		want *string // nil = no configure operation
+		want string
 	}{
-		{"explicit null means no configure operation", `null`, nil},
-		{"absent means no configure operation", ``, nil},
-		{"empty string means the repository root", `""`, strPtr("")},
-		{"a value means that subdirectory", `"ansible"`, strPtr("ansible")},
+		{"absent means the configuration version's root", ``, ""},
+		{"explicit null decodes as the root rather than erroring", `null`, ""},
+		{"empty string means the root", `""`, ""},
+		{"a value means that subdirectory", `"ansible"`, "ansible"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,78 +148,41 @@ func TestConfigDirectoryNullAndEmptyDecodeDifferently(t *testing.T) {
 				attrs["config-directory"] = json.RawMessage(tc.raw)
 			}
 			ws := workspaceFromResource(&Resource{ID: "ws-1", Type: "workspaces", Attributes: attrs})
-
-			switch {
-			case tc.want == nil && ws.ConfigDirectory != nil:
-				t.Fatalf("decoded %s as %q, want nil — a workspace with no "+
-					"configure operation now claims one", tc.raw, *ws.ConfigDirectory)
-			case tc.want != nil && ws.ConfigDirectory == nil:
-				t.Fatalf("decoded %s as nil, want %q — the configure operation "+
-					"was silently dropped", tc.raw, *tc.want)
-			case tc.want != nil && *ws.ConfigDirectory != *tc.want:
-				t.Fatalf("decoded %s as %q, want %q", tc.raw, *ws.ConfigDirectory, *tc.want)
+			if ws.ConfigDirectory != tc.want {
+				t.Errorf("decoded %s as %q, want %q", tc.raw, ws.ConfigDirectory, tc.want)
 			}
 		})
 	}
 }
 
-func TestCreateSendsAnEmptyConfigDirectoryRatherThanDroppingIt(t *testing.T) {
-	// `&""` is the repository root, which is a real and ordinary value. An
-	// emptiness guard here would make it impossible to express.
-	attrs := workspaceCreateAttrs(CreateWorkspaceRequest{
-		Name:            "api",
-		ConfigDirectory: strPtr(""),
-	})
-	got, ok := attrs["config-directory"]
-	if !ok {
-		t.Fatal("create dropped config-directory=\"\" — there is no longer any " +
-			"way to root a configure operation at the repository root")
-	}
-	if got != "" {
-		t.Fatalf("create sent config-directory = %#v, want \"\"", got)
-	}
-}
-
-func TestCreateOmitsConfigDirectoryWhenNil(t *testing.T) {
+func TestCreateOmitsAnEmptyConfigDirectory(t *testing.T) {
+	// Safe to omit precisely because "" and absent now mean the same thing:
+	// the configuration version's root, which is also the column default. That
+	// is what the three-state pointer existed to prevent, and what removing
+	// the third state buys.
 	attrs := workspaceCreateAttrs(CreateWorkspaceRequest{Name: "api"})
 	if _, present := attrs["config-directory"]; present {
-		t.Error("create sent config-directory when the caller set none — a " +
-			"terraform-only workspace would be given a configure operation")
+		t.Error("create sent config-directory when the caller set none")
+	}
+	withValue := workspaceCreateAttrs(CreateWorkspaceRequest{Name: "api", ConfigDirectory: "ansible"})
+	if got := withValue["config-directory"]; got != "ansible" {
+		t.Errorf("create sent config-directory = %#v, want \"ansible\"", got)
 	}
 }
 
-func TestUpdateClearsConfigDirectoryWithAnExplicitNull(t *testing.T) {
-	// Turning the configure operation OFF is a different request from rooting
-	// it at "", so it has to reach the wire as JSON null. Asserted on the
-	// marshalled bytes: a `nil` in the attrs map is only worth something if
-	// MarshalResource actually emits null for it.
-	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{ClearConfigDirectory: true})
+func TestUpdateCanRootTheOperationAtTheConfigurationRoot(t *testing.T) {
+	// Why the UPDATE request keeps a pointer where create does not: a PATCH
+	// has to tell "leave the stored value alone" from "set it to the root",
+	// and on a workspace whose stored root is `ansible` those are different
+	// requests.
+	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{ConfigDirectory: strPtr("")})
 	got, ok := attrs["config-directory"]
 	if !ok {
-		t.Fatal("update dropped the clear — the configure operation cannot be turned off")
+		t.Fatal("update dropped config-directory=\"\" — there is no longer any " +
+			"way to move a configure operation back to the root")
 	}
-	if got != nil {
-		t.Fatalf("update sent config-directory = %#v, want nil", got)
-	}
-
-	body, err := MarshalResourceWithID("ws-1", "workspaces", attrs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(body), `"config-directory":null`) {
-		t.Errorf("marshalled body carries no explicit null: %s", body)
-	}
-}
-
-func TestUpdateClearWinsOverAValue(t *testing.T) {
-	// Both set is a caller bug, but it must resolve one way deterministically
-	// and the documented way is that the clear wins.
-	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{
-		ConfigDirectory:      strPtr("ansible"),
-		ClearConfigDirectory: true,
-	})
-	if got := attrs["config-directory"]; got != nil {
-		t.Errorf("clear did not win: config-directory = %#v, want nil", got)
+	if got != "" {
+		t.Fatalf("update sent config-directory = %#v, want \"\"", got)
 	}
 }
 
@@ -251,7 +310,7 @@ func TestCreateWorkspaceWithAnsibleRoots_Happy(t *testing.T) {
 	off := false
 	ws, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
 		Name:                     "configure-only",
-		ConfigDirectory:          strPtr("ansible"),
+		ConfigDirectory:          "ansible",
 		InventoryPaths:           []string{"inventory/production", "inventory/extra.yml"},
 		DefaultPlaybook:          "site.yml",
 		DefaultLimit:             "web",
@@ -263,8 +322,8 @@ func TestCreateWorkspaceWithAnsibleRoots_Happy(t *testing.T) {
 	}
 
 	// Read side.
-	if ws.ConfigDirectory == nil || *ws.ConfigDirectory != "ansible" {
-		t.Errorf("ConfigDirectory = %v", ws.ConfigDirectory)
+	if ws.ConfigDirectory != "ansible" {
+		t.Errorf("ConfigDirectory = %q", ws.ConfigDirectory)
 	}
 	if len(ws.InventoryPaths) != 2 || ws.InventoryPaths[0] != "inventory/production" {
 		t.Errorf("InventoryPaths = %v — order is precedence, so it must survive", ws.InventoryPaths)
@@ -322,24 +381,38 @@ func TestCreateWorkspaceWithAnsibleRoots_ServerRefusal(t *testing.T) {
 }
 
 func TestUpdateWorkspaceTurningTheConfigureOperationOff(t *testing.T) {
+	// Turning the operation off is a BOOLEAN now (#1966), not a null on the
+	// path. Driven through a fixture server rather than asserted on the attrs
+	// map, so the request body is what is checked: `configure-enabled:false`
+	// has to leave the process, and `config-directory` must not be touched —
+	// a PATCH that also moved the path would reset where a re-enabled
+	// operation would later run.
 	f := newWorkspaceFixtureServer(t)
 	f.updateHandler = func(w http.ResponseWriter, r *http.Request) {
-		// The server echoes null, which is what "no configure operation" is.
 		_, _ = w.Write([]byte(`{"data":{"id":"ws-aaa","type":"workspaces","attributes":{
-		  "name":"api","config-directory":null}}}`))
+		  "name":"api","plan-apply-enabled":true,"configure-enabled":false,
+		  "config-directory":"ansible"}}}`))
 	}
 	c := f.client()
 	ws, err := c.UpdateWorkspace(t.Context(), "ws-aaa", UpdateWorkspaceRequest{
-		ClearConfigDirectory: true,
+		ConfigureEnabled: boolPtr(false),
 	})
 	if err != nil {
 		t.Fatalf("UpdateWorkspace: %v", err)
 	}
-	if ws.ConfigDirectory != nil {
-		t.Errorf("ConfigDirectory = %q, want nil", *ws.ConfigDirectory)
+	if ws.ConfigureEnabled {
+		t.Error("ConfigureEnabled decoded as true from an explicit false")
 	}
-	if !strings.Contains(string(f.lastBody), `"config-directory":null`) {
-		t.Errorf("request body carried no explicit null: %s", f.lastBody)
+	if ws.ConfigDirectory != "ansible" {
+		t.Errorf("ConfigDirectory = %q — turning the operation off must not move "+
+			"the path it would run in", ws.ConfigDirectory)
+	}
+	if !strings.Contains(string(f.lastBody), `"configure-enabled":false`) {
+		t.Errorf("request body did not carry the explicit false: %s", f.lastBody)
+	}
+	if strings.Contains(string(f.lastBody), "config-directory") {
+		t.Errorf("request body touched config-directory, which the caller never "+
+			"mentioned: %s", f.lastBody)
 	}
 }
 
@@ -375,3 +448,5 @@ func TestGetStringPtrAttrSeparatesNullFromEmpty(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func boolPtr(b bool) *bool { return &b }

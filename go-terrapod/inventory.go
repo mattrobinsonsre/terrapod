@@ -25,9 +25,12 @@ import (
 // Workspace/CreateWorkspaceRequest/UpdateWorkspaceRequest rather than through
 // anything here. There was once a 1:1 `InventorySettings` row carrying its own
 // VCS binding; it is gone, and the workspace's own `vcs-*` fields are the
-// single binding. A workspace with a nil ConfigDirectory and no declared rows
+// single binding. A workspace with ConfigureEnabled false and no declared rows
 // has no ansible inventory, which is the normal state of a terraform/tofu-only
-// workspace.
+// workspace -- and note the test is the BOOLEAN, not an empty ConfigDirectory
+// (#1966): "" is the ordinary way to say "at the configuration version's
+// root", so an emptiness check would read a configure-capable workspace as
+// having none.
 //
 // # Paths use the canonical /api/v1 prefix with no legacy fallback
 //
