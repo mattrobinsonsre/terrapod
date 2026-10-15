@@ -1385,3 +1385,171 @@ class TestRuleEngine:
         )
         assert resp.status_code == 422
         assert "not security-scanned" in resp.text
+
+
+class TestARuleCannotDeclareNeitherOperation:
+    """The write boundary the invariant was missing (#1966).
+
+    `validate_operations` landed at the workspace create and PATCH routes,
+    which read as enforced. It was not: `find_or_autocreate_workspace` builds
+    its `Workspace` directly from the rule's fields rather than through the
+    create route, so a rule declaring neither operation materialised an inert
+    workspace on EVERY scan -- one per matched directory, with nothing
+    refusing it anywhere.
+
+    Refusing the rule is the right boundary rather than refusing at
+    materialisation: it is one 422 the operator sees while writing the rule,
+    where the other would be a poller error per directory with nothing
+    actionable in it.
+    """
+
+    @staticmethod
+    def _body(attrs):
+        return {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "pattern": "accounts/*/**/*.tf",
+                    **attrs,
+                },
+            }
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_refuses_both_false(self, *_mocks):
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        added: list = []
+        db.add = added.append
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                        "plan-apply-enabled": False,
+                        "configure-enabled": False,
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "plan-apply-enabled" in detail and "configure-enabled" in detail, detail
+        assert not added, "a refused rule was still added"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_accepts_a_configure_only_rule(self, *_mocks):
+        """A rule that materialises configure-only workspaces is the point.
+
+        Without this the feature's whole fleet story is missing: turning
+        configure on across a discovered estate is the operation, and doing it
+        workspace by workspace afterwards is what a rule exists to avoid.
+        """
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                        "plan-apply-enabled": False,
+                        "configure-enabled": True,
+                        "config-directory": "ansible",
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["plan-apply-enabled"] is False
+        assert attrs["configure-enabled"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_patch_judges_the_merge_not_the_payload(self, *_mocks):
+        """One boolean in the payload, the other read off the stored rule.
+
+        The same single-field PATCH is legitimate on a rule that has configure
+        on and fatal on one that does not, so a check over the request body
+        would have to accept both.
+        """
+        # (a) configure already on -> turning plan/apply off is fine.
+        rule = _mock_rule()
+        rule.plan_apply_enabled = True
+        rule.configure_enabled = True
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json={"data": {"attributes": {"plan-apply-enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+
+        # (b) the identical payload on a plan/apply-only rule -> 422.
+        rule2 = _mock_rule()
+        rule2.plan_apply_enabled = True
+        rule2.configure_enabled = False
+        app2, db2 = _make_app(_admin())
+        db2.get = AsyncMock(return_value=rule2)
+        db2.commit = AsyncMock()
+        db2.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app2), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule2.id}",
+                json={"data": {"attributes": {"plan-apply-enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, (
+            "the same payload that is fine on a configure-capable rule must be "
+            "refused on one it would leave declaring nothing"
+        )
+
+        # (c) THE MIRROR, and it is not symmetry for its own sake. The merge
+        # reads a fallback per field, so a test that only ever supplies
+        # `plan-apply-enabled` exercises the CONFIGURE fallback and never the
+        # plan/apply one -- mutating the untested half then changes nothing any
+        # test can see. Found by exactly that mutation.
+        rule3 = _mock_rule()
+        rule3.plan_apply_enabled = False
+        rule3.configure_enabled = True
+        app3, db3 = _make_app(_admin())
+        db3.get = AsyncMock(return_value=rule3)
+        db3.commit = AsyncMock()
+        db3.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app3), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule3.id}",
+                json={"data": {"attributes": {"configure-enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, (
+            "turning configure off on a rule whose plan/apply is already off must "
+            "be refused -- this is the half that reads the stored plan/apply value"
+        )

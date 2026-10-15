@@ -311,6 +311,32 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
                 out[_col] = workspace_settings.validate_bool(attrs[_key], _key)
             except ValueError as e:
                 raise HTTPException(status_code=422, detail=str(e)) from e
+    # And the PAIR, on the result of the merge (#1966). A rule that declares
+    # neither operation can only ever materialise inert workspaces -- and it
+    # does so on EVERY scan, one per matched directory, because
+    # `find_or_autocreate_workspace` constructs the Workspace directly from
+    # these fields rather than through the create route that validates them. So
+    # this is the boundary where it has to be caught: refusing the rule is one
+    # 422 an operator sees immediately, where refusing at materialisation would
+    # be a poller error per directory with nothing to act on.
+    #
+    # Merged, not read off `attrs`: a PATCH may legitimately send one boolean,
+    # and whether that leaves the rule inert depends on the stored value of the
+    # other. On create the fallbacks are the column defaults, which is what an
+    # absent key means there.
+    try:
+        workspace_settings.validate_operations(
+            plan_apply=out.get(
+                "plan_apply_enabled",
+                True if on_create else getattr(existing, "plan_apply_enabled", True),
+            ),
+            configure=out.get(
+                "configure_enabled",
+                False if on_create else getattr(existing, "configure_enabled", False),
+            ),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     # `in attrs` rather than truthiness, deliberately (#2010's rule): `""` is a
     # value meaning the configuration version's root, so a truthiness test would
     # read it as "not supplied" and leave no way to say "the root".
@@ -756,6 +782,16 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
     v0.23.4 starts materialising workspaces immediately on save, defeating
     the purpose of a dry-run).
     """
+    # The preview object is built from a dict rather than from a stored row, so
+    # it validates the operations pair itself (#1966) rather than trusting its
+    # caller to have done it. Today `_coerce_attrs` already has, so this is a
+    # second check on the same values -- which is the point: a future caller
+    # handing this function unvalidated fields would otherwise render a preview
+    # of workspaces the API would refuse to create.
+    workspace_settings.validate_operations(
+        plan_apply=fields.get("plan_apply_enabled", True),
+        configure=fields.get("configure_enabled", False),
+    )
     rule = AutodiscoveryRule(
         # The transient rule still needs an id so `preview_for_paths`
         # can flag the `existing_autodiscovered` case meaningfully when

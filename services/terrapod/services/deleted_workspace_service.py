@@ -46,6 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.crypto.state import decrypt_state_bytes, encrypt_state_bytes
 from terrapod.db.models import StateVersion, Variable, Workspace
 from terrapod.logging_config import get_logger
+from terrapod.services import workspace_settings
 from terrapod.services.label_validation import sanitize_labels
 from terrapod.services.parallelism import DEFAULT_PARALLELISM
 from terrapod.services.workspace_name import validate_workspace_name
@@ -108,10 +109,15 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
         "ansible_version": ws.ansible_version,
-        # The Ansible roots and run defaults (#1929). `config_directory` is
-        # snapshotted as None-or-string rather than coerced: restoring "" where
-        # it was NULL would give the workspace a configure operation it never
-        # had, rooted at the top of the repository.
+        # Which operations the workspace had (#1966). Snapshotted because the
+        # restore path is one of the sites a new declaration is easiest to miss:
+        # omit them and restoring a configure-only workspace brings it back as
+        # an ordinary plan/apply one -- the column defaults, silently, with its
+        # declared inventory still attached and nothing to run it.
+        "plan_apply_enabled": ws.plan_apply_enabled,
+        "configure_enabled": ws.configure_enabled,
+        # The Ansible roots and run defaults (#1929). An ordinary path now, so
+        # it snapshots and restores like `working_directory` beside it.
         "config_directory": ws.config_directory,
         "inventory_paths": list(ws.inventory_paths or []),
         "default_playbook": ws.default_playbook,
@@ -482,6 +488,19 @@ async def delete_workspace(db: AsyncSession, ws: Workspace, *, deleted_by: str) 
 DEFAULT_MAX_RESTORE_VERSIONS = 20
 
 
+def _restored_plan_apply(settings: dict) -> bool:
+    """`is not False` rather than `or True`: False is a real choice, and a
+    truthiness fallback would silently re-enable plan/apply on a configure-only
+    workspace. An absent key means the marker predates these columns, so the
+    workspace was plan/apply."""
+    return settings.get("plan_apply_enabled") is not False
+
+
+def _restored_configure(settings: dict) -> bool:
+    """`is True` so an absent key stays OFF rather than reading as opted in."""
+    return settings.get("configure_enabled") is True
+
+
 async def restore_workspace(
     db: AsyncSession,
     storage: ObjectStore,
@@ -536,6 +555,21 @@ async def restore_workspace(
         keys = keys[-cap:]
 
     settings = marker.get("settings") or {}
+    # A restored workspace must still declare an operation (#1966). Called
+    # directly rather than through a helper, because the gate that found this
+    # construction looks for `validate_operations` by name -- and it is right
+    # to: a wrapper could do anything, so one that satisfied the gate without
+    # validating is exactly what a name match must not accept.
+    #
+    # In practice the write boundary refuses both-false, so a marker should
+    # never hold it, and one predating these columns falls back to plan/apply.
+    # This is for what is left -- a marker edited by hand, or written by a
+    # version without the invariant -- where restoring an inert workspace
+    # silently is worse than refusing with a message naming the fields.
+    workspace_settings.validate_operations(
+        plan_apply=_restored_plan_apply(settings),
+        configure=_restored_configure(settings),
+    )
     report: dict[str, Any] = {
         "source_workspace_id": workspace_id,
         "source_workspace_name": marker.get("workspace_name"),
@@ -579,14 +613,23 @@ async def restore_workspace(
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",
-        # `.get(...)` with NO `or ""` fallback, deliberately (#1929). NULL and
-        # "" mean different things for this column: NULL is "no configure
-        # operation", "" is "the repository root". A snapshot predating the
-        # column yields None, which is the opted-OUT direction and the right
-        # one -- restoring a workspace must not hand it a configure operation
-        # rooted at the top of the repository that nobody asked for. This is the
-        # same trap as `oidc_audiences` below, which is why that comment exists.
-        config_directory=settings.get("config_directory"),
+        # Which operations the restored workspace has (#1966). Each falls back
+        # to its COLUMN DEFAULT for a snapshot predating these keys, which is
+        # the direction that preserves what such a workspace actually was: it
+        # was taken before configure existed, so it was plan/apply.
+        #
+        # `is not False` rather than `or True` on the first, for the reason the
+        # sibling below records -- False is a real choice and a truthiness
+        # fallback would silently re-enable plan/apply on a configure-only
+        # workspace. And `is True` on the second, so an absent key stays OFF
+        # rather than being read as opted in.
+        plan_apply_enabled=_restored_plan_apply(settings),
+        configure_enabled=_restored_configure(settings),
+        # An ordinary path (#1966): `or ""` is right now that "" and absent both
+        # mean the configuration version's root. It used to be `.get()` with no
+        # fallback because NULL meant "no configure operation" -- that question
+        # is `configure_enabled` above, so the special case is gone with it.
+        config_directory=settings.get("config_directory") or "",
         inventory_paths=list(settings.get("inventory_paths") or []),
         default_playbook=settings.get("default_playbook") or "",
         default_limit=settings.get("default_limit") or "",
