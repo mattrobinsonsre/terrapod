@@ -28,7 +28,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from terrapod.services import inventory_service
+from terrapod.services import inventory_service, run_service, workspace_settings
 
 pytestmark = pytest.mark.asyncio
 
@@ -113,3 +113,63 @@ class TestHasAnythingKeysOnTheBooleanNotOnEmptiness:
             ),
         ):
             assert await inventory_service.has_anything(db, uuid.uuid4()) is True
+
+
+class TestThePlanApplyDeclarationIsEnforcedNotJustStored:
+    """`require_plan_apply_operation` is the enforcement twin of
+    `validate_operations` (#2116).
+
+    #1966 shipped the declaration and nothing on the run path read it, so a
+    workspace declaring `plan_apply_enabled=False` was accepted by every write
+    surface and ignored by all fifteen run creators. These are a CONTRAST
+    rather than two independent cases: the property is a relationship between
+    the two states of one column, so a fixture holding only one of them passes
+    whichever way the guard is written -- including not written at all.
+    """
+
+    async def test_a_workspace_declaring_no_plan_apply_is_refused(self):
+        ws = MagicMock()
+        ws.plan_apply_enabled = False
+        with pytest.raises(workspace_settings.PlanApplyNotEnabled) as exc:
+            workspace_settings.require_plan_apply_operation(ws)
+        # The message has to name the column an operator would go and change.
+        assert "plan-apply-enabled" in str(exc.value)
+
+    async def test_a_workspace_declaring_plan_apply_is_allowed(self):
+        ws = MagicMock()
+        ws.plan_apply_enabled = True
+        assert workspace_settings.require_plan_apply_operation(ws) is None
+
+    async def test_the_refusal_is_a_value_error(self):
+        """So a caller using a bare `except ValueError` still catches it, which
+        is the `LabelValidationError` precedent -- and so the HTTP surfaces
+        that already map `ValueError` to 422 keep working."""
+        assert issubclass(workspace_settings.PlanApplyNotEnabled, ValueError)
+
+    async def test_configure_enabled_is_not_consulted(self):
+        """Configure operations do not exist yet (#1972), so a workspace
+        declaring one has nothing to run and nothing to refuse. If this starts
+        failing, something has taught the plan/apply guard about configure and
+        the two concerns have been conflated."""
+        for configure in (True, False):
+            ws = MagicMock()
+            ws.plan_apply_enabled = True
+            ws.configure_enabled = configure
+            assert workspace_settings.require_plan_apply_operation(ws) is None
+
+
+class TestTheChokepointRefusesRatherThanBuildingTheRow:
+    async def test_create_run_refuses_a_configure_only_workspace(self):
+        """Driven through `create_run` itself, not through the guard: the fix is
+        'the chokepoint now calls the rule', so the test has to be the call."""
+        ws = MagicMock()
+        ws.plan_apply_enabled = False
+        db = AsyncMock()
+        with patch(
+            "terrapod.services.run_service.ha_role.ensure_leader",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(run_service.PlanApplyNotEnabled):
+                await run_service.create_run(db, workspace=ws)
+        # Nothing was written: the refusal comes before the row is built.
+        db.add.assert_not_called()

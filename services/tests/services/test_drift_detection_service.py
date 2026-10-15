@@ -688,3 +688,67 @@ class TestTheEngineCapabilityItself:
 
         assert honours_drift_ignore_rules(None) is True
         assert honours_drift_ignore_rules("") is True
+
+
+class TestDriftSkipsAWorkspaceDeclaringNoPlanApply:
+    """A platform-driven run creator SKIPS the refusal, it does not error
+    (#2116).
+
+    Drift detection is a poll. Erroring once per cycle about a workspace that
+    is behaving exactly as its operator declared is noise, and the kind that
+    trains people to ignore the log. So the caller catches
+    `PlanApplyNotEnabled` and returns None.
+
+    `create_run` is patched to RAISE here on purpose: the rule itself is pinned
+    at the chokepoint (`test_workspace_operations`), and what this file owns is
+    the caller's reaction to it.
+    """
+
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.queue_run", new_callable=AsyncMock
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_run", new_callable=AsyncMock
+    )
+    async def test_it_returns_none_rather_than_raising(self, mock_create, mock_queue):
+        from terrapod.services import run_service
+        from terrapod.services.drift_detection_service import _create_drift_run_non_vcs
+
+        mock_create.side_effect = run_service.PlanApplyNotEnabled(
+            "this workspace declares no plan/apply operation"
+        )
+        ws = _mock_workspace()
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = MagicMock(id=uuid.uuid4())
+        mock_db.execute.return_value = mock_result
+
+        result = await _create_drift_run_non_vcs(mock_db, ws)
+
+        assert result is None
+        # ...and nothing was queued off the back of a run that never existed.
+        mock_queue.assert_not_called()
+
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.queue_run", new_callable=AsyncMock
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_run", new_callable=AsyncMock
+    )
+    async def test_the_contrast_a_declaring_workspace_still_drifts(self, mock_create, mock_queue):
+        """Both states instantiated, because the property is the relationship
+        between them: a test that only ever sees the refusal cannot tell a
+        working skip from a creator that never runs at all."""
+        from terrapod.services.drift_detection_service import _create_drift_run_non_vcs
+
+        run = MagicMock()
+        mock_create.return_value = run
+        mock_queue.return_value = run
+        ws = _mock_workspace()
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = MagicMock(id=uuid.uuid4())
+        mock_db.execute.return_value = mock_result
+
+        assert await _create_drift_run_non_vcs(mock_db, ws) is run
+        mock_queue.assert_called_once()

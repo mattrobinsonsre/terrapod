@@ -142,6 +142,9 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     # #646: plan expiry disabled by default (None) so the confirm-time TTL guard
     # doesn't mis-fire on a truthy MagicMock.
     ws.plan_expiry_seconds = None
+    # #2116: explicit rather than relying on a truthy MagicMock, so that a test
+    # setting it False is making a visible choice and not fighting the fixture.
+    ws.plan_apply_enabled = True
     return ws
 
 
@@ -2470,3 +2473,93 @@ class TestAConfigurationVersionMustBelongToTheWorkspace:
             queue.return_value = run
             resp = await self._post(_row)
         assert resp.status_code == 201, resp.text
+
+
+class TestPlanApplyDeclarationIsEnforcedOnTheRoute:
+    """A workspace declaring no plan/apply operation refuses a run (#2116).
+
+    Driven as a REQUEST with the real `create_run`, deliberately. Every other
+    test in this file patches `run_service.create_run` out, so none of them can
+    see the guard at all -- and the fix here is "the chokepoint refuses and the
+    route translates", which only a request exercises.
+
+    Note the assertion is on the DETAIL, not just the status. This route has
+    another 422 (no uploaded configuration version), so a status-only
+    assertion would pass for a reason unrelated to the change.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.run_service.ha_role.ensure_leader", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_configure_only_workspace_is_refused_with_422(
+        self, mock_resolve, _leader, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.plan_apply_enabled = False
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422
+        detail = resp.json()["errors"][0]["detail"]
+        assert "plan-apply-enabled" in detail, (
+            f"422 for the wrong reason — got {detail!r}. The refusal has to name the "
+            "column an operator would change."
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_plan_apply_workspace_is_unaffected(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """The contrast, and the thing Terraform/OpenTofu users are owed: a
+        workspace that declares plan/apply is untouched by any of this."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
