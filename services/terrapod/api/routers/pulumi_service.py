@@ -1070,15 +1070,20 @@ async def _begin_update(
     # turns on.
     cli_run = None
     if kind != "preview" and not is_runner:
-        cli_run = await run_service.create_run(
-            db,
-            workspace=ws,
-            message=f"pulumi {kind} (CLI)",
-            source=_CLI_RUN_SOURCE,
-            plan_only=False,
-            is_destroy=kind == "destroy",
-            created_by=user.email,
-        )
+        try:
+            cli_run = await run_service.create_run(
+                db,
+                workspace=ws,
+                message=f"pulumi {kind} (CLI)",
+                source=_CLI_RUN_SOURCE,
+                plan_only=False,
+                is_destroy=kind == "destroy",
+                created_by=user.email,
+            )
+        except run_service.PlanApplyNotEnabled as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
         await run_service.start_external_apply(db, cli_run)
         await db.commit()
 

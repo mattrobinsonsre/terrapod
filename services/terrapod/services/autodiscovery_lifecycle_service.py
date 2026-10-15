@@ -457,17 +457,26 @@ async def reconcile_open_pr(
             )
         )
         if dup.scalar_one_or_none() is None:
-            run = await run_service.create_run(
-                db,
-                workspace=ws,
-                message=f"Speculative destroy plan: '{d}' removed in PR #{pr_number}",
-                is_destroy=True,
-                plan_only=True,
-                source=LIFECYCLE_SOURCE,
-                created_by="autodiscovery-lifecycle",
-            )
-            run.vcs_commit_sha = head_sha
-            run.vcs_pull_request_number = pr_number
+            try:
+                run = await run_service.create_run(
+                    db,
+                    workspace=ws,
+                    message=f"Speculative destroy plan: '{d}' removed in PR #{pr_number}",
+                    is_destroy=True,
+                    plan_only=True,
+                    source=LIFECYCLE_SOURCE,
+                    created_by="autodiscovery-lifecycle",
+                )
+                run.vcs_commit_sha = head_sha
+                run.vcs_pull_request_number = pr_number
+            except run_service.PlanApplyNotEnabled:
+                # Skip the whole workspace, not just the run: the notification below
+                # tells the reader a speculative destroy plan was queued.
+                logger.info(
+                    "Speculative destroy plan skipped: workspace declares no plan/apply operation",
+                    workspace=ws.name,
+                )
+                continue
         await _notify_once(
             db,
             conn,
@@ -677,16 +686,23 @@ async def reconcile_branch_advance(
             )
             if existing.scalar_one_or_none() is not None:
                 continue  # a destroy is already queued/running/done
-            run = await run_service.create_run(
-                db,
-                workspace=ws,
-                message=f"Autodiscovery: '{d}' removed — destroying (rule opt-in)",
-                is_destroy=True,
-                plan_only=False,
-                auto_apply=True,
-                source=LIFECYCLE_SOURCE,
-                created_by="autodiscovery-lifecycle",
-            )
+            try:
+                run = await run_service.create_run(
+                    db,
+                    workspace=ws,
+                    message=f"Autodiscovery: '{d}' removed — destroying (rule opt-in)",
+                    is_destroy=True,
+                    plan_only=False,
+                    auto_apply=True,
+                    source=LIFECYCLE_SOURCE,
+                    created_by="autodiscovery-lifecycle",
+                )
+            except run_service.PlanApplyNotEnabled:
+                logger.info(
+                    "Lifecycle destroy skipped: workspace declares no plan/apply operation",
+                    workspace=ws.name,
+                )
+                continue
             ws.lifecycle_reason = f"destroy queued (run {run.id}) — '{d}' removed"
             _audit(
                 db,

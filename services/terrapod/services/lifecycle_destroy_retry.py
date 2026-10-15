@@ -114,17 +114,24 @@ async def lifecycle_destroy_retry_cycle() -> None:
                     source=run.source,
                 )
                 continue
-            retry = await run_service.create_run(
-                db,
-                workspace=ws,
-                message=f"Lifecycle destroy retry (attempt {attempts + 1}/{retries + 1})",
-                is_destroy=True,
-                auto_apply=True,
-                plan_only=False,
-                source=run.source,
-                configuration_version_id=cv.id,
-                created_by="system",
-            )
+            try:
+                retry = await run_service.create_run(
+                    db,
+                    workspace=ws,
+                    message=f"Lifecycle destroy retry (attempt {attempts + 1}/{retries + 1})",
+                    is_destroy=True,
+                    auto_apply=True,
+                    plan_only=False,
+                    source=run.source,
+                    configuration_version_id=cv.id,
+                    created_by="system",
+                )
+            except run_service.PlanApplyNotEnabled:
+                logger.info(
+                    "Lifecycle destroy retry skipped: workspace declares no plan/apply operation",
+                    workspace_id=str(ws.id),
+                )
+                continue
             await run_service.queue_run(db, retry)
             queued += 1
             logger.info(

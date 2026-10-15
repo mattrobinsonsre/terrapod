@@ -338,14 +338,17 @@ async def start_discovery(
             "selected_types must be a non-empty subset of the discovery surface's data sources"
         )
 
-    run = await run_service.create_run(
-        db,
-        workspace,
-        message=f"Onboarding discovery: {session.provider} ({len(cleaned)} data source(s))",
-        plan_only=True,
-        source=ONBOARDING_DISCOVERY_SOURCE,
-        created_by=session.created_by,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace,
+            message=f"Onboarding discovery: {session.provider} ({len(cleaned)} data source(s))",
+            plan_only=True,
+            source=ONBOARDING_DISCOVERY_SOURCE,
+            created_by=session.created_by,
+        )
+    except run_service.PlanApplyNotEnabled as exc:
+        raise OnboardingError(str(exc)) from exc
     # No configuration version — the runner writes providers.tf + the import
     # blocks itself — so queue directly for listener pickup.
     await run_service.queue_run(db, run)

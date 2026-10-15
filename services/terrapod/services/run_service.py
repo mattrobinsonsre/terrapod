@@ -34,8 +34,16 @@ from terrapod.services import (
     gitlab_service,
     ha_role,
     pool_set,
+    workspace_settings,
 )
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
+
+# Re-exported deliberately. `create_run` is what raises it, so this is where a
+# caller of `create_run` looks for it -- and every one of the fifteen callers
+# already imports this module, so catching it costs them no new import. The
+# rule itself lives next to `validate_operations` in `workspace_settings`,
+# because that is where the declaration it enforces is validated on write.
+from terrapod.services.workspace_settings import PlanApplyNotEnabled  # noqa: F401
 
 logger = get_logger(__name__)
 
@@ -1083,6 +1091,18 @@ async def create_run(
 
     await ha_role.ensure_leader("create runs")
 
+    # The ONLY enforcement of the workspace's plan/apply declaration (#2116),
+    # here because this is the only `Run` constructor on the live path and so
+    # the only place fifteen callers cannot route around. Raises
+    # `PlanApplyNotEnabled`, a `ValueError`; see that function for why a caller
+    # either translates it to a 4xx or skips on it, and never re-states the
+    # rule itself.
+    #
+    # Before every other check on purpose: the work below -- resolving a
+    # version, splitting the pool set, reading settings -- is wasted on a run
+    # that cannot exist.
+    workspace_settings.require_plan_apply_operation(workspace)
+
     # A run against a SPECULATIVE configuration version is always plan-only.
     #
     # A speculative CV is the artifact of a plan-only run — an unmerged pull
@@ -2050,20 +2070,28 @@ async def fire_run_triggers(
             )
             continue
 
-        run = await create_run(
-            db,
-            workspace=dest_ws,
-            message=f"Triggered by successful apply in workspace '{source_name}'",
-            auto_apply=dest_ws.auto_apply,
-            plan_only=False,
-            # Its own source (#1307). `tfe-api` is the CLI-upload source, and
-            # labelling a triggered run with it made it indistinguishable from
-            # a CLI run in the UI, the API, the audit log and the SDK — so
-            # "why did this workspace just apply?" had no answer on the run
-            # itself. Every other non-CLI origin already has its own source.
-            source="run-trigger",
-            configuration_version_id=latest_cv_id,
-        )
+        try:
+            run = await create_run(
+                db,
+                workspace=dest_ws,
+                message=f"Triggered by successful apply in workspace '{source_name}'",
+                auto_apply=dest_ws.auto_apply,
+                plan_only=False,
+                # Its own source (#1307). `tfe-api` is the CLI-upload source, and
+                # labelling a triggered run with it made it indistinguishable from
+                # a CLI run in the UI, the API, the audit log and the SDK — so
+                # "why did this workspace just apply?" had no answer on the run
+                # itself. Every other non-CLI origin already has its own source.
+                source="run-trigger",
+                configuration_version_id=latest_cv_id,
+            )
+        except PlanApplyNotEnabled:
+            logger.info(
+                "Run trigger skipped: destination declares no plan/apply operation",
+                source_workspace=source_name,
+                destination_workspace=dest_ws.name,
+            )
+            continue
 
         # Record where the code came from. Beyond provenance in the UI, this is
         # what marks the run as carrying VCS-fetched code, which the apply guard

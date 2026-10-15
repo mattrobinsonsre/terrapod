@@ -779,25 +779,31 @@ async def create_run(
             )
         cv_uuid = latest_cv.id
 
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message=attrs.get("message", ""),
-        is_destroy=attrs.get("is-destroy", False),
-        auto_apply=attrs.get("auto-apply"),
-        plan_only=plan_only,
-        source="tfe-api",
-        engine_version=engine_version_attr(attrs, ""),
-        configuration_version_id=cv_uuid,
-        created_by=user.email,
-        is_drift_detection=attrs.get("is-drift-detection", False),
-        target_addrs=attrs.get("target-addrs"),
-        replace_addrs=attrs.get("replace-addrs"),
-        refresh_only=attrs.get("refresh-only", False),
-        refresh=attrs.get("refresh", True),
-        allow_empty_apply=attrs.get("allow-empty-apply", False),
-        save_plan=save_plan,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=attrs.get("message", ""),
+            is_destroy=attrs.get("is-destroy", False),
+            auto_apply=attrs.get("auto-apply"),
+            plan_only=plan_only,
+            source="tfe-api",
+            engine_version=engine_version_attr(attrs, ""),
+            configuration_version_id=cv_uuid,
+            created_by=user.email,
+            is_drift_detection=attrs.get("is-drift-detection", False),
+            target_addrs=attrs.get("target-addrs"),
+            replace_addrs=attrs.get("replace-addrs"),
+            refresh_only=attrs.get("refresh-only", False),
+            refresh=attrs.get("refresh", True),
+            allow_empty_apply=attrs.get("allow-empty-apply", False),
+            save_plan=save_plan,
+        )
+    except run_service.PlanApplyNotEnabled as exc:
+        # A plan or apply asked for on a workspace that declares neither.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     # Attach VCS metadata if we fetched code from VCS
     if vcs_sha:
@@ -1167,29 +1173,34 @@ async def retry_run(
                 ),
             )
 
-    new_run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message=f"Retry of run-{run.id}",
-        source=run.source,
-        plan_only=run.plan_only,
-        # Without this a retried destroy came back as an ordinary apply of the
-        # same configuration — the opposite of what was asked for.
-        is_destroy=run.is_destroy,
-        configuration_version_id=cv_id_for_retry,
-        created_by=user.email,
-        target_addrs=run.target_addrs,
-        replace_addrs=run.replace_addrs,
-        refresh_only=run.refresh_only,
-        refresh=run.refresh,
-        allow_empty_apply=run.allow_empty_apply,
-    )
+    try:
+        new_run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=f"Retry of run-{run.id}",
+            source=run.source,
+            plan_only=run.plan_only,
+            # Without this a retried destroy came back as an ordinary apply of the
+            # same configuration — the opposite of what was asked for.
+            is_destroy=run.is_destroy,
+            configuration_version_id=cv_id_for_retry,
+            created_by=user.email,
+            target_addrs=run.target_addrs,
+            replace_addrs=run.replace_addrs,
+            refresh_only=run.refresh_only,
+            refresh=run.refresh,
+            allow_empty_apply=run.allow_empty_apply,
+        )
 
-    # Copy VCS metadata and module overrides from the original run
-    new_run.vcs_commit_sha = run.vcs_commit_sha
-    new_run.vcs_branch = run.vcs_branch
-    new_run.vcs_pull_request_number = run.vcs_pull_request_number
-    new_run.module_overrides = run.module_overrides
+        # Copy VCS metadata and module overrides from the original run
+        new_run.vcs_commit_sha = run.vcs_commit_sha
+        new_run.vcs_branch = run.vcs_branch
+        new_run.vcs_pull_request_number = run.vcs_pull_request_number
+        new_run.module_overrides = run.module_overrides
+    except run_service.PlanApplyNotEnabled as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     new_run = await run_service.queue_run(db, new_run)
     await db.commit()

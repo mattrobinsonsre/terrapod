@@ -446,19 +446,26 @@ async def _create_module_test_runs(
             )
             continue
 
-        run = await run_service.create_run(
-            db,
-            workspace=ws,
-            message=f"Module impact: PR #{pr.number} on {module.name}/{module.provider} — {pr.title}",
-            source="module-test",
-            plan_only=True,
-            configuration_version_id=cv_id,
-            created_by="module-impact-analysis",
-        )
-        run.module_overrides = overrides
-        run.vcs_commit_sha = pr.head_sha
-        run.vcs_branch = pr.head_ref
-        run.vcs_pull_request_number = pr.number
+        try:
+            run = await run_service.create_run(
+                db,
+                workspace=ws,
+                message=f"Module impact: PR #{pr.number} on {module.name}/{module.provider} — {pr.title}",
+                source="module-test",
+                plan_only=True,
+                configuration_version_id=cv_id,
+                created_by="module-impact-analysis",
+            )
+            run.module_overrides = overrides
+            run.vcs_commit_sha = pr.head_sha
+            run.vcs_branch = pr.head_ref
+            run.vcs_pull_request_number = pr.number
+        except run_service.PlanApplyNotEnabled:
+            logger.info(
+                "Skipping module-test run — workspace declares no plan/apply operation",
+                workspace=ws.name,
+            )
+            continue
         await db.flush()
 
         run = await run_service.queue_run(db, run)
@@ -519,15 +526,22 @@ async def trigger_linked_workspace_runs(
             )
             continue
 
-        run = await run_service.create_run(
-            db,
-            workspace=ws,
-            message=f"Module {module.name}/{module.provider} v{version} published",
-            source="module-publish",
-            plan_only=False,
-            configuration_version_id=cv_id,
-            created_by="module-impact-analysis",
-        )
+        try:
+            run = await run_service.create_run(
+                db,
+                workspace=ws,
+                message=f"Module {module.name}/{module.provider} v{version} published",
+                source="module-publish",
+                plan_only=False,
+                configuration_version_id=cv_id,
+                created_by="module-impact-analysis",
+            )
+        except run_service.PlanApplyNotEnabled:
+            logger.info(
+                "Skipping module-publish run — workspace declares no plan/apply operation",
+                workspace=ws.name,
+            )
+            continue
         if commit_sha:
             run.vcs_commit_sha = commit_sha
         await db.flush()

@@ -540,18 +540,26 @@ async def _create_vcs_run(
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message=message,
-        source="vcs",
-        plan_only=speculative,
-        configuration_version_id=cv.id,
-        created_by="vcs-poller",
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=message,
+            source="vcs",
+            plan_only=speculative,
+            configuration_version_id=cv.id,
+            created_by="vcs-poller",
+        )
 
-    run.vcs_commit_sha = sha
-    run.vcs_branch = branch
+        run.vcs_commit_sha = sha
+        run.vcs_branch = branch
+    except run_service.PlanApplyNotEnabled as exc:
+        logger.info(
+            "VCS run skipped: workspace declares no plan/apply operation",
+            workspace=ws.name,
+            reason=str(exc),
+        )
+        return None
     if pr_number is not None:
         run.vcs_pull_request_number = pr_number
 

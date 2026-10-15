@@ -500,16 +500,19 @@ async def _materialise(
     await storage.put_stream(key, _single_chunk(tarball), content_type="application/gzip")
     await run_service.mark_configuration_uploaded(db, cv)
 
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message=message,
-        auto_apply=auto_apply,
-        plan_only=False,
-        source="catalog",
-        configuration_version_id=cv.id,
-        created_by=user_email,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=message,
+            auto_apply=auto_apply,
+            plan_only=False,
+            source="catalog",
+            configuration_version_id=cv.id,
+            created_by=user_email,
+        )
+    except run_service.PlanApplyNotEnabled as exc:
+        raise CatalogError(str(exc), status_code=422) from exc
     await run_service.queue_run(db, run)
     return run
 
@@ -658,17 +661,20 @@ async def destroy_instance(
 
     # Destroy the latest generated config; without a CV the runner has no code.
     cv = await run_service.get_latest_uploaded_cv(db, ws.id)
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message="Catalog destroy",
-        is_destroy=True,
-        auto_apply=auto_apply,
-        plan_only=False,
-        source="catalog-lifecycle",
-        configuration_version_id=cv.id if cv else None,
-        created_by=user_email,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message="Catalog destroy",
+            is_destroy=True,
+            auto_apply=auto_apply,
+            plan_only=False,
+            source="catalog-lifecycle",
+            configuration_version_id=cv.id if cv else None,
+            created_by=user_email,
+        )
+    except run_service.PlanApplyNotEnabled as exc:
+        raise CatalogError(str(exc), status_code=422) from exc
     await run_service.queue_run(db, run)
     logger.info("catalog.destroy_queued", workspace_id=str(ws.id), auto_apply=auto_apply)
     return run

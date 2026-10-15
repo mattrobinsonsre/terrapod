@@ -351,6 +351,57 @@ def validate_operations(*, plan_apply: bool, configure: bool) -> None:
         )
 
 
+class PlanApplyNotEnabled(ValueError):
+    """Raised when a plan or apply is asked for on a workspace that declares no
+    such operation (#2116).
+
+    A `ValueError` subclass for the reason `LabelValidationError` gives: a
+    caller using a bare `except ValueError` still catches it, while the explicit
+    type lets a router translate to 422 without catching unrelated
+    `ValueError`s -- and, which matters more here, lets the platform's own
+    run creators tell this refusal apart from a genuine failure and **skip
+    quietly** instead of logging an error every cycle.
+    """
+
+
+def require_plan_apply_operation(workspace) -> None:
+    """Refuse a plan/apply run on a workspace that does not declare one (#2116).
+
+    The enforcement twin of `validate_operations` above: that one refuses a
+    workspace declaring *no* operations at the write boundary, this one refuses
+    a *run* the declaration excludes. #1966 shipped the declaration and nothing
+    read it on the run path, so `plan-apply-enabled: false` was accepted by
+    every write surface and ignored by all fifteen run creators -- the
+    flag-nothing-reads defect, on a column an operator had deliberately set.
+
+    **Called from `run_service.create_run` and nowhere else**, deliberately.
+    That is the only `Run` constructor on the live path, so one call there
+    cannot be bypassed, and no caller has to remember the rule. What a caller
+    chooses is only how to *react*:
+
+    * a run somebody **asked for** -- the API routes, the service catalog,
+      onboarding, a Pulumi CLI update -- translates it into a 4xx naming the
+      column, because a request for something the workspace declares it does
+      not do is a mistake worth reporting;
+    * a run the **platform decided on its own** -- a VCS push, drift detection,
+      a run trigger, module impact, autodiscovery lifecycle, a destroy retry --
+      catches it and skips, because there is nobody to tell and erroring once
+      per poll cycle would be noise about a workspace behaving exactly as
+      declared.
+
+    `configure_enabled` is deliberately **not** checked here: configure
+    operations do not exist yet (#1972 and its neighbours), so a workspace
+    declaring one has nothing to run and nothing to refuse. When a configure
+    run arrives it will not come through this guard -- it is not a plan/apply.
+    """
+    if not workspace.plan_apply_enabled:
+        raise PlanApplyNotEnabled(
+            "this workspace declares no plan/apply operation "
+            "(plan-apply-enabled is false), so it cannot plan or apply; "
+            "set plan-apply-enabled on the workspace to allow it"
+        )
+
+
 def _validate_path_list(raw: object, field: str, cap: int) -> list[str]:
     if not isinstance(raw, list):
         raise ValueError(f"{field} must be a list of strings")

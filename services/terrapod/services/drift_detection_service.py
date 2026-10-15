@@ -268,19 +268,26 @@ async def _create_drift_run_vcs(
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message="Drift detection check",
-        plan_only=True,
-        source="drift-detection",
-        configuration_version_id=cv.id,
-        created_by="drift-detection",
-        is_drift_detection=True,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message="Drift detection check",
+            plan_only=True,
+            source="drift-detection",
+            configuration_version_id=cv.id,
+            created_by="drift-detection",
+            is_drift_detection=True,
+        )
 
-    run.vcs_commit_sha = sha
-    run.vcs_branch = branch
+        run.vcs_commit_sha = sha
+        run.vcs_branch = branch
+    except run_service.PlanApplyNotEnabled:
+        logger.info(
+            "Drift check skipped: workspace declares no plan/apply operation",
+            workspace=ws.name,
+        )
+        return None
 
     run = await run_service.queue_run(db, run)
     return run
@@ -321,16 +328,23 @@ async def _create_drift_run_non_vcs(
         )
         return None
 
-    run = await run_service.create_run(
-        db,
-        workspace=ws,
-        message="Drift detection check",
-        plan_only=True,
-        source="drift-detection",
-        configuration_version_id=cv.id,
-        created_by="drift-detection",
-        is_drift_detection=True,
-    )
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message="Drift detection check",
+            plan_only=True,
+            source="drift-detection",
+            configuration_version_id=cv.id,
+            created_by="drift-detection",
+            is_drift_detection=True,
+        )
+    except run_service.PlanApplyNotEnabled:
+        logger.info(
+            "Drift check skipped: workspace declares no plan/apply operation",
+            workspace=ws.name,
+        )
+        return None
 
     run = await run_service.queue_run(db, run)
     return run
