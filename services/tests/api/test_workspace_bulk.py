@@ -108,6 +108,14 @@ def _mock_ws(
     w.drift_ignore_rules = []
     w.slack_channel = ""
     w.pulumi_bind_plan = False
+    # Which operations the workspace has (#1966). Set explicitly, not left to
+    # auto-MagicMock, because `_reject_leaving_a_workspace_with_no_operations`
+    # reads BOTH off the row: a MagicMock is truthy, so every matched workspace
+    # would look configure-capable and the guard could never fire. A fixture
+    # that cannot make a guard fire is the shape that passes under the mutation
+    # it exists to catch.
+    w.plan_apply_enabled = True
+    w.configure_enabled = False
     return w
 
 
@@ -1029,3 +1037,105 @@ class TestASettingRuleCannotValidateSomethingTheLoopNeverReaches:
 
         both = sorted(set(_FIELD_MAP) & set(_FIELDS_HANDLED_SEPARATELY))
         assert not both, f"{both} claim to be both mapped and handled separately"
+
+
+class TestABulkUpdateCannotLeaveAWorkspaceInert:
+    """The fleet-wide form of #1966's invariant.
+
+    Bulk update is the one path that reaches a hundred workspaces at once, so
+    it is the one that can quietly turn every one of them off. And the check
+    cannot be made from the payload: `plan-apply-enabled: false` is a
+    legitimate fleet operation for workspaces that have configure on, and a
+    silent no-op-forever for every workspace that does not. The same bytes mean
+    both things depending on rows the request never mentions.
+
+    Which is why the guard runs against the MATCHED SET, beside
+    `_reject_scan_enforcement_on_unscannable_engines`, rather than in
+    `_validate_fields` where the per-key rules live.
+    """
+
+    @staticmethod
+    def _app_with(ws):
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([ws]))
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        return app, db
+
+    @staticmethod
+    def _body(update):
+        return {"filter": {"all": True}, "update": update, "dry_run": False}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_turning_plan_apply_off_is_refused_when_configure_is_off(
+        self, _db, _redis, _storage
+    ):
+        ws = _mock_ws(name="plan-only")
+        ws.plan_apply_enabled = True
+        ws.configure_enabled = False
+        app, db = self._app_with(ws)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update",
+                json=self._body({"plan-apply-enabled": False}),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "plan-only" in detail, f"the refusal must name the offender: {detail}"
+        assert ws.plan_apply_enabled is True, "a refused update still mutated the row"
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_same_payload_is_allowed_when_configure_is_already_on(
+        self, _db, _redis, _storage
+    ):
+        """The contrast is the test. One fixture could not tell these apart."""
+        ws = _mock_ws(name="has-configure")
+        ws.plan_apply_enabled = True
+        ws.configure_enabled = True
+        app, db = self._app_with(ws)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update",
+                json=self._body({"plan-apply-enabled": False}),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert ws.plan_apply_enabled is False
+        db.commit.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_setting_both_in_one_update_is_judged_on_the_result(self, _db, _redis, _storage):
+        """Turning plan/apply off and configure on in one request is fine.
+
+        The merge, not either field alone, is what the invariant is about -- so
+        a caller migrating a fleet from plan/apply to configure does it in one
+        request rather than being forced through a refused intermediate state.
+        """
+        ws = _mock_ws(name="migrating")
+        ws.plan_apply_enabled = True
+        ws.configure_enabled = False
+        app, db = self._app_with(ws)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update",
+                json=self._body({"plan-apply-enabled": False, "configure-enabled": True}),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert ws.plan_apply_enabled is False
+        assert ws.configure_enabled is True
