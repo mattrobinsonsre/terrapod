@@ -2,156 +2,471 @@ package workspace
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 )
 
-// The ansible configure operation's roots and run defaults (#1929). They were
-// a separate terrapod_inventory_settings resource; they are workspace columns
-// now, so they are attributes here.
+// A workspace's operations (#1966) and the ansible configure operation's roots
+// and run defaults (#1929).
 //
-// `config_directory` is the one with a trap in it and most of this file is
-// about it: null and "" are DIFFERENT values, and Terraform distinguishes them
-// natively, so the provider only has to avoid collapsing them. The failure if
-// it does is not a lost value but a wrong one -- every workspace rooted at its
-// repository root would read back as having no configure operation at all, and
-// every apply that writes `config_directory = ""` would abort with "Provider
-// produced inconsistent result after apply".
+// This file used to be about keeping `config_directory`'s null and "" apart,
+// because null meant "this workspace has no configure operation" and "" meant
+// the repository root -- one field answering two questions. #1966 split them:
+// `configure_enabled` answers the first, and `config_directory` is an ordinary
+// non-nullable path whose empty value is the configuration version's root,
+// exactly like `working_directory`. So the three-state tests are gone; their
+// premise is what changed.
+//
+// What is tested instead is the hazard that REPLACED it, and it is the single
+// defect this change could most easily ship: a Computed attribute whose plan
+// value disagrees with what the server returns aborts the apply with "Provider
+// produced inconsistent result after apply". For `config_directory` that would
+// fire on EVERY workspace that does not set it (plan null, server ""); for
+// `plan_apply_enabled` on every workspace that does not set it (plan null,
+// server true). Hence roundTripIsConsistent below, which is the shape of test
+// to reach for whenever a server supplies a default the provider does not.
 
-func TestConfigDirectoryIsOptionalAndNotComputed(t *testing.T) {
-	// Not a style preference. Every neighbour is Optional+Computed with
-	// UseStateForUnknown so an unmanaged server value survives, and that
-	// pattern CANNOT express this attribute: a config that omitted it would
-	// plan as the prior state, so once a configure operation had been set up
-	// there would be no way to turn it off from HCL. Optional-only makes a
-	// removal plan as null, which Update sends as an explicit clear.
+// ── The round trip, which is the whole point ────────────────────────────────
+
+// roundTripIsConsistent drives one apply the way Terraform does -- plan value
+// -> create request -> server -> read-back -> final state -- and asserts
+// Terraform's own consistency rule on the result: where the planned value was
+// KNOWN the final state must equal it exactly, and only an UNKNOWN plan value
+// may be filled in by the server.
+//
+// `server` stands in for the API: it receives what actually reached the wire
+// and returns the Workspace the provider would read back, applying the same
+// defaults the server does for anything the request omitted. That is what
+// makes this a round-trip test rather than two assertions about a request.
+func roundTripIsConsistent(
+	t *testing.T,
+	name string,
+	plan func(*workspaceModel),
+	server func(terrapod.CreateWorkspaceRequest) *terrapod.Workspace,
+) *workspaceModel {
+	t.Helper()
+	ctx := context.Background()
+
+	var m workspaceModel
+	plan(&m)
+	planned := m
+
+	req, diags := buildCreateWorkspaceRequest(ctx, &m)
+	if diags.HasError() {
+		t.Fatalf("%s: create request: %v", name, diags)
+	}
+
+	ws := server(req)
+
+	var state workspaceModel
+	// The read starts from the plan, as Create does: the plan value is what a
+	// null-preserving read consults.
+	state = planned
+	if diags := readWorkspaceIntoModel(ctx, ws, &state); diags.HasError() {
+		t.Fatalf("%s: read: %v", name, diags)
+	}
+
+	// Terraform's rule, applied attribute by attribute for the three this
+	// change touches.
+	assertConsistent(t, name+" config_directory", planned.ConfigDirectory, state.ConfigDirectory)
+	assertConsistentBool(t, name+" plan_apply_enabled", planned.PlanApplyEnabled, state.PlanApplyEnabled)
+	assertConsistentBool(t, name+" configure_enabled", planned.ConfigureEnabled, state.ConfigureEnabled)
+	return &state
+}
+
+func assertConsistent(t *testing.T, what string, planned, got types.String) {
+	t.Helper()
+	if planned.IsUnknown() {
+		// The server may supply anything, but it must supply SOMETHING: a
+		// Computed attribute left unknown in state is an error of its own.
+		if got.IsUnknown() {
+			t.Errorf("%s stayed unknown after apply — a Computed attribute must be resolved", what)
+		}
+		return
+	}
+	if !planned.Equal(got) {
+		t.Errorf("%s: planned %v, got %v after apply — this is exactly "+
+			"\"Provider produced inconsistent result after apply\"", what, planned, got)
+	}
+}
+
+func assertConsistentBool(t *testing.T, what string, planned, got types.Bool) {
+	t.Helper()
+	if planned.IsUnknown() {
+		if got.IsUnknown() {
+			t.Errorf("%s stayed unknown after apply — a Computed attribute must be resolved", what)
+		}
+		return
+	}
+	if !planned.Equal(got) {
+		t.Errorf("%s: planned %v, got %v after apply — this is exactly "+
+			"\"Provider produced inconsistent result after apply\"", what, planned, got)
+	}
+}
+
+// theServer applies the server's own defaults to whatever the request omitted,
+// and echoes back whatever it carried. The defaults are the ones #1966 fixed:
+// `config-directory` "", `plan-apply-enabled` TRUE, `configure-enabled` false.
+func theServer(req terrapod.CreateWorkspaceRequest) *terrapod.Workspace {
+	ws := &terrapod.Workspace{
+		ID: "ws-a", Name: "a",
+		ConfigDirectory:  req.ConfigDirectory, // "" when the request omitted it
+		PlanApplyEnabled: true,
+		ConfigureEnabled: false,
+	}
+	if req.PlanApplyEnabled != nil {
+		ws.PlanApplyEnabled = *req.PlanApplyEnabled
+	}
+	if req.ConfigureEnabled != nil {
+		ws.ConfigureEnabled = *req.ConfigureEnabled
+	}
+	return ws
+}
+
+func TestAnOmittedConfigDirectoryRoundTripsAgainstTheServersEmptyString(t *testing.T) {
+	// THE test for this change. A practitioner who never mentions
+	// `config_directory` plans it as unknown (Optional+Computed, no prior
+	// state), the server stores and returns "", and state takes that "".
+	//
+	// Were the attribute Optional-only the plan value would be NULL, the
+	// server would still answer "", and every apply of every workspace that
+	// does not set the attribute would abort. That is not a hypothetical about
+	// this schema: it is what the attribute looked like before #1966, when
+	// null was a meaningful third state the server could return.
+	state := roundTripIsConsistent(t, "omitted", func(m *workspaceModel) {
+		m.ConfigDirectory = types.StringUnknown()
+		m.PlanApplyEnabled = types.BoolUnknown()
+		m.ConfigureEnabled = types.BoolUnknown()
+	}, theServer)
+
+	if state.ConfigDirectory.IsNull() || state.ConfigDirectory.IsUnknown() {
+		t.Fatalf("config_directory resolved to %v, want a concrete value", state.ConfigDirectory)
+	}
+	if got := state.ConfigDirectory.ValueString(); got != "" {
+		t.Errorf("config_directory = %q, want %q — the server's own default", got, "")
+	}
+	// The operations resolve to the server's defaults, not to Go's zero values.
+	if !state.PlanApplyEnabled.ValueBool() {
+		t.Error("plan_apply_enabled resolved false from an omitted attribute — the " +
+			"server defaults it TRUE, and a workspace that cannot plan or apply is " +
+			"not what a practitioner who said nothing asked for")
+	}
+	if state.ConfigureEnabled.ValueBool() {
+		t.Error("configure_enabled resolved true from an omitted attribute — configure is opt-in")
+	}
+}
+
+func TestEveryDeclaredShapeOfTheThreeRoundTripsConsistently(t *testing.T) {
+	// The rest of the matrix. Each case is one apply, and the assertion is
+	// the same consistency rule in every one of them.
+	for _, tc := range []struct {
+		name string
+		plan func(*workspaceModel)
+	}{
+		{"the empty string is the configuration version's root", func(m *workspaceModel) {
+			// The case an emptiness guard on the READ side would break: ""
+			// mapped back to null disagrees with a plan of "".
+			m.ConfigDirectory = types.StringValue("")
+			m.PlanApplyEnabled = types.BoolUnknown()
+			m.ConfigureEnabled = types.BoolUnknown()
+		}},
+		{"a subdirectory roots the operation there", func(m *workspaceModel) {
+			m.ConfigDirectory = types.StringValue("ansible")
+			m.PlanApplyEnabled = types.BoolUnknown()
+			m.ConfigureEnabled = types.BoolUnknown()
+		}},
+		{"configure-only: plan/apply explicitly off", func(m *workspaceModel) {
+			// The combination the two booleans exist for, and the one where a
+			// plain bool on the request would silently lose the `false`.
+			m.ConfigDirectory = types.StringValue("ansible")
+			m.PlanApplyEnabled = types.BoolValue(false)
+			m.ConfigureEnabled = types.BoolValue(true)
+		}},
+		{"both explicitly on", func(m *workspaceModel) {
+			m.ConfigDirectory = types.StringValue("")
+			m.PlanApplyEnabled = types.BoolValue(true)
+			m.ConfigureEnabled = types.BoolValue(true)
+		}},
+		{"configure explicitly off against its own default", func(m *workspaceModel) {
+			// `false` equals the server default here, which is precisely why
+			// it is worth a case: an `omitempty`-shaped bug drops it and the
+			// result happens to match, so this one passes either way. It is
+			// here to document that, not to catch it -- the catching is done
+			// by the configure-only case above, where the default differs.
+			m.PlanApplyEnabled = types.BoolValue(true)
+			m.ConfigureEnabled = types.BoolValue(false)
+			m.ConfigDirectory = types.StringUnknown()
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			roundTripIsConsistent(t, tc.name, tc.plan, theServer)
+		})
+	}
+}
+
+// ── A false must survive, in both directions ───────────────────────────────
+
+func TestAFalseOperationReachesTheWireAndIsNotReadAsAbsent(t *testing.T) {
+	// The request structs hold these as *bool so that "I did not say" and
+	// "turn it off" are different requests; the Workspace holds them as plain
+	// bools with NO omitempty so a false survives the read. Both halves are
+	// asserted here because either one alone lets a false vanish.
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		val  types.Bool
+		want *bool
+	}{
+		{"explicitly true", types.BoolValue(true), ptr(true)},
+		{"explicitly false", types.BoolValue(false), ptr(false)},
+		{"omitted", types.BoolNull(), nil},
+		{"unknown", types.BoolUnknown(), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var m workspaceModel
+			m.PlanApplyEnabled = tc.val
+			m.ConfigureEnabled = tc.val
+
+			create, diags := buildCreateWorkspaceRequest(ctx, &m)
+			if diags.HasError() {
+				t.Fatalf("create: %v", diags)
+			}
+			checkOpBoolPtr(t, "create plan-apply-enabled", create.PlanApplyEnabled, tc.want)
+			checkOpBoolPtr(t, "create configure-enabled", create.ConfigureEnabled, tc.want)
+
+			update, diags := buildUpdateWorkspaceRequest(ctx, &m)
+			if diags.HasError() {
+				t.Fatalf("update: %v", diags)
+			}
+			checkOpBoolPtr(t, "update plan-apply-enabled", update.PlanApplyEnabled, tc.want)
+			checkOpBoolPtr(t, "update configure-enabled", update.ConfigureEnabled, tc.want)
+		})
+	}
+
+	// The read half: false must come back as a concrete false, never null.
+	for _, want := range []bool{true, false} {
+		var m workspaceModel
+		ws := &terrapod.Workspace{
+			ID: "ws-a", Name: "a",
+			PlanApplyEnabled: want,
+			ConfigureEnabled: want,
+		}
+		if diags := readWorkspaceIntoModel(context.Background(), ws, &m); diags.HasError() {
+			t.Fatalf("read: %v", diags)
+		}
+		for _, f := range []struct {
+			what string
+			got  types.Bool
+		}{
+			{"plan_apply_enabled", m.PlanApplyEnabled},
+			{"configure_enabled", m.ConfigureEnabled},
+		} {
+			if f.got.IsNull() || f.got.IsUnknown() {
+				t.Fatalf("%s read back as %v, want a concrete value — these are "+
+					"Optional+Computed, so a null read-back is the inconsistent-result shape",
+					f.what, f.got)
+			}
+			if f.got.ValueBool() != want {
+				t.Errorf("%s = %v, want %v", f.what, f.got.ValueBool(), want)
+			}
+		}
+	}
+}
+
+func TestConfigDirectoryStillTravelsAsAPointerOnUpdateSoEmptyCanBeSent(t *testing.T) {
+	// Create takes a plain string and the SDK drops an empty one, which is
+	// harmless because "" is the server's default anyway. Update takes a
+	// *string precisely so `&""` can travel: that is how an operator moves
+	// the configure root back to the top of the repository, and a plain
+	// string there would make it a silent no-op.
+	ctx := context.Background()
+
+	var m workspaceModel
+	m.ConfigDirectory = types.StringValue("")
+
+	update, diags := buildUpdateWorkspaceRequest(ctx, &m)
+	if diags.HasError() {
+		t.Fatalf("update: %v", diags)
+	}
+	checkStrPtr(t, "update config-directory", update.ConfigDirectory, strPtr(""))
+
+	m.ConfigDirectory = types.StringValue("ansible")
+	update, diags = buildUpdateWorkspaceRequest(ctx, &m)
+	if diags.HasError() {
+		t.Fatalf("update: %v", diags)
+	}
+	checkStrPtr(t, "update config-directory", update.ConfigDirectory, strPtr("ansible"))
+
+	// Null and unknown both say nothing. There is no clear any more -- the
+	// column is non-nullable and the server refuses a JSON null -- so neither
+	// may invent one.
+	for _, val := range []types.String{types.StringNull(), types.StringUnknown()} {
+		m.ConfigDirectory = val
+		update, diags = buildUpdateWorkspaceRequest(ctx, &m)
+		if diags.HasError() {
+			t.Fatalf("update: %v", diags)
+		}
+		checkStrPtr(t, "update config-directory from "+val.String(), update.ConfigDirectory, nil)
+	}
+}
+
+// ── Schema shape ───────────────────────────────────────────────────────────
+
+func TestTheThreeAttributesAreOptionalAndComputed(t *testing.T) {
+	// The inversion of the test this file used to open with. `config_directory`
+	// was Optional-and-NOT-Computed to keep a third state reachable; that
+	// state is `configure_enabled` now, and Optional-only here would mean an
+	// omitted attribute plans null against a server answer of "".
 	var resp resource.SchemaResponse
 	NewResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema build error: %v", resp.Diagnostics)
 	}
 
-	a, ok := resp.Schema.Attributes["config_directory"]
-	if !ok {
-		t.Fatal("config_directory is missing from the schema")
-	}
-	if !a.IsOptional() {
-		t.Error("config_directory must be Optional — otherwise a configure operation " +
-			"cannot be declared in HCL at all")
-	}
-	if a.IsComputed() {
-		t.Error("config_directory must NOT be Computed: with UseStateForUnknown a config " +
-			"that drops the attribute plans as the prior state, so the configure " +
-			"operation could never be turned off from HCL")
-	}
-}
-
-func TestConfigDirectoryNullEmptyAndValueAreThreeDifferentRequests(t *testing.T) {
-	ctx := context.Background()
-
-	cases := []struct {
-		name string
-		val  types.String
-		// create: want a pointer (and its value), or nil for omitted.
-		wantCreate *string
-		// update: want a value, a clear, or neither.
-		wantUpdate *string
-		wantClear  bool
-	}{
-		{
-			name: "a subdirectory roots the operation there",
-			val:  types.StringValue("ansible"),
-			// A plain value on both.
-			wantCreate: strPtr("ansible"), wantUpdate: strPtr("ansible"),
-		},
-		{
-			name: "the empty string is the repository root and must travel",
-			val:  types.StringValue(""),
-			// The case an emptiness guard would silently drop. If create
-			// omits it the workspace is created with no configure operation
-			// at all, and the apply then fails on the read-back.
-			wantCreate: strPtr(""), wantUpdate: strPtr(""),
-		},
-		{
-			name: "null means no configure operation: omitted on create, cleared on update",
-			val:  types.StringNull(),
-			// Omitted on create because null IS the server-side default.
-			// Cleared on update because the attribute is Optional-only, so a
-			// null plan value means the operator removed it from the config.
-			wantCreate: nil, wantUpdate: nil, wantClear: true,
-		},
-		{
-			name: "unknown is left alone on both",
-			val:  types.StringUnknown(),
-			// An unknown is not an instruction. Clearing on unknown would
-			// turn the configure operation off mid-plan.
-			wantCreate: nil, wantUpdate: nil, wantClear: false,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var m workspaceModel
-			m.ConfigDirectory = tc.val
-
-			create, diags := buildCreateWorkspaceRequest(ctx, &m)
-			if diags.HasError() {
-				t.Fatalf("create: %v", diags)
-			}
-			checkStrPtr(t, "create config-directory", create.ConfigDirectory, tc.wantCreate)
-
-			update, diags := buildUpdateWorkspaceRequest(ctx, &m)
-			if diags.HasError() {
-				t.Fatalf("update: %v", diags)
-			}
-			checkStrPtr(t, "update config-directory", update.ConfigDirectory, tc.wantUpdate)
-			if update.ClearConfigDirectory != tc.wantClear {
-				t.Errorf("update ClearConfigDirectory = %v, want %v", update.ClearConfigDirectory, tc.wantClear)
-			}
-		})
+	for _, name := range []string{"config_directory", "plan_apply_enabled", "configure_enabled"} {
+		a, ok := resp.Schema.Attributes[name]
+		if !ok {
+			t.Fatalf("%s is missing from the schema", name)
+		}
+		if !a.IsOptional() {
+			t.Errorf("%s must be Optional — otherwise it cannot be declared in HCL at all", name)
+		}
+		if !a.IsComputed() {
+			t.Errorf("%s must be Computed: the server supplies a default the provider "+
+				"does not, so an Optional-only attribute plans null against a concrete "+
+				"server answer and fails every apply that omits it with \"Provider "+
+				"produced inconsistent result after apply\"", name)
+		}
 	}
 }
 
-func TestReadKeepsConfigDirectoryNullAndEmptyApart(t *testing.T) {
-	// The read half of the same property. `if *ws.ConfigDirectory != ""` here
-	// is the mistake: it reads the repository-root case back as null, so the
-	// apply that set it fails with "inconsistent result after apply".
+// ── The both-false refusal, driven through ValidateConfig ───────────────────
+
+func TestBothOperationsFalseIsRefusedAtPlanTime(t *testing.T) {
+	// Driven through ValidateConfig itself, not through validateOperationsPair:
+	// a test that hands the helper its arguments proves the helper formats a
+	// diagnostic and says nothing about whether anything calls it. Deleting
+	// the call from ValidateConfig must fail this.
 	ctx := context.Background()
 
-	cases := []struct {
+	for _, tc := range []struct {
 		name      string
-		from      *string
-		wantNull  bool
-		wantValue string
+		planApply tftypes.Value
+		configure tftypes.Value
+		wantError bool
 	}{
-		{"nil is no configure operation", nil, true, ""},
-		{"empty is the repository root", strPtr(""), false, ""},
-		{"a value is that subdirectory", strPtr("ansible"), false, "ansible"},
-	}
-
-	for _, tc := range cases {
+		{
+			name:      "both explicitly false is refused",
+			planApply: tftypes.NewValue(tftypes.Bool, false),
+			configure: tftypes.NewValue(tftypes.Bool, false),
+			wantError: true,
+		},
+		{
+			name:      "configure-only is fine",
+			planApply: tftypes.NewValue(tftypes.Bool, false),
+			configure: tftypes.NewValue(tftypes.Bool, true),
+		},
+		{
+			name:      "plan/apply-only is fine",
+			planApply: tftypes.NewValue(tftypes.Bool, true),
+			configure: tftypes.NewValue(tftypes.Bool, false),
+		},
+		{
+			name: "plan/apply false with configure UNSET is left to the server",
+			// Not refusable here: the server validates the MERGED row, and
+			// this workspace may already hold configure_enabled = true. A
+			// plan-time error would refuse a legitimate configuration.
+			planApply: tftypes.NewValue(tftypes.Bool, false),
+			configure: tftypes.NewValue(tftypes.Bool, nil),
+		},
+		{
+			name:      "both unset is fine — that is the default workspace",
+			planApply: tftypes.NewValue(tftypes.Bool, nil),
+			configure: tftypes.NewValue(tftypes.Bool, nil),
+		},
+		{
+			name: "an unknown is not a declaration",
+			// Comes from an interpolation that has not resolved yet. Refusing
+			// on it would fail a plan that is going to be perfectly valid.
+			planApply: tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue),
+			configure: tftypes.NewValue(tftypes.Bool, false),
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var m workspaceModel
-			ws := &terrapod.Workspace{ID: "ws-a", Name: "a", ConfigDirectory: tc.from}
-			if diags := readWorkspaceIntoModel(ctx, ws, &m); diags.HasError() {
-				t.Fatalf("read: %v", diags)
+			r := NewResource()
+			cfg := configWith(t, ctx, r, map[string]tftypes.Value{
+				"plan_apply_enabled": tc.planApply,
+				"configure_enabled":  tc.configure,
+			})
+
+			var resp resource.ValidateConfigResponse
+			r.(interface {
+				ValidateConfig(context.Context, resource.ValidateConfigRequest, *resource.ValidateConfigResponse)
+			}).ValidateConfig(ctx, resource.ValidateConfigRequest{Config: cfg}, &resp)
+
+			if got := resp.Diagnostics.HasError(); got != tc.wantError {
+				t.Fatalf("ValidateConfig error = %v, want %v (diags: %v)",
+					got, tc.wantError, resp.Diagnostics)
 			}
-			if m.ConfigDirectory.IsNull() != tc.wantNull {
-				t.Fatalf("config_directory null = %v, want %v (value %q)",
-					m.ConfigDirectory.IsNull(), tc.wantNull, m.ConfigDirectory.ValueString())
-			}
-			if !tc.wantNull && m.ConfigDirectory.ValueString() != tc.wantValue {
-				t.Errorf("config_directory = %q, want %q", m.ConfigDirectory.ValueString(), tc.wantValue)
+			if tc.wantError {
+				// The message has to name the way out, or an operator who
+				// wanted to park the workspace has nowhere to go.
+				found := false
+				for _, d := range resp.Diagnostics.Errors() {
+					if strings.Contains(d.Detail(), "locked") {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("the refusal does not mention `locked`, which is the "+
+						"reversible way to park a workspace: %v", resp.Diagnostics)
+				}
 			}
 		})
 	}
 }
 
-// ── The other five ──────────────────────────────────────────────────────────
+// configWith builds a resource config whose every attribute is null except the
+// ones named, so a ValidateConfig test states only what it is about.
+func configWith(t *testing.T, ctx context.Context, r resource.Resource, set map[string]tftypes.Value) tfsdk.Config {
+	t.Helper()
+	var sr resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &sr)
+	if sr.Diagnostics.HasError() {
+		t.Fatalf("schema: %v", sr.Diagnostics)
+	}
+
+	objType, ok := sr.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("the workspace schema did not render as an object type")
+	}
+	vals := make(map[string]tftypes.Value, len(objType.AttributeTypes))
+	for name, aType := range objType.AttributeTypes {
+		if v, override := set[name]; override {
+			vals[name] = v
+			continue
+		}
+		vals[name] = tftypes.NewValue(aType, nil)
+	}
+	// Every name the caller asked for must exist, or the test would silently
+	// assert nothing about a misspelled attribute.
+	for name := range set {
+		if _, ok := objType.AttributeTypes[name]; !ok {
+			t.Fatalf("%s is not an attribute of the workspace schema", name)
+		}
+	}
+	return tfsdk.Config{Schema: sr.Schema, Raw: tftypes.NewValue(objType, vals)}
+}
+
+// ── #1929's remaining five, unchanged by #1966 ─────────────────────────────
 
 func TestIncludePlatformReachesTheWireIncludingFalse(t *testing.T) {
 	// The server default is TRUE, so false is the interesting direction: a
@@ -285,9 +600,10 @@ func TestInventoryPathsPreserveOrderAndAnEmptyListClears(t *testing.T) {
 }
 
 func TestOmittedRootsAreNotSentSoAnUnmanagedValueSurvives(t *testing.T) {
-	// The five Optional+Computed ones follow the unmanagedCollections
-	// contract: omitting the attribute leaves the server's value alone. Only
-	// config_directory differs, and its own test above covers that.
+	// The unmanagedCollections contract: omitting the attribute leaves the
+	// server's value alone. `config_directory` joins this set in #1966 --
+	// previously it was the one exception, because a null meant "turn the
+	// operation off" and had to travel as a clear. It no longer does.
 	ctx := context.Background()
 
 	var m workspaceModel
@@ -296,6 +612,9 @@ func TestOmittedRootsAreNotSentSoAnUnmanagedValueSurvives(t *testing.T) {
 	m.DefaultPlaybook = types.StringNull()
 	m.DefaultLimit = types.StringNull()
 	m.InventoryIncludePlatform = types.BoolNull()
+	m.ConfigDirectory = types.StringNull()
+	m.PlanApplyEnabled = types.BoolNull()
+	m.ConfigureEnabled = types.BoolNull()
 
 	update, diags := buildUpdateWorkspaceRequest(ctx, &m)
 	if diags.HasError() {
@@ -317,6 +636,15 @@ func TestOmittedRootsAreNotSentSoAnUnmanagedValueSurvives(t *testing.T) {
 	if update.InventoryIncludePlatform != nil {
 		t.Errorf("update sent inventory-include-platform %v when the config omitted it",
 			*update.InventoryIncludePlatform)
+	}
+	if update.ConfigDirectory != nil {
+		t.Errorf("update sent config-directory %q when the config omitted it", *update.ConfigDirectory)
+	}
+	if update.PlanApplyEnabled != nil {
+		t.Errorf("update sent plan-apply-enabled %v when the config omitted it", *update.PlanApplyEnabled)
+	}
+	if update.ConfigureEnabled != nil {
+		t.Errorf("update sent configure-enabled %v when the config omitted it", *update.ConfigureEnabled)
 	}
 }
 
@@ -366,6 +694,21 @@ func checkStrPtr(t *testing.T, what string, got, want *string) {
 		t.Errorf("%s was dropped, want %q", what, *want)
 	case want != nil && got != nil && *got != *want:
 		t.Errorf("%s sent %q, want %q", what, *got, *want)
+	}
+}
+
+// checkOpBoolPtr is checkBoolPtr's sibling for an attribute that is not
+// allow-fork-pr-plans: that one's messages name their attribute, which would
+// be actively misleading here.
+func checkOpBoolPtr(t *testing.T, what string, got, want *bool) {
+	t.Helper()
+	switch {
+	case want == nil && got != nil:
+		t.Errorf("%s sent %v, want it omitted", what, *got)
+	case want != nil && got == nil:
+		t.Errorf("%s was dropped, want %v — an explicit value must reach the wire", what, *want)
+	case want != nil && got != nil && *got != *want:
+		t.Errorf("%s sent %v, want %v", what, *got, *want)
 	}
 }
 

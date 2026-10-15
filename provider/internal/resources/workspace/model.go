@@ -92,15 +92,28 @@ type workspaceModel struct {
 	TerragruntEnabled types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion types.String `tfsdk:"terragrunt_version"`
 	AnsibleVersion    types.String `tfsdk:"ansible_version"`
+	// Which operations this workspace has (#1966). Two independent booleans
+	// rather than one parsed value, because the states are genuinely
+	// independent and a delimited string has to be kept in step across the
+	// API, this provider, MCP and the UI -- which is how it eventually means
+	// a third thing. The server defaults PlanApplyEnabled TRUE and
+	// ConfigureEnabled FALSE, and refuses the one combination two booleans
+	// permit and nobody wants: both false, which can never produce a run.
+	PlanApplyEnabled types.Bool `tfsdk:"plan_apply_enabled"`
+	ConfigureEnabled types.Bool `tfsdk:"configure_enabled"`
 	// The ansible configure operation's roots and run defaults (#1929).
 	//
-	// ConfigDirectory is Optional-only, NOT Optional+Computed like its
-	// neighbours, and that is the whole point: Terraform distinguishes null
-	// from "" natively and so does the server, where null means this
-	// workspace has NO configure operation and "" means the repository ROOT.
-	// Optional-only is what makes a removal from the config plan as null and
-	// so reach Update as an explicit clear; Computed would fall back to prior
-	// state and the operation could never be turned off from HCL.
+	// ConfigDirectory is Optional+Computed with UseStateForUnknown, exactly
+	// like WorkingDirectory, and that is the whole of #1966's change here. It
+	// used to be Optional-only to keep null and "" apart, because null meant
+	// "this workspace has no configure operation" and "" meant the repository
+	// root -- one field answering two questions. ConfigureEnabled answers the
+	// first one now, so this is an ordinary non-nullable path where "" is the
+	// configuration version's root. The server stores and returns a concrete
+	// string and REFUSES a JSON null, so Optional-only would plan an omitted
+	// attribute as null against a server answer of "" and fail every apply of
+	// every workspace that does not set it with "Provider produced
+	// inconsistent result after apply".
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`

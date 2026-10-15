@@ -73,6 +73,40 @@ func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.Val
 		)
 	}
 	validateEngineVersionPair(m.EngineVersion, m.TerraformVersion, resp)
+	validateOperationsPair(m.PlanApplyEnabled, m.ConfigureEnabled, resp)
+}
+
+// validateOperationsPair errors when a config turns BOTH operations off
+// (#1966).
+//
+// Two independent booleans permit one combination nobody wants: a workspace
+// that can never produce a run. The server refuses it too — against the merged
+// row, which is the authority, because only the server knows what the other
+// boolean currently holds. This catches the subset that is decidable from the
+// configuration alone, and the precedent is `validateEngineVersionPair` above:
+// catching it at plan is the difference between an error before Terraform
+// decides anything and one after it has already planned.
+//
+// Both must be KNOWN and false. An unknown or omitted attribute is not a
+// declaration — it plans as prior state or takes the server's default — so
+// erroring on one would refuse `plan_apply_enabled = false` on a workspace
+// whose `configure_enabled` the server already holds as true.
+func validateOperationsPair(planApply, configure types.Bool, resp *resource.ValidateConfigResponse) {
+	if planApply.IsNull() || planApply.IsUnknown() {
+		return
+	}
+	if configure.IsNull() || configure.IsUnknown() {
+		return
+	}
+	if !planApply.ValueBool() && !configure.ValueBool() {
+		resp.Diagnostics.AddError(
+			"Workspace declares no operations",
+			"This configuration sets both `plan_apply_enabled` and `configure_enabled` to "+
+				"false, which leaves the workspace with nothing it can run. Enable at "+
+				"least one. To park a workspace without removing it, set `locked = true` "+
+				"instead — that is reversible and keeps its operations declared.",
+		)
+	}
 }
 
 // validateEngineVersionPair errors when a config sets `engine_version` and
@@ -541,30 +575,77 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"config_directory": schema.StringAttribute{
-				Description: "Repository-root-relative directory the ansible configure " +
-					"operation runs in: its fetch scope and the working directory the " +
-					"inventory resolver and the playbook executor both run from. " +
-					"**Leaving this unset means the workspace has no configure operation " +
-					"at all**; setting it to the empty string (`config_directory = \"\"`) " +
-					"roots the operation at the top of the repository. Those are different " +
-					"states, which is why this attribute is Optional and not computed — " +
-					"removing it from the configuration turns the configure operation off.",
-				// Optional ONLY, deliberately. Every neighbour here is
-				// Optional+Computed with UseStateForUnknown so an unmanaged
-				// server-side value survives, but that pattern cannot express
-				// this attribute: a config that omits it would plan as the
-				// prior state, so "no configure operation" would be
-				// unreachable from HCL once one had ever been set. Optional
-				// alone makes a removal plan as null, which Update sends as an
-				// explicit JSON null.
-				//
-				// It also round-trips exactly, which is what makes Optional
-				// safe here where it is not for `ansible_version`: the server
-				// default is NULL and it never substitutes a value, so a null
-				// config reads back null and an empty-string config reads back
-				// an empty string.
+			"plan_apply_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether this workspace has the plan/apply operation — " +
+					"the terraform, OpenTofu or Pulumi half. **Defaults to true**, so a " +
+					"workspace that says nothing about its operations behaves exactly as " +
+					"every workspace did before this attribute existed. Setting it false " +
+					"makes the workspace configure-only. **A workspace with both " +
+					"`plan_apply_enabled` and `configure_enabled` false is refused (422)**: " +
+					"it could never produce a run, and `locked` is the reversible way to " +
+					"park a workspace.",
+				// Optional+Computed with UseStateForUnknown, following
+				// `working_directory` and every other settable scalar here.
+				// Optional alone would plan an omitted attribute as null while
+				// the server answers with a concrete `true`, which is the
+				// "inconsistent result after apply" shape. A schema Default of
+				// true would be worse than wrong: it would make the provider's
+				// idea of the default authoritative over the server's, send
+				// `plan-apply-enabled` on every create nobody asked for, and
+				// drift silently if the server's default ever moved.
 				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"configure_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether this workspace has the ansible configure " +
+					"operation. **Defaults to false**, so configure is opt-in and no " +
+					"existing workspace gains an operation by upgrading. This is what " +
+					"declares the operation — not the presence of a `config_directory`, " +
+					"which is now an ordinary path whose empty value means the " +
+					"configuration version's root. **A workspace with both " +
+					"`configure_enabled` and `plan_apply_enabled` false is refused (422).**",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"config_directory": schema.StringAttribute{
+				MarkdownDescription: "Repository-root-relative directory the ansible " +
+					"configure operation runs in: its fetch scope and the working " +
+					"directory the inventory resolver and the playbook executor both run " +
+					"from. **Defaults to the empty string, which is the configuration " +
+					"version's root** — exactly what an empty `working_directory` means. " +
+					"It does not decide whether the workspace *has* a configure " +
+					"operation; `configure_enabled` does (#1966). Omitting this attribute " +
+					"leaves any existing server-side value untouched rather than resetting " +
+					"it to the root; set `config_directory = \"\"` to move it back to the " +
+					"top of the repository.",
+				// Optional+Computed with UseStateForUnknown, the shape
+				// `working_directory` has always had and the one #1966 moves
+				// this attribute to. It was Optional-only while null meant "no
+				// configure operation": that third state is `configure_enabled`
+				// now, the column is non-nullable, and the server refuses a
+				// JSON null outright.
+				//
+				// Optional-only here would be the defect this change could
+				// most easily ship. A practitioner who omits the attribute
+				// plans null; the server stores and returns ""; the read-back
+				// disagrees with the plan and EVERY apply of EVERY workspace
+				// that does not set it fails with "Provider produced
+				// inconsistent result after apply". Sending "" for a null
+				// config instead cannot rescue it either -- the read would
+				// then have to map "" back to null, which breaks the
+				// practitioner who writes `config_directory = ""` explicitly.
+				// Computed is the only shape that satisfies both.
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"inventory_paths": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -1240,8 +1321,20 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
 	}
-	// #1929's six. `config_directory` is handled per-operation below, because
-	// create omits a null and update has to CLEAR it.
+	// Which operations the new workspace has (#1966). POINTERS on the request,
+	// so an explicit `false` is distinguishable from an omitted attribute --
+	// which matters most for `plan_apply_enabled`, whose server default is
+	// TRUE: a plain bool would make "I did not say" and "turn it off" the same
+	// request and silently create a configure-only workspace.
+	if !m.PlanApplyEnabled.IsNull() && !m.PlanApplyEnabled.IsUnknown() {
+		v := m.PlanApplyEnabled.ValueBool()
+		req.PlanApplyEnabled = &v
+	}
+	if !m.ConfigureEnabled.IsNull() && !m.ConfigureEnabled.IsUnknown() {
+		v := m.ConfigureEnabled.ValueBool()
+		req.ConfigureEnabled = &v
+	}
+	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
 		// removes every source, so it has to reach the wire as `[]`.
@@ -1262,13 +1355,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.InventoryIncludePlatform.ValueBool()
 		req.InventoryIncludePlatform = &v
 	}
-	// Null means "no configure operation", which is the server-side default,
-	// so create omits it rather than sending an explicit null. An empty
-	// string is a real value -- the repository root -- and must travel, which
-	// is why this is not guarded on ValueString() != "".
+	// An ordinary path now (#1966): a plain string on the request, like
+	// `working_directory` below. An unknown -- which is what an omitted
+	// Optional+Computed attribute plans as on a create -- is left off the
+	// wire so the server supplies its own default of "", and the read-back
+	// then fills state with that same "".
 	if !m.ConfigDirectory.IsNull() && !m.ConfigDirectory.IsUnknown() {
-		v := m.ConfigDirectory.ValueString()
-		req.ConfigDirectory = &v
+		req.ConfigDirectory = m.ConfigDirectory.ValueString()
 	}
 	if !m.DefaultPlaybook.IsNull() && !m.DefaultPlaybook.IsUnknown() {
 		req.DefaultPlaybook = m.DefaultPlaybook.ValueString()
@@ -1441,8 +1534,20 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
 	}
-	// #1929's six. `config_directory` is handled per-operation below, because
-	// create omits a null and update has to CLEAR it.
+	// Which operations the workspace has (#1966). Pointers for the same reason
+	// as on create: an explicit `false` has to be distinguishable from an
+	// omitted attribute. The server validates the pair against the MERGED row,
+	// so turning one off while the other is only in state is refused there
+	// rather than here.
+	if !m.PlanApplyEnabled.IsNull() && !m.PlanApplyEnabled.IsUnknown() {
+		v := m.PlanApplyEnabled.ValueBool()
+		req.PlanApplyEnabled = &v
+	}
+	if !m.ConfigureEnabled.IsNull() && !m.ConfigureEnabled.IsUnknown() {
+		v := m.ConfigureEnabled.ValueBool()
+		req.ConfigureEnabled = &v
+	}
+	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
 		// removes every source, so it has to reach the wire as `[]`.
@@ -1463,17 +1568,14 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.InventoryIncludePlatform.ValueBool()
 		req.InventoryIncludePlatform = &v
 	}
-	// On update a null is not "leave it alone" -- this attribute is
-	// Optional-only, so a null plan value means the operator removed it from
-	// the configuration, and the matching request is an explicit JSON null
-	// that turns the configure operation off. An unknown is left alone; only
-	// a known null clears.
-	switch {
-	case m.ConfigDirectory.IsUnknown():
-		// nothing: let the server keep what it holds
-	case m.ConfigDirectory.IsNull():
-		req.ClearConfigDirectory = true
-	default:
+	// Still a POINTER on the update request, where create takes a plain
+	// string: that is what lets `&""` travel as an explicit "" and move the
+	// root back to the top of the repository. There is no clear any more --
+	// the attribute is non-nullable and the server refuses a JSON null -- so a
+	// null or unknown plan value means "say nothing", which under
+	// UseStateForUnknown is only ever reached before the attribute has a
+	// value at all.
+	if !m.ConfigDirectory.IsNull() && !m.ConfigDirectory.IsUnknown() {
 		v := m.ConfigDirectory.ValueString()
 		req.ConfigDirectory = &v
 	}
@@ -1655,19 +1757,23 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.AnsibleVersion = types.StringNull()
 	}
 
+	// Which operations the workspace has (#1966), read side. Straight
+	// projections: both are Optional+Computed, so a null read-back is the
+	// "inconsistent result after apply" shape, and `false` is a real value on
+	// each. The SDK holds them as plain bools with no `omitempty`, precisely
+	// so a false survives the round trip rather than vanishing as absent.
+	m.PlanApplyEnabled = types.BoolValue(ws.PlanApplyEnabled)
+	m.ConfigureEnabled = types.BoolValue(ws.ConfigureEnabled)
+
 	// #1929's six, read side.
 	//
-	// `config_directory` is the one that must NOT collapse null and "": nil
-	// from the SDK is "no configure operation" and reads as Terraform null,
-	// while a pointer to "" is the repository root and reads as the empty
-	// string. Writing `if *ws.ConfigDirectory != ""` here would make the
-	// repository-root case read back as null and fail every apply that uses
-	// it with "Provider produced inconsistent result after apply".
-	if ws.ConfigDirectory != nil {
-		m.ConfigDirectory = types.StringValue(*ws.ConfigDirectory)
-	} else {
-		m.ConfigDirectory = types.StringNull()
-	}
+	// `config_directory` is an ordinary non-nullable path now (#1966), so this
+	// is an unconditional projection like `working_directory` below -- and it
+	// must stay one. Mapping "" to null here, which is what the surrounding
+	// `if x != ""` pattern would do, would make every workspace rooted at its
+	// configuration version's root read back as null against a plan of "" and
+	// fail the apply with "Provider produced inconsistent result after apply".
+	m.ConfigDirectory = types.StringValue(ws.ConfigDirectory)
 	// Empty is the server's own default for both, and these two are
 	// Optional+Computed, so an empty value reads as null and keeps a workspace
 	// that declares no default out of the diff -- the same arrangement as

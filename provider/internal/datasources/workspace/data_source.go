@@ -38,6 +38,8 @@ type workspaceDataSourceModel struct {
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	AnsibleVersion                types.String `tfsdk:"ansible_version"`
+	PlanApplyEnabled              types.Bool   `tfsdk:"plan_apply_enabled"`
+	ConfigureEnabled              types.Bool   `tfsdk:"configure_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
@@ -122,7 +124,9 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"ansible_version":                  computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
-			"config_directory":                 computedString("Repository-root-relative directory the ansible configure operation runs in. **Null means the workspace has no configure operation at all**; the empty string means it is rooted at the top of the repository. The two are different states, so do not treat a null as an empty path."),
+			"plan_apply_enabled":               computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
+			"configure_enabled":                computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
+			"config_directory":                 computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
 			"inventory_paths":                  computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
 			"default_playbook":                 computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
 			"default_limit":                    computedString("The default `--limit` for a configure run. Null means the whole inventory."),
@@ -269,16 +273,29 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	// rather than pinning one (#2010); the server does not substitute the
 	// resolved default, so null is the honest reading.
 	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
-	// #1929's six. `config-directory` reads through GetStringPtrAttr, NOT
-	// setOptionalString: that helper maps "" to null, which is exactly the
-	// collapse this field cannot survive -- null is "no configure operation"
-	// and "" is the repository root, so a data source using it would report
-	// every root-rooted workspace as having no configure operation at all.
-	if cd := terrapod.GetStringPtrAttr(res, "config-directory"); cd != nil {
-		m.ConfigDirectory = types.StringValue(*cd)
-	} else {
-		m.ConfigDirectory = types.StringNull()
+	// Which operations the workspace has (#1966). Each falls back to its own
+	// server-side default when the attribute is ABSENT, the same rule as
+	// `inventory-include-platform` below and for the same two reasons: a
+	// server predating #1966 sends neither, and a workspace read through
+	// /api/tfe/v2 drops both. Reading absent as `false` would be wrong in the
+	// dangerous direction for `plan-apply-enabled` -- it would report an
+	// ordinary terraform workspace as having no plan/apply operation, i.e. as
+	// a workspace that can never run.
+	m.PlanApplyEnabled = types.BoolValue(true)
+	if v := terrapod.GetBoolPtrAttr(res, "plan-apply-enabled"); v != nil {
+		m.PlanApplyEnabled = types.BoolValue(*v)
 	}
+	m.ConfigureEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "configure-enabled"); v != nil {
+		m.ConfigureEnabled = types.BoolValue(*v)
+	}
+	// #1929's six. `config-directory` is an ordinary non-nullable path now
+	// (#1966), so it reads as a plain string and NOT through
+	// setOptionalString: that helper maps "" to null, and "" is a real value
+	// here -- the configuration version's root -- so a data source using it
+	// would report every root-rooted workspace as having no path at all.
+	// Whether there is a configure operation is `configure-enabled` above.
+	m.ConfigDirectory = types.StringValue(terrapod.GetStringAttr(res, "config-directory"))
 	setOptionalString(&m.DefaultPlaybook, terrapod.GetStringAttr(res, "default-playbook"))
 	setOptionalString(&m.DefaultLimit, terrapod.GetStringAttr(res, "default-limit"))
 	// Absent is TRUE, not false: the column defaults to true, so a server
