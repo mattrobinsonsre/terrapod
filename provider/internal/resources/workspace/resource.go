@@ -24,6 +24,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 var (
@@ -159,6 +160,33 @@ func onlyPool(v attr.Value, id string) bool {
 	}
 	s, ok := l.Elements()[0].(types.String)
 	return ok && s.ValueString() == id
+}
+
+// derivedNames is every Computed attribute whose value the SERVER derives from
+// a configurable one, with the attributes it is derived from (#2110).
+//
+// A ledger, so `TestEveryDerivedNameIsGuarded` can check it against the schema
+// rather than anyone having to remember. `agent_pool_name` shipped unguarded
+// while the schema comment beside it listed the attribute as safe for
+// `UseStateForUnknown` -- with the invariant "only changes when agent_pool_id
+// changes", which is a statement of the bug rather than of stability.
+var derivedNames = []planmods.Derived{
+	// The pool name follows whichever of the two the config uses to assign
+	// pools, so both are sources.
+	{Name: "agent_pool_name", Sources: []string{"agent_pool_id", "agent_pool_ids"}},
+	{Name: "vcs_connection_name", Sources: []string{"vcs_connection_id"}},
+}
+
+// poolSetSize reports how many pools a pool-set list holds, or 0 when it is
+// null, unknown or not a list. It answers the question `onlyPool` cannot: that
+// one conflates "holds more than the configured pool" with "holds one DIFFERENT
+// pool", and only the first drops anything (#2110).
+func poolSetSize(v attr.Value) int {
+	l, ok := v.(types.List)
+	if !ok || l.IsNull() || l.IsUnknown() {
+		return 0
+	}
+	return len(l.Elements())
 }
 
 // hasElements reports whether a collection attribute holds at least one
@@ -305,16 +333,29 @@ func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 				resp.Plan.SetAttribute(ctx, path.Root("agent_pool_ids"),
 					types.ListUnknown(types.StringType))...,
 			)
-			resp.Diagnostics.AddAttributeWarning(
-				path.Root("agent_pool_id"),
-				"Applying agent_pool_id will drop the workspace's other agent pools",
-				"The workspace runs on several agent pools, but this configuration sets the "+
-					"singular `agent_pool_id`, which replaces the whole set with that one "+
-					"pool. Terraform reports no change to `agent_pool_ids` because the "+
-					"configuration does not declare it.\n\n"+
-					"To keep the set, use `agent_pool_ids = [...]` instead. Losing pools "+
-					"reduces this workspace to a single point of execution failure.",
-			)
+			// The WARNING is narrower than the unknown marking above, and
+			// conflating the two was the bug (#2110). `!onlyPool` is true in two
+			// situations: the workspace holds more pools than the one
+			// configured, and the workspace holds one DIFFERENT pool. Only the
+			// first drops anything -- a 1->1 move of pool replaces a set of one
+			// with a set of one -- so warning on the second told an operator
+			// their workspace "runs on several agent pools" when it ran on
+			// exactly one, about a change that loses nothing.
+			//
+			// The unknown marking still applies to both, because the set
+			// genuinely changes either way.
+			if poolSetSize(state.AgentPoolIDs) > 1 {
+				resp.Diagnostics.AddAttributeWarning(
+					path.Root("agent_pool_id"),
+					"Applying agent_pool_id will drop the workspace's other agent pools",
+					"The workspace runs on several agent pools, but this configuration sets the "+
+						"singular `agent_pool_id`, which replaces the whole set with that one "+
+						"pool. Terraform reports no change to `agent_pool_ids` because the "+
+						"configuration does not declare it.\n\n"+
+						"To keep the set, use `agent_pool_ids = [...]` instead. Losing pools "+
+						"reduces this workspace to a single point of execution failure.",
+				)
+			}
 			continue
 		}
 		if !a.value(&cfg).IsNull() || !hasElements(a.value(&state)) {
@@ -334,6 +375,18 @@ func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 				"silence it.",
 		)
 	}
+
+	// A Computed name derived from a configurable id must not be promised from
+	// state on an apply that changes that id (#2110). Last, so it sees the
+	// planned values the loop above may have altered.
+	//
+	// This is the whole of the class, derived rather than listed --
+	// `TestEveryDerivedNameIsGuarded` walks the schema for Computed,
+	// non-configurable, UseStateForUnknown attributes whose name is an
+	// `<x>_name` beside a configurable `<x>_id`, and fails if one is missing
+	// here. `agent_pool_name` shipped unguarded while the resource's own
+	// safe-list named it as safe.
+	planmods.UnknownStringWhenSourceChanges(ctx, req, resp, derivedNames)
 }
 
 func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -863,9 +916,19 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			// Safe-for-UseStateForUnknown set (each field's invariant):
 			//   created_at         — immutable after creation
 			//   owner_email        — only the platform admin can change; PATCH never does
-			//   agent_pool_name    — only changes when agent_pool_id changes (caller's PATCH)
-			//   vcs_connection_name — only changes when vcs_connection_id changes
 			//   state_diverged     — only set/cleared by a state upload pathway; not by PATCH
+			//
+			// Safe ONLY BECAUSE ModifyPlan marks them unknown when their source
+			// changes (#2110). These two are derived from a configurable id, so
+			// they DO change as a side effect of the applies that change it --
+			// which is the very thing the rule above excludes. They were listed
+			// in the safe set above with the invariant "only changes when
+			// <x>_id changes", which reads as a stability argument and is
+			// actually a statement of the bug: `UseStateForUnknown` then planned
+			// the old name against a read-back of the new one and the framework
+			// refused the apply, after the server-side change had succeeded.
+			//   agent_pool_name     — guarded, sources agent_pool_id/agent_pool_ids
+			//   vcs_connection_name — guarded, source vcs_connection_id
 			//
 			// Server-volatile set (NO UseStateForUnknown — plan will
 			// honestly show `(known after apply)`; the diff noise is the
