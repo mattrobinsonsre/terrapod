@@ -956,6 +956,7 @@ reads to decide what happened to an apply. Terrapod reports these values:
 | `finished` | The apply completed successfully |
 | `errored` | The apply was dispatched and did not complete successfully |
 | `unreachable` | The apply was never dispatched -- the plan failed, was discarded, or the run never got that far |
+| `canceled` | The run was canceled or discarded |
 
 **`errored` means "the apply was dispatched and did not succeed", which is not
 the same as "the engine ran".** The timestamp this is derived from is set when
@@ -971,6 +972,11 @@ signal that distinguishes the two, and inventing one would be a schema change.
 > ran and failed. If you have automation that branches on `unreachable` to mean
 > "safe to re-run without inspecting state", re-read it: that value is now
 > reserved for applies that genuinely were not dispatched.
+>
+> **`tofu` and `terraform` are unaffected.** Neither reads this sub-resource's
+> status: both call only the apply's log endpoint, and neither references the
+> `unreachable` constant at all. The affected population is third-party
+> `go-tfe` automation that calls `Applies.Read` itself.
 
 ### List Workspace Runs
 
