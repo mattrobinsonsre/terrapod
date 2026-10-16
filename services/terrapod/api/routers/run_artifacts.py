@@ -139,6 +139,54 @@ async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> No
         logger.debug("Failed to publish log_updated after artifact upload")
 
 
+async def _publish_run_updated(workspace_id: str, run_id: str, changed: str) -> None:
+    """Notify the UI that a run's own columns changed outside a transition.
+
+    The run detail page refetches the run on exactly one event after mount --
+    `run_status_change`. But three uploads write columns the page renders and
+    change no status, and on the Terraform path two of them arrive AFTER the
+    `plan-result` POST that drove the transition:
+
+        post_plan_result      -> complete_plan -> run_status_change
+        upload_plan_json      -> the five resource_* counts
+        upload_cost_estimate  -> has_cost_estimate + the cached totals
+
+    in that order, in `job_entrypoint`'s Terraform path -- named rather than
+    cited by line, because the numbers differ per release line and the ORDER is
+    the claim.
+
+    So `loadRun()` ran against a row whose numbers had not arrived, and nothing
+    ran again: the Overview's Changes and Cost cards stayed empty until the
+    operator reloaded the page (#2119). The cost one is measured at roughly 14
+    seconds after plan-result -- see the comment on the PR status-comment
+    refresh in `upload_cost_estimate`, which exists for this same lateness and
+    updates the pull request while telling the browser nothing.
+
+    A distinct event rather than reusing `run_status_change`: no status
+    changed, and the page keys on that name to drive log followers and phase
+    transitions. `changed` names what moved, so a consumer can be selective
+    without parsing the run.
+
+    Publishing failures are swallowed for the reason `_publish_log_updated`
+    gives: an SSE hiccup must never fail an in-flight artifact upload. The
+    fallback is the old behaviour -- the UI waits for the next event.
+    """
+    try:
+        from terrapod.redis.client import RUN_EVENTS_PREFIX, publish_event
+
+        payload = json.dumps(
+            {
+                "event": "run_updated",
+                "run_id": run_id,
+                "workspace_id": workspace_id,
+                "changed": changed,
+            }
+        )
+        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+    except Exception:
+        logger.debug("Failed to publish run_updated after artifact upload")
+
+
 # ── Downloads (302 redirect to presigned GET URL) ────────────────────────
 
 
@@ -450,6 +498,11 @@ async def _enqueue_plan_json_followups(run: Run, db: AsyncSession) -> Response:
 
     await vcs_status_comment.refresh_for_run(db, run, "counts")
 
+    # And the fourth case of that same race, which had no handler at all: the
+    # run page's Changes card reads these counts, and the page refetches only
+    # on a status change -- which happened before this request (#2119).
+    await _publish_run_updated(str(run.workspace_id), str(run.id), "plan-json")
+
     return Response(status_code=204)
 
 
@@ -567,6 +620,9 @@ async def upload_cost_estimate(
         from terrapod.services import vcs_status_comment
 
         await vcs_status_comment.refresh_for_run(db, run, "cost")
+        # The browser needs the same refresh the comment just got (#2119) --
+        # the Cost card and the Cost tab both read what this request wrote.
+        await _publish_run_updated(str(run.workspace_id), str(run.id), "cost-estimate")
         return Response(status_code=204)
     finally:
         try:
@@ -957,6 +1013,12 @@ async def record_resource_profile(
         peak_cpu_usec=peak_cpu_usec,
         exit_code=exit_code,
     )
+
+    # The Details tab reads the peaks and the exit code, and `error_message`
+    # may have just been set to the runner's own account of the failure (#1631)
+    # -- all written after the transition that the page last refetched on
+    # (#2119).
+    await _publish_run_updated(str(run.workspace_id), str(run.id), "resource-profile")
 
     return Response(status_code=204)
 
