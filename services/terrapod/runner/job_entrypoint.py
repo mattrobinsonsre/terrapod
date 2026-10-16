@@ -856,7 +856,11 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # does not mean no credentials, it means the POOL's, broader than the ones
     # this workspace was moved off, so the run would succeed against real
     # infrastructure under permissions nobody chose.
-    for _k, _v in cloud_identity.run(cfg, binary=binary, cwd=cwd).items():
+    # `var_file_argv` is built at step 8, above, so discovery sees exactly the
+    # inputs the plan will (#2132).
+    for _k, _v in cloud_identity.run(
+        cfg, binary=binary, cwd=cwd, var_file_args=var_file_argv
+    ).items():
         os.environ[_k] = _v
 
     # 11. Phase-specific execution. Terraform only — Pulumi returned at 7b.

@@ -104,6 +104,7 @@ import httpx
 import structlog
 
 from terrapod.runner import exec_subprocess
+from terrapod.runner.phases import tf_args
 
 # `structlog` directly, not `terrapod.logging_config`: the runner image ships
 # only the modules Dockerfile.runner names, and that one is not among them.
@@ -226,7 +227,49 @@ def parse_graph(output: str) -> set[str]:
     return {_target_name(m.group(1), m.group(2)) for m in _PROVIDER_NODE.finditer(output)}
 
 
-def discover(*, binary: str, cwd: Path) -> Discovery:
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _engine_failure_detail(output: str, *, limit: int = 400) -> str:
+    """The engine's own `Error:` summary, not a tail of coloured bytes (#2132).
+
+    This used to keep the last 300 characters of combined output with ANSI
+    codes intact, and the message was cut again downstream -- so what actually
+    reached the operator was `Error: Faile`, which names nothing. A truncated
+    tail is the wrong unit: the useful part of a terraform/tofu failure is the
+    `Error:` summary line and the first line of its detail, and those are at
+    the START of the diagnostic block, not the end.
+
+    ANSI is stripped here rather than by passing `-no-color`, deliberately. The
+    flag is undocumented in `graph -help` on both engines and unverifiable
+    against an engine version this machine does not have, whereas stripping in
+    Python cannot fail and cannot change the command's behaviour. The graph
+    itself is never coloured -- DOT goes to stdout -- so colour only ever
+    mattered for the diagnostic.
+    """
+    clean = _ANSI.sub("", output or "")
+    # The box-drawing characters terraform/tofu wrap diagnostics in carry no
+    # information once the lines are selected.
+    lines = [ln.strip(" \u2502\u2577\u2575\t") for ln in clean.splitlines()]
+    summaries = [ln for ln in lines if ln.startswith("Error:")]
+    if not summaries:
+        # No recognisable diagnostic: fall back to the tail, which is at least
+        # honest about being a fragment, and say so.
+        tail = clean.strip()[-limit:]
+        return f"(no Error: line found; last {limit} chars) {tail}" if tail else "no output"
+    out: list[str] = []
+    for summary in summaries:
+        out.append(summary)
+        # The first non-empty line after the summary is its detail, which is
+        # where the variable name or module address lives.
+        i = lines.index(summary)
+        detail = next((ln for ln in lines[i + 1 :] if ln), "")
+        if detail and not detail.startswith("Error:"):
+            out.append(detail)
+    return " | ".join(out)[:limit]
+
+
+def discover(*, binary: str, cwd: Path, var_file_args: list[str] | None = None) -> Discovery:
     """Which provider configurations the root module uses, and how sure we are.
 
     Runs the engine's own graph command, which answers exactly the question and
@@ -241,21 +284,49 @@ def discover(*, binary: str, cwd: Path) -> Discovery:
     goes up and the API, which does know, decides. Raising here would fail runs
     that configure no cloud identity at all.
     """
+    # The plan's own inputs, or discovery refuses a configuration the plan
+    # accepts (#2132). The workspace's Terraform VARIABLES already reach graph
+    # without help: `terrapod.auto.tfvars` is rendered at step 4b of the
+    # entrypoint, well before this runs at 10b, and the engine auto-loads
+    # `*.auto.tfvars`. What was missing is the workspace's explicit
+    # `var_files`, which only arrive as `-var-file`.
+    #
+    # Measured against OpenTofu 1.12.6 with a module version taken from a
+    # variable: bare `graph` fails with "Failed to request input from user for
+    # variable var.module_version"; with either the auto tfvars present or
+    # `-var-file`, that error is gone. Note graph tolerates a variable used
+    # only in a RESOURCE ARGUMENT (rc=0, provider nodes listed) and refuses one
+    # needed during STATIC EVALUATION -- a module version, source or count --
+    # which is why this was invisible until a config did the latter.
+    argv = [binary, "graph"]
+    if var_file_args and tf_args.graph_supports_var_file(binary):
+        argv.extend(var_file_args)
+
     try:
         proc = subprocess.run(  # noqa: S603 - the engine binary the run already uses
-            [binary, "graph"],
+            argv,
             cwd=str(cwd),
             capture_output=True,
             text=True,
             timeout=DISCOVER_TIMEOUT_SECONDS,
+            # No stdin, so a configuration needing a value nobody supplied
+            # FAILS instead of waiting for a prompt. `-input=false` is the
+            # obvious flag and `graph` REJECTS it -- measured: "flag provided
+            # but not defined: -input" -- so passing it would break every
+            # discovery. `capture_output` redirects stdout and stderr only, and
+            # would have left stdin inherited.
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return Discovery(outcome="failed", detail=f"{binary} graph failed to run: {exc}")
 
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip()[-300:]
         return Discovery(
-            outcome="failed", detail=f"{binary} graph exited {proc.returncode}. {tail}"
+            outcome="failed",
+            detail=(
+                f"{binary} graph exited {proc.returncode}: "
+                f"{_engine_failure_detail(proc.stderr or proc.stdout or '')}"
+            ),
         )
 
     output = proc.stdout or ""
@@ -337,6 +408,12 @@ def run(
     binary: str,
     cwd: Path,
     discover_providers: bool = True,
+    # The workspace's `var_files`, so discovery evaluates the configuration
+    # with the same inputs the plan will use (#2132). Optional with a None
+    # default because the Pulumi path passes `discover_providers=False` and has
+    # no var files to give; a plan-path caller that forgets is the regression
+    # the gate in the tests catches.
+    var_file_args: list[str] | None = None,
     token_dir: Path | None = None,
     client: httpx.Client | None = None,
     discover_fn=None,
@@ -364,7 +441,7 @@ def run(
         return {}
 
     if discover_providers:
-        found = (discover_fn or discover)(binary=binary, cwd=cwd)
+        found = (discover_fn or discover)(binary=binary, cwd=cwd, var_file_args=var_file_args)
     else:
         # `ok` with nothing in it, because nothing went wrong and there is
         # nothing to report. The API knows this engine cannot discover and does

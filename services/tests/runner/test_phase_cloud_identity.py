@@ -114,8 +114,13 @@ def _found(targets=(), *, outcome="ok", detail=""):
     """A canned `Discovery`, with a counter so a test can prove it was called."""
     calls: list[dict] = []
 
-    def discover_fn(*, binary, cwd):
-        calls.append({"binary": binary, "cwd": cwd})
+    def discover_fn(*, binary, cwd, **kw):
+        # `**kw` rather than enumerating: `discover` gained `var_file_args`
+        # (#2132) and will gain more, and a stub that lists what it is handed
+        # fails every test in this file for a reason that has nothing to do
+        # with what they assert. The kwargs are RECORDED so a test can still
+        # assert on them -- see the var-file gate.
+        calls.append({"binary": binary, "cwd": cwd, **kw})
         return cloud_identity.Discovery(outcome=outcome, targets=set(targets), detail=detail)
 
     return discover_fn, calls
