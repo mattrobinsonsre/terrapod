@@ -218,22 +218,181 @@ class TestTheCallSitePassesThem:
             "expected the argv built at step 8, not a literal"
         )
 
-    def test_it_is_handed_the_same_argv_the_plan_uses(self):
-        """Not a freshly built list: the point is that discovery and the plan
-        agree, so it must be the SAME name the other phases are given."""
-        name = self._plan_path_call()
-        passed = {k.arg: k.value for k in name.keywords}["var_file_args"]
+    def test_it_is_handed_a_list_resolved_against_the_plans_directory(self):
+        """Supersedes an earlier assertion that this had to be the SAME name
+        the other phases are given.
+
+        That assertion's reason still holds -- discovery and the plan must see
+        the same inputs -- but it had the mechanism wrong, and the wrong way
+        round. The phases do not share a working directory: `exec_subprocess.run`
+        takes no `cwd`, so plan and apply run in the PROCESS directory, while
+        discovery is given `cwd=cwd`, which step 9b has already moved to the
+        `.terragrunt-cache` copy on every Terragrunt run. Handing both the same
+        relative `-var-file` therefore made them read DIFFERENT files, which is
+        the opposite of agreeing. The same list is the appearance of agreement;
+        a list resolved against the plan's own directory is the substance.
+        """
+        passed = {k.arg: k.value for k in self._plan_path_call().keywords}["var_file_args"]
+        assert isinstance(passed, ast.Name), "expected a name built at step 8"
+
         tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
-        others = {
-            k.value.id
+        # Follow the name to its assignment and require a resolution base.
+        builds = [
+            n
             for n in ast.walk(tree)
-            if isinstance(n, ast.Call)
-            for k in n.keywords
-            if k.arg == "var_file_args" and isinstance(k.value, ast.Name)
-        }
-        assert others, "no call passes var_file_args by name anywhere in the entrypoint"
-        assert passed.id in others
-        assert len(others) == 1, (
-            f"more than one name is passed as var_file_args ({sorted(others)}); the phases "
-            "may no longer agree on the inputs"
+            if isinstance(n, ast.Assign)
+            and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name)
+            and n.targets[0].id == passed.id
+        ]
+        assert len(builds) == 1, (
+            f"expected exactly one assignment to {passed.id}, found {len(builds)}"
         )
+        call = builds[0].value
+        assert isinstance(call, ast.Call) and ast.unparse(call.func).endswith("var_file_args"), (
+            f"{passed.id} is not built by tf_args.var_file_args"
+        )
+        base = {k.arg: k.value for k in call.keywords}.get("base_dir")
+        assert base is not None, (
+            f"{passed.id} is built without base_dir, so a relative -var-file resolves "
+            "against whatever directory discovery happens to run in (#2132 follow-up)"
+        )
+        assert isinstance(base, ast.Name) and base.id == "plan_cwd", (
+            f"base_dir is {ast.unparse(base)}; it must be the captured process directory, "
+            "because that is where the plan reads these files"
+        )
+
+    def test_the_other_phases_still_get_the_operators_paths_verbatim(self):
+        """Init, plan and apply run in the process directory already, so
+        resolving their paths would change commands that work today."""
+        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        verbatim = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Assign)
+            and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name)
+            and n.targets[0].id == "var_file_argv"
+            and isinstance(n.value, ast.Call)
+        ]
+        assert verbatim, "var_file_argv is no longer built in the entrypoint"
+        for n in verbatim:
+            assert "base_dir" not in {k.arg for k in n.value.keywords}, (
+                "var_file_argv is resolved, which changes the init/plan/apply command line"
+            )
+
+    def test_plan_cwd_is_captured_before_anything_can_move_cwd(self):
+        """Positional, because a behavioural test cannot see it.
+
+        `plan_cwd` is only the plan's directory if it is taken before step 9b
+        reassigns `cwd` to the Terragrunt cache copy. Captured after, it would
+        equal `cwd` and the fix would be a no-op -- silently, and exactly on
+        the workspaces it exists for.
+        """
+        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        captures = [
+            n.lineno
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Assign)
+            and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name)
+            and n.targets[0].id == "plan_cwd"
+        ]
+        assert len(captures) == 1, f"expected one plan_cwd capture, found {len(captures)}"
+        moves = [
+            n.lineno
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Assign)
+            and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name)
+            and n.targets[0].id == "cwd"
+            and "tg_work" in ast.unparse(n.value)
+        ]
+        assert moves, "the Terragrunt reassignment of cwd is gone; re-read this gate"
+        assert captures[0] < min(moves), (
+            f"plan_cwd is captured at line {captures[0]}, after cwd is moved at "
+            f"{min(moves)} -- so it is the cache dir, not the plan's directory"
+        )
+
+
+class TestTheResolutionBase:
+    """`var_file_args`' optional base, which is what makes the two agree."""
+
+    def test_a_relative_path_resolves_against_the_base(self):
+        out = tf_args.var_file_args(["../../env/prod.tfvars"], base_dir=pathlib.Path("/w/unit"))
+        assert out == ["-var-file=/w/unit/../../env/prod.tfvars"]
+
+    def test_an_absolute_path_is_left_alone(self):
+        out = tf_args.var_file_args(["/etc/prod.tfvars"], base_dir=pathlib.Path("/w/unit"))
+        assert out == ["-var-file=/etc/prod.tfvars"]
+
+    def test_without_a_base_the_path_is_byte_for_byte(self):
+        """The plan's command line must not change. `Path("./a/")` stringifies
+        to `a`, so round-tripping through Path would rewrite it."""
+        assert tf_args.var_file_args(["./env/prod.tfvars"]) == ["-var-file=./env/prod.tfvars"]
+        assert tf_args.var_file_args(["env/"]) == ["-var-file=env/"]
+
+    def test_empty_entries_are_still_dropped_either_way(self):
+        assert tf_args.var_file_args(["", "a.tfvars"]) == ["-var-file=a.tfvars"]
+        assert tf_args.var_file_args(["", "a.tfvars"], base_dir=pathlib.Path("/w")) == [
+            "-var-file=/w/a.tfvars"
+        ]
+
+
+class TestTheProbeCannotRaiseIntoThePhase:
+    """`discover` documents itself as never raising, and the probe execs a
+    binary -- so every exec failure must be the probe's to absorb."""
+
+    @staticmethod
+    def _exec_format_error(*a, **k):
+        raise OSError(8, "Exec format error")
+
+    def test_the_probe_answers_false_on_a_binary_it_cannot_execute(self):
+        with patch("subprocess.run", side_effect=self._exec_format_error):
+            assert tf_args.graph_supports_var_file("tofu") is False
+            assert tf_args.init_supports_var_file("tofu") is False
+
+    def test_the_probe_answers_false_when_the_runner_cannot_fork(self):
+        with patch("subprocess.run", side_effect=OSError(12, "Cannot allocate memory")):
+            assert tf_args.graph_supports_var_file("tofu") is False
+
+    def test_discover_degrades_rather_than_raising_when_the_probe_explodes(self):
+        """The whole point: a workspace with var_files and a broken binary must
+        get a failed discovery, not a runner traceback. Before this, a run that
+        configured no cloud identity at all died on an unrelated exec error."""
+        with patch.object(tf_args, "graph_supports_var_file", side_effect=self._exec_format_error):
+            got = cloud_identity.discover(
+                binary="tofu", cwd=pathlib.Path("/w"), var_file_args=["-var-file=a.tfvars"]
+            )
+        assert got.outcome == "failed"
+        assert "Exec format error" in got.detail
+
+
+class TestADiagnosticIsPairedWithItsOwnDetail:
+    """An engine repeats a summary verbatim; the detail is what differs."""
+
+    def test_two_identical_summaries_keep_their_own_details(self):
+        got = cloud_identity._engine_failure_detail(
+            "Error: Failed to read variables file\n"
+            "  Given variables file prod.tfvars does not exist.\n"
+            "\n"
+            "Error: Failed to read variables file\n"
+            "  Given variables file staging.tfvars does not exist.\n"
+        )
+        assert "prod.tfvars" in got, got
+        assert "staging.tfvars" in got, (
+            "the second summary was paired with the first one's detail, so the operator "
+            "is told the wrong file"
+        )
+        assert got.index("prod.tfvars") < got.index("staging.tfvars"), "details swapped"
+
+    def test_every_ansi_form_an_engine_emits_is_stripped(self):
+        """Not only colour: a progress line erases itself with CSI K and a
+        registry URL arrives wrapped in an OSC 8 hyperlink."""
+        got = cloud_identity._engine_failure_detail(
+            "\x1b[31mError: boom\x1b[0m\n"
+            "  see \x1b]8;;https://example.test\x07the docs\x1b]8;;\x07\x1b[K\n"
+        )
+        assert "\x1b" not in got, f"an escape survived: {got!r}"
+        assert "Error: boom" in got
+        assert "the docs" in got

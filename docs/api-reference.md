@@ -1278,6 +1278,35 @@ link form; the attribute is kept alongside it.
 GET /api/tfe/v2/runs/{run_id}
 ```
 
+#### Apply status on the run
+
+A run's response carries a nested `apply` sub-resource whose
+`attributes.status` is what `go-tfe` — and therefore `tofu`/`terraform` — reads
+to decide what happened to an apply. Terrapod reports four values:
+
+| `apply.status` | Meaning |
+|---|---|
+| `pending` | The run has not reached its apply phase |
+| `running` | The apply is in progress |
+| `finished` | The apply completed successfully |
+| `errored` | The apply was dispatched and did not complete successfully |
+| `unreachable` | The apply was never dispatched — the plan failed, was discarded, or the run never got that far |
+
+**`errored` means "the apply was dispatched and did not succeed", which is not
+the same as "the engine ran".** The timestamp this is derived from is set when
+the apply is *dispatched*, so a run whose runner Job never produced a running
+pod — an image that could not be pulled, a cluster with no room, a listener
+that died mid-launch — also reports `errored`, even though it provably mutated
+nothing. Automation that treats `errored` as "state may be partially applied"
+is therefore over-cautious in that case rather than wrong; there is no stored
+signal that distinguishes the two, and inventing one would be a schema change.
+
+> **Changed in v1.10.4 / v1.9.4.** Before those releases *every* failed apply
+> reported `unreachable`, i.e. "the apply never ran", including applies that
+> ran and failed. If you have automation that branches on `unreachable` to mean
+> "safe to re-run without inspecting state", re-read it: that value is now
+> reserved for applies that genuinely were not dispatched.
+
 ### List Workspace Runs
 
 ```

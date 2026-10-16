@@ -227,7 +227,16 @@ def parse_graph(output: str) -> set[str]:
     return {_target_name(m.group(1), m.group(2)) for m in _PROVIDER_NODE.finditer(output)}
 
 
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# Colour (SGR) was the only form this stripped, and it is not the only form a
+# terraform/tofu diagnostic carries: a progress line erases itself with CSI K
+# and a modern engine emits OSC 8 hyperlinks around registry URLs. A leftover
+# escape lands in the operator's `discovery-detail` field as mojibake inside
+# the one string built to tell them what broke.
+_ANSI = re.compile(
+    r"\x1b\[[0-9;?]*[ -/]*[@-~]"  # CSI: colour, cursor movement, erase
+    r"|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"  # OSC: hyperlinks, window title
+    r"|\x1b[@-Z\\-_]"  # Fe: two-character escapes
+)
 
 
 def _engine_failure_detail(output: str, *, limit: int = 400) -> str:
@@ -251,18 +260,24 @@ def _engine_failure_detail(output: str, *, limit: int = 400) -> str:
     # The box-drawing characters terraform/tofu wrap diagnostics in carry no
     # information once the lines are selected.
     lines = [ln.strip(" \u2502\u2577\u2575\t") for ln in clean.splitlines()]
-    summaries = [ln for ln in lines if ln.startswith("Error:")]
-    if not summaries:
+    # POSITIONS, not the lines themselves. `lines.index(summary)` returns the
+    # FIRST line equal to that summary, and an engine routinely emits the same
+    # summary twice -- two unreadable var-files give `Error: Failed to read
+    # variables file` each, and several bad variables give the same `Error:
+    # Variables not allowed`. Pairing by value then handed the second entry the
+    # FIRST one's detail, so the field built to carry the offending variable or
+    # module address named the wrong one, confidently.
+    summary_at = [i for i, ln in enumerate(lines) if ln.startswith("Error:")]
+    if not summary_at:
         # No recognisable diagnostic: fall back to the tail, which is at least
         # honest about being a fragment, and say so.
         tail = clean.strip()[-limit:]
         return f"(no Error: line found; last {limit} chars) {tail}" if tail else "no output"
     out: list[str] = []
-    for summary in summaries:
-        out.append(summary)
+    for i in summary_at:
+        out.append(lines[i])
         # The first non-empty line after the summary is its detail, which is
         # where the variable name or module address lives.
-        i = lines.index(summary)
         detail = next((ln for ln in lines[i + 1 :] if ln), "")
         if detail and not detail.startswith("Error:"):
             out.append(detail)
@@ -298,11 +313,18 @@ def discover(*, binary: str, cwd: Path, var_file_args: list[str] | None = None) 
     # only in a RESOURCE ARGUMENT (rc=0, provider nodes listed) and refuses one
     # needed during STATIC EVALUATION -- a module version, source or count --
     # which is why this was invisible until a config did the latter.
-    argv = [binary, "graph"]
-    if var_file_args and tf_args.graph_supports_var_file(binary):
-        argv.extend(var_file_args)
-
     try:
+        # The probe is INSIDE the try deliberately. It execs the engine binary,
+        # so it can raise an `OSError` the way any exec can -- a wrong-arch
+        # binary from the cache gives `Errno 8 Exec format error`, a runner at
+        # its fork limit gives ENOMEM. The probe catches those itself; this is
+        # the second half of honouring the "Never raises" contract above
+        # STRUCTURALLY, rather than by trusting one sibling's except clause to
+        # stay wide. Raising here would fail runs that configure no cloud
+        # identity at all, which is what that contract exists to prevent.
+        argv = [binary, "graph"]
+        if var_file_args and tf_args.graph_supports_var_file(binary):
+            argv.extend(var_file_args)
         proc = subprocess.run(  # noqa: S603 - the engine binary the run already uses
             argv,
             cwd=str(cwd),

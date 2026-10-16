@@ -529,8 +529,29 @@ explains:
    references, so a `provider "aws" { alias = "unused" }` nobody points at
    yields no token, correctly. The graph build is allowed **180 seconds**. It is
    a static walk of the configuration: it needs no network, no credentials and
-   no state, and it answers even for a configuration whose `plan` would refuse
-   for a missing required variable.
+   no state.
+
+   **It is not, however, indifferent to the configuration's inputs**, and the
+   distinction decides whether a working workspace can fail here. Measured
+   against OpenTofu 1.12.6: a variable used only in a **resource argument**
+   needs no value for the graph to build, so `graph` succeeds where `plan`
+   would refuse for a missing required variable. A variable read during
+   **static evaluation** — a module `version`, `source` or `count` — must have
+   a value, and without one the graph command fails outright.
+
+   So Terrapod hands the graph the same inputs the plan will get. The
+   workspace's Terraform *variables* already arrive without help, because they
+   are rendered to `terrapod.auto.tfvars` before this runs and the engine
+   auto-loads `*.auto.tfvars`. The workspace's **`var_files`** only arrive as
+   `-var-file`, which Terrapod passes **when the engine advertises the flag on
+   `graph`** — it probes `graph -help` on the binary the run is using rather
+   than consulting a version table. OpenTofu 1.12.6 advertises it; an engine
+   that does not gets a bare `graph`, which is correct rather than silently
+   degraded, but means a configuration whose module version comes from a
+   `var_file` can still fail discovery on that engine. Relative `var_files`
+   paths are resolved against the directory the plan runs in, which is what
+   makes them mean the same file on a Terragrunt workspace, where the engine's
+   own working directory is the `.terragrunt-cache` copy.
 2. **Ask the API for the tokens, once.** `POST
    /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens`, carrying the
    discovered list, returns one token per provider configuration it should
@@ -591,8 +612,15 @@ rather than acting on it. The request carries one of three outcomes:
 | `discovery` | Meaning |
 |---|---|
 | `ok` | The graph was read. The list is authoritative, and may be empty — a configuration that declares no provider needs no token |
-| `failed` | The graph command errored or timed out |
+| `failed` | The graph command errored or timed out. Its own `Error:` summary and detail are reported with it, so an operator sees *which* variable or module the engine could not resolve rather than a truncated fragment |
 | `unparsed` | The graph ran and names provider nodes, but none could be read — the engine's output format has moved, or the pattern that reads it has |
+
+**A `failed` outcome is most often about inputs, not about the cloud.** The
+common causes are a `var_file` the engine cannot read from the directory it is
+running in, and a module `version` or `count` taken from a variable the engine
+has no value for — both of which the step above describes. Neither is a problem
+with the identity configuration, so read the reported `Error:` detail before
+changing anything about audiences or trust policies.
 
 The last two matter because **both arrive as an empty list**, which is
 indistinguishable from a provider-less configuration. Taken at face value they

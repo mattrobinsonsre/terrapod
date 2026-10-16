@@ -667,6 +667,14 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
     log.info("chdir", cwd=str(cwd))
 
+    # The PROCESS working directory, captured before anything can move `cwd`.
+    # These are the same directory here and diverge at step 9b on a Terragrunt
+    # run: `cwd` becomes the `.terragrunt-cache` copy tofu works in, while the
+    # process stays chdir'd here. `exec_subprocess.run` takes no `cwd`, so the
+    # plan and apply run HERE -- which makes this, not `cwd`, the directory a
+    # relative `-var-file` means to the engine that reads it (#2132).
+    plan_cwd = cwd
+
     # The engine decides four things below -- this file, the state download, the
     # plan-lock reuse and the provider-credential export -- so it is read once,
     # here, rather than at each.
@@ -784,6 +792,12 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
+    # The same var-files, resolved against the directory the plan runs in, for
+    # any consumer that runs the engine somewhere else (#2132). Init, plan and
+    # apply take `var_file_argv` verbatim because they run in `plan_cwd`
+    # already; discovery runs with `cwd=cwd`, which on a Terragrunt run is the
+    # cache dir, where the operator's relative path resolves to nothing.
+    discovery_var_file_argv = tf_args.var_file_args(cfg.var_files, base_dir=plan_cwd)
 
     # 9. Init. Apply-phase init runs with -lockfile=readonly so it
     # doesn't drop the other-arch hashes the plan phase's lock_extender
@@ -856,10 +870,12 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # does not mean no credentials, it means the POOL's, broader than the ones
     # this workspace was moved off, so the run would succeed against real
     # infrastructure under permissions nobody chose.
-    # `var_file_argv` is built at step 8, above, so discovery sees exactly the
-    # inputs the plan will (#2132).
+    # `discovery_var_file_argv` is the step-8 list resolved against `plan_cwd`,
+    # so discovery reads exactly the files the plan will (#2132) even where the
+    # two run in different directories -- which is every Terragrunt run, since
+    # `cwd` is the cache copy by now and the plan still runs in `plan_cwd`.
     for _k, _v in cloud_identity.run(
-        cfg, binary=binary, cwd=cwd, var_file_args=var_file_argv
+        cfg, binary=binary, cwd=cwd, var_file_args=discovery_var_file_argv
     ).items():
         os.environ[_k] = _v
 

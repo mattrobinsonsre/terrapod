@@ -1338,10 +1338,33 @@ def _apply_status(run: Run) -> str:
         # decide whether to re-run it, while the apply had in fact run and
         # failed. The `errored` return was effectively dead code.
         #
-        # Whether the apply STARTED is the honest question, and it is already
-        # answered correctly: a plan-phase failure leaves `apply_started_at`
-        # None, and the apply-phase unclaim (#1646) deliberately clears it so a
-        # later error cannot record an apply that never happened.
+        # Whether the apply STARTED is the honest question, and it is answered
+        # correctly for the two cases that leave the timestamp None: a
+        # plan-phase failure never sets it, and the apply-phase unclaim (#1646)
+        # deliberately clears it so a later error cannot record an apply that
+        # never happened.
+        #
+        # It is NOT the same question as "did the engine run", and there is one
+        # reachable case where the two diverge. `apply_started_at` is stamped
+        # when the apply is DISPATCHED (`run_service.queue_apply`, before the
+        # transition), not when the engine starts, so a run whose Job never
+        # produced a running pod has it set: `_check_unschedulable` and
+        # `_check_stale` in the reconciler both read it as `phase_start` and
+        # then `_handle_failed`, which errors the run. An `ImagePullBackOff`, a
+        # cluster with no room, or a listener that died mid-launch therefore
+        # reports `errored` -- "the apply ran and failed" -- for an apply that
+        # provably mutated nothing.
+        #
+        # Reported deliberately rather than guessed at. Telling those apart
+        # needs a signal for "the engine executed", which this function does
+        # not have and which no existing timestamp approximates: `job_name` is
+        # None for one of the two paths and set for the other. Inventing one is
+        # a new column, so it is not patch material, and guessing from these
+        # timestamps is exactly what produced the bug above. `errored` is at
+        # least not the lie `unreachable` was for every genuinely failed apply,
+        # which is the defect this branch exists to fix -- but a consumer that
+        # branches on `errored` to mean "state may be partially applied" will
+        # be over-cautious here, and the release notes say so.
         #
         # A third case arrives with the configure phase: apply succeeded,
         # configure failed. That run is `errored` with the apply genuinely
