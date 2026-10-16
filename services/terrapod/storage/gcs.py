@@ -295,6 +295,32 @@ class GCSStore:
         blob_name = self._full_key(key)
         chunk_queue: queue.Queue[bytes | None] = queue.Queue(maxsize=4)
         download_error: list[Exception] = []
+        # Set once the consumer stops reading, so the thread stops too rather
+        # than waiting forever on a queue nobody drains (#2107).
+        stopped = threading.Event()
+
+        def _put(item: bytes | None) -> bool:
+            """Hand an item to the consumer; False once it has stopped reading."""
+            while not stopped.is_set():
+                try:
+                    chunk_queue.put(item, True, 1.0)
+                    return True
+                except queue.Full:
+                    continue
+            return False
+
+        def _get() -> bytes | None:
+            """Take the next item; None once the consumer has stopped reading.
+
+            A cancelled await leaves this running in its executor worker, so
+            it must not wait on the queue forever either.
+            """
+            while not stopped.is_set():
+                try:
+                    return chunk_queue.get(True, 1.0)
+                except queue.Empty:
+                    continue
+            return None
 
         def _download_in_thread() -> None:
             try:
@@ -303,32 +329,33 @@ class GCSStore:
                 blob = bucket.blob(blob_name)
                 if not blob.exists():
                     download_error.append(ObjectNotFoundError(key))
-                    chunk_queue.put(None)
+                    _put(None)
                     return
                 with blob.open("rb") as f:
                     while True:
                         data = f.read(chunk_size)
                         if not data:
                             break
-                        chunk_queue.put(data)
-                chunk_queue.put(None)  # signal EOF
+                        if not _put(data):
+                            return  # leaving the block closes the reader
+                _put(None)  # signal EOF
             except Exception as e:
                 download_error.append(e)
-                try:
-                    chunk_queue.put(None)
-                except queue.Full:
-                    pass
+                _put(None)
 
         thread = threading.Thread(target=_download_in_thread, daemon=True)
         thread.start()
 
         try:
             while True:
-                item = await asyncio.to_thread(chunk_queue.get)
+                item = await asyncio.to_thread(_get)
                 if item is None:
                     break
                 yield item
         finally:
+            # Before the join, not after: a cancel scope can cancel the join
+            # itself, and the thread must be told to stop either way.
+            stopped.set()
             await asyncio.to_thread(thread.join)
 
         if download_error:
