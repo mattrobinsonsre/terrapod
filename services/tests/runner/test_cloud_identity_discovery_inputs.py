@@ -222,15 +222,22 @@ class TestTheCallSitePassesThem:
         """Supersedes an earlier assertion that this had to be the SAME name
         the other phases are given.
 
-        That assertion's reason still holds -- discovery and the plan must see
-        the same inputs -- but it had the mechanism wrong, and the wrong way
-        round. The phases do not share a working directory: `exec_subprocess.run`
-        takes no `cwd`, so plan and apply run in the PROCESS directory, while
-        discovery is given `cwd=cwd`, which step 9b has already moved to the
-        `.terragrunt-cache` copy on every Terragrunt run. Handing both the same
-        relative `-var-file` therefore made them read DIFFERENT files, which is
-        the opposite of agreeing. The same list is the appearance of agreement;
-        a list resolved against the plan's own directory is the substance.
+        That assertion was about the wrong property. It required discovery
+        and the plan to share one argv NAME, on the reasoning that the two must
+        see the same inputs -- which they must, and already did.
+
+        Measured against terragrunt 1.1.3 + tofu 1.12.6: terragrunt execs tofu
+        inside its `.terragrunt-cache` copy, so a relative `-var-file` fails
+        for the PLAN as well, and with terragrunt off the two directories are
+        identical. So there was never a divergence here. What the resolution
+        buys is that a relative entry the plan cannot read no longer ALSO
+        fails discovery, so the workspace surfaces the plan's own
+        variables-file error rather than a cloud-identity failure earlier in
+        the run that names nothing about the cause.
+
+        This gate therefore pins the resolution being WIRED -- a base passed,
+        and the captured process directory rather than `cwd` -- not a claim
+        about agreement.
         """
         passed = {k.arg: k.value for k in self._plan_path_call().keywords}["var_file_args"]
         assert isinstance(passed, ast.Name), "expected a name built at step 8"

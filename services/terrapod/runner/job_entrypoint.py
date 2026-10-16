@@ -667,12 +667,26 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
     log.info("chdir", cwd=str(cwd))
 
-    # The PROCESS working directory, captured before anything can move `cwd`.
-    # These are the same directory here and diverge at step 9b on a Terragrunt
-    # run: `cwd` becomes the `.terragrunt-cache` copy tofu works in, while the
-    # process stays chdir'd here. `exec_subprocess.run` takes no `cwd`, so the
-    # plan and apply run HERE -- which makes this, not `cwd`, the directory a
-    # relative `-var-file` means to the engine that reads it (#2132).
+    # The PROCESS working directory, captured before anything can move `cwd`:
+    # step 9b reassigns `cwd` to the `.terragrunt-cache` copy on a Terragrunt
+    # run, and `exec_subprocess.run` takes no `cwd`, so plan and apply exec
+    # from HERE.
+    #
+    # It is NOT, however, the directory the ENGINE resolves a relative
+    # `-var-file` against on a Terragrunt run, and an earlier version of this
+    # comment claimed it was. Measured against terragrunt 1.1.3 + tofu 1.12.6:
+    # terragrunt execs tofu inside the cache copy, so `-var-file=../x.tfvars`
+    # passed from the unit dir fails for the PLAN as well -- "Given variables
+    # file ../x.tfvars does not exist". An absolute path plans fine.
+    #
+    # So this base is not closing a divergence; discovery and the plan already
+    # agreed, by both resolving in the same place (identical directory with
+    # terragrunt off, the cache dir with it on). What it buys is narrower and
+    # still worth having: a relative entry that the plan cannot read no longer
+    # ALSO fails discovery, so such a workspace fails on the plan's own
+    # variables-file error instead of a cloud-identity 409 that names nothing
+    # about the real cause. Absolute entries -- the only form that works under
+    # Terragrunt -- are passed through untouched, so for them nothing changes.
     plan_cwd = cwd
 
     # The engine decides four things below -- this file, the state download, the
@@ -792,11 +806,11 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
-    # The same var-files, resolved against the directory the plan runs in, for
-    # any consumer that runs the engine somewhere else (#2132). Init, plan and
-    # apply take `var_file_argv` verbatim because they run in `plan_cwd`
-    # already; discovery runs with `cwd=cwd`, which on a Terragrunt run is the
-    # cache dir, where the operator's relative path resolves to nothing.
+    # The same var-files, resolved against the process directory, for a
+    # consumer that execs the engine somewhere else. Init, plan and apply take
+    # `var_file_argv` verbatim -- they exec from `plan_cwd` and normalising
+    # their paths would change command lines that work today. See the
+    # `plan_cwd` comment above for what this does and does not buy.
     discovery_var_file_argv = tf_args.var_file_args(cfg.var_files, base_dir=plan_cwd)
 
     # 9. Init. Apply-phase init runs with -lockfile=readonly so it
@@ -871,9 +885,9 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # this workspace was moved off, so the run would succeed against real
     # infrastructure under permissions nobody chose.
     # `discovery_var_file_argv` is the step-8 list resolved against `plan_cwd`,
-    # so discovery reads exactly the files the plan will (#2132) even where the
-    # two run in different directories -- which is every Terragrunt run, since
-    # `cwd` is the cache copy by now and the plan still runs in `plan_cwd`.
+    # so a relative entry resolves to a real file here rather than failing
+    # discovery for a reason the operator cannot act on. It does not make
+    # discovery and the plan agree -- they already did (see `plan_cwd`).
     for _k, _v in cloud_identity.run(
         cfg, binary=binary, cwd=cwd, var_file_args=discovery_var_file_argv
     ).items():

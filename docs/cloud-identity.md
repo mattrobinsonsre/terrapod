@@ -548,10 +548,17 @@ explains:
    than consulting a version table. OpenTofu 1.12.6 advertises it; an engine
    that does not gets a bare `graph`, which is correct rather than silently
    degraded, but means a configuration whose module version comes from a
-   `var_file` can still fail discovery on that engine. Relative `var_files`
-   paths are resolved against the directory the plan runs in, which is what
-   makes them mean the same file on a Terragrunt workspace, where the engine's
-   own working directory is the `.terragrunt-cache` copy.
+   `var_file` can still fail discovery on that engine.
+
+   **On a Terragrunt workspace, use an absolute path for `var_files`.** Measured
+   against terragrunt 1.1.3 and OpenTofu 1.12.6: terragrunt runs the engine
+   inside its own `.terragrunt-cache` copy of the unit, so a *relative*
+   `-var-file` is resolved there and not from the directory holding your
+   `terragrunt.hcl` — which fails the **plan**, not merely discovery. An
+   absolute path works. Terrapod resolves a relative entry before handing it to
+   discovery, so such a workspace fails on the plan's own variables-file error
+   rather than on an unrelated earlier failure, but the configuration still
+   needs fixing.
 2. **Ask the API for the tokens, once.** `POST
    /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens`, carrying the
    discovered list, returns one token per provider configuration it should

@@ -121,7 +121,16 @@ def _summarize_plan_file(path: str) -> dict | None:
 # waits for the next, instead of the runner's artifact upload stalling. Chosen
 # rather than a socket timeout on the shared client, which would change every
 # Redis call in the process and is not a patch-release change.
-_PUBLISH_TIMEOUT_SECONDS = 5.0
+# STRICTLY under the tightest client deadline on any route that publishes.
+# `resource_profile.post_profile` uses `httpx.Timeout(5.0, connect=2.0)` with a
+# single attempt and no retry, so a 5s bound here equalled the deadline it was
+# meant to protect: the handler could not return before the runner gave up,
+# which is a guaranteed spurious failure and a stall on the Job's exit path
+# rather than a safeguard. The other publishing routes go through
+# `uploads._client_for` at `upload_timeout_seconds` (60s default) with retries,
+# so 2s is comfortably under all three. Pinned against the real minimum by
+# `test_the_bound_is_under_the_tightest_client_deadline`.
+_PUBLISH_TIMEOUT_SECONDS = 2.0
 
 
 async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> None:
@@ -956,7 +965,17 @@ async def _persist_runner_state(
 
     from terrapod.redis.client import publish_workspace_event
 
-    await publish_workspace_event(str(run.workspace_id), "state_version_created")
+    # Bounded for the same reason as the two helpers above: these sit after
+    # `db.commit()` on a RUNNER endpoint, `publish_workspace_event` swallows a
+    # failure but cannot swallow a hang, and a stall on the state upload can
+    # run into the SIGTERM grace window where a killed upload loses state.
+    try:
+        await asyncio.wait_for(
+            publish_workspace_event(str(run.workspace_id), "state_version_created"),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.debug("Failed to publish workspace event within the bound")
 
     # Keep the break-glass index current (#1581): an agent-run apply is how most
     # workspaces' state changes, and this path used to leave the index stale.
@@ -1243,7 +1262,17 @@ async def upload_pulumi_deployment(
 
     from terrapod.redis.client import publish_workspace_event
 
-    await publish_workspace_event(str(ws.id), "state_version_created")
+    # Bounded for the same reason as the two helpers above: these sit after
+    # `db.commit()` on a RUNNER endpoint, `publish_workspace_event` swallows a
+    # failure but cannot swallow a hang, and a stall on the state upload can
+    # run into the SIGTERM grace window where a killed upload loses state.
+    try:
+        await asyncio.wait_for(
+            publish_workspace_event(str(ws.id), "state_version_created"),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.debug("Failed to publish workspace event within the bound")
 
     from terrapod.services import state_index_service
 
@@ -1403,7 +1432,17 @@ async def mark_state_diverged(
 
     from terrapod.redis.client import publish_workspace_event
 
-    await publish_workspace_event(str(run.workspace_id), "state_diverged")
+    # Bounded for the same reason as the two helpers above: these sit after
+    # `db.commit()` on a RUNNER endpoint, `publish_workspace_event` swallows a
+    # failure but cannot swallow a hang, and a stall on the state upload can
+    # run into the SIGTERM grace window where a killed upload loses state.
+    try:
+        await asyncio.wait_for(
+            publish_workspace_event(str(run.workspace_id), "state_diverged"),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.debug("Failed to publish workspace event within the bound")
 
     return Response(status_code=204)
 
