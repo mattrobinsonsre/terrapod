@@ -20,15 +20,18 @@ from pathlib import Path
 def var_file_args(var_files: Iterable[str], *, base_dir: Path | None = None) -> list[str]:
     """`-var-file=PATH` for each entry.
 
-    `base_dir` resolves each RELATIVE entry against that directory, and exists
-    because a second consumer of the same list may run the engine somewhere
-    else (#2132). The plan runs in the PROCESS working directory, and on a
-    Terragrunt run that is not the directory the orchestrator tracks as `cwd`:
-    tofu works in `.terragrunt-cache/<hash>/<hash>/` while the process stays
-    chdir'd to the unit dir where `terragrunt.hcl` lives. So a relative
-    `-var-file` handed to a command run in the cache dir names a different file
-    -- usually none -- than the plan reads, which turns a working run into a
-    discovery failure for a reason nothing in the configuration explains.
+    `base_dir` resolves each RELATIVE entry against that directory, for a
+    caller that execs the engine from somewhere other than the process working
+    directory (#2132).
+
+    It does NOT exist to make two consumers agree, and an earlier docstring
+    claimed it did. Measured against terragrunt 1.1.3 + tofu 1.12.6: terragrunt
+    execs tofu inside its `.terragrunt-cache` copy, so a relative `-var-file`
+    fails for the plan too, not only for a second consumer. What resolving
+    buys is that such an entry does not fail BOTH -- the workspace surfaces the
+    plan's own variables-file error rather than an unrelated failure earlier in
+    the run. Absolute entries, the only form that works under Terragrunt, are
+    returned untouched.
 
     Omitted, the operator's paths are passed **verbatim, byte for byte**, which
     is what plan and init want: they run in the process working directory, so
