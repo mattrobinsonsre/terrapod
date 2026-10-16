@@ -69,7 +69,22 @@ const CHANGE_BADGE: Record<Change, string> = {
   noop: 'bg-slate-700 text-slate-300',
 }
 
-export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?: string }) {
+export function CostPanel({
+  runId,
+  workspaceId,
+  refreshKey = 0,
+}: {
+  runId?: string
+  workspaceId?: string
+  /**
+   * Bumped by the caller when the estimate lands, so this re-fetches (#2119).
+   *
+   * Without it the effect below keys only on the endpoint, which never changes
+   * for a page view — so a panel mounted while the run was still planning kept
+   * the 404 it got for ever, and the operator had to reload.
+   */
+  refreshKey?: number
+}) {
   const t = useTranslations('runDetail')
   const locale = useLocale()
   const [est, setEst] = useState<Estimate | null>(null)
@@ -94,7 +109,7 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
     return () => {
       cancelled = true
     }
-  }, [endpoint, t])
+  }, [endpoint, t, refreshKey])
 
   if (error) return <ErrorBanner message={error} />
   if (!est) return <LoadingSpinner />
