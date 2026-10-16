@@ -751,6 +751,17 @@ class TestTheStreamIsContinuousThroughTheRealLoop:
             "sys.exit(r.exit_code)\n"
         )
 
+        # `terrapod` on the driver's path, DERIVED from the module under test
+        # rather than assumed. A script run as `python /tmp/.../driver.py` gets
+        # its own directory on `sys.path` and NOT the working directory, so the
+        # first version imported successfully only where the package happens to
+        # be installed -- true of an editable venv, false in the test image,
+        # where the tree is on the path because that is where pytest was
+        # invoked. It failed in CI with `ModuleNotFoundError: No module named
+        # 'terrapod'` and nothing else.
+        package_root = Path(exec_subprocess.__file__).parents[2]
+        env = {**os.environ, "PYTHONPATH": str(package_root)}
+
         proc = subprocess.Popen(
             [
                 sys.executable,
@@ -763,6 +774,7 @@ class TestTheStreamIsContinuousThroughTheRealLoop:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             start_new_session=True,
+            env=env,
         )
 
         def _explain(note: str) -> str:
