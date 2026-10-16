@@ -525,3 +525,26 @@ Two consequences worth knowing:
 - [`docs/autodiscovery.md`](autodiscovery.md) — discovering stacks from a
   monorepo, and how the rename/delete lifecycle reasons per stack rather than
   per directory.
+
+## A configure operation is observed separately from `pulumi up`
+
+Where a Terraform or OpenTofu run concatenates an Ansible configure onto its apply — the CLI
+stays attached, and the result it reads covers both — **a Pulumi update does not**, and this
+is a deliberate limitation rather than a gap to be closed later.
+
+The reason is mechanical. The Terraform concatenation works because that CLI polls a run
+status and reads a log blob behind a capability URL, so a run that has not yet reached a
+terminal status keeps the client attached. An agent-mode Pulumi run has neither: it drives
+Terrapod's Pulumi service surface with engine events, checkpoints and a `complete` call, so
+there is nothing for a configure's output to be concatenated onto and no status for the CLI
+to keep polling.
+
+So **a `pulumi up` completes at the end of the apply, exactly as it does today**, and the
+configure runs as its own observable operation — visible in the UI, the API, the Terraform
+provider and the MCP tools, just not inside the `pulumi up` the operator is watching.
+
+Forcing the update to stay open through what may be an hours-long configure would couple it
+to the configure's lifetime for no benefit, since the CLI cannot render per-host progress
+either way. What this means in practice: if you run `pulumi up` on a workspace that also has
+a configure operation, the command returning successfully tells you the **infrastructure**
+landed. Check the run in the UI or through the API to see whether the configure did.

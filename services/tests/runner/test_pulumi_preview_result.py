@@ -425,9 +425,9 @@ class TestWhetherTheUpdateIsBoundToThePreview:
         ):
             setattr(run, attr, None)
         with patch.object(run_service, "resolve_auto_apply_mode", return_value="never"):
-            return _run_json(run, engine="pulumi", pulumi_bind_plan=_bind_plan_of(ws))["data"][
-                "attributes"
-            ]["pulumi-bind-plan"]
+            return _run_json(run, engine="pulumi", tfe=False, pulumi_bind_plan=_bind_plan_of(ws))[
+                "data"
+            ]["attributes"]["pulumi-bind-plan"]
 
     def test_a_bound_pulumi_workspace(self):
         assert self._json(MagicMock(engine="pulumi", pulumi_bind_plan=True)) is True

@@ -50,6 +50,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
+    configure_log_key,
     cost_estimate_key,
     lock_file_key,
     plan_artifacts_key,
@@ -292,6 +293,36 @@ async def download_lock_file(
 
 
 # ── Uploads (receive body, write to storage) ─────────────────────────────
+
+
+@router.put("/runs/{run_id}/artifacts/configure-log")
+async def upload_configure_log(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the configure (Ansible) log (#1988).
+
+    Phase-bound to `configure`, so a plan-phase or apply-phase token cannot
+    write here -- the same rule the two sibling routes apply, and the reason a
+    third route exists rather than a `{phase}` parameter: the phase is part of
+    what the token authorises, not a value the caller chooses.
+
+    A STANDALONE configure's log. A composite run's configure output is
+    concatenated onto the apply log instead and uploaded through
+    `apply-log`, because that is the stream the CLI is attached to.
+    """
+    require_runner_for_run(user, run_id, phase="configure")
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = configure_log_key(str(run.workspace_id), str(run.id))
+    # Streamed for the same reason as the other two: a playbook over a large
+    # inventory produces a lot of output, and buffering it is rule 14's hazard.
+    await storage.put_stream(key, request.stream())
+    await _publish_log_updated(str(run.workspace_id), str(run.id), "configure")
+    return Response(status_code=204)
 
 
 @router.put("/runs/{run_id}/artifacts/plan-log")

@@ -2950,7 +2950,22 @@ is set out in
 PATCH /api/v1/listeners/{id}/runs/{run_id}
 ```
 
-Reports run status changes (planning, planned, applying, applied, errored).
+Reports run status changes (planning, planned, applying, configuring, applied, errored).
+
+**`configuring` is native-only, and `applied` means applied *and* configured.** A run that
+carries an Ansible configure operation sits in `configuring` between `applying` and
+`applied`, so run triggers, notifications and drift — all of which key off `applied` — fire
+once the whole run is done rather than once the infrastructure half is.
+
+On the frozen `/api/tfe/v2` surface `configuring` **folds to `applying`**, because `go-tfe`
+switches on a fixed status set and cannot be given a value it was not compiled with. That is
+not a loss of information for a CLI: from `terraform`'s or `tofu`'s side the configure is
+part of the apply — its log is concatenated onto the apply log, the apply sub-resource reads
+`running` throughout, and the terminal status the CLI finally reads is the composite result.
+`/api/v1` returns the real value, which is what the UI, the provider and the MCP tools read.
+
+A failed apply is never followed by a configure, so a run that errors in the apply reports
+the apply's own result.
 
 ---
 

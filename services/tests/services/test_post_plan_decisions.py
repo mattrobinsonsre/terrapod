@@ -332,7 +332,11 @@ class TestTheRunDocument:
         ):
             setattr(run, attr, None)
         with patch.object(run_service, "resolve_auto_apply_mode", return_value="never"):
-            return _run_json(run, engine="terraform", **kw)["data"]
+            # `tfe` is now required (#1988). This class drives BOTH
+            # vocabularies through `**kw`, and neither is about the
+            # `configuring` fold, so the native value keeps every existing
+            # assertion exactly as it was.
+            return _run_json(run, engine="terraform", tfe=False, **kw)["data"]
 
     def test_1_x_is_unchanged(self):
         doc = self._json(blocked_by="policy")

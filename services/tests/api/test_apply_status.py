@@ -41,12 +41,17 @@ from terrapod.services.run_service import transition_run
 NOW = datetime.now(UTC)
 
 
-def _run(status: str, *, started=None, finished=None):
+def _run(status: str, *, started=None, finished=None, configured=None):
     run = MagicMock()
     run.id = uuid.uuid4()
     run.status = status
     run.apply_started_at = started
     run.apply_finished_at = finished
+    # Explicit, and None by default, because an UNSET MagicMock attribute is
+    # TRUTHY: without this every errored run reads as "the apply succeeded and
+    # the configure failed" once `_apply_status` learned to check it (#1988),
+    # and these tests silently stopped being about the branch they name.
+    run.configure_started_at = configured
     return run
 
 
@@ -130,6 +135,9 @@ class TestThePremiseTheFixRestsOn:
         run.plan_finished_at = kw.get("plan_finished_at")
         run.apply_started_at = kw.get("apply_started_at")
         run.apply_finished_at = kw.get("apply_finished_at")
+        # Same reason as `_run` above: truthy when unset.
+        run.configure_started_at = kw.get("configure_started_at")
+        run.configure_finished_at = kw.get("configure_finished_at")
         run.error_message = ""
         run.source = "tfe-api"
         return run

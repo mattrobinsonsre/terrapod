@@ -64,6 +64,23 @@ def apply_log_key(workspace_id: str, run_id: str) -> str:
     return f"logs/{workspace_id}/applies/{run_id}.log"
 
 
+def configure_log_key(workspace_id: str, run_id: str) -> str:
+    """Key for a run's configure (Ansible) log output (#1988).
+
+    A third key rather than a generic `{phase}` form, matching the two above.
+    The composite case -- apply then configure -- concatenates the configure's
+    bytes onto the APPLY log, because that is what the CLI reads and what
+    `_serve_log` keeps open until the run is terminal. This key is for the
+    standalone configure, which has no apply for its output to belong to.
+
+    Before it existed the live-stream endpoint silently relabelled an unknown
+    phase as `plan` and wrote over the plan's own Redis key, so a configure's
+    output appeared in the plan tab with nothing reporting an error. That
+    coercion is now a refusal.
+    """
+    return f"logs/{workspace_id}/configures/{run_id}.log"
+
+
 def plan_output_key(workspace_id: str, run_id: str) -> str:
     """Key for a run's binary plan output (tfplan file)."""
     return f"plans/{workspace_id}/{run_id}.tfplan"

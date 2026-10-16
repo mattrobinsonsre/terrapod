@@ -31,7 +31,10 @@ class RunnerConfig:
     public_api_url: str
     auth_token: str
     run_id: str
-    phase: Literal["plan", "apply"]
+    # `configure` is the third phase (#1988). A Literal rather than a plain
+    # str so a typo in the Job spec fails at config load with the value named,
+    # rather than reaching a phase dispatch that would silently do nothing.
+    phase: Literal["plan", "apply", "configure"]
 
     # Onboarding discovery (#824 P2). A discovery run is a normal plan-phase run
     # as far as all infra is concerned (Job naming, per-phase Redis status keys,

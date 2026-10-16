@@ -662,6 +662,9 @@ class TestRunDetailStateVersion:
         result = _run_json(
             _mock_run(run_id=run_id),
             engine="terraform",
+            # Required since #1988; these assertions are about the
+            # created-state-version relationship, not the status fold.
+            tfe=False,
             workspace_has_vcs=False,
             state_version_id=f"sv-{sv_id}",
         )
@@ -684,6 +687,9 @@ class TestRunDetailStateVersion:
         result = _run_json(
             _mock_run(),
             engine="terraform",
+            # Required since #1988; these assertions are about the
+            # created-state-version relationship, not the status fold.
+            tfe=False,
             workspace_has_vcs=False,
             state_version_id=None,
         )

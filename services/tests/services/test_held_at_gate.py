@@ -343,9 +343,9 @@ class TestWhatTheApiReports:
         ):
             setattr(held, attr, None)
         with patch.object(run_service, "resolve_auto_apply_mode", return_value="never"):
-            attrs = _run_json(held, engine="terraform", blocked_by="security-scan")["data"][
-                "attributes"
-            ]
+            attrs = _run_json(held, engine="terraform", tfe=False, blocked_by="security-scan")[
+                "data"
+            ]["attributes"]
         assert attrs["blocked-by"] == "security-scan"
         assert attrs["actions"]["is-discardable"] is True
         assert attrs["actions"]["is-confirmable"] is False

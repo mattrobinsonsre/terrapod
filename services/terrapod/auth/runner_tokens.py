@@ -45,7 +45,11 @@ logger = get_logger(__name__)
 #: The phases a Job runs, and so the only values a token may claim. One Job runs
 #: one phase (`TP_PHASE`, taken from the listener's own `phase`), which is what
 #: makes a per-phase token meaningful.
-RUNNER_PHASES: frozenset[str] = frozenset({"plan", "apply"})
+# A configure is a third phase a runner token can be scoped to (#1988). Worth
+# knowing what the closed pair used to mean: a token claiming anything else was
+# treated as INVALID rather than refused, so a `configure` token did not fail
+# with a clear reason -- it failed as though it were forged.
+RUNNER_PHASES: frozenset[str] = frozenset({"plan", "apply", "configure"})
 
 
 @dataclass(frozen=True)

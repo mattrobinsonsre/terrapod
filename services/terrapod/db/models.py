@@ -2680,6 +2680,28 @@ class Run(Base):
     # Module impact analysis overrides (maps module coords to override storage paths)
     module_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
+    #: This run carries an Ansible configure operation (#1988, #1973).
+    #:
+    #: A configure is a `Run` with a flag, not its own object type (#1974,
+    #: settled 2026-10-16) -- so this sits with `is_destroy`, `plan_only`,
+    #: `refresh_only` and `is_drift_detection` as one more thing a run can be.
+    #: The composite case already had to be one run: two objects would mean the
+    #: run goes terminal at the end of the apply, the CLI disconnects, and the
+    #: operator never sees the configure they asked for.
+    #:
+    #: **`plan_only` is refused alongside this** (422, `workspace_settings`): a
+    #: configure mutates hosts and has no plan/apply split to be the plan half
+    #: of, and ansible's dry run is `--check`, which is its own run option in
+    #: the shape of `refresh_only` (#1407 point 14).
+    #:
+    #: Nothing sets it yet, deliberately -- #1974 owns triggering and #1972
+    #: owns executing, and the API exposes no `is-configure` attribute until
+    #: they do. A column an operator could set while nothing executed it is the
+    #: "declaration without its reader" defect #2116 was the fourth instance of.
+    is_configure: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
     # Drift detection
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -2756,6 +2778,22 @@ class Run(Base):
         DateTime(timezone=True), nullable=True
     )
     apply_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: When the configure phase started, and NOT merely symmetric with the pair
+    #: above (#1988).
+    #:
+    #: `_apply_status` derives the TFE apply sub-resource's status entirely from
+    #: the run, and a run whose apply SUCCEEDED and whose configure then FAILED
+    #: is `errored` with both apply timestamps set and a state version
+    #: committed -- indistinguishable, from those two columns alone, from a run
+    #: whose apply failed. Reporting it as a failed apply would be the opposite
+    #: of what happened on the one surface an operator reads to decide whether
+    #: to re-run, so the discrimination needs a signal and this is it.
+    configure_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    configure_finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")

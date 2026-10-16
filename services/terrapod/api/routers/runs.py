@@ -187,12 +187,50 @@ async def _engine_of(run: Run, db: AsyncSession) -> str:
     return ws.engine
 
 
+#: Native run statuses that have no representation on the frozen TFE surface,
+#: mapped to the status a `go-tfe` client built before they existed can read.
+#:
+#: `configuring` is the first entry (#1988). `/api/tfe/v2` is a frozen contract
+#: and `go-tfe` switches on a fixed status set, so a client that does not know
+#: the value would treat it as unrecognised -- and we cannot ship a new one into
+#: a binary compiled before it. `applying` is the honest fold: from the CLI's
+#: side the configure IS part of the apply, its log is concatenated onto the
+#: apply log, and the composite result is what the CLI finally reads.
+#:
+#: This is the `native`/`terraform` arrangement from #1898 and the
+#: `structured`/`hcl` one from #1435 -- the honest name internally, the
+#: compatible name on the frozen surface, folded at ONE boundary -- so it needs
+#: no new precedent and should gain entries rather than a second mechanism.
+_TFE_STATUS_FOLD: dict[str, str] = {"configuring": "applying"}
+
+
+def _reported_run_status(run: Run, *, tfe: bool) -> str:
+    """The run's status as the requesting surface can represent it.
+
+    A separate function rather than an expression inside the serializer so the
+    fold can be driven directly: the property is a relationship between the two
+    surfaces, and a test that only ever builds one of them passes whichever way
+    the fold is written.
+    """
+    if tfe:
+        return _TFE_STATUS_FOLD.get(run.status, run.status)
+    return run.status
+
+
 def _run_json(
     run: Run,
     *,
     # Required, with no default (#1536): a run has no engine of its own, and a
     # default is how a Pulumi run came to be reported as a Terraform one (#1523).
     engine: str,
+    # Whether the response goes out on the frozen TFE surface, which cannot
+    # represent `configuring` (#1988). REQUIRED and with no default for exactly
+    # the reason above: either default is wrong in a way nothing would catch --
+    # False leaks a status `go-tfe` cannot switch on, True hides the real one
+    # from the native API. Route handlers pass `is_tfe_path(request.url.path)`;
+    # the runner-protocol endpoints pass False because they are native by
+    # definition.
+    tfe: bool,
     workspace_name: str = "",
     workspace_has_vcs: bool = False,
     pulumi_bind_plan: bool | None = None,
@@ -228,7 +266,7 @@ def _run_json(
             "id": run_id,
             "type": "runs",
             "attributes": {
-                "status": reported_status or run.status,
+                "status": reported_status or _reported_run_status(run, tfe=tfe),
                 # Whether the update is bound to the preview (#1553, #1560).
                 # Null for an engine with no such distinction.
                 "pulumi-bind-plan": pulumi_bind_plan,
@@ -827,6 +865,7 @@ async def create_run(
         content=_run_json(
             run,
             engine=ws.engine,
+            tfe=is_tfe_path(request.url.path),
             workspace_name=ws.name,
             workspace_has_vcs=ws.vcs_connection_id is not None,
             pulumi_bind_plan=_bind_plan_of(ws),
@@ -917,6 +956,7 @@ async def show_run(
     document = _run_json(
         run,
         engine=ws.engine,
+        tfe=is_tfe_path(request.url.path),
         workspace_name=ws.name if ws else "",
         workspace_has_vcs=bool(ws and ws.vcs_connection_id),
         pulumi_bind_plan=_bind_plan_of(ws),
@@ -973,6 +1013,7 @@ async def list_workspace_runs(
                 _run_json(
                     r,
                     engine=ws.engine,
+                    tfe=is_tfe_path(request.url.path),
                     workspace_name=ws.name,
                     workspace_has_vcs=has_vcs,
                     pulumi_bind_plan=bind_plan,
@@ -1058,7 +1099,13 @@ async def confirm_run(
         raise HTTPException(status_code=422, detail=str(e.reason)) from e
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
+    return JSONResponse(
+        content=_run_json(
+            run,
+            engine=await _engine_of(run, db),
+            tfe=is_tfe_path(request.url.path),
+        )
+    )
 
 
 @router.post("/runs/{run_id}/actions/discard")
@@ -1076,7 +1123,13 @@ async def discard_run(
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
+    return JSONResponse(
+        content=_run_json(
+            run,
+            engine=await _engine_of(run, db),
+            tfe=is_tfe_path(request.url.path),
+        )
+    )
 
 
 @router.post("/runs/{run_id}/actions/cancel")
@@ -1094,7 +1147,13 @@ async def cancel_run(
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
+    return JSONResponse(
+        content=_run_json(
+            run,
+            engine=await _engine_of(run, db),
+            tfe=is_tfe_path(request.url.path),
+        )
+    )
 
 
 def _retry_capability(run: Run) -> str:
@@ -1205,7 +1264,10 @@ async def retry_run(
     new_run = await run_service.queue_run(db, new_run)
     await db.commit()
 
-    return JSONResponse(content=_run_json(new_run, engine=ws.engine), status_code=201)
+    return JSONResponse(
+        content=_run_json(new_run, engine=ws.engine, tfe=is_tfe_path(request.url.path)),
+        status_code=201,
+    )
 
 
 # ── Phase Status Mapping ─────────────────────────────────────────────────
@@ -1242,10 +1304,18 @@ def _apply_status(run: Run) -> str:
         return "unreachable"
     if s == "confirmed":
         return "pending"
-    if s in ("applying", "canceling"):
+    if s in ("applying", "canceling", "configuring"):
         # `canceling` is "apply is in flight and being killed". From the
         # phase-status view it's still running until the reconciler
         # resolves it to a terminal.
+        #
+        # `configuring` reads `running` too, and that is the concatenation
+        # design rather than an approximation (#1988): from the CLI's side the
+        # configure IS part of the apply, so the apply stays `running` until
+        # the whole run is terminal and the composite result is what the client
+        # finally reads. Leaving it out mattered more than it looks -- this
+        # function ends in `return s`, so an unlisted status is handed to
+        # `go-tfe` verbatim, and `configuring` is not a value it can switch on.
         return "running"
     if s == "applied":
         return "finished"
@@ -1280,6 +1350,17 @@ def _apply_status(run: Run) -> str:
         # not have yet (`configure_started_at`). It lands with the run spine
         # (#1988); do not guess at it from these two timestamps, which is what
         # produced this bug.
+        # Apply succeeded, configure failed (#1988). The apply genuinely
+        # happened and a state version is committed, so reporting `errored`
+        # here would tell the CLI the infrastructure change failed when it
+        # landed -- and an operator reading that would re-run an apply that
+        # does not need re-running. `configure_started_at` is the signal, and
+        # it is set on ENTERING `configuring`, which is after the apply has
+        # finished successfully: the state machine has no edge from a failed
+        # apply to a configure (#1407 point 1a), so its presence means the
+        # apply succeeded.
+        if run.configure_started_at:
+            return "finished"
         if run.apply_started_at:
             return "errored"
         return "unreachable"
@@ -2721,7 +2802,9 @@ async def next_run(
 
     await db.commit()
 
-    run_data = _run_json(run, engine=ws.engine)
+    # The runner protocol is native by definition -- a listener is not a
+    # `go-tfe` client and needs the real phase, not the folded one (#1988).
+    run_data = _run_json(run, engine=ws.engine, tfe=False)
     # Which engine this run belongs to (#1407 phase 1). Sent on the runner wire
     # only, not on the public run serializer: nothing outside the listener has a
     # use for it yet, and adding it here keeps the attribute contract still.
@@ -2915,6 +2998,9 @@ async def update_run_status(
         content=_run_json(
             run,
             engine=await _engine_of(run, db),
+            # Runner protocol: a listener is not a `go-tfe` client and needs
+            # the real phase, not the folded one (#1988).
+            tfe=False,
             blocked_by=await run_service.blocked_by(db, run),
         )
     )
@@ -3277,8 +3363,24 @@ async def upload_log_stream(
             status_code=403,
             detail="Listener does not belong to the agent pool this run is assigned to",
         )
-    if phase not in ("plan", "apply"):
-        phase = "plan" if run.status == "planning" else "apply"
+    # REFUSE an unknown phase rather than guessing one (#1988).
+    #
+    # This used to coerce: `phase = "plan" if run.status == "planning" else
+    # "apply"`. The coercion existed to tolerate a value that carried no
+    # meaning, and it was safe only while `plan` and `apply` were the only
+    # phases there were. With `configure` meaningful, a configure log posted
+    # here would have been RELABELLED as a plan log and written over the plan's
+    # own Redis key -- last-write-wins, 300s TTL -- so the operator would watch
+    # the configure's output appear in the plan tab, with nothing anywhere
+    # reporting an error. A mislabelled tab is the kind of defect nobody files.
+    if phase not in run_service.LIVE_STATES_FOR_PHASE:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"unknown run phase {phase!r}: expected one of "
+                f"{', '.join(sorted(run_service.LIVE_STATES_FOR_PHASE))}"
+            ),
+        )
     body_bytes = await request.body()
 
     from terrapod.redis.client import (

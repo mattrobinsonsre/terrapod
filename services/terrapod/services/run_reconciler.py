@@ -30,6 +30,27 @@ logger = get_logger(__name__)
 DEFAULT_STALE_TIMEOUT_SECONDS = 3600
 
 
+#: The runner phase a live run status belongs to (#1988).
+#:
+#: This was `"plan" if run.status == "planning" else "apply"`, written when
+#: there were two phases and every non-planning status therefore had to be an
+#: apply. With `configuring` live, that expression silently reports a configure
+#: Job as an apply -- which is how its log would be fetched from the apply key
+#: and its Vault leases revoked under the wrong record. It is DERIVED from the
+#: state machine's own table rather than restated, so a fourth phase cannot be
+#: added without this following.
+def _phase_of(status: str) -> str:
+    from terrapod.services.run_service import LIVE_STATES_FOR_PHASE
+
+    for phase, states in LIVE_STATES_FOR_PHASE.items():
+        if status in states:
+            return phase
+    # `canceling` and the terminals belong to whichever phase was in flight,
+    # which this function cannot see from a status alone. `apply` keeps the
+    # previous behaviour for them rather than inventing a new one here.
+    return "apply"
+
+
 async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
     """Promote live-streamed log from Redis to object storage if the runner
     didn't upload its own final log.  This prevents log loss when a Job fails
@@ -260,7 +281,7 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
 
     # `canceling` was entered from `applying`, so the Job that may need
     # resolution is the apply Job — `phase` follows the same mapping.
-    phase = "plan" if run.status == "planning" else "apply"
+    phase = _phase_of(run.status)
 
     # A run HELD at a post-plan gate (#1725) has a finished plan; only its
     # decision is outstanding, so its Job is irrelevant. That Job is cleaned up
@@ -456,7 +477,7 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
     from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE
     from terrapod.services import run_service
 
-    phase = "plan" if run.status == "planning" else "apply"
+    phase = _phase_of(run.status)
     await _persist_live_log_if_missing(run, phase)
 
     run = await run_service.transition_run(db, run, "errored", error_message=error_message)

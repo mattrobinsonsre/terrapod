@@ -150,8 +150,12 @@ class TestRequirePhaseClosesOffTheUnphasedForm:
         """It is read as "makes no claim", so it reaches the same form and must
         meet the same refusal -- otherwise `phase: "APPLY"` is a way round the
         setting."""
+        # `configure` was the example here until it became a real phase
+        # (#1988). `APPLY` is the one this docstring already names, it is
+        # genuinely unrecognised because the comparison is case-sensitive, and
+        # it cannot be overtaken by a future phase the way a lowercase word can.
         with pytest.raises(HTTPException) as exc:
-            await _call(status="planning", body={"phase": "configure"}, require_phase=True)
+            await _call(status="planning", body={"phase": "APPLY"}, require_phase=True)
         assert exc.value.status_code == 400
 
     async def test_a_named_phase_is_unaffected(self):

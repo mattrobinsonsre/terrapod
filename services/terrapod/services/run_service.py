@@ -134,7 +134,13 @@ def describe_plan_shape(run: Run) -> str:
 # Valid state transitions
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"queued", "canceled", "errored"},
-    "queued": {"planning", "canceled", "errored"},
+    # `queued -> configuring` is a STANDALONE configure's entry, the twin of
+    # `queued -> planning` (#1988). It does not pass through `confirmed`: the
+    # settled design is that a configure has a default playbook and limit and
+    # runs when asked, with nobody prompted (#1407 point 14), so there is no
+    # plan to review and nothing to confirm. A configure that an operator
+    # should have to approve is a gate on the trigger, which is #1974's.
+    "queued": {"planning", "configuring", "canceled", "errored"},
     # `planning → queued` is the UNCLAIM: a listener claimed the run but the
     # API could not hand it a working environment — today, only a Vault that is
     # unreachable rather than misconfigured. Erroring instead would destroy
@@ -166,7 +172,22 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     # `planning → queued`: the claim is `confirmed → applying`, so a claim the
     # API cannot serve (an unreachable Vault) is undone by going back to
     # `confirmed`, where the next listener picks it up. No Job has launched.
-    "applying": {"applied", "canceling", "errored", "confirmed"},
+    # `applying -> configuring` is the COMPOSITE: the apply landed and the
+    # configure follows (#1988). The run deliberately does NOT go terminal in
+    # between, which is the whole mechanism -- `_serve_log` closes the apply
+    # stream when the RUN is terminal rather than when the apply ends, so the
+    # CLI stays attached through the configure and reads the composite result
+    # with no change to that rule. A failed apply is not followed by a
+    # configure (#1407 point 1a), so there is no `errored -> configuring`.
+    "applying": {"applied", "configuring", "canceling", "errored", "confirmed"},
+    # `configuring -> applied` is what makes `applied` mean applied AND
+    # configured, which is the honest meaning for a run carrying both and is
+    # what run triggers, notifications and drift all want to fire after
+    # (decided 2026-10-07). `configuring -> canceling` rather than straight to
+    # `canceled` for the same reason as `applying`: a configure in flight is
+    # mutating hosts, so the terminal has to come from the observed Job
+    # outcome, not from the request.
+    "configuring": {"applied", "canceling", "errored"},
     # `canceling` is the intermediate status entered when a user cancels
     # a run that may have already launched (or be in the middle of) an
     # apply Job. We send the runner a cancel_job event but the Job's
@@ -187,6 +208,47 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
 }
 
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
+
+
+class PlanOnlyConfigureConflict(ValueError):
+    """`plan_only` was asked for on a configure run (#1988).
+
+    A `ValueError` subclass for the reason `PlanApplyNotEnabled` and
+    `LabelValidationError` give: a bare `except ValueError` still catches it,
+    so every HTTP surface that already turns a ValueError into a 4xx keeps
+    working without learning a new type.
+    """
+
+
+def refuse_plan_only_configure(*, plan_only: bool, is_configure: bool) -> None:
+    """Refuse `plan_only` together with `is_configure`.
+
+    `plan_only` means "plan, and do not apply". A configure has no plan/apply
+    split to be the plan half of -- it either runs the playbook against the
+    hosts or it does not -- so the combination has no honest meaning, and
+    accepting it would leave a caller's flag silently doing nothing, which is
+    the defect class #2116 was the fourth instance of.
+
+    **Ansible's dry run is `--check`**, which is its own run option in the
+    shape of `refresh_only` (#1407 point 14). Letting `plan_only` mean
+    `--check` was considered and declined: one flag would mean two different
+    things depending on run kind, and `--check` would have two spellings.
+
+    Kept as a free function beside the state machine rather than in
+    `workspace_settings`: this is a rule about two RUN OPTIONS, not about a
+    workspace's declaration, and filing it with its siblings there would put
+    two different kinds of rule in one place.
+
+    **One thing still owed, and it is #1975's**: `plan_only` currently also
+    takes part in workspace-serialisation locking, so refusing it here must not
+    be read as settling what a configure run serialises against. It does not.
+    """
+    if plan_only and is_configure:
+        raise PlanOnlyConfigureConflict(
+            "plan-only has no meaning on a configure run: a configure has no "
+            "plan/apply split, and its dry run is the check option"
+        )
+
 
 #: The run states in which a runner token for each phase, and a cloud-identity
 #: mint presenting one, are still LIVE.
@@ -212,6 +274,14 @@ TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
 LIVE_STATES_FOR_PHASE: dict[str, frozenset[str]] = {
     "plan": frozenset({"planning"}),
     "apply": frozenset({"confirmed", "applying"}),
+    # `configure` takes `configuring` ALONE, and deliberately not the state
+    # before it (#1988). The apply entry keeps `confirmed` for a stated
+    # backward-compatibility reason -- it shipped in a patch to a line
+    # operators were running, where a tighter rule risked failing every apply
+    # on a path that might request its token early. Neither reason applies
+    # here: nothing has ever minted a configure token, so there is no existing
+    # behaviour to preserve and the tight rule is free.
+    "configure": frozenset({"configuring"}),
 }
 
 # How many gated runs one pre-plan pass will open stages for (#1837). The pass
@@ -1073,6 +1143,12 @@ async def create_run(
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
     is_drift_detection: bool = False,
+    # This run carries an Ansible configure operation (#1988). Nothing passes
+    # it yet: #1974 owns triggering and #1972 owns executing, and the API
+    # exposes no `is-configure` attribute until they do. It is here so the
+    # refusal above has something to refuse and the column has a writer when
+    # they arrive, rather than the parameter being added in a third PR.
+    is_configure: bool = False,
     target_addrs: list[str] | None = None,
     replace_addrs: list[str] | None = None,
     refresh_only: bool = False,
@@ -1102,6 +1178,11 @@ async def create_run(
     # version, splitting the pool set, reading settings -- is wasted on a run
     # that cannot exist.
     workspace_settings.require_plan_apply_operation(workspace)
+
+    # The second refusal at this chokepoint, for the same reason the first one
+    # is here: `create_run` is the only `Run` constructor on the live path, so
+    # one check cannot be routed around (#1988).
+    refuse_plan_only_configure(plan_only=bool(plan_only), is_configure=bool(is_configure))
 
     # A run against a SPECULATIVE configuration version is always plan-only.
     #
@@ -1179,6 +1260,7 @@ async def create_run(
         status="pending",
         message=message,
         is_destroy=is_destroy,
+        is_configure=is_configure,
         auto_apply=auto_apply,
         auto_apply_mode=auto_apply_mode,
         plan_only=plan_only,
@@ -1329,6 +1411,24 @@ async def transition_run(
         and not run.apply_finished_at
     ):
         run.apply_finished_at = now
+
+    # The configure phase's own pair (#1988), stamped on the same rules as the
+    # two above so a configure run's timeline reads like any other.
+    #
+    # `configure_started_at` is NOT merely symmetric. `_apply_status` has to
+    # tell "the apply failed" from "the apply succeeded and the configure
+    # failed", and those two runs are both `errored` with both apply timestamps
+    # set -- so this stamp is the only thing that distinguishes them. Set it on
+    # ENTERING `configuring`, before anything can fail, or the discrimination
+    # is unavailable exactly when it is needed.
+    if target_status == "configuring" and not run.configure_started_at:
+        run.configure_started_at = now
+    elif (
+        target_status in ("applied", "errored", "canceled")
+        and run.configure_started_at
+        and not run.configure_finished_at
+    ):
+        run.configure_finished_at = now
 
     # A run that ends before its reserved post-plan stage started never will
     # start it. Only the Terraform Enterprise vocabulary reserves stages, and

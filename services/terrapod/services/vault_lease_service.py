@@ -76,7 +76,11 @@ TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed", "deleted"})
 
 _JOB_FIELD = "job"
 _LEASE_FIELD_PREFIX = "lease:"
-_PHASES = ("plan", "apply")
+# A configure phase can hold dynamic Vault leases exactly as the other two do
+# -- a playbook reaching a database or a cloud API needs the same credential
+# (#1988). Omitting it here would not refuse anything: the leases would simply
+# never be revoked when the configure's Job ended, which is the quiet direction.
+_PHASES = ("plan", "apply", "configure")
 
 
 def record_id(run_id: object, phase: str) -> str:
