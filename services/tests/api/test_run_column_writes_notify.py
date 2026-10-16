@@ -292,9 +292,33 @@ class TestAHangingRedisCannotStallAnArtifactUpload:
             for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func).split(".")[-1] in PRIMITIVES
         ]
-        assert len(calls) >= 5, (
-            f"only found {len(calls)} publish call(s); this gate has drifted from the "
-            "module and is asserting nothing"
+        # The floor is bound to the module's IMPORTS, which is the only source
+        # of truth here that is independent of this gate's own filter.
+        #
+        # Two earlier floors were worthless and both were caught by running
+        # them. `>= 5` was main-specific -- main has three
+        # `publish_workspace_event` sites and the release lines two, because
+        # main also keeps the break-glass state index current. Comparing the
+        # kinds found against `PRIMITIVES` was worse: `calls` is FILTERED by
+        # `PRIMITIVES`, so the two agree by construction and narrowing the set
+        # left the gate green while making it blind. A check derived from the
+        # thing it is checking asserts nothing.
+        imported = {
+            alias.name
+            for n in ast.walk(tree)
+            if isinstance(n, ast.ImportFrom) and n.module == "terrapod.redis.client"
+            for alias in n.names
+            if alias.name.startswith("publish")
+        }
+        assert imported, (
+            "the module imports no publish primitive from terrapod.redis.client; this "
+            "gate has drifted from the code and is asserting nothing"
+        )
+        checked = {ast.unparse(n.func).split(".")[-1] for n in calls}
+        assert imported <= checked, (
+            f"the module imports {sorted(imported)} but this gate only inspects "
+            f"{sorted(checked)}; {sorted(imported - checked)} is published somewhere "
+            "it is not watching"
         )
         unbounded = [f"line {n.lineno}: {ast.unparse(n)}" for n in calls if id(n) not in wrapped]
         assert not unbounded, (
