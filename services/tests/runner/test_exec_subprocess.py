@@ -704,21 +704,35 @@ class TestTheStreamIsContinuousThroughTheRealLoop:
     def test_a_line_reaches_the_log_while_the_child_is_still_running(self, tmp_path):
         """A multi-line secret registered, and a child that prints then waits.
 
-        The first line must be readable long before the child exits. It is the
-        only assertion in this file about WHEN output appears rather than about
+        The first line must be readable while the child is still alive. It is
+        the only assertion in this file about WHEN output appears rather than
         what it contains, and it is the one a byte-bounded implementation fails:
         with a 3 KB key registered it would hold the line until 3 KB had
         accumulated, which never happens here.
+
+        **The child waits for a file rather than for a fixed time.** A first
+        version slept four seconds and gave the poll three, which passed
+        locally in 4.19s and failed in CI -- a deadline in the low single digits
+        of seconds is a flake waiting for a loaded runner, and the window has to
+        outlast interpreter startup, an import and two process spawns. Gating on
+        a file the test creates makes the window as long as the test needs, so
+        the only timeout left is the generous upper bound on a line that never
+        comes, which is a real failure rather than a slow machine.
         """
         secret = tmp_path / "secret.txt"
         secret.write_bytes(self.KEY)
+        release = tmp_path / "release"
 
         child = tmp_path / "slow.py"
         child.write_text(
-            "import sys, time\n"
+            "import os, sys, time\n"
             "sys.stdout.write('FIRST LINE\\n')\n"
             "sys.stdout.flush()\n"
-            "time.sleep(4)\n"
+            "# Wait to be released, with a cap so a broken test cannot hang CI.\n"
+            "for _ in range(600):\n"
+            "    if os.path.exists(sys.argv[1]):\n"
+            "        break\n"
+            "    time.sleep(0.1)\n"
             "sys.stdout.write('LAST LINE\\n')\n"
         )
 
@@ -730,36 +744,70 @@ class TestTheStreamIsContinuousThroughTheRealLoop:
             "with open(sys.argv[1], 'rb') as fh:\n"
             "    assert exec_subprocess.register_secret(fh.read().decode())\n"
             "r = exec_subprocess.run(\n"
-            "    [sys.executable, sys.argv[2]], log_file=sys.argv[3], tee_to_stdout=False\n"
+            "    [sys.executable, sys.argv[2], sys.argv[3]],\n"
+            "    log_file=sys.argv[4],\n"
+            "    tee_to_stdout=False,\n"
             ")\n"
             "sys.exit(r.exit_code)\n"
         )
 
         proc = subprocess.Popen(
-            [sys.executable, str(driver), str(secret), str(child), str(log)],
+            [
+                sys.executable,
+                str(driver),
+                str(secret),
+                str(child),
+                str(release),
+                str(log),
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             start_new_session=True,
         )
-        try:
-            started = time.monotonic()
-            seen_at = None
-            while time.monotonic() - started < 3.0:
-                if log.exists() and b"FIRST LINE" in log.read_bytes():
-                    seen_at = time.monotonic() - started
-                    break
-                time.sleep(0.05)
 
-            assert seen_at is not None, (
-                "the first line never appeared while the child was running: the "
-                "stream is being held back, which is the #2145 regression"
+        def _explain(note: str) -> str:
+            """Whatever the driver said, so a CI failure is diagnosable.
+
+            The first version asserted before ever reading these pipes, so its
+            CI failure carried no information about the cause at all.
+            """
+            try:
+                proc.kill()
+                out, err = proc.communicate(timeout=10)
+            except Exception:  # pragma: no cover - diagnostics only
+                out = err = b"<unavailable>"
+            return (
+                f"{note}\n"
+                f"driver rc={proc.returncode}\n"
+                f"driver stdout={out.decode(errors='replace')[-500:]!r}\n"
+                f"driver stderr={err.decode(errors='replace')[-800:]!r}\n"
+                f"log exists={log.exists()} "
+                f"bytes={log.stat().st_size if log.exists() else 0}"
             )
-            assert proc.poll() is None, (
-                "the child had already exited, so this proved nothing about "
-                "streaming -- lengthen the child's sleep"
+
+        deadline = time.monotonic() + 30.0
+        seen = False
+        while time.monotonic() < deadline:
+            if log.exists() and b"FIRST LINE" in log.read_bytes():
+                seen = True
+                break
+            if proc.poll() is not None:
+                raise AssertionError(_explain("the driver exited before emitting anything"))
+            time.sleep(0.05)
+
+        if not seen:
+            raise AssertionError(
+                _explain(
+                    "the first line never appeared while the child was running: "
+                    "the stream is being held back, which is the #2145 regression"
+                )
             )
-        finally:
-            out, err = proc.communicate(timeout=30)
-        assert proc.returncode == 0, err.decode(errors="replace")[-400:]
+        assert proc.poll() is None, _explain(
+            "the child had already exited, so this proved nothing about streaming"
+        )
+
+        release.write_bytes(b"go")
+        out, err = proc.communicate(timeout=120)
+        assert proc.returncode == 0, err.decode(errors="replace")[-500:]
         assert b"LAST LINE" in log.read_bytes()
         assert self.KEY not in log.read_bytes()
