@@ -14,11 +14,37 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Iterable
+from pathlib import Path
 
 
-def var_file_args(var_files: Iterable[str]) -> list[str]:
-    """`-var-file=PATH` for each entry."""
-    return [f"-var-file={vf}" for vf in var_files if vf]
+def var_file_args(var_files: Iterable[str], *, base_dir: Path | None = None) -> list[str]:
+    """`-var-file=PATH` for each entry.
+
+    `base_dir` resolves each RELATIVE entry against that directory, and exists
+    because a second consumer of the same list may run the engine somewhere
+    else (#2132). The plan runs in the PROCESS working directory, and on a
+    Terragrunt run that is not the directory the orchestrator tracks as `cwd`:
+    tofu works in `.terragrunt-cache/<hash>/<hash>/` while the process stays
+    chdir'd to the unit dir where `terragrunt.hcl` lives. So a relative
+    `-var-file` handed to a command run in the cache dir names a different file
+    -- usually none -- than the plan reads, which turns a working run into a
+    discovery failure for a reason nothing in the configuration explains.
+
+    Omitted, the operator's paths are passed **verbatim, byte for byte**, which
+    is what plan and init want: they run in the process working directory, so
+    the paths already mean what the operator wrote, and normalising them here
+    would change a command that works today.
+    """
+    out: list[str] = []
+    for vf in var_files:
+        if not vf:
+            continue
+        if base_dir is None:
+            out.append(f"-var-file={vf}")
+            continue
+        path = Path(vf)
+        out.append(f"-var-file={path if path.is_absolute() else base_dir / path}")
+    return out
 
 
 def target_args(addrs: Iterable[str]) -> list[str]:
@@ -58,7 +84,15 @@ def graph_supports_var_file(binary: str) -> bool:
             text=True,
             timeout=10,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.SubprocessError):
+        # OSError, not FileNotFoundError: a binary that exists but cannot be
+        # executed raises `OSError: [Errno 8] Exec format error` (a wrong-arch
+        # download from the binary cache), and a runner at its fork or memory
+        # limit raises ENOMEM. Both are "cannot tell", which is what False
+        # means here -- and the narrow form let them escape a function whose
+        # only contract is to answer a question, into a caller documented as
+        # never raising. `SubprocessError` keeps `TimeoutExpired`, which is not
+        # an `OSError`.
         return False
     return "-var-file" in (result.stdout + result.stderr)
 
@@ -80,6 +114,14 @@ def init_supports_var_file(binary: str) -> bool:
             text=True,
             timeout=10,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.SubprocessError):
+        # OSError, not FileNotFoundError: a binary that exists but cannot be
+        # executed raises `OSError: [Errno 8] Exec format error` (a wrong-arch
+        # download from the binary cache), and a runner at its fork or memory
+        # limit raises ENOMEM. Both are "cannot tell", which is what False
+        # means here -- and the narrow form let them escape a function whose
+        # only contract is to answer a question, into a caller documented as
+        # never raising. `SubprocessError` keeps `TimeoutExpired`, which is not
+        # an `OSError`.
         return False
     return "-var-file" in (result.stdout + result.stderr)
