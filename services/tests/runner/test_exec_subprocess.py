@@ -13,6 +13,7 @@ prematurely kill pytest if we ran in-process).
 from __future__ import annotations
 
 import os
+import random
 import signal
 import subprocess
 import sys
@@ -444,67 +445,222 @@ class TestTheLogStreamRedactsRegisteredSecrets:
 
 
 class TestTheHeldBackTailIsBoundedInTimeAsWellAsBytes:
-    """`_split_tail`: a slow stream must not go silent for minutes (#2051).
+    """`_split_tail`: a slow stream must not go silent for minutes (#2051, #2145).
 
-    Holding back `longest secret - 1` BYTES is what makes a straddling secret
-    impossible, and on its own it is badly behaved in time. `bufsize=0` makes a
-    read one syscall returning whatever is available -- typically one line --
-    so with an ~850-byte identity token a `tofu apply` emitting one short
-    "Still creating..." line every ten seconds would hold back seventeen lines,
-    nearly three minutes of silence. That is the log someone watches to see
-    where a slow apply is stuck, and it is every run in the cloud-identity
-    cohort.
+    Something must be held back between reads or a secret straddling a chunk
+    boundary survives -- silently, while the redactor looks as though it worked.
+    The question is WHAT, and bytes are the wrong unit: `bufsize=0` makes a read
+    one syscall returning whatever is available, typically a single line, so
+    holding a fixed `longest secret - 1` bytes meant a stream emitting one short
+    line every ten seconds sat silent for minutes. That is the log someone
+    watches to find where a slow apply is stuck.
+
+    #2051 fixed it by cutting at the last newline, but only while no registered
+    secret contained one -- so a multi-line secret (an SSH machine credential,
+    #1933) took the whole run back to the byte bound. Measured at the time:
+    nothing emitted at all in 120 seconds.
+
+    #2145 holds back only the longest suffix that is a proper PREFIX of a
+    secret, which needs no assumption about newlines. So there is no mode to
+    fall out of, and these tests pin both halves: output is never delayed, and a
+    secret split anywhere is still removed.
     """
 
-    OVERLAP = 849  # a realistic token length minus one
+    #: A realistic single-line credential -- the identity token (#2047).
+    TOKEN = b"eyJhbGciOiJSUzI1NiJ9." + b"A" * 800 + b".sIgNaTuRe"
 
-    def test_a_slow_line_stream_emits_each_line_as_it_arrives(self):
-        """The regression this exists for. Byte-bounded, these lines are held."""
+    #: A realistic MULTI-LINE credential -- an SSH machine credential (#1933).
+    #: This is the shape that defeated the newline cut, so every latency
+    #: assertion below is made with it registered rather than with the token.
+    KEY = (
+        b"-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        + b"\n".join([b"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAAB"] * 45)
+        + b"\n-----END OPENSSH PRIVATE KEY-----\n"
+    )
+
+    def _split(self, buf: bytes, *secrets: bytes):
+        """`_split_tail` with the loop's own window rule, not a copy of it."""
+        secrets = tuple(secrets)
+        return exec_subprocess._split_tail(
+            buf, secrets=secrets, ceiling=exec_subprocess._scan_ceiling(secrets)
+        )
+
+    def _drive(self, chunks, *secrets: bytes) -> bytes:
+        """Everything a viewer would ever see, driving the loop's own steps.
+
+        Models `run`'s read loop -- redact, split, emit, flush the carry at EOF
+        -- so a streaming property can be asserted without a subprocess per
+        case. The real loop is driven end to end by
+        `test_a_line_reaches_the_log_while_the_child_is_still_running`, which is
+        what stops this helper from being the only evidence.
+        """
+        secrets = tuple(secrets)
+        ceiling = exec_subprocess._scan_ceiling(secrets)
+        for secret in secrets:
+            exec_subprocess.register_secret(secret.decode())
+        carry, seen = b"", b""
+        try:
+            for chunk in chunks:
+                buf = exec_subprocess._redact(carry + chunk)
+                send, carry = exec_subprocess._split_tail(buf, secrets=secrets, ceiling=ceiling)
+                seen += send
+            return seen + carry
+        finally:
+            exec_subprocess._reset_secrets_for_tests()
+
+    @pytest.fixture(autouse=True)
+    def _clean(self):
+        exec_subprocess._reset_secrets_for_tests()
+        yield
+        exec_subprocess._reset_secrets_for_tests()
+
+    # ---- the latency half -------------------------------------------------
+
+    def test_a_complete_line_goes_out_with_a_multi_line_secret_registered(self):
+        """The regression this exists for, in the case that used to fail.
+
+        Under #2051's newline cut this line was held back in full, because a
+        key containing newlines made every cut unsafe.
+        """
         line = b"aws_db_instance.x: Still creating... [10s elapsed]\n"
-        send, carry = exec_subprocess._split_tail(line, overlap=self.OVERLAP, line_safe=True)
-        assert send == line, "a complete line must go out, not wait for 849 bytes"
+        send, carry = self._split(line, self.KEY)
+        assert send == line, "a complete line must not wait for a key-sized buffer"
         assert carry == b""
 
-    def test_byte_bounded_the_same_line_is_held(self):
-        """The contrast, so the test above is not passing for some other
-        reason: with a newline-bearing secret registered there is no safe cut
-        and the line is correctly held back."""
-        line = b"aws_db_instance.x: Still creating... [10s elapsed]\n"
-        send, carry = exec_subprocess._split_tail(line, overlap=self.OVERLAP, line_safe=False)
-        assert send == b""
-        assert carry == line
+    def test_an_ordinary_line_holds_back_nothing_at_all(self):
+        """Not merely 'less': ordinary output has no secret forming in it, so
+        the correct hold-back is zero bytes and that is what makes the stream
+        continuous rather than just faster."""
+        for line in (
+            b"ok: [web1]\n",
+            b"TASK [install packages] ****\n",
+            b"changed: [db1] => {}\n",
+            b"no trailing newline at all",
+        ):
+            send, carry = self._split(line, self.KEY, self.TOKEN)
+            assert carry == b"", line
 
-    def test_a_partial_line_is_still_held(self):
-        """Cutting at the newline must not emit an incomplete trailing line --
-        a secret could still be forming in it."""
-        send, carry = exec_subprocess._split_tail(
-            b"done\npartial-", overlap=self.OVERLAP, line_safe=True
-        )
-        assert send == b"done\n"
-        assert carry == b"partial-"
+    def test_a_sparse_stream_emits_every_line_as_it_arrives(self):
+        """Twelve reads ten seconds apart: every one must come out on arrival.
 
-    def test_a_single_line_longer_than_the_overlap_still_respects_the_byte_bound(self):
-        """A stream with no newlines at all -- or one very long line -- must not
-        grow the carry without limit, and must still hold back enough that a
-        secret cannot straddle."""
-        buf = b"x" * (self.OVERLAP + 100)
-        send, carry = exec_subprocess._split_tail(buf, overlap=self.OVERLAP, line_safe=True)
-        assert len(carry) == self.OVERLAP
-        assert send == buf[:100]
+        Measured before the fix with a 3,175-byte key registered: zero of the
+        twelve were emitted.
+        """
+        chunks = [f"changed: [host{i:02d}]\n".encode() for i in range(12)]
+        carry, emitted = b"", 0
+        ceiling = exec_subprocess._scan_ceiling((self.KEY,))
+        for chunk in chunks:
+            buf = exec_subprocess._redact(carry + chunk)
+            send, carry = exec_subprocess._split_tail(buf, secrets=(self.KEY,), ceiling=ceiling)
+            if send:
+                emitted += 1
+        assert emitted == 12
+        assert carry == b""
+
+    def test_the_hold_back_is_exactly_the_bytes_that_opened_a_secret(self):
+        """The contrast that stops the tests above passing for the wrong reason:
+        when the tail really is a secret in the making, it IS held -- and only
+        it, not the line in front of it."""
+        opening = self.KEY[:40]
+        buf = b"ok: [web1]\n" + opening
+        send, carry = self._split(buf, self.KEY)
+        assert send == b"ok: [web1]\n"
+        assert carry == opening
+
+    def test_only_the_bytes_that_could_OPEN_a_secret_are_held(self):
+        """#2051 had to hold any incomplete trailing line, because a secret
+        could be forming in it. Matching on prefixes answers that question
+        directly, byte by byte -- which is more precise than it first looks, and
+        the first case here is why the assertion is written out rather than
+        assumed: the key begins `-----BEGIN`, so a line ending in a hyphen holds
+        exactly that one hyphen back and emits everything in front of it."""
+        send, carry = self._split(b"done\npartial-", self.KEY)
+        assert send == b"done\npartial"
+        assert carry == b"-"
+
+        # A tail that cannot open either secret holds nothing at all.
+        send, carry = self._split(b"done\npartial!", self.KEY, self.TOKEN)
+        assert send == b"done\npartial!"
+        assert carry == b""
+
+    # ---- the correctness half ---------------------------------------------
+
+    def test_a_token_straddling_every_byte_boundary_is_removed(self):
+        """Every split point, not a representative one: the straddle is the
+        whole reason anything is held back."""
+        payload = b"before " + self.TOKEN + b" after\n"
+        for cut in range(1, len(self.TOKEN)):
+            at = len(b"before ") + cut
+            seen = self._drive([payload[:at], payload[at:]], self.TOKEN)
+            assert self.TOKEN not in seen, f"leaked when split at byte {cut}"
+
+    def test_a_multi_line_key_arriving_in_tiny_chunks_is_removed(self):
+        """A read can return a single byte. The key is 3 KB and spans 46 lines,
+        so this is the case with the most boundaries to get wrong."""
+        data = b"log line\n" + self.KEY + b"\ntrailing\n"
+        for size in (1, 2, 3, 7, 64, 1000):
+            chunks = [data[i : i + size] for i in range(0, len(data), size)]
+            seen = self._drive(chunks, self.KEY)
+            assert self.KEY not in seen, f"leaked at chunk size {size}"
+            assert b"log line\n" in seen and b"trailing\n" in seen
+
+    def test_randomised_interleavings_never_leak(self):
+        """Fixed seed, so a failure is reproducible rather than a story about a
+        run nobody can repeat."""
+        rng = random.Random(7)
+        pieces = [b"changed: [h1]\n", b"ok: [h2]\n", self.KEY, self.TOKEN, b"\n"]
+        for trial in range(200):
+            data = b"".join(rng.choice(pieces) for _ in range(6))
+            size = rng.choice([1, 4, 17, 4096])
+            chunks = [data[i : i + size] for i in range(0, len(data), size)]
+            seen = self._drive(chunks, self.KEY, self.TOKEN)
+            assert self.KEY not in seen, f"key leaked in trial {trial}"
+            assert self.TOKEN not in seen, f"token leaked in trial {trial}"
+
+    def test_a_secret_is_held_until_it_is_whole_then_never_appears(self):
+        """Byte at a time: the arrived-so-far bytes are retained every step, so
+        there is no moment at which half a secret has been emitted."""
+        chunks = [self.KEY[i : i + 1] for i in range(len(self.KEY))]
+        seen = self._drive(chunks, self.KEY)
+        assert self.KEY not in seen
+        assert seen == exec_subprocess._REDACTED
+
+    # ---- the invariants ---------------------------------------------------
+
+    def test_the_carry_never_exceeds_the_scan_ceiling(self):
+        """What bounds memory now that the hold-back is content-dependent. A
+        single very long line used to be the reason for the byte bound; it is
+        now the reason for the ceiling."""
+        secrets = (self.KEY, self.TOKEN)
+        ceiling = exec_subprocess._scan_ceiling(secrets)
+        for buf in (
+            b"x" * 10000,
+            b"x" * 10000 + b"\n",
+            self.KEY[:-1],
+            b"-" * 5000,
+            b"e" * 5000,
+        ):
+            _, carry = exec_subprocess._split_tail(buf, secrets=secrets, ceiling=ceiling)
+            assert len(carry) <= ceiling, (buf[:12], len(carry), ceiling)
+
+    def test_a_long_secret_free_line_is_emitted_whole(self):
+        """The old byte bound held back 849 bytes of any such line. Nothing in
+        10 KB of `x` can open a key or a JWT, so all of it goes out."""
+        buf = b"x" * 10000 + b"\n"
+        send, carry = self._split(buf, self.KEY, self.TOKEN)
+        assert send == buf
+        assert carry == b""
 
     def test_nothing_registered_emits_everything(self):
-        """`overlap` is 0 when no secret is registered, so the bytes go straight
-        through -- the property that makes an unaffected deployment pay
-        nothing."""
+        """The property that makes an unaffected deployment pay nothing."""
         buf = b"no newline here"
-        send, carry = exec_subprocess._split_tail(buf, overlap=0, line_safe=True)
+        send, carry = self._split(buf)
         assert send == buf
         assert carry == b""
 
     def test_the_split_never_loses_or_duplicates_a_byte(self):
-        """The invariant the whole loop depends on. Checked across both modes
-        and several shapes, because a flush that drops the tail loses the end
-        of the log -- where a provider's last error prints."""
+        """The invariant the whole loop depends on: a flush that drops the tail
+        loses the end of the log, where a provider's last error prints."""
         for buf in (
             b"",
             b"\n",
@@ -513,10 +669,157 @@ class TestTheHeldBackTailIsBoundedInTimeAsWellAsBytes:
             b"x" * 5000,
             b"line\n" * 300,
             b"head\n" + b"y" * 2000,
+            self.KEY[:50],
+            b"tail-" + self.TOKEN[:30],
         ):
-            for line_safe in (True, False):
-                for overlap in (0, 1, self.OVERLAP):
-                    send, carry = exec_subprocess._split_tail(
-                        buf, overlap=overlap, line_safe=line_safe
-                    )
-                    assert send + carry == buf, (buf[:20], line_safe, overlap)
+            for secrets in ((), (self.TOKEN,), (self.KEY, self.TOKEN)):
+                send, carry = exec_subprocess._split_tail(
+                    buf, secrets=secrets, ceiling=exec_subprocess._scan_ceiling(secrets)
+                )
+                assert send + carry == buf, (buf[:20], len(secrets))
+
+
+class TestTheStreamIsContinuousThroughTheRealLoop:
+    """The property asserted against `run` itself, not a model of it (#2145).
+
+    Every test above drives `_split_tail` or a helper that mimics the read loop.
+    That is where the logic is, but it cannot see the loop being wired up
+    wrongly -- a byte bound reintroduced in `run`, or a carry flushed only at
+    exit. So this watches a real log file fill while the child is still alive.
+
+    Driven as a REAL SUBPROCESS rather than a thread, like every other
+    end-to-end test in this file: `run` installs SIGINT/SIGTERM handlers, and
+    `signal.signal` raises `ValueError: signal only works in main thread of the
+    main interpreter` off the main thread.
+    """
+
+    KEY = TestTheHeldBackTailIsBoundedInTimeAsWellAsBytes.KEY
+
+    @pytest.fixture(autouse=True)
+    def _clean(self):
+        exec_subprocess._reset_secrets_for_tests()
+        yield
+        exec_subprocess._reset_secrets_for_tests()
+
+    def test_a_line_reaches_the_log_while_the_child_is_still_running(self, tmp_path):
+        """A multi-line secret registered, and a child that prints then waits.
+
+        The first line must be readable while the child is still alive. It is
+        the only assertion in this file about WHEN output appears rather than
+        what it contains, and it is the one a byte-bounded implementation fails:
+        with a 3 KB key registered it would hold the line until 3 KB had
+        accumulated, which never happens here.
+
+        **The child waits for a file rather than for a fixed time.** A first
+        version slept four seconds and gave the poll three, which passed
+        locally in 4.19s and failed in CI -- a deadline in the low single digits
+        of seconds is a flake waiting for a loaded runner, and the window has to
+        outlast interpreter startup, an import and two process spawns. Gating on
+        a file the test creates makes the window as long as the test needs, so
+        the only timeout left is the generous upper bound on a line that never
+        comes, which is a real failure rather than a slow machine.
+        """
+        secret = tmp_path / "secret.txt"
+        secret.write_bytes(self.KEY)
+        release = tmp_path / "release"
+
+        child = tmp_path / "slow.py"
+        child.write_text(
+            "import os, sys, time\n"
+            "sys.stdout.write('FIRST LINE\\n')\n"
+            "sys.stdout.flush()\n"
+            "# Wait to be released, with a cap so a broken test cannot hang CI.\n"
+            "for _ in range(600):\n"
+            "    if os.path.exists(sys.argv[1]):\n"
+            "        break\n"
+            "    time.sleep(0.1)\n"
+            "sys.stdout.write('LAST LINE\\n')\n"
+        )
+
+        log = tmp_path / "out.log"
+        driver = tmp_path / "driver.py"
+        driver.write_text(
+            "import sys\n"
+            "from terrapod.runner import exec_subprocess\n"
+            "with open(sys.argv[1], 'rb') as fh:\n"
+            "    assert exec_subprocess.register_secret(fh.read().decode())\n"
+            "r = exec_subprocess.run(\n"
+            "    [sys.executable, sys.argv[2], sys.argv[3]],\n"
+            "    log_file=sys.argv[4],\n"
+            "    tee_to_stdout=False,\n"
+            ")\n"
+            "sys.exit(r.exit_code)\n"
+        )
+
+        # `terrapod` on the driver's path, DERIVED from the module under test
+        # rather than assumed. A script run as `python /tmp/.../driver.py` gets
+        # its own directory on `sys.path` and NOT the working directory, so the
+        # first version imported successfully only where the package happens to
+        # be installed -- true of an editable venv, false in the test image,
+        # where the tree is on the path because that is where pytest was
+        # invoked. It failed in CI with `ModuleNotFoundError: No module named
+        # 'terrapod'` and nothing else.
+        package_root = Path(exec_subprocess.__file__).parents[2]
+        env = {**os.environ, "PYTHONPATH": str(package_root)}
+
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                str(driver),
+                str(secret),
+                str(child),
+                str(release),
+                str(log),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+            env=env,
+        )
+
+        def _explain(note: str) -> str:
+            """Whatever the driver said, so a CI failure is diagnosable.
+
+            The first version asserted before ever reading these pipes, so its
+            CI failure carried no information about the cause at all.
+            """
+            try:
+                proc.kill()
+                out, err = proc.communicate(timeout=10)
+            except Exception:  # pragma: no cover - diagnostics only
+                out = err = b"<unavailable>"
+            return (
+                f"{note}\n"
+                f"driver rc={proc.returncode}\n"
+                f"driver stdout={out.decode(errors='replace')[-500:]!r}\n"
+                f"driver stderr={err.decode(errors='replace')[-800:]!r}\n"
+                f"log exists={log.exists()} "
+                f"bytes={log.stat().st_size if log.exists() else 0}"
+            )
+
+        deadline = time.monotonic() + 30.0
+        seen = False
+        while time.monotonic() < deadline:
+            if log.exists() and b"FIRST LINE" in log.read_bytes():
+                seen = True
+                break
+            if proc.poll() is not None:
+                raise AssertionError(_explain("the driver exited before emitting anything"))
+            time.sleep(0.05)
+
+        if not seen:
+            raise AssertionError(
+                _explain(
+                    "the first line never appeared while the child was running: "
+                    "the stream is being held back, which is the #2145 regression"
+                )
+            )
+        assert proc.poll() is None, _explain(
+            "the child had already exited, so this proved nothing about streaming"
+        )
+
+        release.write_bytes(b"go")
+        out, err = proc.communicate(timeout=120)
+        assert proc.returncode == 0, err.decode(errors="replace")[-500:]
+        assert b"LAST LINE" in log.read_bytes()
+        assert self.KEY not in log.read_bytes()

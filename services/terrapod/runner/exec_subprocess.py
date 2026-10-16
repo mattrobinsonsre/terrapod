@@ -156,6 +156,81 @@ def _install_handler(state: _SignalState) -> None:
 _SECRETS: set[bytes] = set()
 
 
+def _scan_ceiling(secrets: tuple[bytes, ...]) -> int:
+    """The scan window, and with it the bound on the carry.
+
+    `longest secret - 1`: nothing longer than that can be a *proper* prefix of a
+    secret, so nothing longer ever needs holding. One function rather than an
+    expression in the loop, because the tests need the same number and a second
+    copy of the rule is how the two come to disagree.
+    """
+    return max((len(secret) for secret in secrets), default=1) - 1
+
+
+def _partial_secret_suffix(buf: bytes, *, secrets: tuple[bytes, ...], ceiling: int) -> int:
+    """How many trailing bytes of `buf` could still be the start of a secret.
+
+    Zero for almost all real output, which is the whole point: the only bytes
+    worth holding are the ones that might be a secret half-arrived.
+
+    Scanned from the left of the window, so the FIRST position that matches
+    gives the longest suffix and the search can stop there. `ceiling` bounds the
+    window at `longest secret - 1`, since nothing longer than that can be a
+    proper prefix.
+
+    The first-byte test is what keeps this cheap: only an offset whose byte
+    opens some secret can begin a partial match, and across a 5 MB log that was
+    1.33% of bytes.
+    """
+    if not secrets:
+        return 0
+    window = buf[-ceiling:] if 0 < ceiling < len(buf) else buf
+    base = len(buf) - len(window)
+    first_bytes = {secret[:1] for secret in secrets}
+    for i in range(len(window)):
+        if window[i : i + 1] not in first_bytes:
+            continue
+        tail = buf[base + i :]
+        for secret in secrets:
+            # Strictly longer: an occurrence of the whole secret cannot be here,
+            # because `_redact` ran over this buffer before we were called.
+            if len(secret) > len(tail) and secret.startswith(tail):
+                return len(tail)
+    return 0
+
+
+def _split_tail(buf: bytes, *, secrets: tuple[bytes, ...], ceiling: int) -> tuple[bytes, bytes]:
+    """Split already-redacted bytes into (emit now, hold back).
+
+    A secret can STRADDLE two reads, so something must be held back or a
+    per-chunk replace misses exactly that case -- silently, while looking as
+    though it worked.
+
+    **What is held back is only what could be a secret in the making** (#2145).
+    An earlier version held `longest secret - 1` BYTES, which made the straddle
+    impossible and was badly behaved in TIME: `bufsize=0` makes a read one
+    syscall returning whatever is available, typically a single line, so a
+    stream emitting one short line every ten seconds sat silent for minutes.
+    That was fixed by cutting at the last newline -- but only when no registered
+    secret contained one, so registering anything multi-line (an SSH machine
+    credential, #1933) took the whole run back to the byte bound and, measured,
+    emitted nothing at all for two minutes.
+
+    Holding the longest suffix that is a proper prefix of a secret needs no
+    assumption about newlines, so there is no condition left to fall off:
+    ordinary output holds back nothing, and a secret arriving in pieces holds
+    back exactly its arrived-so-far bytes until it is whole and redacted.
+
+    `ceiling` still bounds the scan window, and with it the carry, so a single
+    line far longer than any secret cannot grow it without limit.
+    """
+    hold = _partial_secret_suffix(buf, secrets=secrets, ceiling=ceiling)
+    cut = len(buf) - hold
+    if cut <= 0:
+        return b"", buf
+    return buf[:cut], buf[cut:]
+
+
 #: Below this, a value is SKIPPED rather than registered. A short string would
 #: match ordinary output and mangle the log, which is a worse failure than the
 #: leak it would prevent.
@@ -167,39 +242,6 @@ _SECRETS: set[bytes] = set()
 #: function, which is the one thing it must not do. Nothing of value is lost by
 #: skipping, because a value this short cannot be a JWT and so is not the
 #: credential this exists to hide.
-def _split_tail(buf: bytes, *, overlap: int, line_safe: bool) -> tuple[bytes, bytes]:
-    """Split already-redacted bytes into (emit now, hold back).
-
-    A secret can STRADDLE two reads, so something must be held back or a
-    per-chunk replace misses exactly that case -- silently, while looking as
-    though it worked. `overlap` is `longest secret - 1`, which makes the
-    straddle impossible because any occurrence is then whole within some
-    `carry + chunk`.
-
-    Holding back that many BYTES is correct and, on its own, badly behaved in
-    TIME. `bufsize=0` makes a read one syscall returning whatever is available
-    -- typically a single line -- so with an ~850-byte token a stream emitting
-    one short line every ten seconds would sit silent for nearly three minutes.
-    The log of a slow apply is exactly what someone watches to see where it is
-    stuck.
-
-    So when no registered secret contains a newline (`line_safe`, checked by
-    the caller rather than assumed), the split goes at the last newline: a
-    secret with no newline cannot span one, so every occurrence in the emitted
-    region is whole within it. The byte bound still applies to whatever is left,
-    which covers both a newline-bearing secret and a single line longer than
-    the longest secret.
-    """
-    cut = 0
-    if line_safe:
-        cut = buf.rfind(b"\n") + 1
-    if len(buf) - cut > overlap:
-        cut = len(buf) - overlap
-    if cut <= 0:
-        return b"", buf
-    return buf[:cut], buf[cut:]
-
-
 _MIN_SECRET_LEN = 24
 
 _REDACTED = b"[redacted: cloud identity token]"
@@ -302,31 +344,28 @@ def run(
 
         # How much of the tail to hold back between reads. A secret can STRADDLE a
         # chunk boundary, and a per-chunk replace would miss exactly that case --
-        # silently, and look like it worked. Holding back `longest - 1` bytes is
-        # what makes the straddle impossible, because any occurrence is then whole
-        # within some `carry + chunk`.
+        # silently, and look like it worked.
         #
-        # The byte cost is under a kilobyte, but bytes are the wrong unit: with
-        # `bufsize=0` a `read()` is one syscall returning whatever is available,
-        # typically a single line. A terrapod identity token is ~850 bytes, so a
-        # `tofu apply` emitting one ~50-byte "Still creating..." line every ten
-        # seconds would hold back seventeen lines -- nearly three minutes of
-        # silence -- and an operator watching a run, or trying to see where a
-        # hung apply is stuck, sees a frozen log. That is every run in the
-        # cloud-identity cohort, which is the cohort this exists for.
+        # So the tail holds back only the longest suffix that could be the START
+        # of a secret (#2145), which for ordinary output is nothing at all. Bytes
+        # are the wrong unit for this: with `bufsize=0` a `read()` is one syscall
+        # returning whatever is available, typically a single line, so holding a
+        # fixed `longest - 1` bytes meant a `tofu apply` emitting one ~50-byte
+        # "Still creating..." line every ten seconds went quiet for nearly three
+        # minutes -- the log someone watches to find where a slow apply is stuck.
         #
-        # So the tail is cut at the last NEWLINE when it can be: no registered
-        # secret contains one (`_newline_free` checks rather than assumes), and
-        # a secret with no newline cannot span one, so every occurrence in the
-        # emitted region is whole within it. The byte overlap stays as the
-        # fallback for a newline-bearing secret and as the bound on a single
-        # very long line, so the straddle remains impossible either way.
+        # An earlier fix cut at the last newline instead, but only while no
+        # registered secret contained one, so registering a multi-line secret (an
+        # SSH machine credential, #1933) reverted the whole run to the byte bound:
+        # measured, nothing emitted at all for two minutes. Matching on prefixes
+        # needs no newline assumption, so that condition is gone rather than
+        # widened.
         #
-        # With no secrets registered -- every run on a deployment not using
-        # per-workspace cloud identity -- `overlap` is 0 and the bytes are
-        # emitted exactly as before, unexamined.
-        overlap = max((len(s) for s in _SECRETS), default=1) - 1
-        line_safe = all(b"\n" not in s for s in _SECRETS)
+        # `ceiling` remains as the scan window and the bound on the carry, so one
+        # line far longer than any secret cannot grow it without limit. With no
+        # secrets registered -- every run on a deployment not using per-workspace
+        # cloud identity -- the loop below skips all of this and emits the bytes
+        # unexamined.
         carry = b""
 
         # Read child output a chunk at a time. Larger chunks reduce
@@ -339,7 +378,14 @@ def run(
                 _emit(chunk)
                 continue
             buf = _redact(carry + chunk)
-            send, carry = _split_tail(buf, overlap=overlap, line_safe=line_safe)
+            # Read live, per chunk, rather than snapshotted before the loop:
+            # `_redact` above reads `_SECRETS` live, so a snapshot here could
+            # redact a secret whose PREFIX the split does not know to hold --
+            # which is a straddle hole for exactly that secret. Two reads of the
+            # same state or neither; a tuple and a max over at most a handful of
+            # values is nothing against a 4 KB read.
+            secrets = tuple(_SECRETS)
+            send, carry = _split_tail(buf, secrets=secrets, ceiling=_scan_ceiling(secrets))
             if send:
                 _emit(send)
         if carry:
