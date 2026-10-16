@@ -651,20 +651,27 @@ class TestIgnorePathsIsActuallyApplied:
         assert "dropped-01" not in hosts
 
 
-class TestTheFetchPathReadsIgnorePaths:
+class TestEveryMaterialisedSourceIsPrunedThenScanned:
     """A positional gate, because no behavioural test can see this.
 
     The defect was not a wrong pruner -- it was a pruner that was never called.
     A test that drives `_apply_ignore_paths` directly passes whether or not the
-    fetch path invokes it, which is precisely how `ignore_paths` came to be
-    stored and ignored. So this reads the source: the call must exist, must be
-    passed the settings row's own list, and must come BEFORE the plugin scan,
-    since scanning a file the operator excluded would refuse the resolution
-    over something already out of the source.
+    path that materialises a source invokes it, which is precisely how
+    `ignore_paths` came to be stored and ignored. So this reads the source: the
+    call must exist, must be passed the workspace's own list, and must come
+    BEFORE the plugin scan, since scanning a file the operator excluded would
+    refuse the resolution over something already out of the source.
+
+    **It reads `_materialise_config_root`, and that now covers BOTH sources**
+    (#2021). The treatment used to live inside `_fetch_vcs_source`, so this gate
+    spoke for the fetch path alone; the run path reads the configuration version
+    instead, and a second copy of the chmod and the plugin refusal is exactly how
+    one of the two comes to be missing it. One function, one gate, both paths --
+    which is why the factoring was worth doing rather than adding a branch.
     """
 
     def _calls(self) -> list[tuple[str, str]]:
-        """Every call in `_fetch_vcs_source`, as (callee, unparsed arguments).
+        """Every call in `_materialise_config_root`, as (callee, unparsed args).
 
         Read from the AST rather than by searching the text, which matters more
         than it looks: `_refuse_plugin_sources` is NAMED IN THE DOCSTRING above
@@ -678,14 +685,16 @@ class TestTheFetchPathReadsIgnorePaths:
 
         from terrapod.services import inventory_resolve
 
-        tree = ast.parse(textwrap.dedent(inspect.getsource(inventory_resolve._fetch_vcs_source)))
+        tree = ast.parse(
+            textwrap.dedent(inspect.getsource(inventory_resolve._materialise_config_root))
+        )
         out: list[tuple[str, str]] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 out.append((ast.unparse(node.func), " ".join(ast.unparse(a) for a in node.args)))
         return out
 
-    def test_the_fetch_passes_the_workspaces_own_ignore_paths(self):
+    def test_it_passes_the_workspaces_own_ignore_paths(self):
         calls = self._calls()
         pruning = [
             args for callee, args in calls if "_apply_ignore_paths" in (callee, *args.split())
@@ -699,12 +708,12 @@ class TestTheFetchPathReadsIgnorePaths:
             if callee.endswith("to_thread") and "_apply_ignore_paths" in args
         ]
         assert pruning or threaded, (
-            "the fetch path does not prune the source, so `ignore_paths` is "
+            "the materialised source is not pruned, so `ignore_paths` is "
             "stored and honoured by nothing"
         )
         assert any("ws.inventory_ignore_paths" in args for args in (*pruning, *threaded)), (
-            "the pruner is called with something other than the settings row's "
-            "own list, so what an operator configured is not what is applied"
+            "the pruner is called with something other than the workspace's own "
+            "list, so what an operator configured is not what is applied"
         )
 
     def test_the_prune_comes_before_the_plugin_scan(self):

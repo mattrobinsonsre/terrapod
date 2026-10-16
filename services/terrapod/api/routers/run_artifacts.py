@@ -11,6 +11,7 @@ Endpoints:
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/state           — download current state
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file       — download plan file
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file       — download .terraform.lock.hcl from plan
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/resolved-inventory — download the configure's inventory
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts  — download plan-phase workspace diff tarball
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log        — upload plan log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file       — upload plan file
@@ -57,6 +58,7 @@ from terrapod.storage.keys import (
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
+    resolved_inventory_key,
     state_key,
 )
 
@@ -295,6 +297,34 @@ async def download_plan_file(
 
     storage = get_storage()
     key = plan_output_key(str(run.workspace_id), str(run.id))
+    url = await storage.presigned_get_url(key)
+    return RedirectResponse(url=url.url, status_code=302)
+
+
+@router.get("/runs/{run_id}/artifacts/resolved-inventory")
+async def download_resolved_inventory(
+    run_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Download the inventory this configure run targets (#2021).
+
+    `phase="configure"` rather than `"apply"`: a plan-phase token has no use
+    for it, and the phase binding is what stops a run's plan-phase credential
+    reaching an artifact only its configure needs. `require_runner_for_run`
+    carries the `run_id` scoping, so another run's token is refused here as it
+    is on every neighbour.
+
+    The object is written at run creation, so a 404 from the presigned URL means
+    the resolution genuinely produced nothing to store -- which cannot happen
+    for a configure run, because creation refuses rather than storing nothing.
+    An empty inventory is a stored empty document, not an absent object.
+    """
+    require_runner_for_run(user, run_id, phase="configure")
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = resolved_inventory_key(str(run.workspace_id), str(run.id))
     url = await storage.presigned_get_url(key)
     return RedirectResponse(url=url.url, status_code=302)
 

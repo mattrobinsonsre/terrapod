@@ -57,6 +57,7 @@ import yaml
 from terrapod.config import settings
 from terrapod.services.api_ansible import ansible_inventory_binary
 from terrapod.services.workspace_settings import effective_ansible_version
+from terrapod.storage.keys import config_version_key, resolved_inventory_key
 
 logger = structlog.get_logger(__name__)
 
@@ -598,6 +599,93 @@ def _coerce(var) -> Any:  # type: ignore[no-untyped-def]
         return var.value
 
 
+async def write_run_artifact(db, run, *, limit: str | None = None) -> str:
+    """Resolve the run's inventory and store it as the run's own artifact (#2021).
+
+    Returns the storage key. Called from run creation, read by the configure
+    phase through `GET /runs/{run_id}/artifacts/resolved-inventory`.
+
+    **It raises rather than degrading, and that is deliberate.** A configure
+    whose target set could not be resolved must not be dispatched: the Job would
+    start, fail inside the phase, and have consumed a runner slot to tell us
+    something the API already knew. The caller is run creation, so the refusal
+    reaches whoever asked for the run, with the reason.
+
+    **An empty inventory is written, not skipped.** A workspace that resolves to
+    no hosts gets the ordinary empty document, so the phase can tell "nothing to
+    target" from "could not read it" -- the second being the absence of the
+    object. Writing nothing would make those two indistinguishable, which is
+    the one thing the issue asked this to get right.
+    """
+    from terrapod.storage import get_storage
+
+    document = await resolve_for_run(db, run, limit=limit)
+    key = resolved_inventory_key(str(run.workspace_id), str(run.id))
+    storage = get_storage()
+    await storage.put(
+        key,
+        json.dumps(document).encode(),
+        content_type="application/json",
+    )
+    logger.info(
+        "resolved inventory stored for run",
+        run_id=str(run.id),
+        workspace_id=str(run.workspace_id),
+        hosts=len(document.get("hosts") or {}),
+        groups=len(document.get("groups") or {}),
+        from_config_version=str(run.configuration_version_id or ""),
+    )
+    return key
+
+
+async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any]:
+    """The inventory a RUN targets, pinned to the commit the run is running (#2021).
+
+    The run path, and deliberately not `resolve` with an argument:
+
+    * **Its git half comes from the run's configuration version**, which the
+      poller collected when the code changed, so launching a configure fetches
+      nothing. That is the Terraform shape -- poll or webhook, build a CV, run
+      against it -- applied to Ansible code and inventory.
+    * **It is not Redis-cached.** `resolve`'s cache exists because the branch
+      head cannot be derived from rows we hold, so the entry needs a TTL. A CV
+      is immutable and the declared rows are read once here, so there is
+      nothing to go stale and nothing to invalidate -- and the result is
+      persisted as the run's own artifact, which is the only cache this needs.
+    * **A run with no configuration version resolves the declared rows alone.**
+      That is the ordinary shape for a workspace whose inventory is entirely
+      Terraform-declared: there is no git half to be missing.
+
+    Raises `InventoryResolutionFailed` for anything that leaves the answer
+    unknown, so a caller can refuse to dispatch rather than hand a configure an
+    inventory it cannot vouch for.
+    """
+    from terrapod.services import inventory_service as inv
+
+    ws = await inv.get_inventory_workspace(db, run.workspace_id)
+    include_platform = ws.inventory_include_platform if ws else True
+
+    # Same gate as `resolve`, minus the branch-head lookup: a CV is only a git
+    # source for a workspace that has declared a configure operation (#1966),
+    # because `workspace_fetch_paths` only puts the config root in the tarball
+    # when `configure_enabled`. Without that the CV holds the Terraform tree and
+    # no inventory, and extracting it would look like an empty inventory rather
+    # than a misconfiguration.
+    cv_id = None
+    if ws is not None and ws.configure_enabled and run.configuration_version_id is not None:
+        cv_id = run.configuration_version_id
+
+    return await _resolve_uncached(
+        db,
+        run.workspace_id,
+        ws=ws,
+        include_platform=include_platform,
+        git_sha="",
+        limit=limit,
+        config_version_id=cv_id,
+    )
+
+
 async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> dict[str, Any]:
     """The workspace's inventory, resolved by ansible, cached in Redis.
 
@@ -760,8 +848,16 @@ async def _resolve_uncached(
     include_platform: bool,
     git_sha: str,
     limit: str | None,
+    config_version_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
-    """Render, fetch, run ansible, read the output. One scratch directory."""
+    """Render, materialise, run ansible, read the output. One scratch directory.
+
+    `config_version_id` takes precedence over `git_sha` and is the RUN path
+    (#2021): the git half comes from the configuration version the run is
+    executing, which the poller already collected, rather than from a fetch of
+    wherever the branch now points. `git_sha` remains the read path, where
+    "as of the branch head" is the right answer because there may be no run.
+    """
     import shutil
 
     workdir = Path(await asyncio.to_thread(make_tempdir))
@@ -783,7 +879,13 @@ async def _resolve_uncached(
         # to be the config root (#1929).
         cwd: Path | None = None
 
-        if git_sha:
+        # The CV first: a run resolves against the commit it is running, and
+        # only a read with no run falls back to the branch head.
+        if config_version_id is not None:
+            config_root = await _config_root_from_cv(ws, config_version_id, workdir)
+            cwd = config_root
+            sources.extend(_inventory_sources(ws, config_root))
+        elif git_sha:
             config_root = await _fetch_vcs_source(db, ws, git_sha, workdir)
             cwd = config_root
             sources.extend(_inventory_sources(ws, config_root))
@@ -832,7 +934,7 @@ async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
 
     from terrapod.db.models import VCSConnection
     from terrapod.services import vcs_provider
-    from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
+    from terrapod.services.vcs_archive_cache import VCSArchiveCache
 
     result = await db.execute(select(VCSConnection).where(VCSConnection.id == ws.vcs_connection_id))
     conn = result.scalar_one()
@@ -852,6 +954,60 @@ async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
     cache = VCSArchiveCache()
     storage_key = await cache.get_or_fetch(conn, owner, repo, git_sha, paths)
 
+    return await _materialise_config_root(
+        storage_key, ws, workdir, origin=f"{owner}/{repo} at {git_sha[:8]}"
+    )
+
+
+async def _config_root_from_cv(ws, config_version_id, workdir: Path) -> Path:
+    """The config root from a run's CONFIGURATION VERSION -- no fetch (#2021).
+
+    This is the run path, and it exists because the Terraform shape is right:
+    the poller collects code on change, so by the time anyone launches a
+    configure the bytes are already in storage. `vcs_poller` passes
+    `configure_enabled` and `config_directory` into the fetch and
+    `git_fetch.workspace_fetch_paths` includes the config root (#2117), so the
+    CV already contains the playbooks, `roles/`, `group_vars`, `host_vars` and
+    every `inventory_paths` entry -- the config root is taken wholesale, so
+    those need no term of their own.
+
+    **It is also the only shape that keeps the inventory and the playbook on
+    one commit.** `_fetch_vcs_source` resolves the branch head, so a push
+    between this run's CV being created and the configure launching would give
+    the run a playbook from one commit and an inventory from another, silently.
+    A CV is immutable, so taking both halves from it makes them agree by
+    construction -- and the run artifact is then pinned to the commit the run
+    is running, not merely to the moment it was created.
+
+    No `VCSConnection` is read and no credential is needed, which is the
+    security half of the same point: resolving for a run touches no network.
+    """
+    return await _materialise_config_root(
+        config_version_key(str(ws.id), str(config_version_id)),
+        ws,
+        workdir,
+        origin=f"configuration version {config_version_id}",
+    )
+
+
+async def _materialise_config_root(storage_key: str, ws, workdir: Path, *, origin: str) -> Path:
+    """Unpack a stored repository archive and make it inert.
+
+    Shared by the fetch path and the CV path because the bytes are the same
+    shape: the poller copies the archive-cache tarball to the CV key verbatim,
+    so both are a provider archive wrapped in its commit-named directory and
+    `_extract` unwraps either. Two call sites, one treatment -- a second copy
+    of the chmod and the plugin refusal is how one of them comes to be missing
+    it.
+
+    `origin` appears only in the error, and naming it is the point: "not a
+    directory in owner/repo at 0a4cf1cb" and "not a directory in configuration
+    version <id>" send an operator to different places.
+    """
+    from terrapod.services.vcs_archive_cache import materialize_archive
+
+    subdir = (ws.config_directory or "").strip("/")
+
     dest = workdir / "vcs"
     # `materialize_archive` yields the TARBALL, not a tree, so extracting is
     # ours to do -- and ours to do safely.
@@ -861,7 +1017,7 @@ async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
     root = dest / subdir if subdir else dest
     if not root.is_dir():
         raise InventoryResolutionFailed(
-            f"{subdir or '/'} is not a directory in {owner}/{repo} at {git_sha[:8]} -- "
+            f"{subdir or '/'} is not a directory in {origin} -- "
             f"the workspace's config directory names a path the repository does not "
             f"have at that commit"
         )

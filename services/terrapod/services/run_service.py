@@ -1301,6 +1301,27 @@ async def create_run(
     db.add(run)
     await db.flush()
 
+    # The inventory this configure targets, pinned as the run's own artifact
+    # (#2021). After the flush because it is keyed on the run id, and before
+    # anything can dispatch the run.
+    #
+    # Nothing is fetched here. The git half comes from the run's configuration
+    # version, which the VCS poller already collected when the code changed --
+    # the same shape Terraform has always had, applied to Ansible code and
+    # inventory. That is also what keeps the inventory and the playbook on ONE
+    # commit: resolving the branch head instead would let a push between this
+    # run's CV being built and the configure launching give it a playbook from
+    # one commit and an inventory from another, with nothing to say so.
+    #
+    # It RAISES rather than degrading. A configure whose target set cannot be
+    # resolved must not be dispatched -- the Job would start, fail inside the
+    # phase, and have consumed a runner slot to report something that was
+    # already knowable here. The refusal reaches whoever asked for the run.
+    if is_configure:
+        from terrapod.services import inventory_resolve
+
+        await inventory_resolve.write_run_artifact(db, run)
+
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages
     # once, right after creating it, and never sees one added later (#1704).

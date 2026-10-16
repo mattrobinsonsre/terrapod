@@ -91,6 +91,24 @@ def plan_json_output_key(workspace_id: str, run_id: str) -> str:
     return f"plans/{workspace_id}/{run_id}.json-output"
 
 
+def resolved_inventory_key(workspace_id: str, run_id: str) -> str:
+    """Key for the inventory a configure run targets (#2021).
+
+    Written by run creation, read by the configure phase with the run's own
+    token. A run artifact rather than an inventory one, and the distinction is
+    the whole point: the inventory itself is live -- resolution is a function of
+    the declared rows and the run's configuration version, so a read of it
+    moves -- while "what did THIS configure target" must not. Pinned here, it
+    is also #1973's denominator for working out which hosts a partial configure
+    left outstanding.
+
+    Pinned to the COMMIT, not merely to the moment: the git half is extracted
+    from the run's configuration version, so the inventory and the playbook come
+    from the same commit even if the branch moves between launch and execution.
+    """
+    return f"runs/{workspace_id}/{run_id}.inventory.json"
+
+
 def cost_estimate_key(workspace_id: str, run_id: str) -> str:
     """Key for a run's cost estimate (`cost_estimate.json`, #871).
 

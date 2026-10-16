@@ -36,10 +36,12 @@ from terrapod.storage.keys import (
     apply_log_key,
     binary_cache_key,
     config_version_key,
+    configure_log_key,
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
     provider_cache_key,
+    resolved_inventory_key,
     state_key,
 )
 from terrapod.storage.protocol import ObjectStore
@@ -196,6 +198,30 @@ async def _cleanup_state_versions(
     return deleted
 
 
+#: The per-run objects a terminal run's retention sweep deletes.
+#:
+#: **Named rather than inlined because it is checked** (#2148).
+#: `tests/services/test_run_artifact_retention_coverage.py` derives the
+#: per-run key set from `storage/keys.py` and requires every member to be
+#: either here or in its allowlist with a reason -- so a key added to
+#: `keys.py` and forgotten here fails a test instead of accumulating for the
+#: life of the deployment.
+#:
+#: That gate exists because this was an unchecked hand-kept list and it had
+#: drifted: `configure_log_key` arrived with the configure spine two days
+#: before #2021 and was never added, and three older keys are still outstanding
+#: in #2148. A tuple nobody verifies against its source is the same shape as
+#: every other exemption ledger in this codebase.
+RUN_ARTIFACT_KEYS = (
+    plan_log_key,
+    apply_log_key,
+    configure_log_key,
+    plan_output_key,
+    plan_json_output_key,
+    resolved_inventory_key,
+)
+
+
 async def _cleanup_run_artifacts(
     db: AsyncSession,
     storage: ObjectStore,
@@ -224,7 +250,7 @@ async def _cleanup_run_artifacts(
         run_id = str(run.id)
         artifact_count = 0
 
-        for key_fn in (plan_log_key, apply_log_key, plan_output_key, plan_json_output_key):
+        for key_fn in RUN_ARTIFACT_KEYS:
             try:
                 await storage.delete(key_fn(ws_id, run_id))
                 artifact_count += 1
