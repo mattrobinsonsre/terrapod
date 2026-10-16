@@ -1250,8 +1250,37 @@ def _apply_status(run: Run) -> str:
     if s == "applied":
         return "finished"
     if s == "errored":
-        # Errored during apply phase (apply was started but never finished)
-        if run.apply_started_at and not run.apply_finished_at:
+        # `apply_started_at` is the discriminator, and `apply_finished_at` is
+        # emphatically NOT one (#1988).
+        #
+        # This read `apply_started_at and not apply_finished_at`, which cannot
+        # be true for any run the state machine produces: `transition_run` sets
+        # `apply_finished_at` on the very transition to `errored`
+        #
+        #     target_status in ("applied", "errored")
+        #     and run.apply_started_at
+        #     and not run.apply_finished_at   ->  run.apply_finished_at = now
+        #
+        # so by the time this function reads the run the timestamp is always
+        # set, the branch fell through, and EVERY failed apply reported
+        # `unreachable` -- which means "the apply never ran". The CLI was told
+        # the apply had not happened on the one surface an operator reads to
+        # decide whether to re-run it, while the apply had in fact run and
+        # failed. The `errored` return was effectively dead code.
+        #
+        # Whether the apply STARTED is the honest question, and it is already
+        # answered correctly: a plan-phase failure leaves `apply_started_at`
+        # None, and the apply-phase unclaim (#1646) deliberately clears it so a
+        # later error cannot record an apply that never happened.
+        #
+        # A third case arrives with the configure phase: apply succeeded,
+        # configure failed. That run is `errored` with the apply genuinely
+        # finished and a state version committed, so it must report `finished`
+        # here rather than `errored` -- and it needs a signal this function does
+        # not have yet (`configure_started_at`). It lands with the run spine
+        # (#1988); do not guess at it from these two timestamps, which is what
+        # produced this bug.
+        if run.apply_started_at:
             return "errored"
         return "unreachable"
     if s in ("canceled", "discarded"):
