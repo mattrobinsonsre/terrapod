@@ -25,7 +25,7 @@ from google.cloud.storage import blob as blob_module
 from google.cloud.storage.blob import Blob
 
 from terrapod.storage.gcs import GCSStore
-from terrapod.storage.protocol import ObjectNotFoundError
+from terrapod.storage.protocol import ObjectNotFoundError, ObjectStoreError
 
 
 class TestGCSLibraryContract:
@@ -382,6 +382,51 @@ class TestGCSStoreUnit:
             async for chunk in store.get_stream("test/stream.bin", chunk_size=5):
                 result += chunk
             assert result == b"hello world"
+
+    async def test_get_stream_not_found(self, store: GCSStore) -> None:
+        mock_blob = MagicMock()
+        mock_blob.exists.return_value = False
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        mock_client = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+
+        async def read_all() -> None:
+            async for _ in store.get_stream("test/missing.bin"):
+                pass
+
+        with patch.object(store, "_get_sync_client", return_value=mock_client):
+            with pytest.raises(ObjectNotFoundError):
+                await asyncio.wait_for(read_all(), timeout=10)
+
+    async def test_get_stream_delivers_what_was_read_before_an_error(self, store: GCSStore) -> None:
+        import io
+
+        class _Reader(io.BytesIO):
+            def read(self, n: int | None = -1) -> bytes:
+                data = super().read(n)
+                if not data:
+                    raise OSError("connection reset")
+                return data
+
+        mock_blob = MagicMock()
+        mock_blob.exists.return_value = True
+        mock_blob.open.return_value = _Reader(b"helloworld")
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        mock_client = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+
+        chunks: list[bytes] = []
+
+        async def read_all() -> None:
+            async for chunk in store.get_stream("test/stream.bin", chunk_size=5):
+                chunks.append(chunk)
+
+        with patch.object(store, "_get_sync_client", return_value=mock_client):
+            with pytest.raises(ObjectStoreError, match="connection reset"):
+                await asyncio.wait_for(read_all(), timeout=10)
+        assert chunks == [b"hello", b"world"]
 
     async def test_presigned_put_url_has_content_type_header(self, store: GCSStore) -> None:
         mock_blob = MagicMock()

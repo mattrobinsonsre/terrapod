@@ -62,3 +62,20 @@ class TestInitSupportsVarFile:
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=10),
         ):
             assert tf_args.init_supports_var_file("tofu") is False
+
+    def test_returns_false_when_the_binary_cannot_be_executed(self) -> None:
+        """A present-but-unexecutable binary, which is NOT FileNotFoundError.
+
+        A wrong-arch download from the binary cache raises `OSError: [Errno 8]
+        Exec format error`. The probe caught only `FileNotFoundError`, so this
+        escaped it -- and `run_init` calls the probe outside its own try, so
+        the runner died with a traceback where it should have raised a clean
+        InitError.
+        """
+        with patch("subprocess.run", side_effect=OSError(8, "Exec format error")):
+            assert tf_args.init_supports_var_file("tofu") is False
+
+    def test_returns_false_when_the_runner_cannot_fork(self) -> None:
+        """ENOMEM is the other exec failure a loaded runner actually meets."""
+        with patch("subprocess.run", side_effect=OSError(12, "Cannot allocate memory")):
+            assert tf_args.init_supports_var_file("tofu") is False
