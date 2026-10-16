@@ -60,10 +60,18 @@ def run_init(
         if init_supports_var_file(binary):
             argv.extend(var_file_args)
         else:
+            # The probe answers "cannot confirm", which is not the same as
+            # "too old" -- it also returns False when the binary cannot be
+            # executed at all (a wrong-arch download) or the runner is out of
+            # memory to fork with. Naming only the version sent an operator to
+            # upgrade an engine that was fine, so the message now offers the
+            # likely cause without asserting it.
             logger.warning(
-                "init does not accept -var-file (need tofu>=1.12 / terraform>=1.10 "
-                "for early-eval); init will run without var-files. Configs using "
-                "variables in backend/required_providers/module-source will fail.",
+                "init will run WITHOUT -var-file: could not confirm this binary "
+                "accepts it. Usually the engine predates the flag (needs "
+                "tofu>=1.12 / terraform>=1.10); it also reports this way if the "
+                "binary could not be executed at all. Configs using variables in "
+                "backend/required_providers/module-source will fail.",
                 binary=binary,
             )
     if lockfile_readonly:

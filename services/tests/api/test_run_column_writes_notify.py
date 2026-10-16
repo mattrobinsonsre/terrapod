@@ -32,6 +32,7 @@ import pytest
 
 from terrapod.api.routers import run_artifacts
 from terrapod.redis import client as redis_client
+from terrapod.runner.phases import resource_profile
 
 #: Writes that do not change what any surface renders, so they need no event.
 #: Empty today, and present so a future exemption has to state its reason here
@@ -228,4 +229,100 @@ class TestAHangingRedisCannotStallAnArtifactUpload:
         """A `wait_for` whose timeout is None is not a bound, and that is the
         easy wrong fix once someone decides the constant is in the way."""
         assert isinstance(run_artifacts._PUBLISH_TIMEOUT_SECONDS, (int, float))
-        assert 0 < run_artifacts._PUBLISH_TIMEOUT_SECONDS <= 30
+        assert run_artifacts._PUBLISH_TIMEOUT_SECONDS > 0
+
+    def test_the_bound_is_under_the_tightest_client_deadline(self):
+        """DERIVED from the caller, because a bound equal to the deadline it
+        protects is not a bound.
+
+        It shipped at 5.0s, which is exactly `resource_profile.post_profile`'s
+        own `httpx.Timeout(5.0, ...)` -- single attempt, no retry. So on that
+        route the handler could not return before the runner gave up: a
+        guaranteed spurious failure and a stall on the Job's exit path, every
+        run, from the constant that exists to prevent exactly that. An
+        `0 < x <= 30` assertion passed at 5.0 and would pass at 30.
+        """
+        src = pathlib.Path(resource_profile.__file__).read_text()
+        tree = ast.parse(src)
+        timeouts = [
+            a.value
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and ast.unparse(n.func).endswith("Timeout")
+            for a in n.args
+            if isinstance(a, ast.Constant) and isinstance(a.value, (int, float))
+        ]
+        assert timeouts, "could not read the resource-profile client's timeout"
+        assert run_artifacts._PUBLISH_TIMEOUT_SECONDS < min(timeouts), (
+            f"the publish bound ({run_artifacts._PUBLISH_TIMEOUT_SECONDS}s) is not "
+            f"under the tightest client deadline ({min(timeouts)}s), so that caller "
+            "gives up before the handler can return"
+        )
+
+    def test_every_publish_in_the_module_is_bounded(self):
+        """DERIVED, not a list of two.
+
+        The first version of this class named `_publish_log_updated` and
+        `_publish_run_updated`. The pre-release review then found three more
+        publishes in the same file -- on the state-upload and state-diverged
+        RUNNER endpoints -- which the gate was structurally blind to, because
+        it enumerated its subject instead of deriving it. That is the
+        ledger-gate shape, and this is its fix.
+
+        The subject is the two Redis PRIMITIVES, not anything whose name
+        contains "publish": an earlier draft matched the latter and flagged six
+        call sites of the bounded wrappers themselves, which carry the timeout
+        inside. A gate can be too wide as well as too narrow, and a wide one
+        teaches people to double-bound to silence it.
+
+        And the test is on the CALL node rather than the `await`, because once
+        a publish is bounded it is an ARGUMENT of `asyncio.wait_for` and is no
+        longer awaited directly -- a draft that walked `ast.Await` found zero
+        once the fix was in, and a floor of zero asserts nothing.
+        """
+        PRIMITIVES = {"publish_event", "publish_workspace_event"}
+        tree = ast.parse(pathlib.Path(run_artifacts.__file__).read_text())
+
+        wrapped = {
+            id(n.args[0])
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and ast.unparse(n.func) == "asyncio.wait_for" and n.args
+        }
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and ast.unparse(n.func).split(".")[-1] in PRIMITIVES
+        ]
+        # The floor is bound to the module's IMPORTS, which is the only source
+        # of truth here that is independent of this gate's own filter.
+        #
+        # Two earlier floors were worthless and both were caught by running
+        # them. `>= 5` was main-specific -- main has three
+        # `publish_workspace_event` sites and the release lines two, because
+        # main also keeps the break-glass state index current. Comparing the
+        # kinds found against `PRIMITIVES` was worse: `calls` is FILTERED by
+        # `PRIMITIVES`, so the two agree by construction and narrowing the set
+        # left the gate green while making it blind. A check derived from the
+        # thing it is checking asserts nothing.
+        imported = {
+            alias.name
+            for n in ast.walk(tree)
+            if isinstance(n, ast.ImportFrom) and n.module == "terrapod.redis.client"
+            for alias in n.names
+            if alias.name.startswith("publish")
+        }
+        assert imported, (
+            "the module imports no publish primitive from terrapod.redis.client; this "
+            "gate has drifted from the code and is asserting nothing"
+        )
+        checked = {ast.unparse(n.func).split(".")[-1] for n in calls}
+        assert imported <= checked, (
+            f"the module imports {sorted(imported)} but this gate only inspects "
+            f"{sorted(checked)}; {sorted(imported - checked)} is published somewhere "
+            "it is not watching"
+        )
+        unbounded = [f"line {n.lineno}: {ast.unparse(n)}" for n in calls if id(n) not in wrapped]
+        assert not unbounded, (
+            "publish(es) with no timeout -- `publish_event` and "
+            "`publish_workspace_event` swallow a failure but cannot swallow a hang, "
+            "so these stall the request they ride on:\n  " + "\n  ".join(unbounded)
+        )
