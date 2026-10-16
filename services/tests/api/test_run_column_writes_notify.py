@@ -25,11 +25,13 @@ on the first run of this file, before the fix was wrong.
 from __future__ import annotations
 
 import ast
+import asyncio
 import pathlib
 
 import pytest
 
 from terrapod.api.routers import run_artifacts
+from terrapod.redis import client as redis_client
 
 #: Writes that do not change what any surface renders, so they need no event.
 #: Empty today, and present so a future exemption has to state its reason here
@@ -179,3 +181,51 @@ class TestThePayloadIsUsableByTheClient:
         assert len(set(literals)) == len(literals), (
             f"two call sites report the same `changed` value: {literals}"
         )
+
+
+class TestAHangingRedisCannotStallAnArtifactUpload:
+    """Both helpers' `except Exception` says SSE failures must never break an
+    in-flight upload. A hang is not an exception, so the handler could not
+    deliver that: `publish_event` awaits `redis.publish` and the client carries
+    no `socket_timeout`, so a blackholed Redis stalled the runner's POST.
+
+    Driven rather than asserted about. A shape test on the source would pass
+    on a `wait_for` with no timeout, and the property here is about WHEN the
+    helper returns.
+    """
+
+    @pytest.mark.parametrize(
+        "helper,args",
+        [
+            ("_publish_log_updated", ("ws-1", "run-1", "plan")),
+            ("_publish_run_updated", ("ws-1", "run-1", "plan-json")),
+        ],
+    )
+    async def test_the_helper_returns_rather_than_waiting_for_redis(
+        self, helper, args, monkeypatch
+    ):
+        started = asyncio.Event()
+
+        async def _never_returns(*_a, **_k):
+            started.set()
+            await asyncio.sleep(3600)
+
+        # Patched at the SOURCE module, not on `run_artifacts`: the helper
+        # imports `publish_event` inside the function, so the name resolves at
+        # call time and a module attribute here would be patching nothing --
+        # the test would exercise the real Redis client and pass for the wrong
+        # reason, or fail with AttributeError as it first did.
+        monkeypatch.setattr(redis_client, "publish_event", _never_returns)
+        monkeypatch.setattr(run_artifacts, "_PUBLISH_TIMEOUT_SECONDS", 0.05)
+
+        # The outer bound is the test's own assertion: unbounded, this hangs
+        # until pytest is killed, so a generous wait still distinguishes the
+        # two outcomes without being a stopwatch on the real timeout.
+        await asyncio.wait_for(getattr(run_artifacts, helper)(*args), timeout=10)
+        assert started.is_set(), "the publish was never attempted"
+
+    async def test_the_bound_is_a_real_number(self):
+        """A `wait_for` whose timeout is None is not a bound, and that is the
+        easy wrong fix once someone decides the constant is in the way."""
+        assert isinstance(run_artifacts._PUBLISH_TIMEOUT_SECONDS, (int, float))
+        assert 0 < run_artifacts._PUBLISH_TIMEOUT_SECONDS <= 30
