@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.artifact_retention_service import (
+    RUN_ARTIFACT_KEYS,
     _cleanup_binary_cache,
     _cleanup_config_versions,
     _cleanup_module_overrides,
@@ -205,9 +206,23 @@ class TestCleanupRunArtifacts:
         db.execute.return_value = _FakeResult(runs)
 
         deleted = await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
-        # 4 artifacts per run (plan log, apply log, plan output, plan json output)
-        assert deleted == 8
-        assert storage.delete.call_count == 8
+
+        # Derived from the sweep's own key set rather than written as a number
+        # (#2021). It was `== 8` -- two runs times the four keys of the day --
+        # and adding a key to `RUN_ARTIFACT_KEYS` broke it for no reason beyond
+        # the arithmetic, which is the kind of failure that gets "fixed" by
+        # bumping the literal and stops meaning anything.
+        expected = len(runs) * len(RUN_ARTIFACT_KEYS)
+        assert deleted == expected
+        assert storage.delete.call_count == expected
+
+        # And the keys themselves, which the count alone never asserted: every
+        # key in the set, for every run. A count can be right while the sweep
+        # deletes one run's artifacts twice.
+        asked = {call.args[0] for call in storage.delete.await_args_list}
+        for run in runs:
+            for key_fn in RUN_ARTIFACT_KEYS:
+                assert key_fn(str(ws_id), str(run.id)) in asked, key_fn.__name__
 
     @pytest.mark.asyncio
     async def test_resets_has_json_output_flag_when_artifact_deleted(self):
