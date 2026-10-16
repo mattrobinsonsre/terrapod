@@ -953,6 +953,9 @@ function RunDetailPageInner() {
   // PlanAiSummary component refetches without forcing the whole run to
   // reload.
   const [aiSummaryRefresh, setAiSummaryRefresh] = useState(0)
+  // Bumped when the deterministic cost estimate lands, so the Cost tab
+  // re-fetches rather than keeping a mount-time 404 for ever (#2119).
+  const [costRefresh, setCostRefresh] = useState(0)
   // Bumped on the SSE cost_summary_* events so CostAiSummary refetches live
   // (#871) without reloading the whole run.
   const [costSummaryRefresh, setCostSummaryRefresh] = useState(0)
@@ -1114,11 +1117,27 @@ function RunDetailPageInner() {
   useEffect(() => { loadPolicyInfo() }, [loadPolicyInfo, run?.attributes.status])
   useEffect(() => { loadSecurityInfo() }, [loadSecurityInfo, run?.attributes.status])
 
-  // Real-time updates via SSE — reload run on status change, refresh logs on log_updated
+  // Real-time updates via SSE — reload the run on a status change OR on `run_updated`
+  // (a column written outside a transition), and refresh logs on `log_updated`.
   const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
     const bareId = runId.replace(/^run-/, '')
-    if (event.event === 'reconnect' || (event.event === 'run_status_change' && event.run_id === bareId)) {
+    // `run_updated` carries no status change: it means a column the page
+    // renders was written outside a transition (#2119). Three artifact uploads
+    // do that, and on the Terraform path two of them land AFTER the
+    // plan-result POST that drove the status change — so without this the
+    // Changes and Cost cards stay empty until the operator reloads.
+    if (
+      event.event === 'reconnect' ||
+      ((event.event === 'run_status_change' || event.event === 'run_updated') &&
+        event.run_id === bareId)
+    ) {
       loadRun()
+    }
+    // The Cost tab fetches its own estimate, and its effect keys only on the
+    // run id — so a panel mounted while the run was still planning kept the
+    // 404 it got for the life of the page. Bump it when the estimate lands.
+    if (event.event === 'run_updated' && event.run_id === bareId && event.changed === 'cost-estimate') {
+      setCostRefresh((n) => n + 1)
     }
     if (event.event === 'log_updated' && event.run_id === bareId) {
       if (event.phase === 'plan') loadPlanLog()
@@ -1998,7 +2017,7 @@ function RunDetailPageInner() {
             the AI panel self-hides when the feature is off. */}
         {view === 'cost' && (
           <div className="flex flex-col gap-6">
-            <CostPanel runId={runId.replace(/^run-/, '')} engine={engine} />
+            <CostPanel runId={runId.replace(/^run-/, '')} engine={engine} refreshKey={costRefresh} />
             <CostAiSummary runId={runId.replace(/^run-/, '')} refreshKey={costSummaryRefresh} />
           </div>
         )}

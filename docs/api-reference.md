@@ -1326,13 +1326,15 @@ Creates a new run from a terminal run (applied, errored, canceled, discarded) us
 GET /api/v1/workspaces/{workspace_id}/runs/events
 ```
 
-Server-Sent Events stream for real-time workspace updates. The stream emits events whenever a run changes state, the workspace is locked/unlocked, workspace settings are updated, or a new state version is created. Used by the web UI workspace detail page for live updates without polling.
+Server-Sent Events stream for real-time workspace updates. The stream emits events whenever a run changes state **or has its own fields written outside a transition**, the workspace is locked/unlocked, workspace settings are updated, or a new state version is created. Used by the web UI workspace detail page for live updates without polling.
 
 **Event types:**
 
 | Event | Trigger |
 |---|---|
 | `run_status_change` | Run transitions to a new state |
+| `run_updated` | A run's own fields changed **without** a state transition — carries `changed`, naming what moved (`plan-json` for the resource counts, `cost-estimate` for the cost totals, `resource-profile` for the runner's peaks and exit status). The runner uploads all three *after* the result POST that drove the transition, so a consumer that refetches only on `run_status_change` renders a run whose numbers have not arrived yet |
+| `log_updated` | A fresh log artifact landed in storage — carries `phase` (`plan` or `apply`). The authoritative final log is uploaded after the run has already turned terminal, so this is what tells a consumer to come back for the tail |
 | `workspace_lock_change` | Workspace is locked or unlocked (includes `locked` boolean) |
 | `workspace_updated` | Workspace settings are modified |
 | `state_version_created` | New state version is uploaded |

@@ -1360,3 +1360,193 @@ class TestAnEmptyUploadedLineageDoesNotSkipTheCheck:
         assert "latest.lineage and latest.lineage != lineage" in src, (
             "the guard no longer compares a populated head against the upload"
         )
+
+
+# ── run_updated — the three uploads that write run columns (#2119) ────
+
+
+class TestTheUploadsThatWriteRunColumnsPublishRunUpdated:
+    """The run page refetches on one event after mount, and these are late.
+
+    `run_status_change` is the only event that drives `loadRun()`, and on the
+    Terraform path two of these three uploads arrive AFTER the `plan-result`
+    POST that caused that transition:
+
+        job_entrypoint:354  post_plan_result     -> complete_plan -> the event
+        job_entrypoint:375  upload_plan_json     -> the five resource_* counts
+        job_entrypoint:386  upload_cost_estimate -> has_cost_estimate + totals
+
+    So the Overview's Changes and Cost cards rendered against a row whose
+    numbers had not arrived, and nothing refetched: they stayed empty until the
+    operator reloaded the page. The cost one is measured at roughly 14 seconds
+    late in `upload_cost_estimate`'s own comment -- which refreshes the pull
+    request at that moment while telling the browser nothing.
+
+    Each test asserts the whole payload rather than that *something* was
+    published, because `changed` is what lets the page refetch only the panel
+    that moved.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_the_cost_estimate_upload_publishes_run_updated(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        run.has_cost_estimate = False
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        estimate = {
+            "currency": "USD",
+            "total": {"min": 10.0, "max": 20.0},
+            "previous": {"min": 0.0, "max": 0.0},
+            "diff": {"min": 10.0, "max": 20.0},
+            "resources": [],
+            "unpriced": [],
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=json.dumps(estimate).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        published = [json.loads(c.args[1]) for c in mock_publish.await_args_list]
+        updates = [p for p in published if p.get("event") == "run_updated"]
+        assert updates == [
+            {
+                "event": "run_updated",
+                "run_id": str(run_id),
+                "workspace_id": str(ws_id),
+                "changed": "cost-estimate",
+            }
+        ], f"published instead: {published}"
+        # On the workspace channel, which is what `useRunEvents` subscribes to.
+        channels = {c.args[0] for c in mock_publish.await_args_list}
+        assert f"tp:run_events:{ws_id}" in channels
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_the_plan_json_upload_publishes_run_updated(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {
+            "resource_changes": [
+                {"change": {"actions": ["create"]}},
+                {"change": {"actions": ["delete"]}},
+            ]
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        published = [json.loads(c.args[1]) for c in mock_publish.await_args_list]
+        updates = [p for p in published if p.get("event") == "run_updated"]
+        assert updates == [
+            {
+                "event": "run_updated",
+                "run_id": str(run_id),
+                "workspace_id": str(ws_id),
+                "changed": "plan-json",
+            }
+        ], f"published instead: {published}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    async def test_the_resource_profile_post_publishes_run_updated(self, mock_publish, *_mocks):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={"peak_memory_bytes": 123, "peak_cpu_usec": 456, "exit_code": 0},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 204
+        published = [json.loads(c.args[1]) for c in mock_publish.await_args_list]
+        updates = [p for p in published if p.get("event") == "run_updated"]
+        assert updates == [
+            {
+                "event": "run_updated",
+                "run_id": str(run_id),
+                "workspace_id": str(ws_id),
+                "changed": "resource-profile",
+            }
+        ], f"published instead: {published}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_a_publish_failure_never_fails_the_upload(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        """The artifact is what matters; the notification is a courtesy.
+
+        `_publish_log_updated` already takes this position for logs, and the
+        reason is the same: an upload that stored its bytes must not be
+        reported as failed because Redis hiccupped. The cost is the old
+        behaviour -- the UI waits for the next event or a reload.
+        """
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.has_cost_estimate = False
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+        mock_publish.side_effect = RuntimeError("redis is down")
+
+        estimate = {
+            "currency": "USD",
+            "total": {"min": 1.0, "max": 2.0},
+            "previous": {"min": 0.0, "max": 0.0},
+            "diff": {"min": 1.0, "max": 2.0},
+            "resources": [],
+            "unpriced": [],
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=json.dumps(estimate).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.has_cost_estimate is True, "the artifact's flag must still be committed"

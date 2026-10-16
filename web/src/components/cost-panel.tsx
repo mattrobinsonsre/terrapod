@@ -74,11 +74,20 @@ export function CostPanel({
   runId,
   workspaceId,
   engine,
+  refreshKey = 0,
 }: {
   runId?: string
   workspaceId?: string
   /** The run's engine, so the empty state names its phase (#1911). */
   engine?: string
+  /**
+   * Bumped by the caller when the estimate lands, so this re-fetches (#2119).
+   *
+   * Without it the effect below keys only on the endpoint, which never changes
+   * for a page view — so a panel mounted while the run was still planning kept
+   * the 404 it got for ever, and the operator had to reload.
+   */
+  refreshKey?: number
 }) {
   const t = useTranslations('runDetail')
   const tRoot = useTranslations()
@@ -105,7 +114,7 @@ export function CostPanel({
     return () => {
       cancelled = true
     }
-  }, [endpoint, t])
+  }, [endpoint, t, refreshKey])
 
   if (error) return <ErrorBanner message={error} />
   if (!est) return <LoadingSpinner />
