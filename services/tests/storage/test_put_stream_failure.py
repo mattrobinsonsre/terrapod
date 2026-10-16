@@ -13,13 +13,21 @@ had been sent.
 from __future__ import annotations
 
 import asyncio
+import queue
+import threading
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from terrapod.storage import gcs
 from terrapod.storage.filesystem import FilesystemStore
 from terrapod.storage.gcs import GCSStore
-from terrapod.storage.protocol import ObjectNotFoundError
+from terrapod.storage.protocol import (
+    ObjectNotFoundError,
+    ObjectStoreError,
+    ObjectStorePermissionError,
+)
 
 
 class _SourceFailed(Exception):
@@ -30,6 +38,11 @@ async def _fails_after(n: int):
     for _ in range(n):
         yield b"x" * 1024
     raise _SourceFailed("source stream failed")
+
+
+async def _pieces(n: int):
+    for _ in range(n):
+        yield b"x" * 1024
 
 
 async def _once(data: bytes):
@@ -78,7 +91,7 @@ class TestGCSPutStream:
         """A client whose upload, like a resumable upload, completes when the
         reader reports end of stream."""
 
-        def upload_from_file(reader, content_type=None, num_retries=None):  # noqa: ARG001
+        def upload_from_file(reader, **_):
             data = b""
             while piece := reader.read(512):
                 data += piece
@@ -107,3 +120,106 @@ class TestGCSPutStream:
             meta = await store.put_stream("k", _once(b"all of it"))
         assert finalized == [b"all of it"]
         assert meta.size_bytes == len(b"all of it")
+
+    @staticmethod
+    def _stopping_client(
+        reads: int, error: Exception | None, wait_for: threading.Event | None = None
+    ) -> MagicMock:
+        """A client whose upload stops after `reads` reads, raising `error` if
+        given. With `wait_for`, it waits for that event before stopping."""
+
+        def upload_from_file(reader, **_):
+            for _ in range(reads):
+                reader.read(512)
+            if wait_for is not None:
+                wait_for.wait(5)
+            if error is not None:
+                raise error
+
+        blob = MagicMock()
+        blob.upload_from_file = upload_from_file
+        bucket = MagicMock()
+        bucket.blob.return_value = blob
+        client = MagicMock()
+        client.bucket.return_value = bucket
+        return client
+
+    @staticmethod
+    def _watch_full_puts(
+        monkeypatch: pytest.MonkeyPatch, *, end_marker_only: bool = False
+    ) -> threading.Event:
+        """Replace the backend's queue so that a put finding it full sets the
+        returned event (only the end marker's, with `end_marker_only`). An
+        untimed put that cannot complete fails instead of blocking for good."""
+        put_waiting = threading.Event()
+
+        class _Queue(queue.Queue):
+            def put(self, item, block=True, timeout=None):  # type: ignore[no-untyped-def]
+                if block and self.full() and (item is None or not end_marker_only):
+                    put_waiting.set()
+                if block and timeout is None:
+                    try:
+                        super().put(item, True, 5.0)
+                    except queue.Full:
+                        raise AssertionError("an untimed put blocked on a full queue") from None
+                else:
+                    super().put(item, block, timeout)
+
+        monkeypatch.setattr(gcs, "queue", SimpleNamespace(Queue=_Queue, Full=queue.Full))
+        return put_waiting
+
+    @pytest.mark.parametrize("reads", [0, 3])
+    @pytest.mark.usefixtures("gcs_queue_puts_are_bounded")
+    async def test_a_dead_upload_thread_fails_the_stream_promptly(self, reads: int):
+        """Once the upload thread is gone nothing drains the queue, so a stream
+        longer than the queue used to block on `put` forever (#2106)."""
+        store = GCSStore(bucket="test-bucket", prefix="")
+        client = self._stopping_client(reads, RuntimeError("upload failed"))
+        with patch.object(store, "_get_sync_client", return_value=client):
+            with pytest.raises(ObjectStoreError, match="upload failed"):
+                await asyncio.wait_for(store.put_stream("k", _pieces(100)), timeout=10)
+
+    @pytest.mark.usefixtures("gcs_queue_puts_are_bounded")
+    async def test_a_dead_upload_thread_keeps_its_permission_error(self):
+        """A 403 from a dead upload thread still maps to ObjectStorePermissionError."""
+        store = GCSStore(bucket="test-bucket", prefix="")
+        client = self._stopping_client(0, RuntimeError("403 Forbidden"))
+        with patch.object(store, "_get_sync_client", return_value=client):
+            with pytest.raises(ObjectStorePermissionError, match="403"):
+                await asyncio.wait_for(store.put_stream("k", _pieces(100)), timeout=10)
+
+    @pytest.mark.usefixtures("gcs_queue_puts_are_bounded")
+    async def test_an_upload_thread_that_stops_early_is_not_a_success(self):
+        """An upload that returns before the stream ends must not be reported
+        as a complete object."""
+        store = GCSStore(bucket="test-bucket", prefix="")
+        client = self._stopping_client(3, None)
+        with patch.object(store, "_get_sync_client", return_value=client):
+            with pytest.raises(ObjectStoreError, match="stopped before the stream ended"):
+                await asyncio.wait_for(store.put_stream("k", _pieces(100)), timeout=10)
+
+    async def test_an_upload_thread_that_dies_while_a_put_waits_fails_the_stream(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The thread dies while the stream is blocked on a full queue, as when
+        GCS refuses an upload part-way. A put without a timeout would wait for
+        it forever (#2106)."""
+        put_waiting = self._watch_full_puts(monkeypatch)
+        store = GCSStore(bucket="test-bucket", prefix="")
+        client = self._stopping_client(0, RuntimeError("upload failed"), wait_for=put_waiting)
+        with patch.object(store, "_get_sync_client", return_value=client):
+            with pytest.raises(ObjectStoreError, match="upload failed"):
+                await asyncio.wait_for(store.put_stream("k", _pieces(100)), timeout=10)
+
+    async def test_an_upload_thread_that_returns_while_the_end_marker_waits_is_not_a_success(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Four pieces fill the queue (maxsize=4), so the end marker is the put
+        left waiting when the thread returns without an error. An end marker
+        that was never taken means the stream was not stored whole."""
+        put_waiting = self._watch_full_puts(monkeypatch, end_marker_only=True)
+        store = GCSStore(bucket="test-bucket", prefix="")
+        client = self._stopping_client(0, None, wait_for=put_waiting)
+        with patch.object(store, "_get_sync_client", return_value=client):
+            with pytest.raises(ObjectStoreError, match="stopped before the stream ended"):
+                await asyncio.wait_for(store.put_stream("k", _pieces(4)), timeout=10)

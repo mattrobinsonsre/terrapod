@@ -136,6 +136,7 @@ class GCSStore:
             def __init__(self) -> None:
                 self._buffer = b""
                 self._done = False
+                self._pos = 0
 
             def read(self, n: int = -1) -> bytes:
                 if self._done and not self._buffer:
@@ -155,6 +156,7 @@ class GCSStore:
                 else:
                     result = self._buffer[:n]
                     self._buffer = self._buffer[n:]
+                self._pos += len(result)
                 return result
 
             # Stubs required by IO protocol
@@ -164,8 +166,10 @@ class GCSStore:
             def seek(self, offset: int, whence: int = 0) -> int:
                 raise NotImplementedError
 
+            # Not a stub: the resumable upload requires the stream to start at 0
+            # and determines each chunk's byte range from tell() (#2106).
             def tell(self) -> int:
-                raise NotImplementedError
+                return self._pos
 
             def readable(self) -> bool:
                 return True
@@ -184,7 +188,6 @@ class GCSStore:
                 blob.upload_from_file(
                     reader,
                     content_type=content_type,
-                    num_retries=2,
                 )
             except Exception as e:
                 upload_error.append(e)
@@ -192,12 +195,30 @@ class GCSStore:
         thread = threading.Thread(target=_upload_in_thread, daemon=True)
         thread.start()
 
+        async def _put(item: object) -> bool:
+            """Hand an item to the upload thread; False once it has stopped.
+
+            A plain put on a full queue would wait forever if the thread had
+            died, since nothing would drain it (#2106).
+            """
+            while thread.is_alive():
+                try:
+                    await asyncio.to_thread(chunk_queue.put, item, True, 1.0)
+                    return True
+                except queue.Full:
+                    continue
+            return False
+
+        delivered = True
         try:
             async for chunk in chunks:
                 md5_hasher.update(chunk)
                 total_size += len(chunk)
-                await asyncio.to_thread(chunk_queue.put, chunk)
-            await asyncio.to_thread(chunk_queue.put, None)  # signal EOF
+                if not await _put(chunk):
+                    delivered = False
+                    break
+            else:
+                delivered = await _put(None)  # signal EOF
         except BaseException:
             # Abandon the upload — do not end it. Ending it (None) let the
             # thread complete the resumable upload with whatever had been
@@ -222,6 +243,10 @@ class GCSStore:
             if "403" in str(exc):
                 raise ObjectStorePermissionError(str(exc)) from exc
             raise ObjectStoreError(str(exc)) from exc
+        # Feeding stopped because the thread had returned, so it did not take
+        # the whole stream and did not store it whole.
+        if not delivered:
+            raise ObjectStoreError("GCS upload stopped before the stream ended")
 
         # Update metadata if provided
         if metadata:
