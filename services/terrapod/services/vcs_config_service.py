@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import VCSConnection, Workspace
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service
+from terrapod.services import git_fetch, run_service
 
 logger = get_logger(__name__)
 
@@ -125,18 +125,25 @@ async def fetch_config_version(
     # module sources (`module "auth0" { source = "../auth0" }`), the operator
     # MUST declare the referenced paths in `trigger_prefixes` — sparse-checkout
     # cone mode includes parent directories but not siblings, so without an
-    # explicit prefix the runner would `lstat ../foo: no such file`. This
-    # contract is consistent with the VCS-poll path's `_compute_paths_unions`,
-    # so a workspace that works under VCS poll also works here. See #478 /
+    # explicit prefix the runner would `lstat ../foo: no such file`. See #478 /
     # #480 for the history (v0.35.3 briefly forced whole-repo here as a
     # blanket fix; v0.35.4 reverted that and put the responsibility back on
     # the workspace declaration).
-    fetch_paths: list[str] = []
-    if ws.working_directory:
-        fetch_paths.append(ws.working_directory.strip("/ "))
-    if ws.trigger_prefixes:
-        fetch_paths.extend(p.strip("/ ") for p in ws.trigger_prefixes if p)
-    fetch_paths = [p for p in fetch_paths if p]
+    #
+    # The scope itself comes from `git_fetch.workspace_fetch_paths`, which the
+    # VCS-poll path's `_compute_paths_unions` also uses, so "a workspace that
+    # works under VCS poll also works here" is now true by construction rather
+    # than by two implementations agreeing. It was asserted here in exactly
+    # those terms while both were missing the Ansible config root (#2117): a
+    # configure-capable workspace with a narrow `working_directory` built a
+    # configuration tarball with no playbook, no `roles/` and no
+    # `group_vars/` in it.
+    fetch_paths = git_fetch.workspace_fetch_paths(
+        working_directory=ws.working_directory,
+        trigger_prefixes=ws.trigger_prefixes,
+        configure_enabled=ws.configure_enabled,
+        config_directory=ws.config_directory,
+    )
 
     cache = VCSArchiveCache()
     cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths or None)

@@ -143,6 +143,68 @@ def normalize_paths(paths: Iterable[str] | None) -> list[str]:
     return result
 
 
+def workspace_fetch_paths(
+    *,
+    working_directory: str | None,
+    trigger_prefixes: list[str] | None,
+    configure_enabled: bool = False,
+    config_directory: str | None = None,
+) -> list[str]:
+    """The repo-relative paths one workspace's sparse fetch must include.
+
+    Returns a normalized list, or **`[]` meaning "fetch the whole repo"** --
+    the same sentinel `normalize_paths` and `paths_hash` already use, so an
+    unnarrowed workspace needs no special case at any call site.
+
+    This is the ONE place the fetch scope is decided. It was computed
+    independently in `vcs_poller._compute_paths_unions` and in
+    `vcs_config_service`, with the latter asserting in a comment that the two
+    agreed -- true when written, and unenforced. #2117 is what that cost: the
+    Ansible config root was missing from both, so a workspace with a narrow
+    `working_directory` built a configuration tarball containing no playbook,
+    no `roles/`, no `group_vars/` and no `host_vars/`.
+
+    **`config_directory` is only consulted when `configure_enabled`** (#1966).
+    The column is an ordinary path with `""` meaning the root and carries no
+    capability meaning of its own, so a workspace that declares an Ansible root
+    and has configure switched off keeps its narrowing rather than paying for a
+    fetch nothing will read.
+
+    **`config_directory == ""` forces the whole repo**, and that asymmetry with
+    `working_directory` is the subtle part. For `working_directory`, `""`
+    contributes no path and the workspace is narrowed by its
+    `trigger_prefixes` alone. For an enabled configure, `""` means the Ansible
+    root IS the top of the tree, so there is nothing left to narrow away --
+    appending nothing would leave the union at `["terraform"]` and exclude the
+    playbook, which is #2117 in a new costume.
+
+    The config root is taken WHOLESALE rather than narrowed to the inventory
+    directory, for the reason #1929 measured one layer over: `group_vars` and
+    `host_vars` are found inside the inventory directory or at the working
+    directory, never merely beside the inventory directory, and the same
+    narrowing skips role submodules because `_submodules_under` initialises
+    only submodules inside the sparse set. Fetching the inventory directory
+    alone yielded the right hosts, the right groups, exit 0 and every variable
+    missing. `inventory_paths` therefore needs no term of its own: its entries
+    are relative to the config root and may not escape it (`..` is refused by
+    `validate_inventory_paths`).
+    """
+    paths: list[str] = []
+    if working_directory:
+        paths.append(working_directory)
+    if trigger_prefixes:
+        paths.extend(trigger_prefixes)
+
+    if configure_enabled:
+        root = (config_directory or "").strip("/ ")
+        if not root:
+            # The Ansible root is the repository root -- nothing to narrow.
+            return []
+        paths.append(root)
+
+    return normalize_paths(paths)
+
+
 def paths_hash(paths: Iterable[str] | None) -> str:
     """Stable 12-hex-char hash of a normalized path set.
 

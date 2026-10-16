@@ -44,6 +44,7 @@ from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import (
     autodiscovery_lifecycle_service,
+    git_fetch,
     github_service,
     gitlab_service,
     run_service,
@@ -1665,20 +1666,25 @@ PathsUnionMap = dict[tuple[uuid.UUID, str, str], list[str]]
 
 
 async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]) -> PathsUnionMap:
-    """Compute the union of working_directory + trigger_prefixes per
-    (connection_id, owner, repo) across the cycle's workspaces.
+    """Union each workspace's own fetch scope per (connection_id, owner, repo).
 
     Returned map is keyed by (connection_id, owner, repo); the value is
     the sorted, deduplicated, prefix-collapsed path list. An empty list
     means "fetch the whole repo" (some workspace under that key has no
     narrowing configured).
 
+    **What one workspace needs is `git_fetch.workspace_fetch_paths`, not this
+    function.** This only unions, and deliberately holds no opinion about which
+    columns make up a scope -- that lived here and in `vcs_config_service`
+    independently until #2117, when both turned out to be missing the Ansible
+    config root and a configure-capable workspace in a monorepo built a
+    configuration tarball with no playbook in it.
+
     This drives the partial-clone fetch in `git_fetch.py`. Path narrowing
     only applies when EVERY workspace under the same (conn, owner, repo)
-    has a non-empty `working_directory ∪ trigger_prefixes`. If any one
-    workspace wants the whole repo, we fetch the whole repo for that
-    cache entry — otherwise that workspace's plan/apply would miss
-    files outside its declared paths.
+    is itself narrowed. If any one workspace wants the whole repo, we fetch
+    the whole repo for that cache entry — otherwise that workspace's
+    plan/apply would miss files outside its declared paths.
     """
     if not workspace_ids:
         return {}
@@ -1689,6 +1695,11 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
             Workspace.vcs_repo_url,
             Workspace.working_directory,
             Workspace.trigger_prefixes,
+            # The Ansible config root is part of the fetch scope when the
+            # workspace has a configure operation (#2117). Selected here so the
+            # shared rule can be asked; this function does not interpret them.
+            Workspace.configure_enabled,
+            Workspace.config_directory,
             VCSConnection.provider,
         )
         .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
@@ -1699,7 +1710,7 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
     # Per-key accumulator. None as the value means "whole repo wanted by
     # at least one workspace under this key" — we collapse to [] at the end.
     accum: dict[tuple[uuid.UUID, str, str], set[str] | None] = {}
-    for _ws_id, conn_id, repo_url, wd, tp, provider in rows:
+    for _ws_id, conn_id, repo_url, wd, tp, cfg_enabled, cfg_dir, provider in rows:
         if conn_id is None or not repo_url:
             continue
         if provider not in _KNOWN_VCS_PROVIDERS:
@@ -1713,12 +1724,12 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
         owner, repo_name = parsed
         key = (conn_id, owner, repo_name)
 
-        ws_paths: list[str] = []
-        if wd:
-            ws_paths.append(wd.strip("/ "))
-        if tp:
-            ws_paths.extend(p.strip("/ ") for p in tp if p)
-        ws_paths = [p for p in ws_paths if p]
+        ws_paths = git_fetch.workspace_fetch_paths(
+            working_directory=wd,
+            trigger_prefixes=tp,
+            configure_enabled=cfg_enabled,
+            config_directory=cfg_dir,
+        )
 
         if not ws_paths:
             # Workspace wants the whole repo → poison the union for this key.
@@ -1740,16 +1751,11 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
         if val is None:
             out[key] = []  # whole-repo sentinel
         else:
-            # Drop entries that are strict prefixes of others (the shorter
-            # subsumes). git_fetch.normalize_paths does the same; we duplicate
-            # here so the map values are already canonical for logging.
-            sorted_paths = sorted(val)
-            collapsed: list[str] = []
-            for p in sorted_paths:
-                if any(p != prev and p.startswith(prev + "/") for prev in collapsed):
-                    continue
-                collapsed.append(p)
-            out[key] = collapsed
+            # `normalize_paths` rather than a local copy of it: this used to
+            # re-implement the collapse "so the map values are already canonical
+            # for logging", which is a true reason for canonicalising and no
+            # reason at all for a second implementation of how.
+            out[key] = git_fetch.normalize_paths(val)
     return out
 
 
