@@ -48,6 +48,14 @@ def init_supports_var_file(binary: str) -> bool:
             text=True,
             timeout=10,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.SubprocessError):
+        # OSError, not FileNotFoundError: a binary that exists but cannot be
+        # executed raises `OSError: [Errno 8] Exec format error` (a wrong-arch
+        # download from the binary cache), and a runner at its fork or memory
+        # limit raises ENOMEM. Both mean "cannot tell", which is what False
+        # says. The narrow form let them escape instead, and `run_init` calls
+        # this OUTSIDE its own try, so the runner died with a traceback where
+        # it should have raised a clean InitError. `SubprocessError` keeps
+        # `TimeoutExpired`, which is not an `OSError`.
         return False
     return "-var-file" in (result.stdout + result.stderr)

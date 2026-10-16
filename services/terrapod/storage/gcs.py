@@ -199,7 +199,14 @@ class GCSStore:
             """Hand an item to the upload thread; False once it has stopped.
 
             A plain put on a full queue would wait forever if the thread had
-            died, since nothing would drain it (#2106).
+            DIED, since nothing would drain it (#2106). That is the hang this
+            closes, and it is not the whole class: a thread that is alive but
+            not draining -- parked in a GCS request with no socket read
+            timeout while the queue is full -- keeps `is_alive()` true, so this
+            loop spins on its one-second timeouts indefinitely and the
+            `thread.join` below would wait behind it anyway. Bounding that
+            needs a timeout on the upload request itself, which is the client's
+            to set, not this loop's.
             """
             while thread.is_alive():
                 try:
