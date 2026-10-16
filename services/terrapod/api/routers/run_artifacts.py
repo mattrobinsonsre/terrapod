@@ -107,6 +107,17 @@ def _summarize_plan_file(path: str) -> dict | None:
         return summarize_plan_json(fh.read())
 
 
+# A best-effort notification must not be able to outlive the request it rides
+# on. `publish_event` awaits `redis.publish`, and the client is built with no
+# `socket_timeout` (`redis/client.py`), so a blackholed Redis blocks forever --
+# and both callers' `except Exception` cannot catch a hang, only a failure.
+# Bounding it here keeps the stated contract: the browser misses one event and
+# waits for the next, instead of the runner's artifact upload stalling. Chosen
+# rather than a socket timeout on the shared client, which would change every
+# Redis call in the process and is not a patch-release change.
+_PUBLISH_TIMEOUT_SECONDS = 5.0
+
+
 async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> None:
     """Notify the UI that a fresh log artifact landed in storage.
 
@@ -131,7 +142,10 @@ async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> No
                 "phase": phase,
             }
         )
-        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+        await asyncio.wait_for(
+            publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
     except Exception:
         # Match upload_log_stream: SSE publishing failures must never break
         # an in-flight artifact upload. Worst case we fall back to the old
@@ -182,7 +196,10 @@ async def _publish_run_updated(workspace_id: str, run_id: str, changed: str) -> 
                 "changed": changed,
             }
         )
-        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+        await asyncio.wait_for(
+            publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
     except Exception:
         logger.debug("Failed to publish run_updated after artifact upload")
 
