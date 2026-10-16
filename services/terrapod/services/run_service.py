@@ -1131,6 +1131,69 @@ async def expire_stale_plans_cycle() -> None:
             logger.info("Expired stale plans", count=discarded)
 
 
+class DeclaredInventoryUnavailable(RuntimeError):
+    """The run's declared inventory could not be written (#2021).
+
+    A `RuntimeError` rather than a `ValueError`, deliberately: this is not a
+    caller supplying something invalid, so the HTTP surfaces that turn a
+    ValueError into a 4xx must NOT catch it. A configure run whose target set
+    was never recorded has to fail loudly.
+    """
+
+
+async def write_declared_inventory(db: AsyncSession, run: Run) -> None:
+    """Write the run's declared inventory to storage, at run creation (#2021).
+
+    The artefact is the **platform/declared rows**, not the merge -- see
+    `declared_inventory_key`. Written here rather than fetched by the phase
+    because that is what pins it for the life of the run, which is what makes
+    it #1973's subtraction basis: a configure cannot be asked which hosts are
+    still outstanding against a set that has moved since it started.
+
+    **A zero-byte artefact must never be stored, and that is a measured
+    requirement rather than tidiness.** Driven against real ansible-core
+    2.21.5, `ansible-inventory --list` returns rc=0 for BOTH a valid empty
+    inventory (`all: null`) and a ZERO-BYTE file -- even with
+    `ANY_UNPARSED_IS_FAILED=True`. So ansible cannot distinguish "this
+    workspace declares no hosts of its own", which is entirely normal because
+    the git source may carry them all, from "the write truncated". If a
+    truncated artefact reached the phase it would configure nothing and report
+    success, which is the short-host-set failure this whole area exists to
+    prevent. `render_inventory_yaml` always emits the `all:` root, so the empty
+    case is a real document; this refuses to store anything that is not.
+    """
+    # Local imports: `inventory_resolve` reaches the inventory service and the
+    # VCS layer, and this module is imported by both -- the house pattern here
+    # for exactly that reason.
+    from collections.abc import AsyncIterator
+
+    from terrapod.services import inventory_resolve
+
+    rendered = await inventory_resolve.declared_inventory(db, run.workspace_id)
+    if not rendered.strip():
+        # Cannot happen while the renderer emits `all:` -- which is the point
+        # of asserting it rather than trusting it.
+        raise DeclaredInventoryUnavailable(
+            f"declared inventory for run {run.id} rendered empty; refusing to store an "
+            "artefact a configure cannot tell apart from one it declares nothing in"
+        )
+
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import declared_inventory_key
+
+    body = rendered.encode("utf-8")
+
+    async def _once() -> AsyncIterator[bytes]:
+        yield body
+
+    storage = get_storage()
+    await storage.put_stream(
+        declared_inventory_key(str(run.workspace_id), str(run.id)),
+        _once(),
+        content_type="application/yaml",
+    )
+
+
 async def create_run(
     db: AsyncSession,
     workspace: Workspace,
@@ -1300,6 +1363,19 @@ async def create_run(
     )
     db.add(run)
     await db.flush()
+
+    # The declared inventory, pinned to this run (#2021). Only for a run that
+    # carries a configure operation: resolving it for every plan of every
+    # workspace -- including the terraform/tofu-only ones that are supposed to
+    # pay nothing for any of this -- to produce an artefact nothing reads is
+    # the defect #2116 was the fourth instance of.
+    #
+    # NOT best-effort. A configure whose target set was never recorded cannot
+    # be asked afterwards what it was supposed to touch, so #1973 would have no
+    # basis to subtract against and a partial configure would be unrecoverable.
+    # The exception is a RuntimeError so the 4xx surfaces do not swallow it.
+    if run.is_configure:
+        await write_declared_inventory(db, run)
 
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages

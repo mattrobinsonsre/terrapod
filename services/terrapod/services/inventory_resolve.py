@@ -535,8 +535,23 @@ def make_tempdir() -> str:
 # ── The orchestrator ─────────────────────────────────────────────────────────
 
 
-async def _declared_sources(db, workspace_id: uuid.UUID) -> str:
-    """The declared rows, rendered to one inventory YAML."""
+async def declared_inventory(db, workspace_id: uuid.UUID) -> str:
+    """The declared rows, rendered to one inventory YAML.
+
+    Public because it is also the run handoff's artefact (#2021): the API
+    writes this at run creation and the configure phase reads it, composing
+    `-i <git sources> -i <platform>` with the repository it already fetched
+    for the playbook. One builder for both, so the file a configure runs
+    against cannot differ from the one the resolved view was computed from.
+
+    **A workspace with no declared rows renders a VALID EMPTY inventory, not
+    an empty string.** That distinction is the artefact's whole contract: the
+    phase has to tell "this workspace declares no hosts of its own" -- entirely
+    normal, the git source may carry them all -- from "the artefact could not
+    be read", which must fail the run. `render_inventory_yaml` always emits the
+    `all:` root, so the empty case is a parseable document ansible resolves to
+    zero declared hosts.
+    """
     from terrapod.services import inventory_service as inv
 
     hosts = await inv.list_hosts(db, workspace_id)
@@ -789,7 +804,7 @@ async def _resolve_uncached(
             sources.extend(_inventory_sources(ws, config_root))
 
         if include_platform:
-            rendered = await _declared_sources(db, workspace_id)
+            rendered = await declared_inventory(db, workspace_id)
             platform_file = workdir / "platform.yml"
             await asyncio.to_thread(platform_file.write_text, rendered)
             sources.append(platform_file)

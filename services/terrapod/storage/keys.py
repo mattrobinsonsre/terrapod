@@ -132,9 +132,32 @@ def config_version_key(workspace_id: str, config_version_id: str) -> str:
     return f"config/{workspace_id}/{config_version_id}.tar.gz"
 
 
-def run_tfvars_key(workspace_id: str, run_id: str) -> str:
-    """Key for a generated .tfvars file for a run."""
-    return f"runs/{workspace_id}/{run_id}.auto.tfvars"
+def declared_inventory_key(workspace_id: str, run_id: str) -> str:
+    """Key for a run's DECLARED inventory, handed to the configure phase (#2021).
+
+    Named for what it holds rather than for the merge. #2021's body calls this
+    `resolved_inventory_key` and gives it a `.json` suffix; its 2026-10-12
+    comment narrows that, and the comment is what this follows. The artefact is
+    the **platform/declared rows** rendered as one inventory file -- what only
+    the API knows -- and the runner composes `-i <git sources> -i <platform>`
+    with the repository it has already fetched for the playbook.
+
+    Writing the merge instead would not survive #2033: once a workspace permits
+    inventory plugins on the runner, the merged result is not knowable in the
+    API at all, because the plugin runs there. It would also leave the runner
+    holding two answers to reconcile. So the split is: the API contributes what
+    only it can, the runner contributes what only it can.
+
+    YAML rather than JSON because `render_inventory_yaml` produces YAML and
+    ansible's own `group_vars` are YAML -- a superset of JSON, so nothing is
+    lost and the file is readable in a bug report.
+
+    Written at RUN CREATION, which is what pins it for the life of that run.
+    That is precisely "what did this configure target", and it is why #1973 can
+    subtract against it: a configure cannot be asked which hosts are still
+    outstanding against a set that has moved since it started.
+    """
+    return f"runs/{workspace_id}/{run_id}.inventory.yml"
 
 
 def policy_set_key(policy_set_id: str, version_id: str) -> str:
