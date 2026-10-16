@@ -113,6 +113,17 @@ def _summarize_plan_file(path: str) -> dict | None:
         return summarize_plan_json(fh.read())
 
 
+# A best-effort notification must not be able to outlive the request it rides
+# on. `publish_event` awaits `redis.publish`, and the client is built with no
+# `socket_timeout` (`redis/client.py`), so a blackholed Redis blocks forever --
+# and both callers' `except Exception` cannot catch a hang, only a failure.
+# Bounding it here keeps the stated contract: the browser misses one event and
+# waits for the next, instead of the runner's artifact upload stalling. Chosen
+# rather than a socket timeout on the shared client, which would change every
+# Redis call in the process and is not a patch-release change.
+_PUBLISH_TIMEOUT_SECONDS = 5.0
+
+
 async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> None:
     """Notify the UI that a fresh log artifact landed in storage.
 
@@ -137,7 +148,10 @@ async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> No
                 "phase": phase,
             }
         )
-        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+        await asyncio.wait_for(
+            publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
     except Exception:
         # Match upload_log_stream: SSE publishing failures must never break
         # an in-flight artifact upload. Worst case we fall back to the old
@@ -153,9 +167,16 @@ async def _publish_run_updated(workspace_id: str, run_id: str, changed: str) -> 
     change no status, and on the Terraform path two of them arrive AFTER the
     `plan-result` POST that drove the transition:
 
-        :354 post_plan_result      -> complete_plan -> run_status_change
-        :375 upload_plan_json      -> the five resource_* counts
-        :386 upload_cost_estimate  -> has_cost_estimate + the cached totals
+        the plan-result POST            -> complete_plan -> run_status_change
+        _enqueue_plan_json_followups    -> the five resource_* counts
+        upload_cost_estimate            -> has_cost_estimate + the cached totals
+        record_resource_profile         -> the peak-usage columns
+
+    in that order on the Terraform path -- named rather than cited by line,
+    because the numbers differ per release line and go stale on the first
+    carry, while the ORDER is the claim. The cited lines were already wrong
+    here: they pointed at a `) -> Response:`, a docstring line and a blank
+    line, and named an `upload_plan_json` this line does not have.
 
     So `loadRun()` ran against a row whose numbers had not arrived, and nothing
     ran again: the Overview's Changes and Cost cards stayed empty until the
@@ -184,7 +205,10 @@ async def _publish_run_updated(workspace_id: str, run_id: str, changed: str) -> 
                 "changed": changed,
             }
         )
-        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+        await asyncio.wait_for(
+            publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
     except Exception:
         logger.debug("Failed to publish run_updated after artifact upload")
 
