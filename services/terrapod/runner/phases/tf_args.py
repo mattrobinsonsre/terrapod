@@ -31,6 +31,38 @@ def replace_args(addrs: Iterable[str]) -> list[str]:
     return [f"-replace={a}" for a in addrs if a]
 
 
+def graph_supports_var_file(binary: str) -> bool:
+    """Whether `<binary> graph` accepts `-var-file` (#2132).
+
+    Its own probe rather than reusing `init_supports_var_file`, because the two
+    commands gained the flag independently and the answer genuinely differs:
+    measured against OpenTofu 1.12.6, `graph -help` advertises `-var` and
+    `-var-file`, while the same binary's `init` support arrived separately
+    (tofu >= 1.12 / terraform >= 1.10). Asking the wrong command is how a
+    capability check comes to be confidently wrong.
+
+    Probes the help output for the same reason the sibling does: it covers both
+    engines, cannot be wrong about the specific binary just downloaded, and
+    needs no version table to maintain.
+
+    **`-input=false` is deliberately not probed, because `graph` rejects it.**
+    Measured: `flag provided but not defined: -input`. The no-prompt guarantee
+    comes from giving the subprocess no stdin instead, which no engine can
+    refuse.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603 — binary is operator-supplied
+            [binary, "graph", "-help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return "-var-file" in (result.stdout + result.stderr)
+
+
 def init_supports_var_file(binary: str) -> bool:
     """Detect whether `<binary> init` accepts `-var-file`. tofu >= 1.12
     and terraform >= 1.10 support it for early-evaluation configs.
