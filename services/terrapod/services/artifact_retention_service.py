@@ -7,7 +7,11 @@ the distributed scheduler — multi-replica safe.
 Safety invariants:
   - Never delete the latest state version (highest serial per workspace).
   - Skip workspaces with state_diverged=True.
-  - Only clean run artifacts for runs in terminal states.
+  - Only clean run artifacts for runs that can do nothing further: a
+    terminal run, or a `planned` PLAN-ONLY run, which `confirm_run` refuses
+    to apply outright and so can never need its plan files again. Never a run
+    that is pending/queued/planning, nor an apply-capable `planned` run whose
+    plan someone may still confirm.
   - Only clean config versions not referenced by any non-terminal run.
   - Cache entries are cleaned based on last_accessed_at, not cached_at.
   - All storage deletes are best-effort (catch + log, continue).
@@ -18,7 +22,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
@@ -36,6 +40,9 @@ from terrapod.storage.keys import (
     apply_log_key,
     binary_cache_key,
     config_version_key,
+    cost_estimate_key,
+    lock_file_key,
+    plan_artifacts_key,
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
@@ -191,13 +198,63 @@ async def _cleanup_state_versions(
     return deleted
 
 
+#: A run whose stored objects are safe to delete: nothing can act on it again.
+#:
+#: **One producer, deliberately (#2148).** Two sweeps need this rule --
+#: `_cleanup_run_artifacts` and `_cleanup_module_overrides` -- and they had
+#: *both* written `Run.status.in_(TERMINAL_STATES)` inline. That is wrong in the
+#: same way twice: a PLAN-ONLY run finishes in `planned` and stays there for
+#: ever, because nothing supersedes it (it is not the workspace's desired state)
+#: and plan expiry excludes it explicitly. So neither sweep ever saw one.
+#:
+#: It cost more on the module-override side, which is the less obvious of the
+#: two: the ONLY run that carries `module_overrides` is the module-impact run,
+#: and `module_impact_service` creates it with `plan_only=True` -- so a rule
+#: written as "terminal runs" excluded every single row the sweep existed to
+#: clean, and those are real module tarballs rather than small artifacts.
+#:
+#: Reaping these is safe because `confirm_run` refuses a plan-only run outright
+#: ("this run is plan-only and cannot be applied", a guard with a security
+#: reason behind it), so no code path can ever want the bytes back.
+#:
+#: The status is pinned to `planned` rather than keyed on `plan_only` alone so a
+#: run still executing (pending/queued/planning) is never touched while its own
+#: phases are still reading and writing these objects. And it is deliberately
+#: NOT `_is_supersedeable_kind`, which answers a different question -- "is this
+#: the workspace's desired state", used for contention and staleness. A
+#: predicate that answers two questions is where the next bug goes.
+REAPABLE_RUN = or_(
+    Run.status.in_(TERMINAL_STATES),
+    and_(Run.status == "planned", Run.plan_only.is_(True)),
+)
+
+
+#: The per-run objects the retention sweep deletes, for every run `REAPABLE_RUN`
+#: admits.
+#:
+#: **Named rather than inlined because it is checked** (#2148). It was a
+#: hand-written tuple inside the loop holding four of the seven per-run keys
+#: `storage/keys.py` defines; nothing derived it and nothing failed when it
+#: drifted, so the cost estimate, the provider lock file and the plan-artifacts
+#: tarball were never reaped at all.
+RUN_ARTIFACT_KEYS = (
+    plan_log_key,
+    apply_log_key,
+    plan_output_key,
+    plan_json_output_key,
+    cost_estimate_key,
+    lock_file_key,
+    plan_artifacts_key,
+)
+
+
 async def _cleanup_run_artifacts(
     db: AsyncSession,
     storage: ObjectStore,
     retention_days: int,
     batch_size: int,
 ) -> int:
-    """Delete logs and plan outputs for old terminal runs."""
+    """Delete logs and plan outputs for old runs that can do nothing further."""
     from terrapod.api.metrics import RETENTION_DELETED
 
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
@@ -206,7 +263,7 @@ async def _cleanup_run_artifacts(
     result = await db.execute(
         select(Run)
         .where(
-            Run.status.in_(TERMINAL_STATES),
+            REAPABLE_RUN,
             Run.created_at < cutoff,
         )
         .limit(batch_size)
@@ -219,7 +276,7 @@ async def _cleanup_run_artifacts(
         run_id = str(run.id)
         artifact_count = 0
 
-        for key_fn in (plan_log_key, apply_log_key, plan_output_key, plan_json_output_key):
+        for key_fn in RUN_ARTIFACT_KEYS:
             try:
                 await storage.delete(key_fn(ws_id, run_id))
                 artifact_count += 1
@@ -231,11 +288,15 @@ async def _cleanup_run_artifacts(
                     exc_info=True,
                 )
 
-        # Keep the row's `has_json_output` flag honest: if the artifact
-        # is gone, the plan-show response must stop advertising a URL
-        # that would 404.
+        # Keep the row's flags honest: each gates a URL the API would
+        # otherwise advertise into a 404. `has_cost_estimate` gates both the
+        # run page's Cost tab and `has-cost-estimate` in the run JSON, so it
+        # needs the same treatment `has_json_output` has always had.
         if run.has_json_output:
             run.has_json_output = False
+            flag_resets += 1
+        if run.has_cost_estimate:
+            run.has_cost_estimate = False
             flag_resets += 1
 
         deleted += artifact_count
@@ -485,7 +546,14 @@ async def _cleanup_module_overrides(
     retention_days: int,
     batch_size: int,
 ) -> int:
-    """Delete module override tarballs for old terminal runs."""
+    """Delete module override tarballs for old runs that can do nothing further.
+
+    `REAPABLE_RUN`, not `TERMINAL_STATES`: the only run that carries
+    `module_overrides` is the module-impact run, and it is created
+    `plan_only=True`, so it finishes in `planned` and stays there. Filtering on
+    terminal states therefore excluded every row this sweep exists to clean
+    (#2148).
+    """
     from terrapod.api.metrics import RETENTION_DELETED
 
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
@@ -494,7 +562,7 @@ async def _cleanup_module_overrides(
     result = await db.execute(
         select(Run)
         .where(
-            Run.status.in_(TERMINAL_STATES),
+            REAPABLE_RUN,
             Run.module_overrides.isnot(None),
             Run.created_at < cutoff,
         )
