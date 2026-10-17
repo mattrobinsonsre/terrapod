@@ -150,11 +150,6 @@ def config_version_key(workspace_id: str, config_version_id: str) -> str:
     return f"config/{workspace_id}/{config_version_id}.tar.gz"
 
 
-def run_tfvars_key(workspace_id: str, run_id: str) -> str:
-    """Key for a generated .tfvars file for a run."""
-    return f"runs/{workspace_id}/{run_id}.auto.tfvars"
-
-
 def policy_set_key(policy_set_id: str, version_id: str) -> str:
     """Key for a policy set bundle."""
     return f"policies/{policy_set_id}/{version_id}.tar.gz"

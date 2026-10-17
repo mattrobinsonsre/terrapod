@@ -11,7 +11,7 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 | Category | Retention Key | Default | What Gets Deleted |
 |---|---|---|---|
 | **State versions** | `state_versions_keep` | 20 per workspace | Excess state versions beyond the keep count (oldest first) |
-| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan JSON output, plan logs, and apply logs for terminal runs |
+| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Every per-run object: plan output, plan JSON output, cost estimate, provider lock file, plan-artifacts tarball, resolved inventory, and the plan/apply/configure logs. Eligible once the run can do nothing further -- see below |
 | **Config versions (age)** | `config_versions_retention_days` | 90 days | Uploaded configuration tarballs no longer referenced by active runs, older than the threshold |
 | **Config versions (count)** | `config_versions_keep` | 50 per workspace | Excess CVs beyond the keep count (oldest first); CVs referenced by an active run are always preserved |
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
@@ -68,8 +68,29 @@ The retention system enforces several invariants to prevent data loss:
 
 ### Run Artifacts
 
-- **Only terminal runs are eligible.** Runs in `applied`, `errored`, `discarded`, or `canceled` state have their artifacts cleaned up. Runs still in progress (`pending`, `queued`, `planning`, `planned`, `confirmed`, `applying`) are never touched.
-- Artifacts deleted: plan output file, plan JSON output, plan-phase log, apply-phase log.
+- **A run is eligible once nothing can act on it again**, which is not quite the
+  same as "terminal":
+  - **Terminal runs** -- `applied`, `errored`, `discarded`, `canceled`.
+  - **Plan-only runs that have finished planning** (`planned` with
+    `plan-only: true`): a speculative pull-request plan, a drift-detection run,
+    or a CLI `plan`. These never reach a terminal state -- nothing supersedes
+    them, because they do not represent the workspace's desired state, and plan
+    expiry excludes them too -- so they sit in `planned` for ever. They are
+    safe to reap because an apply is refused outright: confirming one answers
+    *"this run is plan-only and cannot be applied"*. Before this was fixed their
+    artifacts accumulated for the life of the deployment, which on a busy
+    deployment is the largest single source of storage growth, since drift
+    detection creates one such run per workspace per interval.
+- **Never touched:** a run still executing (`pending`, `queued`, `planning`,
+  `confirmed`, `applying`), and an **apply-capable** `planned` run however old,
+  because someone may still confirm it and the apply phase needs its plan file.
+- Artifacts deleted: plan output file (`tfplan`), plan JSON output, cost
+  estimate, provider lock file, plan-artifacts tarball, resolved inventory, and
+  the plan, apply and configure logs. The run row itself is kept -- only the
+  stored objects go, so the run stays in the history with its metadata.
+- Flags on the run are kept honest as artifacts go: `has-json-output` and
+  `has-cost-estimate` flip back to `false` so the API stops advertising a URL
+  that would 404.
 
 ### Config Versions
 
@@ -82,7 +103,15 @@ The retention system enforces several invariants to prevent data loss:
 
 ### Module Overrides
 
-- **Only overrides from terminal runs are deleted.** Active speculative runs retain their override tarballs.
+- **Eligibility is the same rule as run artifacts above** -- a run that can do
+  nothing further. That matters here more than anywhere else: the only run that
+  carries override tarballs is the module-impact run, and it is created
+  plan-only, so it finishes in `planned` and stays there. While this sweep
+  filtered on terminal states it therefore matched almost nothing and the
+  tarballs accumulated indefinitely; a module-impact run that the VCS poller
+  cancelled on a new commit was the only kind ever reaped.
+- A run still executing retains its override tarballs, because its own plan
+  needs them.
 - The `module_overrides` JSONB field on the run is set to `NULL` after storage objects are deleted.
 
 ### Deleted Workspaces

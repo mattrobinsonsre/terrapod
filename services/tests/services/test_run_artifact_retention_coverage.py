@@ -11,6 +11,13 @@ This is the same shape as `_FIELDS_HANDLED_SEPARATELY` and `_SURFACE_EXEMPT`:
 an enumeration trusted to stay in step with another module by hand. The answer
 is the one that works for those -- derive the subject from the source of truth,
 and make every exemption carry a reason.
+
+**`NOT_REAPED` is now empty, and that is the point.** #2148 closed the last
+three and deleted `run_tfvars_key`, which had one occurrence in the whole
+repo -- its own definition. The dict stays because the gate needs somewhere
+for a future deliberate exemption to go; an empty ledger is the healthy
+state, not a dead mechanism. `test_the_ledger_is_not_how_a_key_escapes`
+keeps it honest.
 """
 
 from __future__ import annotations
@@ -25,16 +32,7 @@ from terrapod.storage import keys as keys_mod
 #: Per-run keys deliberately NOT reaped by the run-artifact sweep, each with the
 #: reason. An entry here is a decision; an absence from both this and
 #: `RUN_ARTIFACT_KEYS` is the drift this test exists to catch.
-NOT_REAPED: dict[str, str] = {
-    "plan_artifacts_key": "#2148 -- outstanding, and the largest of them",
-    "cost_estimate_key": "#2148 -- outstanding",
-    "lock_file_key": "#2148 -- outstanding",
-    "run_tfvars_key": (
-        "dead: one occurrence in the repo, its own definition. Terraform "
-        "variables reach the runner through the per-run Secret, never storage. "
-        "Deletion tracked in #2148"
-    ),
-}
+NOT_REAPED: dict[str, str] = {}
 
 
 def _per_run_key_functions() -> set[str]:
@@ -56,6 +54,19 @@ def _per_run_key_functions() -> set[str]:
 
 
 class TestEveryPerRunKeyIsAccountedFor:
+    def test_the_ledger_is_not_how_a_key_escapes(self):
+        """Every per-run key is reaped as at #2148, so the exemption ledger is
+        empty. This is not a style preference: an entry here is an object
+        nothing deletes, so the bar for adding one is a stated reason that
+        survives review -- and a ledger that quietly refills is how the
+        original four keys went missing. If you are adding an entry, the
+        question to answer first is why the object must outlive its run."""
+        assert NOT_REAPED == {}, (
+            f"a per-run key has been exempted from reaping: {sorted(NOT_REAPED)}. "
+            f"That is a decision, not a default -- state why the object must "
+            f"outlive its run, and update this test deliberately."
+        )
+
     def test_the_subject_was_actually_found(self):
         """The floor. A signature matcher that matches nothing would make every
         assertion below vacuously true -- which is how a derived gate comes to

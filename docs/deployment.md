@@ -346,7 +346,7 @@ When enabled, the drift detection scheduler runs as a periodic task (via the dis
 | `api.config.artifact_retention.poll_interval_seconds` | `86400` | How often cleanup runs (default: daily) |
 | `api.config.artifact_retention.batch_size` | `100` | Max items processed per category per cycle |
 | `api.config.artifact_retention.state_versions_keep` | `20` | State versions to keep per workspace (0 = disabled) |
-| `api.config.artifact_retention.run_artifacts_retention_days` | `90` | Days before terminal run logs/plans are deleted (0 = disabled) |
+| `api.config.artifact_retention.run_artifacts_retention_days` | `90` | Days before a finished run's logs/plans are deleted -- terminal runs, plus plan-only runs that can never apply (0 = disabled) |
 | `api.config.artifact_retention.config_versions_retention_days` | `90` | Days before config tarballs are deleted (0 = disabled) |
 | `api.config.artifact_retention.provider_cache_retention_days` | `30` | Days since last access before provider cache entries are deleted (0 = disabled) |
 | `api.config.artifact_retention.binary_cache_retention_days` | `30` | Days since last access before binary cache entries are deleted (0 = disabled) |
