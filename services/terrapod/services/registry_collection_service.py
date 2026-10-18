@@ -228,6 +228,21 @@ async def get_version_by_id(db: AsyncSession, version_id: str) -> RegistryCollec
     return result.scalar_one_or_none()
 
 
+async def get_collection_of_version(
+    db: AsyncSession, version: RegistryCollectionVersion
+) -> RegistryCollection | None:
+    """The collection a version belongs to, loaded by id.
+
+    The version row's ``collection`` relationship is lazy, and a lazy load on an
+    async session raises rather than emitting a query, so the import poll — which
+    has only a version id — reaches its owner and labels through here.
+    """
+    result = await db.execute(
+        select(RegistryCollection).where(RegistryCollection.id == version.collection_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def publish(
     db: AsyncSession,
     storage: ObjectStore,

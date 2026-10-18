@@ -485,6 +485,7 @@ async def galaxy_collection(
     # A published collection is answered from our own registry and never proxied.
     # Checking first also means a private name cannot be shadowed by an upstream
     # one that happens to match.
+    await _require_collection_read(db, user, namespace, name)
     published = await collections.list_versions(db, namespace, name)
     if published:
         newest = published[-1].version
@@ -560,6 +561,7 @@ async def galaxy_versions(
     key = galaxy.collection_key(namespace, name)
     base = _galaxy_base(request, user)
 
+    await _require_collection_read(db, user, namespace, name)
     published = await collections.list_versions(db, namespace, name)
     if published:
         prefix = f"{base}/v3/collections/{namespace}/{name}/versions"
@@ -640,6 +642,7 @@ async def galaxy_version(
     key = galaxy.collection_key(namespace, name)
     base = _galaxy_base(request, user)
 
+    await _require_collection_read(db, user, namespace, name)
     row = await collections.get_version(db, namespace, name, version)
     if row is not None:
         return JSONResponse(content=_published_version_json(row, base, namespace, name, version))
@@ -710,6 +713,7 @@ async def galaxy_download(
     if filename != galaxy.artifact_filename(namespace, name, version):
         raise HTTPException(status_code=404, detail="Not found")
 
+    await _require_collection_read(db, user, namespace, name)
     published = await collections.get_version(db, namespace, name, version)
     if published is not None:
         return await _redirect_to_object(
@@ -788,6 +792,54 @@ def _published_version_json(row, base: str, namespace: str, name: str, version: 
             else []
         ),
     }
+
+
+async def _require_collection_read(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    namespace: str,
+    name: str,
+) -> None:
+    """Authorise a read of one PRIVATE Galaxy collection, by owner and labels.
+
+    Publishing has been gated since #1949; reading was not, so a collection
+    scoped with labels was still served to any principal who could authenticate
+    anywhere on this deployment — including a runner token belonging to an
+    unrelated workspace's run. The module and provider registries authorise
+    their CLI download paths (``registry_modules.download_module_cli``), and
+    this is the same rule on the same axis rather than a second one: the
+    capability comes from ``resolve_registry_capabilities_for``, so the
+    runner-token read floor that lets a run install a collection is inherited
+    from there and is not restated here.
+
+    **404, not 403**, matching the module download: a 403 would confirm that a
+    private namespace exists to a caller who may not see it, which is the thing
+    an unreadable collection is hiding.
+
+    A refused read does **not** fall through to the proxy. Serving upstream's
+    collection of the same name would hand the caller different content under
+    the name they asked for, which is the shadowing hazard
+    :func:`galaxy_collection` already refuses in the other direction.
+
+    Does nothing when no such collection is published here — the proxy path
+    decides that case, and a collection nobody published has nothing to
+    authorise against.
+    """
+    from terrapod.services.registry_rbac_service import resolve_registry_capabilities_for
+
+    existing = await collections.get_collection(db, namespace, name)
+    if existing is None:
+        return
+
+    caps = await resolve_registry_capabilities_for(
+        db,
+        user,
+        f"{namespace}.{name}",
+        existing.labels or {},
+        existing.owner_email or "",
+    )
+    if not has_capability(caps, cap.REGISTRY_READ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
 async def _require_collection_write(
@@ -972,6 +1024,9 @@ async def galaxy_import_status(
     row = await collections.get_version_by_id(db, import_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Not found")
+    owner = await collections.get_collection_of_version(db, row)
+    if owner is not None:
+        await _require_collection_read(db, user, owner.namespace, owner.name)
     return JSONResponse(
         content={
             "state": "completed",
