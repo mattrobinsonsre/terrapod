@@ -24,6 +24,7 @@
 //	"ansible-version"                   → ansible_version     (string, optional; empty inherits the deployment default)
 //	"config-directory"                  → config_directory    (string, optional; NULL and "" differ — see below)
 //	"inventory-paths"                   → inventory_paths     (list,   optional+computed; ordered)
+//	"ansible-collections"               → ansible_collections (list of {name, version})
 //	"default-playbook"                  → default_playbook    (string, optional+computed)
 //	"default-limit"                     → default_limit       (string, optional+computed)
 //	"inventory-include-platform"        → inventory_include_platform (bool, optional+computed; defaults true)
@@ -116,6 +117,7 @@ type workspaceModel struct {
 	// inconsistent result after apply".
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
+	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
 	InventoryIncludePlatform      types.Bool   `tfsdk:"inventory_include_platform"`

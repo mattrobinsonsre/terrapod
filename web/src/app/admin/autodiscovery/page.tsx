@@ -25,6 +25,7 @@ import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
+import { formatCollectionLines, parseCollectionLines } from '@/lib/ansible-collections'
 
 interface AutodiscoveryRule {
   id: string
@@ -44,6 +45,7 @@ interface AutodiscoveryRule {
     'agent-pool-id': string | null
     'terraform-version': string
     'ansible-version'?: string
+    'ansible-collections'?: { name: string; version?: string }[]
     // Which operations a materialised workspace has (#1966), and the roots
     // each one uses (#1929). `configure-enabled` defaults false, so a rule
     // written before #1966 goes on producing plan/apply workspaces.
@@ -150,6 +152,7 @@ export default function AutodiscoveryPage() {
   // happened to be the day it was created -- which is the thing that goes
   // stale. An operator who wants a pin types one.
   const [ansibleVersion, setAnsibleVersion] = useState('')
+  const [ansibleCollections, setAnsibleCollections] = useState<string[]>([])
   // Which operations every workspace this rule materialises has (#1966).
   // These initial values are the model's own column defaults, so a rule
   // created through this form without touching them produces exactly what
@@ -357,6 +360,7 @@ export default function AutodiscoveryPage() {
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
     setAnsibleVersion(a['ansible-version'] || '')
+    setAnsibleCollections(formatCollectionLines(a['ansible-collections']))
     // `?? default` rather than `|| default` on both booleans: a stored `false`
     // is a value, and `||` would read it as absent and seed the column default
     // — so editing a rule that had plan/apply turned off would silently offer
@@ -433,6 +437,7 @@ export default function AutodiscoveryPage() {
       'agent-pool-id': agentPoolId || null,
       'engine-version': terraformVersion,
       'ansible-version': ansibleVersion.trim(),
+      'ansible-collections': parseCollectionLines(ansibleCollections),
       // Which operations the materialised workspaces have (#1966). Always
       // sent, like every other attribute in this form: the rule holds a
       // concrete value for each, so there is no "leave alone" to express.
@@ -1094,6 +1099,20 @@ export default function AutodiscoveryPage() {
                     onChange={setInventoryPaths}
                     placeholder={tWs('fields.inventoryPathsPlaceholder')}
                     addLabel={tWs('fields.inventoryPathsAdd')}
+                  />
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {tWs('fields.ansibleCollections')}
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    {tWs('fields.ansibleCollectionsHint')}
+                  </p>
+                  <StringListEditor
+                    values={ansibleCollections}
+                    onChange={setAnsibleCollections}
+                    placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
+                    addLabel={tWs('fields.ansibleCollectionsAdd')}
                   />
                 </div>
                 <div className="mt-3">

@@ -75,6 +75,12 @@ class RunnerConfig:
     target_addrs: list[str]
     replace_addrs: list[str]
     var_files: list[str]
+    #: The collections this workspace declares, already flattened by the API to
+    #: `ansible-galaxy`'s own `name[:version]` argument form (#1931). Installed
+    #: AFTER the configuration's own requirements file and with `--force`, so a
+    #: workspace entry overrides the repository's build of that collection and
+    #: leaves every other one standing.
+    ansible_collections: list[str]
     #: How many operations the engine runs at once (#1431). Set on every run
     #: by the API, so the runner never has to know an engine's own default.
     parallelism: int
@@ -166,6 +172,7 @@ class RunnerConfig:
             target_addrs=_json_list("TP_TARGET_ADDRS"),
             replace_addrs=_json_list("TP_REPLACE_ADDRS"),
             var_files=_json_list("TP_VAR_FILES"),
+            ansible_collections=_json_list("TP_ANSIBLE_COLLECTIONS"),
             refresh=_bool("TP_REFRESH", default=True),
             parallelism=_int("TP_PARALLELISM", 10),
             refresh_only=_bool("TP_REFRESH_ONLY"),

@@ -390,6 +390,7 @@ def _materialise_rule(**overrides):
         "execution_backend": "tofu",
         "engine_version": "1.12",
         "ansible_version": "2.21.5",
+        "ansible_collections": [],
         "resource_cpu": "1",
         "parallelism": 10,
         "resource_memory": "2Gi",
@@ -515,6 +516,10 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "execution_backend",
         "engine_version",
         "ansible_version",
+        # The collections a configure installs (#1931). Templated for the same
+        # reason as the version above: a fleet standardising on an internal
+        # collection should not have to be edited one workspace at a time.
+        "ansible_collections",
         # Which operations a materialised workspace has (#1966). Templated for
         # the same reason as the roots below: turning configure on for a fleet
         # the rule discovers is the operation, and doing it per workspace

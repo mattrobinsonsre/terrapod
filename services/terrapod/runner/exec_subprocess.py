@@ -281,6 +281,7 @@ def run(
     log_file: str | None = None,
     child_grace_seconds: float = 25.0,
     tee_to_stdout: bool = True,
+    env: dict[str, str] | None = None,
 ) -> ExecResult:
     """Run `argv` as a child process with signal forwarding.
 
@@ -294,6 +295,11 @@ def run(
             enough for terraform's normal state-write cycle.
         tee_to_stdout: also write child output to our stdout so the
             kubelet log stream sees it.
+        env: the child's environment *instead of* this process's, for a
+            caller that must REMOVE a variable rather than only add one
+            (`os.environ.update` cannot). The reserved-key filter below
+            still applies to it, so this cannot be used to smuggle a
+            `TP_*` value into a child.
 
     Returns ExecResult with the child's exit code.
     """
@@ -318,7 +324,8 @@ def run(
     # read from nowhere else. An allowlist would have to enumerate all of that
     # correctly and would break a deployment behind an egress proxy the first
     # time it missed one.
-    child_env = {k: v for k, v in os.environ.items() if not is_reserved_env_key(k)}
+    source_env = os.environ if env is None else env
+    child_env = {k: v for k, v in source_env.items() if not is_reserved_env_key(k)}
 
     proc = subprocess.Popen(  # noqa: S603 — argv is operator-supplied
         argv,

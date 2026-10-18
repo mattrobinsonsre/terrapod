@@ -184,6 +184,38 @@ token = <a Terrapod API token>
 entirely through Terrapod, and installs again with no route to the internet once
 the collection is cached.
 
+### Collections and roles are two mechanisms
+
+**Collections** are usually external, so they come through the pull-through proxy
+above — that is the optimised path, and it is what lets a runner install one with
+no route to `galaxy.ansible.com`. A collection published to this deployment's own
+registry is answered from there and never proxied.
+
+**Roles** are usually in-house, so they come from git. An operator declares the
+credential once as a `git_http_auth` or `git_ssh_auth` workspace variable and the
+runner materialises it into git's own configuration before anything fetches, so a
+`roles:` entry naming a git source clones with no extra setup. Both are installed
+from the same `requirements.yml`, with `ansible-galaxy role install` and
+`ansible-galaxy collection install` run in turn.
+
+Both kinds work either way, with one exception: **a Galaxy-hosted role** (a
+`roles:` entry naming `namespace.name` with no `src`) uses the v1 roles API, which
+Terrapod does not serve. It reaches upstream directly where there is a route out
+and fails where there is not, so a sealed deployment should use a git source or
+vendor the role into a collection.
+
+### Declaring collections on the workspace
+
+A workspace can declare collections itself, through `ansible-collections` on the
+API, `terrapod_workspace`'s `ansible_collections` attribute, bulk update, or an
+autodiscovery rule template. They are installed **after** the configuration's own
+requirements file and with `--force`, so a version declared on the workspace wins
+over one committed in the repository and every other committed collection stands.
+
+That exists because a collection is a supply-chain dependency: declared on the
+platform it is visible in a plan, governed by workspace RBAC, in the audit log,
+and movable across a fleet in one operation.
+
 The endpoints served are the ones the client actually calls, catalogued in
 [the Galaxy CLI surface](galaxy-cli-surface.md) — captured from a real client
 rather than read from documentation, which is how four of that document's

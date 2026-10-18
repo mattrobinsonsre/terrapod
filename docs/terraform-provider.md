@@ -352,8 +352,25 @@ resource "terrapod_workspace" "fleet" {
   name              = "fleet-prod"
   configure_enabled = true    # Ansible as well as plan/apply
   config_directory  = "ansible"
+
+  # The collections a configure installs, declared on the platform rather than
+  # only in the repository's own requirements.yml. Installed after that file and
+  # with --force, so a version here overrides a committed one and every other
+  # committed collection stands.
+  ansible_collections = [
+    { name = "community.general", version = "9.2.0" },
+    { name = "acme.internal" },   # omit version for whatever resolves
+  ]
 }
 ```
+
+`ansible_collections` is collections only — a **role** is a different mechanism
+and is declared in the configuration's own `requirements.yml` under `roles:`,
+where a git source clones using the workspace's `git_http_auth` /
+`git_ssh_auth` credentials. Collections are usually external so they come
+through Terrapod's Galaxy proxy; roles are usually in-house so they come from
+git. Omitting the attribute leaves the stored list untouched; set
+`ansible_collections = []` to clear it.
 
 The refusal is evaluated against the row the write would produce, not against
 what the configuration sends, so turning `plan_apply_enabled` off is accepted on

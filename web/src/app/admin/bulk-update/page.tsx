@@ -21,6 +21,7 @@ import {
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { parseCollectionLines } from '@/lib/ansible-collections'
 
 interface WorkspaceSummary {
   id: string
@@ -183,6 +184,8 @@ export default function BulkUpdatePage() {
   // what says "touch this at all" (#1929).
   const [uSetInventoryPaths, setUSetInventoryPaths] = useState(false)
   const [uInventoryPaths, setUInventoryPaths] = useState<string[]>([])
+  const [uSetAnsibleCollections, setUSetAnsibleCollections] = useState(false)
+  const [uAnsibleCollections, setUAnsibleCollections] = useState<string[]>([])
   const [uSetInventoryIgnorePaths, setUSetInventoryIgnorePaths] = useState(false)
   const [uInventoryIgnorePaths, setUInventoryIgnorePaths] = useState<string[]>([])
   // Only to tell the operator when the deployment publishes no issuer, so an
@@ -303,6 +306,8 @@ export default function BulkUpdatePage() {
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
     if (uSetInventoryPaths)
       u['inventory-paths'] = uInventoryPaths.map((s) => s.trim()).filter(Boolean)
+    if (uSetAnsibleCollections)
+      u['ansible-collections'] = parseCollectionLines(uAnsibleCollections)
     if (uSetInventoryIgnorePaths)
       u['inventory-ignore-paths'] = uInventoryIgnorePaths.map((s) => s.trim()).filter(Boolean)
     // Blank audience rows are refused by the server rather than dropped, and
@@ -1117,6 +1122,28 @@ export default function BulkUpdatePage() {
                   onChange={setUInventoryPaths}
                   placeholder={tWs('fields.inventoryPathsPlaceholder')}
                   addLabel={tWs('fields.inventoryPathsAdd')}
+                />
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2 mt-3">
+              <input
+                type="checkbox"
+                className="rounded border-slate-600 bg-slate-800"
+                checked={uSetAnsibleCollections}
+                onChange={(e) => setUSetAnsibleCollections(e.target.checked)}
+              />
+              {t('update.setAnsibleCollections')}
+            </label>
+            {uSetAnsibleCollections && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">
+                  {tWs('fields.ansibleCollectionsHint')}
+                </p>
+                <StringListEditor
+                  values={uAnsibleCollections}
+                  onChange={setUAnsibleCollections}
+                  placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
+                  addLabel={tWs('fields.ansibleCollectionsAdd')}
                 />
               </div>
             )}

@@ -1181,6 +1181,30 @@
             "boolean"
           ]
         },
+        "ansible_collections": {
+          "description": "the ansible collections installed before a configure runs, declared on the platform. Each entry is {\"name\": \"namespace.name\"} with an optional \"version\" (a pin or a range, as in ansible's own requirements.yml; omit for whatever resolves). These are installed AFTER the configuration's own requirements.yml and with --force, so an entry here OVERRIDES the repository's build of that collection and leaves every other one standing. Collections come from this deployment's own Galaxy surface -- its published ones and a pull-through proxy of upstream -- so source and type are deliberately not settable. ROLES are a different mechanism and are not declared here: they come from git, using the workspace's git credentials, declared in the configuration's own requirements.yml",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "description": "galaxy coordinate, namespace.name, lowercase",
+                "type": "string"
+              },
+              "version": {
+                "description": "version or range; omit for whatever resolves",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "ansible_version": {
           "description": "exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default",
           "type": "string"
@@ -1410,6 +1434,30 @@
           "type": [
             "null",
             "boolean"
+          ]
+        },
+        "ansible_collections": {
+          "description": "the ansible collections installed before a configure runs, declared on the platform. Each entry is {\"name\": \"namespace.name\"} with an optional \"version\" (a pin or a range, as in ansible's own requirements.yml; omit for whatever resolves). These are installed AFTER the configuration's own requirements.yml and with --force, so an entry here OVERRIDES the repository's build of that collection and leaves every other one standing. Collections come from this deployment's own Galaxy surface -- its published ones and a pull-through proxy of upstream -- so source and type are deliberately not settable. ROLES are a different mechanism and are not declared here: they come from git, using the workspace's git credentials, declared in the configuration's own requirements.yml. Omitting the field leaves the stored list alone; pass an empty list to clear it",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "description": "galaxy coordinate, namespace.name, lowercase",
+                "type": "string"
+              },
+              "version": {
+                "description": "version or range; omit for whatever resolves",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
           ]
         },
         "ansible_version": {

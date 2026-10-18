@@ -196,3 +196,42 @@ func TestStripAndAddPrefix(t *testing.T) {
 		t.Errorf("add(idempotent): %q", got)
 	}
 }
+
+// TestGetAnsibleCollectionsAttr covers the reader added for #1931.
+//
+// A straight Unmarshal into the typed slice rather than walking a
+// map[string]any, so a numeric-looking version stays a string and a field
+// nothing assigns cannot ship permanently nil the way Inventory.Sources did.
+func TestGetAnsibleCollectionsAttr(t *testing.T) {
+	r := &Resource{Attributes: map[string]json.RawMessage{
+		"both":    json.RawMessage(`[{"name":"community.general","version":"9.2.0"}]`),
+		"no_ver":  json.RawMessage(`[{"name":"acme.internal"}]`),
+		"empty":   json.RawMessage(`[]`),
+		"nullish": json.RawMessage("null"),
+		"wrong":   json.RawMessage(`"not-a-list"`),
+	}}
+
+	got := GetAnsibleCollectionsAttr(r, "both")
+	if len(got) != 1 || got[0].Name != "community.general" || got[0].Version != "9.2.0" {
+		t.Errorf("both = %+v", got)
+	}
+
+	// An absent version is the empty string, which `omitempty` then drops on a
+	// write — so the round trip does not invent a pin the practitioner never set.
+	got = GetAnsibleCollectionsAttr(r, "no_ver")
+	if len(got) != 1 || got[0].Name != "acme.internal" || got[0].Version != "" {
+		t.Errorf("no_ver = %+v", got)
+	}
+
+	// An explicit empty list is a REAL value — "declare none" — and must be
+	// distinguishable from absent, which is "do not touch".
+	if got = GetAnsibleCollectionsAttr(r, "empty"); got == nil || len(got) != 0 {
+		t.Errorf("empty = %+v (want non-nil, length 0)", got)
+	}
+
+	for _, key := range []string{"absent", "nullish", "wrong"} {
+		if got := GetAnsibleCollectionsAttr(r, key); got != nil {
+			t.Errorf("%s should produce nil, got %+v", key, got)
+		}
+	}
+}

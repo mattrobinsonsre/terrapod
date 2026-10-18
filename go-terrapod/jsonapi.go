@@ -281,6 +281,25 @@ func GetListAttr(r *Resource, key string) []string {
 	return l
 }
 
+// GetAnsibleCollectionsAttr reads a declared collection list off a resource,
+// nil-safe.
+//
+// A straight Unmarshal into the typed slice rather than walking
+// GetObjectAttr's map[string]any: hand-walking is how a numeric field quietly
+// becomes a float64, and a field nothing ever assigns is how `Inventory.Sources`
+// shipped permanently nil with tests passing on both sides.
+func GetAnsibleCollectionsAttr(r *Resource, key string) []AnsibleCollection {
+	raw, ok := r.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var out []AnsibleCollection
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
 // GetObjectAttr returns a nested-object attribute from r, nil-safe.
 //
 // Distinct from GetMapAttr, which flattens to map[string]string and so cannot

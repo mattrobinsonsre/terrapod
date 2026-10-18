@@ -45,7 +45,10 @@ from terrapod.engines import known_engines
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service, workspace_settings
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
-from terrapod.services.workspace_settings import validate_ansible_version
+from terrapod.services.workspace_settings import (
+    validate_ansible_collections,
+    validate_ansible_version,
+)
 
 router = APIRouter(tags=["autodiscovery-rules"])
 logger = get_logger(__name__)
@@ -87,6 +90,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "ansible-version": rule.ansible_version,
+            "ansible-collections": list(rule.ansible_collections or []),
             # Which operations a materialised workspace has (#1966), and the
             # roots each one uses (#1929). `configure-enabled` defaults false,
             # so a rule written before this goes on producing plan/apply
@@ -297,6 +301,11 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         # as a 500 where the guard exists to give a 422.
         try:
             out["ansible_version"] = validate_ansible_version(attrs["ansible-version"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    if "ansible-collections" in attrs:
+        try:
+            out["ansible_collections"] = validate_ansible_collections(attrs["ansible-collections"])
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
     # Which operations a materialised workspace has (#1966). Membership-tested
@@ -814,6 +823,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         ansible_version=fields.get("ansible_version", "2.21.5"),
+        ansible_collections=fields.get("ansible_collections", []),
         # These literals are checked against the model's own column defaults by
         # a gate: a preview that invents its own would show workspaces that are
         # not what saving the rule produces.

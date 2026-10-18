@@ -109,6 +109,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
         "ansible_version": ws.ansible_version,
+        "ansible_collections": list(ws.ansible_collections or []),
         # Which operations the workspace had (#1966). Snapshotted because the
         # restore path is one of the sites a new declaration is easiest to miss:
         # omit them and restoring a configure-only workspace brings it back as
@@ -651,6 +652,9 @@ async def restore_workspace(
         # "" is the correct fallback, not the deployment default: a snapshot
         # predating this column means the workspace never pinned one.
         ansible_version=settings.get("ansible_version") or "",
+        # `[]` for a snapshot predating the column, which is also the
+        # correct meaning: that workspace declared none.
+        ansible_collections=list(settings.get("ansible_collections") or []),
         resource_memory=settings.get("resource_memory") or "2Gi",
         drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),
         # Settings that only describe how a run is evaluated, and cannot start

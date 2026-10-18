@@ -71,6 +71,102 @@ def validate_ansible_version(raw: object) -> str:
     return value
 
 
+#: A fleet standardising on a handful of internal collections, not a lockfile.
+#: Past this the declaration has stopped being configuration and the
+#: configuration's own `requirements.yml` is the right home.
+MAX_ANSIBLE_COLLECTIONS = 50
+
+#: `namespace.name`, which is all a Galaxy coordinate ever is. Both halves are
+#: lowercase alphanumeric-plus-underscore by ansible's own rule, and a name that
+#: does not match cannot resolve against any Galaxy server -- so this refuses it
+#: here with the field named rather than at install time inside a Job.
+_COLLECTION_NAME = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+
+
+def validate_ansible_collections(raw: object) -> list[dict[str, str]]:
+    """The collections a workspace declares, as given.
+
+    Entries are `{"name": "ns.coll"}` with an optional `"version"` -- ansible's
+    own `requirements.yml` shape minus the parts that do not belong in platform
+    configuration: no `source` (the source is Terrapod, and letting a workspace
+    name another would be a hole in the proxy this exists to route through) and
+    no `type` (a git or tarball requirement bypasses the registry and its RBAC
+    entirely).
+
+    **Validated, never normalised.** No lowercasing, no trimming of a version,
+    no de-duplicating into a canonical order -- a provider writes the server's
+    response back into state, so a stored value that differs from the declared
+    one fails every apply with "Provider produced inconsistent result after
+    apply". Whitespace is refused rather than stripped for the same reason.
+
+    No format rule on `version`, deliberately, following `ansible-version` and
+    `engine_version`: ansible accepts a range (`>=1.0.0,<2.0.0`) as readily as a
+    pin, so a regex of ours would refuse valid input. A version that cannot
+    resolve fails at install with ansible's own message, which names the
+    versions that do exist.
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("ansible-collections must be a list")
+    if len(raw) > MAX_ANSIBLE_COLLECTIONS:
+        raise ValueError(
+            f"ansible-collections: maximum {MAX_ANSIBLE_COLLECTIONS} entries. Past that "
+            f"the list has stopped being platform configuration; declare them in the "
+            f"configuration's own requirements.yml."
+        )
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise ValueError(
+                "ansible-collections entries must be objects like "
+                '{"name": "community.general", "version": "1.2.3"}'
+            )
+        unknown = set(entry) - {"name", "version"}
+        if unknown:
+            # Named rather than ignored: `source` and `type` are the two a reader
+            # would reach for from ansible's own documentation, and silently
+            # dropping either would route a collection around the registry while
+            # reporting success.
+            raise ValueError(
+                f"ansible-collections entries accept only 'name' and 'version'; got "
+                f"{sorted(unknown)}. A collection is always fetched from this "
+                f"deployment's own Galaxy surface, so 'source' and 'type' are not "
+                f"configurable here."
+            )
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError("ansible-collections entries need a non-empty string 'name'")
+        if not _COLLECTION_NAME.match(name):
+            raise ValueError(
+                f"ansible-collections: {name!r} is not a collection name. Galaxy "
+                f"coordinates are 'namespace.name', lowercase, letters, digits and "
+                f"underscores."
+            )
+        if name in seen:
+            # Two entries for one collection is a conflict ansible's resolver
+            # would refuse with a message about requirements it cannot satisfy;
+            # refusing it here names the field instead.
+            raise ValueError(f"ansible-collections: {name!r} is declared more than once")
+        seen.add(name)
+
+        item: dict[str, str] = {"name": name}
+        version = entry.get("version")
+        if version is not None:
+            if not isinstance(version, str):
+                raise ValueError(f"ansible-collections: the version for {name!r} must be a string")
+            if not version or version != version.strip():
+                raise ValueError(
+                    f"ansible-collections: the version for {name!r} must not be empty or "
+                    f"carry surrounding whitespace"
+                )
+            item["version"] = version
+        out.append(item)
+    return out
+
+
 def effective_ansible_version(workspace_version: str | None) -> str:
     """The ansible-core version a workspace actually runs (#2035).
 
@@ -116,6 +212,33 @@ MAX_SCAN_SKIP_RULE_LENGTH = 100
 #: Workspace context is a hint, not a repo. Anything bigger belongs in
 #: `fleet_context` or a doc the operator pastes into their `prompt_suffix`.
 MAX_AI_SUMMARY_CONTEXT = 4000
+
+
+def ansible_collection_arguments(declared: object) -> list[str]:
+    """A workspace's stored collections as `ansible-galaxy` arguments.
+
+    `[{"name": "ns.coll", "version": "1.2.3"}]` becomes `["ns.coll:1.2.3"]`,
+    which is ansible's own argument form. Flattened here, in the API, so the
+    runner carries no opinion about the stored shape and needs no YAML parser
+    to read a list it is only going to pass through.
+
+    Tolerant of a malformed row rather than raising: this runs on the dispatch
+    path, where the alternative to skipping a bad entry is a run that cannot
+    start. Writes are validated by `validate_ansible_collections`, so the only
+    way one gets here is a row written before that existed.
+    """
+    if not isinstance(declared, list):
+        return []
+    out: list[str] = []
+    for entry in declared:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        version = entry.get("version")
+        out.append(f"{name}:{version}" if isinstance(version, str) and version else name)
+    return out
 
 
 def _enum(value: object, valid: frozenset[str], field: str, default: str) -> str:

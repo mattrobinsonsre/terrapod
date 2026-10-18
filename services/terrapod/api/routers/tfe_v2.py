@@ -91,7 +91,10 @@ from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
-from terrapod.services.workspace_settings import validate_ansible_version
+from terrapod.services.workspace_settings import (
+    validate_ansible_collections,
+    validate_ansible_version,
+)
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_key
 
@@ -303,6 +306,14 @@ def _validate_ansible_version(raw: object) -> str:
     """HTTP wrapper over the canonical rule in `services.workspace_settings`."""
     try:
         return validate_ansible_version(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _validate_ansible_collections(raw: object) -> list[dict[str, str]]:
+    """HTTP wrapper over the canonical rule in `services.workspace_settings`."""
+    try:
+        return validate_ansible_collections(raw)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -766,6 +777,9 @@ def _workspace_json(
                 # because a client writing a read straight back would then pin
                 # every workspace to whatever the default was at read time.
                 "ansible-version": ws.ansible_version or "",
+                # Returned as stored, never normalised: a provider writes this
+                # back into state, so a reshaped value fails every apply.
+                "ansible-collections": list(ws.ansible_collections or []),
                 "terragrunt-enabled": ws.terragrunt_enabled,
                 "terragrunt-version": ws.terragrunt_version or "",
                 "working-directory": ws.working_directory,
@@ -1540,6 +1554,13 @@ async def _create_workspace_impl(
             if "ansible-version" in attrs
             else settings.default_ansible_version
         ),
+        # `in attrs`, not truthiness: an explicit `[]` means "declare none here"
+        # and must not fall through to anything else.
+        ansible_collections=(
+            _validate_ansible_collections(attrs["ansible-collections"])
+            if "ansible-collections" in attrs
+            else []
+        ),
         terragrunt_enabled=_422(
             workspace_settings.validate_bool,
             attrs.get("terragrunt-enabled", False),
@@ -2261,6 +2282,8 @@ async def update_workspace(
         ws.engine_version = _engine_version_attr(attrs, ws.engine_version)
     if "ansible-version" in attrs:
         ws.ansible_version = _validate_ansible_version(attrs["ansible-version"])
+    if "ansible-collections" in attrs:
+        ws.ansible_collections = _validate_ansible_collections(attrs["ansible-collections"])
     if "slack-channel" in attrs:
         # Slack opt-in channel (#556): empty clears it (workspace goes silent).
         ws.slack_channel = (attrs["slack-channel"] or "").strip()[:128]

@@ -315,6 +315,74 @@ class TestThePlatformsOwnEnvironmentIsNotHandedToTheEngine:
             assert keep in names, f"{keep} was dropped — the engine needs it"
 
 
+class TestAnExplicitChildEnvironment:
+    """`env=` replaces the child's environment instead of extending it (#1931).
+
+    `os.environ.update` can only ADD, and the Ansible collection phase has to
+    REMOVE: an inherited `ANSIBLE_GALAXY_SERVER_LIST` would redirect where a
+    run's collections come from, which is a supply-chain decision and not the
+    ambient environment's to make. So the caller composes the whole environment
+    and hands it over.
+
+    Driven through a real child that dumps its own environment, like the class
+    above: an optional parameter makes the BYPASS the default, so every
+    pre-existing test here exercises the `env=None` path and a green suite would
+    say nothing about this one. That is how a total VCS outage shipped in v1.3.0
+    (#1244) — the wrapper was reached through an optional argument no test
+    supplied.
+    """
+
+    def _dump(self, env=None) -> dict[str, str]:
+        with tempfile.TemporaryDirectory() as d:
+            log = os.path.join(d, "env.log")
+            result = exec_subprocess.run(["/usr/bin/env"], log_file=log, env=env)
+            assert result.exit_code == 0, result.exit_code
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                dumped = fh.read()
+        out = {}
+        for line in dumped.splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                out[k] = v
+        return out
+
+    def test_the_child_gets_exactly_what_was_passed(self):
+        got = self._dump({"PATH": os.environ.get("PATH", ""), "ONLY_THIS": "yes"})
+        assert got.get("ONLY_THIS") == "yes"
+
+    def test_an_inherited_variable_is_ABSENT_when_it_is_left_out(self, monkeypatch):
+        """The whole reason the parameter exists. `os.environ.update` cannot do
+        this, and the galaxy server settings are the case that needs it."""
+        monkeypatch.setenv("ANSIBLE_GALAXY_SERVER_LIST", "evil")
+        inherited = self._dump()
+        assert inherited.get("ANSIBLE_GALAXY_SERVER_LIST") == "evil"
+
+        replaced = self._dump({"PATH": os.environ.get("PATH", "")})
+        assert "ANSIBLE_GALAXY_SERVER_LIST" not in replaced
+
+    def test_reserved_keys_are_still_filtered_from_an_explicit_environment(self):
+        """`env=` must not become a way to smuggle the run's own token into a
+        child: the reserved-key filter applies to it exactly as it does to
+        `os.environ`, or this parameter would be a hole in the scrub the class
+        above exists to pin."""
+        got = self._dump(
+            {
+                "PATH": os.environ.get("PATH", ""),
+                "TP_AUTH_TOKEN": "runtok-should-not-appear",
+                "tp_api_url": "https://api.internal",
+                "KEPT": "1",
+            }
+        )
+        assert "TP_AUTH_TOKEN" not in got
+        assert "tp_api_url" not in got
+        assert got.get("KEPT") == "1"
+
+    def test_omitting_it_still_inherits_this_process(self, monkeypatch):
+        """The default path, pinned so the parameter cannot change it."""
+        monkeypatch.setenv("SOME_INHERITED_THING", "inherited")
+        assert self._dump().get("SOME_INHERITED_THING") == "inherited"
+
+
 class TestTheLogStreamRedactsRegisteredSecrets:
     """A cloud identity token must not survive into the run log (#2047).
 

@@ -2875,6 +2875,15 @@ async def next_run(
     run_data["data"]["attributes"]["debug-mode"] = bool(ws and ws.debug_mode)
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
+    # The collections a configure installs (#1931), flattened to ansible's own
+    # `name[:version]` argument form. Always emitted, like `var-files` above, so
+    # a workspace that declares none sends `[]` rather than leaving the runner to
+    # infer anything from the key's absence.
+    from terrapod.services.workspace_settings import ansible_collection_arguments
+
+    run_data["data"]["attributes"]["ansible-collections"] = (
+        ansible_collection_arguments(ws.ansible_collections) if ws else []
+    )
     run_data["data"]["attributes"]["phase"] = phase
     # Which stack a Pulumi run operates on (#1523). The engine reads this into
     # `--stack`; without it the CLI has nothing selected and every run fails with

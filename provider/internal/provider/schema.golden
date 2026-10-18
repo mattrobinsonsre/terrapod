@@ -181,6 +181,7 @@ resource terrapod_autodiscovery_rule.ai_policy_mode required=false optional=true
 resource terrapod_autodiscovery_rule.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.ansible_collections required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 resource terrapod_autodiscovery_rule.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -537,6 +538,7 @@ resource terrapod_workspace.ai_policy_mode required=false optional=true computed
 resource terrapod_workspace.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.ansible_collections required=false optional=true computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType

@@ -65,6 +65,14 @@ SCENARIOS: dict[str, dict] = {
         "parallelism": 32,
         "timeout_minutes": 180,
     },
+    # A workspace declaring collections (#1931). Emitted only when non-empty, so
+    # every other scenario pins the absence and this one pins the presence --
+    # which is the pair that makes TP_ANSIBLE_COLLECTIONS a real contract rather
+    # than a line nobody renders.
+    "ansible-collections": {
+        "phase": "apply",
+        "ansible_collections": ["community.general:9.2.0", "acme.internal"],
+    },
     # Both phases, because TERRAPOD_WORKSPACE must be exported in plan AND
     # apply -- the provider reads inventory in one and writes it in the other
     # (#2036). The empty case is covered by every other scenario.

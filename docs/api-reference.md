@@ -457,6 +457,53 @@ practitioner declared.
 Settable on workspace create, workspace update, bulk update, and as an
 autodiscovery rule template field.
 
+### `ansible-collections`
+
+The Ansible collections a configure installs, declared on the platform rather
+than only in the configuration's own `requirements.yml`.
+
+`ansible-core` ships no collections, so every playbook beyond the builtins
+depends on content fetched at run time. That makes this a **supply-chain
+declaration**, not a convenience: declared here it is visible in a plan, governed
+by workspace RBAC, carried in the audit log, and settable across a fleet by bulk
+update. Left only in the repository it is whatever somebody committed.
+
+| | |
+|---|---|
+| **Type** | list of objects, each `{"name": "namespace.name"}` with an optional `"version"` |
+| **Default** | `[]` — no collections declared, and the configuration's own `requirements.yml` is the only source |
+| **Accepted** | `name` must be a Galaxy coordinate: `namespace.name`, lowercase letters, digits and underscores. `version` is any non-empty string — a pin or a range (`>=1.0.0,<2.0.0`), as in ansible's own file. A duplicate collection name is refused, as are `source` and `type` |
+| **Refused, not normalised** | the list is stored exactly as declared. Nothing is lowercased, trimmed, reordered or de-duplicated, because a Terraform provider writes the server's response back into state and a reshaped value fails every apply with "Provider produced inconsistent result after apply" |
+| **Ceiling** | 50 entries. Past that the list has stopped being platform configuration and the configuration's own requirements file is the right home |
+
+**Merged OVER the configuration's own requirements, keyed on collection name.**
+The repository's requirements file is installed first, then this list with
+`--force`, so a workspace entry replaces the repository's build of that
+collection and every other repository entry stands. The platform is the later
+word — the same relationship a workspace variable has to a default committed in
+the configuration.
+
+**Why an override rather than a joint resolution.** Handed two constraints for
+one collection, ansible's resolver refuses (`Requirements conflict: …`) rather
+than preferring either, so a merged document cannot express "the platform wins".
+Order plus `--force` can. The cost is that the two sets are not
+dependency-resolved together: a workspace pin that breaks a repository
+collection's own requirement is taken as the operator's declared intent.
+
+**Collections only — roles are a different mechanism.** A collection is usually
+external, so it comes through Terrapod's Galaxy surface: its own published
+collections answered from the registry, upstream ones proxied, which is what lets
+a runner in a restricted network install one with no route to
+`galaxy.ansible.com`. A role is usually in-house, so it comes from git using the
+workspace's own `git_http_auth` / `git_ssh_auth` credentials, declared in the
+configuration's `requirements.yml` under `roles:` and installed alongside these.
+Both kinds work either way, with one exception: a **Galaxy-hosted role** uses the
+v1 roles API, which Terrapod does not serve, so in a sealed deployment use a git
+source or vendor the role into a collection.
+
+Settable on workspace create, workspace update, bulk update, and as an
+autodiscovery rule template field.
+
 ### The operations a workspace has
 
 A workspace declares which operations it has with two independent booleans.

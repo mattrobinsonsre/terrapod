@@ -57,6 +57,8 @@ class TerraformRunOptions:
     allow_empty_apply: bool = False
     is_destroy: bool = False
     parallelism: int = 10
+    #: The collections a configure installs, in `name[:version]` form (#1931).
+    ansible_collections: list[str] | None = None
     cost_estimation: bool = True
     cost_default_region: str = "us-east-1"
     working_directory: str = ""
@@ -137,6 +139,7 @@ class TerraformStrategy:
         allow_empty_apply = options.allow_empty_apply
         is_destroy = options.is_destroy
         parallelism = options.parallelism
+        ansible_collections = options.ansible_collections
         cost_estimation = options.cost_estimation
         cost_default_region = options.cost_default_region
         working_directory = options.working_directory
@@ -171,6 +174,11 @@ class TerraformStrategy:
             env.append({"name": "TP_PLAN_ONLY", "value": "true"})
         if var_files:
             env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
+        # Only when the workspace declares some, so a terraform-only deployment's
+        # rendered Job spec is byte-identical to before (the golden matrix pins
+        # the order these lines occupy).
+        if ansible_collections:
+            env.append({"name": "TP_ANSIBLE_COLLECTIONS", "value": json.dumps(ansible_collections)})
         if target_addrs:
             env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
         if replace_addrs:
@@ -275,6 +283,7 @@ class TerraformStrategy:
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             is_destroy=attrs.get("is-destroy", False),
             parallelism=attrs.get("parallelism", 10),
+            ansible_collections=attrs.get("ansible-collections", []),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),

@@ -76,6 +76,7 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		m.InventoryPaths = types.ListNull(types.StringType)
 		m.InventoryIgnorePaths = types.ListNull(types.StringType)
 		m.OIDCAudiences = types.MapNull(audienceElemType)
+		m.AnsibleCollections = types.ListNull(ansibleCollectionObjType)
 
 		switch target.name {
 		case "agent_pool_ids":
@@ -98,6 +99,15 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 			m.OIDCAudiences = types.MapValueMust(audienceElemType, map[string]attr.Value{
 				"aws": types.ListValueMust(types.StringType,
 					[]attr.Value{types.StringValue("sts.example.com")}),
+			})
+		case "ansible_collections":
+			// A list of OBJECTS, not of strings — the second entry in
+			// unmanagedCollections whose element shape differs.
+			m.AnsibleCollections = types.ListValueMust(ansibleCollectionObjType, []attr.Value{
+				types.ObjectValueMust(ansibleCollectionAttrTypes, map[string]attr.Value{
+					"name":    types.StringValue("community.general"),
+					"version": types.StringValue("9.2.0"),
+				}),
 			})
 		default:
 			t.Fatalf("unmanagedCollections gained %q with no case here — extend this test", target.name)

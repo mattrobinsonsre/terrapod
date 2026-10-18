@@ -73,6 +73,7 @@ class TestAutodiscoveryRule:
             agent_pool_id=pool,
             engine_version="1.12",
             ansible_version="2.21.5",
+            ansible_collections=[],
             plan_apply_enabled=True,
             configure_enabled=False,
             config_directory="",

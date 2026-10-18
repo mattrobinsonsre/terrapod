@@ -357,6 +357,30 @@ class Workspace(Base):
     #: Empty still resolves to the deployment default, for a row that predates
     #: this column -- a restore from an older snapshot, say.
     ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
+    #: The Ansible collections a configure installs, declared on the platform
+    #: rather than only in the repository (#1931).
+    #:
+    #: `ansible-core` ships no collections, so every playbook beyond the
+    #: builtins depends on content fetched at run time -- which makes this a
+    #: supply-chain declaration, not a convenience. Declared here it is visible
+    #: in a plan, governed by workspace RBAC, auditable, and settable across a
+    #: fleet by bulk update; left only in the repository it is whatever someone
+    #: committed.
+    #:
+    #: A list of `{"name": "ns.coll", "version": "1.2.3"}`, where `version` is
+    #: optional and means "whatever resolves" exactly as it does in ansible's
+    #: own `requirements.yml`. Stored as declared -- refused if malformed,
+    #: never normalised -- because a provider writes the server's response back
+    #: into state.
+    #:
+    #: **Merged OVER the repository's own requirements**, keyed on collection
+    #: name: a workspace entry replaces the repository's entry for the same
+    #: collection and every other repository entry stands. The platform is the
+    #: later word, the same relationship a workspace variable has to a default
+    #: committed in the configuration.
+    ansible_collections: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     # Terragrunt single-unit support (#534): when enabled the runner invokes
     # `terragrunt` wrapping the tofu/terraform binary (via TG_TF_PATH). Version
     # is partial (e.g. "0.67"), resolved via the binary cache like
@@ -1753,6 +1777,14 @@ class AutodiscoveryRule(Base):
     #: as this column's `engine_version` sibling mirrors
     #: `default_terraform_version`.
     ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
+    #: Template for a materialised workspace's declared collections (#1931),
+    #: following `ansible_version` above. A rule without this could only ever
+    #: produce workspaces whose collections come from their repository, so a
+    #: fleet standardising on an internal collection would have to be edited one
+    #: workspace at a time.
+    ansible_collections: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
 
     #: The Ansible roots and run defaults a materialised workspace inherits
     #: (#1929), mirroring the workspace columns of the same names. A rule

@@ -158,6 +158,79 @@ var unmanagedCollections = []struct {
 	{"inventory_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryPaths }},
 	{"inventory_ignore_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryIgnorePaths }},
 	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
+	{"ansible_collections", "[]", func(m *workspaceModel) attr.Value { return m.AnsibleCollections }},
+}
+
+// ansibleCollectionAttrTypes is the object shape of one `ansible_collections`
+// entry (#1931) -- ansible's own requirements entry, minus the fields Terrapod
+// does not accept (`source`, `type`), so a practitioner writes what they
+// already know.
+var ansibleCollectionAttrTypes = map[string]attr.Type{
+	"name":    types.StringType,
+	"version": types.StringType,
+}
+
+var ansibleCollectionObjType = types.ObjectType{AttrTypes: ansibleCollectionAttrTypes}
+
+// ansibleCollectionModel carries the tfsdk tags ListValueFrom reflects over.
+// The SDK's own terrapod.AnsibleCollection has json tags only, and reflection
+// over it would not find the attribute names.
+type ansibleCollectionModel struct {
+	Name    types.String `tfsdk:"name"`
+	Version types.String `tfsdk:"version"`
+}
+
+// ansibleCollectionsForRequest converts planned state to the SDK shape, or nil
+// when the practitioner left the attribute out entirely.
+//
+// A nil return and an empty slice mean different things on the wire: nil omits
+// the key and leaves the stored list alone, `[]` clears it. That is the same
+// rule inventory_paths follows.
+func ansibleCollectionsForRequest(l types.List) []terrapod.AnsibleCollection {
+	if l.IsNull() || l.IsUnknown() {
+		return nil
+	}
+	out := make([]terrapod.AnsibleCollection, 0, len(l.Elements()))
+	for _, e := range l.Elements() {
+		obj, ok := e.(types.Object)
+		if !ok {
+			continue
+		}
+		a := obj.Attributes()
+		entry := terrapod.AnsibleCollection{Name: objStrOf(a, "name")}
+		if v := objStrOf(a, "version"); v != "" {
+			entry.Version = v
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// ansibleCollectionsToState converts the API's answer back into state.
+//
+// An absent version becomes NULL rather than "": the practitioner wrote no
+// version, and storing an empty string would show a diff on every plan against
+// a configuration that still writes none.
+func ansibleCollectionsToState(
+	ctx context.Context, entries []terrapod.AnsibleCollection,
+) (types.List, diag.Diagnostics) {
+	models := make([]ansibleCollectionModel, 0, len(entries))
+	for _, e := range entries {
+		m := ansibleCollectionModel{Name: types.StringValue(e.Name), Version: types.StringNull()}
+		if e.Version != "" {
+			m.Version = types.StringValue(e.Version)
+		}
+		models = append(models, m)
+	}
+	return types.ListValueFrom(ctx, ansibleCollectionObjType, models)
+}
+
+// objStrOf reads a string out of an object's attributes, empty when absent.
+func objStrOf(a map[string]attr.Value, key string) string {
+	if s, ok := a[key].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
+		return s.ValueString()
+	}
+	return ""
 }
 
 // agentPoolIDsForRequest returns the pool set to put on the wire, or nil when it
@@ -646,6 +719,30 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"ansible_collections": schema.ListNestedAttribute{
+				Description: "Ansible collections installed before a configure runs. " +
+					"Installed AFTER the configuration's own `requirements.yml` and with " +
+					"`--force`, so an entry here overrides the repository's build of that " +
+					"collection and leaves every other one standing. Omitting the attribute " +
+					"leaves the stored value untouched — it does not clear it; set " +
+					"`ansible_collections = []` to clear.",
+				Optional: true,
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Galaxy coordinate, `namespace.name`.",
+							Required:    true,
+						},
+						"version": schema.StringAttribute{
+							Description: "Version or range, as in ansible's own requirements " +
+								"file. Omit for whatever resolves.",
+							Optional: true,
+						},
+					},
+				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"inventory_paths": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -1344,6 +1441,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.InventoryPaths = paths
 	}
+	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
+		req.AnsibleCollections = c
+	}
 	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
 		ignore := []string{}
 		for _, v := range m.InventoryIgnorePaths.Elements() {
@@ -1556,6 +1656,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 			paths = append(paths, v.(types.String).ValueString())
 		}
 		req.InventoryPaths = paths
+	}
+	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
+		req.AnsibleCollections = c
 	}
 	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
 		ignore := []string{}
@@ -2005,6 +2108,13 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		ipVal, ipDiag := types.ListValueFrom(ctx, types.StringType, ws.InventoryPaths)
 		diags.Append(ipDiag...)
 		m.InventoryPaths = ipVal
+	}
+	if m.AnsibleCollections.IsNull() && len(ws.AnsibleCollections) == 0 {
+		m.AnsibleCollections = types.ListNull(ansibleCollectionObjType)
+	} else {
+		acVal, acDiag := ansibleCollectionsToState(ctx, ws.AnsibleCollections)
+		diags.Append(acDiag...)
+		m.AnsibleCollections = acVal
 	}
 	if m.InventoryIgnorePaths.IsNull() && len(ws.InventoryIgnorePaths) == 0 {
 		m.InventoryIgnorePaths = types.ListNull(types.StringType)

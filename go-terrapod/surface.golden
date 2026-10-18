@@ -80,6 +80,8 @@ field AgentPoolToken.IsRevoked bool `json:"is-revoked"`
 field AgentPoolToken.MaxUses int64 `json:"max-uses,omitempty"`
 field AgentPoolToken.Token string `json:"token,omitempty"`
 field AgentPoolToken.UseCount int64 `json:"use-count"`
+field AnsibleCollection.Name string `json:"name"`
+field AnsibleCollection.Version string `json:"version,omitempty"`
 field ArchitectureCritique.Architecture ArchitectureCritiqueArchitecture `json:"architecture"`
 field ArchitectureCritique.CreatedAt string `json:"created-at,omitempty"`
 field ArchitectureCritique.Deferred []string `json:"deferred,omitempty"`
@@ -353,6 +355,7 @@ field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
+field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1188,6 +1191,7 @@ field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
+field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1392,6 +1396,7 @@ field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
+field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
@@ -1513,6 +1518,7 @@ field WorkspaceVarset.Name string `json:"name"`
 field WorkspaceVarset.Priority bool `json:"priority"`
 field WorkspaceVarset.VariableCount int64 `json:"variable-count"`
 func AddPrefix(id, prefix string) string
+func GetAnsibleCollectionsAttr(r *Resource, key string) []AnsibleCollection
 func GetAudienceMapAttr(r *Resource, key string) map[string][]string
 func GetBoolAttr(r *Resource, key string) bool
 func GetBoolPtrAttr(r *Resource, key string) *bool
@@ -1851,6 +1857,7 @@ type APIToken struct
 type AddPolicyRequest struct
 type AgentPool struct
 type AgentPoolToken struct
+type AnsibleCollection struct
 type ArchitectureCritique struct
 type ArchitectureCritiqueArchitecture struct
 type ArchitectureCritiqueFinding struct

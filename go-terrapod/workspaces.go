@@ -22,6 +22,19 @@ import (
 // meaningful value the server may return (disabled-by-explicit-zero
 // vs. unset). Same logic for any future field where 0 is a legal
 // non-default value.
+// AnsibleCollection is one entry in a workspace's declared collection list
+// (#1931). It is ansible's own `requirements.yml` entry shape, minus the parts
+// Terrapod does not accept: no `source` (every collection is fetched from this
+// deployment's own Galaxy surface) and no `type` (a git or tarball requirement
+// would bypass the registry and its RBAC).
+//
+// Version is optional and means "whatever resolves", exactly as it does in
+// ansible's own file.
+type AnsibleCollection struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+}
+
 type Workspace struct {
 	ID               string `json:"id"`
 	Name             string `json:"name"`
@@ -62,7 +75,16 @@ type Workspace struct {
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
-	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// AnsibleCollections are the collections a configure installs, declared on
+	// the platform (#1931). Installed AFTER the configuration's own
+	// requirements file and with --force, so an entry here overrides the
+	// repository's build of that collection and leaves the rest standing.
+	//
+	// `!= nil` is how an empty list travels on a write, as with InventoryPaths:
+	// `[]` means "declare none here" and has to be distinguishable from "do
+	// not touch this".
+	AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+	ResourceMemory     string              `json:"resource-memory,omitempty"`
 	// PlanApplyEnabled and ConfigureEnabled are which operations this
 	// workspace HAS (#1966). Independent, and the server refuses both false.
 	//
@@ -267,7 +289,16 @@ type CreateWorkspaceRequest struct {
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
-	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// AnsibleCollections are the collections a configure installs, declared on
+	// the platform (#1931). Installed AFTER the configuration's own
+	// requirements file and with --force, so an entry here overrides the
+	// repository's build of that collection and leaves the rest standing.
+	//
+	// `!= nil` is how an empty list travels on a write, as with InventoryPaths:
+	// `[]` means "declare none here" and has to be distinguishable from "do
+	// not touch this".
+	AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+	ResourceMemory     string              `json:"resource-memory,omitempty"`
 	// PlanApplyEnabled and ConfigureEnabled declare which operations the new
 	// workspace has (#1966). POINTERS, like AutoApply above and for the same
 	// reason: a plain bool's false is indistinguishable from unset, and on
@@ -404,7 +435,16 @@ type UpdateWorkspaceRequest struct {
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	AnsibleVersion    string `json:"ansible-version,omitempty"`
-	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// AnsibleCollections are the collections a configure installs, declared on
+	// the platform (#1931). Installed AFTER the configuration's own
+	// requirements file and with --force, so an entry here overrides the
+	// repository's build of that collection and leaves the rest standing.
+	//
+	// `!= nil` is how an empty list travels on a write, as with InventoryPaths:
+	// `[]` means "declare none here" and has to be distinguishable from "do
+	// not touch this".
+	AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+	ResourceMemory     string              `json:"resource-memory,omitempty"`
 	// PlanApplyEnabled and ConfigureEnabled turn an operation on or off
 	// (#1966). POINTERS so that nil leaves the stored value alone -- a plain
 	// bool would flip the field to false on every PATCH that did not mention
@@ -787,6 +827,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 		// so it has to travel.
 		attrs["inventory-paths"] = req.InventoryPaths
 	}
+	if req.AnsibleCollections != nil {
+		attrs["ansible-collections"] = req.AnsibleCollections
+	}
 	if req.DefaultPlaybook != "" {
 		attrs["default-playbook"] = req.DefaultPlaybook
 	}
@@ -954,6 +997,10 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		// `!= nil` not `len() > 0`: an explicit empty slice is how every
 		// source is removed, so it has to travel as `[]`.
 		attrs["inventory-paths"] = req.InventoryPaths
+	}
+	if req.AnsibleCollections != nil {
+		// Same rule: `[]` is how every declared collection is removed.
+		attrs["ansible-collections"] = req.AnsibleCollections
 	}
 	if req.DefaultPlaybook != nil {
 		// *string so a caller can explicitly stop defaulting to a playbook
@@ -1136,6 +1183,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ConfigureEnabled:              GetBoolAttr(res, "configure-enabled"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
+		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),
 		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
 		DefaultLimit:                  GetStringAttr(res, "default-limit"),
 		InventoryIgnorePaths:          GetListAttr(res, "inventory-ignore-paths"),

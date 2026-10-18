@@ -26,6 +26,7 @@
 //	"engine-version"     -> engine_version      (string, optional+computed; `terraform_version` is its deprecated alias)
 //	"terraform-version"  -> terraform_version   (string, optional+computed, deprecated)
 //	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
+//	"ansible-collections" -> ansible_collections (list of {name, version}, optional)
 //	"plan-apply-enabled" -> plan_apply_enabled  (bool, optional+computed, default true)
 //	"configure-enabled"  -> configure_enabled   (bool, optional+computed, default false)
 //	"config-directory"   -> config_directory    (string, optional+computed; "" is the config version's root)
@@ -97,20 +98,21 @@ var (
 type autodiscoveryRuleModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name             types.String `tfsdk:"name"`
-	NameTemplate     types.String `tfsdk:"name_template"`
-	VCSConnectionID  types.String `tfsdk:"vcs_connection_id"`
-	RepoURL          types.String `tfsdk:"repo_url"`
-	Branch           types.String `tfsdk:"branch"`
-	Pattern          types.String `tfsdk:"pattern"`
-	IgnorePatterns   types.List   `tfsdk:"ignore_patterns"`
-	Enabled          types.Bool   `tfsdk:"enabled"`
-	ExecutionMode    types.String `tfsdk:"execution_mode"`
-	ExecutionBackend types.String `tfsdk:"execution_backend"`
-	AgentPoolID      types.String `tfsdk:"agent_pool_id"`
-	EngineVersion    types.String `tfsdk:"engine_version"`
-	TerraformVersion types.String `tfsdk:"terraform_version"`
-	AnsibleVersion   types.String `tfsdk:"ansible_version"`
+	Name               types.String `tfsdk:"name"`
+	NameTemplate       types.String `tfsdk:"name_template"`
+	VCSConnectionID    types.String `tfsdk:"vcs_connection_id"`
+	RepoURL            types.String `tfsdk:"repo_url"`
+	Branch             types.String `tfsdk:"branch"`
+	Pattern            types.String `tfsdk:"pattern"`
+	IgnorePatterns     types.List   `tfsdk:"ignore_patterns"`
+	Enabled            types.Bool   `tfsdk:"enabled"`
+	ExecutionMode      types.String `tfsdk:"execution_mode"`
+	ExecutionBackend   types.String `tfsdk:"execution_backend"`
+	AgentPoolID        types.String `tfsdk:"agent_pool_id"`
+	EngineVersion      types.String `tfsdk:"engine_version"`
+	TerraformVersion   types.String `tfsdk:"terraform_version"`
+	AnsibleVersion     types.String `tfsdk:"ansible_version"`
+	AnsibleCollections types.List   `tfsdk:"ansible_collections"`
 	// Which operations a materialised workspace has (#1966), and the roots
 	// each one uses (#1929). Templated onto every workspace this rule
 	// creates, exactly like the settings further down -- the rule carries the
@@ -167,6 +169,13 @@ type autodiscoveryRuleModel struct {
 
 // runTaskTemplateAttrTypes is the object attribute type map for a single
 // element of run_task_templates. Used for nested list (un)marshalling.
+// ruleCollectionAttrTypes is the object shape of one `ansible_collections`
+// entry on a rule (#1931), mirroring the workspace resource's own.
+var ruleCollectionAttrTypes = map[string]attr.Type{
+	"name":    types.StringType,
+	"version": types.StringType,
+}
+
 var runTaskTemplateAttrTypes = map[string]attr.Type{
 	"name":              types.StringType,
 	"url":               types.StringType,
@@ -347,6 +356,26 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				// contradicting the server, since the rule resource shipped (#1559).
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ansible_collections": schema.ListNestedAttribute{
+				Description: "The Ansible collections a workspace created by this rule " +
+					"declares. Installed after the configuration's own `requirements.yml` " +
+					"and with `--force`, so an entry here overrides the repository's build " +
+					"of that collection. A fleet standardising on an internal collection " +
+					"is the case this exists for.",
+				Optional: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Galaxy coordinate, `namespace.name`.",
+							Required:    true,
+						},
+						"version": schema.StringAttribute{
+							Description: "Version or range; omit for whatever resolves.",
+							Optional:    true,
+						},
+					},
 				},
 			},
 			"ansible_version": schema.StringAttribute{
@@ -1030,6 +1059,22 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		attrs["ansible-version"] = m.AnsibleVersion.ValueString()
 	}
+	if !m.AnsibleCollections.IsNull() && !m.AnsibleCollections.IsUnknown() {
+		cols := make([]map[string]any, 0, len(m.AnsibleCollections.Elements()))
+		for _, e := range m.AnsibleCollections.Elements() {
+			obj, ok := e.(types.Object)
+			if !ok {
+				continue
+			}
+			a := obj.Attributes()
+			col := map[string]any{"name": objStr(a, "name")}
+			if v := objStr(a, "version"); v != "" {
+				col["version"] = v
+			}
+			cols = append(cols, col)
+		}
+		attrs["ansible-collections"] = cols
+	}
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
 	}
@@ -1322,6 +1367,23 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.AnsibleVersion = types.StringValue(v)
 	} else {
 		m.AnsibleVersion = types.StringNull()
+	}
+	acObjType := types.ObjectType{AttrTypes: ruleCollectionAttrTypes}
+	if rawCols := parseRawObjectList(res, "ansible-collections"); len(rawCols) > 0 {
+		elems := make([]attr.Value, 0, len(rawCols))
+		for _, c := range rawCols {
+			ov, d := types.ObjectValue(ruleCollectionAttrTypes, map[string]attr.Value{
+				"name":    rawStr(c, "name"),
+				"version": rawStr(c, "version"),
+			})
+			diags.Append(d...)
+			elems = append(elems, ov)
+		}
+		lv, d := types.ListValue(acObjType, elems)
+		diags.Append(d...)
+		m.AnsibleCollections = lv
+	} else {
+		m.AnsibleCollections = types.ListNull(acObjType)
 	}
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))

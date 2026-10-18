@@ -72,6 +72,7 @@ _FIELD_MAP: dict[str, str] = {
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
     "ansible-version": "ansible_version",
+    "ansible-collections": "ansible_collections",
     # Which operations a workspace has (#1966). Fleet-settable on purpose:
     # turning configure on across a matched set is the operation an operator
     # adopting Ansible actually performs, and doing it one workspace at a time
@@ -377,6 +378,7 @@ _SETTING_RULES: dict[str, Any] = {
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "ansible-version": workspace_settings.validate_ansible_version,
+    "ansible-collections": workspace_settings.validate_ansible_collections,
     # The Ansible roots and run defaults (#1929). Shared with the
     # single-workspace PATCH rather than restated here -- restating one is how
     # the two surfaces come to disagree about what is valid (#1763).
