@@ -66,10 +66,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from terrapod.logging_config import get_logger
+import structlog
+
 from terrapod.runner import exec_subprocess
 
-logger = get_logger(__name__)
+# `structlog` directly rather than `terrapod.logging_config`: the runner image
+# ships only the modules Dockerfile.runner names and that one is not among them.
+# Matches every sibling phase.
+logger = structlog.get_logger("runner.phase.ansible_collections")
 
 #: The DEPRECATED alias, deliberately, and the same one `pulumi_deps` uses.
 #: `/api/v1` is canonical, but this is a runner calling back to an API it may lag

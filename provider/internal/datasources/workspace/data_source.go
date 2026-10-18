@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -42,6 +43,7 @@ type workspaceDataSourceModel struct {
 	ConfigureEnabled              types.Bool   `tfsdk:"configure_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
+	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
 	InventoryIncludePlatform      types.Bool   `tfsdk:"inventory_include_platform"`
@@ -118,16 +120,29 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					"\"terraform\" or \"pulumi\", or another engine the deployment " +
 					"enables. Distinct from execution_backend, which picks the " +
 					"binary within the Terraform engine."),
-			"pulumi_bind_plan":                 computedBool("Pulumi only: whether the update is bound to the approved preview."),
-			"engine_version":                   computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
-			"terraform_version":                computedString("The same version under its original name; `engine_version` is the current one."),
-			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
-			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
-			"ansible_version":                  computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
-			"plan_apply_enabled":               computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
-			"configure_enabled":                computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
-			"config_directory":                 computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
-			"inventory_paths":                  computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
+			"pulumi_bind_plan":   computedBool("Pulumi only: whether the update is bound to the approved preview."),
+			"engine_version":     computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
+			"terraform_version":  computedString("The same version under its original name; `engine_version` is the current one."),
+			"terragrunt_enabled": computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
+			"terragrunt_version": computedString("Terragrunt CLI version (when terragrunt_enabled)."),
+			"ansible_version":    computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
+			"plan_apply_enabled": computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
+			"configure_enabled":  computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
+			"config_directory":   computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
+			"inventory_paths":    computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
+			"ansible_collections": schema.ListNestedAttribute{
+				Description: "Collections a configure installs, declared on the workspace. " +
+					"Installed after the configuration's own requirements.yml and with " +
+					"--force, so an entry here overrides the repository's build of that " +
+					"collection.",
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name":    schema.StringAttribute{Computed: true, Description: "Galaxy coordinate, namespace.name."},
+						"version": schema.StringAttribute{Computed: true, Description: "Version or range; null when none is pinned."},
+					},
+				},
+			},
 			"default_playbook":                 computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
 			"default_limit":                    computedString("The default `--limit` for a configure run. Null means the whole inventory."),
 			"inventory_include_platform":       computedBool("Whether the inventory rows declared through Terrapod contribute to the resolved inventory. Defaults to true."),
@@ -359,6 +374,31 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.PlanExpirySeconds = types.Int64Value(v)
 	} else {
 		m.PlanExpirySeconds = types.Int64Null()
+	}
+
+	acObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name":    types.StringType,
+		"version": types.StringType,
+	}}
+	if cols := terrapod.GetAnsibleCollectionsAttr(res, "ansible-collections"); len(cols) > 0 {
+		elems := make([]attr.Value, 0, len(cols))
+		for _, c := range cols {
+			version := types.StringNull()
+			if c.Version != "" {
+				version = types.StringValue(c.Version)
+			}
+			ov, d := types.ObjectValue(acObjType.AttrTypes, map[string]attr.Value{
+				"name":    types.StringValue(c.Name),
+				"version": version,
+			})
+			diags.Append(d...)
+			elems = append(elems, ov)
+		}
+		val, d := types.ListValue(acObjType, elems)
+		diags.Append(d...)
+		m.AnsibleCollections = val
+	} else {
+		m.AnsibleCollections = types.ListNull(acObjType)
 	}
 
 	if invPaths := terrapod.GetListAttr(res, "inventory-paths"); len(invPaths) > 0 {
