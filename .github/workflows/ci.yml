@@ -1089,6 +1089,17 @@ jobs:
       # and v7 at once, and is v7.
       - name: Pinned actions agree on their version comments
         run: python3 scripts/docs-audit/check_action_pins.py
+      # A job that downloads an artifact must depend on the job producing it.
+      # Without that the two are only ordered by the scheduler, so the job is
+      # green until the ordering goes the other way -- which is how the runner
+      # image build failed on arm64 and passed on amd64 in the same run.
+      # The only gate here with a dependency. Installed explicitly rather
+      # than assumed: every other job in this file that needs PyYAML installs
+      # it, which is evidence enough that the runner image is not relied on to
+      # carry it.
+      - run: pip install pyyaml
+      - name: Downloaded artifacts come from a declared dependency
+        run: python3 scripts/docs-audit/check_artifact_deps.py
       # Advisory: prints for human review, never fails. Telling a factual
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list
@@ -2858,7 +2869,7 @@ jobs:
   # artifacted on PRs so scan-images can scan it.
   build-images-amd64:
     name: Build ${{ matrix.image }} (amd64)
-    needs: [prepare, build-query]
+    needs: [prepare, build-query, build-ee-agent]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -2957,7 +2968,7 @@ jobs:
 
   build-images-arm64:
     name: Build ${{ matrix.image }} (arm64)
-    needs: [prepare, build-query]
+    needs: [prepare, build-query, build-ee-agent]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-24.04-arm
     permissions:
