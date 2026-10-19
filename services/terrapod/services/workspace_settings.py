@@ -167,6 +167,73 @@ def validate_ansible_collections(raw: object) -> list[dict[str, str]]:
     return out
 
 
+#: The quantities a resource request may be written in -- and it is deliberately
+#: NARROWER than Kubernetes accepts, because it is exactly what
+#: `runner.job_template._double_resource` can double. That function logs a
+#: warning and returns the value unchanged when it cannot parse one, so a
+#: perfectly valid Kubernetes quantity it does not recognise ("0.5", "1G",
+#: "512M") yields a limit EQUAL to the request rather than twice it -- a silent
+#: halving of the headroom every other workspace gets. Refusing it at the write
+#: boundary is the only place that asymmetry is visible.
+_RESOURCE_QUANTITY = re.compile(r"^\d+(m|Ki|Mi|Gi|Ti)?$")
+
+
+def validate_resource_quantity(value: object, field: str) -> str:
+    """A CPU or memory request, or `""` to inherit the deployment default.
+
+    Shared by all four resource settings -- the orchestrator's pair and the
+    Ansible execution environment's (#2154) -- so the two cannot come to
+    disagree about what is writable.
+
+    The orchestrator's pair was unvalidated until #2154: a workspace could
+    store "half a cpu" and the only symptom was the Job being refused at
+    admission, with the run failing on an opaque message from the Kubernetes
+    API server naming neither the workspace nor the field. The value reaches a
+    cluster, so it is refused here.
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{field}: must be a string, not {type(value).__name__}")
+    text = value.strip()
+    if text != value:
+        raise ValueError(f"{field}: must not carry surrounding whitespace")
+    if text == "":
+        return ""
+    if not _RESOURCE_QUANTITY.match(text):
+        raise ValueError(
+            f"{field}: {value!r} is not a resource quantity this deployment can size. "
+            "Use a whole number of CPUs ('1', '4'), millicores ('500m'), or binary "
+            "bytes ('256Mi', '2Gi') -- decimals ('0.5') and decimal SI suffixes "
+            "('1G', '512M') are refused because the limit is computed as 2x the "
+            "request and those forms cannot be doubled, which would silently leave "
+            "the limit equal to the request. Empty inherits the deployment default."
+        )
+    return text
+
+
+def effective_ee_resources(
+    workspace_cpu: str | None, workspace_memory: str | None
+) -> tuple[str, str]:
+    """The EE sidecar's CPU and memory request for a workspace (#2154).
+
+    The single resolver, and single for a reason: two sites deciding what to
+    request is how a run's recorded size comes to differ from the size its Job
+    actually asked for. Resolved once at run creation and snapshotted onto the
+    run, so the concrete numbers survive the deployment default moving.
+
+    `""` and `None` both mean inherit --
+    `validate_resource_quantity` is what normalises a request to `""`, and this
+    is what turns `""` into something a Job spec can carry.
+    """
+    from terrapod.config import settings
+
+    return (
+        (workspace_cpu or "") or settings.default_ee_resource_cpu,
+        (workspace_memory or "") or settings.default_ee_resource_memory,
+    )
+
+
 #: A guard against a value that is certainly a mistake, not a limit the
 #: scanners impose.
 MAX_SCAN_SKIP_RULES = 200

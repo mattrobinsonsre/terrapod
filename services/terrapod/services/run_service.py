@@ -1275,6 +1275,21 @@ async def create_run(
         resource_cpu=workspace.resource_cpu,
         parallelism=workspace.parallelism,
         resource_memory=workspace.resource_memory,
+        # The Ansible execution environment's own size (#2154), snapshotted
+        # ALREADY RESOLVED: the workspace's value when it set one, otherwise the
+        # deployment default. Resolved once here, by the single resolver, so the
+        # concrete numbers the Job asked for stay recoverable from the run after
+        # the deployment default moves -- which is exactly what the unresolved
+        # `""` on the workspace could not tell you.
+        **dict(
+            zip(
+                ("ee_resource_cpu", "ee_resource_memory"),
+                workspace_settings.effective_ee_resources(
+                    workspace.ee_resource_cpu, workspace.ee_resource_memory
+                ),
+                strict=True,
+            )
+        ),
         # The RESOLVED mapping — the workspace's override already merged over
         # the deployment catalogue — snapshotted for the same reason as the
         # resources above (#1901). Resolved here rather than at mint time so

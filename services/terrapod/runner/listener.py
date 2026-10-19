@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import os
+import secrets
 import signal
 import time
 
@@ -864,6 +865,13 @@ class RunnerListener:
                 workspace_id=attrs.get("workspace-id", ""),
                 resource_cpu=attrs.get("resource-cpu", "1"),
                 resource_memory=attrs.get("resource-memory", "2Gi"),
+                # The Ansible execution environment (#2154). Absent from an API
+                # that predates it, and absent on every plan and apply, so the
+                # default renders exactly the spec this listener always built:
+                # no sidecar, no shared volume, no fsGroup.
+                ee_image=attrs.get("ee-image", ""),
+                ee_resource_cpu=attrs.get("ee-resource-cpu", ""),
+                ee_resource_memory=attrs.get("ee-resource-memory", ""),
                 ca_secret_name=ca_secret_name,
                 # Debug mode (#1764). The API sends intent only -- it cannot
                 # read `runners.*`, which is the listener's own config -- so the
@@ -905,7 +913,18 @@ class RunnerListener:
         try:
             job_uid = await get_job_uid(job_name, namespace=namespace)
             await self._create_auth_secret(
-                auth_secret_name, run_id, runner_token, job_name, job_uid
+                auth_secret_name,
+                run_id,
+                runner_token,
+                job_name,
+                job_uid,
+                # The orchestrator and the EE agent share this to authenticate
+                # over loopback (#2154). Minted here rather than by the API
+                # because nothing outside the pod ever needs it: the Job spec
+                # names only the Secret KEY, so the value is free to be
+                # generated at Secret-creation time. Empty when no execution
+                # environment runs, which is every plan and apply.
+                ee_token=(secrets.token_urlsafe(32) if attrs.get("ee-image", "") else ""),
             )
         except Exception as e:
             logger.error("Failed to create auth secret", run_id=run_id, error=str(e))
@@ -1235,7 +1254,13 @@ class RunnerListener:
         return response.json()["token"]
 
     async def _create_auth_secret(
-        self, secret_name: str, run_id: str, token: str, job_name: str, job_uid: str
+        self,
+        secret_name: str,
+        run_id: str,
+        token: str,
+        job_name: str,
+        job_uid: str,
+        ee_token: str = "",
     ) -> str:
         """Create a K8s Secret containing the runner token with ownerReference.
 
@@ -1268,7 +1293,10 @@ class RunnerListener:
                 ],
             ),
             type="Opaque",
-            string_data={"token": token},
+            # The EE key is present only when an execution environment runs.
+            # A key nothing mounts is harmless, but minting a shared secret on
+            # every plan and apply is a credential with no purpose.
+            string_data=({"token": token, "ee-token": ee_token} if ee_token else {"token": token}),
         )
 
         core_api = _get_core_api()

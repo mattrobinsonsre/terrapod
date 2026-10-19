@@ -234,6 +234,70 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 
 Each workspace has `resource_cpu` and `resource_memory` settings (default: 1 CPU / 2Gi memory) that control the resource **requests** for its runner Jobs. Limits are computed as 2x the requests automatically. These are set via the workspace API or UI.
 
+A **configure** run adds a second container to the Job — the Ansible execution
+environment, where the playbooks actually run — and it is sized separately by
+`ee_resource_cpu` and `ee_resource_memory`, with the same 2x limit rule. One pair
+cannot size both, because the two containers do different work: the orchestrator
+runs tofu, while the execution environment runs ansible against however many
+hosts the inventory resolves to. A directory with little terraform in it and a
+thousand managed hosts wants the opposite sizing from its neighbour.
+
+Leave the EE pair unset and the workspace takes the deployment default
+(`api.config.default_ee_resource_cpu` / `_memory`, 500m / 1Gi). An empty value is
+a real value meaning "follow the deployment", so clearing it is how a workspace
+rejoins the default — and the value a run **records** is the resolved one, so
+moving the deployment default never rewrites what a finished run ran with.
+
+**Both are refused if they are not quantities Terrapod can double.** A whole
+number of CPUs (`1`, `4`), millicores (`500m`) and binary bytes (`256Mi`, `2Gi`)
+are accepted; decimals (`0.5`) and decimal SI suffixes (`1G`, `512M`) are not,
+because the limit is computed as 2x the request and those forms cannot be
+doubled — accepting one would silently leave the limit equal to the request. The
+same rule now applies to `resource_cpu` and `resource_memory`, which were
+previously stored unchecked and surfaced only as the Kubernetes API server
+refusing the Job.
+
+### The Job a configure runs in
+
+A configure run is a **three-container pod**, and the shape is worth knowing
+because it is what makes an execution environment replaceable:
+
+| container | kind | what it is |
+|---|---|---|
+| `agent-copy` | init container | copies a small static agent out of the runner image onto a shared volume |
+| `ee` | **native sidecar** (`restartPolicy: Always`) | the execution environment, started with a `command` override so its own entrypoint is never used |
+| `runner` | main container | the orchestrator, exactly as for a plan or an apply |
+
+**The execution environment contributes its filesystem, not its entrypoint.**
+Terrapod wants `ansible-core`, its collections and the system libraries they link
+against at a path; it does not want to program against an arbitrary image's shell,
+`CMD` or user setup. That is what lets an operator supply their own image without
+it carrying any Terrapod code — and what keeps an image insensitive to Terrapod
+releases.
+
+Two properties follow from the sidecar form, and neither is incidental:
+
+* **the orchestrator does not start until the environment is ready.** A native
+  sidecar holds every later init container until its startup probe passes, so
+  there is no retry loop and no handshake file.
+* **the Job still completes.** Kubernetes terminates a native sidecar when the
+  main container exits. A plain second container that never exits would hang the
+  Job for ever.
+
+The two containers share a volume for the agent, the installed collections and
+ansible's temporary files, plus the workspace volume carrying the playbook
+directory and the resolved inventory. `fsGroup` is what makes that work for any
+uid, which is why the contract an image must meet is only "a uid that can read
+the shared volume" rather than a specific user.
+
+**If the environment never becomes ready the run is failed with a message naming
+it.** An image that cannot be pulled, or whose reference is wrong, fails
+immediately — waiting changes nothing about either. A sidecar that is running but
+whose startup probe never passes gets `runners.eeStartupTimeoutSeconds` (default
+600) first, which covers pulling a large image onto a cold node. Without this the
+Job's own counters would report the pod as active and the run would hang to the
+one-hour stale timeout, reporting nothing an operator could act on.
+
 ### Routing a workspace to several pools
 
 Within a pool, multiple listener replicas already give you HA — a listener pod

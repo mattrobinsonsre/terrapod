@@ -361,6 +361,15 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
         await _check_unschedulable(db, run)
         return
 
+    if status in ("init-failed", "init-pending"):
+        # The pod was scheduled and then stuck before the orchestrator ever
+        # ran -- an execution environment that cannot be pulled, or whose
+        # startup probe never passes (#2154). The Job's own counters call that
+        # "active", so without this the run hangs to the 1h stale timeout and
+        # reports nothing an operator can act on.
+        await _check_init_stalled(db, run, terminal=status == "init-failed")
+        return
+
     # `canceling` resolution is keyed on the Job-completion signal AND
     # whether a state-version was uploaded by this run; both branches
     # of the normal-path handlers (succeeded → applied, failed →
@@ -562,6 +571,69 @@ async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
         resource_cpu=run.resource_cpu,
         parallelism=run.parallelism,
         resource_memory=run.resource_memory,
+    )
+
+
+async def _check_init_stalled(db: AsyncSession, run: Run, *, terminal: bool) -> None:
+    """Fail a run whose pod never got past its init containers (#2154).
+
+    Two different waits, because they are different events:
+
+    * `terminal` -- the image cannot be pulled, or the container cannot be
+      created. No amount of waiting changes that, so the run fails now. Waiting
+      out a grace here would only delay a failure that is already decided.
+    * otherwise -- a native sidecar is up and its `startupProbe` has not
+      passed. That is legitimate for a while (a large execution environment
+      landing on a cold node), so it gets `ee_startup_timeout_seconds`.
+
+    The message names the execution environment, which is the whole point: the
+    reference comes from a workspace setting or an operator's own registry, so
+    "a pod is Pending" is not actionable and "this image did not become ready"
+    is.
+    """
+    cfg = load_runner_config()
+    if not terminal:
+        phase_start = run.plan_started_at if run.status == "planning" else run.apply_started_at
+        if phase_start is None:
+            return
+        if datetime.now(UTC) - phase_start <= timedelta(seconds=cfg.ee_startup_timeout_seconds):
+            return  # still inside the window an EE has to become ready
+
+    detail = ""
+    if run.job_name:
+        from terrapod.runner.job_manager import init_stall_detail
+
+        try:
+            detail = await init_stall_detail(run.job_name, namespace=cfg.runner_namespace)
+        except Exception:  # never let the diagnosis mask the failure
+            logger.warning("Could not read the init stall detail", run_id=str(run.id))
+
+    named = run.ee_image or "the Ansible execution environment"
+    if terminal:
+        msg = (
+            f"The runner pod could not start: {detail or 'an init container failed to start'}. "
+            f"Check that {named} exists, that its reference is correct, and that the "
+            "cluster can pull it (imagePullSecrets for a private registry)."
+        )
+    else:
+        msg = (
+            f"{named} did not become ready within "
+            f"{cfg.ee_startup_timeout_seconds}s"
+            + (f" -- {detail}" if detail else "")
+            + ". Its startup probe asserts ansible-playbook, ansible-galaxy, ssh and git "
+            "are on PATH; an image missing one never passes. Raise "
+            "runners.eeStartupTimeoutSeconds if the image is simply slow to pull."
+        )
+
+    await _handle_failed(db, run, msg)
+    await _reap_abandoned_job(run)
+    logger.warning(
+        "Run errored: pod stalled before the orchestrator started",
+        run_id=str(run.id),
+        status=run.status,
+        terminal=terminal,
+        ee_image=run.ee_image,
+        detail=detail,
     )
 
 

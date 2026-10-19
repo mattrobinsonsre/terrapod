@@ -407,6 +407,1179 @@
       "ttlSecondsAfterFinished": 300
     }
   },
+  "ansible-ee": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "labels": {
+        "app.kubernetes.io/component": "runner",
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/phase": "apply",
+        "terrapod.io/run-id": "run-0123456789abcdef"
+      },
+      "name": "tprun-run-0123456789ab-apply",
+      "namespace": "terrapod-runners"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 3600,
+      "backoffLimit": 3,
+      "podFailurePolicy": {
+        "rules": [
+          {
+            "action": "FailJob",
+            "onExitCodes": {
+              "containerName": "runner",
+              "operator": "NotIn",
+              "values": [
+                0
+              ]
+            }
+          }
+        ]
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app.kubernetes.io/name": "terrapod-runner",
+            "terrapod.io/phase": "apply",
+            "terrapod.io/run-id": "run-0123456789abcdef"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": true,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/runner"
+                },
+                {
+                  "name": "TP_RUN_ID",
+                  "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
+                  "name": "TP_PHASE",
+                  "value": "apply"
+                },
+                {
+                  "name": "TP_API_URL",
+                  "value": "http://terrapod-api:8000"
+                },
+                {
+                  "name": "TP_AUTH_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_VERSION",
+                  "value": "1.11"
+                },
+                {
+                  "name": "TP_BACKEND",
+                  "value": "tofu"
+                },
+                {
+                  "name": "TP_VERIFY_BINARIES",
+                  "value": "signature"
+                },
+                {
+                  "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_COST_DEFAULT_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "TP_TERMINATION_GRACE",
+                  "value": "120"
+                },
+                {
+                  "name": "TF_LOG",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "TF_LOG",
+                      "name": "tprun-0123-plan-vars"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_EE_ENDPOINT",
+                  "value": "http://127.0.0.1:7781"
+                },
+                {
+                  "name": "TP_EE_IMAGE",
+                  "value": "ghcr.io/x/terrapod-ee:2.21"
+                },
+                {
+                  "name": "TP_EE_COLLECTIONS_DIR",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "TP_EE_ROLES_DIR",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runner",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                },
+                {
+                  "mountPath": "/home/runner",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/vars",
+                  "name": "tfvars",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            }
+          ],
+          "imagePullSecrets": [],
+          "initContainers": [
+            {
+              "command": [
+                "/bin/sh",
+                "-c",
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "agent-copy",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            },
+            {
+              "command": [
+                "/tp/terrapod-ee-agent",
+                "serve",
+                "--listen",
+                "127.0.0.1:7781"
+              ],
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/tp/home"
+                },
+                {
+                  "name": "TMPDIR",
+                  "value": "/tp/tmp"
+                },
+                {
+                  "name": "ANSIBLE_LOCAL_TEMP",
+                  "value": "/tp/tmp/ansible-local"
+                },
+                {
+                  "name": "ANSIBLE_REMOTE_TEMP",
+                  "value": "~/.ansible/tmp"
+                },
+                {
+                  "name": "ANSIBLE_COLLECTIONS_PATH",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "ANSIBLE_ROLES_PATH",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/x/terrapod-ee:2.21",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "ee",
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                },
+                "requests": {
+                  "cpu": "500m",
+                  "memory": "1Gi"
+                }
+              },
+              "restartPolicy": "Always",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsNonRoot": true,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "/tp/terrapod-ee-agent",
+                    "healthcheck",
+                    "--listen",
+                    "127.0.0.1:7781"
+                  ]
+                },
+                "failureThreshold": 24,
+                "periodSeconds": 5,
+                "timeoutSeconds": 5
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                },
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                }
+              ]
+            }
+          ],
+          "restartPolicy": "Never",
+          "securityContext": {
+            "fsGroup": 1000
+          },
+          "serviceAccountName": "terrapod-runner",
+          "terminationGracePeriodSeconds": 120,
+          "volumes": [
+            {
+              "emptyDir": {},
+              "name": "workspace"
+            },
+            {
+              "emptyDir": {},
+              "name": "tmp"
+            },
+            {
+              "emptyDir": {},
+              "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
+            },
+            {
+              "name": "tfvars",
+              "secret": {
+                "items": [
+                  {
+                    "key": "terraform.tfvars.json",
+                    "path": "terraform.tfvars.json"
+                  }
+                ],
+                "secretName": "tprun-0123-plan-vars"
+              }
+            },
+            {
+              "emptyDir": {},
+              "name": "tp"
+            }
+          ]
+        }
+      },
+      "ttlSecondsAfterFinished": 300
+    }
+  },
+  "ansible-ee-ca-bundle": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "labels": {
+        "app.kubernetes.io/component": "runner",
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/phase": "plan",
+        "terrapod.io/run-id": "run-0123456789abcdef"
+      },
+      "name": "tprun-run-0123456789ab-plan",
+      "namespace": "terrapod-runners"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 3600,
+      "backoffLimit": 3,
+      "podFailurePolicy": {
+        "rules": [
+          {
+            "action": "Ignore",
+            "onPodConditions": [
+              {
+                "status": "True",
+                "type": "DisruptionTarget"
+              }
+            ]
+          },
+          {
+            "action": "FailJob",
+            "onExitCodes": {
+              "containerName": "runner",
+              "operator": "NotIn",
+              "values": [
+                0
+              ]
+            }
+          }
+        ]
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app.kubernetes.io/name": "terrapod-runner",
+            "terrapod.io/phase": "plan",
+            "terrapod.io/run-id": "run-0123456789abcdef"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": true,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/runner"
+                },
+                {
+                  "name": "TP_RUN_ID",
+                  "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
+                  "name": "TP_PHASE",
+                  "value": "plan"
+                },
+                {
+                  "name": "TP_API_URL",
+                  "value": "http://terrapod-api:8000"
+                },
+                {
+                  "name": "TP_AUTH_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_VERSION",
+                  "value": "1.11"
+                },
+                {
+                  "name": "TP_BACKEND",
+                  "value": "tofu"
+                },
+                {
+                  "name": "TP_VERIFY_BINARIES",
+                  "value": "signature"
+                },
+                {
+                  "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_COST_DEFAULT_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "TP_TERMINATION_GRACE",
+                  "value": "120"
+                },
+                {
+                  "name": "TF_LOG",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "TF_LOG",
+                      "name": "tprun-0123-plan-vars"
+                    }
+                  }
+                },
+                {
+                  "name": "SSL_CERT_FILE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "REQUESTS_CA_BUNDLE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "CURL_CA_BUNDLE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "GIT_SSL_CAINFO",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "TP_EE_ENDPOINT",
+                  "value": "http://127.0.0.1:7781"
+                },
+                {
+                  "name": "TP_EE_IMAGE",
+                  "value": "ghcr.io/x/terrapod-ee:2.21"
+                },
+                {
+                  "name": "TP_EE_COLLECTIONS_DIR",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "TP_EE_ROLES_DIR",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runner",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                },
+                {
+                  "mountPath": "/home/runner",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/vars",
+                  "name": "tfvars",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/terrapod-ca",
+                  "name": "ca-merged",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            }
+          ],
+          "imagePullSecrets": [],
+          "initContainers": [
+            {
+              "command": [
+                "/bin/sh",
+                "-c",
+                "cat /etc/ssl/certs/ca-certificates.crt /etc/terrapod-ca-src/ca-extra.pem > /etc/terrapod-ca/ca-bundle.crt"
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "ca-merge",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/terrapod-ca-src",
+                  "name": "ca-src",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/terrapod-ca",
+                  "name": "ca-merged"
+                }
+              ]
+            },
+            {
+              "command": [
+                "/bin/sh",
+                "-c",
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "agent-copy",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            },
+            {
+              "command": [
+                "/tp/terrapod-ee-agent",
+                "serve",
+                "--listen",
+                "127.0.0.1:7781"
+              ],
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/tp/home"
+                },
+                {
+                  "name": "TMPDIR",
+                  "value": "/tp/tmp"
+                },
+                {
+                  "name": "ANSIBLE_LOCAL_TEMP",
+                  "value": "/tp/tmp/ansible-local"
+                },
+                {
+                  "name": "ANSIBLE_REMOTE_TEMP",
+                  "value": "~/.ansible/tmp"
+                },
+                {
+                  "name": "ANSIBLE_COLLECTIONS_PATH",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "ANSIBLE_ROLES_PATH",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/x/terrapod-ee:2.21",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "ee",
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                },
+                "requests": {
+                  "cpu": "500m",
+                  "memory": "1Gi"
+                }
+              },
+              "restartPolicy": "Always",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsNonRoot": true,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "/tp/terrapod-ee-agent",
+                    "healthcheck",
+                    "--listen",
+                    "127.0.0.1:7781"
+                  ]
+                },
+                "failureThreshold": 24,
+                "periodSeconds": 5,
+                "timeoutSeconds": 5
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                },
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/etc/terrapod-ca",
+                  "name": "ca-merged",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "restartPolicy": "Never",
+          "securityContext": {
+            "fsGroup": 1000
+          },
+          "serviceAccountName": "terrapod-runner",
+          "terminationGracePeriodSeconds": 120,
+          "volumes": [
+            {
+              "emptyDir": {},
+              "name": "workspace"
+            },
+            {
+              "emptyDir": {},
+              "name": "tmp"
+            },
+            {
+              "emptyDir": {},
+              "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
+            },
+            {
+              "name": "tfvars",
+              "secret": {
+                "items": [
+                  {
+                    "key": "terraform.tfvars.json",
+                    "path": "terraform.tfvars.json"
+                  }
+                ],
+                "secretName": "tprun-0123-plan-vars"
+              }
+            },
+            {
+              "name": "ca-src",
+              "secret": {
+                "items": [
+                  {
+                    "key": "ca-extra.pem",
+                    "path": "ca-extra.pem"
+                  }
+                ],
+                "secretName": "tp-ca"
+              }
+            },
+            {
+              "emptyDir": {},
+              "name": "ca-merged"
+            },
+            {
+              "emptyDir": {},
+              "name": "tp"
+            }
+          ]
+        }
+      },
+      "ttlSecondsAfterFinished": 300
+    }
+  },
+  "ansible-ee-sized": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "labels": {
+        "app.kubernetes.io/component": "runner",
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/phase": "apply",
+        "terrapod.io/run-id": "run-0123456789abcdef"
+      },
+      "name": "tprun-run-0123456789ab-apply",
+      "namespace": "terrapod-runners"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 3600,
+      "backoffLimit": 3,
+      "podFailurePolicy": {
+        "rules": [
+          {
+            "action": "FailJob",
+            "onExitCodes": {
+              "containerName": "runner",
+              "operator": "NotIn",
+              "values": [
+                0
+              ]
+            }
+          }
+        ]
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app.kubernetes.io/name": "terrapod-runner",
+            "terrapod.io/phase": "apply",
+            "terrapod.io/run-id": "run-0123456789abcdef"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": true,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/runner"
+                },
+                {
+                  "name": "TP_RUN_ID",
+                  "value": "run-0123456789abcdef"
+                },
+                {
+                  "name": "TP_WORKSPACE_ID",
+                  "value": ""
+                },
+                {
+                  "name": "TP_PHASE",
+                  "value": "apply"
+                },
+                {
+                  "name": "TP_API_URL",
+                  "value": "http://terrapod-api:8000"
+                },
+                {
+                  "name": "TP_AUTH_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_VERSION",
+                  "value": "1.11"
+                },
+                {
+                  "name": "TP_BACKEND",
+                  "value": "tofu"
+                },
+                {
+                  "name": "TP_VERIFY_BINARIES",
+                  "value": "signature"
+                },
+                {
+                  "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_COST_DEFAULT_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "TP_TERMINATION_GRACE",
+                  "value": "120"
+                },
+                {
+                  "name": "TF_LOG",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "TF_LOG",
+                      "name": "tprun-0123-plan-vars"
+                    }
+                  }
+                },
+                {
+                  "name": "TP_EE_ENDPOINT",
+                  "value": "http://127.0.0.1:7781"
+                },
+                {
+                  "name": "TP_EE_IMAGE",
+                  "value": "ghcr.io/x/terrapod-ee:2.16"
+                },
+                {
+                  "name": "TP_EE_COLLECTIONS_DIR",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "TP_EE_ROLES_DIR",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runner",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                },
+                {
+                  "mountPath": "/home/runner",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
+                  "mountPath": "/var/run/terrapod/vars",
+                  "name": "tfvars",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            }
+          ],
+          "imagePullSecrets": [],
+          "initContainers": [
+            {
+              "command": [
+                "/bin/sh",
+                "-c",
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "agent-copy",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                }
+              ]
+            },
+            {
+              "command": [
+                "/tp/terrapod-ee-agent",
+                "serve",
+                "--listen",
+                "127.0.0.1:7781"
+              ],
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/tp/home"
+                },
+                {
+                  "name": "TMPDIR",
+                  "value": "/tp/tmp"
+                },
+                {
+                  "name": "ANSIBLE_LOCAL_TEMP",
+                  "value": "/tp/tmp/ansible-local"
+                },
+                {
+                  "name": "ANSIBLE_REMOTE_TEMP",
+                  "value": "~/.ansible/tmp"
+                },
+                {
+                  "name": "ANSIBLE_COLLECTIONS_PATH",
+                  "value": "/tp/collections"
+                },
+                {
+                  "name": "ANSIBLE_ROLES_PATH",
+                  "value": "/tp/roles"
+                },
+                {
+                  "name": "TP_EE_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "ee-token",
+                      "name": "tprun-0123-plan-auth"
+                    }
+                  }
+                }
+              ],
+              "image": "ghcr.io/x/terrapod-ee:2.16",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "ee",
+              "resources": {
+                "limits": {
+                  "cpu": "4",
+                  "memory": "8Gi"
+                },
+                "requests": {
+                  "cpu": "2",
+                  "memory": "4Gi"
+                }
+              },
+              "restartPolicy": "Always",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsNonRoot": true,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "/tp/terrapod-ee-agent",
+                    "healthcheck",
+                    "--listen",
+                    "127.0.0.1:7781"
+                  ]
+                },
+                "failureThreshold": 24,
+                "periodSeconds": 5,
+                "timeoutSeconds": 5
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/tp",
+                  "name": "tp"
+                },
+                {
+                  "mountPath": "/workspace",
+                  "name": "workspace"
+                }
+              ]
+            }
+          ],
+          "restartPolicy": "Never",
+          "securityContext": {
+            "fsGroup": 1000
+          },
+          "serviceAccountName": "terrapod-runner",
+          "terminationGracePeriodSeconds": 120,
+          "volumes": [
+            {
+              "emptyDir": {},
+              "name": "workspace"
+            },
+            {
+              "emptyDir": {},
+              "name": "tmp"
+            },
+            {
+              "emptyDir": {},
+              "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
+            },
+            {
+              "name": "tfvars",
+              "secret": {
+                "items": [
+                  {
+                    "key": "terraform.tfvars.json",
+                    "path": "terraform.tfvars.json"
+                  }
+                ],
+                "secretName": "tprun-0123-plan-vars"
+              }
+            },
+            {
+              "emptyDir": {},
+              "name": "tp"
+            }
+          ]
+        }
+      },
+      "ttlSecondsAfterFinished": 300
+    }
+  },
   "apply-minimal": {
     "apiVersion": "batch/v1",
     "kind": "Job",
@@ -720,6 +1893,22 @@
                       "name": "tprun-0123-plan-vars"
                     }
                   }
+                },
+                {
+                  "name": "SSL_CERT_FILE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "REQUESTS_CA_BUNDLE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "CURL_CA_BUNDLE",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
+                },
+                {
+                  "name": "GIT_SSL_CAINFO",
+                  "value": "/etc/terrapod-ca/ca-bundle.crt"
                 }
               ],
               "image": "ghcr.io/test/runner:latest",
@@ -771,11 +1960,54 @@
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/terrapod-ca",
+                  "name": "ca-merged",
+                  "readOnly": true
                 }
               ]
             }
           ],
           "imagePullSecrets": [],
+          "initContainers": [
+            {
+              "command": [
+                "/bin/sh",
+                "-c",
+                "cat /etc/ssl/certs/ca-certificates.crt /etc/terrapod-ca-src/ca-extra.pem > /etc/terrapod-ca/ca-bundle.crt"
+              ],
+              "image": "ghcr.io/test/runner:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "ca-merge",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsGroup": 1000,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "seccompProfile": {
+                  "type": "RuntimeDefault"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/terrapod-ca-src",
+                  "name": "ca-src",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/terrapod-ca",
+                  "name": "ca-merged"
+                }
+              ]
+            }
+          ],
           "restartPolicy": "Never",
           "serviceAccountName": "terrapod-runner",
           "terminationGracePeriodSeconds": 120,
@@ -809,6 +2041,22 @@
                 ],
                 "secretName": "tprun-0123-plan-vars"
               }
+            },
+            {
+              "name": "ca-src",
+              "secret": {
+                "items": [
+                  {
+                    "key": "ca-extra.pem",
+                    "path": "ca-extra.pem"
+                  }
+                ],
+                "secretName": "tp-ca"
+              }
+            },
+            {
+              "emptyDir": {},
+              "name": "ca-merged"
             }
           ]
         }

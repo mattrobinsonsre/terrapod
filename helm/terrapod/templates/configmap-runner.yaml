@@ -32,6 +32,7 @@ data:
     default_pulumi_version: {{ .Values.runners.defaultPulumiVersion | default "3.208" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}
     launch_timeout_seconds: {{ .Values.runners.launchTimeoutSeconds | default 300 }}
+    ee_startup_timeout_seconds: {{ .Values.runners.eeStartupTimeoutSeconds | default 600 }}
     {{- /* Execution-hooks kill-switch (#619). `dig` gives a correct default-true
        bool: an explicit `hooksEnabled: false` is preserved (a `| default true`
        would wrongly coerce it back to true). */}}

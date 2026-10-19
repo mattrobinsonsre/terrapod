@@ -532,6 +532,20 @@ class Workspace(Base):
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
+    #: The Ansible execution-environment sidecar's own request (#2154), with
+    #: limits computed at 2x exactly as the pair above. Separate from them
+    #: because the two containers do different work: the orchestrator runs
+    #: tofu, and the EE runs ansible against however many hosts the inventory
+    #: resolves to, so one pair cannot size both.
+    #:
+    #: `""` means the deployment default (`api.config.default_ee_resource_*`),
+    #: resolved by `workspace_settings.effective_ee_resources` at run creation
+    #: and snapshotted onto the run. An empty string is a value, not an
+    #: absence -- it means "inherit" -- so only the key being absent from a
+    #: request falls through to this column default.
+    ee_resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    ee_resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+
     #: How many operations the engine performs at once (#1431). One setting for
     #: every engine: `-parallelism` for terraform/tofu, `--parallel` for Pulumi,
     #: `forks` for Ansible. The unit differs — the first two count concurrent
@@ -1825,6 +1839,11 @@ class AutodiscoveryRule(Base):
     inventory_ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    #: The EE sidecar's request, templated like the pair above (#2154). `""`
+    #: materialises a workspace that inherits the deployment default, which is
+    #: what a rule wants unless the operator has sized it deliberately.
+    ee_resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    ee_resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     #: Templated onto workspaces this rule materialises (#1431), alongside the
     #: resources above — a monorepo's directories are rarely uniform in weight, so
     #: a rule that can size the runner should be able to say how hard to drive it.
@@ -2625,6 +2644,29 @@ class Run(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    #: The EE sidecar's request, snapshotted **already resolved** (#2154) -- the
+    #: workspace's value if it set one, otherwise the deployment default -- so
+    #: the concrete numbers the Job ran with are recoverable from the run even
+    #: after the deployment default moves.
+    #:
+    #: `""` here means a run created before this column existed, or by an API
+    #: older than it. `build_job_spec` carries its own default for exactly that
+    #: case, so an in-flight run across an upgrade renders a valid Job rather
+    #: than an empty resource request.
+    ee_resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    ee_resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    #: The Ansible execution environment this run actually used, resolved to a
+    #: full image reference (#2154). Recorded on the run because the built-in
+    #: tags MOVE -- `terrapod-ee:2.21` is rebuilt whenever upstream patches the
+    #: line or a base image is refreshed -- so without this a run could not be
+    #: identified after the fact.
+    #:
+    #: `""` means no configure operation ran, which is every plan and apply.
+    #: `build_job_spec` renders no sidecar at all for an empty value, so a
+    #: terraform/tofu-only deployment never pulls an EE. It is also what
+    #: `run_reconciler` names when the sidecar never becomes ready, which is
+    #: why the reconciler needs it here rather than reading the Job back.
+    ee_image: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     #: Snapshotted from the workspace at run creation, like the resources above,
     #: so editing the workspace mid-flight cannot change a run already under way.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)

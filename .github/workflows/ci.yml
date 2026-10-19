@@ -1792,6 +1792,14 @@ jobs:
           # output, not the template: a values key with no render line is
           # silently inert, and the code default wins with nothing to show it.
           echo "$out" | grep -q "debug_linger_seconds: 1800" || { echo "FAIL: runners.yaml debug_linger_seconds not rendered"; exit 1; }
+          # The Ansible execution environment's config, both halves (#2154).
+          # Each is a values key whose only proof of reaching a pod is the
+          # rendered output: the API resolves the default size, the listener
+          # bounds how long a sidecar has to become ready, and a missing render
+          # line on either leaves the code default winning silently.
+          echo "$out" | grep -q "ee_startup_timeout_seconds: 600" || { echo "FAIL: runners.yaml ee_startup_timeout_seconds not rendered — a stalled execution environment would hang to the stale timeout with the operator's window ignored"; exit 1; }
+          echo "$out" | grep -q 'default_ee_resource_cpu: "500m"' || { echo "FAIL: config.yaml default_ee_resource_cpu not rendered — a workspace that sizes no EE would take the code default, ignoring the operator's"; exit 1; }
+          echo "$out" | grep -q 'default_ee_resource_memory: "1Gi"' || { echo "FAIL: config.yaml default_ee_resource_memory not rendered"; exit 1; }
           # Slack integration (#556) is OFF by default: config renders but no
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }

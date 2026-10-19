@@ -38,6 +38,54 @@ _CA_SRC_DIR = "/etc/terrapod-ca-src"
 _CA_MERGED_DIR = "/etc/terrapod-ca"
 _CA_MERGED_FILE = f"{_CA_MERGED_DIR}/ca-bundle.crt"
 
+# Ansible execution environment (#2154). The EE contributes its FILESYSTEM, not
+# its entrypoint: we want ansible-core, its collections and the system libraries
+# they link against at a path, and we do not want to program against an
+# arbitrary image's shell, CMD or user setup. So an init container copies the
+# static agent out of the runner image onto a shared volume and the sidecar is
+# started with a `command:` override, which Kubernetes applies over the image
+# ENTRYPOINT. That is what keeps an EE insensitive to Terrapod code changes --
+# it carries none of ours.
+_EE_CONTAINER = "ee"
+_EE_AGENT_COPY_CONTAINER = "agent-copy"
+#: Where the agent lives in the runner image, and where it is copied to.
+_EE_AGENT_SRC = "/usr/local/bin/terrapod-ee-agent"
+_EE_SHARED_VOLUME = "tp"
+_EE_SHARED_DIR = "/tp"
+_EE_AGENT_PATH = f"{_EE_SHARED_DIR}/terrapod-ee-agent"
+#: Loopback, and that is the whole security model: containers in a pod share a
+#: network namespace but not a filesystem, so the orchestrator reaches the agent
+#: at 127.0.0.1 while nothing outside the pod can. It also decides the probe
+#: form -- see `_ee_startup_probe`.
+_EE_LISTEN = "127.0.0.1:7781"
+_EE_ENDPOINT = f"http://{_EE_LISTEN}"
+#: Everything the EE writes lives under the shared volume, which is what lets it
+#: keep `readOnlyRootFilesystem` and lets a custom EE meet the contract without
+#: providing any particular writable path of its own.
+_EE_TMPDIR = f"{_EE_SHARED_DIR}/tmp"
+_EE_COLLECTIONS_DIR = f"{_EE_SHARED_DIR}/collections"
+_EE_ROLES_DIR = f"{_EE_SHARED_DIR}/roles"
+_EE_HOME = f"{_EE_SHARED_DIR}/home"
+#: The group both containers reach the shared volumes through. The orchestrator
+#: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
+#: image says. `fsGroup` is what makes all three work: kubelet chowns every
+#: volume to this gid AND adds it to the supplementary groups of every container
+#: in the pod, so volume access does not depend on the EE's uid at all. That is
+#: why we must NOT pin `runAsUser` on the EE -- see `_ee_security_context`.
+_EE_FS_GROUP = 1000
+#: The builder's own fallback when a run carries no EE size -- a run created
+#: before the columns existed, or by an API up to N-2 minors behind. It is a
+#: SEPARATE constant from `Settings.default_ee_resource_*` on purpose: the
+#: listener does not mount the API's ConfigMap, so reading the API's setting
+#: here would silently yield the code default rather than the operator's value.
+#: `test_the_builder_default_matches_the_deployment_default` pins the two equal.
+_EE_DEFAULT_CPU = "500m"
+_EE_DEFAULT_MEMORY = "1Gi"
+#: The env key the agent reads its shared token from (ee-agent/agent.go).
+_EE_TOKEN_ENV = "TP_EE_TOKEN"
+#: The key of the per-run auth Secret holding that token (listener writes it).
+_EE_TOKEN_SECRET_KEY = "ee-token"
+
 
 def _double_resource(value: str) -> str:
     """Double a K8s resource value.
@@ -66,13 +114,20 @@ def _double_resource(value: str) -> str:
     return f"{doubled}{suffix}"
 
 
-def _vault_file_mode(runner_config: RunnerConfig) -> int:
+def _vault_file_mode(runner_config: RunnerConfig, fs_group: int | None = None) -> int:
     """0440 when the pod has an fsGroup (the file's group), else 0444.
 
     Kubelet projects Secret files owned by root. The runner is a non-root UID,
     so without an fsGroup it can only read a world-readable file; with one, the
     group bit suffices and "other" gets nothing.
+
+    `fs_group` is the one the EE path sets (#2154), which does not come from
+    `pod_security_context` -- so without this argument a configure run would
+    HAVE an fsGroup and still project world-readable files, which is the
+    looser of the two and exactly the direction worth not getting wrong.
     """
+    if fs_group is not None:
+        return 0o440
     psc = runner_config.pod_security_context
     if isinstance(psc, dict) and psc.get("fsGroup") is not None:
         return 0o440
@@ -86,6 +141,7 @@ def _add_vault_file_mounts(
     vars_secret_name: str,
     runner_config: RunnerConfig,
     image: str,
+    fs_group: int | None = None,
 ) -> None:
     """Mount Vault-delivered files (#1619) from the per-run vars Secret.
 
@@ -104,7 +160,7 @@ def _add_vault_file_mounts(
     """
     from terrapod.runner import vault_files as vf
 
-    mode = _vault_file_mode(runner_config)
+    mode = _vault_file_mode(runner_config, fs_group)
     container = pod["containers"][0]
     rel = [f for f in vault_files if not vf.is_home(f["name"])]
     home = [f for f in vault_files if vf.is_home(f["name"])]
@@ -168,6 +224,221 @@ def _add_vault_file_mounts(
             )
 
 
+def _ee_security_context() -> dict:
+    """The EE sidecar's securityContext -- and what it deliberately omits.
+
+    No `runAsUser` and no `runAsGroup`. The contract an EE must meet is "a uid
+    able to read the shared volume", and `fsGroup` is what satisfies it for any
+    uid, so pinning 1000 here would buy nothing and would break an operator's
+    image whose files belong to a different user. `runAsNonRoot` stays, because
+    we do require that much: an image whose USER is root fails to start with
+    kubelet saying so, which is a legible refusal rather than a silent
+    privilege.
+
+    `readOnlyRootFilesystem` stays too. Everything ansible writes is redirected
+    under the shared volume by `_ee_env`, so an EE needs no writable path of its
+    own -- which is the property that keeps the contract to four binaries on
+    PATH.
+    """
+    return {
+        "runAsNonRoot": True,
+        "readOnlyRootFilesystem": True,
+        "allowPrivilegeEscalation": False,
+        "capabilities": {"drop": ["ALL"]},
+        "seccompProfile": {"type": "RuntimeDefault"},
+    }
+
+
+def _ee_startup_probe() -> dict:
+    """`exec`, NOT `httpGet` -- and this is not a style choice.
+
+    The agent binds loopback only. A kubelet `httpGet` probe dials the POD's
+    IP from the node, which is a different network namespace from the one
+    `127.0.0.1:7781` is bound in, so an httpGet probe can never succeed however
+    healthy the agent is. #1925's sketch shows `httpGet`; it is wrong, and the
+    failure it produces is the worst kind -- a sidecar that works perfectly and
+    a pod that never leaves `PodInitializing`.
+
+    `healthcheck` dials loopback from inside the container and asserts the
+    contract (ansible-playbook, ansible-galaxy, ssh and git on PATH) while it is
+    there. So a non-conforming operator image becomes a startup failure naming
+    what is missing, rather than a mid-run mystery.
+
+    `failureThreshold` x `periodSeconds` is the window an image has to become
+    ready; past it kubelet restarts the sidecar and the run stalls, which
+    `run_reconciler` is what notices (#2154 item 13).
+    """
+    return {
+        "exec": {"command": [_EE_AGENT_PATH, "healthcheck", "--listen", _EE_LISTEN]},
+        "periodSeconds": 5,
+        "timeoutSeconds": 5,
+        "failureThreshold": 24,
+    }
+
+
+def _ee_env(auth_secret_name: str) -> list[dict]:
+    """The sidecar's environment: where to write, and the shared token.
+
+    Every writable path points into the shared volume, which is what lets the
+    EE keep a read-only root filesystem and lets a custom EE provide no
+    particular directory of its own.
+
+    `ANSIBLE_REMOTE_TEMP` is included although it names a path on the TARGET
+    host, not here: ansible's default is `~/.ansible/tmp` under the remote
+    user, and a target whose home is unwritable fails late and obscurely. It
+    costs nothing to be explicit.
+    """
+    return [
+        {"name": "HOME", "value": _EE_HOME},
+        {"name": "TMPDIR", "value": _EE_TMPDIR},
+        {"name": "ANSIBLE_LOCAL_TEMP", "value": f"{_EE_TMPDIR}/ansible-local"},
+        {"name": "ANSIBLE_REMOTE_TEMP", "value": "~/.ansible/tmp"},
+        {"name": "ANSIBLE_COLLECTIONS_PATH", "value": _EE_COLLECTIONS_DIR},
+        {"name": "ANSIBLE_ROLES_PATH", "value": _EE_ROLES_DIR},
+        {
+            "name": _EE_TOKEN_ENV,
+            "valueFrom": {"secretKeyRef": {"name": auth_secret_name, "key": _EE_TOKEN_SECRET_KEY}},
+        },
+    ]
+
+
+def _add_execution_environment(
+    pod: dict,
+    *,
+    ee_image: str,
+    auth_secret_name: str,
+    resource_cpu: str,
+    resource_memory: str,
+    runner_config: RunnerConfig,
+    runner_image: str,
+    ca_mounted: bool,
+) -> None:
+    """Add the Ansible execution environment as a NATIVE SIDECAR (#2154, #1925).
+
+    Called LAST on purpose, and moving it breaks the pod. `initContainers` run
+    in order, and a native sidecar -- an init container with
+    `restartPolicy: Always` -- holds every later one until its `startupProbe`
+    passes, with the main container starting after all of them. So the EE must
+    be the final entry: appended after `ca-merge` (which populates the bundle
+    the EE trusts) and after `home-dirs`, and with `agent-copy` immediately
+    before it.
+
+    What this shape buys, and why it is a sidecar rather than a container:
+
+    * **Ordering for free.** The orchestrator does not start until the probe
+      passes, so there is no retry loop and no sentinel-file handshake.
+    * **The Job still completes.** A native sidecar is terminated by Kubernetes
+      when the main container exits; a plain `containers` entry that never exits
+      would hang the Job for ever.
+
+    `shareProcessNamespace` is deliberately NOT set. #1925 records it as a
+    backstop only -- the agent is the ansible process's parent and signals it
+    directly, so cancellation is an endpoint rather than a kill -- and it has a
+    cost of its own: both containers run as uid 1000, so with a shared PID
+    namespace an operator-supplied EE could read `/proc/<pid>/environ` of the
+    orchestrator and lift that run's `TP_AUTH_TOKEN`.
+    """
+    limit_cpu = _double_resource(resource_cpu)
+    limit_memory = _double_resource(resource_memory)
+
+    # One volume, several directories under it. A single shared mount is what
+    # #1925 specifies (`cp … /tp/`), and it keeps the contract to one path
+    # rather than one per concern.
+    pod["volumes"].append({"name": _EE_SHARED_VOLUME, "emptyDir": {}})
+
+    # Both containers reach the playbook directory and the resolved inventory
+    # (#2021) through the workspace volume the orchestrator already fetches
+    # into, so the inventory handoff needs no volume of its own.
+    ee_mounts = [
+        {"name": _EE_SHARED_VOLUME, "mountPath": _EE_SHARED_DIR},
+        {"name": "workspace", "mountPath": "/workspace"},
+    ]
+    if ca_mounted:
+        ee_mounts.append({"name": "ca-merged", "mountPath": _CA_MERGED_DIR, "readOnly": True})
+
+    # The orchestrator sees the same shared volume: it is how it reads what the
+    # agent installed, and how the agent binary gets there in the first place.
+    pod["containers"][0]["volumeMounts"].append(
+        {"name": _EE_SHARED_VOLUME, "mountPath": _EE_SHARED_DIR}
+    )
+    # Appended AFTER the operator's `extraEnv`, deliberately: Kubernetes gives
+    # the last duplicate precedence, so the agent's address and token cannot be
+    # redirected by a workspace variable or an operator env entry.
+    pod["containers"][0]["env"].extend(
+        [
+            {"name": "TP_EE_ENDPOINT", "value": _EE_ENDPOINT},
+            {"name": "TP_EE_IMAGE", "value": ee_image},
+            {"name": "TP_EE_COLLECTIONS_DIR", "value": _EE_COLLECTIONS_DIR},
+            {"name": "TP_EE_ROLES_DIR", "value": _EE_ROLES_DIR},
+            {
+                "name": _EE_TOKEN_ENV,
+                "valueFrom": {
+                    "secretKeyRef": {"name": auth_secret_name, "key": _EE_TOKEN_SECRET_KEY}
+                },
+            },
+        ]
+    )
+
+    inits = pod.setdefault("initContainers", [])
+    inits.append(
+        {
+            "name": _EE_AGENT_COPY_CONTAINER,
+            "image": runner_image,
+            "imagePullPolicy": runner_config.image.pull_policy,
+            # The runner image, so the directories are created by the uid that
+            # will share them, and the binary arrives with its exec bit.
+            # `install -D` would create the parents too, but `cp` plus an
+            # explicit mkdir says what it does and needs no shell.
+            "command": [
+                "/bin/sh",
+                "-c",
+                f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
+                f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
+            ],
+            "securityContext": {
+                "runAsNonRoot": True,
+                "runAsUser": 1000,
+                "runAsGroup": 1000,
+                "readOnlyRootFilesystem": True,
+                "allowPrivilegeEscalation": False,
+                "capabilities": {"drop": ["ALL"]},
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
+            "volumeMounts": [{"name": _EE_SHARED_VOLUME, "mountPath": _EE_SHARED_DIR}],
+        }
+    )
+    inits.append(
+        {
+            "name": _EE_CONTAINER,
+            "image": ee_image,
+            # A built-in EE is pulled through the cache; an operator's URI is
+            # used exactly as given, because it is their own registry reference
+            # and frequently already internal. Either way `imagePullSecrets` is
+            # pod-level, so it covers this container with no extra wiring.
+            "imagePullPolicy": runner_config.image.pull_policy,
+            # NATIVE SIDECAR. This single line is the difference between a Job
+            # that completes and one that hangs for ever.
+            "restartPolicy": "Always",
+            "command": [_EE_AGENT_PATH, "serve", "--listen", _EE_LISTEN],
+            "env": _ee_env(auth_secret_name),
+            "startupProbe": _ee_startup_probe(),
+            "resources": {
+                "requests": {"cpu": resource_cpu, "memory": resource_memory},
+                "limits": {"cpu": limit_cpu, "memory": limit_memory},
+            },
+            "securityContext": _ee_security_context(),
+            "volumeMounts": ee_mounts,
+        }
+    )
+
+    # fsGroup is the uid alignment, and it is merged UNDER the operator's own
+    # pod securityContext rather than over it: they may have set a different
+    # fsGroup for their storage, and theirs is the deployment's business. We
+    # only supply one when they have not.
+    sec = pod.setdefault("securityContext", {})
+    sec.setdefault("fsGroup", _EE_FS_GROUP)
+
+
 def build_job_spec(
     run_id: str,
     phase: str,  # "plan" or "apply"
@@ -195,6 +466,18 @@ def build_job_spec(
     #: so a workspace asks for a debug pod and the operator decides how long
     #: one may survive.
     debug_linger_seconds: int = 0,
+    #: The Ansible execution environment for a configure run (#2154). EMPTY --
+    #: the default -- renders exactly the spec this builder always rendered: no
+    #: init container, no sidecar, no shared volume, no fsGroup, no EE env. So a
+    #: terraform/tofu-only deployment pays nothing for Ansible support and never
+    #: pulls an EE image, which is the property #1925's withdrawn engine gate
+    #: was protecting by another mechanism.
+    ee_image: str = "",
+    #: The EE sidecar's own requests, limits computed at 2x as for the
+    #: orchestrator's. Empty falls back to this module's own defaults, which is
+    #: the case for a run created by an API that predates the columns.
+    ee_resource_cpu: str = "",
+    ee_resource_memory: str = "",
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -571,6 +854,10 @@ def build_job_spec(
             vars_secret_name=vars_secret_name,
             runner_config=runner_config,
             image=image,
+            # Known here rather than read back off the pod, because the EE block
+            # that sets it runs last -- and the Secret's file mode has to be
+            # decided when the volume is projected, not afterwards.
+            fs_group=_EE_FS_GROUP if ee_image else None,
         )
 
     # Custom CA trust bundle (#592): mount the per-run CA Secret (raw custom CA,
@@ -668,5 +955,21 @@ def build_job_spec(
     if runner_config.pod_annotations:
         pod_meta = job_spec["spec"]["template"]["metadata"]
         pod_meta["annotations"] = runner_config.pod_annotations
+
+    # LAST, and `_add_execution_environment`'s docstring says why moving it
+    # breaks the pod: the sidecar has to be the final `initContainers` entry,
+    # and the fsGroup has to merge over the operator's `pod_security_context`
+    # rather than be assigned before it.
+    if ee_image:
+        _add_execution_environment(
+            pod_spec,
+            ee_image=ee_image,
+            auth_secret_name=auth_secret_name,
+            resource_cpu=ee_resource_cpu or _EE_DEFAULT_CPU,
+            resource_memory=ee_resource_memory or _EE_DEFAULT_MEMORY,
+            runner_config=runner_config,
+            runner_image=image,
+            ca_mounted=bool(ca_secret_name and runner_config.ca_bundle_enabled),
+        )
 
     return job_spec

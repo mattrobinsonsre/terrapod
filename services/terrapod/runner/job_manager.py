@@ -260,6 +260,111 @@ async def _pod_unschedulable(job_name: str, namespace: str) -> bool:
     return False
 
 
+#: Kubelet waiting reasons that will not resolve on their own, whatever the
+#: grace. Each is a statement about the image or the container's configuration
+#: rather than about progress, so waiting out a timeout on one only delays a
+#: failure that is already decided -- and an Ansible execution environment is
+#: the container most likely to produce them, because its reference comes from
+#: a workspace setting or an operator's own registry (#2154).
+#:
+#: `PodInitializing`, `ContainerCreating` and the pull-in-progress states are
+#: deliberately ABSENT: a large EE on a cold node legitimately sits in them for
+#: minutes, and treating those as failure is how a working deployment on a slow
+#: registry gets told its image is broken.
+_TERMINAL_INIT_REASONS = frozenset(
+    {
+        "ErrImagePull",
+        "ImagePullBackOff",
+        "InvalidImageName",
+        "ImageInspectError",
+        "ErrImageNeverPull",
+        "RegistryUnavailable",
+        "CreateContainerConfigError",
+        "CreateContainerError",
+        "CrashLoopBackOff",
+    }
+)
+
+
+def _init_stall_of(pod) -> tuple[bool, str] | None:
+    """Why this pod is stuck before its main container, or None (#2154).
+
+    Returns `(terminal, detail)`. Two distinguishable shapes, because they
+    deserve different treatment:
+
+    * **terminal** -- an init container is waiting on a reason from
+      `_TERMINAL_INIT_REASONS`. Nothing about waiting changes it.
+    * **not terminal** -- a native sidecar is running but has not `started`,
+      which is precisely "its `startupProbe` has not passed yet". Legitimate
+      for a while; a run hangs for ever if it never resolves, which is what the
+      reconciler's grace is for.
+
+    A native sidecar is an init container with `restartPolicy: Always`, so both
+    live in `initContainerStatuses` -- the ordinary `containerStatuses` says
+    nothing at all here, which is why a pod stuck this way looks like a
+    perfectly healthy "running" Job from the counters alone.
+    """
+    if not pod.status or pod.status.phase != "Pending":
+        return None
+    for cs in pod.status.init_container_statuses or []:
+        waiting = getattr(cs.state, "waiting", None) if cs.state else None
+        if waiting and waiting.reason in _TERMINAL_INIT_REASONS:
+            message = (waiting.message or "").strip()
+            detail = f"container {cs.name!r} (image {cs.image}): {waiting.reason}"
+            return True, f"{detail} -- {message}" if message else detail
+    for cs in pod.status.init_container_statuses or []:
+        running = getattr(cs.state, "running", None) if cs.state else None
+        # `started` is None on a plain init container and False on a sidecar
+        # whose probe has not passed, so the `is False` is load-bearing: `not
+        # cs.started` would flag every ordinary init container as a stall.
+        if running and cs.started is False:
+            return False, (
+                f"container {cs.name!r} (image {cs.image}) is running but its "
+                "startup probe has not passed"
+            )
+    return None
+
+
+async def _pod_init_stall(job_name: str, namespace: str) -> tuple[bool, str] | None:
+    """`_init_stall_of` for the Job's pod, best-effort (#2154).
+
+    Any Kubernetes error returns None, so the caller falls back to treating the
+    Job as running and the ordinary stale timeout still bounds it -- degrading
+    to the behaviour that existed before this check, never to a spurious
+    failure.
+    """
+    core_api = _get_core_api()
+    try:
+        loop = asyncio.get_event_loop()
+        pods = await loop.run_in_executor(
+            _executor,
+            lambda: core_api.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"job-name={job_name}",
+            ),
+        )
+        core_api.api_client.last_response = None
+        for pod in pods.items:
+            stall = _init_stall_of(pod)
+            if stall is not None:
+                return stall
+    except Exception:
+        return None
+    return None
+
+
+async def init_stall_detail(job_name: str, namespace: str = "") -> str:
+    """The human half of `_pod_init_stall`, for the message a run fails with.
+
+    Called only on the path that is about to fail a run, so the extra listing
+    is paid once rather than on every reconcile.
+    """
+    if not namespace:
+        namespace = _default_namespace()
+    stall = await _pod_init_stall(job_name, namespace)
+    return stall[1] if stall else ""
+
+
 async def delete_job(
     job_name: str,
     namespace: str = "",
@@ -325,6 +430,14 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         # reconciler can fail fast with a clear reason (#748).
         if await _pod_unschedulable(job_name, namespace):
             return "unschedulable"
+        # Scheduled, but possibly stuck before the main container ever runs
+        # (#2154). Only reachable when the pod IS schedulable, so the second
+        # listing is paid for a pending-but-placed pod and never for a
+        # healthy running one.
+        stall = await _pod_init_stall(job_name, namespace)
+        if stall is not None:
+            terminal, _ = stall
+            return "init-failed" if terminal else "init-pending"
         return "running"  # active, or Job exists but no pod status yet
     except ApiException as e:
         if e.status == 404:

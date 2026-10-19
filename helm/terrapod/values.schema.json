@@ -412,6 +412,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "eeStartupTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
         "defaultTerraformVersion": {
           "type": "string"
         },
@@ -3179,6 +3183,12 @@
         },
         "require_strong_secrets": {
           "type": "boolean"
+        },
+        "default_ee_resource_cpu": {
+          "type": "string"
+        },
+        "default_ee_resource_memory": {
+          "type": "string"
         }
       }
     }

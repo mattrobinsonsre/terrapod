@@ -227,6 +227,13 @@ api:
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.13"
+    # The Ansible execution-environment sidecar's resources when a workspace
+    # sets none. Limits are 2x these, as for the orchestrator's own. Separate
+    # from the orchestrator's because the two containers do different work:
+    # one runs tofu, the other runs ansible against however many hosts the
+    # inventory resolves to.
+    default_ee_resource_cpu: "500m"
+    default_ee_resource_memory: "1Gi"
     # What a new Pulumi workspace gets when it pins no engine-version. Partial,
     # like its Terraform counterpart: resolved to the newest matching release.
     default_pulumi_version: "3.208"
@@ -1996,6 +2003,12 @@ runners:
   # Seconds before a claimed run with no Job launched is errored (listener
   # claimed it but never created the Job — e.g. runner-token 401, K8s outage).
   launchTimeoutSeconds: 300
+  # Seconds an Ansible execution-environment sidecar has to become ready before
+  # the run is errored. Covers pulling the EE image onto a cold node and the
+  # startup probe asserting the image's contract. A pull failure or a broken
+  # image fails the run immediately regardless — this only bounds a sidecar
+  # that is running and has not passed its probe.
+  eeStartupTimeoutSeconds: 600
   # Default terraform/tofu version + backend for runner Jobs when a workspace
   # doesn't pin one. Runs snapshot the resolved version at creation time.
   defaultTerraformVersion: "1.13"

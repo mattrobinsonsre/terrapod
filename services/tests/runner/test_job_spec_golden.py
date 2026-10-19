@@ -114,6 +114,30 @@ SCENARIOS: dict[str, dict] = {
     # a credential-holding pod killed mid-inspection, or reaped before anyone
     # reached it.
     "debug-linger": {"phase": "plan", "debug_linger_seconds": 900},
+    # The Ansible execution environment (#2154). Three scenarios, because the
+    # sidecar is the one option that changes the pod's SHAPE rather than a
+    # container's env: an init container, a native sidecar, a shared volume and
+    # an fsGroup all appear, and the orchestrator gains a mount and five env
+    # entries. Every other scenario pins their ABSENCE, which is what makes
+    # "a terraform-only deployment pays nothing" a contract rather than a claim.
+    "ansible-ee": {"phase": "apply", "ee_image": "ghcr.io/x/terrapod-ee:2.21"},
+    # Sized explicitly, so the 2x limit rule is pinned for the EE's own pair
+    # rather than only for the orchestrator's.
+    "ansible-ee-sized": {
+        "phase": "apply",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.16",
+        "ee_resource_cpu": "2",
+        "ee_resource_memory": "4Gi",
+    },
+    # With a custom CA, because the EE mounts the merged bundle only when one
+    # exists -- and the init-container ORDER matters: `ca-merge` populates the
+    # bundle and must precede the sidecar, which holds every later entry until
+    # its startup probe passes.
+    "ansible-ee-ca-bundle": {
+        "phase": "plan",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "ca_secret_name": "tp-ca",
+    },
     # A sensitive native variable (#1898). One list serves every engine, and
     # `sensitive` is the field a Pulumi delivery turns into `--secret`; what
     # this pins is that adding it changed nothing in the Job -- one mount item,
@@ -151,6 +175,15 @@ def _cfg():
     cfg.service_account_name = "terrapod-runner"
     cfg.termination_grace_period_seconds = 120
     cfg.extra_env_from = []
+    # The shared mock leaves this False, and the CA block is gated on
+    # `ca_secret_name AND ca_bundle_enabled` -- so the `ca-bundle` scenario
+    # below has been pinning the ABSENCE of a CA while claiming to pin its
+    # presence: no ca-src volume, no merged bundle, no init container, no
+    # SSL_CERT_FILE. A scenario that cannot render the thing it names says
+    # nothing about it, which is the one failure this whole file exists to
+    # prevent. Found while adding the Ansible scenarios, which were inert for
+    # the same reason.
+    cfg.ca_bundle_enabled = True
     return cfg
 
 

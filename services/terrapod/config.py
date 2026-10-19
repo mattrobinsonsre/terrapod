@@ -234,6 +234,20 @@ class RunnerConfig(BaseSettings):
             "failure signal, whereas a long-running Job with no status is not."
         ),
     )
+    ee_startup_timeout_seconds: int = Field(
+        default=600,
+        description=(
+            "Seconds an Ansible execution-environment sidecar has to become "
+            "ready before the run is errored (#2154). Its own setting rather "
+            "than launch_timeout's, because the two bound different things: "
+            "launch_timeout is about a listener that never created a Job, "
+            "while this covers pulling an EE image onto a cold node AND the "
+            "startup probe asserting the image's contract. A pull failure or "
+            "a broken image is failed immediately whatever this says -- the "
+            "timeout only applies to a sidecar that is running and has not "
+            "yet passed its probe."
+        ),
+    )
     drift_max_duration_seconds: int = Field(
         default=1800,
         description=(
@@ -3682,6 +3696,22 @@ class Settings(BaseSettings):
     default_terraform_version: str = Field(
         default="1.13",
         description="Default terraform/tofu version for new workspaces",
+    )
+    default_ee_resource_cpu: str = Field(
+        default="500m",
+        description="CPU request for the Ansible execution-environment sidecar when a "
+        "workspace sets none (#2154). The limit is 2x this, exactly as for the "
+        "orchestrator's own resources. Separate from those because the two containers "
+        "do different work -- the orchestrator runs tofu, the EE runs ansible against "
+        "however many hosts the inventory resolves to -- so one pair cannot size both. "
+        "Resolved in one place by services.workspace_settings.effective_ee_resources "
+        "and snapshotted onto the run, so a run records the concrete size it ran with "
+        "even after this default moves.",
+    )
+    default_ee_resource_memory: str = Field(
+        default="1Gi",
+        description="Memory request for the Ansible execution-environment sidecar when "
+        "a workspace sets none (#2154). Limit is 2x. See default_ee_resource_cpu.",
     )
     default_dotnet_version: str = Field(
         default="9.0",
