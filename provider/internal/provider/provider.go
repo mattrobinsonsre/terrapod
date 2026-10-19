@@ -14,6 +14,7 @@ import (
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
+	ansibleEEDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/ansible_execution_environments"
 	architectureCritiqueDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/architecture_critique"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
 	catalogItemInterfaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_item_interface"
@@ -249,5 +250,6 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		userDS.NewDataSource,
 		oidcAudienceDefaultsDS.NewDataSource,
 		inventoryResolvedDS.NewDataSource,
+		ansibleEEDS.NewDataSource,
 	}
 }

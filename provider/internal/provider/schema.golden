@@ -5,6 +5,10 @@ data terrapod_agent_pool.labels required=false optional=false computed=true sens
 data terrapod_agent_pool.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_agent_pool.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_agent_pool.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_ansible_execution_environments.environments required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["ansible_core_line":basetypes.StringType, "id":basetypes.StringType, "image":basetypes.StringType, "kind":basetypes.StringType, "label":basetypes.StringType]]
+data terrapod_ansible_execution_environments.labels required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_ansible_execution_environments.lines required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_ansible_execution_environments.listing required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_architecture_critique.architecture required=false optional=false computed=true sensitive=false type=types.ObjectType["blast_radius":basetypes.StringType, "data_stores":types.ListType[basetypes.StringType], "summary":basetypes.StringType, "tiers":types.ListType[basetypes.StringType]]
 data terrapod_architecture_critique.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_architecture_critique.deferred required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
@@ -85,6 +89,7 @@ data terrapod_workspace.ai_summary_context required=false optional=false compute
 data terrapod_workspace.ai_summary_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.allow_fork_pr_plans required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_collections required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
+data terrapod_workspace.ansible_execution_environment required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ansible_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -185,6 +190,7 @@ resource terrapod_autodiscovery_rule.ai_summary_context required=false optional=
 resource terrapod_autodiscovery_rule.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.ansible_collections required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
+resource terrapod_autodiscovery_rule.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -544,6 +550,7 @@ resource terrapod_workspace.ai_summary_context required=false optional=true comp
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_collections required=false optional=true computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
+resource terrapod_workspace.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType

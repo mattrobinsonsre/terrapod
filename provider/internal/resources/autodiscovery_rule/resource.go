@@ -26,6 +26,7 @@
 //	"engine-version"     -> engine_version      (string, optional+computed; `terraform_version` is its deprecated alias)
 //	"terraform-version"  -> terraform_version   (string, optional+computed, deprecated)
 //	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
+//	"ansible-execution-environment" -> ansible_execution_environment (string, optional; overrides the line)
 //	"ansible-collections" -> ansible_collections (list of {name, version}, optional)
 //	"plan-apply-enabled" -> plan_apply_enabled  (bool, optional+computed, default true)
 //	"configure-enabled"  -> configure_enabled   (bool, optional+computed, default false)
@@ -98,21 +99,22 @@ var (
 type autodiscoveryRuleModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name               types.String `tfsdk:"name"`
-	NameTemplate       types.String `tfsdk:"name_template"`
-	VCSConnectionID    types.String `tfsdk:"vcs_connection_id"`
-	RepoURL            types.String `tfsdk:"repo_url"`
-	Branch             types.String `tfsdk:"branch"`
-	Pattern            types.String `tfsdk:"pattern"`
-	IgnorePatterns     types.List   `tfsdk:"ignore_patterns"`
-	Enabled            types.Bool   `tfsdk:"enabled"`
-	ExecutionMode      types.String `tfsdk:"execution_mode"`
-	ExecutionBackend   types.String `tfsdk:"execution_backend"`
-	AgentPoolID        types.String `tfsdk:"agent_pool_id"`
-	EngineVersion      types.String `tfsdk:"engine_version"`
-	TerraformVersion   types.String `tfsdk:"terraform_version"`
-	AnsibleVersion     types.String `tfsdk:"ansible_version"`
-	AnsibleCollections types.List   `tfsdk:"ansible_collections"`
+	Name                        types.String `tfsdk:"name"`
+	NameTemplate                types.String `tfsdk:"name_template"`
+	VCSConnectionID             types.String `tfsdk:"vcs_connection_id"`
+	RepoURL                     types.String `tfsdk:"repo_url"`
+	Branch                      types.String `tfsdk:"branch"`
+	Pattern                     types.String `tfsdk:"pattern"`
+	IgnorePatterns              types.List   `tfsdk:"ignore_patterns"`
+	Enabled                     types.Bool   `tfsdk:"enabled"`
+	ExecutionMode               types.String `tfsdk:"execution_mode"`
+	ExecutionBackend            types.String `tfsdk:"execution_backend"`
+	AgentPoolID                 types.String `tfsdk:"agent_pool_id"`
+	EngineVersion               types.String `tfsdk:"engine_version"`
+	TerraformVersion            types.String `tfsdk:"terraform_version"`
+	AnsibleVersion              types.String `tfsdk:"ansible_version"`
+	AnsibleExecutionEnvironment types.String `tfsdk:"ansible_execution_environment"`
+	AnsibleCollections          types.List   `tfsdk:"ansible_collections"`
 	// Which operations a materialised workspace has (#1966), and the roots
 	// each one uses (#1929). Templated onto every workspace this rule
 	// creates, exactly like the settings further down -- the rule carries the
@@ -401,6 +403,17 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"ansible_execution_environment": schema.StringAttribute{
+				Description: "Template for a materialised workspace's operator-supplied " +
+					"execution environment, by label. Overrides `ansible_version` on the " +
+					"workspaces this rule creates. Available labels come from the " +
+					"`terrapod_ansible_execution_environments` data source. Leave unset " +
+					"and materialised workspaces run the built-in image for their line.",
+				// Optional alone, not Optional+Computed: the server returns ""
+				// when no label is templated and has no value to supply, so
+				// Computed would put "" into state against a null config.
+				Optional: true,
 			},
 			// Which operations a materialised workspace has (#1966) and the
 			// roots each one uses (#1929). Optional+Computed with
@@ -1083,6 +1096,9 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		attrs["ansible-version"] = m.AnsibleVersion.ValueString()
 	}
+	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
+		attrs["ansible-execution-environment"] = m.AnsibleExecutionEnvironment.ValueString()
+	}
 	if !m.AnsibleCollections.IsNull() && !m.AnsibleCollections.IsUnknown() {
 		cols := make([]map[string]any, 0, len(m.AnsibleCollections.Elements()))
 		for _, e := range m.AnsibleCollections.Elements() {
@@ -1397,6 +1413,13 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.AnsibleVersion = types.StringValue(v)
 	} else {
 		m.AnsibleVersion = types.StringNull()
+	}
+	// Same shape and the same reason: null for an unset label, so a rule that
+	// templates none produces no diff.
+	if v := terrapod.GetStringAttr(res, "ansible-execution-environment"); v != "" {
+		m.AnsibleExecutionEnvironment = types.StringValue(v)
+	} else {
+		m.AnsibleExecutionEnvironment = types.StringNull()
 	}
 	acObjType := types.ObjectType{AttrTypes: ruleCollectionAttrTypes}
 	if rawCols := parseRawObjectList(res, "ansible-collections"); len(rawCols) > 0 {

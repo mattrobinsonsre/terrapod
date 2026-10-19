@@ -1,5 +1,13 @@
 [
   {
+    "name": "terrapod_ansible_execution_environments",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_catalog_item_interface",
     "read_only": true,
     "input_schema": {
@@ -1205,8 +1213,12 @@
             "array"
           ]
         },
+        "ansible_execution_environment": {
+          "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line",
+          "type": "string"
+        },
         "ansible_version": {
-          "description": "exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default",
+          "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
         },
         "auto_apply": {
@@ -1475,8 +1487,12 @@
             "array"
           ]
         },
+        "ansible_execution_environment": {
+          "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line",
+          "type": "string"
+        },
         "ansible_version": {
-          "description": "exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default",
+          "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
         },
         "auto_apply": {

@@ -503,6 +503,24 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, defaults, nil
 	})
 
+	// ── terrapod_ansible_execution_environments ──────────────────────
+	// The write-side tools accept `ansible_version` and
+	// `ansible_execution_environment` and the server validates both, so without
+	// this an agent's only way to find an acceptable value is to attempt a write
+	// and read the 422 -- and for the built-in half the set is not static.
+	type ansibleEEIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_ansible_execution_environments",
+		Description: "List the Ansible execution environments this deployment can run -- read this BEFORE setting `ansible_version` or `ansible_execution_environment` on a workspace, because the server refuses a value it cannot run and the acceptable set is not static. Two KINDS come back together and the precedence between them is not symmetric: a `built-in` entry is one ansible-core LINE (`2.21`) whose image Terrapod builds and republishes, selected by `ansible_version`; an `operator` entry is an image the operator added under a `label`, selected by `ansible_execution_environment`, and it OVERRIDES `ansible_version` entirely -- so a workspace carrying a label ignores its line, and setting a line on such a workspace changes nothing about what runs. Each entry carries the `image` reference a run would execute in, resolved by the server's own resolver, so it cannot drift from what actually runs. READ `listing` BEFORE DRAWING ANY CONCLUSION FROM AN EMPTY LIST: the built-in set is read from a container registry, so `complete` means the registry answered and an absent line genuinely does not exist, while `unknown` means the set could not be determined -- and in that state the server ACCEPTS any line rather than refusing one it cannot confirm, because refusing would make an ordinary workspace edit depend on registry reachability. So with `unknown` do NOT tell the user this deployment has no environments and do NOT refuse to set a line they asked for; say the set could not be confirmed and proceed. An empty list with `complete` is a real answer (the deployment publishes nothing and every line will be refused); an empty list with `unknown` means nothing at all. Operator entries are always authoritative either way -- they come from the deployment's own configuration, not from a registry. Read-only; any authenticated user, because the answer is which images this deployment can pull and reveals nothing an operator's own configuration does not.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ ansibleEEIn) (*mcp.CallToolResult, *terrapod.AnsibleExecutionEnvironments, error) {
+		available, err := c.ListAnsibleExecutionEnvironments(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, available, nil
+	})
+
 	// ── terrapod_vault_status ────────────────────────────────────────
 	type vaultStatusIn struct{}
 	mcp.AddTool(s, &mcp.Tool{

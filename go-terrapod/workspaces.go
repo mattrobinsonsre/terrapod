@@ -83,6 +83,18 @@ type Workspace struct {
 	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 	Parallelism      int64  `json:"parallelism,omitempty"`
 	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	// AnsibleExecutionEnvironment names one of the deployment's own execution
+	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
+	// so a workspace carrying one ignores its line entirely.
+	//
+	// A label rather than an image reference, and a separate field rather than
+	// an overloaded AnsibleVersion for a measured reason: the server screens
+	// that field only for pre-releases, so a label would pass it -- and a label
+	// named "2.21" would shadow a real ansible-core line with no way to tell.
+	//
+	// Available labels come from ListAnsibleExecutionEnvironments; naming one
+	// the deployment has not configured is refused at the write with a 422.
+	AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -305,6 +317,18 @@ type CreateWorkspaceRequest struct {
 	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 	Parallelism      int64  `json:"parallelism,omitempty"`
 	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	// AnsibleExecutionEnvironment names one of the deployment's own execution
+	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
+	// so a workspace carrying one ignores its line entirely.
+	//
+	// A label rather than an image reference, and a separate field rather than
+	// an overloaded AnsibleVersion for a measured reason: the server screens
+	// that field only for pre-releases, so a label would pass it -- and a label
+	// named "2.21" would shadow a real ansible-core line with no way to tell.
+	//
+	// Available labels come from ListAnsibleExecutionEnvironments; naming one
+	// the deployment has not configured is refused at the write with a 422.
+	AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -459,6 +483,18 @@ type UpdateWorkspaceRequest struct {
 	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 	Parallelism      int64  `json:"parallelism,omitempty"`
 	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	// AnsibleExecutionEnvironment names one of the deployment's own execution
+	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
+	// so a workspace carrying one ignores its line entirely.
+	//
+	// A label rather than an image reference, and a separate field rather than
+	// an overloaded AnsibleVersion for a measured reason: the server screens
+	// that field only for pre-releases, so a label would pass it -- and a label
+	// named "2.21" would shadow a real ansible-core line with no way to tell.
+	//
+	// Available labels come from ListAnsibleExecutionEnvironments; naming one
+	// the deployment has not configured is refused at the write with a 422.
+	AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -833,6 +869,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
 	}
+	if req.AnsibleExecutionEnvironment != "" {
+		attrs["ansible-execution-environment"] = req.AnsibleExecutionEnvironment
+	}
 	// #1929's six. `config-directory` is the only one whose null carries a
 	// meaning, so it is the only one guarded on a pointer rather than on an
 	// empty value: a non-nil pointer travels even when it points at "",
@@ -1008,6 +1047,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
+	}
+	if req.AnsibleExecutionEnvironment != "" {
+		attrs["ansible-execution-environment"] = req.AnsibleExecutionEnvironment
 	}
 	// #1966's two, then #1929's six. Each is sent only when the caller set it,
 	// so a PATCH that mentions none of them leaves all eight alone.
@@ -1201,17 +1243,18 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoApplyMode:    GetStringAttr(res, "auto-apply-mode"),
 		// Both fields carry the resolved value, so a caller reading either one
 		// gets the right answer whichever name the server used (#1559).
-		EngineVersion:     version,
-		TerraformVersion:  version,
-		TerragruntEnabled: GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
-		WorkingDirectory:  GetStringAttr(res, "working-directory"),
-		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
-		EEResourceCPU:     GetStringAttr(res, "ee-resource-cpu"),
-		EEResourceMemory:  GetStringAttr(res, "ee-resource-memory"),
-		Parallelism:       GetIntAttr(res, "parallelism"),
-		AnsibleVersion:    GetStringAttr(res, "ansible-version"),
-		ResourceMemory:    GetStringAttr(res, "resource-memory"),
+		EngineVersion:               version,
+		TerraformVersion:            version,
+		TerragruntEnabled:           GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion:           GetStringAttr(res, "terragrunt-version"),
+		WorkingDirectory:            GetStringAttr(res, "working-directory"),
+		ResourceCPU:                 GetStringAttr(res, "resource-cpu"),
+		EEResourceCPU:               GetStringAttr(res, "ee-resource-cpu"),
+		EEResourceMemory:            GetStringAttr(res, "ee-resource-memory"),
+		Parallelism:                 GetIntAttr(res, "parallelism"),
+		AnsibleVersion:              GetStringAttr(res, "ansible-version"),
+		AnsibleExecutionEnvironment: GetStringAttr(res, "ansible-execution-environment"),
+		ResourceMemory:              GetStringAttr(res, "resource-memory"),
 		// #1929's six. `config-directory` reads through GetStringPtrAttr so a
 		// JSON null lands as nil -- the absent state -- rather than as "",
 		// which on this field means the repository root. GetStringAttr would

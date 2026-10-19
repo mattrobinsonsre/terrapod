@@ -652,6 +652,23 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"ansible_execution_environment": schema.StringAttribute{
+				Description: "One of the deployment's OWN execution environments, by label " +
+					"— `rhel8-hardened`, say. Overrides `ansible_version` outright, so a " +
+					"workspace carrying this ignores its line entirely. A label rather " +
+					"than an image reference, so a workspace cannot name an arbitrary " +
+					"image and so the whole estate can be re-pointed in one place. " +
+					"Available labels come from the " +
+					"`terrapod_ansible_execution_environments` data source; naming one " +
+					"the deployment has not configured is refused at apply with a 422. " +
+					"Leave unset to run the built-in image for `ansible_version`, which " +
+					"is the ordinary case.",
+				// Optional alone, NOT Optional+Computed like its neighbours: the
+				// server returns "" when no label is set, and there is no value
+				// for it to supply. Marking it Computed would put "" into state
+				// against a null config and diff for ever.
+				Optional: true,
+			},
 			"plan_apply_enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether this workspace has the plan/apply operation — " +
 					"the terraform, OpenTofu or Pulumi half. **Defaults to true**, so a " +
@@ -1446,6 +1463,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
 	}
+	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
+		req.AnsibleExecutionEnvironment = m.AnsibleExecutionEnvironment.ValueString()
+	}
 	// Which operations the new workspace has (#1966). POINTERS on the request,
 	// so an explicit `false` is distinguishable from an omitted attribute --
 	// which matters most for `plan_apply_enabled`, whose server default is
@@ -1667,6 +1687,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
+	}
+	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
+		req.AnsibleExecutionEnvironment = m.AnsibleExecutionEnvironment.ValueString()
 	}
 	// Which operations the workspace has (#1966). Pointers for the same reason
 	// as on create: an explicit `false` has to be distinguishable from an
@@ -1900,6 +1923,14 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.AnsibleVersion = types.StringValue(ws.AnsibleVersion)
 	} else {
 		m.AnsibleVersion = types.StringNull()
+	}
+	// Null rather than StringValue("") for an unset label: the attribute is
+	// Optional and not Computed, so writing "" into state against a null config
+	// would diff on every plan.
+	if ws.AnsibleExecutionEnvironment != "" {
+		m.AnsibleExecutionEnvironment = types.StringValue(ws.AnsibleExecutionEnvironment)
+	} else {
+		m.AnsibleExecutionEnvironment = types.StringNull()
 	}
 
 	// Which operations the workspace has (#1966), read side. Straight

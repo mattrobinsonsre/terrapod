@@ -7,6 +7,10 @@ const CategoryGitSSH
 const CategoryNative
 const CategoryTerraform
 const DiscoveryPath
+const KindBuiltIn
+const KindOperator
+const ListingComplete
+const ListingUnknown
 const MaskedValue
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
@@ -82,6 +86,13 @@ field AgentPoolToken.Token string `json:"token,omitempty"`
 field AgentPoolToken.UseCount int64 `json:"use-count"`
 field AnsibleCollection.Name string `json:"name"`
 field AnsibleCollection.Version string `json:"version,omitempty"`
+field AnsibleExecutionEnvironment.AnsibleCoreLine string
+field AnsibleExecutionEnvironment.ID string
+field AnsibleExecutionEnvironment.Image string
+field AnsibleExecutionEnvironment.Kind string
+field AnsibleExecutionEnvironment.Label string
+field AnsibleExecutionEnvironments.Environments []AnsibleExecutionEnvironment
+field AnsibleExecutionEnvironments.Listing string
 field ArchitectureCritique.Architecture ArchitectureCritiqueArchitecture `json:"architecture"`
 field ArchitectureCritique.CreatedAt string `json:"created-at,omitempty"`
 field ArchitectureCritique.Deferred []string `json:"deferred,omitempty"`
@@ -356,6 +367,7 @@ field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1197,6 +1209,7 @@ field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+field UpdateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1404,6 +1417,7 @@ field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
+field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
@@ -1728,6 +1742,7 @@ method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleA
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
+method (*Client) ListAnsibleExecutionEnvironments( ctx context.Context, ) (*AnsibleExecutionEnvironments, error)
 method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspaceID string, ) ([]ArchitectureCritiqueMessage, error)
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
@@ -1867,6 +1882,8 @@ type AddPolicyRequest struct
 type AgentPool struct
 type AgentPoolToken struct
 type AnsibleCollection struct
+type AnsibleExecutionEnvironment struct
+type AnsibleExecutionEnvironments struct
 type ArchitectureCritique struct
 type ArchitectureCritiqueArchitecture struct
 type ArchitectureCritiqueFinding struct

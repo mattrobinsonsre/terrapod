@@ -81,18 +81,19 @@ type workspaceModel struct {
 	ID types.String `tfsdk:"id"`
 
 	// Writable attributes
-	Name              types.String `tfsdk:"name"`
-	ExecutionMode     types.String `tfsdk:"execution_mode"`
-	AutoApply         types.Bool   `tfsdk:"auto_apply"`
-	AutoApplyMode     types.String `tfsdk:"auto_apply_mode"`
-	ExecutionBackend  types.String `tfsdk:"execution_backend"`
-	Engine            types.String `tfsdk:"engine"`
-	PulumiBindPlan    types.Bool   `tfsdk:"pulumi_bind_plan"`
-	EngineVersion     types.String `tfsdk:"engine_version"`
-	TerraformVersion  types.String `tfsdk:"terraform_version"`
-	TerragruntEnabled types.Bool   `tfsdk:"terragrunt_enabled"`
-	TerragruntVersion types.String `tfsdk:"terragrunt_version"`
-	AnsibleVersion    types.String `tfsdk:"ansible_version"`
+	Name                        types.String `tfsdk:"name"`
+	ExecutionMode               types.String `tfsdk:"execution_mode"`
+	AutoApply                   types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode               types.String `tfsdk:"auto_apply_mode"`
+	ExecutionBackend            types.String `tfsdk:"execution_backend"`
+	Engine                      types.String `tfsdk:"engine"`
+	PulumiBindPlan              types.Bool   `tfsdk:"pulumi_bind_plan"`
+	EngineVersion               types.String `tfsdk:"engine_version"`
+	TerraformVersion            types.String `tfsdk:"terraform_version"`
+	TerragruntEnabled           types.Bool   `tfsdk:"terragrunt_enabled"`
+	TerragruntVersion           types.String `tfsdk:"terragrunt_version"`
+	AnsibleVersion              types.String `tfsdk:"ansible_version"`
+	AnsibleExecutionEnvironment types.String `tfsdk:"ansible_execution_environment"`
 	// Which operations this workspace has (#1966). Two independent booleans
 	// rather than one parsed value, because the states are genuinely
 	// independent and a delimited string has to be kept in step across the

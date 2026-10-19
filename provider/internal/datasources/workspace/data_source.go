@@ -39,6 +39,7 @@ type workspaceDataSourceModel struct {
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	AnsibleVersion                types.String `tfsdk:"ansible_version"`
+	AnsibleExecutionEnvironment   types.String `tfsdk:"ansible_execution_environment"`
 	PlanApplyEnabled              types.Bool   `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled              types.Bool   `tfsdk:"configure_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
@@ -122,16 +123,17 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					"\"terraform\" or \"pulumi\", or another engine the deployment " +
 					"enables. Distinct from execution_backend, which picks the " +
 					"binary within the Terraform engine."),
-			"pulumi_bind_plan":   computedBool("Pulumi only: whether the update is bound to the approved preview."),
-			"engine_version":     computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
-			"terraform_version":  computedString("The same version under its original name; `engine_version` is the current one."),
-			"terragrunt_enabled": computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
-			"terragrunt_version": computedString("Terragrunt CLI version (when terragrunt_enabled)."),
-			"ansible_version":    computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
-			"plan_apply_enabled": computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
-			"configure_enabled":  computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
-			"config_directory":   computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
-			"inventory_paths":    computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
+			"pulumi_bind_plan":              computedBool("Pulumi only: whether the update is bound to the approved preview."),
+			"engine_version":                computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
+			"terraform_version":             computedString("The same version under its original name; `engine_version` is the current one."),
+			"terragrunt_enabled":            computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
+			"terragrunt_version":            computedString("Terragrunt CLI version (when terragrunt_enabled)."),
+			"ansible_version":               computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
+			"ansible_execution_environment": computedString("The operator-supplied execution environment this workspace runs its configure operations in, by label. Overrides ansible_version. Null when it names none and runs the built-in image for its line."),
+			"plan_apply_enabled":            computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
+			"configure_enabled":             computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
+			"config_directory":              computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
+			"inventory_paths":               computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
 			"ansible_collections": schema.ListNestedAttribute{
 				Description: "Collections a configure installs, declared on the workspace. " +
 					"Installed after the configuration's own requirements.yml and with " +
@@ -296,6 +298,10 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	// than pinning one (#2010); the server does not substitute the platform's
 	// default, so null is the honest reading.
 	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
+	setOptionalString(
+		&m.AnsibleExecutionEnvironment,
+		terrapod.GetStringAttr(res, "ansible-execution-environment"),
+	)
 	// Empty means the workspace takes the deployment default rather than
 	// sizing the EE itself (#2154); the server does not substitute, so null is
 	// the honest reading -- the same shape as the ansible version above.
