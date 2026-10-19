@@ -848,6 +848,7 @@ export default function AutodiscoveryPage() {
                   </label>
                   {envs.listing === 'complete' && envs.lines.length > 0 ? (
                     <select
+                      data-testid="rule-ansible-version"
                       value={ansibleVersion}
                       onChange={e => setAnsibleVersion(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
@@ -862,6 +863,7 @@ export default function AutodiscoveryPage() {
                        input is correct here -- an empty picker would block work
                        the server would have allowed. */
                     <input
+                      data-testid="rule-ansible-version"
                       value={ansibleVersion}
                       onChange={e => setAnsibleVersion(e.target.value)}
                       placeholder={tWs('fields.ansibleVersionPlaceholder')}
@@ -883,6 +885,7 @@ export default function AutodiscoveryPage() {
                       configured is refused at the write, so there is nothing to
                       gain from letting one be typed. */}
                   <select
+                    data-testid="rule-ansible-ee"
                     value={ansibleEE}
                     onChange={e => setAnsibleEE(e.target.value)}
                     disabled={envs.labels.length === 0}

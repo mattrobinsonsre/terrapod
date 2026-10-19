@@ -1713,6 +1713,92 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
 })
 
+// Its own describe: the pickers are the Ansible execution-environment feature,
+// not part of the run-identity work above. This file already carries a note
+// about a test that ended up in the wrong describe by accident.
+test.describe('Ansible execution environments (#2154)', () => {
+
+  // The execution-environment pickers (#2154). Both cases are driven here
+  // because the whole point of the server reporting `meta.listing` is that the
+  // form behaves DIFFERENTLY in the two states, and a single fixture cannot
+  // see a difference -- which is the shape of weak test this file has been
+  // bitten by before.
+  for (const listing of ['complete', 'unknown'] as const) {
+    test(`the execution-environment fields follow meta.listing=${listing} at phone width`, async ({
+      page,
+    }) => {
+      await page.route(
+        (url) => url.pathname.endsWith('/ansible/execution-environments'),
+        (route) =>
+          route.fulfill({
+            json: {
+              data: [
+                {
+                  type: 'ansible-execution-environments',
+                  id: '2.21',
+                  attributes: {
+                    kind: 'built-in',
+                    'ansible-core-line': '2.21',
+                    label: null,
+                    image: 'r/ee:2.21',
+                  },
+                },
+                {
+                  type: 'ansible-execution-environments',
+                  id: 'rhel8-hardened',
+                  attributes: {
+                    kind: 'operator',
+                    'ansible-core-line': null,
+                    label: 'rhel8-hardened',
+                    image: 'registry.internal/ee:1',
+                  },
+                },
+              ],
+              meta: { listing },
+            },
+          }),
+      )
+
+      await page.goto('/admin/autodiscovery')
+      await expectNoHorizontalPageScroll(page)
+
+      // Same two steps and the same reasoning as the test above: open the form,
+      // then expand the collapsed template-defaults section the fields live in.
+      const eeSelect = page.getByTestId('rule-ansible-ee')
+      await expect(async () => {
+        if ((await eeSelect.count()) > 0) {
+          await expect(eeSelect).toBeVisible({ timeout: 1_000 })
+          return
+        }
+        const newRule = page.getByRole('button', { name: 'New Rule' })
+        if ((await newRule.count()) > 0) await newRule.click()
+        const summary = page.getByText('Workspace template defaults')
+        if ((await summary.count()) > 0) await summary.click()
+        await expect(eeSelect).toBeVisible({ timeout: 1_000 })
+      }).toPass({ timeout: 20_000 })
+
+      // The operator label is ALWAYS a picker, in both states: labels come from
+      // configuration rather than from a registry, so they are authoritative
+      // even when the built-in listing is not.
+      await expect(eeSelect).toHaveRole('combobox')
+      await expect(eeSelect.locator('option[value="rhel8-hardened"]')).toHaveCount(1)
+
+      // The line field is a picker ONLY when the set is known. With `unknown`
+      // the server accepts any line, so an empty-or-stale picker would block a
+      // value the server would have taken -- it must be free text.
+      const line = page.getByTestId('rule-ansible-version')
+      await expect(line).toBeVisible()
+      await expect(line).toHaveRole(listing === 'complete' ? 'combobox' : 'textbox')
+      if (listing === 'complete') {
+        await expect(line.locator('option[value="2.21"]')).toHaveCount(1)
+      }
+
+      await expectNoHorizontalPageScroll(page)
+    })
+  }
+
+})
+
 // The inventory tab is its own feature, not part of the run-identity work the
 // block above covers; it was sitting in that describe by accident.
 test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
