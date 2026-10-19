@@ -213,17 +213,22 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
     slow upstream must not make a pull that could be served locally slow too.
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{tag}"
-    headers = {"Accept": MANIFEST_ACCEPT}
-    auth = _auth(host)
-    if auth:
-        headers["Authorization"] = auth
 
     try:
+        # `auth=` rather than an Authorization header: `_auth` returns a
+        # (username, password) tuple, which httpx turns into basic auth here and
+        # refuses as a header value -- `TypeError: Header value must be str or
+        # bytes`. That is not an `httpx.HTTPError`, so it would escape the
+        # handler below, break this function's documented "returns None on any
+        # failure" contract, and surface as a 500 on an ordinary image pull. It
+        # only ever fired for an upstream with credentials, which is why it sat
+        # here unmet while every anonymous mirror worked.
         async with httpx.AsyncClient(
             follow_redirects=True,
+            auth=_auth(host),
             timeout=httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0),
         ) as client:
-            response = await client.head(url, headers=headers)
+            response = await client.head(url, headers={"Accept": MANIFEST_ACCEPT})
     except httpx.HTTPError as exc:
         logger.info(
             "Could not confirm mirrored tag with upstream; serving the cached image",
