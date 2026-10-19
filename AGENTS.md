@@ -893,18 +893,35 @@ curl -s https://pypi.org/pypi/ansible-core/json | jq -r .info.version
 ```
 
 **`ansible-core` belongs to the same review and is in neither of the same
-places.** Its default is `api.config.default_ansible_version`, not an entry
-under `registry.platform_tools`, because a fleet does not move to a new ansible
-in one step — one workspace's playbooks are ready before another's — so a
-workspace overrides it in `ansible_version`, exactly as it overrides
-`default_terraform_version` in `engine_version`. Bumping the default therefore
-moves every workspace that has not pinned one and leaves the pinned ones alone,
-which is the opposite of a platform-tool bump: those move everybody.
+places — it is in TWO other places, and they are independent.**
 
-It is also not acquired the same way. `ansible-core` publishes no release
-binary, so it is pip-installed into a virtualenv from the PyPI pull-through
-proxy rather than unpacked from an archive — hence no `*_mirror_url` sibling,
-and no entry in `PLATFORM_TOOLS`.
+The first is the **API image**, which carries one `ansible-core` pinned in
+`services/pyproject.toml` (a line, `~2.21`) and installed from the committed
+hash-pinned lock at build time. That is the whole of the API's relationship
+with ansible: it runs `ansible-inventory` to resolve a workspace's inventory
+once, server-side. It is **not** a Helm value and must not become one —
+parsing a static inventory file is one stable operation, so there is nothing
+for an operator or a workspace to choose. Review the pin at every minor like
+the tools above; bumping it is an ordinary dependency bump.
+
+The second is the **execution-environment images** Terrapod builds and
+publishes, one per ansible-core line, which is where the line genuinely
+matters: it decides which **target** Pythons a playbook can reach (2.16 is the
+newest line reaching a Python 2.7 target, so EL7 support means carrying an EOL
+line deliberately). A workspace picks its line in `ansible_version` and gets
+that image; the default line is `DEFAULT_ANSIBLE_LINE` in `db/models.py`, one
+producer for the column default and the create path. Those images are rebuilt
+by their own scheduled job as upstream patches, so nothing here bumps them.
+
+So `ansible-core` has no entry in `PLATFORM_TOOLS` and no `*_mirror_url`
+sibling, and **nothing fetches ansible at run time.** An earlier design did —
+the API created a virtualenv on first use and `pip install
+ansible-core==<the workspace's version>`-ed into it through an in-process
+PEP 503 shim over the PyPI pull-through cache. It is gone: what the API ran
+depended on a workspace's pin and on reaching an index, and it layered
+ansible-specific machinery on a cache that exists for Pulumi's language SDKs.
+The PyPI proxy itself stays, for those SDKs and for a collection's own Python
+dependencies.
 
 This is now the mechanism that clears a whole class of finding. Before #1208
 these tools' vendored modules were reported against Terrapod's own artifacts and

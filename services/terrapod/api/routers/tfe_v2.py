@@ -68,6 +68,7 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
+    DEFAULT_ANSIBLE_LINE,
     AuditLog,
     Run,
     StateVersion,
@@ -1543,16 +1544,16 @@ async def _create_workspace_impl(
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         engine_version=_engine_version_attr(attrs, default_engine_version(engine)),
-        # Only what the CLIENT supplied is policy-checked. The deployment
-        # default is the operator's own pin, and `get_or_cache_binary` already
-        # draws exactly this line: the pre-release policy governs the version a
-        # USER picks, not one an operator deliberately set in Helm. Validating
-        # the default here would 422 every workspace create on a deployment
-        # whose default is a pre-release.
+        # The ansible-core LINE, which selects this workspace's
+        # execution-environment image (#2154). Only what the CLIENT supplied is
+        # policy-checked; the fallback is Terrapod's own constant rather than an
+        # operator setting, so there is no pre-release default to screen -- and
+        # nothing here is a version to install, because the API's own ansible is
+        # baked into its image.
         ansible_version=(
             _validate_ansible_version(attrs["ansible-version"])
             if "ansible-version" in attrs
-            else settings.default_ansible_version
+            else DEFAULT_ANSIBLE_LINE
         ),
         # `in attrs`, not truthiness: an explicit `[]` means "declare none here"
         # and must not fall through to anything else.

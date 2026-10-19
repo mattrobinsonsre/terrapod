@@ -156,14 +156,12 @@ def _trapped(monkeypatch, store):
     monkeypatch.setattr(inventory_resolve, "_fetch_vcs_source", _never_fetch)
     monkeypatch.setattr(inventory_resolve, "_resolve_git_sha", _never_fetch)
 
-    # The binary from PATH rather than through `api_ansible`, which acquires it
-    # via the PyPI pull-through and therefore wants a database. What is under
-    # test is where the INVENTORY comes from, not where ansible comes from
-    # (#2010 owns that), so standing in here keeps the test about one thing.
-    async def _binary(version):
-        return _ANSIBLE
-
-    monkeypatch.setattr(inventory_resolve, "ansible_inventory_binary", _binary)
+    # A known binary rather than whatever this machine's PATH holds: what is
+    # under test is where the INVENTORY comes from, not which ansible runs.
+    # Synchronous and argument-free, matching the real lookup -- the API's
+    # ansible is baked into its image, so there is nothing to await and no
+    # version to pass.
+    monkeypatch.setattr(inventory_resolve, "ansible_inventory_binary", lambda: _ANSIBLE)
     yield
 
 

@@ -45,6 +45,7 @@ import asyncio
 import hashlib
 import json
 import os
+import shutil
 import stat
 import tempfile
 import uuid
@@ -55,11 +56,64 @@ import structlog
 import yaml
 
 from terrapod.config import settings
-from terrapod.services.api_ansible import ansible_inventory_binary
-from terrapod.services.workspace_settings import effective_ansible_version
 from terrapod.storage.keys import config_version_key, resolved_inventory_key
 
 logger = structlog.get_logger(__name__)
+
+
+class AnsibleUnavailable(RuntimeError):
+    """`ansible-inventory` is not in this image, so no inventory can be resolved.
+
+    Raised rather than degraded, deliberately: a silently partial host set is
+    worse than a refusal, and a configure must never target a set the platform
+    could not resolve.
+    """
+
+
+#: The API's `ansible-inventory`, found on PATH.
+#:
+#: **The API's ansible-core is a property of the IMAGE, pinned in
+#: `services/pyproject.toml` and installed from the committed hash-pinned lock
+#: at build time.** It is deliberately not a Helm value, not a per-workspace
+#: value, and not fetched at run time -- the three things the machinery this
+#: replaced did, which is why it was wrong:
+#:
+#: * it created a virtualenv under the PVC tempdir on first use and
+#:   `pip install ansible-core==<version>`-ed into it, so what the API ran
+#:   depended on what a workspace had pinned and on reaching an index;
+#: * it stood up an in-process HTTP shim serving pip a PEP 503 index off the
+#:   PyPI pull-through, i.e. ansible-specific machinery layered on a cache that
+#:   exists for Pulumi's language SDKs;
+#: * it keyed the staged venv per version, so a fleet pinning several lines
+#:   installed several ansibles into the API pod.
+#:
+#: A workspace's `ansible_version` selects its **execution environment** -- the
+#: image its playbooks run in, where the ansible-core line genuinely matters
+#: because it decides which target Pythons are supported (#2154). It has never
+#: had anything to do with how the API parses an inventory FILE: that is a
+#: static parse of a stable format, done once in the API, which then hands the
+#: runner a finalised document (#2021).
+#:
+#: **There is no `version` parameter, and there must not be one** -- a parameter
+#: is exactly how the per-workspace read got in last time.
+_ANSIBLE_INVENTORY = "ansible-inventory"
+
+
+def ansible_inventory_binary() -> str:
+    """Path to the image's `ansible-inventory`, or raise.
+
+    A plain PATH lookup, because the binary is installed in the image. Nothing
+    is downloaded, staged, resolved or cached here.
+    """
+    found = shutil.which(_ANSIBLE_INVENTORY)
+    if not found:
+        raise AnsibleUnavailable(
+            f"{_ANSIBLE_INVENTORY} is not on PATH in this API image. It is installed "
+            "from services/pyproject.toml at build time, so this means the image was "
+            "built without it rather than that anything needs configuring."
+        )
+    return found
+
 
 #: How long a resolution may be served from Redis.
 #:
@@ -310,7 +364,6 @@ async def run_ansible_inventory(
     sources: list[Path],
     *,
     scratch: Path,
-    version: str,
     limit: str | None = None,
     cwd: Path | None = None,
 ) -> dict[str, Any]:
@@ -330,9 +383,7 @@ async def run_ansible_inventory(
     catch. Relative paths in the operator's `ansible.cfg` also resolve against
     the cwd rather than against the config file.
     """
-    binary = await ansible_inventory_binary(version)
-
-    argv = [binary, "--list"]
+    argv = [ansible_inventory_binary(), "--list"]
     if limit:
         argv += ["--limit", limit]
     for source in sources:
@@ -858,16 +909,8 @@ async def _resolve_uncached(
     wherever the branch now points. `git_sha` remains the read path, where
     "as of the branch head" is the right answer because there may be no run.
     """
-    import shutil
-
     workdir = Path(await asyncio.to_thread(make_tempdir))
     try:
-        # The workspace's own ansible-core, not the deployment-wide default
-        # (#2035): one resolver, shared with every other consumer, because two
-        # sites deciding "which version" independently IS the skew that shelling
-        # out to `ansible-inventory` exists to prevent. `ws` may be None for a
-        # workspace with no row, which inherits the default like an unset pin.
-        version = effective_ansible_version(ws.ansible_version if ws else None)
         sources: list[Path] = []
 
         # The repository first, the declared rows second: a later `-i` wins a
@@ -902,9 +945,7 @@ async def _resolve_uncached(
             # no hosts, and saying so is the honest answer.
             return {"hosts": {}, "groups": {}, "children": {}}
 
-        document = await run_ansible_inventory(
-            sources, scratch=workdir, version=version, limit=limit, cwd=cwd
-        )
+        document = await run_ansible_inventory(sources, scratch=workdir, limit=limit, cwd=cwd)
         return normalise(document)
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
@@ -1059,8 +1100,6 @@ def _apply_ignore_paths(root: Path, patterns: list[str]) -> None:
     """
     if not patterns:
         return
-
-    import shutil
 
     from terrapod.services.workspace_autodiscovery_service import _match_glob
 

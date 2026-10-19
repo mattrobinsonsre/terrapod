@@ -834,6 +834,47 @@ per-ecosystem flags (`pypi`, `npm`, `galaxy`, `pulumi`, `go`, `nuget`) for the
 package proxies. Each of those is read, and switching one off unmounts its
 routes rather than leaving them answering 404.
 
+### `api.config.default_ansible_version` is removed
+
+**Affects:** any deployment whose `values.yaml` sets it.
+
+```yaml
+# remove this line entirely
+api:
+  config:
+    default_ansible_version: "2.21.5"
+```
+
+Because `values.schema.json` refuses keys it does not declare, a `values.yaml`
+that still sets it **fails `helm lint` and `helm upgrade`** rather than ignoring
+it — which is the useful direction, since the setting no longer corresponds to
+anything.
+
+**Nothing replaces it, because it was answering two different questions at
+once.** They now have separate, better answers:
+
+| question | before | now |
+|---|---|---|
+| which ansible does the **API** use to read an inventory? | the workspace's pinned version, installed into a virtualenv on first use via `pip install ansible-core==…` through the PyPI pull-through cache, with this setting as the fallback | one `ansible-core` pinned in the API image at build time. Not configurable, because parsing a static inventory file is one stable operation done once, server-side |
+| which ansible runs a workspace's **playbooks**? | the same value, conflated with the above | the workspace's `ansible-version`, naming an ansible-core **line**, which selects its execution-environment image — where the line genuinely matters, because it decides which target Pythons a playbook can reach |
+
+**Your workspaces keep the versions they carry.** `ansible-version` is still a
+per-workspace attribute, still settable on create, PATCH, bulk update and the
+autodiscovery rule template, and nothing rewrites existing values. What changed
+is what the value selects. New workspaces that name none take the platform's
+current line rather than a value from your `values.yaml`.
+
+**If you pinned a patch** (`2.21.5`), that is accepted and still means its line —
+there is one execution environment per line, so the patch component names no
+image of its own. The default for a new workspace is now written as a line
+(`2.21`), which keeps a workspace on that line's newest patch as the image is
+rebuilt for upstream fixes.
+
+**The PyPI pull-through cache is unaffected** and still serves Pulumi's language
+SDKs and a collection's own Python dependencies. What was removed is the
+ansible-specific layer on top of it: the API no longer fetches an ansible at run
+time, so an inventory read can no longer fail because an index was unreachable.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

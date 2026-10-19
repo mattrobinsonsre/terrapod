@@ -3179,9 +3179,6 @@
         },
         "require_strong_secrets": {
           "type": "boolean"
-        },
-        "default_ansible_version": {
-          "type": "string"
         }
       }
     }

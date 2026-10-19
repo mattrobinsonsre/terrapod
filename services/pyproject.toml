@@ -97,6 +97,26 @@ litellm = ">=1.87,<2.0"
 # fails with ModuleNotFoundError. Caught by the #824 live Bedrock smoke.
 orjson = "^3.10"
 
+# `ansible-inventory`, for resolving a workspace's inventory in the API (#2021).
+#
+# BAKED IN, deliberately, and this is the whole of the API's relationship with
+# ansible. It replaced machinery that created a virtualenv on first use and
+# `pip install ansible-core==<the workspace's version>`-ed into it through an
+# in-process PEP 503 shim over the PyPI pull-through cache -- so what the API
+# ran depended on what a workspace had pinned, on reaching an index, and on a
+# cache that exists for Pulumi's language SDKs. None of that was right: parsing
+# a static inventory file is one stable operation, done once, in one place.
+#
+# A LINE, so the API takes that line's newest patch on each rebuild. It is NOT
+# a Helm value and must not become one -- a workspace's `ansible_version`
+# selects its execution-environment IMAGE, which is where the core line
+# genuinely matters because it decides the supported target Pythons (#2154).
+#
+# Only the API image installs this: the listener, migrations and runner images
+# resolve from their own `pyproject-{name}.toml` manifests. Review at every
+# minor release, as for the platform tools.
+ansible-core = "~2.21"
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
 pytest-asyncio = "^1.3.0"

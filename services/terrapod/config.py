@@ -3683,17 +3683,6 @@ class Settings(BaseSettings):
         default="1.13",
         description="Default terraform/tofu version for new workspaces",
     )
-    default_ansible_version: str = Field(
-        default="2.21.5",
-        description="Default ansible-core version for a workspace that pins none (#2010). It is BOTH the value a new workspace is created with and the fallback at use time for a workspace whose pin is empty, resolved in one place by services.workspace_settings.effective_ansible_version (#2035) -- two sites deciding which version to use is the skew that shelling out to ansible-inventory exists to prevent. A "
-        "workspace may override it, exactly as it overrides its engine version — "
-        "collection compatibility is a per-workspace concern, so one version for the "
-        "whole deployment would be the wrong shape. Deliberately NOT in "
-        "registry.platform_tools: that block is explicitly platform-scoped with no "
-        "per-workspace field. Also unlike those three, ansible-core publishes no "
-        "release binary, so it is pip-installed from the PyPI pull-through proxy "
-        "rather than unpacked from an archive. Review at every minor release.",
-    )
     default_dotnet_version: str = Field(
         default="9.0",
         description="Default .NET SDK version for a Pulumi C# program (#1566). "

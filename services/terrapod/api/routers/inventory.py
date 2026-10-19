@@ -81,9 +81,9 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import inventory_service as inv
-from terrapod.services.api_ansible import AnsibleUnavailable
 from terrapod.services.inventory_resolution import InventoryValidationError
 from terrapod.services.inventory_resolve import (
+    AnsibleUnavailable,
     InventoryResolutionFailed,
     InventorySourceRefused,
 )
@@ -1424,8 +1424,8 @@ async def show_resolved_inventory(
         raise HTTPException(
             status_code=503,
             detail=(
-                f"ansible could not be obtained, so this inventory cannot be resolved. "
-                f"It is installed on first use from Terrapod's own PyPI cache. {exc}"
+                f"ansible is not available in this API image, so an inventory cannot "
+                f"be resolved. {exc}"
             ),
         ) from exc
     except InventoryResolutionFailed as exc:

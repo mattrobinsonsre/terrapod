@@ -167,43 +167,6 @@ def validate_ansible_collections(raw: object) -> list[dict[str, str]]:
     return out
 
 
-def effective_ansible_version(workspace_version: str | None) -> str:
-    """The ansible-core version a workspace actually runs (#2035).
-
-    **The single resolver, and it has to be single.** #1407 point 10 records
-    that inventory resolution shells out to `ansible-inventory` rather than
-    importing ansible as a library for exactly one reason -- version skew
-    between the copy that parses an inventory and the copy that runs the
-    playbook. Two sites resolving "which version" independently is that skew
-    arriving by the back door, so this is the only place the fallback is
-    written and every consumer imports it.
-
-    The shape is `engine_version`'s, deliberately: a workspace value wins, and
-    an absent one takes the deployment default
-    (`api.config.default_ansible_version`) -- the same relationship
-    `engines/terraform.py` has in `engine_version or
-    runner_config.default_terraform_version`.
-
-    **An empty string takes the default here, which is NOT a contradiction of
-    `engine_version_attr`'s rule.** That rule governs the WRITE boundary: an
-    explicit `""` on a request is a value meaning "inherit the deployment
-    default", so only the key being absent falls through to the column's own
-    default. This is the READ at use time, where "inherit the deployment
-    default" has to be turned into a concrete version to install -- and both
-    `""` and `None` mean inherit. `validate_ansible_version` is what normalises
-    a request to `""`; this is what resolves `""` to a version.
-
-    Returns `""` when the deployment default is empty too. Callers raise their
-    own domain error rather than this one guessing which -- the API's is
-    `AnsibleUnavailable` from `api_ansible`, the runner's is the one in
-    `runner/phases/ansible_env.py`, and they say different things because a
-    failed inventory read and a failed configure are different events.
-    """
-    from terrapod.config import settings
-
-    return (workspace_version or "") or settings.default_ansible_version
-
-
 #: A guard against a value that is certainly a mistake, not a limit the
 #: scanners impose.
 MAX_SCAN_SKIP_RULES = 200

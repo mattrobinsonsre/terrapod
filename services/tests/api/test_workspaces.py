@@ -2434,7 +2434,6 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         practitioner declared. This is the case that catches it: with a concrete
         version stored, substitution and no substitution look identical.
         """
-        from terrapod.config import settings
 
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(name="inherit-ws", ansible_version="")
@@ -2445,7 +2444,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         no_run_result.scalar_one_or_none.return_value = None
         mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
-        with patch.object(settings, "default_ansible_version", "2.20.4"):
+        with patch("terrapod.api.routers.tfe_v2.DEFAULT_ANSIBLE_LINE", "2.20"):
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
                 resp = await c.get(
                     "/api/v2/organizations/default/workspaces/inherit-ws", headers=_AUTH
@@ -2461,7 +2460,6 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
     async def test_create_without_the_attribute_takes_the_deployment_default(
         self, _mock_publish, *mocks
     ):
-        from terrapod.config import settings
 
         app, mock_db = _make_app(_user(roles=["admin"]))
         mock_result = MagicMock()
@@ -2469,7 +2467,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         mock_db.execute.return_value = mock_result
         mock_db.refresh = AsyncMock()
 
-        with patch.object(settings, "default_ansible_version", "2.20.4"):
+        with patch("terrapod.api.routers.tfe_v2.DEFAULT_ANSIBLE_LINE", "2.20"):
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
                 resp = await c.post(
                     "/api/v2/organizations/default/workspaces",
@@ -2510,45 +2508,9 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
-    async def test_a_prerelease_DEFAULT_does_not_422_every_create(self, _mock_publish, *mocks):
-        """Only what the CLIENT supplied is policy-checked.
-
-        The deployment default is the operator's own pin, and
-        `get_or_cache_binary` draws exactly this line already: the policy
-        governs a version a *user* picks, not one an operator deliberately set
-        in Helm. Checking the default here made every workspace create on such
-        a deployment a 422 -- including creates that never mentioned ansible.
-        """
-        from terrapod.config import settings
-
-        app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
-        mock_db.refresh = AsyncMock()
-
-        with (
-            patch.object(settings, "default_ansible_version", "2.22.0rc1"),
-            patch.object(settings.registry.binary_cache, "allow_prerelease", "none"),
-        ):
-            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-                resp = await c.post(
-                    "/api/v2/organizations/default/workspaces",
-                    json={"data": {"attributes": {"name": "ws-c"}}},
-                    headers=_AUTH,
-                )
-
-        assert resp.status_code == 201
-        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.22.0rc1"
-
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_with_an_explicit_empty_string_means_inherit(self, _mock_publish, *mocks):
         """Empty is a value, not an absence -- it must NOT be replaced by the
         default, or there would be no way to say "follow the deployment"."""
-        from terrapod.config import settings
 
         app, mock_db = _make_app(_user(roles=["admin"]))
         mock_result = MagicMock()
@@ -2556,7 +2518,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         mock_db.execute.return_value = mock_result
         mock_db.refresh = AsyncMock()
 
-        with patch.object(settings, "default_ansible_version", "2.20.4"):
+        with patch("terrapod.api.routers.tfe_v2.DEFAULT_ANSIBLE_LINE", "2.20"):
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
                 resp = await c.post(
                     "/api/v2/organizations/default/workspaces",

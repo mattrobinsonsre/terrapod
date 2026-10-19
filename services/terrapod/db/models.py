@@ -316,6 +316,24 @@ class AgentPoolToken(Base):
 # --- Workspace Models ---
 
 
+#: The ansible-core LINE a workspace selects when it names none (#2154).
+#:
+#: A **line**, `X.Y`, not a patch — every sibling default is written this way
+#: (`default_terraform_version` "1.13", `default_pulumi_version` "3.208",
+#: `default_go_version` "1.25"), and here it is load-bearing rather than
+#: cosmetic: Terrapod publishes **one execution-environment image per
+#: ansible-core line**, tagged by the line, so a value carrying a patch names
+#: no image and would have to be reduced before it could select one. A line
+#: also keeps the fleet on that line's newest patch as the EE is rebuilt,
+#: which a pinned patch would freeze.
+#:
+#: Deliberately NOT a Helm value. What the line selects is the image a
+#: workspace's playbooks run in, which is a per-workspace concern because the
+#: line decides which target Pythons are supported; the API's own ansible is a
+#: property of the API image and is not configurable at all.
+DEFAULT_ANSIBLE_LINE = "2.21"
+
+
 class Workspace(Base):
     """Terraform workspace — isolates state, variables, and runs."""
 
@@ -354,9 +372,11 @@ class Workspace(Base):
     #: `helm upgrade` must not silently move an existing workspace onto one.
     #: Moving a fleet is a deliberate act, and bulk update is how.
     #:
-    #: Empty still resolves to the deployment default, for a row that predates
-    #: this column -- a restore from an older snapshot, say.
-    ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
+    #: Empty means this workspace names no line of its own, which is how a row
+    #: predating the column reads -- a restore from an older snapshot, say.
+    ansible_version: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=DEFAULT_ANSIBLE_LINE
+    )
     #: The Ansible collections a configure installs, declared on the platform
     #: rather than only in the repository (#1931).
     #:
@@ -1771,12 +1791,12 @@ class AutodiscoveryRule(Base):
     )
     execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
     engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.13")
-    #: Template for a materialised workspace's ansible-core version (#2010),
-    #: following `engine_version` above -- including the literal default, which
-    #: mirrors `api.config.default_ansible_version` and moves with it, exactly
-    #: as this column's `engine_version` sibling mirrors
-    #: `default_terraform_version`.
-    ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
+    #: Template for a materialised workspace's ansible-core line (#2010),
+    #: following `engine_version` above and taking the same literal default, so
+    #: a rule that names none materialises workspaces on the platform's line.
+    ansible_version: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=DEFAULT_ANSIBLE_LINE
+    )
     #: Template for a materialised workspace's declared collections (#1931),
     #: following `ansible_version` above. A rule without this could only ever
     #: produce workspaces whose collections come from their repository, so a

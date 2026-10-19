@@ -443,7 +443,7 @@ out was chosen to avoid. One resolver now answers "which version" for both.
 | | |
 |---|---|
 | **Type** | string |
-| **Default** | `api.config.default_ansible_version` at the time the workspace was created. Raising that value moves only workspaces created afterwards — existing ones keep what they carry, exactly as the engine version does. Use bulk update to move a fleet. |
+| **Default** | The platform's current ansible-core **line** (`DEFAULT_ANSIBLE_LINE`), written at create time. Changing it moves only workspaces created afterwards — existing ones keep what they carry, exactly as the engine version does. Use bulk update to move a fleet. It is a line (`2.21`), not a patch, because Terrapod publishes one execution-environment image per ansible-core line and the line names the image. |
 | **Empty means** | inherit the deployment default. A row predating this attribute reads back empty; a workspace created normally carries a concrete version. |
 | **Accepted** | any non-empty string. The only write-time rule is the deployment's pre-release policy, so `binary_cache.allow_prerelease: none` 422s `2.21.5rc1` and allows `2.21.5`. There is deliberately **no format rule** — `engine-version` has none either, and pip's own message about a version PyPI does not publish beats a regex of ours guessing at what it does. |
 | **Not resolved** | a partial such as `2.18` is **not** expanded to the newest matching release, unlike `engine-version`: nothing resolves it, so the value reaches pip as written and fails at install time. Pin an exact version. `latest` likewise. |

@@ -208,6 +208,23 @@ that is literally what this is.
 
 ---
 
+## Which ansible resolves it
+
+**The one in the API's image, and there is nothing to configure.** `ansible-core`
+is pinned in the API image at build time and `ansible-inventory` runs from there.
+It is not a Helm value and not a per-workspace value, because parsing a static
+inventory file is one stable operation done once, server-side — and whatever
+Terrapod resolves is what every consumer of that inventory sees, including the
+run, which is handed a finalised document rather than resolving for itself.
+
+**A workspace's `ansible-version` is a different thing**, and the distinction is
+worth holding on to: it names an ansible-core **line**, and that line selects the
+**execution environment** — the image a configure's playbooks actually run in.
+That is where the line matters, because it decides which Python versions a
+*managed host* can have (the 2.16 line is the newest that reaches a Python 2.7
+target). Setting it changes what runs your playbooks; it has never changed how
+this inventory is read.
+
 ## A read is live, and writes nothing
 
 **Every source is static.** Dynamic inventory — an external, AWX-style source
@@ -705,7 +722,7 @@ that keeps a workspace's effective cloud-identity audiences off its resource.
 - [RBAC capabilities](rbac-capabilities.md) — the full gate → capability table
 - [VCS integration](vcs-integration.md) — the connections a VCS source is bound through
 - [Encryption at rest](encryption-at-rest.md) — what the variable columns are covered by
-- [Language package proxies](package-cache.md) — how `ansible-core` reaches a sealed deployment
+- [Language package proxies](package-cache.md) — how a collection's own Python dependencies reach a sealed deployment
 - [Runners](runners.md) — the Job a configure will run in
 - Original feature requests:
   <https://github.com/mattrobinsonsre/terrapod/issues/1967> (the inventory),

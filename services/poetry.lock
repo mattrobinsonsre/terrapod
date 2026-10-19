@@ -345,6 +345,24 @@ files = [
 ]
 
 [[package]]
+name = "ansible-core"
+version = "2.21.5"
+description = "Radically simple IT automation"
+optional = false
+python-versions = ">=3.12"
+files = [
+    {file = "ansible_core-2.21.5-py3-none-any.whl", hash = "sha256:08886f9f3e23d129aa98a01271c4a47833516e1cb7c737a246788cb474f41222"},
+    {file = "ansible_core-2.21.5.tar.gz", hash = "sha256:65bb3148c58ebb843cd5074004c805f404f152114d98476dd823324616c9c6cb"},
+]
+
+[package.dependencies]
+cryptography = "*"
+jinja2 = ">=3.1.0"
+packaging = "*"
+PyYAML = ">=5.1"
+resolvelib = ">=0.8.0,<2.0.0"
+
+[[package]]
 name = "anyio"
 version = "4.15.1"
 description = "High-level concurrency and networking framework on top of asyncio or Trio"
@@ -4529,6 +4547,22 @@ requests = ">=2.0.0"
 rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
 
 [[package]]
+name = "resolvelib"
+version = "1.2.1"
+description = "Resolve abstract dependencies into concrete ones"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "resolvelib-1.2.1-py3-none-any.whl", hash = "sha256:fb06b66c8da04172d9e72a21d7d06186d8919e32ae5ab5cdf5b9d920be805ac2"},
+    {file = "resolvelib-1.2.1.tar.gz", hash = "sha256:7d08a2022f6e16ce405d60b68c390f054efcfd0477d4b9bd019cc941c28fad1c"},
+]
+
+[package.extras]
+lint = ["mypy", "ruff", "types-requests"]
+release = ["build", "towncrier", "twine"]
+test = ["packaging", "pytest"]
+
+[[package]]
 name = "rpds-py"
 version = "2026.9.1"
 description = "Python bindings to Rust's persistent data structures (rpds)"
@@ -5787,4 +5821,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.14,<3.15"
-content-hash = "788e00e99e1fa5f176999f5ada110e37296b84b4a62c9cdd7abfcad7a4557987"
+content-hash = "4e1f9ab4aa1c75b8f2e59cf0d363594296ad26adde743f79bcd43b91fa8546d5"

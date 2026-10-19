@@ -39,7 +39,12 @@ from terrapod.api.routers.workspace_bulk import (
     validate_run_task_specs,
 )
 from terrapod.api.serialization import engine_version_attr
-from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
+from terrapod.db.models import (
+    DEFAULT_ANSIBLE_LINE,
+    AgentPool,
+    AutodiscoveryRule,
+    VCSConnection,
+)
 from terrapod.db.session import get_db
 from terrapod.engines import known_engines
 from terrapod.logging_config import get_logger
@@ -822,7 +827,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         engine_version=fields.get("engine_version", "1.13"),
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
-        ansible_version=fields.get("ansible_version", "2.21.5"),
+        ansible_version=fields.get("ansible_version", DEFAULT_ANSIBLE_LINE),
         ansible_collections=fields.get("ansible_collections", []),
         # These literals are checked against the model's own column defaults by
         # a gate: a preview that invents its own would show workspaces that are
