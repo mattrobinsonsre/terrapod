@@ -2476,7 +2476,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
                 )
 
         assert resp.status_code == 201
-        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.20.4"
+        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.20"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
