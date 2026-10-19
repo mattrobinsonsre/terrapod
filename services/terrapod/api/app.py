@@ -1341,6 +1341,14 @@ def create_application() -> FastAPI:
 
     include_terrapod(gpg_keys_router)
 
+    # Ansible execution environments (#2154) — Terrapod-native: no CLI consumes
+    # it. `include_terrapod`, never a bare mount, so the deprecated alias is
+    # served too; mounting the prefix directly serves only the canonical path,
+    # which is a removal for anything that lags.
+    from terrapod.api.routers.ansible import router as ansible_router
+
+    include_terrapod(ansible_router)
+
     # Caching routes (provider mirror, binary cache)
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
 
