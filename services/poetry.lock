@@ -213,6 +213,21 @@ yarl = ">=1.17.0,<2.0"
 speedups = ["Brotli (>=1.2) ; platform_python_implementation == \"CPython\" and sys_platform != \"android\" and sys_platform != \"ios\"", "aiodns (>=3.3.0) ; sys_platform != \"android\" and sys_platform != \"ios\"", "backports.zstd ; platform_python_implementation == \"CPython\" and python_version < \"3.14\" and sys_platform != \"android\" and sys_platform != \"ios\"", "brotlicffi (>=1.2) ; platform_python_implementation != \"CPython\""]
 
 [[package]]
+name = "aiohttp-retry"
+version = "2.9.1"
+description = "Simple retry client for aiohttp"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "aiohttp_retry-2.9.1-py3-none-any.whl", hash = "sha256:66d2759d1921838256a05a3f80ad7e724936f083e35be5abb5e16eed6be6dc54"},
+    {file = "aiohttp_retry-2.9.1.tar.gz", hash = "sha256:8eb75e904ed4ee5c2ec242fefe85bf04240f685391c4879d8f541d6028ff01f1"},
+]
+
+[package.dependencies]
+aiohttp = "*"
+
+[[package]]
 name = "aioitertools"
 version = "0.13.0"
 description = "itertools and builtins for AsyncIO and mixed iterables"
@@ -2322,26 +2337,28 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kubernetes"
-version = "36.0.3"
+version = "37.0.1"
 description = "Kubernetes python client"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "kubernetes-36.0.3-py2.py3-none-any.whl", hash = "sha256:8fde9241c4b298e6374a069dcf728359b4e72c2fb29489a975ba4e1c047cf10f"},
-    {file = "kubernetes-36.0.3.tar.gz", hash = "sha256:36993ed25ce59b789c9341473a228fcf268504a2fec7c2b2b1531d73072e5ce7"},
+    {file = "kubernetes-37.0.1-py2.py3-none-any.whl", hash = "sha256:a313a482361506340b5972cabaf20a7ee16ec8713e73325bf699b783a40464a9"},
+    {file = "kubernetes-37.0.1.tar.gz", hash = "sha256:e41db0a95615c2388680a2d556df33fd0f27a5717c9b5df5857e475c196c2f10"},
 ]
 
 [package.dependencies]
-aiohttp = ">=3.13.5,<4.0.0"
-certifi = ">=14.5.14"
-durationpy = ">=0.7"
-python-dateutil = ">=2.5.3"
-pyyaml = ">=6.0.3"
+aiohttp = ">=3.14.3,<4.0.0"
+aiohttp-retry = ">=2.9.1"
+certifi = ">=2026.7.22"
+durationpy = ">=0.11"
+pydantic = ">=2.13.5"
+python-dateutil = ">=2.8.2"
+PyYAML = ">=6.0.3"
 requests = "*"
 requests-oauthlib = "*"
-six = ">=1.9.0"
-urllib3 = ">=1.24.2,!=2.6.0"
+typing-extensions = ">=4.16.0"
+urllib3 = ">=2.8.0,<3.0.0"
 websocket-client = ">=0.32.0,!=0.40.0,<0.41 || >=0.43.dev0"
 
 [package.extras]
@@ -5717,4 +5734,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<3.15"
-content-hash = "2b493fb6e8cd2246cc605a1bb4cc274ba146f9bbc0bb17f4a73afc06a7051adc"
+content-hash = "788e00e99e1fa5f176999f5ada110e37296b84b4a62c9cdd7abfcad7a4557987"
