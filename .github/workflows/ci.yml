@@ -1098,8 +1098,22 @@ jobs:
       # it, which is evidence enough that the runner image is not relied on to
       # carry it.
       - run: pip install pyyaml
+      # Checks itself along with the rest, which is what makes the set closed
+      # rather than merely one longer.
+      - name: Every docs-audit gate is run by this job
+        run: python3 scripts/docs-audit/check_docs_audit_wiring.py
       - name: Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+      # The EE contract is asserted twice on purpose -- at build time and
+      # against the pushed digest -- and dropping either half leaves the other
+      # green. Stdlib only, so it needs nothing installed above.
+      - name: The EE contract still has both its readers
+        run: python3 scripts/docs-audit/check_ee_contract.py
+      # Wired in here because nothing auto-discovers these scripts, and this
+      # one had been sitting in the directory unrun -- the same shape as a flag
+      # nothing reads, with the gate itself as the thing nobody was reading.
+      - name: No forward-looking issue references
+        run: python3 scripts/docs-audit/check_issue_refs.py
       # Advisory: prints for human review, never fails. Telling a factual
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list
