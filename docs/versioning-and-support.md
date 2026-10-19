@@ -142,6 +142,25 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
     workspace has a configure operation, so plan and apply are unaffected — and either
     way it fails closed at pod startup rather than part way through a playbook.
     **Upgrade the two together.**
+- **runner ↔ execution environment:** **no window, because there is no protocol
+  to skew.** An execution environment carries no Terrapod code at all — the agent
+  that drives it is copied in from the runner image at pod startup — so the agent
+  and the orchestrator that talks to it over loopback are always the same build,
+  and an EE never needs rebuilding for a Terrapod release. What an EE must satisfy
+  is not a protocol but a short fixed contract: `ansible-playbook`,
+  `ansible-galaxy`, `ansible`, `ssh` and `git` on `PATH`, `ansible` runnable as the
+  uid the image runs as, and a uid that can read the shared volume. It is asserted
+  at the EE's startup probe, for operator-supplied images as much as for Terrapod's
+  own, so a non-conforming image fails at startup naming what is absent rather
+  than part way through a playbook.
+
+  **Widening that contract is a breaking change for operator-supplied images**, and
+  is treated as one: an image built against today's contract must keep working, so
+  a new requirement waits for a MAJOR or arrives as something the agent tolerates
+  the absence of. Terrapod's own images are checked against the same contract at
+  build time and again against the published digest, and a gate asserts the
+  startup-probe requirement never exceeds what those builds check — otherwise an
+  image of ours could pass its build and fail its own probe.
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 
