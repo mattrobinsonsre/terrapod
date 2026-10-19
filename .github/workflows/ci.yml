@@ -455,7 +455,7 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -trimpath -ldflags "-s -w" -o "terrapod-query-linux-${{ matrix.goarch }}" ./cmd/terrapod-query
       - name: Upload binary artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: terrapod-query-linux-${{ matrix.goarch }}
           path: query/terrapod-query-linux-${{ matrix.goarch }}
@@ -879,7 +879,7 @@ jobs:
           go-version-file: go-terrapod/go.mod
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -924,7 +924,7 @@ jobs:
           done
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           category: codeql-${{ matrix.language }}
 
@@ -2465,7 +2465,7 @@ jobs:
           done
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: image-*-amd64
           path: /tmp/images
@@ -2687,7 +2687,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
@@ -2761,7 +2761,7 @@ jobs:
       # build-query job compiled once — staged into the build context here.
       - name: Stage terrapod-query binary (api/runner only)
         if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-query-linux-amd64
           path: docker/query-bin
@@ -2797,7 +2797,7 @@ jobs:
 
       - name: Upload image artifact
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: image-${{ matrix.image }}-amd64
           path: /tmp/${{ matrix.image }}-amd64.tar.gz
@@ -2844,7 +2844,7 @@ jobs:
       # build-query job compiled once — staged into the build context here.
       - name: Stage terrapod-query binary (api/runner only)
         if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-query-linux-arm64
           path: docker/query-bin
@@ -2878,7 +2878,7 @@ jobs:
 
       - name: Upload image artifact
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: image-${{ matrix.image }}-arm64
           path: /tmp/${{ matrix.image }}-arm64.tar.gz
@@ -2938,7 +2938,7 @@ jobs:
 
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: image-*-amd64
           path: /tmp/images
@@ -3023,7 +3023,7 @@ jobs:
       # Per-shard blob report → merged into one HTML report by `e2e-report`.
       - name: Upload blob report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: blob-report-${{ matrix.shard }}
           path: e2e/blob-report/
@@ -3078,7 +3078,7 @@ jobs:
 
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: image-*-amd64
           path: /tmp/images
@@ -3215,7 +3215,7 @@ jobs:
 
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: image-*-amd64
           path: /tmp/images
@@ -3314,7 +3314,7 @@ jobs:
         # Keep going if a shard's report cannot be fetched: a partial report is
         # more useful than none, and this job is not a gate.
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: blob-report-*
           path: all-blob-reports
@@ -3350,7 +3350,7 @@ jobs:
           npx playwright merge-reports --reporter html ../all-blob-reports
       - name: Upload merged HTML report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-html-report
           path: e2e/playwright-report/
@@ -3440,7 +3440,7 @@ jobs:
       # ── amd64 ──
       - name: Download image artifact (amd64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: image-${{ matrix.image }}-amd64
           path: /tmp
@@ -3488,7 +3488,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (amd64)
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-amd64.sarif
           category: trivy-${{ matrix.image }}-amd64
@@ -3496,7 +3496,7 @@ jobs:
       # ── arm64 ──
       - name: Download image artifact (arm64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: image-${{ matrix.image }}-arm64
           path: /tmp
@@ -3544,7 +3544,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (arm64)
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-arm64.sarif
           category: trivy-${{ matrix.image }}-arm64
@@ -4083,7 +4083,7 @@ jobs:
           (cd dist && sha256sum -- *.tgz *.spdx.json > checksums.txt)
 
       - name: Upload artifact for release-finalize
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-images-assets
           path: dist/
@@ -4120,7 +4120,7 @@ jobs:
           echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
 
       - name: Build provider binaries with GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: latest
@@ -4166,7 +4166,7 @@ jobs:
       # Universal 2 binary built by lipo-merging darwin/amd64 +
       # darwin/arm64. See migrate/.goreleaser.yml.
       - name: Build migrate-tool binaries with GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: latest
@@ -4207,7 +4207,7 @@ jobs:
           echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
 
       - name: Build terrapod-publish binaries with GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: latest
@@ -4241,7 +4241,7 @@ jobs:
           cache: false
 
       - name: Download prebuilt linux binaries (built once by build-query)
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: terrapod-query-linux-*
           path: prebuilt
@@ -4335,7 +4335,7 @@ jobs:
           echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
 
       - name: Build terrapod-mcp binaries with GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: latest
@@ -4376,7 +4376,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download release-images artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-images-assets
           path: dist/

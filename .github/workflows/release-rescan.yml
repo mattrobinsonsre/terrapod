@@ -144,7 +144,7 @@ jobs:
             "${{ matrix.tag }}" "image:${{ matrix.image }} (${{ matrix.arch }})" \
             "finding.json"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: rescan-${{ matrix.tag }}-${{ matrix.image }}-${{ matrix.arch }}
           path: finding.json
@@ -303,7 +303,7 @@ jobs:
         id: sarif
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: semgrep.sarif
           category: release-rescan-${{ matrix.tag }}
@@ -345,7 +345,7 @@ jobs:
                "will point at a page that does not have them."
           exit 1
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: rescan-${{ matrix.tag }}-source
@@ -419,7 +419,7 @@ jobs:
           # job, and absent means genuinely stale.
           exit-code: '0'
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: register-${{ matrix.image }}
           path: trivy-${{ matrix.image }}.json
@@ -436,7 +436,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: scans
           pattern: register-*
@@ -526,7 +526,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: findings
           pattern: rescan-*
