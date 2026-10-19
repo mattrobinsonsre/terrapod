@@ -37,12 +37,16 @@ on:
         required: false
         default: false
   schedule:
-    # Wednesdays, an hour after the release re-scan (05:23) rather than beside
-    # it: the scan is what decides a rebuild is WORTH doing, so reading its
-    # findings before building is the right order. A Debian refresh is ten
-    # images across two architectures, which is why this is weekly and not
-    # nightly.
-    - cron: "23 6 * * 3"
+    # Wednesdays, 30 minutes after `mirror-images.yml` (04:17 daily). That order
+    # is the point: the mirror is what MOVES a base which upstream rebuilds in
+    # place, so building before it would build against yesterday's base and
+    # report itself current. The mirror is a copy by digest and finishes in a
+    # couple of minutes, so half an hour is ample headroom.
+    #
+    # Weekly rather than daily because a base refresh is ten images across two
+    # architectures and every deployment then re-mirrors what it holds. The
+    # scan-driven rebuild is the other trigger and is not on a clock.
+    - cron: "47 4 * * 3"
 
 permissions:
   contents: read
@@ -69,6 +73,13 @@ jobs:
       # its manifest-list digest, both WITHOUT pulling anything. That is what
       # makes the staleness check a comparison against the registry rather than
       # against a state file nobody maintains.
+      #
+      # There is deliberately NO Docker Hub login here, because nothing in this
+      # workflow reaches Docker Hub: bases come from `ghcr.io/.../mirror`, which
+      # `mirror-images.yml` syncs daily by digest. That removes the anonymous
+      # `100;w=3600`-per-source-IP manifest limit as an exposure rather than
+      # managing it. Do not add one back -- add the base to
+      # `.github/mirror-images.txt` instead.
       - name: Install crane
         run: |
           set -euo pipefail
@@ -84,20 +95,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
-
-      # Authenticated, because the anonymous Docker Hub manifest limit is
-      # `100;w=3600` per source IP and Actions runners share egress addresses --
-      # so an unauthenticated plan competes with every other project for that
-      # bucket. Degrades to anonymous when no credential is configured, which is
-      # fine for a hand-run dispatch and not for the schedule.
-      - name: Log in to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: |
-          set -euo pipefail
-          printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' \
-            | crane auth login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Derive what needs building
         id: derive

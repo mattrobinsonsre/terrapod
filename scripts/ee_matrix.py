@@ -55,6 +55,22 @@ PYPI = "https://pypi.org/pypi/ansible-core"
 #: an agent pool runs. Native runners per arch rather than QEMU.
 ARCHES = ("amd64", "arm64")
 
+#: Bases come from Terrapod's own MIRROR of Docker Hub, never from Docker Hub.
+#: Two reasons, and the second is the one that matters:
+#:
+#:   * CI does not depend on a third-party registry being reachable, and is not
+#:     exposed to the anonymous `100;w=3600`-per-source-IP manifest limit that
+#:     Actions runners share across every project on the host;
+#:   * `mirror-images.yml` syncs DAILY and copies by digest, which is the
+#:     security path for a base rebuilt in place -- anything embedded in it that
+#:     apt does not manage (pip's vendored packages being the case in point)
+#:     moves on that schedule and on no other.
+#:
+#: The copy is bit-identical: measured, `crane digest` on the mirror and on
+#: Docker Hub return the same manifest-list digest, so resolving staleness
+#: against the mirror is equivalent rather than merely close.
+MIRROR = "ghcr.io/mattrobinsonsre/mirror"
+
 #: A floor on the derivation itself. If PyPI answers but the shape has changed,
 #: fail loudly rather than publish an empty or truncated matrix.
 MIN_LINES = 8
@@ -148,14 +164,16 @@ def build_matrix(repository: str, *, force: bool, only: str | None) -> list[dict
                 "cannot be derived. Refusing to guess."
             )
         newest = pythons[-1]
-        base = f"python:{newest[0]}.{newest[1]}-slim"
+        base = f"{MIRROR}/python:{newest[0]}.{newest[1]}-slim"
         digest = base_digest(base)
         if digest is None:
             raise SystemExit(
-                f"ansible-core {version} wants {base}, which does not resolve. A new line "
-                "declaring a python we have no base image for is a stop, never a silent "
-                "fall back to an older interpreter -- that would contradict the rule the "
-                "whole matrix is built on."
+                f"ansible-core {version} wants {base}, which does not resolve. Either a new "
+                "line declares a python we have no base image for, or that base is simply "
+                "not in `.github/mirror-images.txt` yet -- add it there rather than reaching "
+                "past the mirror to Docker Hub. This is a stop, never a silent fall back to "
+                "an older interpreter: that would contradict the rule the whole matrix is "
+                "built on."
             )
 
         entry = {

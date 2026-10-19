@@ -80,7 +80,43 @@ def test_the_build_picks_the_NEWEST_declared_python(one_line, registry, pypi):
     pypi["classifiers"]["2.16.0"] = ["3.9", "3.10", "3.11"]
     entry = ee_matrix.build_matrix("repo", force=True, only="2.16")[0]
     assert entry["python"] == "3.11"
-    assert entry["base"] == "python:3.11-slim"
+    assert entry["base"].endswith("/python:3.11-slim")
+
+
+def test_bases_come_from_the_mirror_never_docker_hub(one_line, registry):
+    """CI must not depend on Docker Hub being reachable, and must not share the
+    anonymous `100;w=3600`-per-source-IP manifest limit with every other project
+    on the runner. The daily mirror sync is also the security path for a base
+    rebuilt in place, so reaching past it would skip that too.
+
+    Pinned as a property because the tempting simplification -- writing
+    `python:3.12-slim` and letting the registry default apply -- looks tidier and
+    silently reintroduces both problems."""
+    entry = ee_matrix.build_matrix("repo", force=True, only="2.16")[0]
+    assert entry["base"].startswith(ee_matrix.MIRROR + "/"), entry["base"]
+    assert "docker.io" not in entry["base"]
+
+
+def test_every_mirrored_base_the_matrix_can_want_is_in_the_mirror_list():
+    """The derivation can only name a base the mirror carries, so the list and
+    the matrix have to agree -- and nothing else checks that. A line whose base
+    is absent is a hard stop at plan time, which is correct but late."""
+    import pathlib as _pathlib
+    import re as _re
+
+    root = _pathlib.Path(__file__).resolve().parents[2]
+    listed = {
+        line.strip()
+        for line in (root / ".github" / "mirror-images.txt").read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    }
+    pythons = {m.group(0) for m in _re.finditer(r"python:3\.\d+-slim", " ".join(listed))}
+    # Every interpreter the current range can select. 3.10 is the floor because
+    # ansible-core 2.12/2.13 declare 3.8-3.10 and we take the newest; 3.14 is
+    # the ceiling because 2.20/2.21 declare up to it.
+    for minor in range(10, 15):
+        want = f"python:3.{minor}-slim"
+        assert want in pythons, f"{want} is not mirrored; the matrix would stop on it"
 
 
 # ── staleness, which is read from the image ──────────────────────────
