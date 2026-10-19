@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "O Terrapod emite um token OpenID Connect de curta duração para cada configuração de provider que uma execução usa e o grava em um arquivo que a execução pode ler. Indexe cada entrada pelo provider como a sua configuração o nomeia — aws, ou aws.west para uma configuração com alias — e liste as audiences que esse destino aceita. Cada entrada sobrepõe a configuração própria da implantação para aquele provider; remova-a e aquele provider volta às audiences da implantação. Uma audience é uma string opaca escolhida pelo destino de federação, por isso é armazenada exatamente como você a digita.",
       "oidcAudiencesLoading": "Verificando as audiences configuradas na implantação …",
       "oidcAudiencesNone": "Nenhuma (as execuções usam a identidade própria do agent pool)",
-      "oidcAudiencesPlaceholder": "ex.: sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "ex.: sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ambiente de execução do Ansible",
+      "ansibleExecutionEnvironmentTitle": "Um dos ambientes de execução próprios desta instalação, por rótulo. Substitui a versão do Ansible, então um workspace com rótulo definido ignora sua linha. Deixe vazio para usar a imagem integrada da linha.",
+      "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

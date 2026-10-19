@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru, kterou běh používá, a zapisuje ho do souboru, který si běh může přečíst. Záznam zaklíčujte na provider tak, jak ho pojmenovává vaše konfigurace — aws, nebo aws.west pro konfiguraci s aliasem — a vypište audience, které ten cíl přijímá. Každý záznam přepisuje vlastní konfiguraci nasazení pro daný provider; odeberte ho a ten provider se vrátí k audience nasazení. Audience je neprůhledný řetězec, který si vybral cíl federace, takže se ukládá přesně tak, jak ji napíšete.",
       "oidcAudiencesLoading": "Kontrolují se audience nakonfigurované v nasazení …",
       "oidcAudiencesNone": "Žádné (běhy používají vlastní identitu fondu agentů)",
-      "oidcAudiencesPlaceholder": "např. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "např. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Běhové prostředí Ansible",
+      "ansibleExecutionEnvironmentTitle": "Jedno z vlastních běhových prostředí této instalace, podle označení. Přepisuje verzi Ansible, takže pracovní prostor s nastaveným označením ignoruje svou linii. Ponechte prázdné pro použití vestavěného obrazu linie.",
+      "ansibleExecutionEnvironmentPlaceholder": "např. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

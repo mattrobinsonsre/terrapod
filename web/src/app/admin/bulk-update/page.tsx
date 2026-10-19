@@ -112,6 +112,7 @@ export default function BulkUpdatePage() {
   // ---- Update form state ----
   const [uTfVersion, setUTfVersion] = useState('')
   const [uAnsibleVersion, setUAnsibleVersion] = useState('')
+  const [uAnsibleEE, setUAnsibleEE] = useState('')
   // Which operations the matched workspaces have (#1966). Tri-state
   // '' | 'true' | 'false', as terragrunt-enabled below: a plain checkbox
   // cannot say "leave this alone", and the endpoint type-checks booleans
@@ -262,6 +263,7 @@ export default function BulkUpdatePage() {
     // keeps the UI off a deprecated spelling.
     if (uTfVersion.trim()) u['engine-version'] = uTfVersion.trim()
     if (uAnsibleVersion.trim()) u['ansible-version'] = uAnsibleVersion.trim()
+    if (uAnsibleEE.trim()) u['ansible-execution-environment'] = uAnsibleEE.trim()
     // Which operations the matched workspaces have (#1966). Either may be sent
     // on its own: the endpoint checks the MERGE against each matched
     // workspace's own row, so turning plan/apply off is legitimate across a set
@@ -633,6 +635,18 @@ export default function BulkUpdatePage() {
                 type="text"
                 value={uAnsibleVersion}
                 onChange={(e) => setUAnsibleVersion(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls} title={tWs('fields.ansibleExecutionEnvironmentTitle')}>
+                {tWs('fields.ansibleExecutionEnvironment')}
+              </label>
+              <input
+                type="text"
+                value={uAnsibleEE}
+                onChange={(e) => setUAnsibleEE(e.target.value)}
                 placeholder={t('unchanged')}
                 className={inputCls}
               />

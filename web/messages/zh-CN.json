@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod 为运行所使用的每个 provider 配置颁发一个短期的 OpenID Connect 令牌，并写入运行可读取的文件。条目的键使用你的配置对该 provider 的命名 — aws，或带别名的配置用 aws.west — 然后列出该目标接受的受众。每条条目会覆盖部署自身针对该 provider 的配置；移除它，该 provider 便回退到部署的受众。受众是联合目标自行选定的不透明字符串，因此会按你输入的原样存储。",
       "oidcAudiencesLoading": "正在检查部署中配置的受众 …",
       "oidcAudiencesNone": "无（运行使用代理池自身的身份）",
-      "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible 执行环境",
+      "ansibleExecutionEnvironmentTitle": "通过标签指定本部署自有的执行环境。它会覆盖 Ansible 版本，因此设置了标签的工作区将忽略其版本线。留空则使用该版本线的内置镜像。",
+      "ansibleExecutionEnvironmentPlaceholder": "例如 rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

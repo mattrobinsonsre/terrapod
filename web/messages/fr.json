@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod émet un jeton OpenID Connect de courte durée pour chaque configuration de provider qu''une exécution utilise et l''écrit dans un fichier que l''exécution peut lire. Indexez une entrée sur le provider tel que votre configuration le nomme — aws, ou aws.west pour une configuration avec alias — puis listez les audiences que cette cible accepte. Chaque entrée surcharge la configuration propre du déploiement pour ce provider ; retirez-la et ce provider revient aux audiences du déploiement. Une audience est une chaîne opaque choisie par la cible de fédération : elle est donc enregistrée exactement telle que vous la saisissez.",
       "oidcAudiencesLoading": "Vérification des audiences configurées dans le déploiement …",
       "oidcAudiencesNone": "Aucune (les exécutions utilisent l''identité propre du pool d''agents)",
-      "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Environnement d'exécution Ansible",
+      "ansibleExecutionEnvironmentTitle": "Un des environnements d'exécution propres à ce déploiement, par étiquette. Il remplace la version d'Ansible, donc un espace de travail avec une étiquette ignore sa ligne. Laissez vide pour utiliser l'image intégrée de la ligne.",
+      "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod udsteder et kortlivet OpenID Connect-token for hver providerkonfiguration en kørsel bruger og skriver det til en fil, kørslen kan læse. Angiv en post med provideren som nøgle, som din konfiguration kalder den — aws, eller aws.west for en konfiguration med alias — og angiv de audiences, det mål accepterer. Hver post tilsidesætter deploymentets egen konfiguration for den provider; fjern den, og provideren falder tilbage til deploymentets audiences. En audience er en uigennemsigtig streng, som føderationsmålet har valgt, så den gemmes præcis som du skriver den.",
       "oidcAudiencesLoading": "Kontrollerer de audiences, der er konfigureret i deploymentet …",
       "oidcAudiencesNone": "Ingen (kørsler bruger agentpuljens egen identitet)",
-      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible-eksekveringsmiljø",
+      "ansibleExecutionEnvironmentTitle": "Et af denne installations egne eksekveringsmiljøer, via etiket. Det tilsidesætter Ansible-versionen, så et arbejdsområde med en etiket ignorerer sin linje. Lad feltet være tomt for at bruge linjens indbyggede image.",
+      "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

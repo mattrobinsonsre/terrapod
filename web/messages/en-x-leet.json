@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n f0r 34ch pr0v1d3r c0nf1gur4710n 4 run u535 4nd wr1735 17 70 4 f1l3 7h3 run c4n r34d. K3y 4n 3n7ry 0n 7h3 pr0v1d3r 45 y0ur c0nf1gur4710n n4m35 17 — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n — 4nd l157 7h3 4ud13nc35 7h47 74rg37 4cc3p75. 34ch 3n7ry 0v3rr1d35 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n f0r 7h47 pr0v1d3r; r3m0v3 17 4nd 7h47 pr0v1d3r f4ll5 b4ck 70 7h3 d3pl0ym3n7'5 4ud13nc35. 4n 4ud13nc3 15 4n 0p4qu3 57r1ng 7h3 f3d3r4710n 74rg37 ch053, 50 17 15 570r3d 3x4c7ly 45 7yp3d.",
       "oidcAudiencesLoading": "Ch3ck1ng 7h3 d3pl0ym3n7'5 c0nf1gur3d 4ud13nc35…",
       "oidcAudiencesNone": "N0n3 (run5 u53 7h3 4g3n7 p00l'5 0wn 1d3n717y)",
-      "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m"
+      "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m",
+      "ansibleExecutionEnvironment": "4n51bl3 3x3cu710n 3nv1r0nm3n7",
+      "ansibleExecutionEnvironmentTitle": "0n3 0f 7h15 d3pl0ym3n7'5 0wn 3x3cu710n 3nv1r0nm3n75, by l4b3l. 17 0v3rr1d35 7h3 4n51bl3 v3r510n, 50 4 w0rk5p4c3 w17h 4 l4b3l 537 1gn0r35 175 l1n3. L34v3 3mp7y 70 u53 7h3 bu1l7-1n 1m4g3 f0r 7h3 l1n3.",
+      "ansibleExecutionEnvironmentPlaceholder": "3.g. rh3l8-h4rd3n3d"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

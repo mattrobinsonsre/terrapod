@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod は実行が使用するプロバイダー設定ごとに短命な OpenID Connect トークンを発行し、実行が読み取れるファイルに書き出します。エントリのキーには、あなたの設定がそのプロバイダーを呼ぶ名前を指定します — aws、またはエイリアス付き設定なら aws.west — そのうえで、その宛先が受け付けるオーディエンスを列挙します。各エントリはそのプロバイダーについてデプロイメント自身の設定を上書きします。エントリを削除すれば、そのプロバイダーはデプロイメントのオーディエンスに戻ります。オーディエンスはフェデレーション先が選んだ不透明な文字列なので、入力したとおりに保存されます。",
       "oidcAudiencesLoading": "デプロイメントで設定されたオーディエンスを確認しています …",
       "oidcAudiencesNone": "なし（実行はエージェントプール自身のアイデンティティを使用）",
-      "oidcAudiencesPlaceholder": "例: sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "例: sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible 実行環境",
+      "ansibleExecutionEnvironmentTitle": "このデプロイメント独自の実行環境をラベルで指定します。Ansible バージョンより優先されるため、ラベルが設定されたワークスペースはそのラインを無視します。空のままにすると、そのラインの組み込みイメージを使用します。",
+      "ansibleExecutionEnvironmentPlaceholder": "例: rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

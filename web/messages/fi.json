@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod myöntää lyhytikäisen OpenID Connect -tokenin jokaiselle provider-konfiguraatiolle, jota ajo käyttää, ja kirjoittaa sen tiedostoon, jonka ajo voi lukea. Avaimena merkinnässä on provider sellaisena kuin konfiguraatiosi sen nimeää — aws tai aws.west alias-konfiguraatiolle — ja luettele audiencet, jotka kohde hyväksyy. Jokainen merkintä ohittaa käyttöönoton oman konfiguraation kyseiselle providerille; poista se, niin provider palaa käyttöönoton audienceihin. Audience on läpinäkymätön merkkijono, jonka federaatiokohde valitsi, joten se tallennetaan täsmälleen kirjoittamassasi muodossa.",
       "oidcAudiencesLoading": "Tarkistetaan käyttöönotossa määritetyt audiencet …",
       "oidcAudiencesNone": "Ei mitään (ajot käyttävät agenttipoolin omaa identiteettiä)",
-      "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible-suoritusympäristö",
+      "ansibleExecutionEnvironmentTitle": "Yksi tämän asennuksen omista suoritusympäristöistä, nimiöllä. Se ohittaa Ansible-version, joten nimiöllä varustettu työtila ohittaa oman linjansa. Jätä tyhjäksi käyttääksesi linjan sisäänrakennettua vedosta.",
+      "ansibleExecutionEnvironmentPlaceholder": "esim. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

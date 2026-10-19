@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "يُصدر Terrapod رمز OpenID Connect قصير العمر لكل تهيئة provider يستخدمها التشغيل، ويكتبه في ملف يمكن للتشغيل قراءته. اجعل مفتاح المُدخل هو provider بالاسم الذي تسميه به تهيئتك — aws، أو aws.west لتهيئة ذات اسم بديل — ثم اسرد الجماهير التي يقبلها ذلك الهدف. كل مُدخل يتجاوز تهيئة النشر نفسها لذلك provider؛ أزِله فيعود ذلك provider إلى جماهير النشر. الجمهور سلسلة معتمة اختارها هدف الاتحاد، ولذلك يُخزَّن تمامًا كما تكتبه.",
       "oidcAudiencesLoading": "يجري التحقق من الجماهير المهيّأة في النشر …",
       "oidcAudiencesNone": "لا شيء (تستخدم عمليات التشغيل هوية مجموعة الوكلاء الخاصة)",
-      "oidcAudiencesPlaceholder": "مثال: sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "مثال: sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "بيئة تنفيذ Ansible",
+      "ansibleExecutionEnvironmentTitle": "إحدى بيئات التنفيذ الخاصة بهذا النشر، بواسطة التسمية. تتجاوز إصدار Ansible، لذا تتجاهل مساحة العمل التي تحمل تسمية خطها. اتركه فارغًا لاستخدام الصورة المدمجة للخط.",
+      "ansibleExecutionEnvironmentPlaceholder": "مثال rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",

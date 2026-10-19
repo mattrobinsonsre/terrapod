@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod מנפיק אסימון OpenID Connect קצר-מועד לכל תצורת provider שהריצה משתמשת בה, וכותב אותו לקובץ שהריצה יכולה לקרוא. מפתח הרשומה הוא ה-provider בשם שהתצורה שלך נותנת לו — aws, או aws.west לתצורה עם כינוי — ואחריו רשימת הקהלים שאותו יעד מקבל. כל רשומה דורסת את התצורה של הפריסה עצמה עבור אותו provider; הסר אותה ואותו provider חוזר לקהלים של הפריסה. קהל הוא מחרוזת אטומה שיעד הפדרציה בחר, ולכן הוא נשמר בדיוק כפי שהקלדת אותו.",
       "oidcAudiencesLoading": "בודק את הקהלים המוגדרים בפריסה …",
       "oidcAudiencesNone": "ללא (ריצות משתמשות בזהות של מאגר הסוכנים עצמו)",
-      "oidcAudiencesPlaceholder": "לדוגמה sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "לדוגמה sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "סביבת הרצה של Ansible",
+      "ansibleExecutionEnvironmentTitle": "אחת מסביבות ההרצה של פריסה זו, לפי תווית. היא עוקפת את גרסת Ansible, ולכן סביבת עבודה עם תווית מתעלמת מהקו שלה. השאר ריק כדי להשתמש בתמונה המשובצת של הקו.",
+      "ansibleExecutionEnvironmentPlaceholder": "לדוגמה rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",

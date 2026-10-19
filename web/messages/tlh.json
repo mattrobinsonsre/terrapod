@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "vum lo''bogh Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chenmoHghachlIj provider pongbogh rur ngoD ngaQHa''wI'' yIlan — aws, pagh pongqa''bogh chenmoHghachvaD aws.west — ''ej ghochvetlh Hevbogh HevwI''mey yItetlh. Hoch ngoD provider''vetlhvaD nISwI'' chenmoHghach chartlh; yIteq ''ej provider''vetlh nISwI'' HevwI''meyDaq chegh. HevwI'' ''oH DIvI'' ghoch wIvbogh pegh ngaD; vaj DaghItlhbogh rur lan.",
       "oidcAudiencesLoading": "nISwI''Daq chenmoHlu''bogh HevwI''mey wIlegh …",
       "oidcAudiencesNone": "pagh (vummey Duy bIQ''a'' pong lo'')",
-      "oidcAudiencesPlaceholder": "Da sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "Da sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible vumwI' Daq",
+      "ansibleExecutionEnvironmentTitle": "naDev vumwI' Daqmey wa'. Ansible mI' chenmoHlaHbe'; per ghajbogh Daq lulIjlaH lInDaj. chIm yIlan 'ej lIn Dochvam lo'.",
+      "ansibleExecutionEnvironmentPlaceholder": "ghob rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

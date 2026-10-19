@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider y mae rhediad yn ei ddefnyddio, ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Allweddwch gofnod ar y provider fel y mae eich cyfluniad yn ei enwi — aws, neu aws.west ar gyfer cyfluniad ag alias — a rhestrwch y cynulleidfaoedd y mae'r targed hwnnw'n eu derbyn. Mae pob cofnod yn disodli cyfluniad y defnydd ei hun ar gyfer y provider hwnnw; tynnwch e ac mae'r provider hwnnw'n dychwelyd at gynulleidfaoedd y defnydd. Llinyn afloyw a ddewiswyd gan y targed ffederasiwn yw cynulleidfa, felly caiff ei storio yn union fel yr ydych yn ei deipio.",
       "oidcAudiencesLoading": "Yn gwirio'r cynulleidfaoedd a gyflunnir yn y defnydd …",
       "oidcAudiencesNone": "Dim (mae rhediadau yn defnyddio hunaniaeth y pwll asiantau ei hun)",
-      "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Amgylchedd gweithredu Ansible",
+      "ansibleExecutionEnvironmentTitle": "Un o amgylcheddau gweithredu'r gosodiad hwn, drwy label. Mae'n disodli fersiwn Ansible, felly bydd gweithle â label yn anwybyddu ei linell. Gadewch yn wag i ddefnyddio delwedd fewnol y llinell.",
+      "ansibleExecutionEnvironmentPlaceholder": "e.e. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

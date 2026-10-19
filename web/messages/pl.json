@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod wystawia krótkotrwały token OpenID Connect dla każdej konfiguracji providera, której używa uruchomienie, i zapisuje go do pliku, który uruchomienie może odczytać. Zaindeksuj wpis na providerze tak, jak nazywa go twoja konfiguracja — aws lub aws.west dla konfiguracji z aliasem — i wypisz audience, które ten cel przyjmuje. Każdy wpis nadpisuje własną konfigurację wdrożenia dla tego providera; usuń go i ten provider wraca do audience wdrożenia. Audience to nieprzejrzysty ciąg wybrany przez cel federacji, więc jest przechowywany dokładnie tak, jak go wpiszesz.",
       "oidcAudiencesLoading": "Sprawdzanie audience skonfigurowanych we wdrożeniu …",
       "oidcAudiencesNone": "Brak (uruchomienia używają własnej tożsamości puli agentów)",
-      "oidcAudiencesPlaceholder": "np. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "np. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Środowisko wykonawcze Ansible",
+      "ansibleExecutionEnvironmentTitle": "Jedno z własnych środowisk wykonawczych tej instalacji, według etykiety. Nadpisuje wersję Ansible, więc obszar roboczy z ustawioną etykietą ignoruje swoją linię. Pozostaw puste, aby użyć wbudowanego obrazu linii.",
+      "ansibleExecutionEnvironmentPlaceholder": "np. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

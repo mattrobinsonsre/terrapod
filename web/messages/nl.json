@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod geeft voor elke providerconfiguratie die een uitvoering gebruikt een kortlevend OpenID Connect-token uit en schrijft het naar een bestand dat de uitvoering kan lezen. Geef een vermelding de provider als sleutel zoals je configuratie die noemt — aws, of aws.west voor een configuratie met alias — en noem de audiences die dat doel accepteert. Elke vermelding overschrijft de eigen configuratie van het deployment voor die provider; verwijder hem en die provider valt terug op de audiences van het deployment. Een audience is een ondoorzichtige tekenreeks die het federatiedoel heeft gekozen, dus hij wordt precies zo opgeslagen als je hem typt.",
       "oidcAudiencesLoading": "De in het deployment geconfigureerde audiences worden gecontroleerd …",
       "oidcAudiencesNone": "Geen (uitvoeringen gebruiken de eigen identiteit van de agent-pool)",
-      "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible-uitvoeringsomgeving",
+      "ansibleExecutionEnvironmentTitle": "Een van de eigen uitvoeringsomgevingen van deze installatie, op label. Dit overschrijft de Ansible-versie, dus een workspace met een label negeert zijn lijn. Laat leeg om de ingebouwde image van de lijn te gebruiken.",
+      "ansibleExecutionEnvironmentPlaceholder": "bijv. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

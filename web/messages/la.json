@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod pro omni configuratione provider quam exsecutio adhibet tesseram OpenID Connect brevis aevi emittit eamque in tabulam scribit quam exsecutio legere potest. Inscriptionem sub provider pone, sicut configuratio tua eum nominat — aws, vel aws.west pro configuratione cum alias — et auditores quos illud propositum accipit enumera. Omnis inscriptio configurationem propriam instructionis pro illo provider supervertit; eam remove, et ille provider ad auditores instructionis redit. Auditor chorda opaca est quam propositum foederationis elegit, ideo prorsus ut eam scribis servatur.",
       "oidcAudiencesLoading": "Auditores in instructione configurati examinantur …",
       "oidcAudiencesNone": "Nulli (exsecutiones propria identitate copiae actorum utuntur)",
-      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ambitus exsecutionis Ansible",
+      "ansibleExecutionEnvironmentTitle": "Unus ex ambitibus exsecutionis huius institutionis, per titulum. Versionem Ansible supervertit, itaque locus operis cum titulo lineam suam neglegit. Vacuum relinque ut imagine insita lineae utaris.",
+      "ansibleExecutionEnvironmentPlaceholder": "ex. gr. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

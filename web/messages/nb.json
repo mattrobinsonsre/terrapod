@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod utsteder et kortlevd OpenID Connect-token for hver providerkonfigurasjon en kjøring bruker, og skriver det til en fil kjøringen kan lese. Nøkle en oppføring på provideren slik konfigurasjonen din navngir den — aws, eller aws.west for en konfigurasjon med alias — og list opp audiences målet godtar. Hver oppføring overstyrer utrullingens egen konfigurasjon for den provideren; fjern den, og provideren faller tilbake til utrullingens audiences. En audience er en ugjennomsiktig streng føderasjonsmålet har valgt, så den lagres nøyaktig slik du skriver den.",
       "oidcAudiencesLoading": "Sjekker audiences som er konfigurert i utrullingen …",
       "oidcAudiencesNone": "Ingen (kjøringer bruker agentpuljens egen identitet)",
-      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible-kjøremiljø",
+      "ansibleExecutionEnvironmentTitle": "Et av denne installasjonens egne kjøremiljøer, via etikett. Det overstyrer Ansible-versjonen, så et arbeidsområde med en etikett ignorerer sin linje. La feltet stå tomt for å bruke linjens innebygde image.",
+      "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

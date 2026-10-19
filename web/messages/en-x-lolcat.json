@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod mintz a short-livd OpenID Connect tokin fer evry providr configurashun a run yuzez an ritez it ta a file da run can reed. Key an entree on da providr liek ur configurashun namez it — aws, or aws.west fer an aliasd configurashun — an list da audiencez dat targit akceptz. Evry entree overridez da deployment''z own configurashun fer dat providr; remoov it an dat providr fallz bak ta da deployment''z audiencez. An audienz iz an opayk string da federashun targit choze, so itz stord exackly as typd.",
       "oidcAudiencesLoading": "Checkin da deployment''z configurd audiencez …",
       "oidcAudiencesNone": "Noes (runz yuze da agent pool''z own identitee)",
-      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansibul execushun enviroment",
+      "ansibleExecutionEnvironmentTitle": "WAN OF DIS deployments OWN execushun enviroments, BY LABEL. IT OVERRIDEZ TEH Ansibul vershun, SO A WORKSPACE WIF A LABEL SET IGNORES ITS LINE. LEAV EMPTY 2 USE TEH BUILT-IN IMAGE 4 TEH LINE. KTHXBAI",
+      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

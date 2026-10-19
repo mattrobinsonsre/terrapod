@@ -2626,7 +2626,10 @@
       "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for each marklar marklar a marklar uses and writes it to a marklar the marklar can read. Key a marklar on the marklar as your marklar names it — aws, or aws.west for an aliased marklar — and list the marklars that marklar accepts. Each marklar overrides the marklar''s own marklar for that marklar; remove it and that marklar falls back to the marklar''s marklars. A marklar is an opaque marklar the marklar marklar chose, so it is stored exactly as typed.",
       "oidcAudiencesLoading": "Checking the marklar''s configured marklars …",
       "oidcAudiencesNone": "None (marklars use the marklar marklar''s own marklar)",
-      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "ansibleExecutionEnvironment": "Ansible marklar marklar",
+      "ansibleExecutionEnvironmentTitle": "One of this marklar's own marklar marklar, by marklar. It overrides the Ansible marklar, so a marklar with a marklar set ignores its marklar. Leave empty to use the built-in marklar for the marklar.",
+      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
