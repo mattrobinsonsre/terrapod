@@ -198,6 +198,36 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		DefaultLimit             *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
 		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone"`
+		// Resource sizing (#2154). Absent from this tool until now, so an agent
+		// could read a workspace's sizing with terrapod_workspace_get and not
+		// change it -- 25 of the API's 46 settable workspace attributes are
+		// still in that position, which is tracked separately.
+		//
+		// The two PAIRS are deliberately separate, because the two containers
+		// of a configure Job do different work: the orchestrator runs tofu
+		// while the execution environment runs ansible against however many
+		// hosts the inventory resolves to. One pair cannot size both.
+		ResourceCPU      string `json:"resource_cpu,omitempty" jsonschema:"CPU request for this workspace's runner Jobs, as a Kubernetes quantity: a whole number of CPUs (1, 4) or millicores (500m). The LIMIT is twice this, computed automatically. Decimals (0.5) and decimal SI suffixes are refused (422), because the limit is 2x the request and those forms cannot be doubled -- accepting one would silently leave the limit equal to the request. Omit to leave the stored value alone"`
+		ResourceMemory   string `json:"resource_memory,omitempty" jsonschema:"memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu"`
+		EEResourceCPU    string `json:"ee_resource_cpu,omitempty" jsonschema:"CPU request for the Ansible EXECUTION ENVIRONMENT -- the sidecar container a configure run's playbooks execute in -- not the orchestrator, which resource_cpu sizes. Same quantity rules and the same 2x limit. EMPTY means this workspace takes the deployment default rather than sizing the environment itself, so passing an empty string is how a workspace rejoins that default; omitting the field leaves the stored value alone"`
+		EEResourceMemory string `json:"ee_resource_memory,omitempty" jsonschema:"memory request for the Ansible execution-environment sidecar. Limit is 2x. Empty takes the deployment default. See ee_resource_cpu"`
+		// The AI overrides (#2174). `ai_policy_mode` is here because the parity
+		// gate demands it by NAME and refuses to let it be excused: this file's
+		// own history is that attribute shipping "on three surfaces out of
+		// four", and MCP was the fourth. Its two siblings come with it because
+		// half a feature on a tool surface is worse than none -- an agent that
+		// can set the gate but not the summary has to explain the asymmetry.
+		//
+		// All three are three-state strings rather than booleans: a workspace
+		// may defer to the deployment rather than choosing, which is what
+		// `inherit` means and what an empty value leaves alone.
+		AIPolicyMode  string `json:"ai_policy_mode,omitempty" jsonschema:"this workspace's override for the AI POLICY GATE -- whether a run's plan is reviewed by a model before it may apply: enabled, disabled or inherit. inherit defers to the deployment setting, which is the default and is NOT the same as disabled. Omit to leave the stored value alone. Distinct from ai_summary_mode: the gate can BLOCK a run, the summary only describes one"`
+		AISummaryMode string `json:"ai_summary_mode,omitempty" jsonschema:"this workspace's override for AI PLAN SUMMARIES -- prose describing what a plan will do, which blocks nothing: enabled, disabled or inherit. inherit defers to the deployment setting. Omit to leave the stored value alone"`
+		// A POINTER, unlike the two above, and the SDK is right to make it one:
+		// the modes are three-state enums where "" means "leave alone", while
+		// this is free prose where "" is a real value meaning "clear what is
+		// stored". A plain string could not express the difference.
+		AISummaryContext *string `json:"ai_summary_context,omitempty" jsonschema:"workspace-specific facts given to the model on top of the deployment's own context -- what this estate is for, naming conventions, which resources are load-bearing. Prose, not configuration: it changes what a summary SAYS, never what a run does. A hint rather than a repository, and capped at 4000 characters. Omitting the field leaves the stored value alone; pass an EMPTY STRING to clear it"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -247,6 +277,20 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			DefaultLimit:             in.DefaultLimit,
 			InventoryIncludePlatform: in.InventoryIncludePlatform,
 			InventoryIgnorePaths:     in.InventoryIgnorePaths,
+			// #2154's two pairs. Plain strings, so the SDK's own `!= ""` guards
+			// decide what reaches the wire -- which means an empty value cannot
+			// be SENT, and clearing an EE size back to the deployment default is
+			// therefore not expressible here. That is the same limitation
+			// `ansible_version` has had since #2010 and the sibling fields above
+			// share; a pointer for these two alone would make the tool
+			// inconsistent for a case nothing has asked for yet.
+			ResourceCPU:      in.ResourceCPU,
+			ResourceMemory:   in.ResourceMemory,
+			EEResourceCPU:    in.EEResourceCPU,
+			EEResourceMemory: in.EEResourceMemory,
+			AIPolicyMode:     in.AIPolicyMode,
+			AISummaryMode:    in.AISummaryMode,
+			AISummaryContext: in.AISummaryContext,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

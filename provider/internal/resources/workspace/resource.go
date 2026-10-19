@@ -839,6 +839,30 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     stringdefault.StaticString("2Gi"),
 			},
+			// NO `Default` on these two, unlike the pair above: `""` is a real
+			// value meaning "take the deployment default", and a
+			// StaticString default would make it impossible to express. The
+			// server returns what is stored without substituting, so
+			// Optional+Computed with UseStateForUnknown is the shape --
+			// matching `ansible_version`.
+			"ee_resource_cpu": schema.StringAttribute{
+				Description: "CPU request for the Ansible execution-environment sidecar (K8s format, " +
+					"e.g. '500m'), the container a configure's playbooks run in. Separate " +
+					"from `resource_cpu`, which sizes the orchestrator, because the two do " +
+					"different work: one runs tofu, the other runs ansible against however " +
+					"many hosts the inventory resolves to. The limit is 2x the request. " +
+					"Leave unset to take the deployment default.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"ee_resource_memory": schema.StringAttribute{
+				Description: "Memory request for the Ansible execution-environment sidecar (K8s " +
+					"format, e.g. '1Gi'). Limit is 2x. See `ee_resource_cpu`.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"labels": schema.MapAttribute{
 				Description: "Labels for RBAC evaluation (key-value pairs).",
 				Optional:    true,
@@ -1479,6 +1503,12 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		req.Parallelism = m.Parallelism.ValueInt64()
 	}
+	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
+		req.EEResourceCPU = m.EEResourceCPU.ValueString()
+	}
+	if !m.EEResourceMemory.IsNull() && !m.EEResourceMemory.IsUnknown() {
+		req.EEResourceMemory = m.EEResourceMemory.ValueString()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		req.ResourceCPU = m.ResourceCPU.ValueString()
 	}
@@ -1701,6 +1731,12 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		req.Parallelism = m.Parallelism.ValueInt64()
 	}
+	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
+		req.EEResourceCPU = m.EEResourceCPU.ValueString()
+	}
+	if !m.EEResourceMemory.IsNull() && !m.EEResourceMemory.IsUnknown() {
+		req.EEResourceMemory = m.EEResourceMemory.ValueString()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		req.ResourceCPU = m.ResourceCPU.ValueString()
 	}
@@ -1828,6 +1864,8 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.PulumiBindPlan = types.BoolValue(ws.PulumiBindPlan)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
+	m.EEResourceCPU = types.StringValue(ws.EEResourceCPU)
+	m.EEResourceMemory = types.StringValue(ws.EEResourceMemory)
 	m.Parallelism = types.Int64Value(ws.Parallelism)
 	m.ResourceMemory = types.StringValue(ws.ResourceMemory)
 	m.VCSWorkflow = types.StringValue(ws.VCSWorkflow)

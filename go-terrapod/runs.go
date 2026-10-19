@@ -102,6 +102,15 @@ type Run struct {
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// The Ansible execution environment this run used, and how big its sidecar
+	// was (#2154). Recorded on the run because the built-in EE tags MOVE -- a
+	// line's image is rebuilt when upstream patches it -- so without the image
+	// reference a finished run could not be identified afterwards. All three
+	// are empty on a plan or an apply, which is every run that configures
+	// nothing.
+	EEImage          string `json:"ee-image,omitempty"`
+	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 	// Resource profile — populated once the Job reports it. Nil until then.
 	PeakMemoryBytes  *int64 `json:"peak-memory-bytes,omitempty"`
 	PeakCPUUsec      *int64 `json:"peak-cpu-usec,omitempty"`
@@ -423,6 +432,9 @@ func runFromResource(res *Resource) *Run {
 		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
 		Parallelism:       GetIntAttr(res, "parallelism"),
 		ResourceMemory:    GetStringAttr(res, "resource-memory"),
+		EEImage:           GetStringAttr(res, "ee-image"),
+		EEResourceCPU:     GetStringAttr(res, "ee-resource-cpu"),
+		EEResourceMemory:  GetStringAttr(res, "ee-resource-memory"),
 		RunnerExitReason:  GetStringAttr(res, "runner-exit-reason"),
 		RunnerExitStatus:  GetStringAttr(res, "runner-exit-status"),
 		ErrorMessage:      GetStringAttr(res, "error-message"),

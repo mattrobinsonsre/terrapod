@@ -111,3 +111,96 @@ func TestWorkspaceDecodesTheSettingsItSends(t *testing.T) {
 		t.Errorf("ai-policy-mode decoded as %q, want %q", ws.AIPolicyMode, "enabled")
 	}
 }
+
+// The Ansible execution environment's resources (#2154). Same wire trap as the
+// settings above, and one more besides: the RUN carries three fields nothing
+// sends -- they are read-only, populated by the server -- so for those the
+// failure mode is the mirror of the one this file is about. A declared field
+// that the parser never assigns is permanently nil and no fixture without it
+// will say so.
+
+func TestCreateAndUpdateSendTheExecutionEnvironmentResources(t *testing.T) {
+	for name, attrs := range map[string]map[string]any{
+		"create": workspaceCreateAttrs(CreateWorkspaceRequest{
+			Name:             "smoke",
+			EEResourceCPU:    "2",
+			EEResourceMemory: "4Gi",
+		}),
+		"update": workspaceUpdateAttrs(UpdateWorkspaceRequest{
+			EEResourceCPU:    "2",
+			EEResourceMemory: "4Gi",
+		}),
+	} {
+		for key, want := range map[string]any{
+			"ee-resource-cpu":    "2",
+			"ee-resource-memory": "4Gi",
+		} {
+			got, ok := attrs[key]
+			if !ok {
+				t.Errorf("%s dropped %q entirely — sizing the EE would be a silent no-op", name, key)
+				continue
+			}
+			if got != want {
+				t.Errorf("%s sent %q = %v, want %v", name, key, got, want)
+			}
+		}
+	}
+}
+
+func TestWorkspaceDecodesTheExecutionEnvironmentResources(t *testing.T) {
+	ws := workspaceFromResource(&Resource{
+		ID:   "ws-1",
+		Type: "workspaces",
+		Attributes: map[string]json.RawMessage{
+			"name":               json.RawMessage(`"smoke"`),
+			"ee-resource-cpu":    json.RawMessage(`"2"`),
+			"ee-resource-memory": json.RawMessage(`"4Gi"`),
+		},
+	})
+	if ws.EEResourceCPU != "2" {
+		t.Errorf("EEResourceCPU = %q, want %q", ws.EEResourceCPU, "2")
+	}
+	if ws.EEResourceMemory != "4Gi" {
+		t.Errorf("EEResourceMemory = %q, want %q", ws.EEResourceMemory, "4Gi")
+	}
+}
+
+func TestRunDecodesWhichExecutionEnvironmentItUsed(t *testing.T) {
+	// The image reference matters most: the built-in EE tags MOVE as a line is
+	// rebuilt for upstream patches, so a run that does not record its own
+	// reference cannot be identified after the fact.
+	run := runFromResource(&Resource{
+		ID:   "run-1",
+		Type: "runs",
+		Attributes: map[string]json.RawMessage{
+			"status":             json.RawMessage(`"applied"`),
+			"ee-image":           json.RawMessage(`"ghcr.io/x/terrapod-ee:2.16"`),
+			"ee-resource-cpu":    json.RawMessage(`"500m"`),
+			"ee-resource-memory": json.RawMessage(`"1Gi"`),
+		},
+	})
+	for _, c := range []struct{ name, got, want string }{
+		{"EEImage", run.EEImage, "ghcr.io/x/terrapod-ee:2.16"},
+		{"EEResourceCPU", run.EEResourceCPU, "500m"},
+		{"EEResourceMemory", run.EEResourceMemory, "1Gi"},
+	} {
+		if c.got != c.want {
+			t.Errorf("%s = %q, want %q — declared and populated from nowhere", c.name, c.got, c.want)
+		}
+	}
+}
+
+func TestAPlanRunCarriesNoExecutionEnvironment(t *testing.T) {
+	// The pair to the test above: every plan and apply leaves all three empty,
+	// which is what renders no sidecar at all. Asserted so "a terraform-only
+	// deployment pays nothing" is checked on this side of the wire too.
+	run := runFromResource(&Resource{
+		ID:         "run-2",
+		Type:       "runs",
+		Attributes: map[string]json.RawMessage{"status": json.RawMessage(`"planned"`)},
+	})
+	if run.EEImage != "" || run.EEResourceCPU != "" || run.EEResourceMemory != "" {
+		t.Errorf("a plan run carries EE fields: %q %q %q",
+			run.EEImage, run.EEResourceCPU, run.EEResourceMemory)
+	}
+}

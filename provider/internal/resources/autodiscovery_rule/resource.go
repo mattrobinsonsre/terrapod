@@ -128,6 +128,8 @@ type autodiscoveryRuleModel struct {
 	InventoryIncludePlatform types.Bool   `tfsdk:"inventory_include_platform"`
 	InventoryIgnorePaths     types.List   `tfsdk:"inventory_ignore_paths"`
 	ResourceCPU              types.String `tfsdk:"resource_cpu"`
+	EEResourceCPU            types.String `tfsdk:"ee_resource_cpu"`
+	EEResourceMemory         types.String `tfsdk:"ee_resource_memory"`
 	Parallelism              types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory           types.String `tfsdk:"resource_memory"`
 	AutoApply                types.Bool   `tfsdk:"auto_apply"`
@@ -520,6 +522,24 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
+			},
+			"ee_resource_cpu": schema.StringAttribute{
+				Description: "CPU request for the Ansible execution-environment sidecar (K8s format, " +
+					"e.g. '500m'), the container a configure's playbooks run in. Separate " +
+					"from `resource_cpu`, which sizes the orchestrator, because the two do " +
+					"different work: one runs tofu, the other runs ansible against however " +
+					"many hosts the inventory resolves to. The limit is 2x the request. " +
+					"Leave unset to take the deployment default.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"ee_resource_memory": schema.StringAttribute{
+				Description: "Memory request for the Ansible execution-environment sidecar (K8s " +
+					"format, e.g. '1Gi'). Limit is 2x. See `ee_resource_cpu`.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"resource_cpu": schema.StringAttribute{
 				Description: "Default CPU request for runner Jobs in created workspaces. Defaults to \"1\".",
@@ -1082,6 +1102,12 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
 	}
+	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
+		attrs["ee-resource-cpu"] = m.EEResourceCPU.ValueString()
+	}
+	if !m.EEResourceMemory.IsNull() && !m.EEResourceMemory.IsUnknown() {
+		attrs["ee-resource-memory"] = m.EEResourceMemory.ValueString()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		attrs["resource-cpu"] = m.ResourceCPU.ValueString()
 	}
@@ -1391,6 +1417,8 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	}
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
+	m.EEResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-cpu"))
+	m.EEResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-memory"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
 	m.AutoApplyMode = types.StringValue(terrapod.GetStringAttr(res, "auto-apply-mode"))

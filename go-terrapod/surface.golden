@@ -369,6 +369,8 @@ field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omit
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field CreateWorkspaceRequest.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
+field CreateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
 field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
@@ -940,6 +942,9 @@ field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`
 field Run.CreatedAt string `json:"created-at,omitempty"`
 field Run.CreatedBy string `json:"created-by,omitempty"`
 field Run.DiscardReason string `json:"discard-reason,omitempty"`
+field Run.EEImage string `json:"ee-image,omitempty"`
+field Run.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
+field Run.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field Run.Engine string `json:"engine,omitempty"`
 field Run.EngineVersion string `json:"engine-version,omitempty"`
 field Run.ErrorMessage string `json:"error-message,omitempty"`
@@ -1205,6 +1210,8 @@ field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omi
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field UpdateWorkspaceRequest.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
+field UpdateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
@@ -1414,6 +1421,8 @@ field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
 field Workspace.DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty"`
 field Workspace.DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
 field Workspace.DriftStatus string `json:"drift-status,omitempty"`
+field Workspace.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
+field Workspace.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field Workspace.Engine string `json:"engine,omitempty"`
 field Workspace.EngineVersion string `json:"engine-version,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`

@@ -1429,6 +1429,21 @@
             "array"
           ]
         },
+        "ai_policy_mode": {
+          "description": "this workspace's override for the AI POLICY GATE -- whether a run's plan is reviewed by a model before it may apply: enabled, disabled or inherit. inherit defers to the deployment setting, which is the default and is NOT the same as disabled. Omit to leave the stored value alone. Distinct from ai_summary_mode: the gate can BLOCK a run, the summary only describes one",
+          "type": "string"
+        },
+        "ai_summary_context": {
+          "description": "workspace-specific facts given to the model on top of the deployment's own context -- what this estate is for, naming conventions, which resources are load-bearing. Prose, not configuration: it changes what a summary SAYS, never what a run does. A hint rather than a repository, and capped at 4000 characters. Omitting the field leaves the stored value alone; pass an EMPTY STRING to clear it",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "ai_summary_mode": {
+          "description": "this workspace's override for AI PLAN SUMMARIES -- prose describing what a plan will do, which blocks nothing: enabled, disabled or inherit. inherit defers to the deployment setting. Omit to leave the stored value alone",
+          "type": "string"
+        },
         "allow_fork_pr_plans": {
           "description": "allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)",
           "type": [
@@ -1506,6 +1521,14 @@
             "string"
           ]
         },
+        "ee_resource_cpu": {
+          "description": "CPU request for the Ansible EXECUTION ENVIRONMENT -- the sidecar container a configure run's playbooks execute in -- not the orchestrator, which resource_cpu sizes. Same quantity rules and the same 2x limit. EMPTY means this workspace takes the deployment default rather than sizing the environment itself, so passing an empty string is how a workspace rejoins that default; omitting the field leaves the stored value alone",
+          "type": "string"
+        },
+        "ee_resource_memory": {
+          "description": "memory request for the Ansible execution-environment sidecar. Limit is 2x. Empty takes the deployment default. See ee_resource_cpu",
+          "type": "string"
+        },
         "engine_version": {
           "description": "version of the engine this workspace runs; partial like 1.15 (means 1.15.*)",
           "type": "string"
@@ -1582,6 +1605,14 @@
             "null",
             "boolean"
           ]
+        },
+        "resource_cpu": {
+          "description": "CPU request for this workspace's runner Jobs, as a Kubernetes quantity: a whole number of CPUs (1, 4) or millicores (500m). The LIMIT is twice this, computed automatically. Decimals (0.5) and decimal SI suffixes are refused (422), because the limit is 2x the request and those forms cannot be doubled -- accepting one would silently leave the limit equal to the request. Omit to leave the stored value alone",
+          "type": "string"
+        },
+        "resource_memory": {
+          "description": "memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu",
+          "type": "string"
         },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",

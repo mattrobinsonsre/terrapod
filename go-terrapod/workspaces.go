@@ -73,8 +73,16 @@ type Workspace struct {
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
-	Parallelism       int64  `json:"parallelism,omitempty"`
-	AnsibleVersion    string `json:"ansible-version,omitempty"`
+	// The Ansible execution environment's own requests (#2154), separate from
+	// the orchestrator's above because the two containers do different work.
+	// Empty means the deployment default, as for AnsibleVersion -- and
+	// `omitempty` therefore has the same consequence it has there: omitting
+	// the field on an update leaves the stored value alone rather than
+	// clearing it back to the default.
+	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
+	Parallelism      int64  `json:"parallelism,omitempty"`
+	AnsibleVersion   string `json:"ansible-version,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -287,8 +295,16 @@ type CreateWorkspaceRequest struct {
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
-	Parallelism       int64  `json:"parallelism,omitempty"`
-	AnsibleVersion    string `json:"ansible-version,omitempty"`
+	// The Ansible execution environment's own requests (#2154), separate from
+	// the orchestrator's above because the two containers do different work.
+	// Empty means the deployment default, as for AnsibleVersion -- and
+	// `omitempty` therefore has the same consequence it has there: omitting
+	// the field on an update leaves the stored value alone rather than
+	// clearing it back to the default.
+	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
+	Parallelism      int64  `json:"parallelism,omitempty"`
+	AnsibleVersion   string `json:"ansible-version,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -433,8 +449,16 @@ type UpdateWorkspaceRequest struct {
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
-	Parallelism       int64  `json:"parallelism,omitempty"`
-	AnsibleVersion    string `json:"ansible-version,omitempty"`
+	// The Ansible execution environment's own requests (#2154), separate from
+	// the orchestrator's above because the two containers do different work.
+	// Empty means the deployment default, as for AnsibleVersion -- and
+	// `omitempty` therefore has the same consequence it has there: omitting
+	// the field on an update leaves the stored value alone rather than
+	// clearing it back to the default.
+	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
+	Parallelism      int64  `json:"parallelism,omitempty"`
+	AnsibleVersion   string `json:"ansible-version,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -845,6 +869,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
+	if req.EEResourceCPU != "" {
+		attrs["ee-resource-cpu"] = req.EEResourceCPU
+	}
+	if req.EEResourceMemory != "" {
+		attrs["ee-resource-memory"] = req.EEResourceMemory
+	}
 	if req.ResourceCPU != "" {
 		attrs["resource-cpu"] = req.ResourceCPU
 	}
@@ -1021,6 +1051,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
+	if req.EEResourceCPU != "" {
+		attrs["ee-resource-cpu"] = req.EEResourceCPU
+	}
+	if req.EEResourceMemory != "" {
+		attrs["ee-resource-memory"] = req.EEResourceMemory
+	}
 	if req.ResourceCPU != "" {
 		attrs["resource-cpu"] = req.ResourceCPU
 	}
@@ -1171,6 +1207,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
 		WorkingDirectory:  GetStringAttr(res, "working-directory"),
 		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
+		EEResourceCPU:     GetStringAttr(res, "ee-resource-cpu"),
+		EEResourceMemory:  GetStringAttr(res, "ee-resource-memory"),
 		Parallelism:       GetIntAttr(res, "parallelism"),
 		AnsibleVersion:    GetStringAttr(res, "ansible-version"),
 		ResourceMemory:    GetStringAttr(res, "resource-memory"),

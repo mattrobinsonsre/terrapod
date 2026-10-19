@@ -52,6 +52,8 @@ type workspaceDataSourceModel struct {
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
+	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`
+	EEResourceMemory              types.String `tfsdk:"ee_resource_memory"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
@@ -143,15 +145,21 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					},
 				},
 			},
-			"default_playbook":                 computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
-			"default_limit":                    computedString("The default `--limit` for a configure run. Null means the whole inventory."),
-			"inventory_include_platform":       computedBool("Whether the inventory rows declared through Terrapod contribute to the resolved inventory. Defaults to true."),
-			"inventory_ignore_paths":           computedList("Paths excluded from the inventory resolution."),
-			"working_directory":                computedString("Working directory."),
-			"parallelism":                      computedInt64("How many operations the engine performs at once."),
-			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
-			"allow_fork_pr_plans":              computedBool("Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
-			"resource_cpu":                     computedString("CPU request."),
+			"default_playbook":           computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
+			"default_limit":              computedString("The default `--limit` for a configure run. Null means the whole inventory."),
+			"inventory_include_platform": computedBool("Whether the inventory rows declared through Terrapod contribute to the resolved inventory. Defaults to true."),
+			"inventory_ignore_paths":     computedList("Paths excluded from the inventory resolution."),
+			"working_directory":          computedString("Working directory."),
+			"parallelism":                computedInt64("How many operations the engine performs at once."),
+			"debug_mode":                 computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
+			"allow_fork_pr_plans":        computedBool("Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
+			"resource_cpu":               computedString("CPU request."),
+			"ee_resource_cpu": computedString(
+				"CPU request for the Ansible execution-environment sidecar. Empty means " +
+					"the workspace takes the deployment default."),
+			"ee_resource_memory": computedString(
+				"Memory request for the Ansible execution-environment sidecar. Empty " +
+					"means the workspace takes the deployment default."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),
 			"vcs_repo_url":                     computedString("VCS repo URL."),
@@ -288,6 +296,11 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	// than pinning one (#2010); the server does not substitute the platform's
 	// default, so null is the honest reading.
 	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
+	// Empty means the workspace takes the deployment default rather than
+	// sizing the EE itself (#2154); the server does not substitute, so null is
+	// the honest reading -- the same shape as the ansible version above.
+	setOptionalString(&m.EEResourceCPU, terrapod.GetStringAttr(res, "ee-resource-cpu"))
+	setOptionalString(&m.EEResourceMemory, terrapod.GetStringAttr(res, "ee-resource-memory"))
 	// Which operations the workspace has (#1966). Each falls back to its own
 	// server-side default when the attribute is ABSENT, the same rule as
 	// `inventory-include-platform` below and for the same two reasons: a

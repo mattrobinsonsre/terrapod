@@ -124,6 +124,8 @@ type workspaceModel struct {
 	InventoryIgnorePaths          types.List   `tfsdk:"inventory_ignore_paths"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
+	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`
+	EEResourceMemory              types.String `tfsdk:"ee_resource_memory"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`

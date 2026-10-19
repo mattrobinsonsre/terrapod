@@ -100,6 +100,8 @@ data terrapod_workspace.drift_ignore_rules required=false optional=false compute
 data terrapod_workspace.drift_last_checked_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.ee_resource_cpu required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.ee_resource_memory required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.engine required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.engine_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_backend required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -198,6 +200,8 @@ resource terrapod_autodiscovery_rule.default_playbook required=false optional=tr
 resource terrapod_autodiscovery_rule.drift_detection_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.drift_detection_interval_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.drift_ignore_rules required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
+resource terrapod_autodiscovery_rule.ee_resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.ee_resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -557,6 +561,8 @@ resource terrapod_workspace.drift_ignore_rules required=false optional=true comp
 resource terrapod_workspace.drift_last_checked_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.ee_resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.ee_resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.engine required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
