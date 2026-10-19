@@ -27,6 +27,7 @@ that way is to wire a new setting up rather than add a line.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Callable
 
 import pytest
 
@@ -221,6 +222,46 @@ _AD_API = _surface(
     "services/terrapod/api/routers/autodiscovery_rules.py",
     "terrapod/api/routers/autodiscovery_rules.py",
 )
+_MCP = _surface("mcp/internal/mcpserver/crud.go")
+
+
+#: How each surface SPELLS an attribute, as a function from the API's key to
+#: the literal forms that count as that surface offering it.
+#:
+#: Every surface but MCP writes the API's own kebab-case key, quoted, so the
+#: check can look for `'attr'` or `"attr"` directly. **MCP writes neither.** Its
+#: tool schema is a Go struct whose fields carry
+#: `json:"ai_policy_mode,omitempty"` -- snake_case, which is what an MCP client
+#: expects, and with the tag options inside the same quotes. So BOTH naive forms
+#: are wrong there: `"ai-policy-mode"` is the wrong case, and `"ai_policy_mode"`
+#: never appears as a complete quoted string because `,omitempty` follows. A
+#: gate that searched for either would report all 46 attributes as missing --
+#: failing on its own spelling rather than on a real gap, which is the least
+#: useful way for a gate to be red.
+#:
+#: Per-surface rather than "try every form everywhere", which looks simpler and
+#: is wrong: a Python file mentioning the COLUMN name `resource_cpu` would then
+#: satisfy the check without the surface offering the attribute at all, and
+#: every one of these surfaces is Python or TypeScript that mentions columns.
+def _kebab_quoted(attr: str) -> tuple[str, ...]:
+    return (f"'{attr}'", f'"{attr}"')
+
+
+def _go_json_tag(attr: str) -> tuple[str, ...]:
+    """`json:"snake_case"` or `json:"snake_case,omitempty"`."""
+    snake = attr.replace("-", "_")
+    return (f'json:"{snake}"', f'json:"{snake},')
+
+
+_SPELLING: dict[str, Callable[[str], tuple[str, ...]]] = {
+    "MCP workspace tools": _go_json_tag,
+}
+
+
+def _spellings(surface: str, attr: str) -> tuple[str, ...]:
+    """The literal forms that count as this surface offering `attr`."""
+    return _SPELLING.get(surface, _kebab_quoted)(attr)
+
 
 #: Attributes a surface deliberately does not offer, and why. Each is a
 #: judgement that the control costs more than it is worth THERE -- never a
@@ -253,7 +294,55 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 #: which is the failure this gate exists to prevent. Every entry names the
 #: issue that will clear it, and clearing one means wiring the setting up and
 #: deleting the line. This should end empty.
-_SURFACE_DEBT: dict[str, dict[str, str]] = {}
+#: Why an entry sits in `_SURFACE_DEBT` below. Two reasons, deliberately.
+WIRE_REASON = "#2174 — nothing decided against it; MCP simply had no parity gate until now"
+#: `debug-mode` arms a pod that holds the run's credentials and keeps it alive
+#: for inspection; `auto-merge` and its strategy merge pull requests;
+#: `security-scan-enforcement` is a governance gate. Each may still belong on
+#: the tool surface -- the point is that it is a decision rather than an
+#: oversight, and it is made on the issue.
+JUDGEMENT_REASON = "#2174 — a genuine judgement, to be argued there: an agent flipping this has consequences beyond the workspace's own configuration"
+
+
+_SURFACE_DEBT: dict[str, dict[str, str]] = {
+    # Found by MEASURING the surface rather than reading it: 21 of the 46
+    # settable attributes were unreachable from MCP when it was first added to
+    # this gate (#2174). Three are now wired -- `ai-policy-mode` because the
+    # named test below refuses to let it be excused, and its two siblings
+    # because half a feature on a tool surface is worse than none.
+    #
+    # These eighteen are DEBT rather than exemptions, which is why they are in
+    # this ledger and not the one above: nobody decided an agent should not
+    # change them. Four carry a different reason because they genuinely are a
+    # judgement, and keeping that visible here is the point -- a uniform string
+    # would flatten "nobody got round to it" and "we should think about this"
+    # into the same thing, which is how a debt ledger turns into an excuse list.
+    #
+    # What this buys TODAY is the thing that was missing for as long as this
+    # gate has existed: the next setting cannot drift the same way, because it
+    # will fail here.
+    "MCP workspace tools": {
+        "drift-detection-enabled": WIRE_REASON,
+        "drift-detection-interval-seconds": WIRE_REASON,
+        "drift-ignore-rules": WIRE_REASON,
+        "parallelism": WIRE_REASON,
+        "plan-expiry-seconds": WIRE_REASON,
+        "security-scan-engine": WIRE_REASON,
+        "security-scan-severity-threshold": WIRE_REASON,
+        "security-scan-skip-rules": WIRE_REASON,
+        "slack-channel": WIRE_REASON,
+        "terragrunt-enabled": WIRE_REASON,
+        "terragrunt-version": WIRE_REASON,
+        "trigger-prefixes": WIRE_REASON,
+        "var-files": WIRE_REASON,
+        "vcs-workflow": WIRE_REASON,
+        # The four worth arguing rather than assuming.
+        "debug-mode": JUDGEMENT_REASON,
+        "auto-merge": JUDGEMENT_REASON,
+        "auto-merge-strategy": JUDGEMENT_REASON,
+        "security-scan-enforcement": JUDGEMENT_REASON,
+    },
+}
 
 
 def _surface_sources() -> dict[str, str]:
@@ -261,6 +350,13 @@ def _surface_sources() -> dict[str, str]:
         "bulk-update GUI": _BULK_GUI.read_text(),
         "autodiscovery GUI": _AD_GUI.read_text(),
         "autodiscovery API": _AD_API.read_text(),
+        # The MCP tools an agent drives a workspace through (#2174). Added last
+        # and the reason matters: this gate has enforced three surfaces since
+        # #1763 while a fourth drifted, so MCP was missing 21 of the 46
+        # settable attributes -- including `ai-policy-mode`, the very attribute
+        # whose shipping "on three surfaces out of four" is why this file
+        # exists. A gate is only as wide as the surfaces it reads.
+        "MCP workspace tools": _MCP.read_text(),
     }
 
 
@@ -274,7 +370,7 @@ class TestEverySettableAttributeReachesEverySurface:
             for a in sorted(attrs):
                 if a in excused:
                     continue
-                if f"'{a}'" not in src and f'"{a}"' not in src:
+                if not any(form in src for form in _spellings(surface, a)):
                     problems.append(f"{surface}: {a}")
         assert not problems, (
             "Settable per-workspace attribute(s) unreachable from a surface that "
@@ -288,7 +384,7 @@ class TestEverySettableAttributeReachesEverySurface:
         """Pinned by name: this is the one that regressed, and the general gate
         above would pass again if a future change excused it instead."""
         for surface, src in _surface_sources().items():
-            assert "'ai-policy-mode'" in src or '"ai-policy-mode"' in src, (
+            assert any(form in src for form in _spellings(surface, "ai-policy-mode")), (
                 f"ai-policy-mode is unreachable from {surface}"
             )
 

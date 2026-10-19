@@ -156,6 +156,10 @@ COPY helm ./helm
 COPY go-terrapod/*.go ./go-terrapod/
 COPY provider/internal/resources/workspace/*.go ./provider/internal/resources/workspace/
 COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasources/workspace/
+# The MCP tool definitions, for the workspace-setting parity gate. Without this
+# the gate's `_surface()` raises rather than skipping -- deliberately, because a
+# gate that cannot read the file it checks proves nothing.
+COPY mcp/internal/mcpserver/crud.go ./mcp/internal/mcpserver/crud.go
 
 # The two admin pages the workspace-setting parity gate reads (#1763). The gate
 # requires every bulk-settable setting to be reachable from the GUI too; without
