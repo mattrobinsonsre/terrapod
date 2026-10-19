@@ -277,3 +277,98 @@ class TestAnyFailureToReadTheSetIsCannotTell:
         with patch.object(ee, "availability", AsyncMock(side_effect=RuntimeError("db gone"))):
             with pytest.raises(ee.UnknownExecutionEnvironment):
                 await ee.validate_selection(AsyncMock(), ansible_version="", ee_label="nope")
+
+
+class TestPointingAtOurOwnRegistry:
+    """The documented restricted-network path, which `ee_repository` makes awkward.
+
+    That value is both the reference a kubelet pulls -- needing the ingress host
+    -- and the repository whose tags are listed, which in Terrapod's own
+    registry is named WITHOUT that host. Looking up the full reference would
+    miss, then try an authenticated HTTP call against Terrapod itself, and
+    degrade to "unknown" for exactly the deployments the advice is aimed at.
+    """
+
+    async def test_our_own_host_is_stripped_before_the_local_lookup(self, monkeypatch) -> None:
+        monkeypatch.setattr(settings, "external_url", "https://terrapod.example.com")
+        monkeypatch.setattr(
+            settings.ansible, "ee_repository", "terrapod.example.com/ghcr.io/x/terrapod-ee"
+        )
+        seen: list[str] = []
+
+        async def _get_repository(_db, name):
+            seen.append(name)
+            return _repo("ghcr.io")
+
+        with (
+            patch.object(ee.registry_service, "get_repository", _get_repository),
+            patch.object(ee.registry_service, "list_tags", AsyncMock(return_value=["2.21"])),
+            patch.object(
+                ee.pullthrough_service, "resolve_upstream", lambda _: ("ghcr.io", "x/terrapod-ee")
+            ),
+            patch.object(ee.pullthrough_service, "upstream_tags", AsyncMock(return_value=[])),
+        ):
+            assert await ee._builtin_lines(AsyncMock()) == ["2.21"]
+        assert seen == ["ghcr.io/x/terrapod-ee"], seen
+
+    async def test_a_reference_not_naming_our_host_is_left_alone(self, monkeypatch) -> None:
+        """Otherwise a blind strip would turn `ghcr.io/x/terrapod-ee` into
+        `x/terrapod-ee` and could match an unrelated local repository."""
+        monkeypatch.setattr(settings, "external_url", "https://terrapod.example.com")
+        monkeypatch.setattr(settings.ansible, "ee_repository", "ghcr.io/x/terrapod-ee")
+        seen: list[str] = []
+
+        async def _get_repository(_db, name):
+            seen.append(name)
+            return None
+
+        with (
+            patch.object(ee.registry_service, "get_repository", _get_repository),
+            patch.object(ee.pullthrough_service, "resolve_upstream", lambda _: None),
+            patch.object(ee.pullthrough_service, "list_tags_at", AsyncMock(return_value=["2.12"])),
+        ):
+            assert await ee._builtin_lines(AsyncMock()) == ["2.12"]
+        assert seen == ["ghcr.io/x/terrapod-ee"], seen
+
+    async def test_no_external_url_configured_strips_nothing(self, monkeypatch) -> None:
+        monkeypatch.setattr(settings, "external_url", "")
+        assert ee._local_name("ghcr.io/x/terrapod-ee") == "ghcr.io/x/terrapod-ee"
+
+    async def test_a_bare_hostname_without_a_scheme_still_parses(self, monkeypatch) -> None:
+        """`external_url` is operator-supplied; urlparse gives an empty netloc for
+        a bare host, which would silently disable the strip."""
+        monkeypatch.setattr(settings, "external_url", "terrapod.example.com")
+        assert ee._local_name("terrapod.example.com/ghcr.io/x/ee") == "ghcr.io/x/ee"
+
+    async def test_the_upstream_fall_through_uses_the_stripped_name_too(self, monkeypatch) -> None:
+        """Stripping only for the local lookup is not enough.
+
+        A mirror row's upstream is not null, so the function falls through — and
+        with the FULL reference it would find `terrapod.example.com` is not a
+        configured upstream and make an authenticated call against Terrapod
+        itself, degrading to "unknown" one step later than before. The stripped
+        remainder is both the local row's name and a resolvable upstream
+        coordinate, so one substitution has to serve both.
+        """
+        monkeypatch.setattr(settings, "external_url", "https://terrapod.example.com")
+        monkeypatch.setattr(
+            settings.ansible, "ee_repository", "terrapod.example.com/ghcr.io/x/terrapod-ee"
+        )
+        resolved: list[str] = []
+
+        def _resolve(name):
+            resolved.append(name)
+            return ("ghcr.io", "x/terrapod-ee")
+
+        with (
+            patch.object(
+                ee.registry_service, "get_repository", AsyncMock(return_value=_repo("ghcr.io"))
+            ),
+            patch.object(ee.registry_service, "list_tags", AsyncMock(return_value=["2.12"])),
+            patch.object(ee.pullthrough_service, "resolve_upstream", _resolve),
+            patch.object(ee.pullthrough_service, "upstream_tags", AsyncMock(return_value=["2.21"])),
+            patch.object(ee.pullthrough_service, "list_tags_at", AsyncMock()) as direct,
+        ):
+            assert await ee._builtin_lines(AsyncMock()) == ["2.21", "2.12"]
+        assert resolved == ["ghcr.io/x/terrapod-ee"], resolved
+        direct.assert_not_awaited()

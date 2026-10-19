@@ -88,6 +88,38 @@ class Availability:
         return self.lines is not None
 
 
+def _own_registry_host() -> str:
+    """The host clients address this deployment's own registry at, or "".
+
+    Needed because `ee_repository` serves two purposes at once and they differ
+    for a mirrored setup: it is the reference a **kubelet** pulls, which needs
+    the ingress host, and it is the repository whose tags are listed, which in
+    Terrapod's own registry is named *without* that host (a mirror row is the
+    client-facing path minus the host -- see `ensure_mirror_repository`).
+
+    So an operator following the documented restricted-network advice --
+    `terrapod.example.com/ghcr.io/.../terrapod-ee` -- would otherwise have the
+    listing look up a repository name that does not exist and then try an
+    authenticated HTTP call against Terrapod itself, degrading to "unknown" for
+    exactly the deployments the advice is aimed at.
+    """
+    from urllib.parse import urlparse
+
+    raw = (settings.external_url or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw if "//" in raw else f"//{raw}")
+    return parsed.netloc or ""
+
+
+def _local_name(reference: str) -> str:
+    """`reference` as this registry would name it, with our own host removed."""
+    host = _own_registry_host()
+    if host and reference.startswith(f"{host}/"):
+        return reference[len(host) + 1 :]
+    return reference
+
+
 def _split_repository(reference: str) -> tuple[str, str] | None:
     """Split `host/path/to/repo` into (host, repository).
 
@@ -120,6 +152,15 @@ async def _builtin_lines(db: AsyncSession) -> list[str] | None:
     reference = settings.ansible.ee_repository.strip()
     if not reference:
         return []
+
+    # Our own host is stripped once, here, and EVERYTHING below uses the result.
+    # Doing it only for the local lookup is not enough: the fall-through would
+    # still resolve the full reference, find `terrapod.example.com` is not a
+    # configured upstream, and make an authenticated call against Terrapod
+    # itself -- so the mirrored case would degrade to "unknown" anyway, just one
+    # step later. Stripped, the remainder is both the local row's name and a
+    # resolvable upstream coordinate, so one substitution fixes both halves.
+    reference = _local_name(reference)
 
     local: list[str] = []
     repository = await registry_service.get_repository(db, reference)
