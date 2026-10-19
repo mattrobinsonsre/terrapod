@@ -254,3 +254,141 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
 
     digest = response.headers.get("Docker-Content-Digest", "").strip()
     return digest or None
+
+
+#: How many `tags/list` pages a single listing will follow. A registry chooses
+#: its own page size, so the only way to be sure a listing is complete is to
+#: walk to the end -- and the only way to be sure the walk terminates is a cap.
+_MAX_TAG_PAGES = 20
+
+
+async def upstream_tags(host: str, repository: str) -> list[str] | None:
+    """Every tag upstream holds for a repository, or None if it cannot be known.
+
+    **None means "cannot tell", and a caller must not read it as "empty".** That
+    distinction is the whole point of the return type here. The execution-
+    environment availability read (#2154) refuses a workspace write naming a
+    line it cannot find, so an empty list and an unknown list have opposite
+    consequences: empty is grounds to refuse, unknown is grounds to accept. A
+    function that collapsed the two would turn an upstream hiccup into a refused
+    workspace edit.
+
+    Which is also why a **truncated** listing returns None rather than what it
+    managed to collect. The spec paginates `tags/list` with a `Link` header, so a
+    registry with a small page size would otherwise hand back a partial set that
+    looks authoritative -- and a tag missing from a partial set is
+    indistinguishable from a tag that does not exist. Hitting `_MAX_TAG_PAGES`
+    is therefore "cannot tell", not "here is most of it".
+
+    Unlike `current_upstream_digest` this has no cached answer to fall back on,
+    so the timeouts are a little more generous -- but still bounded, because this
+    sits behind a read an operator is waiting on in a form.
+    """
+    return await list_tags_at(_base_url(host), repository, auth=_auth(host), label=host)
+
+
+async def list_tags_at(
+    base_url: str,
+    repository: str,
+    *,
+    auth: tuple[str, str] | None = None,
+    label: str = "",
+) -> list[str] | None:
+    """`upstream_tags` for a registry that is not a configured pull-through upstream.
+
+    Separate because the two have different reasons to exist, and conflating
+    them would weaken one of them. `registry.oci.upstreams` is an allow-list
+    against a **client** naming a host -- that is an SSRF control and must stay
+    closed by default. A base URL an operator put in their own Helm values is
+    not that: it is the same shape as the eight `*_mirror_url` settings the
+    binary cache already fetches from, and refusing to read it would mean a
+    deployment could not discover its own execution environments without also
+    opening a client-facing mirror it may not want.
+
+    So the caller supplies the base URL and owns having obtained it from
+    configuration rather than from a request. `registry.cache_only` still seals
+    this shut, as it does every other outbound read.
+    """
+    url: str | None = f"{base_url.rstrip('/')}/v2/{repository}/tags/list?n=100"
+    collected: list[str] = []
+    host = label or base_url
+
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            auth=auth,
+            timeout=httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=5.0),
+        ) as client:
+            for _ in range(_MAX_TAG_PAGES):
+                response = await client.get(url, headers={"Accept": "application/json"})
+                if response.status_code == 404:
+                    # The repository genuinely has no tags upstream. Distinct
+                    # from unreachable: this one IS an answer.
+                    return []
+                if response.status_code >= 400:
+                    logger.info(
+                        "Upstream refused a tag listing",
+                        host=host,
+                        repository=repository,
+                        status=response.status_code,
+                    )
+                    return None
+
+                body = response.json()
+                tags = body.get("tags") if isinstance(body, dict) else None
+                # `tags: null` is legal in the spec for an empty repository, and
+                # is not a malformed response to warn about.
+                if isinstance(tags, list):
+                    collected.extend(t for t in tags if isinstance(t, str))
+
+                url = _next_page(response, base_url.rstrip("/"))
+                if url is None:
+                    return collected
+    except (httpx.HTTPError, ValueError) as exc:
+        # ValueError covers a non-JSON body: a proxy error page is a failure to
+        # reach the registry, not a repository with no tags.
+        logger.info(
+            "Could not list tags upstream",
+            host=host,
+            repository=repository,
+            error=str(exc),
+        )
+        return None
+
+    logger.warning(
+        "Upstream tag listing exceeded the page cap; treating it as unknown",
+        host=host,
+        repository=repository,
+        pages=_MAX_TAG_PAGES,
+        collected=len(collected),
+    )
+    return None
+
+
+def _next_page(response: httpx.Response, base: str) -> str | None:
+    """The `Link: <...>; rel="next"` target of a paginated listing, absolutised.
+
+    The spec says the `Link` value is opaque and must be used as given, so the
+    query string is never reconstructed from the tags we received -- a registry
+    is free to use a cursor that has nothing to do with tag names.
+
+    A relative target is resolved against the configured upstream base rather
+    than against the response's own URL, so a registry that returned an absolute
+    `Link` pointing somewhere else cannot redirect the walk off-host.
+    """
+    link = response.headers.get("Link", "")
+    for part in link.split(","):
+        segments = part.split(";")
+        if not any('rel="next"' in s.replace(" ", "") or "rel=next" in s for s in segments[1:]):
+            continue
+        target = segments[0].strip().strip("<>")
+        if not target:
+            return None
+        if target.startswith(base):
+            return target
+        if target.startswith("/"):
+            return f"{base}{target}"
+        # Absolute and pointing elsewhere: refuse to follow it.
+        logger.warning("Ignoring an off-host Link in a tag listing", base=base, target=target)
+        return None
+    return None

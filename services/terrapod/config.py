@@ -1556,6 +1556,61 @@ class CatalogConfig(BaseModel):
     enabled: bool = Field(default=True)
 
 
+class AnsibleConfig(BaseModel):
+    """Which Ansible execution environments a deployment may run (#2154).
+
+    An execution environment is a container image carrying one ansible-core
+    line, run as a sidecar beside the orchestrator. There are two kinds and they
+    are deliberately different things:
+
+    * **built-in** -- the images Terrapod publishes, one per ansible-core line,
+      selected by a workspace's ``ansible_version``. ``ee_repository`` says
+      where they are pulled from, exactly as the five component image
+      repositories do, so mirroring them for a restricted network is the same
+      operation as mirroring those.
+    * **operator-supplied** -- anything else, named by a label in
+      ``execution_environments`` and selected by a workspace's
+      ``ansible_execution_environment``. A label rather than a raw reference so
+      a workspace cannot name an arbitrary image, and so the estate can be
+      re-pointed in one place.
+
+    An operator-supplied environment is **trusted code**, on the same footing as
+    the custom runner image an operator can already set. Its URI is used exactly
+    as given and is never rewritten through the pull-through cache, and it is
+    not covered by Terrapod's own image scanning.
+    """
+
+    ee_repository: str = Field(
+        default="ghcr.io/mattrobinsonsre/terrapod-ee",
+        description="Repository holding the built-in execution environments, one tag per "
+        "ansible-core line (2.12 … 2.21). Follows the same convention as the component "
+        "image repositories: the kubelet pulls it directly, and a restricted-network "
+        "deployment re-points it at its own mirror -- including Terrapod's own registry, "
+        "e.g. terrapod.example.com/ghcr.io/mattrobinsonsre/terrapod-ee, which makes the "
+        "layers a pull-through cached artifact like any other.",
+    )
+    execution_environments: dict[str, str] = Field(
+        default_factory=dict,
+        description="Operator-supplied execution environments as label -> image URI. A "
+        "workspace selects one by label in `ansible_execution_environment`, which "
+        "overrides its `ansible_version`. The URI is used as given and never rewritten "
+        "through the pull-through. Each image must carry ansible-playbook, "
+        "ansible-galaxy, ssh and git on PATH and run as a uid that can read the shared "
+        "volume; the sidecar's startup probe asserts that, so a non-conforming image "
+        "fails at pod startup naming what is missing rather than mid-run. These images "
+        "are trusted code and are not covered by Terrapod's image scanning.",
+    )
+    availability_ttl_seconds: int = Field(
+        default=300,
+        ge=0,
+        description="How long the list of available execution environments is cached. It "
+        "is a tag LISTING -- mutable by nature, unlike the immutable layers beneath it -- "
+        "so it needs a bound or a newly published line could never be selected. Short "
+        "because an operator waiting for a newly published line to appear in a form is "
+        "the case that matters; 0 disables caching entirely.",
+    )
+
+
 class CostEstimationConfig(BaseModel):
     """Cost estimation via a cached pricesheet (#871).
 
@@ -3631,6 +3686,8 @@ class Settings(BaseSettings):
 
     # Service Catalog
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
+
+    ansible: AnsibleConfig = Field(default_factory=AnsibleConfig)
 
     # Cost estimation (#871)
     cost_estimation: CostEstimationConfig = Field(default_factory=CostEstimationConfig)
