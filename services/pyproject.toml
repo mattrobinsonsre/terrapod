@@ -56,7 +56,7 @@ cryptography = ">=50.0.0,<51.0.0"
 zxcvbn = "^4.4.28"
 python-multipart = ">=0.0.26,<0.0.33"
 # Kubernetes (runner listener)
-kubernetes = ">=35,<37"
+kubernetes = ">=35,<38"
 # GPG key parsing for provider registry
 pgpy = "^0.6.0"
 # GitHub App JWT signing for VCS integration

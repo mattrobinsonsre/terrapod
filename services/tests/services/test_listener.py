@@ -26,8 +26,17 @@ def _make_listener(shutdown_event: asyncio.Event, **overrides) -> RunnerListener
     with patch("terrapod.runner.listener.load_runner_config") as mock_cfg:
         # __init__ now reads listener knobs off RunnerConfig (#617) — give the
         # mock real int defaults so comparisons (active >= max_concurrent) work.
+        #
+        # The namespaces need real STRINGS for the same class of reason, since
+        # kubernetes-client 37: its models are pydantic now, so V1ObjectMeta
+        # VALIDATES its fields and a MagicMock namespace raises
+        # `ValidationError: Input should be a valid string` from inside
+        # `_create_vars_secret`. On 36.x the models were plain classes and a
+        # mock sailed through. Values match the RunnerConfig defaults.
         mock_cfg.return_value = MagicMock(
             definitions=[],
+            runner_namespace="terrapod-runners",
+            listener_namespace="terrapod",
             heartbeat_interval=60,
             max_concurrent=3,
             health_port=8081,
