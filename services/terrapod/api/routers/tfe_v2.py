@@ -311,6 +311,31 @@ def _validate_ansible_version(raw: object) -> str:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+async def _refuse_unrunnable_selection(
+    db: AsyncSession, *, ansible_version: str, ee_label: str
+) -> None:
+    """422 when this deployment has no execution environment for the selection.
+
+    Two different refusals behind one call, and the difference matters:
+
+    * an **unconfigured operator label** is always refused -- the map is local
+      configuration, so there is no "cannot tell".
+    * an **ansible-core line** is refused only when the available set is known.
+      The set is read from a registry, so refusing on an unknown set would make
+      an ordinary workspace edit depend on registry reachability (#2154 D7). The
+      run-time path already names the image when an EE cannot be pulled, so this
+      is an earlier, better error rather than the only guard.
+    """
+    from terrapod.services import ansible_ee_service
+
+    try:
+        await ansible_ee_service.validate_selection(
+            db, ansible_version=ansible_version, ee_label=ee_label
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 def _validate_ansible_collections(raw: object) -> list[dict[str, str]]:
     """HTTP wrapper over the canonical rule in `services.workspace_settings`."""
     try:
@@ -778,6 +803,7 @@ def _workspace_json(
                 # because a client writing a read straight back would then pin
                 # every workspace to whatever the default was at read time.
                 "ansible-version": ws.ansible_version or "",
+                "ansible-execution-environment": ws.ansible_execution_environment,
                 # Returned as stored, never normalised: a provider writes this
                 # back into state, so a reshaped value fails every apply.
                 "ansible-collections": list(ws.ansible_collections or []),
@@ -1561,6 +1587,15 @@ async def _create_workspace_impl(
             if "ansible-version" in attrs
             else DEFAULT_ANSIBLE_LINE
         ),
+        # An operator EE label overrides the line above when set (#2154). `""`
+        # is the default and means "use the built-in image for the line", so an
+        # absent key and an explicit empty string agree.
+        # No field-name argument: the rule names the field in its own message,
+        # and `_422` forwards every extra positional straight to the rule.
+        ansible_execution_environment=_422(
+            workspace_settings.validate_ansible_execution_environment,
+            attrs.get("ansible-execution-environment", ""),
+        ),
         # `in attrs`, not truthiness: an explicit `[]` means "declare none here"
         # and must not fall through to anything else.
         ansible_collections=(
@@ -1711,6 +1746,18 @@ async def _create_workspace_impl(
         configure=ws.configure_enabled,
     )
     pool_set.set_workspace_pools(ws, requested_pool_ids)
+    if "ansible-version" in attrs or "ansible-execution-environment" in attrs:
+        # Only when the caller actually chose, and `ws.ansible_version` is NOT
+        # the thing to pass: create resolves an absent key to the default line,
+        # so passing it would make every ordinary workspace create -- the vast
+        # majority, which name no line at all -- wait on a registry listing to
+        # confirm a line Terrapod itself chose. `""` means "inheriting", which
+        # is never refused.
+        await _refuse_unrunnable_selection(
+            db,
+            ansible_version=ws.ansible_version if "ansible-version" in attrs else "",
+            ee_label=ws.ansible_execution_environment,
+        )
     db.add(ws)
 
     # GHSA-49q6-pm68-3xgw. An assignment rule selects on attributes this caller
@@ -2313,6 +2360,11 @@ async def update_workspace(
         ws.engine_version = _engine_version_attr(attrs, ws.engine_version)
     if "ansible-version" in attrs:
         ws.ansible_version = _validate_ansible_version(attrs["ansible-version"])
+    if "ansible-execution-environment" in attrs:
+        ws.ansible_execution_environment = _422(
+            workspace_settings.validate_ansible_execution_environment,
+            attrs["ansible-execution-environment"],
+        )
     if "ansible-collections" in attrs:
         ws.ansible_collections = _validate_ansible_collections(attrs["ansible-collections"])
     if "slack-channel" in attrs:
@@ -2396,6 +2448,20 @@ async def update_workspace(
                 column,
                 _422(workspace_settings.validate_resource_quantity, attrs[key], key),
             )
+    if "ansible-version" in attrs or "ansible-execution-environment" in attrs:
+        # Only what the caller sent, per #316: re-validating a stored line would
+        # trap a row written before its EE was published -- editable only by the
+        # route that refuses it. So an unsupplied line passes `""`, which means
+        # "inheriting" and is never refused.
+        #
+        # The LABEL is taken from the merged state either way, because the label
+        # decides whether the line selects anything at all: with one set, an
+        # unpublished line alongside it is irrelevant and must not be refused.
+        await _refuse_unrunnable_selection(
+            db,
+            ansible_version=ws.ansible_version if "ansible-version" in attrs else "",
+            ee_label=ws.ansible_execution_environment,
+        )
     if "oidc-audiences" in attrs:
         ws.oidc_audiences = _422(
             workspace_settings.validate_oidc_audiences, attrs["oidc-audiences"]

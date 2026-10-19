@@ -247,3 +247,33 @@ class TestTheWriteTimeCheck:
         """Local configuration, so "cannot tell" does not arise."""
         with pytest.raises(ee.UnknownExecutionEnvironment):
             await ee.validate_selection(AsyncMock(), ansible_version="", ee_label="nope")
+
+
+class TestAnyFailureToReadTheSetIsCannotTell:
+    """Not just an unreachable registry — a database or Redis error too.
+
+    The consequence is asymmetric, which is what justifies the broad catch:
+    accepting an unrunnable line costs a legible run-time failure, while
+    refusing a runnable one costs the operator their edit for a reason that has
+    nothing to do with what they typed.
+    """
+
+    async def test_a_database_error_accepts(self) -> None:
+        with patch.object(ee, "availability", AsyncMock(side_effect=RuntimeError("db gone"))):
+            await ee.validate_selection(AsyncMock(), ansible_version="2.99", ee_label=None)
+
+    async def test_it_does_not_swallow_the_refusal_itself(self) -> None:
+        """The catch must wrap only the read. A refusal raised after it is the
+        answer, not an error to absorb."""
+        with patch.object(
+            ee, "availability", AsyncMock(return_value=ee.Availability(["2.21"], {}))
+        ):
+            with pytest.raises(ee.UnpublishedAnsibleLine):
+                await ee.validate_selection(AsyncMock(), ansible_version="2.99", ee_label=None)
+
+    async def test_an_unknown_label_is_still_refused_without_reading_anything(self) -> None:
+        """The label branch short-circuits before the read, so a broken database
+        cannot turn an unconfigured label into an accepted one."""
+        with patch.object(ee, "availability", AsyncMock(side_effect=RuntimeError("db gone"))):
+            with pytest.raises(ee.UnknownExecutionEnvironment):
+                await ee.validate_selection(AsyncMock(), ansible_version="", ee_label="nope")

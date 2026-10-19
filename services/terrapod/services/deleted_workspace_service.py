@@ -112,6 +112,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "ee_resource_memory": ws.ee_resource_memory,
         "parallelism": ws.parallelism,
         "ansible_version": ws.ansible_version,
+        "ansible_execution_environment": ws.ansible_execution_environment,
         "ansible_collections": list(ws.ansible_collections or []),
         # Which operations the workspace had (#1966). Snapshotted because the
         # restore path is one of the sites a new declaration is easiest to miss:
@@ -662,6 +663,13 @@ async def restore_workspace(
         # "" is the correct fallback, not the deployment default: a snapshot
         # predating this column means the workspace never pinned one.
         ansible_version=settings.get("ansible_version") or "",
+        # "" again, and for the same reason: a snapshot predating the column
+        # means that workspace named no operator environment, so it should come
+        # back on the built-in image for its line. Substituting a configured
+        # label would silently move a restored workspace onto an environment it
+        # never asked for -- and unlike a wrong size, that changes which ansible
+        # runs its playbooks.
+        ansible_execution_environment=settings.get("ansible_execution_environment") or "",
         # `[]` for a snapshot predating the column, which is also the
         # correct meaning: that workspace declared none.
         ansible_collections=list(settings.get("ansible_collections") or []),

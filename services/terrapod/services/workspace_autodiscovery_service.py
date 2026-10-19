@@ -395,6 +395,7 @@ async def find_or_autocreate_workspace(
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         ansible_version=rule.ansible_version,
+        ansible_execution_environment=rule.ansible_execution_environment,
         ansible_collections=list(rule.ansible_collections or []),
         # Which operations the materialised workspace has, and the roots each
         # one uses (#1966, #1929). `configure_enabled` defaults FALSE on the

@@ -274,7 +274,23 @@ async def validate_selection(
         # caller could have got wrong.
         return
 
-    available = await availability(db)
+    try:
+        available = await availability(db)
+    except Exception as exc:  # noqa: BLE001
+        # ANY failure to determine the set is "cannot tell", not just an
+        # unreachable registry: a database error, a Redis error, a malformed
+        # upstream response. The alternative is refusing a legitimate workspace
+        # edit because of an infrastructure problem somewhere else entirely,
+        # which is the failure mode D7's fail-open rule exists to prevent -- and
+        # a broad catch is right here precisely because the consequence of
+        # getting it wrong is asymmetric: accepting an unrunnable line costs a
+        # legible run-time failure, refusing a runnable one costs the edit.
+        logger.info(
+            "Accepting an ansible line without confirming it: the set could not be read",
+            line=line,
+            error=str(exc),
+        )
+        return
     if available.lines is None:
         logger.info(
             "Accepting an ansible line without confirming it: the available set is unknown",

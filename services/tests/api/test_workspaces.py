@@ -52,6 +52,7 @@ def _mock_workspace(
     execution_mode="local",
     engine_version="1.11",
     ansible_version="2.21.5",
+    ansible_execution_environment="",
     resource_cpu="1",
     parallelism=10,
     resource_memory="2Gi",
@@ -67,6 +68,7 @@ def _mock_workspace(
     ws.execution_mode = execution_mode
     ws.engine_version = engine_version
     ws.ansible_version = ansible_version
+    ws.ansible_execution_environment = ansible_execution_environment
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""

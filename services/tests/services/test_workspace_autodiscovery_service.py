@@ -518,6 +518,7 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "execution_backend",
         "engine_version",
         "ansible_version",
+        "ansible_execution_environment",
         # The collections a configure installs (#1931). Templated for the same
         # reason as the version above: a fleet standardising on an internal
         # collection should not have to be edited one workspace at a time.

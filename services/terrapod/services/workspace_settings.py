@@ -178,6 +178,33 @@ def validate_ansible_collections(raw: object) -> list[dict[str, str]]:
 _RESOURCE_QUANTITY = re.compile(r"^\d+(m|Ki|Mi|Gi|Ti)?$")
 
 
+def validate_ansible_execution_environment(raw: object) -> str:
+    """An operator-supplied execution-environment **label**, or `""` for none.
+
+    Shape only. Whether the label is actually configured on this deployment is
+    `ansible_ee_service.validate_selection`'s job, because answering it needs
+    the deployment's own map and, for the sibling line check, a database
+    session -- and a rule here that quietly accepted an unconfigured label would
+    be the worse half of the pair to get wrong.
+
+    Stored byte for byte once accepted. A Terraform provider writes the server's
+    response back into state, so trimming or case-folding a value a practitioner
+    wrote would fail their apply with "Provider produced inconsistent result
+    after apply" -- the v1.9.0 advisory batch was largely this.
+    """
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError(
+            f"ansible-execution-environment: must be a string, not {type(raw).__name__}"
+        )
+    if raw.strip() != raw:
+        raise ValueError("ansible-execution-environment: must not carry surrounding whitespace")
+    if len(raw) > 100:
+        raise ValueError("ansible-execution-environment: must be at most 100 characters")
+    return raw
+
+
 def validate_resource_quantity(value: object, field: str) -> str:
     """A CPU or memory request, or `""` to inherit the deployment default.
 

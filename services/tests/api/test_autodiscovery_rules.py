@@ -53,6 +53,7 @@ def _mock_rule(
     r.pulumi_bind_plan = False
     r.engine_version = "1.11"
     r.ansible_version = "2.21.5"
+    r.ansible_execution_environment = ""
     # #1929's six, which `_rule_json` serialises.
     r.plan_apply_enabled = True
     r.configure_enabled = False

@@ -377,6 +377,19 @@ class Workspace(Base):
     ansible_version: Mapped[str] = mapped_column(
         String(20), nullable=False, default=DEFAULT_ANSIBLE_LINE
     )
+    #: An operator-supplied execution environment, by **label** from
+    #: `ansible.execution_environments`, which OVERRIDES `ansible_version`
+    #: when set (#2154). Empty is the ordinary case: use the built-in image for
+    #: the line above.
+    #:
+    #: A label rather than an image reference so a workspace cannot name an
+    #: arbitrary image, and a separate column rather than an overloaded
+    #: `ansible_version` for a measured reason: `is_pypi_version_allowed`
+    #: screens only pre-releases, so a label passes it -- and a label named
+    #: `2.21` would shadow a real line with no way to tell.
+    ansible_execution_environment: Mapped[str] = mapped_column(
+        String(100), nullable=False, default=""
+    )
     #: The Ansible collections a configure installs, declared on the platform
     #: rather than only in the repository (#1931).
     #:
@@ -1810,6 +1823,12 @@ class AutodiscoveryRule(Base):
     #: a rule that names none materialises workspaces on the platform's line.
     ansible_version: Mapped[str] = mapped_column(
         String(20), nullable=False, default=DEFAULT_ANSIBLE_LINE
+    )
+    #: Template for a materialised workspace's operator-supplied execution
+    #: environment label (#2154), following `ansible_version` above. Empty means
+    #: the materialised workspaces use the built-in image for their line.
+    ansible_execution_environment: Mapped[str] = mapped_column(
+        String(100), nullable=False, default=""
     )
     #: Template for a materialised workspace's declared collections (#1931),
     #: following `ansible_version` above. A rule without this could only ever

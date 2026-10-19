@@ -72,6 +72,7 @@ _FIELD_MAP: dict[str, str] = {
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
     "ansible-version": "ansible_version",
+    "ansible-execution-environment": "ansible_execution_environment",
     "ansible-collections": "ansible_collections",
     # Which operations a workspace has (#1966). Fleet-settable on purpose:
     # turning configure on across a matched set is the operation an operator
@@ -383,6 +384,11 @@ _SETTING_RULES: dict[str, Any] = {
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "ansible-version": workspace_settings.validate_ansible_version,
+    # Shape only. Whether the label is CONFIGURED needs the deployment map and
+    # a session, so it is refused in `_reject_unrunnable_ee_selection` below --
+    # a rule here is still required, because a key in `_FIELD_MAP` and absent
+    # from this dict is written unvalidated.
+    "ansible-execution-environment": (workspace_settings.validate_ansible_execution_environment),
     # All four resource requests share one rule (#2154), so the orchestrator's
     # pair and the EE's cannot come to disagree about what is writable. The
     # orchestrator's two were in `_FIELD_MAP` and absent from here, which means
@@ -634,6 +640,49 @@ def _reject_leaving_a_workspace_with_no_operations(
             "filter to the workspaces that already have it."
         ),
     )
+
+
+async def _reject_unrunnable_ee_selection(fields: dict[str, Any], workspaces: list, db) -> None:
+    """Refuse a fleet-wide Ansible selection this deployment cannot run (#2154).
+
+    The single-workspace PATCH refuses this, so without it here the one path
+    that can touch a hundred workspaces at once would be the path that bypasses
+    the check -- the same reasoning as
+    `_reject_scan_enforcement_on_unscannable_engines` above, and the same
+    all-or-nothing contract.
+
+    The two halves are refused on different grounds:
+
+    * an **unconfigured label** is always refused; the map is local
+      configuration, so there is no "cannot tell".
+    * a **line** is refused only when the available set is known (#2154 D7),
+      and only when some matched workspace would actually end up selecting by
+      line. A workspace carrying a label ignores the line entirely, so refusing
+      a fleet update because of a line none of them will use would be wrong.
+    """
+    from terrapod.services import ansible_ee_service
+
+    label = fields.get("ansible_execution_environment")
+    line = fields.get("ansible_version")
+
+    if label:
+        try:
+            ansible_ee_service.effective_ee_image(ansible_version=None, ee_label=label)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # Every matched workspace will select by label, so the line is inert.
+        return
+
+    if not line:
+        return
+    # `label` is unset in the payload, so each workspace keeps its stored one.
+    # Only those with none will select by line.
+    if label is None and all(w.ansible_execution_environment for w in workspaces):
+        return
+    try:
+        await ansible_ee_service.validate_selection(db, ansible_version=line, ee_label=None)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _reject_scan_enforcement_on_unscannable_engines(
@@ -910,6 +959,7 @@ async def bulk_update_workspaces(
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
     _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
     _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
+    await _reject_unrunnable_ee_selection(plan["fields"], workspaces, db)
     _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)
     _reject_bind_plan_on_non_pulumi_engines(plan["fields"], workspaces)
 

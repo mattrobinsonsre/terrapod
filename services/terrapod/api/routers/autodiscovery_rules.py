@@ -95,6 +95,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "ansible-version": rule.ansible_version,
+            "ansible-execution-environment": rule.ansible_execution_environment,
             "ansible-collections": list(rule.ansible_collections or []),
             # Which operations a materialised workspace has (#1966), and the
             # roots each one uses (#1929). `configure-enabled` defaults false,
@@ -309,6 +310,15 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         # as a 500 where the guard exists to give a 422.
         try:
             out["ansible_version"] = validate_ansible_version(attrs["ansible-version"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    if "ansible-execution-environment" in attrs:
+        try:
+            out["ansible_execution_environment"] = (
+                workspace_settings.validate_ansible_execution_environment(
+                    attrs["ansible-execution-environment"]
+                )
+            )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
     if "ansible-collections" in attrs:
@@ -841,6 +851,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         ee_resource_memory=fields.get("ee_resource_memory", ""),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         ansible_version=fields.get("ansible_version", DEFAULT_ANSIBLE_LINE),
+        ansible_execution_environment=fields.get("ansible_execution_environment", ""),
         ansible_collections=fields.get("ansible_collections", []),
         # These literals are checked against the model's own column defaults by
         # a gate: a preview that invents its own would show workspaces that are
