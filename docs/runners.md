@@ -298,6 +298,18 @@ whose startup probe never passes gets `runners.eeStartupTimeoutSeconds` (default
 Job's own counters would report the pod as active and the run would hang to the
 one-hour stale timeout, reporting nothing an operator could act on.
 
+**Upgrade the runner and listener images together.** Both default to the chart's
+`appVersion`, so this only arises if you pin `runners.image.tag` or
+`listener.image.tag` independently — but if you do, note that the two images
+each supply half of this pod. The listener is what adds the sidecar and the shared
+volume; the runner image is what carries the agent copied onto it. So a listener
+that predates configure runs gives a newer runner no environment to drive, and a
+runner that predates them fails the `agent-copy` init container, which looks for
+an agent its image does not contain. Either way only configure runs are affected
+— the sidecar is added only for a workspace that has a configure operation — and
+either way the pod fails at startup rather than part way through a playbook. See
+[component version skew](versioning-and-support.md#component-version-skew).
+
 ### Choosing an execution environment
 
 There are two kinds, and the difference is who vouches for the image.

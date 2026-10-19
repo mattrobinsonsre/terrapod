@@ -119,15 +119,29 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
 - **runner ↔ listener:** normally not a pair that can skew, because both default to
   the chart's `appVersion` — but `runners.image.tag` and `listener.image.tag` are
   **independently settable**, so pinning one and not the other creates a skew the
-  wire protocol above does not cover. **One feature couples them, from v1.10.0:
-  [per-workspace cloud identity](cloud-identity.md).** The listener image is what
-  builds the runner Job's pod spec, so the in-memory volume the runner's credential
-  phase writes its tokens into is created by the *listener*, not the runner. A newer
-  runner launched by a listener that predates the feature therefore finds no volume,
-  hits the container's read-only root filesystem, and fails closed with an `EROFS`
-  error naming a filesystem path rather than a stale image. **Upgrade listeners before
-  (or with) runners**, and before enabling cloud identity. Pinning only one of the two
-  tags is what makes this reachable at all.
+  wire protocol above does not cover. Pinning only one of the two tags is what makes
+  any of the following reachable at all, and the general cause is the same each time:
+  **the listener image is what builds the runner Job's pod spec**, so a feature whose
+  runner-side half depends on something in that spec is a feature that couples the
+  two images. The coupled features are:
+
+  - **[Per-workspace cloud identity](cloud-identity.md)**, from v1.10.0. The
+    in-memory volume the runner's credential phase writes its tokens into is created
+    by the *listener*. A newer runner launched by a listener that predates the feature
+    finds no volume, hits the container's read-only root filesystem, and fails closed
+    with an `EROFS` error naming a filesystem path rather than a stale image.
+    **Upgrade listeners before (or with) runners**, and before enabling cloud identity.
+  - **[Ansible configure runs](runners.md#the-job-a-configure-runs-in)**, from v2.0.0.
+    This one couples in **both** directions, because the two images each supply half of
+    the pod: the listener adds the execution-environment sidecar and the shared volume,
+    and the *runner* image is what carries the small static agent the sidecar is probed
+    for. A newer runner under an older listener gets no sidecar and nothing to drive;
+    an older runner under a newer listener fails in the `agent-copy` init container,
+    which copies that agent out of the runner image and finds no such file. Either way
+    the failure is confined to configure runs — the sidecar is only added when the
+    workspace has a configure operation, so plan and apply are unaffected — and either
+    way it fails closed at pod startup rather than part way through a playbook.
+    **Upgrade the two together.**
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 
