@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m",
       "ansibleExecutionEnvironment": "4n51bl3 3x3cu710n 3nv1r0nm3n7",
       "ansibleExecutionEnvironmentTitle": "0n3 0f 7h15 d3pl0ym3n7'5 0wn 3x3cu710n 3nv1r0nm3n75, by l4b3l. 17 0v3rr1d35 7h3 4n51bl3 v3r510n, 50 4 w0rk5p4c3 w17h 4 l4b3l 537 1gn0r35 175 l1n3. L34v3 3mp7y 70 u53 7h3 bu1l7-1n 1m4g3 f0r 7h3 l1n3.",
-      "ansibleExecutionEnvironmentPlaceholder": "3.g. rh3l8-h4rd3n3d"
+      "ansibleExecutionEnvironmentPlaceholder": "3.g. rh3l8-h4rd3n3d",
+      "ansibleExecutionEnvironmentNone": "N0n3 c0nf1gur3d 0n 7h15 d3pl0ym3n7",
+      "ansibleVersionUnconfirmed": "4v41l4bl3 v3r510n5 c0uld n07 b3 c0nf1rm3d — 7yp3 0n3"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

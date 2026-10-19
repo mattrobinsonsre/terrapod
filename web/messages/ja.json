@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "例: sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible 実行環境",
       "ansibleExecutionEnvironmentTitle": "このデプロイメント独自の実行環境をラベルで指定します。Ansible バージョンより優先されるため、ラベルが設定されたワークスペースはそのラインを無視します。空のままにすると、そのラインの組み込みイメージを使用します。",
-      "ansibleExecutionEnvironmentPlaceholder": "例: rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "例: rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "このデプロイメントには未設定です",
+      "ansibleVersionUnconfirmed": "利用可能なバージョンを確認できませんでした — 入力してください"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

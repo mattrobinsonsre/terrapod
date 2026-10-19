@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible-suoritusympäristö",
       "ansibleExecutionEnvironmentTitle": "Yksi tämän asennuksen omista suoritusympäristöistä, nimiöllä. Se ohittaa Ansible-version, joten nimiöllä varustettu työtila ohittaa oman linjansa. Jätä tyhjäksi käyttääksesi linjan sisäänrakennettua vedosta.",
-      "ansibleExecutionEnvironmentPlaceholder": "esim. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "esim. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Tähän asennukseen ei ole määritetty yhtään",
+      "ansibleVersionUnconfirmed": "Saatavilla olevia versioita ei voitu vahvistaa — kirjoita versio"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

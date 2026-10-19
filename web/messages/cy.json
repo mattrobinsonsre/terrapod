@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Amgylchedd gweithredu Ansible",
       "ansibleExecutionEnvironmentTitle": "Un o amgylcheddau gweithredu'r gosodiad hwn, drwy label. Mae'n disodli fersiwn Ansible, felly bydd gweithle â label yn anwybyddu ei linell. Gadewch yn wag i ddefnyddio delwedd fewnol y llinell.",
-      "ansibleExecutionEnvironmentPlaceholder": "e.e. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "e.e. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Dim un wedi'i ffurfweddu ar y gosodiad hwn",
+      "ansibleVersionUnconfirmed": "Methwyd cadarnhau'r fersiynau sydd ar gael — teipiwch un"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

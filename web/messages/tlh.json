@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "Da sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible vumwI' Daq",
       "ansibleExecutionEnvironmentTitle": "naDev vumwI' Daqmey wa'. Ansible mI' chenmoHlaHbe'; per ghajbogh Daq lulIjlaH lInDaj. chIm yIlan 'ej lIn Dochvam lo'.",
-      "ansibleExecutionEnvironmentPlaceholder": "ghob rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "ghob rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "naDev pagh chenmoHlu'pu'",
+      "ansibleVersionUnconfirmed": "lo'laHbogh mI'mey ngu'laHbe' — yIqon"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ambitus exsecutionis Ansible",
       "ansibleExecutionEnvironmentTitle": "Unus ex ambitibus exsecutionis huius institutionis, per titulum. Versionem Ansible supervertit, itaque locus operis cum titulo lineam suam neglegit. Vacuum relinque ut imagine insita lineae utaris.",
-      "ansibleExecutionEnvironmentPlaceholder": "ex. gr. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "ex. gr. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Nullum in hac institutione constitutum",
+      "ansibleVersionUnconfirmed": "Versiones praesto confirmari non potuerunt — scribe unam"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

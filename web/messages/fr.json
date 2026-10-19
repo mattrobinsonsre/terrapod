@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Environnement d'exécution Ansible",
       "ansibleExecutionEnvironmentTitle": "Un des environnements d'exécution propres à ce déploiement, par étiquette. Il remplace la version d'Ansible, donc un espace de travail avec une étiquette ignore sa ligne. Laissez vide pour utiliser l'image intégrée de la ligne.",
-      "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Aucun configuré sur ce déploiement",
+      "ansibleVersionUnconfirmed": "Impossible de confirmer les versions disponibles — saisissez-en une"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

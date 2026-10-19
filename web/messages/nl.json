@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible-uitvoeringsomgeving",
       "ansibleExecutionEnvironmentTitle": "Een van de eigen uitvoeringsomgevingen van deze installatie, op label. Dit overschrijft de Ansible-versie, dus een workspace met een label negeert zijn lijn. Laat leeg om de ingebouwde image van de lijn te gebruiken.",
-      "ansibleExecutionEnvironmentPlaceholder": "bijv. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "bijv. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Geen geconfigureerd in deze installatie",
+      "ansibleVersionUnconfirmed": "Beschikbare versies konden niet worden bevestigd — typ er een"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

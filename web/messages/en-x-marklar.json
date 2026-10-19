@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible marklar marklar",
       "ansibleExecutionEnvironmentTitle": "One of this marklar's own marklar marklar, by marklar. It overrides the Ansible marklar, so a marklar with a marklar set ignores its marklar. Leave empty to use the built-in marklar for the marklar.",
-      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "None configured on this marklar",
+      "ansibleVersionUnconfirmed": "Available marklars could not be confirmed — type one"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

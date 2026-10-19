@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible 执行环境",
       "ansibleExecutionEnvironmentTitle": "通过标签指定本部署自有的执行环境。它会覆盖 Ansible 版本，因此设置了标签的工作区将忽略其版本线。留空则使用该版本线的内置镜像。",
-      "ansibleExecutionEnvironmentPlaceholder": "例如 rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "例如 rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "本部署未配置任何项",
+      "ansibleVersionUnconfirmed": "无法确认可用版本 — 请手动输入"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "např. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Běhové prostředí Ansible",
       "ansibleExecutionEnvironmentTitle": "Jedno z vlastních běhových prostředí této instalace, podle označení. Přepisuje verzi Ansible, takže pracovní prostor s nastaveným označením ignoruje svou linii. Ponechte prázdné pro použití vestavěného obrazu linie.",
-      "ansibleExecutionEnvironmentPlaceholder": "např. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "např. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "V této instalaci není nic nastaveno",
+      "ansibleVersionUnconfirmed": "Dostupné verze nelze potvrdit — zadejte ji"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

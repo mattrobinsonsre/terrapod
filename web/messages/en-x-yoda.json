@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Environment of execution, Ansible",
       "ansibleExecutionEnvironmentTitle": "Of this deployment's own execution environments, one it is, by label. The Ansible version, it overrides — so its line, a workspace with a label set ignores. Empty leave it, and the built-in image for the line, use it will.",
-      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened, hmm"
+      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened, hmm",
+      "ansibleExecutionEnvironmentNone": "Configured on this deployment, none are",
+      "ansibleVersionUnconfirmed": "Confirmed, the available versions could not be — type one, you must"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

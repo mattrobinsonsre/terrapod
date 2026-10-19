@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "مثال: sts.amazonaws.com",
       "ansibleExecutionEnvironment": "بيئة تنفيذ Ansible",
       "ansibleExecutionEnvironmentTitle": "إحدى بيئات التنفيذ الخاصة بهذا النشر، بواسطة التسمية. تتجاوز إصدار Ansible، لذا تتجاهل مساحة العمل التي تحمل تسمية خطها. اتركه فارغًا لاستخدام الصورة المدمجة للخط.",
-      "ansibleExecutionEnvironmentPlaceholder": "مثال rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "مثال rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "لا يوجد أي منها مُهيأ في هذا النشر",
+      "ansibleVersionUnconfirmed": "لم يتعذر تأكيد الإصدارات المتاحة — اكتب أحدها"
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",

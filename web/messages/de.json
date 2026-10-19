@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "z. B. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible-Ausführungsumgebung",
       "ansibleExecutionEnvironmentTitle": "Eine der eigenen Ausführungsumgebungen dieser Installation, per Label. Sie überschreibt die Ansible-Version, sodass ein Workspace mit gesetztem Label seine Linie ignoriert. Leer lassen, um das integrierte Image der Linie zu verwenden.",
-      "ansibleExecutionEnvironmentPlaceholder": "z. B. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "z. B. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Keine in dieser Installation konfiguriert",
+      "ansibleVersionUnconfirmed": "Verfügbare Versionen konnten nicht bestätigt werden – bitte eingeben"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "örn. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible yürütme ortamı",
       "ansibleExecutionEnvironmentTitle": "Bu kurulumun kendi yürütme ortamlarından biri, etiketle. Ansible sürümünü geçersiz kılar, bu nedenle etiketi ayarlanmış bir çalışma alanı kendi hattını yok sayar. Hattın yerleşik görüntüsünü kullanmak için boş bırakın.",
-      "ansibleExecutionEnvironmentPlaceholder": "örn. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "örn. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Bu kurulumda yapılandırılmış yok",
+      "ansibleVersionUnconfirmed": "Kullanılabilir sürümler doğrulanamadı — birini yazın"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

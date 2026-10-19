@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "مثلاً sts.amazonaws.com",
       "ansibleExecutionEnvironment": "محیط اجرای Ansible",
       "ansibleExecutionEnvironmentTitle": "یکی از محیط‌های اجرای خودِ این استقرار، با برچسب. نسخهٔ Ansible را لغو می‌کند، بنابراین فضای کاری با برچسب تعیین‌شده خط خود را نادیده می‌گیرد. خالی بگذارید تا تصویر داخلی آن خط استفاده شود.",
-      "ansibleExecutionEnvironmentPlaceholder": "مثلاً rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "مثلاً rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "هیچ‌کدام در این استقرار تنظیم نشده است",
+      "ansibleVersionUnconfirmed": "نسخه‌های موجود تأیید نشد — یکی را تایپ کنید"
     },
     "vcsWorkflowWarning": {
       "title": "مجوزدهی به مخزن VCS شما واگذار شده است.",

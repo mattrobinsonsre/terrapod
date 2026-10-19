@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "например, sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Среда выполнения Ansible",
       "ansibleExecutionEnvironmentTitle": "Одна из собственных сред выполнения этой установки, по метке. Она переопределяет версию Ansible, поэтому рабочая область с заданной меткой игнорирует свою линию. Оставьте пустым, чтобы использовать встроенный образ линии.",
-      "ansibleExecutionEnvironmentPlaceholder": "напр. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "напр. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "В этой установке не настроено ни одного",
+      "ansibleVersionUnconfirmed": "Не удалось подтвердить доступные версии — введите вручную"
     },
     "vcsWorkflowWarning": {
       "title": "Авторизация делегирована вашему репозиторию VCS.",

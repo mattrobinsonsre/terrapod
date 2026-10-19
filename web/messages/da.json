@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible-eksekveringsmiljø",
       "ansibleExecutionEnvironmentTitle": "Et af denne installations egne eksekveringsmiljøer, via etiket. Det tilsidesætter Ansible-versionen, så et arbejdsområde med en etiket ignorerer sin linje. Lad feltet være tomt for at bruge linjens indbyggede image.",
-      "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Ingen konfigureret i denne installation",
+      "ansibleVersionUnconfirmed": "Tilgængelige versioner kunne ikke bekræftes — skriv en"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

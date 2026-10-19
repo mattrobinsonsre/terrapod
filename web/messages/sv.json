@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "t.ex. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansible-exekveringsmiljö",
       "ansibleExecutionEnvironmentTitle": "En av den här installationens egna exekveringsmiljöer, via etikett. Den åsidosätter Ansible-versionen, så en arbetsyta med en etikett ignorerar sin linje. Lämna tomt för att använda linjens inbyggda avbildning.",
-      "ansibleExecutionEnvironmentPlaceholder": "t.ex. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "t.ex. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Inga konfigurerade i den här installationen",
+      "ansibleVersionUnconfirmed": "Tillgängliga versioner kunde inte bekräftas — skriv en"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

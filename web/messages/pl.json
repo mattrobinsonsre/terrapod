@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "np. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Środowisko wykonawcze Ansible",
       "ansibleExecutionEnvironmentTitle": "Jedno z własnych środowisk wykonawczych tej instalacji, według etykiety. Nadpisuje wersję Ansible, więc obszar roboczy z ustawioną etykietą ignoruje swoją linię. Pozostaw puste, aby użyć wbudowanego obrazu linii.",
-      "ansibleExecutionEnvironmentPlaceholder": "np. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "np. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "Brak skonfigurowanych w tej instalacji",
+      "ansibleVersionUnconfirmed": "Nie udało się potwierdzić dostępnych wersji — wpisz ją"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

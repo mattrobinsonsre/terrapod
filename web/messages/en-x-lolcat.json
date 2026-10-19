@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "ansibleExecutionEnvironment": "Ansibul execushun enviroment",
       "ansibleExecutionEnvironmentTitle": "WAN OF DIS deployments OWN execushun enviroments, BY LABEL. IT OVERRIDEZ TEH Ansibul vershun, SO A WORKSPACE WIF A LABEL SET IGNORES ITS LINE. LEAV EMPTY 2 USE TEH BUILT-IN IMAGE 4 TEH LINE. KTHXBAI",
-      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "NUFFIN CONFIGURD ON DIS deployment",
+      "ansibleVersionUnconfirmed": "AVAILABLE VERSHUNS COULD NOT BE CONFIRMD — TIPE WAN KTHX"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

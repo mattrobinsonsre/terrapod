@@ -2629,7 +2629,9 @@
       "oidcAudiencesPlaceholder": "לדוגמה sts.amazonaws.com",
       "ansibleExecutionEnvironment": "סביבת הרצה של Ansible",
       "ansibleExecutionEnvironmentTitle": "אחת מסביבות ההרצה של פריסה זו, לפי תווית. היא עוקפת את גרסת Ansible, ולכן סביבת עבודה עם תווית מתעלמת מהקו שלה. השאר ריק כדי להשתמש בתמונה המשובצת של הקו.",
-      "ansibleExecutionEnvironmentPlaceholder": "לדוגמה rhel8-hardened"
+      "ansibleExecutionEnvironmentPlaceholder": "לדוגמה rhel8-hardened",
+      "ansibleExecutionEnvironmentNone": "לא הוגדר אף אחד בפריסה זו",
+      "ansibleVersionUnconfirmed": "לא ניתן לאמת את הגרסאות הזמינות — הקלד גרסה"
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
