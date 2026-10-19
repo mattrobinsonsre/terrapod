@@ -482,7 +482,28 @@ jobs:
         # amd64 only, deliberately. A suppression is per-package and the
         # register has never carried an arch-specific entry, so scanning both
         # would double the work to re-confirm the same package list.
-        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
+        #
+        # `include` entries rather than a bare list, because the EE images are
+        # one repository tagged per ansible-core line and so have no `:latest`.
+        include:
+          - { image: terrapod-api, tag: latest }
+          - { image: terrapod-web, tag: latest }
+          - { image: terrapod-runner, tag: latest }
+          - { image: terrapod-listener, tag: latest }
+          - { image: terrapod-migrations, tag: latest }
+          # The EEs carry register entries of their own (#2154 — pip's vendored
+          # setuptools/urllib3/msgpack), so they belong in the review that asks
+          # whether an accepted risk has become resolvable. Without them the
+          # entry would be renewed by neglect rather than re-tested, which is
+          # the failure this review exists to prevent.
+          #
+          # TWO lines, not ten, for the same reason this job is amd64 only: the
+          # entries are per-package and every line shares the same vendored-pip
+          # set. 2.12 and 2.21 bracket the range — oldest core on python 3.10,
+          # newest on 3.14 — so between them they cover both ends of the
+          # interpreter span where the vendored set could differ.
+          - { image: terrapod-ee, tag: "2.12" }
+          - { image: terrapod-ee, tag: "2.21" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -498,9 +519,9 @@ jobs:
           TRIVY_PLATFORM: linux/amd64
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:latest
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ matrix.tag }}
           format: json
-          output: trivy-${{ matrix.image }}.json
+          output: trivy-${{ matrix.image }}-${{ matrix.tag }}.json
           severity: HIGH,CRITICAL
           # Both `trivyignores` and `ignore-unfixed` are deliberately ABSENT,
           # and the second one is the correction from #1257.
@@ -520,8 +541,11 @@ jobs:
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: register-${{ matrix.image }}
-          path: trivy-${{ matrix.image }}.json
+          # The tag is in the name because the EE entries share one image name;
+          # without it the second would silently overwrite the first and the
+          # review would see half the evidence.
+          name: register-${{ matrix.image }}-${{ matrix.tag }}
+          path: trivy-${{ matrix.image }}-${{ matrix.tag }}.json
           retention-days: 7
 
   register:
@@ -627,9 +651,23 @@ jobs:
           path: eefindings
           pattern: eescan-*
 
+      # The detail goes into a DRAFT advisory, private to maintainers, reusing
+      # the same script and the same token as the release re-scan. Never
+      # published: publishing is irreversible and would make an unfixed
+      # vulnerability public, so it stays a human act.
+      #
+      # GITHUB_TOKEN cannot write advisories (verified upstream: 403 on both
+      # valid and invalid payloads), which is why this needs its own secret.
+      - name: Record EE findings in draft advisories
+        env:
+          ADVISORY_TOKEN: ${{ secrets.SECURITY_ADVISORY_AUTH }}
+        run: python3 scripts/rescan_advisory.py eefindings ee-advisory-urls.json
+
       - name: Build the EE notification
         id: ee
-        run: python3 scripts/ee_scan_report.py eefindings body.md | tee -a "$GITHUB_OUTPUT"
+        run: |
+          python3 scripts/ee_scan_report.py eefindings body.md ee-advisory-urls.json \
+            >> "$GITHUB_OUTPUT"
 
       - name: Open or refresh the EE findings issue
         env:

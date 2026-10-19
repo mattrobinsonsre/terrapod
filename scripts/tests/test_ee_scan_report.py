@@ -38,7 +38,7 @@ def test_the_marker_carries_the_fingerprint_the_script_reports(tmp_path):
     _finding(tmp_path, "2.16", "amd64", ["CVE-1"])
     out = tmp_path / "body.md"
     digest = rep.fingerprint(rep.by_line(rep.load(tmp_path)))
-    out.write_text(rep.render(rep.by_line(rep.load(tmp_path)), digest))
+    out.write_text(rep.render(rep.by_line(rep.load(tmp_path)), digest, {}))
     assert f"<!-- {rep.MARKER}:{digest} -->" in out.read_text()
 
 
@@ -57,17 +57,24 @@ def test_separate_lines_stay_separate(tmp_path):
     assert set(rep.by_line(rep.load(tmp_path))) == {"2.16", "2.21"}
 
 
-def test_the_body_names_the_dispatch_for_every_affected_line(tmp_path):
-    """The whole point of the report: the scheduled build will NOT pick these up,
-    because it rebuilds on a moved digest or a moved version and a Debian fix
-    that upstream has not rebuilt moves neither. So the action has to be in the
-    report, per line, or the loop is not closed."""
+def test_the_body_names_the_dispatch_without_enumerating_the_lines(tmp_path):
+    """Supersedes an earlier test that required the dispatch PER LINE.
+
+    The reason that test existed still holds in full: the scheduled build will
+    not pick these up, because it rebuilds on a moved digest or version and a
+    Debian fix upstream has not rebuilt moves neither — so the action has to be
+    in the report or the loop is not closed.
+
+    What changed is that enumerating the affected lines in a PUBLIC issue is the
+    map the convention forbids, and that enumeration is why #2168 had to be
+    withdrawn. The dispatch form stays; the advisory names the lines."""
     _finding(tmp_path, "2.16", "amd64", ["CVE-1"])
     _finding(tmp_path, "2.21", "arm64", ["CVE-2"])
     lines = rep.by_line(rep.load(tmp_path))
-    body = rep.render(lines, rep.fingerprint(lines))
-    for line in ("2.16", "2.21"):
-        assert f"-f line={line} -f force=true" in body, f"no dispatch for {line}"
+    body = rep.render(lines, rep.fingerprint(lines), {})
+    assert "gh workflow run ee-build.yml" in body
+    assert "-f force=true" in body
+    assert "line=2.16" not in body and "line=2.21" not in body
 
 
 def test_an_unchanged_set_keeps_its_fingerprint(tmp_path):
@@ -107,3 +114,50 @@ def test_no_findings_writes_an_empty_body_and_says_so(tmp_path, capsys):
     printed = capsys.readouterr().out
     assert "has_findings=false" in printed
     assert out.read_text() == ""
+
+
+# ── the public/private split ─────────────────────────────────────────
+
+
+def test_the_public_body_names_no_advisory_and_no_package(tmp_path):
+    """The issue is PUBLIC. Naming an image alongside what is wrong with it is a
+    map for anyone deciding where to look, and the detail belongs in the draft
+    advisory. The first version of this reporter listed CVE ids per line and had
+    to be withdrawn (#2168), so this is pinned rather than trusted to review."""
+    _finding(tmp_path, "2.16", "amd64", ["CVE-2025-47273", "GHSA-6v7p-g79w-8964"])
+    lines = rep.by_line(rep.load(tmp_path))
+    body = rep.render(lines, rep.fingerprint(lines), {})
+    for leak in ("CVE-", "GHSA-", "setuptools", "urllib3", "msgpack"):
+        assert leak not in body, f"the public body leaks {leak!r}"
+
+
+def test_the_public_body_does_not_name_the_affected_lines(tmp_path):
+    """Counts are allowed — "how many" is not a map. "which line" is."""
+    _finding(tmp_path, "2.16", "amd64", ["CVE-1"])
+    _finding(tmp_path, "2.21", "amd64", ["CVE-2"])
+    lines = rep.by_line(rep.load(tmp_path))
+    body = rep.render(lines, rep.fingerprint(lines), {})
+    assert "2 ansible-core line(s)" in body
+    # the dispatch is a placeholder, not an enumeration
+    assert "line=<LINE>" in body
+    assert "line=2.16" not in body and "line=2.21" not in body
+
+
+def test_a_missing_advisory_url_is_stated_not_silently_omitted(tmp_path):
+    """With no detail in the issue, a missing advisory means the detail is
+    NOWHERE. Omitting the link quietly would leave a report that points at
+    nothing and reads complete."""
+    _finding(tmp_path, "2.16", "amd64", ["CVE-1"])
+    lines = rep.by_line(rep.load(tmp_path))
+    body = rep.render(lines, rep.fingerprint(lines), {})
+    assert "No draft advisory URL was recorded" in body
+
+
+def test_advisory_links_are_rendered_when_present(tmp_path):
+    """The positive control: without it the test above would pass against a
+    reporter that never renders a link at all."""
+    _finding(tmp_path, "2.16", "amd64", ["CVE-1"])
+    lines = rep.by_line(rep.load(tmp_path))
+    body = rep.render(lines, rep.fingerprint(lines), {"ee-2.16": "https://example.test/ghsa-x"})
+    assert "https://example.test/ghsa-x" in body
+    assert "No draft advisory URL was recorded" not in body

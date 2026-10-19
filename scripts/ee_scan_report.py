@@ -14,17 +14,28 @@ moved. An EE on an EOL ansible-core line carries unfixable CVEs for ever -- ever
 route to a Python 2 target is an EOL core -- and those are excluded before they
 reach here, because reporting them would be noise nobody can act on.
 
+**The issue is PUBLIC, so it carries no detail** — no advisory ids, no package
+versions, not which ansible-core lines are affected. That is the same split
+`rescan_report.py` states for releases, and for the same reason: naming an image
+alongside what is wrong with it is a map for anyone deciding where to look, and
+the people who need the detail are maintainers, who read it in the draft
+advisory. The first version of this reporter listed CVE ids per line and had to
+be withdrawn (#2168).
+
+    draft security advisory   the findings, per line     private
+    this issue                "there is something to do"  public
+
 **It reports; it does not act.** `release-rescan.yml` says that of itself and the
 same reasoning holds: a scanner that started publishing images on its own would
-be the opposite of a maintainer deciding. So the body carries the exact dispatch
-that clears each line, and a maintainer runs it.
+be the opposite of a maintainer deciding. So the body says what to run, without
+saying what is wrong.
 
 That matters because the two triggers genuinely do not meet. The build plan
 rebuilds when PyPI or the base DIGEST moves; a Debian fix that upstream has not
 yet rebuilt into `python:3.X-slim` moves neither, so the plan reports "current"
 while a rebuild would clear the finding. `--force` exists for exactly that case.
 
-    ee_scan_report.py <findings-dir> <out.md>
+    ee_scan_report.py <findings-dir> <out.md> [advisory-urls.json]
 """
 
 from __future__ import annotations
@@ -85,56 +96,65 @@ def fingerprint(lines: dict[str, set[str]]) -> str:
     return hashlib.sha256(material.encode()).hexdigest()[:16]
 
 
-def render(lines: dict[str, set[str]], digest: str) -> str:
-    """The body, with the fingerprint embedded in the marker.
+def render(lines: dict[str, set[str]], digest: str, advisories: dict[str, str]) -> str:
+    """The PUBLIC body: what to do, never what is wrong.
 
-    Embedded rather than kept alongside: the workflow decides whether to
-    re-notify by grepping the EXISTING body for `MARKER:<fingerprint>`, so a
-    marker without one can never match and the issue would comment on every
-    single run. Pinned by a test, because the failure is noise rather than an
-    error and nobody would chase it.
+    Deliberately carries no advisory id, no package name and no line number. The
+    counts are the most it says, because "how many" is not a map to anything
+    while "which line carries which CVE" is.
+
+    The fingerprint is embedded in the marker because the workflow decides
+    whether to re-notify by grepping the EXISTING body for
+    `MARKER:<fingerprint>` — a marker without one can never match and the issue
+    would comment on every single run.
     """
+    affected = len(lines)
+    total = len({i for ids in lines.values() for i in ids})
     out = [
-        "The published Ansible execution-environment images carry findings that a "
-        "**rebuild would fix**.",
+        "The scheduled scan found findings in the published Ansible "
+        "execution-environment images that **a rebuild would fix**.",
         "",
-        "Every advisory below has a fix available — the scan runs with "
-        "`ignore-unfixed: true`, so anything unfixable is excluded before it reaches "
-        "here. An EE pinned to an EOL ansible-core line carries unfixable CVEs "
-        "permanently, which is inherent to supporting EL6 and EL7 rather than a "
-        "defect, and those belong in the accepted-risk register.",
+        f"**{total} advisory/advisories across {affected} ansible-core line(s).** "
+        "The detail — which line, which package, which advisory — is in the "
+        "**draft security advisory**, which is private to maintainers. It is "
+        "deliberately not here: naming an image alongside what is wrong with it "
+        "is a map for anyone deciding where to look.",
         "",
-        "| line | advisories |",
-        "|---|---|",
     ]
-    for line, ids in sorted(lines.items()):
-        shown = ", ".join(f"`{i}`" for i in sorted(ids)[:6])
-        if len(ids) > 6:
-            shown += f" (+{len(ids) - 6} more)"
-        out += [f"| **{line}** | {shown} |"]
+    if advisories:
+        out += ["Draft advisories:", ""]
+        for name in sorted(advisories):
+            out += [f"* [{name}]({advisories[name]})"]
+        out += [""]
+    else:
+        out += [
+            "> No draft advisory URL was recorded for this run — check the "
+            "`Record EE findings in draft advisories` step. The detail is not in "
+            "this issue by design, so a missing advisory means the detail is "
+            "nowhere and the step needs fixing.",
+            "",
+        ]
     out += [
-        "",
         "## Clearing them",
         "",
-        "A rebuild picks up current Debian packages through the `apt-get upgrade` in "
-        "`docker/Dockerfile.ee`, **whether or not the base tag's digest has moved** — "
-        "the official python images compile CPython into `/usr/local`, so it is not "
-        "dpkg-owned, while the libraries around it are.",
+        "A rebuild picks up current Debian packages through the `apt-get upgrade` "
+        "in `docker/Dockerfile.ee`, **whether or not the base tag's digest has "
+        "moved** — the official python images compile CPython into `/usr/local`, "
+        "so it is not dpkg-owned, while the libraries around it are.",
         "",
-        "The scheduled build will NOT pick these up on its own: it rebuilds when PyPI "
-        "or the base digest moves, and a Debian fix that upstream has not yet rebuilt "
-        "into `python:3.X-slim` moves neither. So dispatch it, per line:",
+        "The scheduled build will **not** pick these up on its own: it rebuilds "
+        "when PyPI or the base digest moves, and a Debian fix that upstream has "
+        "not yet rebuilt into `python:3.X-slim` moves neither. The advisory names "
+        "the affected lines; dispatch per line:",
         "",
         "```",
-    ]
-    for line in sorted(lines):
-        out += [f"gh workflow run ee-build.yml -f line={line} -f force=true"]
-    out += [
+        "gh workflow run ee-build.yml -f line=<LINE> -f force=true",
         "```",
         "",
-        "If a rebuild does **not** clear a finding, it is not fixable by us — route it "
-        "to `pentest/trivy/.trivyignore` with a stated exit condition, which is the "
-        "same flow a platform-image finding takes.",
+        "If a rebuild does **not** clear a finding it is not fixable by us — it "
+        "goes to `pentest/trivy/.trivyignore` with a stated exit condition, and "
+        "the EE images are in the weekly register review so the entry is "
+        "re-tested rather than renewed by neglect.",
         "",
         f"<!-- {MARKER}:{digest} -->",
     ]
@@ -148,8 +168,17 @@ def main() -> int:
     directory, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
     lines = by_line(load(directory)) if directory.is_dir() else {}
 
+    # Written by the advisory step, as rescan_report consumes its own. Absent is
+    # tolerated and SAID SO in the body rather than silently omitted: with no
+    # detail in the issue, a missing advisory means the detail is nowhere.
+    advisories: dict[str, str] = {}
+    if len(sys.argv) > 3:
+        urls = pathlib.Path(sys.argv[3])
+        if urls.is_file():
+            advisories = json.loads(urls.read_text())
+
     digest = fingerprint(lines)
-    out.write_text(render(lines, digest) if lines else "")
+    out.write_text(render(lines, digest, advisories) if lines else "")
     # Printed as job outputs so the workflow can decide without re-parsing. An
     # empty set means "do not raise or refresh" -- never "close the issue":
     # someone may be mid-rebuild on it, and a list that empties because a scan
