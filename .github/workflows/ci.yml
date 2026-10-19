@@ -1800,6 +1800,18 @@ jobs:
           echo "$out" | grep -q "ee_startup_timeout_seconds: 600" || { echo "FAIL: runners.yaml ee_startup_timeout_seconds not rendered — a stalled execution environment would hang to the stale timeout with the operator's window ignored"; exit 1; }
           echo "$out" | grep -q 'default_ee_resource_cpu: "500m"' || { echo "FAIL: config.yaml default_ee_resource_cpu not rendered — a workspace that sizes no EE would take the code default, ignoring the operator's"; exit 1; }
           echo "$out" | grep -q 'default_ee_resource_memory: "1Gi"' || { echo "FAIL: config.yaml default_ee_resource_memory not rendered"; exit 1; }
+          # Which environments are selectable (#2154). The repository is what a
+          # kubelet pulls and what the availability read lists, so a missing
+          # render line leaves the code default winning while the operator's
+          # own mirror is ignored -- and in a restricted network that means
+          # every configure fails on an image it cannot reach. The TTL bounds a
+          # mutable tag listing; without it a newly published line could never
+          # be selected.
+          echo "$out" | grep -q 'ee_repository: "ghcr.io/mattrobinsonsre/terrapod-ee"' || { echo "FAIL: config.yaml ansible.ee_repository not rendered — an operator pointing at their own mirror would be silently ignored"; exit 1; }
+          echo "$out" | grep -q "availability_ttl_seconds: 300" || { echo "FAIL: config.yaml ansible.availability_ttl_seconds not rendered"; exit 1; }
+          # Empty by default, so nothing should render -- an operator-supplied
+          # environment is opt-in and must not appear from nowhere.
+          echo "$out" | grep -q "execution_environments:" && { echo "FAIL: ansible.execution_environments rendered while empty"; exit 1; }
           # Slack integration (#556) is OFF by default: config renders but no
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }

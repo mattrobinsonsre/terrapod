@@ -2185,6 +2185,18 @@
             }
           }
         },
+        "ansible": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ee_repository": { "type": "string" },
+            "execution_environments": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "availability_ttl_seconds": { "type": "integer", "minimum": 0 }
+          }
+        },
         "catalog": {
           "type": "object",
           "additionalProperties": false,

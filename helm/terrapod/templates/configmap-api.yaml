@@ -475,6 +475,19 @@ data:
     catalog:
       enabled: {{ .Values.api.config.catalog.enabled }}
     {{- end }}
+    {{- if .Values.api.config.ansible }}
+    ansible:
+      {{- if .Values.api.config.ansible.ee_repository }}
+      ee_repository: {{ .Values.api.config.ansible.ee_repository | quote }}
+      {{- end }}
+      {{- if .Values.api.config.ansible.execution_environments }}
+      execution_environments:
+        {{- toYaml .Values.api.config.ansible.execution_environments | nindent 8 }}
+      {{- end }}
+      {{- if not (kindIs "invalid" .Values.api.config.ansible.availability_ttl_seconds) }}
+      availability_ttl_seconds: {{ .Values.api.config.ansible.availability_ttl_seconds }}
+      {{- end }}
+    {{- end }}
     {{- if .Values.api.config.cost_estimation }}
     cost_estimation:
       enabled: {{ .Values.api.config.cost_estimation.enabled }}
