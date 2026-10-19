@@ -85,19 +85,42 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # Authenticated, because the anonymous Docker Hub manifest limit is
-      # `100;w=3600` per source IP and Actions runners share egress addresses --
-      # so an unauthenticated plan competes with every other project for that
-      # bucket. Degrades to anonymous when no credential is configured, which is
-      # fine for a hand-run dispatch and not for the schedule.
+      # Authenticated where a credential exists, because the anonymous Docker Hub
+      # manifest limit is `100;w=3600` per SOURCE IP and Actions runners share
+      # egress addresses -- so an unauthenticated plan competes with every other
+      # project on that runner for the same bucket.
+      #
+      # The condition reads `secrets`, not `env`: a step's own `env:` is not
+      # available to that step's own `if:`, which is evaluated first. The
+      # `env.DOCKERHUB_USERNAME != ''` form this replaces was therefore always
+      # false -- a step that could never run, which is worse than no step at all
+      # because it reads as covered.
       - name: Log in to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
-          printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' \
+          printf '%s' "$DOCKERHUB_TOKEN" \
             | crane auth login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+          echo "authenticated to Docker Hub as $DOCKERHUB_USERNAME"
+
+      # No credential is configured today, so the derivation runs anonymously
+      # against that shared 100/hour bucket. Printing what is left turns a
+      # rate-limit failure into one glance rather than a hunt -- the error
+      # Docker Hub returns for an exhausted bucket names neither the limit nor
+      # the fact that it is shared.
+      - name: Report the Docker Hub rate limit
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          token=$(curl -fsSL "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/python:pull" \
+            | python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+          curl -sI -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            https://registry-1.docker.io/v2/library/python/manifests/3.14-slim \
+            | grep -iE 'ratelimit' || echo "no rate-limit headers returned"
 
       - name: Derive what needs building
         id: derive
