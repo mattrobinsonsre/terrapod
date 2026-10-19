@@ -254,3 +254,50 @@ def test_an_empty_matrix_reports_any_false(tmp_path, capsys):
     ee_matrix_outputs.main.__globals__["sys"].argv = ["x", str(matrix)]
     ee_matrix_outputs.main()
     assert "any=false" in capsys.readouterr().out
+
+
+# ── what the scan leg scans ──────────────────────────────────────────
+
+
+def _crane_ls(monkeypatch, tags, rc=0):
+    class Done:
+        returncode = rc
+        stdout = "\n".join(tags)
+
+    monkeypatch.setattr(ee_matrix.subprocess, "run", lambda *a, **k: Done())
+
+
+def test_published_lines_takes_only_line_tags_newest_first(monkeypatch):
+    """The repository carries both tag shapes — immutable `2.16.19` and the
+    moving `2.16` — plus whatever else lands there. The scan wants one entry per
+    line, not one per patch, or it scans the same image twice."""
+    _crane_ls(monkeypatch, ["2.16", "2.16.19", "2.21", "2.21.5", "latest", "sha-abc1234", "2.9"])
+    assert ee_matrix.published_lines("repo") == ["2.21", "2.16", "2.9"]
+
+
+def test_published_lines_sorts_numerically_not_lexically(monkeypatch):
+    """`2.9` sorts after `2.10` as a string and before it as a version. Getting
+    this wrong would not fail anything — it would just report in a confusing
+    order, which is exactly the kind of thing nobody notices."""
+    _crane_ls(monkeypatch, ["2.9", "2.10", "2.21"])
+    assert ee_matrix.published_lines("repo") == ["2.21", "2.10", "2.9"]
+
+
+def test_an_absent_repository_means_nothing_published(monkeypatch):
+    """The normal state before the first build. An error here would make the
+    scan leg fail every run until something had been published."""
+    _crane_ls(monkeypatch, [], rc=1)
+    assert ee_matrix.published_lines("repo") == []
+
+
+def test_published_lines_resolves_no_base_image(monkeypatch):
+    """The scan's question is "what have we published", which must not depend on
+    a base being mirrored — routing it through the build plan made it fail for a
+    build-side reason that has nothing to do with scanning."""
+    _crane_ls(monkeypatch, ["2.16"])
+
+    def explode(_base):
+        raise AssertionError("published_lines resolved a base image")
+
+    monkeypatch.setattr(ee_matrix, "base_digest", explode)
+    assert ee_matrix.published_lines("repo") == ["2.16"]

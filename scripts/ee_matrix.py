@@ -143,6 +143,26 @@ def base_digest(base: str) -> str | None:
     return probe.stdout.strip() or None
 
 
+def published_lines(repository: str) -> list[str]:
+    """Which EE lines actually exist in the registry, newest first.
+
+    Asks the REGISTRY, not PyPI, and deliberately resolves no base image. The
+    scan leg's question is "what have we published", which has nothing to do
+    with what we would build next -- routing it through the build plan made it
+    fail when a base was simply not mirrored yet, which is a build problem and
+    not a scanning one.
+
+    A repository that does not exist yet is the normal state before the first
+    build, not an error: it answers "nothing published" so the scan leg skips.
+    """
+    probe = subprocess.run(["crane", "ls", repository], capture_output=True, text=True, check=False)
+    if probe.returncode != 0:
+        return []
+    line_tag = re.compile(r"^\d+\.\d+$")
+    found = {tag for tag in probe.stdout.split() if line_tag.match(tag)}
+    return sorted(found, key=lambda t: tuple(int(p) for p in t.split(".")), reverse=True)
+
+
 def build_matrix(repository: str, *, force: bool, only: str | None) -> list[dict]:
     lines = latest_patch_per_line()
     if len(lines) < MIN_LINES:
@@ -213,9 +233,27 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="rebuild regardless of provenance")
     parser.add_argument("--line", default=None, help="restrict to one line, e.g. 2.16")
     parser.add_argument("--all", action="store_true", help="print the whole matrix, not the delta")
+    parser.add_argument(
+        "--published",
+        action="store_true",
+        help="list only the lines that ARE published, for the scan leg",
+    )
     arguments = parser.parse_args()
 
     try:
+        if arguments.published:
+            published = published_lines(arguments.repository)
+            # The cross product, for the same reason the build plan builds it: a
+            # GitHub matrix `include` EXTENDS combinations rather than crossing
+            # with another dimension, so pairing it with `arch:` would give
+            # N+2 entries instead of N*2.
+            scan = [{"line": line, "arch": arch} for line in published for arch in ARCHES]
+            print(json.dumps({"include": scan}))
+            for line in published:
+                print(f"  {line:5} published, will be scanned", file=sys.stderr)
+            if not published:
+                print("  no EE images are published yet; nothing to scan", file=sys.stderr)
+            return 0
         entries = build_matrix(
             arguments.repository, force=arguments.force or arguments.all, only=arguments.line
         )

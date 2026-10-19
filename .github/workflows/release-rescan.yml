@@ -47,6 +47,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io/mattrobinsonsre
+  EE_REPOSITORY: ghcr.io/mattrobinsonsre/terrapod-ee
   SEMGREP_IMAGE: semgrep/semgrep:1.117
 
 jobs:
@@ -149,6 +150,104 @@ jobs:
           name: rescan-${{ matrix.tag }}-${{ matrix.image }}-${{ matrix.arch }}
           path: finding.json
           retention-days: 7
+
+  # ── The Ansible execution environments (#2154) ──────────────────────
+  #
+  # Their own family, deliberately: an EE is not a release, and crowding them
+  # into the supported-releases issue would conflate "a release we ship has a
+  # finding" with "an image a configure runs on has one". They are also the
+  # family where `ignore-unfixed: true` matters most -- an EE for core 2.12 or
+  # 2.16 carries unfixable CVEs by construction, because every route to a
+  # Python 2 target is an EOL ansible-core. Reporting those would be noise
+  # nobody can act on; reporting the FIXABLE ones is the whole signal.
+  ee-discover:
+    name: Discover published EE images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      lines: ${{ steps.find.outputs.lines }}
+      any: ${{ steps.find.outputs.any }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install crane
+        run: |
+          set -euo pipefail
+          version=v0.21.2
+          curl -fsSL -o crane.tar.gz \
+            "https://github.com/google/go-containerregistry/releases/download/${version}/go-containerregistry_Linux_x86_64.tar.gz"
+          tar -xzf crane.tar.gz crane
+          sudo install -m 0755 crane /usr/local/bin/crane
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+      - name: List published lines
+        id: find
+        run: |
+          set -euo pipefail
+          python3 scripts/ee_matrix.py --repository "$EE_REPOSITORY" --published > lines.json
+          echo "lines=$(cat lines.json)" >> "$GITHUB_OUTPUT"
+          count=$(python3 -c 'import json;print(len(json.load(open("lines.json"))["include"]))')
+          echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Found $count published EE line(s)."
+
+  ee-artifacts:
+    name: Scan EE ${{ matrix.line }} (${{ matrix.arch }})
+    needs: ee-discover
+    if: needs.ee-discover.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      # The discovery step emits the cross product already, each entry
+      # carrying its own `arch`. Pairing `include` with a separate `arch:`
+      # dimension would not cross them.
+      matrix: ${{ fromJson(needs.ee-discover.outputs.lines) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+      - name: Trivy
+        continue-on-error: true   # a missing image must not sink the run
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # Mandatory: an EE tag is a multi-arch manifest, and without this
+          # Trivy resolves to the runner's own platform so the arm64 leg would
+          # scan amd64 and report it as arm64.
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+        with:
+          image-ref: ${{ env.EE_REPOSITORY }}:${{ matrix.line }}
+          format: json
+          output: raw.json
+          severity: HIGH,CRITICAL
+          # The setting that makes "try the update" the right first move every
+          # time: a reported finding is, by construction, one with a fix
+          # available somewhere, so a rebuild is a reasoned response rather than
+          # a shot in the dark. An EE on an EOL line has unfixable CVEs that no
+          # rebuild clears, and those belong in the register, not in a report.
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '0'          # reporter, not a gate
+      - name: Normalise
+        run: |
+          python3 scripts/rescan_normalise.py trivy raw.json \
+            "ee-${{ matrix.line }}" "ee:${{ matrix.line }} (${{ matrix.arch }})" \
+            "finding.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          # NOT `rescan-*`: the report job globs that pattern, and these
+          # findings must not land in the supported-releases issue. An EE is not
+          # a release, and that issue's title would stop being true.
+          name: eescan-${{ matrix.line }}-${{ matrix.arch }}
+          path: finding.json
 
   source:
     name: Scan source ${{ matrix.tag }}
@@ -503,6 +602,63 @@ jobs:
             else
               gh issue comment "$number" --body \
                 "The register review changed: an accepted risk became resolvable, or an entry stopped matching."
+              echo "Refreshed issue #$number and notified"
+            fi
+          else
+            gh issue create --title "$TITLE" --body-file body.md --label security 2>/dev/null \
+              || gh issue create --title "$TITLE" --body-file body.md
+          fi
+
+  ee-report:
+    name: Report EE findings
+    needs: [ee-discover, ee-artifacts]
+    # `always()`, so a single scan leg failing does not suppress the report for
+    # every other line — the same reasoning the release report uses.
+    if: always() && needs.ee-discover.result == 'success' && needs.ee-discover.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: eefindings
+          pattern: eescan-*
+
+      - name: Build the EE notification
+        id: ee
+        run: python3 scripts/ee_scan_report.py eefindings body.md | tee -a "$GITHUB_OUTPUT"
+
+      - name: Open or refresh the EE findings issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Security: fixable findings in the Ansible execution environments"
+          HAS_FINDINGS: ${{ steps.ee.outputs.has_findings }}
+          FINGERPRINT: ${{ steps.ee.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,body --jq '.[0] // empty')
+
+          if [ "$HAS_FINDINGS" != "true" ]; then
+            # Clean is the goal, not an event. An open issue is LEFT ALONE:
+            # someone may be mid-rebuild on it, and a list that empties because
+            # a scan leg was skipped must not read as "done".
+            echo "No fixable EE findings. Nothing to raise."
+            exit 0
+          fi
+
+          if [ -n "$existing" ]; then
+            number=$(echo "$existing" | jq -r '.number')
+            # Refresh the body every run; comment only when the set changed.
+            gh issue edit "$number" --body-file body.md
+            if echo "$existing" | jq -r '.body' | grep -q "terrapod-ee-scan:$FINGERPRINT"; then
+              echo "Issue #$number refreshed; finding set unchanged, not re-notifying."
+            else
+              gh issue comment "$number" --body \
+                "The EE finding set changed. Each affected line's rebuild dispatch is in the issue body."
               echo "Refreshed issue #$number and notified"
             fi
           else
