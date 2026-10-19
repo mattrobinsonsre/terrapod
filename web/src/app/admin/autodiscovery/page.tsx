@@ -146,8 +146,8 @@ export default function AutodiscoveryPage() {
   const [executionBackend, setExecutionBackend] = useState<'tofu' | 'terraform'>('tofu')
   const [terraformVersion, setTerraformVersion] = useState('1.13')
   // Deliberately NOT pre-filled, unlike the engine version beside it. Empty is
-  // a real value here and means "inherit api.config.default_ansible_version"
-  // at run time (#2010, the semantics `engine_version_attr` documents), so
+  // a real value here and means "take the platform's current ansible-core
+  // line" (#2010, the semantics `engine_version_attr` documents), so
   // pre-filling would pin every rule the UI creates to whatever the default
   // happened to be the day it was created -- which is the thing that goes
   // stale. An operator who wants a pin types one.

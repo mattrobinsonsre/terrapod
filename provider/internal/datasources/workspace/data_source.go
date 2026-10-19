@@ -284,9 +284,9 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
-	// Empty means the workspace inherits `api.config.default_ansible_version`
-	// rather than pinning one (#2010); the server does not substitute the
-	// resolved default, so null is the honest reading.
+	// Empty means the workspace names no ansible-core line of its own rather
+	// than pinning one (#2010); the server does not substitute the platform's
+	// default, so null is the honest reading.
 	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
 	// Which operations the workspace has (#1966). Each falls back to its own
 	// server-side default when the attribute is ABSENT, the same rule as

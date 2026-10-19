@@ -379,13 +379,17 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"ansible_version": schema.StringAttribute{
-				Description: "The ansible-core version this workspace's configure " +
-					"operations use. An exact version such as `2.21.5`, optionally with a " +
-					"pre-release suffix (`2.21.5rc1`); no HCL constraint operators and not " +
-					"`latest`. Left unset the server supplies the deployment default " +
-					"(`api.config.default_ansible_version`) at creation, which is then the " +
-					"workspace's own value — raising that default moves only workspaces " +
-					"created afterwards, exactly as `engine_version` behaves.",
+				Description: "The ansible-core LINE whose execution environment this " +
+					"workspace's configure operations run in — `2.21`, say. Terrapod " +
+					"publishes one execution-environment image per line, and the line is " +
+					"what decides which Python versions a managed host may have, so it is " +
+					"the unit to pin. An exact patch (`2.21.5`) is accepted and names its " +
+					"own line. No HCL constraint operators and not `latest`. Left unset " +
+					"the server supplies the platform's current line at creation, which is " +
+					"then the workspace's own value — changing the platform default moves " +
+					"only workspaces created afterwards, exactly as `engine_version` " +
+					"behaves. This does not affect how Terrapod reads the workspace's " +
+					"inventory: that is done server-side with the ansible in the API image.",
 				// Optional+Computed with UseStateForUnknown, following
 				// `engine_version` above. The server always returns a concrete
 				// version, so Optional alone would put the server's value into
