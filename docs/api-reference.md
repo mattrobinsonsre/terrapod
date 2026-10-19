@@ -425,34 +425,61 @@ The refusal names the variable sets it would have pulled in — the names are no
 secret, the values are.
 ### `ansible-version`
 
-The ansible-core version this workspace runs — **both its configure operations
-and the resolution of its inventory** — a deployment default that a workspace may
-override, exactly as it overrides its engine version. Collection compatibility is
-a per-workspace concern, so one version for the whole deployment would be the
-wrong shape.
+The ansible-core **line** whose execution environment this workspace's configure
+operations run in — a deployment default that a workspace may override, exactly
+as it overrides its engine version. Collection compatibility is a per-workspace
+concern, so one version for the whole deployment would be the wrong shape.
 
-**Inventory resolution honours it too (#2035), and that is the point rather than
-a side effect.** Terrapod resolves an inventory by shelling out to
-`ansible-inventory` instead of importing ansible as a library for one reason:
-version skew between the copy that parses an inventory and the copy that runs the
-playbook. Until #2035 the API installed the deployment-wide default whatever the
-workspace pinned, so a workspace on its own version had its inventory parsed by an
-ansible-core its playbooks would never run under — the exact divergence shelling
-out was chosen to avoid. One resolver now answers "which version" for both.
+**It governs the workspace's configure operations only, not how Terrapod reads
+its inventory** (#2172). The API carries one `ansible-core`, pinned as a line in
+its own image, and uses it to resolve every workspace's inventory; nothing is
+installed per workspace and no operator setting chooses it, because the API's
+ansible is a property of the API image. An earlier arrangement did install a
+per-workspace version in the API — that is removed, and this value's only job is
+to select which execution-environment image a configure runs in.
 
 | | |
 |---|---|
 | **Type** | string |
 | **Default** | The platform's current ansible-core **line** (`DEFAULT_ANSIBLE_LINE`), written at create time. Changing it moves only workspaces created afterwards — existing ones keep what they carry, exactly as the engine version does. Use bulk update to move a fleet. It is a line (`2.21`), not a patch, because Terrapod publishes one execution-environment image per ansible-core line and the line names the image. |
 | **Empty means** | inherit the deployment default. A row predating this attribute reads back empty; a workspace created normally carries a concrete version. |
-| **Accepted** | any non-empty string. The only write-time rule is the deployment's pre-release policy, so `binary_cache.allow_prerelease: none` 422s `2.21.5rc1` and allows `2.21.5`. There is deliberately **no format rule** — `engine-version` has none either, and pip's own message about a version PyPI does not publish beats a regex of ours guessing at what it does. |
-| **Not resolved** | a partial such as `2.18` is **not** expanded to the newest matching release, unlike `engine-version`: nothing resolves it, so the value reaches pip as written and fails at install time. Pin an exact version. `latest` likewise. |
+| **Accepted** | any non-empty string, subject to two checks. The deployment's pre-release policy applies, so `binary_cache.allow_prerelease: none` 422s `2.21.5rc1` and allows `2.21.5`. And a line with **no published execution environment is refused** — but only when Terrapod can determine which lines exist: the set is read from a container registry, so when it cannot be read the value is accepted rather than making a workspace edit depend on registry reachability. There is deliberately no *format* rule; `engine-version` has none either. |
+| **Not resolved** | a partial is not expanded to a newest matching release, unlike `engine-version`. The value names an image tag, and Terrapod publishes one tag per line — so `2.21` is the ordinary thing to write. An exact patch is accepted and names its own line. `latest` is not a line and has no image. |
+| **See also** | [`GET /api/v1/ansible/execution-environments`](#get-apiv1ansibleexecution-environments) for which lines this deployment can run. |
 
 **A read returns the workspace's own value.** The deployment default is not
 substituted in for an empty one, because a client that wrote a read straight
 back would then pin every workspace to whatever the default happened to be at
 read time — the same reason `oidc_audiences` reconciles only the keys a
 practitioner declared.
+
+Settable on workspace create, workspace update, bulk update, and as an
+autodiscovery rule template field.
+
+### `ansible-execution-environment`
+
+One of the deployment's **own** execution environments, named by label, which
+**overrides `ansible-version` outright** — a workspace carrying a label ignores
+its line, so setting a line on such a workspace changes nothing about what runs.
+
+A label rather than an image reference for two reasons: a workspace cannot then
+name an arbitrary image, and the estate is re-pointed in one place when the
+image moves. The labels come from `api.config.ansible.execution_environments`;
+see [Choosing an execution environment](runners.md#choosing-an-execution-environment)
+for what an image must provide and what supplying one means.
+
+It is a **separate attribute rather than an overloaded `ansible-version`**, and
+that is measured rather than aesthetic: the pre-release screen is the only rule
+`ansible-version` applies, so a label passes it unchanged — and a label named
+`2.21` would shadow a real ansible-core line with nothing to distinguish them.
+
+| | |
+|---|---|
+| **Type** | string |
+| **Default** | `""` |
+| **Empty means** | no operator environment; run the built-in image for `ansible-version`. This is the ordinary case. |
+| **Accepted** | any label configured on this deployment, at most 100 characters. A label that is **not** configured is always a 422 — the map is local configuration, so unlike a line there is no "cannot tell". |
+| **Stored** | byte for byte. Nothing is trimmed or case-folded, because a Terraform provider writes the response back into state and a normalised value fails the apply with "Provider produced inconsistent result after apply". |
 
 Settable on workspace create, workspace update, bulk update, and as an
 autodiscovery rule template field.
@@ -5941,8 +5968,58 @@ Statuses worth knowing, because the three say different things:
 | Status | Meaning |
 |---|---|
 | `422` | A fetched source was **declined**: a file whose top level carries a `plugin:` key is an inventory plugin configuration, and Terrapod does not run inventory plugins. The message names the file and the plugin it asks for. The resolution did not fail — there is something to do about it |
-| `503` | The resolution could not be performed: a repository that cannot be fetched, a branch that is gone, a source ansible cannot parse, or `ansible-core` itself not obtainable from Terrapod's own PyPI cache. **It fails closed** rather than degrading into a partial host list, because a silently short target set is the failure mode this whole surface exists to prevent |
+| `503` | The resolution could not be performed: a repository that cannot be fetched, a branch that is gone, a source ansible cannot parse, or `ansible-core` missing from the API image (it is baked in, so this means a broken image rather than anything an operator can configure). **It fails closed** rather than degrading into a partial host list, because a silently short target set is the failure mode this whole surface exists to prevent |
 | `200` with empty maps | A workspace that has declared nothing and bound no repository. A defined empty result, not an error |
+
+## Ansible execution environments
+
+Which images this deployment can run a configure operation in (#2154). See
+[Choosing an execution environment](runners.md#choosing-an-execution-environment).
+
+### `GET /api/v1/ansible/execution-environments`
+
+Any authenticated user. The answer is which images this deployment can pull,
+which every workspace editor needs and which discloses nothing an operator's own
+Helm values do not.
+
+Both kinds come back from one route, tagged, because the precedence between them
+is not symmetric: an operator label overrides a workspace's ansible-core line.
+
+```json
+{"data": [
+   {"type": "ansible-execution-environments", "id": "2.21",
+    "attributes": {"kind": "built-in", "ansible-core-line": "2.21",
+                   "label": null,
+                   "image": "ghcr.io/mattrobinsonsre/terrapod-ee:2.21"}},
+   {"type": "ansible-execution-environments", "id": "rhel8-hardened",
+    "attributes": {"kind": "operator", "ansible-core-line": null,
+                   "label": "rhel8-hardened",
+                   "image": "registry.internal/platform/ee-rhel8:2026.10"}}
+ ],
+ "meta": {"listing": "complete",
+          "pagination": {"current-page": 1, "page-size": 2,
+                         "total-count": 2, "total-pages": 1}}}
+```
+
+`image` is resolved by the same resolver the run path uses, so what this returns
+cannot drift from what actually executes.
+
+**`meta.listing` must be read before concluding anything from an empty `data`.**
+
+| `listing` | meaning |
+|---|---|
+| `complete` | the registry answered. A line that is absent does not exist, and [`ansible-version`](#ansible-version) naming it is refused with a 422 |
+| `unknown` | the set could not be determined — an unreachable registry, a listing truncated by pagination, a sealed deployment's upstream being off limits. **Any** line is then accepted on a write, because refusing one Terrapod cannot confirm would make an ordinary workspace edit depend on registry reachability |
+
+So an empty `data` with `complete` is a real answer — this deployment publishes
+nothing and every line will be refused. An empty `data` with `unknown` means
+nothing at all, and a client offering a picker should let someone type a line
+rather than presenting an empty list. Operator-supplied entries are
+authoritative in both states: they come from configuration, not from a registry.
+
+A string rather than a boolean because the next state this may need is
+`partial` — a listing trusted for one source and not another — and a boolean
+would have to be deprecated to say it.
 
 ## High Availability
 

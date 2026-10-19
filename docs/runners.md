@@ -298,6 +298,93 @@ whose startup probe never passes gets `runners.eeStartupTimeoutSeconds` (default
 Job's own counters would report the pod as active and the run would hang to the
 one-hour stale timeout, reporting nothing an operator could act on.
 
+### Choosing an execution environment
+
+There are two kinds, and the difference is who vouches for the image.
+
+**Built-in.** Terrapod publishes one image per ansible-core line — `2.12`
+through `2.21` — builds and smoke-tests each one, scans them with the release
+re-scan and rebuilds them when an upstream patch lands. A workspace selects one
+with `ansible_version`, which names a **line** (`2.21`), not a patch: the line's
+tag moves as that line is rebuilt, and the run records the reference it actually
+used so a finished run stays identifiable afterwards.
+
+They come from `api.config.ansible.ee_repository`, which defaults to the public
+repository and is pulled **directly by the kubelet** — the same arrangement as
+the five component images. So mirroring them for a restricted network is the
+same operation you already perform for those: re-point the value, including at
+Terrapod's own registry, which makes the layers a pull-through cached artifact
+like any other.
+
+```yaml
+api:
+  config:
+    ansible:
+      ee_repository: terrapod.example.com/ghcr.io/mattrobinsonsre/terrapod-ee
+```
+
+**Your own.** Add images under a label and a workspace selects one with
+`ansible_execution_environment`, which **overrides `ansible_version`** — a
+workspace carrying a label ignores its line entirely, so setting a line on such
+a workspace changes nothing about what runs.
+
+```yaml
+api:
+  config:
+    ansible:
+      execution_environments:
+        rhel8-hardened: registry.internal/platform/ee-rhel8:2026.10
+```
+
+A label rather than a raw image reference, for two reasons: a workspace cannot
+then name an arbitrary image, and the whole estate is re-pointed in one place
+when the image moves.
+
+Three things to be clear about before you add one. An environment you supply is
+**trusted code**, on the same footing as the custom runner image you can already
+set. Its **URI is used exactly as given** and is never rewritten through the
+pull-through cache. And it is **not covered by Terrapod's own image scanning** —
+the release re-scan reports on the built-in images only.
+
+The contract an image must meet is short: `ansible-playbook`, `ansible-galaxy`,
+`ssh` and `git` on `PATH`, and a uid that can read the shared volume. The
+sidecar's startup probe asserts exactly that, so a non-conforming image fails at
+pod startup naming what is missing rather than part-way through a run. Writable
+temporary space comes from the Job spec, so the image needs no writable root.
+
+#### Which environments this deployment can run
+
+```
+GET /api/v1/ansible/execution-environments
+```
+
+Both kinds, tagged, each with the image reference it resolves to. The UI and the
+`terrapod_ansible_execution_environments` data source read this, and so does the
+check that **refuses a workspace naming a line with no published image** — so
+you get the error at the write rather than at the first run.
+
+**Read `meta.listing` before concluding anything from an empty list.** The
+built-in set is read from a container registry, so it can be unavailable:
+
+| `listing` | what it means |
+|---|---|
+| `complete` | the registry answered. A line that is absent does not exist, and naming it is refused. |
+| `unknown` | the set could not be determined. **Any** line is accepted, because refusing one Terrapod cannot confirm would make an ordinary workspace edit depend on registry reachability. |
+
+An empty list with `complete` is a real answer — this deployment publishes
+nothing and every line will be refused. An empty list with `unknown` means
+nothing at all. Operator-supplied environments are authoritative either way:
+they come from your own configuration, not from a registry.
+
+In a sealed deployment (`registry.cache_only`) the answer is whatever is already
+cached, and that is `complete` rather than degraded — there, what is cached is
+exactly what can run.
+
+The listing is cached for `api.config.ansible.availability_ttl_seconds`
+(default 300). It is a **tag listing**, which is mutable in a way the immutable
+layers beneath it are not, so it needs a bound; short, because the case that
+matters is an operator waiting for a newly published line to appear in a form.
+
 ### Routing a workspace to several pools
 
 Within a pool, multiple listener replicas already give you HA — a listener pod

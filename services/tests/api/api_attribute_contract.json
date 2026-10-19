@@ -48,6 +48,15 @@
   "ai_policy.override_run_ai_policy:meta": [
     "run-status"
   ],
+  "ansible.list_execution_environments": [
+    "ansible-core-line",
+    "image",
+    "kind",
+    "label"
+  ],
+  "ansible.list_execution_environments:meta": [
+    "listing"
+  ],
   "audit.list_audit_log": [
     "action",
     "actor-email",
@@ -67,6 +76,7 @@
     "ai-summary-mode",
     "allow-fork-pr-plans",
     "ansible-collections",
+    "ansible-execution-environment",
     "ansible-version",
     "auto-apply",
     "auto-apply-mode",
@@ -990,6 +1000,7 @@
     "ai-summary-mode",
     "allow-fork-pr-plans",
     "ansible-collections",
+    "ansible-execution-environment",
     "ansible-version",
     "auto-apply",
     "auto-apply-mode",

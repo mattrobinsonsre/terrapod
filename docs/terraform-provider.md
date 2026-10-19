@@ -53,7 +53,14 @@ with its merged variables, each group's **direct** membership, and the nesting
 carried separately, with an optional `limit` that ansible itself expands through
 that nesting; a data source rather than an attribute on a resource for the same
 reason as `oidc_audiences` below, since a data source has no round-trip
-requirement and a derived value belongs there).
+requirement and a derived value belongs there), and
+`terrapod_ansible_execution_environments` (which Ansible
+[execution environments](runners.md#choosing-an-execution-environment) this
+deployment can run — the built-in image per ansible-core line and any the
+operator has added under a label, each with the image reference it resolves to).
+Read `listing` before gating on `lines`: `unknown` means the set could not be
+determined and the server will accept **any** line, so a configuration that
+blocks on an empty list would refuse applies the server would have allowed.
 
 **`terrapod_workspace.oidc_audiences` holds what you set, not the effective
 map**, and that pairing is deliberate. The API returns the merged result, so the
