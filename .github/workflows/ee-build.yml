@@ -164,6 +164,30 @@ jobs:
           echo '${{ steps.push.outputs.digest }}' > "digests/${{ matrix.line }}-${{ matrix.arch }}"
           cat "digests/${{ matrix.line }}-${{ matrix.arch }}"
 
+      # The contract again, against the PUBLISHED artifact rather than the build.
+      # The Dockerfile's own assertion proves the layers were right; this pulls
+      # back exactly what the registry now serves and asserts it a second time,
+      # because the two can differ -- a push that half-succeeded, a re-tag, a
+      # layer set reassembled -- and an operator only ever gets the published
+      # bytes.
+      #
+      # It belongs HERE rather than in `manifest` or the weekly re-scan for one
+      # reason: this job is on a NATIVE runner for its arch (`ubuntu-24.04-arm`
+      # for arm64), so the image executes without qemu. `manifest` is amd64
+      # only and nothing in this repository installs setup-qemu, so asserting
+      # arm64 there would mean adding that dependency or silently resolving the
+      # multi-arch manifest to the runner's own platform -- the same trap
+      # `TRIVY_PLATFORM` exists for in release-rescan.yml, where the arm64 leg
+      # would otherwise scan amd64. A periodic sweep would buy nothing either:
+      # conformance is a property of an immutable digest, so it can only change
+      # when something is published, which is exactly when this runs.
+      - name: The published image meets the EE contract
+        run: |
+          set -euo pipefail
+          ref="${EE_REPOSITORY}@${{ steps.push.outputs.digest }}"
+          echo "asserting the contract on $ref ($(uname -m))"
+          docker run --rm -i --entrypoint sh "$ref" -s < docker/ee-contract.sh
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ee-digest-${{ matrix.line }}-${{ matrix.arch }}

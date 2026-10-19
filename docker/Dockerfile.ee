@@ -97,30 +97,23 @@ ENV HOME=/home/ansible
 USER 1000
 
 # The contract, asserted at build time so a broken image cannot be published --
-# and asserted AS THE RUNTIME USER, because that is the only uid whose ability to
-# run ansible matters.
-RUN set -eux; \
-    command -v ansible-playbook; \
-    command -v ansible-galaxy; \
-    command -v ansible; \
-    command -v ssh; \
-    command -v git; \
-    ansible --version; \
-    test "$(id -u)" = "1000"
-
-# A real playbook with a REAL module. `ansible.builtin.debug` is a
-# controller-side action plugin that opens no connection and would pass while
-# proving nothing, so this uses `command` and `stat` against a local connection.
-# Removed again afterwards: the EE ships no Terrapod artefacts of any kind.
-RUN set -eux; \
-    mkdir -p "$HOME/ee-smoke"; \
-    printf -- '- hosts: localhost\n  gather_facts: false\n  tasks:\n    - command: /bin/true\n    - stat: {path: /etc/hostname}\n' > $HOME/ee-smoke/play.yml; \
-    TMPDIR="$HOME/ee-smoke" ANSIBLE_LOCAL_TEMP="$HOME/ee-smoke/local" \
-      ansible-playbook -i localhost, -c local $HOME/ee-smoke/play.yml \
-      | tee $HOME/ee-smoke/out; \
-    grep -q 'failed=0' $HOME/ee-smoke/out; \
-    grep -q 'ok=2' $HOME/ee-smoke/out; \
-    rm -rf "$HOME/ee-smoke"
+# and asserted AS THE RUNTIME USER, because that is the only uid whose ability
+# to run ansible matters. Both halves of #2154's first build were invisible to a
+# root check: `ansible --version` passed as root and failed for uid 1000 on an
+# unwritable HOME, then failed again because that uid had no passwd entry.
+#
+# ONE PRODUCER with the published-image conformance job (#2154 item 19), which
+# feeds the same bytes to `docker run` against what is actually in the registry.
+# Build time and published are different questions -- the moving `X.Y` tags are
+# rebuilt, and an operator pulls what is published.
+#
+# BIND-MOUNTED rather than COPYed, so it leaves no layer behind: this image
+# ships no Terrapod artefacts of any kind, which is exactly what makes it
+# insensitive to a Terrapod release. The conformance job pipes it on stdin for
+# the same reason, plus one more -- an operator-supplied environment will never
+# carry this file and is the image most worth checking.
+RUN --mount=type=bind,source=docker/ee-contract.sh,target=/tmp/ee-contract.sh \
+    sh /tmp/ee-contract.sh
 
 # Provenance, so staleness is a comparison rather than a guess. `crane config`
 # reads these without pulling the image, which is what lets the scheduled build
