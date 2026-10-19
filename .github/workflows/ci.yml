@@ -428,6 +428,94 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: mcp
 
+  # ── EE Agent Lint ─────────────────────────────────────
+  # The agent that drives ansible inside an execution-environment container
+  # (#2154). Its own module, stdlib-only, so it can be injected into an EE
+  # without dragging a dependency surface in with it — which is what keeps an EE
+  # free of Terrapod code and therefore insensitive to Terrapod releases.
+  ee-agent-lint:
+    name: EE Agent Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ee-agent/go.mod
+          # Stdlib-only module — no go.sum, so nothing to cache.
+          cache: false
+      - name: Vet
+        run: go vet ./...
+        working-directory: ee-agent
+      - name: Build
+        run: go build ./...
+        working-directory: ee-agent
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
+          working-directory: ee-agent
+          args: --config=../.golangci.yml
+
+  # ── EE Agent Test ─────────────────────────────────────
+  ee-agent-test:
+    name: EE Agent Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ee-agent/go.mod
+          cache: false
+      - name: Test
+        # Longer than the other modules': several tests start a real child and
+        # wait for it to be signalled, because cancellation is a property you
+        # cannot assert without one.
+        run: go test ./... -v -count=1 -timeout 300s
+        working-directory: ee-agent
+
+  # ── Build terrapod-ee-agent binary (baked into the runner image) ──────
+  # Static and stdlib-only, so the initContainer can copy it onto a shared
+  # volume and the EE can run it with no interpreter and no libraries of ours.
+  build-ee-agent:
+    name: Build terrapod-ee-agent (${{ matrix.goarch }})
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ee-agent/go.mod
+          cache: false
+      - name: Build linux/${{ matrix.goarch }}
+        working-directory: ee-agent
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          # CGO off is not an optimisation here: the binary runs inside an
+          # arbitrary EE whose libc we do not choose, so it must not link one.
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags "-s -w" -o "terrapod-ee-agent-linux-${{ matrix.goarch }}" .
+      - name: Confirm it is actually static
+        working-directory: ee-agent
+        run: |
+          set -euo pipefail
+          file "terrapod-ee-agent-linux-${{ matrix.goarch }}"
+          file "terrapod-ee-agent-linux-${{ matrix.goarch }}" | grep -q 'statically linked'
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: terrapod-ee-agent-linux-${{ matrix.goarch }}
+          path: ee-agent/terrapod-ee-agent-linux-${{ matrix.goarch }}
+          retention-days: 1
+
   # ── Build terrapod-query binary (baked into api + runner images) ──────
   build-query:
     name: Build terrapod-query (${{ matrix.goarch }})
@@ -814,7 +902,26 @@ jobs:
           fi
 
           fail=0
-          for m in go-terrapod provider migrate publish query mcp; do
+          # DERIVED, not listed. A hand-kept list is why `loadtest` had never
+          # been audited at all — it is the one module that was also missing a
+          # lint and a test job, and it stayed invisible here for the same
+          # reason. The floor is the same shape CodeQL's module build uses: a
+          # finder that stops matching must fail rather than audit a fraction
+          # of the Go code and report success.
+          mapfile -t mods < <(
+            find . -name go.mod \
+              -not -path './.conformance/*' \
+              -not -path './.claude/*' \
+              -not -path './node_modules/*' \
+              -printf '%h\n' | sed 's|^\./||' | sort
+          )
+          if [ "${#mods[@]}" -lt 7 ]; then
+            echo "Found only ${#mods[@]} Go module(s): ${mods[*]}"
+            echo "Expected at least 7 — failing rather than auditing a fraction."
+            exit 1
+          fi
+          echo "Auditing ${#mods[@]} module(s): ${mods[*]}"
+          for m in "${mods[@]}"; do
             echo "── $m"
             docker run --rm -v "$PWD:/src" -v "$CACHE:/cache" -w /src \
               "$TRIVY" \
@@ -2780,6 +2887,22 @@ jobs:
           mv docker/query-bin/terrapod-query-linux-amd64 docker/query-bin/terrapod-query
           chmod 0755 docker/query-bin/terrapod-query
 
+      # terrapod-ee-agent is baked into the RUNNER only (#2154), from the
+      # binary build-ee-agent compiled once. The runner's initContainer
+      # copies it onto a shared volume so the EE can run it — which is how
+      # an EE stays free of Terrapod code and insensitive to our releases.
+      - name: Stage terrapod-ee-agent binary (runner only)
+        if: matrix.image == 'terrapod-runner'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: terrapod-ee-agent-linux-amd64
+          path: docker/ee-agent-bin
+      - name: Normalise terrapod-ee-agent binary
+        if: matrix.image == 'terrapod-runner'
+        run: |
+          mv docker/ee-agent-bin/terrapod-ee-agent-linux-amd64 docker/ee-agent-bin/terrapod-ee-agent
+          chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
+
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
@@ -2862,6 +2985,22 @@ jobs:
         run: |
           mv docker/query-bin/terrapod-query-linux-arm64 docker/query-bin/terrapod-query
           chmod 0755 docker/query-bin/terrapod-query
+
+      # terrapod-ee-agent is baked into the RUNNER only (#2154), from the
+      # binary build-ee-agent compiled once. The runner's initContainer
+      # copies it onto a shared volume so the EE can run it — which is how
+      # an EE stays free of Terrapod code and insensitive to our releases.
+      - name: Stage terrapod-ee-agent binary (runner only)
+        if: matrix.image == 'terrapod-runner'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: terrapod-ee-agent-linux-arm64
+          path: docker/ee-agent-bin
+      - name: Normalise terrapod-ee-agent binary
+        if: matrix.image == 'terrapod-runner'
+        run: |
+          mv docker/ee-agent-bin/terrapod-ee-agent-linux-arm64 docker/ee-agent-bin/terrapod-ee-agent
+          chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
 
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
@@ -3712,6 +3851,8 @@ jobs:
       - query-test
       - mcp-lint
       - mcp-test
+      - ee-agent-lint
+      - ee-agent-test
       - python-test
       - pricegen-test
       - rescan-test
@@ -3747,6 +3888,8 @@ jobs:
             query-test=${{ needs.query-test.result }}
             mcp-lint=${{ needs.mcp-lint.result }}
             mcp-test=${{ needs.mcp-test.result }}
+            ee-agent-lint=${{ needs.ee-agent-lint.result }}
+            ee-agent-test=${{ needs.ee-agent-test.result }}
             python-test=${{ needs.python-test.result }}
             pricegen-test=${{ needs.pricegen-test.result }}
             rescan-test=${{ needs.rescan-test.result }}
@@ -4556,6 +4699,9 @@ jobs:
       - query-test
       - mcp-lint
       - mcp-test
+      - ee-agent-lint
+      - ee-agent-test
+      - build-ee-agent
       - build-query
       - python-test
       - pricegen-test
@@ -4619,6 +4765,9 @@ jobs:
             "${{ needs.query-test.result }}"
             "${{ needs.mcp-lint.result }}"
             "${{ needs.mcp-test.result }}"
+            "${{ needs.ee-agent-lint.result }}"
+            "${{ needs.ee-agent-test.result }}"
+            "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.pricegen-test.result }}"

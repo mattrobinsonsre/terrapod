@@ -82,6 +82,15 @@ RUN echo "pkg-refresh=${PKG_REFRESH}" \
 # context. The runner drives it for data-source discovery (D2) using the tofu
 # the Job fetches per-run from the binary cache.
 COPY docker/query-bin/terrapod-query /usr/local/bin/terrapod-query
+
+# terrapod-ee-agent (#2154). Lives in the RUNNER image but never runs here: the
+# Job's initContainer copies it onto a shared volume, and the EE sidecar runs it
+# via a `command:` override. That indirection is the point — it is how an
+# execution environment gets Terrapod's driver without carrying Terrapod code,
+# and therefore why an EE is never rebuilt for a Terrapod release.
+#
+# Static and stdlib-only, so it does not care which libc the EE has.
+COPY docker/ee-agent-bin/terrapod-ee-agent /usr/local/bin/terrapod-ee-agent
 RUN chmod 0755 /usr/local/bin/terrapod-query && /usr/local/bin/terrapod-query --help >/dev/null
 
 # Python deps from builder

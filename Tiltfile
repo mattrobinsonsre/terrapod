@@ -123,6 +123,21 @@ QUERY_BUILD = (
 )
 local(QUERY_BUILD, quiet=True)
 
+# terrapod-ee-agent (#2154) is baked into the runner image the same way, and for
+# the same reason: CI's build-ee-agent job produces it, so locally we compile it
+# in a container rather than requiring a host Go toolchain.
+#
+# CGO off is not an optimisation. The binary is copied out of the runner image
+# into an arbitrary execution-environment container whose libc we do not choose,
+# so it must not link one.
+EE_AGENT_BUILD = (
+    'mkdir -p docker/ee-agent-bin && ' +
+    'docker run --rm -e CGO_ENABLED=0 -v "$PWD/ee-agent":/src -w /src golang:1.26 ' +
+    'go build -trimpath -o terrapod-ee-agent-bin . && ' +
+    'mv ee-agent/terrapod-ee-agent-bin docker/ee-agent-bin/terrapod-ee-agent'
+)
+local(EE_AGENT_BUILD, quiet=True)
+
 # API Server (Python)
 docker_build(
     'terrapod-api',
@@ -183,11 +198,15 @@ local_resource(
     # runners.yaml ConfigMap rather than a pod spec, so Tilt does not track it
     # and `default_registry` does not apply. Elsewhere a plain local build is
     # all that is needed, exactly as before.
-    cmd=QUERY_BUILD + _RUNNER_BUILD,
+    cmd=QUERY_BUILD + ' && ' + EE_AGENT_BUILD + _RUNNER_BUILD,
     deps=[
         'docker/Dockerfile.runner',
         'query/cmd',
         'query/internal',
+        # The agent ships in this image, so an edit to it must rebuild here —
+        # otherwise the runner carries a stale agent and `kubectl exec` would
+        # show the fix present while the behaviour is the old one.
+        'ee-agent',
         # Both: the requirements file is what the image installs, so it is the
         # one that changes the image, and without it a regenerated lock would
         # not rebuild here (GHSA-rgvw-c74c-h75w). The manifest stays because it
