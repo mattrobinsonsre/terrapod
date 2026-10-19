@@ -1,0 +1,228 @@
+name: EE build
+
+# Terrapod builds and publishes the Ansible execution-environment images (#2154).
+# One image per ansible-core line, on the NEWEST python that line declares.
+#
+# The matrix is DERIVED, never hand-kept: `scripts/ee_matrix.py` asks PyPI which
+# lines exist, reads each one's own classifiers for its controller range, and
+# compares that against the provenance labels on what is already published. So a
+# new upstream line needs no code change here -- the floor is pinned at 2.12
+# (EL6, python 2.6 targets) and the ceiling floats.
+#
+# **An EE carries ZERO Terrapod code.** The orchestrator injects a static Go agent
+# and runs it with a `command:` override, so an EE contributes its filesystem and
+# not its entrypoint -- which is what makes these images insensitive to Terrapod
+# releases. They are never rebuilt for one. Rebuilds are CVE-driven: a finding in
+# the release re-scan triggers one, and a finding no rebuild clears goes to the
+# accepted-risk register by the existing platform-image flow.
+#
+# Why a rebuild is worth attempting at all when the base tag has not moved: the
+# official python images compile CPython into /usr/local (measured: NOT
+# dpkg-owned), while the Debian libraries around it are -- so the
+# `apt-get upgrade` in Dockerfile.ee clears a distribution CVE even on a frozen
+# base. Only a CPython CVE on an EOL interpreter is beyond us.
+#
+# Never on pull requests: it publishes images and needs `packages: write`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      line:
+        description: "A single ansible-core line to build (e.g. 2.16). Blank = the delta the plan finds."
+        required: false
+        default: ""
+      force:
+        description: "Rebuild even where the published provenance is already current"
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    # Wednesdays, an hour after the release re-scan (05:23) rather than beside
+    # it: the scan is what decides a rebuild is WORTH doing, so reading its
+    # findings before building is the right order. A Debian refresh is ten
+    # images across two architectures, which is why this is weekly and not
+    # nightly.
+    - cron: "23 6 * * 3"
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io/mattrobinsonsre
+  EE_REPOSITORY: ghcr.io/mattrobinsonsre/terrapod-ee
+
+jobs:
+  plan:
+    name: Plan the EE matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      build: ${{ steps.derive.outputs.build }}
+      lines: ${{ steps.derive.outputs.lines }}
+      any: ${{ steps.derive.outputs.any }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # `crane` reads a published image's config blob, and resolves a base tag to
+      # its manifest-list digest, both WITHOUT pulling anything. That is what
+      # makes the staleness check a comparison against the registry rather than
+      # against a state file nobody maintains.
+      - name: Install crane
+        run: |
+          set -euo pipefail
+          version=v0.21.2
+          curl -fsSL -o crane.tar.gz \
+            "https://github.com/google/go-containerregistry/releases/download/${version}/go-containerregistry_Linux_x86_64.tar.gz"
+          tar -xzf crane.tar.gz crane
+          sudo install -m 0755 crane /usr/local/bin/crane
+          crane version
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      # Authenticated, because the anonymous Docker Hub manifest limit is
+      # `100;w=3600` per source IP and Actions runners share egress addresses --
+      # so an unauthenticated plan competes with every other project for that
+      # bucket. Degrades to anonymous when no credential is configured, which is
+      # fine for a hand-run dispatch and not for the schedule.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' \
+            | crane auth login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+
+      - name: Derive what needs building
+        id: derive
+        env:
+          INPUT_LINE: ${{ inputs.line }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          # `if` rather than `[ -n "$X" ] && ...`: under `set -e` a failing test
+          # is the exit status of the whole list, so the short-circuit form kills
+          # the step whenever the input is blank -- which is the common case.
+          args=(--repository "$EE_REPOSITORY")
+          if [ -n "$INPUT_LINE" ]; then args+=(--line "$INPUT_LINE"); fi
+          if [ "$INPUT_FORCE" = "true" ]; then args+=(--force); fi
+          python3 scripts/ee_matrix.py "${args[@]}" > matrix.json
+          python3 scripts/ee_matrix_outputs.py matrix.json >> "$GITHUB_OUTPUT"
+          python3 scripts/ee_matrix_outputs.py matrix.json --summary
+
+  build:
+    name: Build EE ${{ matrix.line }} (${{ matrix.arch }})
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      # The plan emits the CROSS PRODUCT already, each entry carrying its own
+      # `arch`. Pairing `include` with a separate `arch:` dimension would not
+      # cross them -- `include` EXTENDS combinations, so it would yield N+2
+      # entries rather than N*2. checkov-build.yml records the same trap.
+      matrix: ${{ fromJson(needs.plan.outputs.build) }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      # The build itself asserts the contract and runs a real playbook with a
+      # real module, as the RUNTIME uid rather than as root -- see Dockerfile.ee.
+      # A broken image therefore cannot be pushed: the build fails first.
+      - name: Build and push by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: docker/Dockerfile.ee
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          provenance: false
+          build-args: |
+            BASE_IMAGE=${{ matrix.base }}
+            ANSIBLE_CORE_VERSION=${{ matrix.version }}
+            BASE_DIGEST=${{ matrix.base_digest }}
+          outputs: type=image,name=${{ env.EE_REPOSITORY }},push-by-digest=true,name-canonical=true
+
+      - name: Record the digest
+        run: |
+          set -euo pipefail
+          mkdir -p digests
+          echo '${{ steps.push.outputs.digest }}' > "digests/${{ matrix.line }}-${{ matrix.arch }}"
+          cat "digests/${{ matrix.line }}-${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ee-digest-${{ matrix.line }}-${{ matrix.arch }}
+          path: digests/
+
+  manifest:
+    name: Publish EE ${{ matrix.line }}
+    needs: [plan, build]
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.lines) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: ee-digest-${{ matrix.line }}-*
+          merge-multiple: true
+          path: digests
+
+      # TWO tags, deliberately. The patch tag is immutable, so a run can be
+      # identified exactly; the line tag moves, so a deployment picks up a
+      # rebuild through the pull-through cache (OCI tags revalidate on access,
+      # #1425). The run records the resolved DIGEST, which is what keeps a moving
+      # tag from making a run unidentifiable.
+      - name: Create the manifest list
+        run: |
+          set -euo pipefail
+          refs=()
+          for f in digests/*; do
+            refs+=("${EE_REPOSITORY}@$(cat "$f")")
+          done
+          echo "merging ${#refs[@]} arch manifest(s) for ${{ matrix.line }}"
+          docker buildx imagetools create \
+            -t "${EE_REPOSITORY}:${{ matrix.version }}" \
+            -t "${EE_REPOSITORY}:${{ matrix.line }}" \
+            "${refs[@]}"
+
+      # Verify what was published rather than assume the push succeeded: the
+      # labels are what the next plan reads to decide staleness, so a manifest
+      # whose provenance did not survive the merge would be rebuilt for ever.
+      - name: Verify the published provenance
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${EE_REPOSITORY}:${{ matrix.line }}" --raw > /dev/null
+          echo "published ${EE_REPOSITORY}:${{ matrix.line }} and :${{ matrix.version }}"

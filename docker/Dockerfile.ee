@@ -1,0 +1,138 @@
+# syntax=docker/dockerfile:1
+#
+# An Ansible execution environment (#2154). One image per ansible-core line,
+# built on the NEWEST python that line declares, carrying ZERO Terrapod code.
+#
+# That last point is the whole design. The orchestrator injects a static Go
+# agent via an initContainer and runs it with a `command:` override, which
+# Kubernetes applies over this image's ENTRYPOINT -- so an EE contributes its
+# FILESYSTEM, not its entrypoint, and is never rebuilt for a Terrapod release.
+# Rebuilds are CVE-driven: a finding in the release re-scan triggers one, and a
+# finding no rebuild clears goes to the accepted-risk register.
+#
+# The contract an EE must meet is exactly this, and no more:
+#   * `ansible-playbook` and `ansible-galaxy` on PATH -- the orchestrator finds
+#     them by PATH discovery, so no fixed path is imposed;
+#   * `ssh` on PATH, or nothing reaches a managed node;
+#   * `git` on PATH, because `ansible-galaxy role install -r` clones a
+#     git-sourced role and we do not reimplement its requirements parsing;
+#   * a uid that can read the shared volume.
+# Writable temp is NOT its problem: it arrives as TMPDIR / ANSIBLE_LOCAL_TEMP /
+# ANSIBLE_REMOTE_TEMP from the Job spec, which is what lets the EE run under
+# readOnlyRootFilesystem. Measured: without them ansible dies `rc 250`,
+# "No usable temporary directory found".
+
+ARG BASE_IMAGE=python:3.14-slim
+FROM ${BASE_IMAGE}
+
+ARG ANSIBLE_CORE_VERSION
+ARG BASE_IMAGE
+ARG BASE_DIGEST=""
+
+# `apt-get upgrade` is load-bearing rather than tidy. The official python images
+# compile CPython into /usr/local -- measured: it is NOT dpkg-owned, and there
+# are zero `python3*` packages in the dpkg status file -- while the Debian
+# libraries around it ARE (libssl3t64 owns libssl.so.3). So upgrading here is
+# what lets a rebuild clear a distribution CVE **even when the base tag's digest
+# has stopped moving**, which is the case for any line pinned to an interpreter
+# that has gone EOL. Only a CPython CVE is then beyond us.
+#
+# git and openssh-client are the two contract packages. Both are distro packages
+# that move with the base, so neither makes this image sensitive to our releases.
+RUN set -eux; \
+    apt-get update; \
+    apt-get upgrade -y; \
+    apt-get install -y --no-install-recommends \
+        git \
+        openssh-client \
+        ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
+
+# `wheel` FIRST, and this is not optional. ansible-core 2.12 is sdist-only, and
+# without `wheel` present pip falls back to a legacy `setup.py install` that
+# writes the console scripts with the literal shebang `#!python`. Measured: every
+# one of ansible, ansible-playbook and ansible-galaxy is then present,
+# executable, and fails with `not found` -- an error naming a file that exists.
+# With `wheel` installed beforehand the shebang is rewritten correctly.
+#
+# No `--only-binary=:all:`: 2.12 publishes no wheel, so demanding one cannot work.
+RUN set -eux; \
+    pip install --no-cache-dir --upgrade pip wheel; \
+    pip install --no-cache-dir "ansible-core==${ANSIBLE_CORE_VERSION}"
+
+# A writable HOME owned by the runtime uid. Without it ansible cannot even be
+# IMPORTED as a non-root user: `DEFAULT_LOCAL_TMP` defaults to `~/.ansible/tmp`,
+# and with HOME unset that resolves to `/.ansible/tmp`, which uid 1000 cannot
+# create -- so `ansible --version` dies inside `import ansible.constants` with
+# `Invalid settings supplied for DEFAULT_LOCAL_TMP`. Measured, and it is the
+# reason the assertions below moved after USER: as root they passed while the
+# runtime user could not run ansible at all.
+#
+# The Job spec still overrides TMPDIR / ANSIBLE_LOCAL_TEMP / ANSIBLE_REMOTE_TEMP
+# onto the shared volume; this is only what makes the image coherent on its own.
+# A REAL account for the runtime uid, not merely a writable directory. Two
+# separate things need it, and both were measured as uid 1000 rather than assumed
+# from a root build:
+#
+#   * ansible cannot be IMPORTED with an unwritable HOME -- `DEFAULT_LOCAL_TMP`
+#     defaults to `~/.ansible/tmp`, which with HOME unset resolves to
+#     `/.ansible/tmp`, so `ansible --version` dies inside
+#     `import ansible.constants` with `Invalid settings supplied for
+#     DEFAULT_LOCAL_TMP`;
+#   * a TASK then fails with `KeyError: getpwuid(): uid not found: 1000` if the
+#     uid has no passwd entry, however writable HOME is.
+#
+# The second is the one a root build hides completely, which is why the contract
+# assertions and the smoke below both run after USER.
+#
+# Group 0 and g+w on HOME so the image still works if a Job runs it under a
+# different uid in the root group, which is the usual Kubernetes arrangement.
+RUN set -eux; \
+    useradd --uid 1000 --gid 0 --home-dir /home/ansible --create-home --shell /bin/bash ansible; \
+    chmod 775 /home/ansible
+ENV HOME=/home/ansible
+
+# Non-root, and numeric so the Job's fsGroup can be reasoned about without
+# resolving a name inside the image.
+USER 1000
+
+# The contract, asserted at build time so a broken image cannot be published --
+# and asserted AS THE RUNTIME USER, because that is the only uid whose ability to
+# run ansible matters.
+RUN set -eux; \
+    command -v ansible-playbook; \
+    command -v ansible-galaxy; \
+    command -v ansible; \
+    command -v ssh; \
+    command -v git; \
+    ansible --version; \
+    test "$(id -u)" = "1000"
+
+# A real playbook with a REAL module. `ansible.builtin.debug` is a
+# controller-side action plugin that opens no connection and would pass while
+# proving nothing, so this uses `command` and `stat` against a local connection.
+# Removed again afterwards: the EE ships no Terrapod artefacts of any kind.
+RUN set -eux; \
+    mkdir -p "$HOME/ee-smoke"; \
+    printf -- '- hosts: localhost\n  gather_facts: false\n  tasks:\n    - command: /bin/true\n    - stat: {path: /etc/hostname}\n' > $HOME/ee-smoke/play.yml; \
+    TMPDIR="$HOME/ee-smoke" ANSIBLE_LOCAL_TEMP="$HOME/ee-smoke/local" \
+      ansible-playbook -i localhost, -c local $HOME/ee-smoke/play.yml \
+      | tee $HOME/ee-smoke/out; \
+    grep -q 'failed=0' $HOME/ee-smoke/out; \
+    grep -q 'ok=2' $HOME/ee-smoke/out; \
+    rm -rf "$HOME/ee-smoke"
+
+# Provenance, so staleness is a comparison rather than a guess. `crane config`
+# reads these without pulling the image, which is what lets the scheduled build
+# ask "is this current" against PyPI and the base tag with no state file.
+# ABSENT provenance means rebuild -- never "assume current".
+LABEL io.terrapod.ee.ansible-core="${ANSIBLE_CORE_VERSION}" \
+      io.terrapod.ee.base-image="${BASE_IMAGE}" \
+      io.terrapod.ee.base-digest="${BASE_DIGEST}" \
+      org.opencontainers.image.source="https://github.com/mattrobinsonsre/terrapod" \
+      org.opencontainers.image.description="Ansible execution environment: ansible-core ${ANSIBLE_CORE_VERSION}"
+
+# Never relied upon -- the Job overrides `command` with the injected agent. Here
+# only so the image is runnable by hand when someone wants to inspect it.
+ENTRYPOINT ["ansible-playbook"]
+CMD ["--version"]
