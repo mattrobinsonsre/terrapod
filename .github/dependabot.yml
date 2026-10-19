@@ -114,6 +114,29 @@ updates:
       # toolchain; lift then.
       - dependency-name: typescript
         versions: [">=7"]
+      # next 16.4 ships new React-Compiler lint rules enabled by default, and
+      # eslint-config-next turns them on: our existing components trip 53 of
+      # them (36 set-state-in-effect, 8 create-component-during-render, 5
+      # access-before-declaration, 3 immutability). They are REAL correctness
+      # rules and worth adopting -- but 53 React fixes across the component
+      # tree is a migration with a UI review attached, not something to land
+      # inside a dependency bump.
+      #
+      # Measured on #2156 (closed unmerged): the bump is lint-only. Both web
+      # image builds, all eight E2E shards, CodeQL and the image scan PASSED;
+      # `Frontend Lint` was the single failure. So this holds back a lint
+      # adoption, not a broken dependency.
+      #
+      # Nothing security-relevant is held: 16.4.0's notes mention security only
+      # as FEATURES about upgrade prompts, and the five open npm highs are the
+      # allowlisted braces chain (GHSA-vfj7-8cjw-p6xm), unaffected either way.
+      #
+      # The two move as a pair -- eslint-config-next tracks next's version.
+      # Lift both together when doing the rules migration.
+      - dependency-name: next
+        versions: [">=16.4"]
+      - dependency-name: eslint-config-next
+        versions: [">=16.4"]
 
   - package-ecosystem: docker
     directory: /docker
