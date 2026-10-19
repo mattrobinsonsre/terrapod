@@ -156,6 +156,10 @@ export default function BulkUpdatePage() {
   const [uAgentPoolId, setUAgentPoolId] = useState('')
   const [uResourceCpu, setUResourceCpu] = useState('')
   const [uResourceMemory, setUResourceMemory] = useState('')
+  // The Ansible execution environment's own pair (#2154). Blank means "leave
+  // this alone", as every field on this form does.
+  const [uEeResourceCpu, setUEeResourceCpu] = useState('')
+  const [uEeResourceMemory, setUEeResourceMemory] = useState('')
   const [uScanEnforcement, setUScanEnforcement] = useState('')
   const [uScanEngine, setUScanEngine] = useState('')
   const [uScanThreshold, setUScanThreshold] = useState('')
@@ -281,6 +285,8 @@ export default function BulkUpdatePage() {
     if (uAgentPoolId) u['agent-pool-id'] = uAgentPoolId
     if (uResourceCpu.trim()) u['resource-cpu'] = uResourceCpu.trim()
     if (uResourceMemory.trim()) u['resource-memory'] = uResourceMemory.trim()
+    if (uEeResourceCpu.trim()) u['ee-resource-cpu'] = uEeResourceCpu.trim()
+    if (uEeResourceMemory.trim()) u['ee-resource-memory'] = uEeResourceMemory.trim()
     if (uScanEnforcement) u['security-scan-enforcement'] = uScanEnforcement
     if (uScanEngine) u['security-scan-engine'] = uScanEngine
     if (uScanThreshold) u['security-scan-severity-threshold'] = uScanThreshold
@@ -701,6 +707,26 @@ export default function BulkUpdatePage() {
                 type="text"
                 value={uResourceMemory}
                 onChange={(e) => setUResourceMemory(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{t('update.eeCpuRequest')}</label>
+              <input
+                type="text"
+                value={uEeResourceCpu}
+                onChange={(e) => setUEeResourceCpu(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{t('update.eeMemoryRequest')}</label>
+              <input
+                type="text"
+                value={uEeResourceMemory}
+                onChange={(e) => setUEeResourceMemory(e.target.value)}
                 placeholder={t('unchanged')}
                 className={inputCls}
               />

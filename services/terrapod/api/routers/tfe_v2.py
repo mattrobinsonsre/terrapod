@@ -793,6 +793,12 @@ def _workspace_json(
                 "resource-cpu": ws.resource_cpu,
                 "parallelism": ws.parallelism,
                 "resource-memory": ws.resource_memory,
+                # The EE sidecar's own pair (#2154). Returned UNRESOLVED -- `""`
+                # means "the deployment default" and must not be substituted
+                # here, or a client writing a read straight back would pin every
+                # inheriting workspace to whatever the default was at read time.
+                "ee-resource-cpu": ws.ee_resource_cpu,
+                "ee-resource-memory": ws.ee_resource_memory,
                 # The MERGED view, not the stored override: the workspace's own
                 # map resolved over the deployment catalogue, per key. Clients
                 # see what this workspace would actually mint for, because the
@@ -1616,10 +1622,34 @@ async def _create_workspace_impl(
         inventory_ignore_paths=_validate_inventory_ignore_paths(
             attrs.get("inventory-ignore-paths")
         ),
-        resource_cpu=attrs.get("resource-cpu", "1"),
+        # All four resource requests go through one rule (#2154). The
+        # orchestrator's two were accepted unvalidated, so "half a cpu" stored
+        # fine and surfaced only as the Kubernetes API server refusing the Job.
+        resource_cpu=_422(
+            workspace_settings.validate_resource_quantity,
+            attrs.get("resource-cpu", "1"),
+            "resource-cpu",
+        ),
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
         pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
-        resource_memory=attrs.get("resource-memory", "2Gi"),
+        resource_memory=_422(
+            workspace_settings.validate_resource_quantity,
+            attrs.get("resource-memory", "2Gi"),
+            "resource-memory",
+        ),
+        # `""` is the default and means "inherit the deployment's", so an
+        # absent key and an explicit empty string agree here -- unlike the
+        # orchestrator's pair above, which carry a concrete literal.
+        ee_resource_cpu=_422(
+            workspace_settings.validate_resource_quantity,
+            attrs.get("ee-resource-cpu", ""),
+            "ee-resource-cpu",
+        ),
+        ee_resource_memory=_422(
+            workspace_settings.validate_resource_quantity,
+            attrs.get("ee-resource-memory", ""),
+            "ee-resource-memory",
+        ),
         oidc_audiences=_422(
             workspace_settings.validate_oidc_audiences, attrs.get("oidc-audiences")
         ),
@@ -2354,10 +2384,18 @@ async def update_workspace(
         ws.parallelism = _validate_parallelism(attrs["parallelism"])
     if "pulumi-bind-plan" in attrs:
         ws.pulumi_bind_plan = _validate_pulumi_bind_plan(attrs["pulumi-bind-plan"], ws.engine)
-    if "resource-cpu" in attrs:
-        ws.resource_cpu = attrs["resource-cpu"]
-    if "resource-memory" in attrs:
-        ws.resource_memory = attrs["resource-memory"]
+    for key, column in (
+        ("resource-cpu", "resource_cpu"),
+        ("resource-memory", "resource_memory"),
+        ("ee-resource-cpu", "ee_resource_cpu"),
+        ("ee-resource-memory", "ee_resource_memory"),
+    ):
+        if key in attrs:
+            setattr(
+                ws,
+                column,
+                _422(workspace_settings.validate_resource_quantity, attrs[key], key),
+            )
     if "oidc-audiences" in attrs:
         ws.oidc_audiences = _422(
             workspace_settings.validate_oidc_audiences, attrs["oidc-audiences"]

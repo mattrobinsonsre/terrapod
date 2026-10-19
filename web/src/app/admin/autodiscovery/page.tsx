@@ -62,6 +62,8 @@ interface AutodiscoveryRule {
     'resource-cpu': string
     parallelism: number
     'resource-memory': string
+    'ee-resource-cpu'?: string
+    'ee-resource-memory'?: string
     'auto-apply': boolean
     'auto-apply-mode'?: string
     'on-directory-delete': 'flag' | 'destroy'
@@ -182,6 +184,12 @@ export default function AutodiscoveryPage() {
   const [bindPlan, setBindPlan] = useState(false)
   const [parallelism, setParallelism] = useState('10')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
+  // Deliberately NOT pre-filled, unlike the pair above: empty is a real value
+  // here and means "inherit the deployment default" (#2154), so pre-filling
+  // would pin every rule the UI creates to whatever the default happened to be
+  // the day it was created.
+  const [eeResourceCpu, setEeResourceCpu] = useState('')
+  const [eeResourceMemory, setEeResourceMemory] = useState('')
   const [autoApplyMode, setAutoApplyMode] = useState('never')
   const [onDirectoryDelete, setOnDirectoryDelete] = useState<'flag' | 'destroy'>('flag')
   const [labels, setLabels] = useState<Record<string, string>>({})
@@ -381,6 +389,8 @@ export default function AutodiscoveryPage() {
     setEngine(a.engine || 'terraform')
     setBindPlan(Boolean(a['pulumi-bind-plan']))
     setResourceMemory(a['resource-memory'])
+    setEeResourceCpu(a['ee-resource-cpu'] ?? '')
+    setEeResourceMemory(a['ee-resource-memory'] ?? '')
     // Fall back to the boolean for a rule created before #1274.
     setAutoApplyMode(a['auto-apply-mode'] || (a['auto-apply'] ? 'always' : 'never'))
     setOnDirectoryDelete(a['on-directory-delete'] === 'destroy' ? 'destroy' : 'flag')
@@ -457,6 +467,8 @@ export default function AutodiscoveryPage() {
       engine,
       ...(engine === 'pulumi' ? { 'pulumi-bind-plan': bindPlan } : {}),
       'resource-memory': resourceMemory,
+      'ee-resource-cpu': eeResourceCpu.trim(),
+      'ee-resource-memory': eeResourceMemory.trim(),
       'auto-apply-mode': autoApplyMode,
       'on-directory-delete': onDirectoryDelete,
       labels,
@@ -591,6 +603,8 @@ export default function AutodiscoveryPage() {
             'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
             'resource-memory': resourceMemory,
+            'ee-resource-cpu': eeResourceCpu.trim(),
+            'ee-resource-memory': eeResourceMemory.trim(),
             'auto-apply-mode': autoApplyMode,
             labels,
             'owner-email': ownerEmail,
@@ -830,6 +844,24 @@ export default function AutodiscoveryPage() {
                   <input
                     value={resourceCpu}
                     onChange={e => setResourceCpu(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.eeCpuRequest')}</label>
+                  <input
+                    value={eeResourceCpu}
+                    onChange={e => setEeResourceCpu(e.target.value)}
+                    placeholder={t('form.eeInherit')}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.eeMemoryRequest')}</label>
+                  <input
+                    value={eeResourceMemory}
+                    onChange={e => setEeResourceMemory(e.target.value)}
+                    placeholder={t('form.eeInherit')}
                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                   />
                 </div>

@@ -313,6 +313,14 @@ def _run_json(
                 "resource-cpu": run.resource_cpu,
                 "parallelism": run.parallelism,
                 "resource-memory": run.resource_memory,
+                # The Ansible execution environment this run uses, and how big
+                # its sidecar is (#2154). Already RESOLVED on the run, so the
+                # listener needs no fallback and the numbers stay recoverable
+                # after the deployment default moves. Empty on every plan and
+                # apply, which is what renders no sidecar at all.
+                "ee-image": run.ee_image,
+                "ee-resource-cpu": run.ee_resource_cpu,
+                "ee-resource-memory": run.ee_resource_memory,
                 # Which agent pool has this run (#1231). At creation this is
                 # element 0 of the workspace's pool set; on claim it is
                 # REWRITTEN to the pool that actually took it. So on a finished

@@ -141,6 +141,9 @@ def _mock_run(
     run.resource_cpu = "1"
     run.parallelism = 10
     run.resource_memory = "2Gi"
+    run.ee_image = ""
+    run.ee_resource_cpu = ""
+    run.ee_resource_memory = ""
     run.configuration_version_id = None
     run.created_by = "test@example.com"
     run.resource_additions = None

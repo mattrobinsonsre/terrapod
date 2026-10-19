@@ -89,6 +89,11 @@ _FIELD_MAP: dict[str, str] = {
     "inventory-ignore-paths": "inventory_ignore_paths",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
+    # The Ansible execution environment's own pair (#2154). Separate from the
+    # orchestrator's above because the two containers do different work, so one
+    # pair cannot size both.
+    "ee-resource-cpu": "ee_resource_cpu",
+    "ee-resource-memory": "ee_resource_memory",
     # Per-workspace cloud identity (#1901). An ordinary mapped field: one input
     # key, one column, and the same validator the single-workspace API uses.
     "oidc-audiences": "oidc_audiences",
@@ -378,6 +383,22 @@ _SETTING_RULES: dict[str, Any] = {
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "ansible-version": workspace_settings.validate_ansible_version,
+    # All four resource requests share one rule (#2154), so the orchestrator's
+    # pair and the EE's cannot come to disagree about what is writable. The
+    # orchestrator's two were in `_FIELD_MAP` and absent from here, which means
+    # they were written UNVALIDATED: "half a cpu" stored fine and surfaced only
+    # as the Kubernetes API server refusing the Job, naming neither the
+    # workspace nor the field.
+    "resource-cpu": lambda v: workspace_settings.validate_resource_quantity(v, "resource-cpu"),
+    "resource-memory": lambda v: workspace_settings.validate_resource_quantity(
+        v, "resource-memory"
+    ),
+    "ee-resource-cpu": lambda v: workspace_settings.validate_resource_quantity(
+        v, "ee-resource-cpu"
+    ),
+    "ee-resource-memory": lambda v: workspace_settings.validate_resource_quantity(
+        v, "ee-resource-memory"
+    ),
     "ansible-collections": workspace_settings.validate_ansible_collections,
     # The Ansible roots and run defaults (#1929). Shared with the
     # single-workspace PATCH rather than restated here -- restating one is how

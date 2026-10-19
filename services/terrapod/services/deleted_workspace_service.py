@@ -107,6 +107,9 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "var_files": list(ws.var_files or []),
         "oidc_audiences": dict(ws.oidc_audiences or {}),
         "resource_cpu": ws.resource_cpu,
+        # The Ansible execution environment's own pair (#2154).
+        "ee_resource_cpu": ws.ee_resource_cpu,
+        "ee_resource_memory": ws.ee_resource_memory,
         "parallelism": ws.parallelism,
         "ansible_version": ws.ansible_version,
         "ansible_collections": list(ws.ansible_collections or []),
@@ -648,6 +651,13 @@ async def restore_workspace(
         # whose restore path defaulted the permissive way.
         oidc_audiences=settings.get("oidc_audiences") or {},
         resource_cpu=settings.get("resource_cpu") or "1",
+        # `""` is the correct fallback, not the deployment default: a snapshot
+        # predating these columns means the workspace never sized the EE, which
+        # is what empty means. Substituting a concrete size here would pin a
+        # restored workspace to whatever the default was on the day it came
+        # back -- the same trap the ansible version below avoids.
+        ee_resource_cpu=settings.get("ee_resource_cpu") or "",
+        ee_resource_memory=settings.get("ee_resource_memory") or "",
         parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
         # "" is the correct fallback, not the deployment default: a snapshot
         # predating this column means the workspace never pinned one.

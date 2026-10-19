@@ -109,6 +109,9 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "inventory-include-platform": rule.inventory_include_platform,
             "inventory-ignore-paths": list(rule.inventory_ignore_paths or []),
             "resource-memory": rule.resource_memory,
+            # The EE sidecar's pair, templated like the orchestrator's (#2154).
+            "ee-resource-cpu": rule.ee_resource_cpu,
+            "ee-resource-memory": rule.ee_resource_memory,
             "oidc-audiences": dict(rule.oidc_audiences or {}),
             "auto-apply": rule.auto_apply,
             "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
@@ -392,10 +395,18 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-    if "resource-cpu" in attrs:
-        out["resource_cpu"] = str(attrs["resource-cpu"])
-    if "resource-memory" in attrs:
-        out["resource_memory"] = str(attrs["resource-memory"])
+    # One rule for all four (#2154), shared with the workspace routes rather
+    # than restated, and it refuses what a Job spec cannot carry instead of
+    # coercing with `str()` -- which turned a wrong type into a stored value
+    # the Kubernetes API server would later reject.
+    for key, column in (
+        ("resource-cpu", "resource_cpu"),
+        ("resource-memory", "resource_memory"),
+        ("ee-resource-cpu", "ee_resource_cpu"),
+        ("ee-resource-memory", "ee_resource_memory"),
+    ):
+        if key in attrs:
+            out[column] = workspace_settings.validate_resource_quantity(attrs[key], key)
     if "auto-apply" in attrs and "auto-apply-mode" in attrs:
         raise HTTPException(
             status_code=422,
@@ -826,6 +837,8 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         execution_backend=fields.get("execution_backend", "tofu"),
         engine_version=fields.get("engine_version", "1.13"),
         resource_cpu=fields.get("resource_cpu", "1"),
+        ee_resource_cpu=fields.get("ee_resource_cpu", ""),
+        ee_resource_memory=fields.get("ee_resource_memory", ""),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         ansible_version=fields.get("ansible_version", DEFAULT_ANSIBLE_LINE),
         ansible_collections=fields.get("ansible_collections", []),

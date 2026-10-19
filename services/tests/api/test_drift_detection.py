@@ -58,6 +58,8 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.resource_cpu = "1"
     ws.parallelism = 10
     ws.resource_memory = "2Gi"
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""
     ws.vcs_connection_id = None
@@ -264,6 +266,9 @@ class TestRunDriftAttributes:
         run.resource_cpu = "1"
         run.parallelism = 10
         run.resource_memory = "2Gi"
+        run.ee_image = ""
+        run.ee_resource_cpu = ""
+        run.ee_resource_memory = ""
         run.module_overrides = None
         run.created_by = "test@example.com"
         run.resource_additions = None

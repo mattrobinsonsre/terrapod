@@ -394,6 +394,8 @@ def _materialise_rule(**overrides):
         "resource_cpu": "1",
         "parallelism": 10,
         "resource_memory": "2Gi",
+        "ee_resource_cpu": "",
+        "ee_resource_memory": "",
         "auto_apply": True,
         "auto_apply_mode": "create_update",
         "owner_email": "platform@example.com",
@@ -538,6 +540,12 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "inventory_ignore_paths",
         "resource_cpu",
         "resource_memory",
+        # The EE sidecar's own pair (#2154). A rule that can size the
+        # orchestrator should be able to size the EE too: a monorepo's
+        # directories differ in how many hosts they configure as much as in how
+        # much terraform they hold.
+        "ee_resource_cpu",
+        "ee_resource_memory",
         "parallelism",
         "auto_apply",
         "auto_apply_mode",

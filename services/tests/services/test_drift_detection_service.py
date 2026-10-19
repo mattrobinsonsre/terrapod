@@ -27,6 +27,8 @@ def _mock_workspace(**overrides):
     ws.resource_cpu = "1"
     ws.parallelism = 10
     ws.resource_memory = "2Gi"
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
     ws.owner_email = "test@example.com"
     return ws
 

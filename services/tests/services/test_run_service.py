@@ -444,6 +444,8 @@ def _mock_workspace(**kwargs):
     ws.resource_cpu = kwargs.get("resource_cpu", "1")
     ws.parallelism = 10
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
     # Pool set is a relationship (#1087); a MagicMock here would not read back
     # as links, so it is always a real list.
     ws.agent_pool_links = kwargs.get("agent_pool_links", [])

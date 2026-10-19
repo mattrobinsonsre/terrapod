@@ -65,6 +65,8 @@ def _mock_rule(
     r.resource_cpu = "1"
     r.parallelism = 10
     r.resource_memory = "2Gi"
+    r.ee_resource_cpu = ""
+    r.ee_resource_memory = ""
     r.auto_apply = False
     r.on_directory_delete = "flag"
     r.labels = {"env": "monorepo"}

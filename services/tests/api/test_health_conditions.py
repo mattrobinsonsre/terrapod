@@ -19,6 +19,8 @@ def _mock_workspace(**overrides):
     ws.resource_cpu = "1"
     ws.parallelism = 10
     ws.resource_memory = "2Gi"
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
     _pool = overrides.get("agent_pool_id", None)
     ws.agent_pool_links = (
         [SimpleNamespace(agent_pool_id=_pool, ordinal=0, agent_pool=None)] if _pool else []

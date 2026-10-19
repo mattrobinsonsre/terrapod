@@ -409,6 +409,11 @@ async def find_or_autocreate_workspace(
         inventory_include_platform=rule.inventory_include_platform,
         inventory_ignore_paths=list(rule.inventory_ignore_paths or []),
         resource_memory=rule.resource_memory,
+        # Templated like the orchestrator's pair (#2154); `""` materialises a
+        # workspace that inherits the deployment default, which is what a rule
+        # wants unless the operator sized it deliberately.
+        ee_resource_cpu=rule.ee_resource_cpu,
+        ee_resource_memory=rule.ee_resource_memory,
         auto_apply=rule.auto_apply,
         # Inherit the rule's conditional mode too (#1274) — carrying only
         # the boolean would turn a `create_update` rule into `always` on

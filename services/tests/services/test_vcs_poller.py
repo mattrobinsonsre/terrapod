@@ -32,6 +32,8 @@ def _mock_workspace(**overrides):
     ws.engine_version = "1.11"
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
     ws.owner_email = "test@example.com"
     return ws
 
