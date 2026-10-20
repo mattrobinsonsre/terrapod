@@ -995,7 +995,8 @@
       "valueSourceStatic": "Wprowadź wartość",
       "valueSourceVault": "Odczytaj z OpenBao/Vault",
       "vaultHint": "Terrapod odczytuje sekret z OpenBao (lub HashiCorp Vault) podczas uruchomienia. Nic nie jest tu przechowywane.",
-      "applyOnly": "Tylko apply"
+      "applyOnly": "Tylko apply",
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
     }
   },
   "adminAutodiscovery": {

@@ -995,7 +995,8 @@
       "valueSourceStatic": "Ange ett värde",
       "valueSourceVault": "Läs från OpenBao/Vault",
       "vaultHint": "Terrapod läser hemligheten från OpenBao (eller HashiCorp Vault) vid körning. Inget lagras här.",
-      "applyOnly": "Endast apply"
+      "applyOnly": "Endast apply",
+      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö."
     }
   },
   "adminAutodiscovery": {

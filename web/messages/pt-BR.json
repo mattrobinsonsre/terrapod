@@ -995,7 +995,8 @@
       "valueSourceStatic": "Inserir um valor",
       "valueSourceVault": "Ler do OpenBao/Vault",
       "vaultHint": "O Terrapod lê o segredo do OpenBao (ou do HashiCorp Vault) durante a execução. Nada é armazenado aqui.",
-      "applyOnly": "Somente apply"
+      "applyOnly": "Somente apply",
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan."
     }
   },
   "adminAutodiscovery": {

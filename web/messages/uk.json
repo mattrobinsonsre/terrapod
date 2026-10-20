@@ -995,7 +995,8 @@
       "valueSourceStatic": "Ввести значення",
       "valueSourceVault": "Читати з OpenBao/Vault",
       "vaultHint": "Terrapod читає секрет з OpenBao (або HashiCorp Vault) під час запуску. Тут нічого не зберігається.",
-      "applyOnly": "Лише apply"
+      "applyOnly": "Лише apply",
+      "applyOnlyHint": "Не передається в plan і доставляється лише в apply. plan виконує код конфігурації, тому дані для входу, потрібні лише apply, не повинні бути в середовищі plan."
     }
   },
   "adminAutodiscovery": {

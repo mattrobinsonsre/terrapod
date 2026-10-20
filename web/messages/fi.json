@@ -995,7 +995,8 @@
       "valueSourceStatic": "Syötä arvo",
       "valueSourceVault": "Lue OpenBao/Vaultista",
       "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne.",
-      "applyOnly": "Vain apply"
+      "applyOnly": "Vain apply",
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
     }
   },
   "adminAutodiscovery": {

@@ -995,7 +995,8 @@
       "valueSourceStatic": "Waarde invoeren",
       "valueSourceVault": "Uit OpenBao/Vault lezen",
       "vaultHint": "Terrapod leest het geheim tijdens de run uit OpenBao (of HashiCorp Vault). Hier wordt niets opgeslagen.",
-      "applyOnly": "Alleen apply"
+      "applyOnly": "Alleen apply",
+      "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan."
     }
   },
   "adminAutodiscovery": {

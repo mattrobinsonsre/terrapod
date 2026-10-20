@@ -995,7 +995,8 @@
       "valueSourceStatic": "Zadat hodnotu",
       "valueSourceVault": "Načíst z OpenBao/Vault",
       "vaultHint": "Terrapod načte tajemství z OpenBao (nebo HashiCorp Vault) při běhu. Zde se nic neukládá.",
-      "applyOnly": "Pouze apply"
+      "applyOnly": "Pouze apply",
+      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan."
     }
   },
   "adminAutodiscovery": {

@@ -995,7 +995,8 @@
       "valueSourceStatic": "Valorem inserere",
       "valueSourceVault": "Ex OpenBao/Vault legere",
       "vaultHint": "Terrapod arcanum ex OpenBao (vel HashiCorp Vault) tempore cursus legit. Nihil hic servatur.",
-      "applyOnly": "Tantum apply"
+      "applyOnly": "Tantum apply",
+      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent."
     }
   },
   "adminAutodiscovery": {

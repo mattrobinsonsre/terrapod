@@ -995,7 +995,8 @@
       "valueSourceStatic": "A value, enter",
       "valueSourceVault": "From OpenBao/Vault, read",
       "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is.",
-      "applyOnly": "Apply only, it is"
+      "applyOnly": "Apply only, it is",
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
     }
   },
   "adminAutodiscovery": {

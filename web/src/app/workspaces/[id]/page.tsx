@@ -3616,13 +3616,21 @@ function WorkspaceDetailContent() {
                               vaultDefaultInstance={vaultDefaultInstance}
                               saving={savingVar}
                               onSave={handleSaveVar}
+                              saveError={error}
                               onCancel={() => setEditingVarId(null)}
                             />
                           </td>
                         </tr>
                       ) : (
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
-                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
+                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">
+                            <span className="inline-flex items-center gap-2">
+                              {v.attributes.key}
+                              {v.attributes['apply-only'] && (
+                                <span title={t('variables.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
@@ -3668,12 +3676,18 @@ function WorkspaceDetailContent() {
                           vaultDefaultInstance={vaultDefaultInstance}
                           saving={savingVar}
                           onSave={handleSaveVar}
+                          saveError={error}
                           onCancel={() => setEditingVarId(null)}
                         />
                     ) : (
                       <>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <span className="text-sm font-mono font-medium text-slate-200 break-all">{v.attributes.key}</span>
+                          <span className="text-sm font-mono font-medium text-slate-200 break-all">
+                            {v.attributes.key}
+                            {v.attributes['apply-only'] && (
+                              <span title={t('variables.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                            )}
+                          </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                           }`}>

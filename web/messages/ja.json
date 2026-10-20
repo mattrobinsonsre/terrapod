@@ -995,7 +995,8 @@
       "valueSourceStatic": "値を入力",
       "valueSourceVault": "OpenBao/Vault から読み取る",
       "vaultHint": "Terrapod は実行時に OpenBao（または HashiCorp Vault）からシークレットを読み取ります。ここには保存されません。",
-      "applyOnly": "apply のみ"
+      "applyOnly": "apply のみ",
+      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。"
     }
   },
   "adminAutodiscovery": {
