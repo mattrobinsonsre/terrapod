@@ -2,7 +2,33 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Release branches build images on merge, exactly as main does. A squash
+    # merge creates a NEW commit sha, so the images built during a PR never
+    # match it -- which is why a post-merge build is needed at all, and why
+    # without this a release-branch tag had to rebuild everything from scratch.
+    #
+    # It moves the verification EARLIER rather than removing it. Before this,
+    # the tag push was the gate for a patch: no `sha-` images existed for a
+    # cherry-picked commit, so the tag workflow ran the full set before
+    # publishing. Now `images_exist` is true by tag time and the tests and
+    # builds skip, so the release-branch run IS the gate and must be green
+    # before anyone tags. That is the discipline main already has, and the
+    # feedback arrives at merge instead of after a tag `Cleanup Tag` then
+    # deletes.
+    #
+    # Safe to share the trigger: nothing here is conditioned on being main
+    # (the only `github.ref` use is the concurrency group, which is per-ref),
+    # and every release and publish job is gated on `is_tag`, computed from
+    # GITHUB_REF matching a version tag. A branch push is not a tag, so none of
+    # them can fire. `build-query` and `build-ee-agent` still run on a tag even
+    # when images exist, deliberately, so the Release attaches the same
+    # binaries.
+    #
+    # And the skip is EARNED rather than assumed: `create-manifests` requires
+    # every lint, test and scan to be success-or-skipped, so a red run leaves no
+    # `sha-` manifest, `images_exist` is false, and a tag on that commit
+    # rebuilds and re-tests from scratch as it used to.
+    branches: [main, 'release/**']
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
     # Release branches too, not just main. A release line is where patches and

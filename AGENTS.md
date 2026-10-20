@@ -944,20 +944,41 @@ for one.
 minor, so this path exists to discharge that promise. The re-scan reports which
 supported releases have actionable findings; this is how you act on one.
 
-**The tag push is the gate.** There is no separate verification step, because a
-cherry-picked commit is a *new* commit: no `sha-<short>` images exist for it, so
-the tag workflow runs the full lint, test and build set before it publishes
-anything. If any of it fails, the `Cleanup Tag` job deletes the tag, no release
-is created and no version images are retagged — so the version is back to
-"never released" and re-tagging the same version after a fix is safe and
-expected.
+**The release-branch run is the gate, and it must be green before you tag.**
+A push to `release/**` builds `sha-<short>` images exactly as a push to `main`
+does, so by tag time `images_exist` is true and the tag workflow **skips** the
+tests and builds and goes straight to retagging and publishing. The
+verification therefore happens at **merge** time, not at tag time: check it,
+the same way `main` CI green on the release commit is already required for a
+minor.
+
+This is the same discipline as `main` and deliberately so — the feedback
+arrives when the change lands rather than after a tag has been pushed and then
+deleted. It was not always this way: a cherry-picked commit is a *new* commit,
+so before release branches built on merge there were no `sha-` images for it
+and the tag push itself ran the full set. If you are reading an older note that
+says the tag push is the gate, this is what replaced it.
+
+**Tagging a red commit falls back to the old behaviour rather than publishing
+it.** `create-manifests` requires every lint, test and scan to be success or
+skipped, so a failed release-branch run leaves no `sha-<short>` manifest at
+all; `images_exist` is then false and the tag run rebuilds and re-tests from
+scratch exactly as it used to. So the skip is earned by a green run, not
+assumed — which is why this is a saving rather than a hole.
+
+Two things that still hold. `build-query` and `build-ee-agent` run on a tag
+even when images exist, deliberately, so the Release attaches the same binaries
+the images were baked from. And if anything in the tag run does fail, the
+`Cleanup Tag` job deletes the tag, no release is created and no version images
+are retagged — so the version is back to "never released" and re-tagging the
+same version after a fix is safe and expected.
 
 ```sh
 git fetch origin --tags
 git checkout -b release/v1.1 v1.1.1        # branch from the tag, not from main
 # ...then whichever of the two mechanisms below fits...
-git push -u origin release/v1.1
-git tag v1.1.2 && git push origin v1.1.2    # this is the gate and the release
+git push -u origin release/v1.1              # THIS is the gate -- wait for it green
+git tag v1.1.2 && git push origin v1.1.2    # retags what that run built
 ```
 
 ### Two mechanisms, and picking the right one
@@ -1009,7 +1030,8 @@ that claims to fix something and ships the identical bytes. The daily
 apt-refresh that would have picked up the fix only applies when a build actually
 runs.
 
-Give it a new commit so a real build happens:
+Give it a new commit so a real build happens — pushing it to the release branch
+is what builds, and the tag then retags what that build produced:
 
 ```sh
 git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base image"
@@ -1056,7 +1078,9 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
   not been published when the tag was cut. That is the mechanism doing its job,
   not a broken pipeline. Read each failure on its merits: prefer the upstream
   fix (a targeted version bump on the branch), and reach for the register only
-  where no fix exists.
+  where no fix exists. The first attempt is the **push to the release branch**,
+  not the tag, which is the point of it being there: the scan fails where
+  nothing has been published and there is no tag to clean up.
 - **A security-driven patch is still a release.** Being prompted by a scanner
   earns it no shortcut: it goes through the same pre-release process as any
   other patch, including the independent third-party review. A patch cut in a
