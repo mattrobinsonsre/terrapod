@@ -143,13 +143,21 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | Tool | Safety | What it does |
 |---|---|---|
 | `terrapod_workspace_create` | — | Create a workspace (name required; execution mode, VCS wiring, agent pool, labels, …). |
-| `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). |
+| `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). Covers every settable workspace attribute **except four held back deliberately** — see the note below. |
 | `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. Its **state survives** and stays recoverable for the deployment's retention window (default 30 days) via `terrapod_deleted_workspace_restore`, but recovery yields a NEW workspace with a NEW id and is admin-only — so this is reversible-with-effort, not undoable. |
 | `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
 | `terrapod_workspace_varsets` | read-only | The variable sets that apply to a workspace, and how each one came to apply: explicit assignment, `global`, or an assignment rule. |
 | `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |
+
+**Four workspace attributes are deliberately not settable through MCP**, and their
+absence is a decision rather than an oversight: `debug-mode` arms a pod that holds
+the run's credentials and keeps it alive for inspection, `auto-merge` and
+`auto-merge-strategy` merge pull requests, and `security-scan-enforcement` is a
+governance gate. Each reaches outside the workspace's own configuration. They are
+readable with `terrapod_workspace_get` and settable through the API, the Terraform
+provider and the UI; whether an agent should hold them is argued on #2174.
 
 ### Ground (read-only) — write correct config against *your* estate
 

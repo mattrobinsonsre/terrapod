@@ -201,10 +201,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		DefaultLimit             *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
 		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone"`
-		// Resource sizing (#2154). Absent from this tool until now, so an agent
-		// could read a workspace's sizing with terrapod_workspace_get and not
-		// change it -- 25 of the API's 46 settable workspace attributes are
-		// still in that position, which is tracked separately.
+		// Resource sizing (#2154). Absent from this tool until #2154, so an
+		// agent could read a workspace's sizing with terrapod_workspace_get and
+		// not change it. That asymmetry is now closed for everything except
+		// the four #2174 reserves as judgements, named in the block below --
+		// a count is not restated here, because a number in prose has no gate
+		// behind it and this comment carried a stale one.
 		//
 		// The two PAIRS are deliberately separate, because the two containers
 		// of a configure Job do different work: the orchestrator runs tofu
@@ -231,6 +233,38 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// this is free prose where "" is a real value meaning "clear what is
 		// stored". A plain string could not express the difference.
 		AISummaryContext *string `json:"ai_summary_context,omitempty" jsonschema:"workspace-specific facts given to the model on top of the deployment's own context -- what this estate is for, naming conventions, which resources are load-bearing. Prose, not configuration: it changes what a summary SAYS, never what a run does. A hint rather than a repository, and capped at 4000 characters. Omitting the field leaves the stored value alone; pass an EMPTY STRING to clear it"`
+		// The fourteen #2174 called wire plumbing: nothing was decided against
+		// them, MCP simply had no parity gate until #2175 and so drifted for as
+		// long as that gate had existed. An agent could READ every one of these
+		// with terrapod_workspace_get and change none, which is the asymmetry
+		// worth closing -- a tool surface that reports a setting it cannot set
+		// invites an agent to describe a change it is unable to make.
+		//
+		// FOUR are deliberately still absent and stay in the gate's debt ledger
+		// with their own reason: debug_mode arms a pod that holds the run's
+		// credentials and keeps it alive for inspection, auto_merge and
+		// auto_merge_strategy merge pull requests, and
+		// security_scan_enforcement is a governance gate. Each reaches outside
+		// the workspace's own configuration, so whether an agent should hold it
+		// is a decision to argue on #2174 rather than an omission to fix here.
+		//
+		// Pointers where the zero value is a real request (a false, a 0, an
+		// empty channel name); plain strings and slices where "" and nil mean
+		// "leave the stored value alone", matching the fields above.
+		DriftDetectionEnabled         *bool    `json:"drift_detection_enabled,omitempty" jsonschema:"whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone"`
+		DriftDetectionIntervalSeconds *int64   `json:"drift_detection_interval_seconds,omitempty" jsonschema:"how often a drift check runs, in seconds; 86400 (daily) by default. Only meaningful with drift_detection_enabled true. Omit to leave the stored value alone"`
+		DriftIgnoreRules              []string `json:"drift_ignore_rules,omitempty" jsonschema:"resource addresses or attribute paths whose drift is not reported -- for the perpetual phantom diffs a provider produces on write-only attributes. Pass an empty list to remove every rule; omitting the field leaves the stored list alone"`
+		Parallelism                   int64    `json:"parallelism,omitempty" jsonschema:"the engine's -parallelism for this workspace's runs; 10 by default, which is the engine's own. Lower it for a provider that rate-limits; raising it rarely helps and can trip API quotas. Omit to leave the stored value alone"`
+		PlanExpirySeconds             *int64   `json:"plan_expiry_seconds,omitempty" jsonschema:"how long an apply-capable plan may wait for confirmation before it is expired; unset means never, which is the default. It does NOT expire speculative plans. Omit to leave the stored value alone"`
+		SecurityScanEngine            string   `json:"security_scan_engine,omitempty" jsonschema:"which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone"`
+		SecurityScanSeverityThreshold string   `json:"security_scan_severity_threshold,omitempty" jsonschema:"the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone"`
+		SecurityScanSkipRules         []string `json:"security_scan_skip_rules,omitempty" jsonschema:"scanner rule ids this workspace does not report, as the scanner itself names them (e.g. CKV_AWS_18). Pass an empty list to remove every skip; omitting the field leaves the stored list alone"`
+		SlackChannel                  *string  `json:"slack_channel,omitempty" jsonschema:"the Slack channel this workspace's run notifications go to, overriding the deployment default. Pass an EMPTY STRING to drop back to the default; omitting the field leaves the stored value alone"`
+		TerragruntEnabled             *bool    `json:"terragrunt_enabled,omitempty" jsonschema:"run this workspace through terragrunt rather than the engine binary directly. Omit to leave the stored value alone"`
+		TerragruntVersion             string   `json:"terragrunt_version,omitempty" jsonschema:"which terragrunt version this workspace runs; only meaningful with terragrunt_enabled true. Omit to leave the stored value alone"`
+		TriggerPrefixes               []string `json:"trigger_prefixes,omitempty" jsonschema:"the repository paths that make a push or pull request create a run here, each a directory prefix from the repository root. It REPLACES working_directory for the trigger decision and UNIONS with it for the fetch, so a monorepo workspace watching several directories names them all. A push touching no matching path creates no run at all. Pass an empty list to remove every prefix, which falls back to working_directory; omitting the field leaves the stored list alone"`
+		VarFiles                      []string `json:"var_files,omitempty" jsonschema:".tfvars files from the repository, applied in order, relative to the working directory. Pass an empty list to remove every one; omitting the field leaves the stored list alone"`
+		VCSWorkflow                   string   `json:"vcs_workflow,omitempty" jsonschema:"when a pull request's run applies: merge_then_apply (the default -- the PR gets a speculative plan, and the apply happens after it merges) or apply_then_merge (the PR's plan is applied BEFORE the merge, which holds the workspace lock while the PR is open and is what Atlantis does). Omit to leave the stored value alone"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -295,6 +329,23 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AIPolicyMode:     in.AIPolicyMode,
 			AISummaryMode:    in.AISummaryMode,
 			AISummaryContext: in.AISummaryContext,
+			// #2174's fourteen. The SDK already carried every one of these --
+			// the gap was only ever this tool -- so each is a straight pass
+			// through, typed to the SDK's own int64 so nothing needs converting.
+			DriftDetectionEnabled:         in.DriftDetectionEnabled,
+			DriftDetectionIntervalSeconds: in.DriftDetectionIntervalSeconds,
+			DriftIgnoreRules:              in.DriftIgnoreRules,
+			Parallelism:                   in.Parallelism,
+			PlanExpirySeconds:             in.PlanExpirySeconds,
+			SecurityScanEngine:            in.SecurityScanEngine,
+			SecurityScanSeverityThreshold: in.SecurityScanSeverityThreshold,
+			SecurityScanSkipRules:         in.SecurityScanSkipRules,
+			SlackChannel:                  in.SlackChannel,
+			TerragruntEnabled:             in.TerragruntEnabled,
+			TerragruntVersion:             in.TerragruntVersion,
+			TriggerPrefixes:               in.TriggerPrefixes,
+			VarFiles:                      in.VarFiles,
+			VCSWorkflow:                   in.VCSWorkflow,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

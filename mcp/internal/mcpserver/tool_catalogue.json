@@ -1537,6 +1537,30 @@
             "string"
           ]
         },
+        "drift_detection_enabled": {
+          "description": "whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "drift_detection_interval_seconds": {
+          "description": "how often a drift check runs, in seconds; 86400 (daily) by default. Only meaningful with drift_detection_enabled true. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "drift_ignore_rules": {
+          "description": "resource addresses or attribute paths whose drift is not reported -- for the perpetual phantom diffs a provider produces on write-only attributes. Pass an empty list to remove every rule; omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "ee_resource_cpu": {
           "description": "CPU request for the Ansible EXECUTION ENVIRONMENT -- the sidecar container a configure run's playbooks execute in -- not the orchestrator, which resource_cpu sizes. Same quantity rules and the same 2x limit. EMPTY means this workspace takes the deployment default rather than sizing the environment itself, so passing an empty string is how a workspace rejoins that default; omitting the field leaves the stored value alone",
           "type": "string"
@@ -1608,11 +1632,22 @@
           "description": "replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do.",
           "type": "object"
         },
+        "parallelism": {
+          "description": "the engine's -parallelism for this workspace's runs; 10 by default, which is the engine's own. Lower it for a provider that rate-limits; raising it rarely helps and can trip API quotas. Omit to leave the stored value alone",
+          "type": "integer"
+        },
         "plan_apply_enabled": {
           "description": "turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled",
           "type": [
             "null",
             "boolean"
+          ]
+        },
+        "plan_expiry_seconds": {
+          "description": "how long an apply-capable plan may wait for confirmation before it is expired; unset means never, which is the default. It does NOT expire speculative plans. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "integer"
           ]
         },
         "pulumi_bind_plan": {
@@ -1630,8 +1665,68 @@
           "description": "memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu",
           "type": "string"
         },
+        "security_scan_engine": {
+          "description": "which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone",
+          "type": "string"
+        },
+        "security_scan_severity_threshold": {
+          "description": "the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone",
+          "type": "string"
+        },
+        "security_scan_skip_rules": {
+          "description": "scanner rule ids this workspace does not report, as the scanner itself names them (e.g. CKV_AWS_18). Pass an empty list to remove every skip; omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "slack_channel": {
+          "description": "the Slack channel this workspace's run notifications go to, overriding the deployment default. Pass an EMPTY STRING to drop back to the default; omitting the field leaves the stored value alone",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",
+          "type": "string"
+        },
+        "terragrunt_enabled": {
+          "description": "run this workspace through terragrunt rather than the engine binary directly. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "terragrunt_version": {
+          "description": "which terragrunt version this workspace runs; only meaningful with terragrunt_enabled true. Omit to leave the stored value alone",
+          "type": "string"
+        },
+        "trigger_prefixes": {
+          "description": "the repository paths that make a push or pull request create a run here, each a directory prefix from the repository root. It REPLACES working_directory for the trigger decision and UNIONS with it for the fetch, so a monorepo workspace watching several directories names them all. A push touching no matching path creates no run at all. Pass an empty list to remove every prefix, which falls back to working_directory; omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "var_files": {
+          "description": ".tfvars files from the repository, applied in order, relative to the working directory. Pass an empty list to remove every one; omitting the field leaves the stored list alone",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "vcs_workflow": {
+          "description": "when a pull request's run applies: merge_then_apply (the default -- the PR gets a speculative plan, and the apply happens after it merges) or apply_then_merge (the PR's plan is applied BEFORE the merge, which holds the workspace lock while the PR is open and is what Atlantis does). Omit to leave the stored value alone",
           "type": "string"
         },
         "working_directory": {

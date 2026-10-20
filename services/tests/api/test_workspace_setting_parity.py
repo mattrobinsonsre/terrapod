@@ -295,7 +295,6 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 #: issue that will clear it, and clearing one means wiring the setting up and
 #: deleting the line. This should end empty.
 #: Why an entry sits in `_SURFACE_DEBT` below. Two reasons, deliberately.
-WIRE_REASON = "#2174 — nothing decided against it; MCP simply had no parity gate until now"
 #: `debug-mode` arms a pod that holds the run's credentials and keeps it alive
 #: for inspection; `auto-merge` and its strategy merge pull requests;
 #: `security-scan-enforcement` is a governance gate. Each may still belong on
@@ -305,37 +304,30 @@ JUDGEMENT_REASON = "#2174 — a genuine judgement, to be argued there: an agent 
 
 
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
-    # Found by MEASURING the surface rather than reading it: 21 of the 46
+    # Found by MEASURING the surface rather than reading it: 21 of the then-46
     # settable attributes were unreachable from MCP when it was first added to
-    # this gate (#2174). Three are now wired -- `ai-policy-mode` because the
-    # named test below refuses to let it be excused, and its two siblings
-    # because half a feature on a tool surface is worse than none.
+    # this gate (#2174), having drifted for as long as the gate had existed.
     #
-    # These eighteen are DEBT rather than exemptions, which is why they are in
-    # this ledger and not the one above: nobody decided an agent should not
-    # change them. Four carry a different reason because they genuinely are a
-    # judgement, and keeping that visible here is the point -- a uniform string
-    # would flatten "nobody got round to it" and "we should think about this"
-    # into the same thing, which is how a debt ledger turns into an excuse list.
+    # The WIRE half is now CLOSED. Fourteen were "nobody decided against it,
+    # MCP simply had no parity gate" and are wired; three (`ai-policy-mode` and
+    # its two siblings) went with #2175. So nothing is left in this ledger that
+    # merely needs doing, which is the state a debt ledger should reach -- and
+    # the reason the generic wire reason string is gone rather than kept for the
+    # next occupant: an unused reason is an invitation to file something under
+    # it without deciding anything.
     #
-    # What this buys TODAY is the thing that was missing for as long as this
-    # gate has existed: the next setting cannot drift the same way, because it
-    # will fail here.
+    # What REMAINS is four genuine judgements, kept here rather than in the
+    # exemption ledger above because they are unanswered, not answered-no.
+    # Each reaches outside the workspace's own configuration -- `debug-mode`
+    # arms a pod that holds the run's credentials, the two `auto-merge` keys
+    # merge pull requests, `security-scan-enforcement` is a governance gate --
+    # so whether an agent should hold them is argued on #2174. Flattening these
+    # into one reason with the wire fourteen is how "we should think about this"
+    # quietly becomes "nobody got round to it".
+    #
+    # What the gate buys either way: the next setting cannot drift the same
+    # way, because it will fail here.
     "MCP workspace tools": {
-        "drift-detection-enabled": WIRE_REASON,
-        "drift-detection-interval-seconds": WIRE_REASON,
-        "drift-ignore-rules": WIRE_REASON,
-        "parallelism": WIRE_REASON,
-        "plan-expiry-seconds": WIRE_REASON,
-        "security-scan-engine": WIRE_REASON,
-        "security-scan-severity-threshold": WIRE_REASON,
-        "security-scan-skip-rules": WIRE_REASON,
-        "slack-channel": WIRE_REASON,
-        "terragrunt-enabled": WIRE_REASON,
-        "terragrunt-version": WIRE_REASON,
-        "trigger-prefixes": WIRE_REASON,
-        "var-files": WIRE_REASON,
-        "vcs-workflow": WIRE_REASON,
         # The four worth arguing rather than assuming.
         "debug-mode": JUDGEMENT_REASON,
         "auto-merge": JUDGEMENT_REASON,
