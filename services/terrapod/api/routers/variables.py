@@ -264,6 +264,7 @@ def _var_json(var: Variable) -> dict:
             # without hiding anything that is actually sensitive.
             "value": _visible_value(var),
             "sensitive": var.sensitive,
+            "apply-only": var.apply_only,
             "category": var.category,
             "hcl": var.hcl,
             "value-source": var.value_source,
@@ -356,6 +357,7 @@ async def create_workspace_var(
             description=attrs.get("description", ""),
             hcl=attrs.get("hcl", False),
             sensitive=force_sensitive or attrs.get("sensitive", False),
+            apply_only=attrs.get("apply-only", False),
             value_source=value_source,
         )
         await db.commit()
@@ -413,6 +415,7 @@ async def update_workspace_var(
             description=attrs.get("description"),
             hcl=attrs.get("hcl"),
             sensitive=attrs.get("sensitive"),
+            apply_only=attrs.get("apply-only"),
             value_source=value_source,
         )
         await db.commit()
@@ -742,6 +745,7 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
             # not a secret, so it is shown rather than masked (#1439).
             "value": _visible_value(vsv),
             "sensitive": vsv.sensitive,
+            "apply-only": vsv.apply_only,
             "category": vsv.category,
             "hcl": vsv.hcl,
             "value-source": vsv.value_source,
@@ -790,6 +794,10 @@ async def create_varset_var(
 
     value = attrs.get("value", "")
     sensitive = attrs.get("sensitive", False)
+    # Withheld from a plan, delivered to an apply (#2189). A separate ROW, not
+    # a phase attribute: a different value per phase is two rows with one
+    # flagged, which is why the uniqueness tuple carries the flag.
+    apply_only = attrs.get("apply-only", False)
     try:
         category = variable_service._validated_category(attrs.get("category", "terraform"))
     except ValueError as e:
@@ -817,6 +825,7 @@ async def create_varset_var(
         category=category,
         hcl=attrs.get("hcl", False),
         sensitive=sensitive,
+        apply_only=apply_only,
         version_id=variable_service._version_hash(key, value, category),
     )
     db.add(vsv)
@@ -889,6 +898,8 @@ async def update_varset_var(
         vsv.sensitive = True
     elif "sensitive" in attrs:
         vsv.sensitive = attrs["sensitive"]
+    if "apply-only" in attrs:
+        vsv.apply_only = bool(attrs["apply-only"])
 
     # Security: a sensitive → non-sensitive downgrade must not expose the
     # previously-hidden value. If no fresh value was supplied in the same

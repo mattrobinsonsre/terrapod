@@ -86,6 +86,7 @@ async def create_variable(
     description: str = "",
     hcl: bool = False,
     sensitive: bool = False,
+    apply_only: bool = False,
     value_source: str = "static",
 ) -> Variable:
     """Create a workspace variable."""
@@ -103,6 +104,7 @@ async def create_variable(
         category=category,
         hcl=hcl,
         sensitive=sensitive,
+        apply_only=apply_only,
         value_source=value_source,
         version_id=_version_hash(key, value, category),
     )
@@ -120,6 +122,7 @@ async def update_variable(
     description: str | None = None,
     hcl: bool | None = None,
     sensitive: bool | None = None,
+    apply_only: bool | None = None,
     value_source: str | None = None,
 ) -> Variable:
     """Update an existing variable."""
@@ -133,6 +136,9 @@ async def update_variable(
         var.category = _validated_category(category)
     if hcl is not None:
         var.hcl = hcl
+
+    if apply_only is not None:
+        var.apply_only = apply_only
 
     was_sensitive = var.sensitive
 
