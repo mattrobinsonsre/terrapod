@@ -88,6 +88,43 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Labels           map[string]string   `json:"labels,omitempty" jsonschema:"replace the label set (reserved keys rejected)"`
 		OIDCAudiences    map[string][]string `json:"oidc_audiences,omitempty" jsonschema:"replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do."`
 		AllowForkPRPlans *bool               `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
+		// The eighteen #2174 found by MEASURING this surface rather than reading
+		// it: of this line's 32 settable workspace attributes, MCP could set 10,
+		// so an agent could READ every one of these with terrapod_workspace_get
+		// and change none. Nothing was decided against them -- MCP simply had no
+		// parity gate, so it drifted. A tool surface that reports a setting it
+		// cannot set invites an agent to describe a change it is unable to make.
+		//
+		// FOUR of this line's 22 stay absent and keep their own reason in the
+		// gate's debt ledger: debug_mode arms a pod that holds the run's
+		// credentials and keeps it alive for inspection, auto_merge and
+		// auto_merge_strategy merge pull requests, security_scan_enforcement is a
+		// governance gate. Each reaches outside the workspace's own configuration,
+		// so whether an agent should hold it is a decision, not an omission.
+		//
+		// This list is NOT main's: parallelism is not an attribute on this line at
+		// all, and the AI and resource-sizing keys below reached MCP on main only.
+		// It was derived from THIS branch's own _FIELD_MAP and
+		// _FIELDS_HANDLED_SEPARATELY, because copying main's would have been wrong
+		// in both directions.
+		AIPolicyMode                  string   `json:"ai_policy_mode,omitempty" jsonschema:"this workspace's override for the AI POLICY GATE -- whether a run's plan is reviewed by a model before it may apply: enabled, disabled or inherit. inherit defers to the deployment setting, which is the default and is NOT the same as disabled. Omit to leave the stored value alone. Distinct from ai_summary_mode: the gate can BLOCK a run, the summary only describes one"`
+		AISummaryMode                 string   `json:"ai_summary_mode,omitempty" jsonschema:"this workspace's override for AI PLAN SUMMARIES -- prose describing what a plan will do, which blocks nothing: enabled, disabled or inherit. inherit defers to the deployment setting. Omit to leave the stored value alone"`
+		AISummaryContext              *string  `json:"ai_summary_context,omitempty" jsonschema:"workspace-specific facts given to the model on top of the deployment's own context -- what this estate is for, naming conventions, which resources are load-bearing. Prose, not configuration: it changes what a summary SAYS, never what a run does. Capped at 4000 characters. Omitting the field leaves the stored value alone; pass an EMPTY STRING to clear it. A pointer, unlike the two modes above, because there an empty string means leave-alone while here it is a real value meaning clear-what-is-stored"`
+		DriftDetectionEnabled         *bool    `json:"drift_detection_enabled,omitempty" jsonschema:"whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone"`
+		DriftDetectionIntervalSeconds *int64   `json:"drift_detection_interval_seconds,omitempty" jsonschema:"how often a drift check runs, in seconds; 86400 (daily) by default. Only meaningful with drift_detection_enabled true. Omit to leave the stored value alone"`
+		DriftIgnoreRules              []string `json:"drift_ignore_rules,omitempty" jsonschema:"resource addresses or attribute paths whose drift is not reported -- for the perpetual phantom diffs a provider produces on write-only attributes. Pass an empty list to remove every rule; omitting the field leaves the stored list alone"`
+		PlanExpirySeconds             *int64   `json:"plan_expiry_seconds,omitempty" jsonschema:"how long an apply-capable plan may wait for confirmation before it is expired; unset means never, which is the default. It does NOT expire speculative plans. Omit to leave the stored value alone"`
+		ResourceCPU                   string   `json:"resource_cpu,omitempty" jsonschema:"CPU request for this workspace's runner Jobs, as a Kubernetes quantity: a whole number of CPUs (1, 4) or millicores (500m). The LIMIT is twice this, computed automatically. Decimals (0.5) and decimal SI suffixes are refused (422), because the limit is 2x the request and those forms cannot be doubled. Omit to leave the stored value alone"`
+		ResourceMemory                string   `json:"resource_memory,omitempty" jsonschema:"memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu"`
+		SecurityScanEngine            string   `json:"security_scan_engine,omitempty" jsonschema:"which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone"`
+		SecurityScanSeverityThreshold string   `json:"security_scan_severity_threshold,omitempty" jsonschema:"the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone"`
+		SecurityScanSkipRules         []string `json:"security_scan_skip_rules,omitempty" jsonschema:"scanner rule ids this workspace does not report, as the scanner itself names them (e.g. CKV_AWS_18). Pass an empty list to remove every skip; omitting the field leaves the stored list alone"`
+		SlackChannel                  *string  `json:"slack_channel,omitempty" jsonschema:"the Slack channel this workspace's run notifications go to, overriding the deployment default. Pass an EMPTY STRING to drop back to the default; omitting the field leaves the stored value alone"`
+		TerragruntEnabled             *bool    `json:"terragrunt_enabled,omitempty" jsonschema:"run this workspace through terragrunt rather than the engine binary directly. Omit to leave the stored value alone"`
+		TerragruntVersion             string   `json:"terragrunt_version,omitempty" jsonschema:"which terragrunt version this workspace runs; only meaningful with terragrunt_enabled true. Omit to leave the stored value alone"`
+		TriggerPrefixes               []string `json:"trigger_prefixes,omitempty" jsonschema:"the repository paths that make a push or pull request create a run here, each a directory prefix from the repository root. It REPLACES working_directory for the trigger decision and UNIONS with it for the fetch, so a monorepo workspace watching several directories names them all. A push touching no matching path creates no run at all. Pass an empty list to remove every prefix, which falls back to working_directory; omitting the field leaves the stored list alone"`
+		VarFiles                      []string `json:"var_files,omitempty" jsonschema:".tfvars files from the repository, applied in order, relative to the working directory. Pass an empty list to remove every one; omitting the field leaves the stored list alone"`
+		VCSWorkflow                   string   `json:"vcs_workflow,omitempty" jsonschema:"when a pull request's run applies: merge_then_apply (the default -- the PR gets a speculative plan, and the apply happens after it merges) or apply_then_merge (the PR's plan is applied BEFORE the merge, which holds the workspace lock while the PR is open and is what Atlantis does). Omit to leave the stored value alone"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -111,6 +148,27 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			Labels:           in.Labels,
 			OIDCAudiences:    in.OIDCAudiences,
 			AllowForkPRPlans: in.AllowForkPRPlans,
+			// #2174's eighteen. The SDK already carried every one on this line --
+			// the gap was only ever this tool -- so each is a straight pass-through,
+			// typed to the SDK's own int64 where it asks for one.
+			AIPolicyMode:                  in.AIPolicyMode,
+			AISummaryMode:                 in.AISummaryMode,
+			AISummaryContext:              in.AISummaryContext,
+			DriftDetectionEnabled:         in.DriftDetectionEnabled,
+			DriftDetectionIntervalSeconds: in.DriftDetectionIntervalSeconds,
+			DriftIgnoreRules:              in.DriftIgnoreRules,
+			PlanExpirySeconds:             in.PlanExpirySeconds,
+			ResourceCPU:                   in.ResourceCPU,
+			ResourceMemory:                in.ResourceMemory,
+			SecurityScanEngine:            in.SecurityScanEngine,
+			SecurityScanSeverityThreshold: in.SecurityScanSeverityThreshold,
+			SecurityScanSkipRules:         in.SecurityScanSkipRules,
+			SlackChannel:                  in.SlackChannel,
+			TerragruntEnabled:             in.TerragruntEnabled,
+			TerragruntVersion:             in.TerragruntVersion,
+			TriggerPrefixes:               in.TriggerPrefixes,
+			VarFiles:                      in.VarFiles,
+			VCSWorkflow:                   in.VCSWorkflow,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
