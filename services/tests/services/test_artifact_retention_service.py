@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.artifact_retention_service import (
+    RUN_ARTIFACT_KEYS,
     _cleanup_binary_cache,
     _cleanup_config_versions,
     _cleanup_module_overrides,
@@ -16,6 +17,7 @@ from terrapod.services.artifact_retention_service import (
     _cleanup_vcs_archives,
     artifact_retention_cycle,
 )
+from terrapod.storage.keys import cost_estimate_key, lock_file_key, plan_artifacts_key
 
 
 def _make_uuid() -> uuid.UUID:
@@ -38,6 +40,8 @@ def _make_run(
     module_overrides=None,
     run_id=None,
     has_json_output=False,
+    has_cost_estimate=False,
+    plan_only=False,
 ):
     run = MagicMock()
     run.id = run_id or _make_uuid()
@@ -47,6 +51,12 @@ def _make_run(
     run.configuration_version_id = cv_id
     run.module_overrides = module_overrides
     run.has_json_output = has_json_output
+    # Every flag the sweep READS has to be set here, not left as a MagicMock:
+    # an unset attribute is truthy, so the sweep would "reset" it and commit,
+    # and `test_no_commit_when_no_flags_to_reset` would fail for a reason that
+    # has nothing to do with what it is testing (#2148).
+    run.has_cost_estimate = has_cost_estimate
+    run.plan_only = plan_only
     return run
 
 
@@ -206,8 +216,22 @@ class TestCleanupRunArtifacts:
 
         deleted = await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
         # 4 artifacts per run (plan log, apply log, plan output, plan json output)
-        assert deleted == 8
-        assert storage.delete.call_count == 8
+        # Derived from the sweep's own key set rather than written as a number
+        # (#2148). It was `== 8` -- two runs times the four keys of the day --
+        # and adding a key to `RUN_ARTIFACT_KEYS` broke it for no reason beyond
+        # the arithmetic, which is the kind of failure that gets "fixed" by
+        # bumping the literal and stops meaning anything.
+        expected = len(runs) * len(RUN_ARTIFACT_KEYS)
+        assert deleted == expected
+        assert storage.delete.call_count == expected
+
+        # And the keys themselves, which the count alone never asserted: every
+        # key in the set, for every run. A count can be right while the sweep
+        # deletes one run's artifacts twice.
+        asked = {call.args[0] for call in storage.delete.await_args_list}
+        for run in runs:
+            for key_fn in RUN_ARTIFACT_KEYS:
+                assert key_fn(str(ws_id), str(run.id)) in asked, key_fn.__name__
 
     @pytest.mark.asyncio
     async def test_resets_has_json_output_flag_when_artifact_deleted(self):
@@ -232,6 +256,50 @@ class TestCleanupRunArtifacts:
         assert runs[1].has_json_output is False
         # One commit covers all flag changes in the batch.
         db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_resets_has_cost_estimate_flag_when_artifact_deleted(self):
+        """`has_cost_estimate` gates the run page's Cost tab and the
+        `has-cost-estimate` attribute in the run JSON, so once the estimate is
+        reaped the row must stop advertising it -- exactly as `has_json_output`
+        has always done. It was missed when the cost estimate was never reaped
+        at all (#2148); the flag and the reap arrive together."""
+        ws_id = _make_uuid()
+        runs = [
+            _make_run(ws_id, status="applied", has_cost_estimate=True),
+            _make_run(ws_id, status="applied", has_cost_estimate=False),
+        ]
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        db.execute.return_value = _FakeResult(runs)
+
+        await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        assert runs[0].has_cost_estimate is False
+        assert runs[1].has_cost_estimate is False
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_the_cost_estimate_and_lock_and_plan_artifacts_are_asked_for(self):
+        """The three keys #2148 added, named individually.
+
+        `len(RUN_ARTIFACT_KEYS)` above moves with the tuple, so it would stay
+        green if one of these were dropped again while another was added. These
+        are the keys that went years unreaped, so they get their own assertion.
+        """
+        ws_id = _make_uuid()
+        run = _make_run(ws_id, status="applied")
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        db.execute.return_value = _FakeResult([run])
+
+        await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        asked = {call.args[0] for call in storage.delete.await_args_list}
+        for key_fn in (cost_estimate_key, lock_file_key, plan_artifacts_key):
+            assert key_fn(str(ws_id), str(run.id)) in asked, key_fn.__name__
 
     @pytest.mark.asyncio
     async def test_no_commit_when_no_flags_to_reset(self):

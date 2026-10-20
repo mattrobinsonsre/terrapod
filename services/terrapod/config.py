@@ -1456,7 +1456,11 @@ class ArtifactRetentionConfig(BaseModel):
     )
     run_artifacts_retention_days: int = Field(
         default=90,
-        description="Days to keep run logs + plans for terminal runs (0 = disabled)",
+        description=(
+            "Days to keep run logs + plans for runs that can do nothing "
+            "further: terminal runs, plus plan-only runs that have finished "
+            "planning and can never be applied (0 = disabled)"
+        ),
     )
     config_versions_retention_days: int = Field(
         default=90,
@@ -1483,7 +1487,10 @@ class ArtifactRetentionConfig(BaseModel):
     )
     module_overrides_retention_days: int = Field(
         default=14,
-        description="Days to keep module override tarballs for terminal runs (0 = disabled)",
+        description=(
+            "Days to keep module override tarballs for runs that can do "
+            "nothing further (0 = disabled)"
+        ),
     )
 
 
