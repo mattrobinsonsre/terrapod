@@ -397,6 +397,75 @@ The listing is cached for `api.config.ansible.availability_ttl_seconds`
 layers beneath it are not, so it needs a bound; short, because the case that
 matters is an operator waiting for a newly published line to appear in a form.
 
+### What a configure actually runs
+
+One command, in the execution environment, from the workspace's Ansible config
+root:
+
+```
+ansible-playbook -i <the run's resolved inventory> [--limit <pattern>] <playbook>
+```
+
+**The inventory is exactly one source, and it is the run's own artifact.** The
+API resolves the inventory when the run is created — merging the declared rows
+with the inventory files in the run's configuration version — stores the result
+as an artifact belonging to that run, and the phase fetches it with the run's
+own token. So the playbook and the hosts it targets come from one commit by
+construction: a push between the configuration version being built and the
+configure launching cannot give a run a playbook from one commit and an
+inventory from another.
+
+The workspace's `inventory_paths` are **not** passed here. They tell the API
+which files to read when it resolves; by the time the phase runs, those files
+have already been merged into the artifact. Passing them as well would hand
+ansible the same hosts from two sources and let `-i` ordering decide a variable
+precedence nobody expressed.
+
+`--limit` **is** passed, because the artifact is the whole inventory. It comes
+from the run, falling back to the workspace's `default_limit`, and ansible
+expands it through group nesting — so limiting to a parent group reaches the
+hosts it holds only through its children.
+
+**`ansible.cfg` is the operator's, untouched.** Terrapod writes none and sets
+`ANSIBLE_CONFIG` nowhere, so a committed `ansible.cfg` at the config root is
+read normally, with its `roles_path`, `forks`, `strategy` and
+`inventory_ignore_extensions` intact. Four settings are forced through the
+**environment**, which beats the file:
+
+| variable | why |
+|---|---|
+| `ANSIBLE_INVENTORY_ENABLED=yaml,ini` | no `auto` and no `script`, so no inventory plugin and no executable inventory can run |
+| `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED=True` | an unreadable source fails the run rather than resolving a partial host set |
+| `ANSIBLE_HOST_KEY_CHECKING` | an unattended run has no one to answer a host-key prompt |
+| `ANSIBLE_RETRY_FILES_ENABLED=False` | a retry file would be written into the fetched tree, and nothing reads it back |
+
+Every other inherited `ANSIBLE_*` variable is **stripped** before these are
+set. Overriding them would not be enough: environment beats `ansible.cfg`, so an
+`ANSIBLE_INVENTORY_ENABLED=auto` reaching the pod from anywhere would re-enable
+the plugin dispatcher that the second layer above exists to disable, and the set
+of ansible settings is far larger than the set anyone thinks about.
+
+`ANSIBLE_FORKS` is set from the workspace's `parallelism`, so the platform's own
+per-workspace setting governs rather than the file's `forks`.
+
+**Collections install first, in the same environment.** `requires_ansible` is
+not enforced at install time, so installing with one ansible-core and running
+with another produces a set that fails part way through a fleet — the worst time
+to find out. The install's failure stops the configure for the same reason.
+
+**Three things are refused rather than worked around**, because each alternative
+is a configure that appears to succeed against hosts nobody chose:
+
+* **no playbook** — neither the run nor the workspace's `default_playbook` names
+  one. Guessing would run something nobody asked for.
+* **no execution environment** — the orchestrator ships no ansible by design, so
+  there is nowhere for a playbook to run.
+* **an unreadable inventory** — the artifact is missing or is not an inventory
+  document.
+
+None of the three returns an exit code, because every caller above reads one as
+ansible's own verdict on the estate.
+
 ### Routing a workspace to several pools
 
 Within a pool, multiple listener replicas already give you HA — a listener pod
