@@ -2666,7 +2666,10 @@ async def next_run(
     # Resolve workspace variables for injection into the runner Job
     from terrapod.services.variable_service import resolve_variables
 
-    resolved = await resolve_variables(db, run.workspace_id)
+    # `claim_next_run` returned the phase, so the narrowing costs nothing: an
+    # apply-only variable (#2189) reaches an apply and never a plan, which
+    # executes the configuration's code and so runs a pull request's code.
+    resolved = await resolve_variables(db, run.workspace_id, phase=phase)
 
     # Vault value source (#1439): a variable whose `value_source` is "vault"
     # holds a reference, not a literal. Resolve it here — before delivery — so

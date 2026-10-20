@@ -33,6 +33,7 @@ type variableSetVariableModel struct {
 	Structured  types.Bool   `tfsdk:"structured"`
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
 	Description types.String `tfsdk:"description"`
 	ValueSource types.String `tfsdk:"value_source"`
 
@@ -102,7 +103,14 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"only the provider attribute is deprecated.",
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
-			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
+			"sensitive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
+			"apply_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan and deliver it only to an " +
+					"apply. An apply-only row shadows its standard twin inside this set's own " +
+					"precedence tier only — a priority set's standard row still beats a " +
+					"workspace apply-only one.",
+			},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
 			"value_source": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
@@ -247,6 +255,9 @@ func buildCreateVSVRequest(m *variableSetVariableModel) terrapod.CreateVarsetVar
 	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		req.Structured = m.HCL.ValueBool()
 	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		req.ApplyOnly = m.ApplyOnly.ValueBool()
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
 	}
@@ -274,6 +285,10 @@ func buildUpdateVSVRequest(m *variableSetVariableModel) terrapod.UpdateVarsetVar
 	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		v := m.HCL.ValueBool()
 		req.Structured = &v
+	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		a := m.ApplyOnly.ValueBool()
+		req.ApplyOnly = &a
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -311,6 +326,7 @@ func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel
 	m.Structured = types.BoolValue(v.Structured)
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
+	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

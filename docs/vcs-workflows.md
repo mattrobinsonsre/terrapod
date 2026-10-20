@@ -19,6 +19,37 @@ If you also want a UI, state management, label-based RBAC, a private registry, a
 
 The toggle lives on each workspace (`vcs_workflow`); flipping it is a deliberate operational decision and is rejected while PR runs are in flight on that workspace.
 
+## What a pull-request run executes, and with whose credentials
+
+Both modes above run the **pull request's own code**, and that is the point of
+them — a plan is only useful if it is a plan of the proposed change. It is also
+the exposure, and it is worth being explicit about where it sits, because the two
+modes put it in different places.
+
+In `merge_then_apply` the pull-request run is a **speculative plan**. "Plan" does
+not mean "nothing happens": `init` fetches the module sources and provider
+binaries the branch names, and the plan evaluates its `data` sources and
+refreshes state. All of that is arbitrary code — a module source, a provider, an
+`external` data source — executing in the runner Job with the workspace's
+credentials, before any human has read the diff.
+
+In `apply_then_merge` the pull-request run is apply-capable from the outset, so
+the same code also reaches the apply path once someone comments `terrapod apply`.
+
+Three controls bound it, and they answer different questions:
+
+| Question | Control |
+|---|---|
+| **May this author's code run at all?** | [`allow-fork-pr-plans`](vcs-integration.md#pull-requests-from-forks), **off by default** — a fork author has neither write access nor the ability to merge, so a speculative plan would otherwise be their only route to the workspace's credentials. In `apply_then_merge` the stake is higher still, because the run is apply-capable. |
+| **May this person ask Terrapod to act?** | VCS push permission on comment-driven commands, in the next section — plus branch protection on what may land. |
+| **What can the code do once it runs?** | The plan phase's own identity. Put the plan Job on a read-only cloud role and keep write on the apply, and mark credentials only an apply needs as `apply-only` so they are not in a plan's environment. See [Security Hardening → Give the plan phase a narrower identity than the apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply). |
+
+The third is the one most often left at its default, and the only one that helps
+once you have decided the code *should* run — which is every pull request raised
+inside the repository. It narrows the blast radius rather than removing it: a
+plan still runs the code, and still reads. There is no approval step in front of
+a speculative plan; the run is dispatched when the pull request is pushed.
+
 ## Authorization model for apply-then-merge — read this carefully
 
 > If you can merge the PR, you can apply it.
@@ -314,6 +345,7 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 - [`docs/vcs-integration.md`](vcs-integration.md) — VCS connection setup
 - [`docs/rbac.md`](rbac.md) — Terrapod's RBAC (which does *not* gate comment-driven applies)
 - [`docs/audit-logging.md`](audit-logging.md) — dual-actor audit model
+- [`docs/security-hardening.md`](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply) — giving the plan phase a narrower cloud identity than the apply, and what that does not buy you
 
 
 ## `apply_then_merge` and auto-apply are incompatible

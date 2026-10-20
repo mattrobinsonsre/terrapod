@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Les fra OpenBao/Vault",
       "vaultHint": "Terrapod leser hemmeligheten fra OpenBao (eller HashiCorp Vault) ved kjøring. Ingenting lagres her.",
       "categoryNative": "Nativ",
-      "structured": "Strukturert"
+      "structured": "Strukturert",
+      "applyOnly": "Bare apply",
+      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Nativ",
       "structured": "Strukturert",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi-konfigurasjon"
+      "categoryPulumiConfig": "Pulumi-konfigurasjon",
+      "applyOnly": "Bare apply",
+      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan."
     },
     "runs": {
       "options": "Alternativer",

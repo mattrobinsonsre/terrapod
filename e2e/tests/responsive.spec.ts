@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route, type Dialog } from '@playwright/te
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
-import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedVariable, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -1956,6 +1956,37 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     await page.getByRole('button', { name: /Remove this host from web/ }).click()
     await expect.poll(() => message, { timeout: 5_000 }).toContain('web')
     await expect(page.getByText(/in no group/i)).toBeVisible({ timeout: 10_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+})
+
+test.describe('Apply-only variables (#2189)', () => {
+  test('a long key plus its apply-only badge does not push the page sideways', async ({ page }) => {
+    // The badge sits beside the KEY rather than next to the category pill,
+    // because the category column is `hidden sm:table-cell` -- invisible at
+    // exactly this width, where two rows sharing a name are most confusing.
+    // That puts a new inline element next to the longest string on the row, so
+    // the thing to prove is that it wraps rather than overflowing.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2e-resp-applyonly'))
+    const longKey = 'AWS_ASSUME_ROLE_ARN_FOR_THE_PRODUCTION_DEPLOYMENT_PIPELINE'
+    await seedVariable(token, wsId, longKey, 'arn:plan', false)
+    await seedVariable(token, wsId, longKey, 'arn:apply', true)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+
+    // The mobile card list is what renders here; the table is hidden md:block.
+    // Scope to the visible render, or the assertion passes on a hidden node.
+    const badge = page.getByText('Apply only', { exact: true }).filter({ visible: true })
+    await expect(badge).toHaveCount(1, { timeout: 10_000 })
+    await expect(badge).toBeVisible()
+
+    // Both copies are reachable: without the badge they are indistinguishable,
+    // and at this width the category pill that would otherwise tell them apart
+    // is not rendered at all.
+    await expect(page.getByText('arn:plan', { exact: true }).filter({ visible: true })).toBeVisible()
+    await expect(page.getByText('arn:apply', { exact: true }).filter({ visible: true })).toBeVisible()
+
     await expectNoHorizontalPageScroll(page)
   })
 })

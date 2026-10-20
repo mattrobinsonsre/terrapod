@@ -97,6 +97,14 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description:   "Mark as sensitive (value will not be returned by API).",
 				PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()},
 			},
+			"apply_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan and deliver it only to an " +
+					"apply. A plan executes the configuration's code, so a credential only " +
+					"the apply needs should not be in a plan's environment. For a different " +
+					"value per phase, declare TWO variables with the same `key` — one " +
+					"ordinary and one `apply_only` — and the apply-only one wins on an apply.",
+			},
 			"description": schema.StringAttribute{
 				Optional: true, Description: "Description.",
 			},
@@ -282,6 +290,9 @@ func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest
 	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		req.Structured = m.HCL.ValueBool()
 	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		req.ApplyOnly = m.ApplyOnly.ValueBool()
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
 	}
@@ -314,6 +325,10 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		v := m.HCL.ValueBool()
 		req.Structured = &v
+	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		a := m.ApplyOnly.ValueBool()
+		req.ApplyOnly = &a
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -355,6 +370,7 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	m.Structured = types.BoolValue(v.Structured)
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
+	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

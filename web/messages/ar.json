@@ -1024,7 +1024,9 @@
       "valueSourceVault": "القراءة من OpenBao/Vault",
       "vaultHint": "يقرأ Terrapod السر من OpenBao (أو HashiCorp Vault) وقت التشغيل. لا يُخزَّن شيء هنا.",
       "categoryNative": "أصلي",
-      "structured": "منظّم"
+      "structured": "منظّم",
+      "applyOnly": "التطبيق فقط",
+      "applyOnlyHint": "يُحجب عن الخطة ويُسلَّم إلى التطبيق فقط. تنفّذ الخطة شفرة الإعداد، لذا لا ينبغي أن تكون بيانات اعتماد يحتاجها التطبيق وحده في بيئة الخطة."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "أصلي",
       "structured": "منظّم",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "إعدادات Pulumi"
+      "categoryPulumiConfig": "إعدادات Pulumi",
+      "applyOnly": "التطبيق فقط",
+      "applyOnlyHint": "يُحجب عن الخطة ويُسلَّم إلى التطبيق فقط. تنفّذ الخطة شفرة الإعداد، لذا لا ينبغي أن تكون بيانات اعتماد يحتاجها التطبيق وحده في بيئة الخطة."
     },
     "runs": {
       "options": "الخيارات",

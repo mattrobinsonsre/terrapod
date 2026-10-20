@@ -51,6 +51,7 @@ type variableModel struct {
 	Structured  types.Bool   `tfsdk:"structured"`
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
 	Description types.String `tfsdk:"description"`
 	ValueSource types.String `tfsdk:"value_source"`
 

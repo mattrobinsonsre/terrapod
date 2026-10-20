@@ -605,6 +605,48 @@ runners:
   azureWorkloadIdentity: false
 ```
 
+### A separate ServiceAccount for the apply phase
+
+A run's `plan` and its `apply` are **separate Jobs**, and the apply phase can be
+given its own ServiceAccount:
+
+| Helm value | Default | What it does |
+|---|---|---|
+| `runners.serviceAccount.create` | `true` | Create the runner ServiceAccount (only when `listener.enabled: true`). |
+| `runners.serviceAccount.name` | `""` | The account **every** Job uses. Empty resolves to `<release>-runner` when `create: true`, and to `default` when `create: false`. |
+| `runners.serviceAccount.annotations` | `{}` | Its cloud-identity annotations. |
+| `runners.applyServiceAccount.create` | **`false`** | Create a second account for the apply phase. |
+| `runners.applyServiceAccount.name` | **`""`** | The apply account. Empty resolves to `<release>-runner-apply` when `create: true`, and to **nothing at all** when `create: false` — which is what keeps the feature off. Set it with `create: false` to adopt an account you manage elsewhere. |
+| `runners.applyServiceAccount.annotations` | `{}` | Its own cloud-identity annotations — **set these**, or the apply has no cloud identity. |
+
+The resolution is one line: **an `apply` Job uses
+`runners.applyServiceAccount` when it resolves to a non-empty name, and every
+other Job uses `runners.serviceAccount`.** `plan` and `apply` are the only two
+Job phases, so in practice that is "plan on one account, apply on the other".
+
+With `applyServiceAccount` left at its defaults **nothing renders** — no second
+ServiceAccount, and no `apply_service_account_name` in the runner ConfigMap — and
+the Job spec is identical to what it was before the value existed. The point of
+configuring it is to put the plan phase on a narrower cloud role, because a
+speculative pull-request plan runs unreviewed code; see [Security Hardening →
+Give the plan phase a narrower identity than the
+apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply),
+and [Cloud Identity](cloud-identity.md#a-separate-serviceaccount-for-the-apply-phase)
+for a worked example per cloud.
+
+**The Job spec is built by the listener**, which reads
+`apply_service_account_name` from the runner ConfigMap — and `RunnerConfig`
+ignores keys it does not recognise, so a listener image older than this value
+runs every phase on `runners.serviceAccount` without reporting anything. An
+ordinary `helm upgrade` rolls the listener alongside the ConfigMap (the
+Deployment carries a `checksum/runner-config` annotation), so this is a concern
+only where `listener.image.tag` is pinned to an older release.
+
+`automountServiceAccountToken` is computed from the account the Job **actually
+runs as** — true when a name resolved for that phase, false when none did — so
+configuring the apply account cannot leave an apply Job named after one account
+and mounting the token of another.
+
 ---
 
 ## Graceful Termination
@@ -743,6 +785,15 @@ It holds:
 - one key per env-category variable, each injected into the Job container via `secretKeyRef`.
 
 No variable value — sensitive or not — ever appears in the Job spec, the listener logs, or `kubectl describe` output. Sensitive variables are protected by living only in this short-lived, cascade-GC'd Secret, not by masking.
+
+**Each phase's Secret holds the variables resolved for that phase**, which is what
+makes [apply-only variables](cloud-identity.md#apply-only-variables) work: a
+variable marked `apply-only` is written into the `-apply-vars` Secret and is
+absent from the `-plan-vars` one, so a plan Job never holds it on disk or in its
+environment. The API resolves variables per phase when the listener claims the
+run, so the narrowing happens server-side and the listener has nothing to decide.
+Everything else about delivery is unchanged — same Secret, same mount, same
+`secretKeyRef` injection, same `ownerReference` lifecycle.
 
 ---
 

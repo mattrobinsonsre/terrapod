@@ -1024,7 +1024,9 @@
       "valueSourceVault": "OpenBao/Vault'tan oku",
       "vaultHint": "Terrapod gizli değeri çalıştırma sırasında OpenBao'dan (veya HashiCorp Vault'tan) okur. Burada hiçbir şey saklanmaz.",
       "categoryNative": "Yerel",
-      "structured": "Yapılandırılmış"
+      "structured": "Yapılandırılmış",
+      "applyOnly": "Yalnızca apply",
+      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Yerel",
       "structured": "Yapılandırılmış",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi yapılandırması"
+      "categoryPulumiConfig": "Pulumi yapılandırması",
+      "applyOnly": "Yalnızca apply",
+      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır."
     },
     "runs": {
       "options": "Seçenekler",

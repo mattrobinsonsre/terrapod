@@ -38,13 +38,21 @@ def _mock_workspace(ws_id=None):
     return ws
 
 
-def _mock_var(key="region", value="us-east-1", sensitive=False, ws_id=None, var_id=None):
+def _mock_var(
+    key="region",
+    value="us-east-1",
+    sensitive=False,
+    ws_id=None,
+    var_id=None,
+    apply_only=False,
+):
     var = MagicMock()
     var.id = var_id or uuid.uuid4()
     var.workspace_id = ws_id or uuid.uuid4()
     var.key = key
     var.value = value
     var.sensitive = sensitive
+    var.apply_only = apply_only
     var.category = "terraform"
     var.structured = False
     var.value_source = "static"
@@ -395,13 +403,14 @@ class TestVariableSetCRUD:
         assert resp.status_code == 403
 
 
-def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True):
+def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True, apply_only=False):
     v = MagicMock()
     v.id = uuid.uuid4()
     v.variable_set_id = uuid.uuid4()
     v.key = key
     v.value = value
     v.sensitive = sensitive
+    v.apply_only = apply_only
     v.category = "terraform"
     v.structured = False
     v.value_source = "static"

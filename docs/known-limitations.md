@@ -109,6 +109,47 @@ Two limitations of the OIDC federation added in v1.10.0. Full detail in
   and treat a federated workspace on a stale pool as mis-scoped until you have.
   See [Cloud Identity → The honest limitation](cloud-identity.md#the-honest-limitation-a-runner-image-that-predates-this-feature).
 
+## Separating the plan phase from the apply
+
+Terrapod can give a run's `plan` and its `apply` different identities — an
+[apply-phase ServiceAccount](cloud-credentials.md#apply-phase-serviceaccount) and
+[apply-only variables](cloud-identity.md#apply-only-variables) — so unreviewed
+pull-request code runs under something that cannot change infrastructure. Both
+are off by default. What they do **not** do:
+
+- **A plan is not sandboxed, and it still reads.** A plan executes the
+  configuration's code — module sources, provider binaries, `data` sources, a
+  state refresh — so the plan identity needs **read** across the infrastructure
+  the workspace manages. Narrowing the apply does not make a plan harmless; it
+  bounds what the plan can *change*, not what it can run or see. Runner isolation
+  (read-only root, dropped capabilities, no datastore reach, a run-scoped token)
+  is what bounds the rest, and it is not a sandbox either. See
+  [Security Hardening → Give the plan phase a narrower identity than the
+  apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply).
+- **Terrapod does not verify that the plan identity is read-only, and cannot.**
+  The cloud role behind a ServiceAccount is the operator's; Terrapod only decides
+  which account a Job runs as. Two accounts annotated onto two roles that can
+  both write is accepted and buys nothing, with no warning.
+- **A plan still receives every variable not marked `apply-only`.** The flag is
+  opt-in per variable, so `env` values, sensitive values, OpenBao/Vault-resolved
+  values and minted git credentials reach a plan until you mark them — and the
+  git-module credentials usually must, because `init` needs them.
+- **There is no approval gate in front of a speculative plan.** A pull-request
+  plan is dispatched when the pull request is pushed. The control over *whether*
+  unreviewed code runs is
+  [`allow-fork-pr-plans`](vcs-integration.md#pull-requests-from-forks), not this.
+- **A listener image predating the apply-phase ServiceAccount ignores it.** The
+  Job spec is built by the listener, and its config model ignores unknown keys,
+  so an older listener runs every phase on `runners.serviceAccount` and says
+  nothing. An ordinary `helm upgrade` moves both together; a deployment pinning
+  `listener.image.tag` to an older release silently keeps one account. This is
+  the same shape as the runner-image limitation above, and equally undetectable
+  server-side.
+- **The MCP server cannot declare the two-row pair.** `terrapod_variable_set` can
+  set the flag, but it is an upsert keyed on `key` alone, so it cannot hold the
+  same key twice — once ordinary and once apply-only. Use the API, the Terraform
+  provider or the UI for a pair. See [MCP](mcp.md#tools).
+
 ## Object storage
 
 - **Native SDKs + filesystem; no S3-compat shim**. State and

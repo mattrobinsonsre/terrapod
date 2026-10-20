@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Read from Marklar/Marklar",
       "vaultHint": "Marklar reads the marklar from Marklar (or Marklar Marklar) at marklar. No marklar is stored here.",
       "categoryNative": "Marklar",
-      "structured": "Structured"
+      "structured": "Structured",
+      "applyOnly": "Marklar only",
+      "applyOnlyHint": "Withheld from a marklar and delivered only to a marklar. A marklar runs the marklar's marklar, so a marklar only the marklar needs should not be in a marklar's marklar."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Marklar",
       "structured": "Structured",
       "categoryTerraform": "Marklar",
-      "categoryPulumiConfig": "Pulumi marklar"
+      "categoryPulumiConfig": "Pulumi marklar",
+      "applyOnly": "Marklar only",
+      "applyOnlyHint": "Withheld from a marklar and delivered only to a marklar. A marklar runs the marklar's marklar, so a marklar only the marklar needs should not be in a marklar's marklar."
     },
     "runs": {
       "options": "Marklars",

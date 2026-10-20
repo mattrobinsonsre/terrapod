@@ -28,10 +28,15 @@ pytestmark = pytest.mark.asyncio
 MOD = "terrapod.services.variable_service"
 
 
-def _var(key: str, value: str, category: str):
+def _var(key: str, value: str, category: str, *, apply_only: bool = False):
     v = MagicMock()
     v.key, v.value, v.category = key, value, category
     v.structured, v.sensitive, v.value_source = False, False, "static"
+    # Set explicitly: an absent attribute on a MagicMock answers with a
+    # DISTINCT auto-attribute per row, so every resolution key would
+    # differ and nothing would collapse -- precedence would read as
+    # broken when it is the fixture that is (#2189).
+    v.apply_only = apply_only
     return v
 
 
@@ -41,7 +46,7 @@ def _set(*variables):
     return vs
 
 
-async def _resolve(*, priority=(), workspace=(), non_priority=()):
+async def _resolve(*, priority=(), workspace=(), non_priority=(), phase=None):
     priority_sets, non_priority_sets = list(priority), list(non_priority)
 
     # An explicit conditional, not `priority and x or y`: with no priority sets
@@ -55,7 +60,7 @@ async def _resolve(*, priority=(), workspace=(), non_priority=()):
         patch(f"{MOD}._get_applicable_varsets", varsets),
         patch(f"{MOD}.list_variables", AsyncMock(return_value=list(workspace))),
     ):
-        return await variable_service.resolve_variables(AsyncMock(), "ws-1")
+        return await variable_service.resolve_variables(AsyncMock(), "ws-1", phase)
 
 
 def _by_category(resolved) -> dict[str, str]:
@@ -152,7 +157,12 @@ class TestPrecedenceIsUnchangedWithinACategory:
 class TestTheIdentityIsAssertedInBothPlacesItMustBe:
     """Resolution is only half of it — the schema is the other, and the two have
     to agree or the database permits what the resolver cannot represent (or the
-    reverse, which is how this defect survived)."""
+    reverse, which is how this defect survived).
+
+    The tuple is four columns rather than the three these test names mention:
+    `apply_only` is a second, orthogonal dimension of the same identity
+    (#2189), so a standard and an apply-only variable may share a
+    `(key, category)` exactly as two categories may share a key."""
 
     def test_the_workspace_constraint_carries_the_category(self) -> None:
         from terrapod.db.models import Variable
@@ -162,7 +172,7 @@ class TestTheIdentityIsAssertedInBothPlacesItMustBe:
             for arg in Variable.__table_args__
             if hasattr(arg, "columns") and getattr(arg, "name", "") == "uq_variables_workspace_key"
         }
-        assert cols == {("workspace_id", "key", "category")}
+        assert cols == {("workspace_id", "key", "category", "apply_only")}
 
     def test_the_variable_set_constraint_carries_it_too(self) -> None:
         from terrapod.db.models import VariableSetVariable
@@ -172,4 +182,93 @@ class TestTheIdentityIsAssertedInBothPlacesItMustBe:
             for arg in VariableSetVariable.__table_args__
             if hasattr(arg, "columns") and getattr(arg, "name", "") == "uq_variable_set_variables"
         }
-        assert cols == {("variable_set_id", "key", "category")}
+        assert cols == {("variable_set_id", "key", "category", "apply_only")}
+
+
+class TestTheTwoDimensionsOfTheIdentityAreIndependent:
+    """`category` (#1898) and `apply_only` (#2189) are orthogonal halves of one
+    identity, which is what makes the constraint four columns rather than three.
+
+    Asserting each half on its own cannot establish that, and that is the whole
+    reason this class exists: a one-category fixture resolves identically
+    whether or not `category` is in the key, and a one-slot fixture resolves
+    identically whether or not `apply_only` is. The property is the cross
+    product, so the fixture has to instantiate it -- all four combinations at
+    once -- or it pins nothing about the interaction between them.
+    """
+
+    async def test_an_apply_keeps_the_apply_only_row_of_each_category(self) -> None:
+        resolved = await _resolve(
+            workspace=(
+                _var("region", "plain-terraform", "terraform"),
+                _var("region", "apply-terraform", "terraform", apply_only=True),
+                _var("region", "plain-env", "env"),
+                _var("region", "apply-env", "env", apply_only=True),
+            ),
+            phase="apply",
+        )
+
+        # Two entries: within each category the apply-only row shadows its
+        # standard twin. Not one (categories do not collide) and not four
+        # (an apply-only row is not a separate variable on an apply).
+        assert sorted((r.category, r.value) for r in resolved) == [
+            ("env", "apply-env"),
+            ("terraform", "apply-terraform"),
+        ]
+
+    async def test_a_plan_keeps_the_standard_row_of_each_category(self) -> None:
+        resolved = await _resolve(
+            workspace=(
+                _var("region", "plain-terraform", "terraform"),
+                _var("region", "apply-terraform", "terraform", apply_only=True),
+                _var("region", "plain-env", "env"),
+                _var("region", "apply-env", "env", apply_only=True),
+            ),
+            phase="plan",
+        )
+
+        # The apply-only row of a category is withheld without taking its
+        # standard twin with it -- the failure that would deliver a plan the
+        # wrong value, or no value, for a key the configuration requires.
+        assert sorted((r.category, r.value) for r in resolved) == [
+            ("env", "plain-env"),
+            ("terraform", "plain-terraform"),
+        ]
+
+    async def test_an_apply_only_row_shadows_only_its_own_category(self) -> None:
+        resolved = await _resolve(
+            workspace=(
+                _var("region", "plain-terraform", "terraform"),
+                _var("region", "apply-env", "env", apply_only=True),
+            ),
+            phase="apply",
+        )
+
+        # The asymmetric case, which is the one a key-only identity gets wrong:
+        # an apply-only `env:region` must not displace a standard
+        # `terraform:region`. Both are delivered, as two different variables.
+        assert sorted((r.category, r.value) for r in resolved) == [
+            ("env", "apply-env"),
+            ("terraform", "plain-terraform"),
+        ]
+
+    async def test_redaction_sees_both_slots_of_both_categories(self) -> None:
+        resolved = await _resolve(
+            workspace=(
+                _var("region", "plain-terraform", "terraform"),
+                _var("region", "apply-terraform", "terraform", apply_only=True),
+                _var("region", "plain-env", "env"),
+                _var("region", "apply-env", "env", apply_only=True),
+            ),
+        )
+
+        # `phase=None` is prompt redaction, which must see every literal that
+        # could reach the model -- so here the cross product does NOT collapse
+        # and all four survive. A secret dropped by the key is a secret that
+        # cannot be scrubbed.
+        assert sorted(r.value for r in resolved) == [
+            "apply-env",
+            "apply-terraform",
+            "plain-env",
+            "plain-terraform",
+        ]

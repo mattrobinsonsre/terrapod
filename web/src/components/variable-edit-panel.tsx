@@ -27,6 +27,7 @@ export interface VariableEditState {
   value: string
   category: string
   sensitive: boolean
+  applyOnly: boolean
   hcl: boolean
   source: 'static' | 'vault'
   vault: VaultReferenceValue
@@ -44,6 +45,7 @@ export function VariableEditPanel({
   onCancel,
   vaultCheckUrl,
   engine,
+  saveError,
 }: {
   idPrefix: string
   state: VariableEditState
@@ -63,6 +65,16 @@ export function VariableEditPanel({
   saving: boolean
   onSave: () => void
   onCancel: () => void
+  /**
+   * The server's refusal, shown HERE rather than only in the page banner.
+   *
+   * A conflict on a variable is the one an operator cannot diagnose from the
+   * status alone -- clearing the apply-only flag can collide with a standard
+   * variable of the same name that it coexisted with a moment earlier (#2189).
+   * The page-level banner is at the top of a long variables list, so on the
+   * fortieth row the explanation is off-screen from the control that caused it.
+   */
+  saveError?: string
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const tc = useTranslations('workspaceDetail.actions')
@@ -166,6 +178,17 @@ export function VariableEditPanel({
             />
             <span className="text-xs text-slate-400">{t('sensitive')}</span>
           </label>
+          {/* Universal: a credential only the apply needs is withheld from the
+              plan whatever its category (#2189). */}
+          <label className="flex items-center gap-2 cursor-pointer" title={t('applyOnlyHint')}>
+            <input
+              type="checkbox"
+              checked={state.applyOnly}
+              onChange={(e) => onChange({ applyOnly: e.target.checked })}
+              className="rounded border-slate-600 bg-slate-700 text-brand-600"
+            />
+            <span className="text-xs text-slate-400">{t('applyOnly')}</span>
+          </label>
           {/* Only where a value can be typed at all. An environment variable
               is a string by definition and a git credential is a JSON
               envelope, so the flag meant nothing there and the API refuses it
@@ -204,6 +227,14 @@ export function VariableEditPanel({
           </button>
         </div>
       </div>
+      {saveError && (
+        <p
+          role="alert"
+          className="text-sm text-red-300 bg-red-900/30 border border-red-800/50 rounded-lg px-3 py-2"
+        >
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }

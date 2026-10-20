@@ -1024,7 +1024,9 @@
       "valueSourceVault": "OpenBao/Vault-vo' yIlaD",
       "vaultHint": "QaptaHvIS OpenBao-vo' (HashiCorp Vault-vo' joq) pegh laD Terrapod. naDev pagh pollu'.",
       "categoryNative": "juH Segh",
-      "structured": "chenmoHlu'bogh"
+      "structured": "chenmoHlu'bogh",
+      "applyOnly": "lo' neH",
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "juH Segh",
       "structured": "chenmoHlu'bogh",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi numtaH"
+      "categoryPulumiConfig": "Pulumi numtaH",
+      "applyOnly": "lo' neH",
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
     },
     "runs": {
       "options": "wIvmey",

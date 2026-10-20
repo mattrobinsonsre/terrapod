@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Lire depuis OpenBao/Vault",
       "vaultHint": "Terrapod lit le secret depuis OpenBao (ou HashiCorp Vault) au moment de l'exécution. Rien n'est stocké ici.",
       "categoryNative": "Native",
-      "structured": "Structurée"
+      "structured": "Structurée",
+      "applyOnly": "apply uniquement",
+      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Native",
       "structured": "Structurée",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Configuration Pulumi"
+      "categoryPulumiConfig": "Configuration Pulumi",
+      "applyOnly": "apply uniquement",
+      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan."
     },
     "runs": {
       "options": "Options",

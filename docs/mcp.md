@@ -148,8 +148,21 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
 | `terrapod_workspace_varsets` | read-only | The variable sets that apply to a workspace, and how each one came to apply: explicit assignment, `global`, or an assignment rule. |
-| `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
+| `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). `apply_only` withholds the variable from a plan and delivers it only to an apply — see the note below. |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |
+
+**`terrapod_variable_set` is an upsert keyed on `key` alone, which bounds what it
+can do with `apply_only`.** The flag itself works: pass `apply_only: true` and the
+variable is withheld from a plan and delivered only to an apply
+([Cloud Identity → Apply-only
+variables](cloud-identity.md#apply-only-variables)). What the tool cannot express
+is the **pair** — the same key held twice, once ordinary and once apply-only, so
+each phase gets a different value. It looks the key up, finds whichever row
+matches first, and updates that one, so a second call with the same key flips the
+existing row rather than adding its twin. Declare a pair through the API, the
+[Terraform provider](terraform-provider.md#apply_only-on-the-two-variable-resources)
+or the UI; use the tool for the single-row case, where a value is simply not
+wanted on plans.
 
 **Four workspace attributes are deliberately not settable through MCP**, and their
 absence is a decision rather than an oversight: `debug-mode` arms a pod that holds

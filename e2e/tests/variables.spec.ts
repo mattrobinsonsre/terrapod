@@ -1,6 +1,6 @@
 import path from 'path';
 import { test, expect, type Page, type Route } from '@playwright/test';
-import { createWorkspace, getStoredToken, uniqueName } from '../helpers/api.js';
+import { createWorkspace, getStoredToken, seedVariable, uniqueName } from '../helpers/api.js';
 
 test.describe('Variables', () => {
   let workspaceId: string;
@@ -583,5 +583,101 @@ test.describe('Vault templated files — RBAC negative (regular user, #1648)', (
     await page.goto(`/workspaces/${wsId}?tab=variables`)
     await expect(page.getByRole('button', { name: 'Add Variable' })).toHaveCount(0)
     await expect(page.locator('#add-file-template')).toHaveCount(0)
+  })
+})
+
+test.describe('Apply-only variables (#2189)', () => {
+  let wsId: string
+  let adminToken: string
+
+  test.beforeAll(async () => {
+    adminToken = getStoredToken()
+    wsId = await createWorkspace(adminToken, uniqueName('e2e-applyonly'))
+  })
+
+  test('a key can be held twice, and the apply-only copy is distinguishable', async ({ page }) => {
+    // The whole feature rests on this: a read-only role for plans, a writing
+    // role for applies, under one key. Seeded through the API so the test is
+    // about what the page SHOWS -- creation through the form is covered below.
+    await seedVariable(adminToken, wsId, 'AWS_ROLE_ARN', 'arn:plan', false)
+    await seedVariable(adminToken, wsId, 'AWS_ROLE_ARN', 'arn:apply', true)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+
+    // Two rows, one key. Scope to <tr> -- the mobile card renders the same text
+    // and is in the DOM at desktop width.
+    await expect(page.locator('tr:has-text("AWS_ROLE_ARN")')).toHaveCount(2, { timeout: 10_000 })
+
+    // Exactly one of them is badged. Without this the two rows are
+    // indistinguishable, which is the defect the badge was added for.
+    const badged = page.locator('tr:has-text("AWS_ROLE_ARN")').filter({ hasText: 'Apply only' })
+    await expect(badged).toHaveCount(1)
+    await expect(badged).toContainText('arn:apply')
+  })
+
+  test('the create form can set the flag, and the new row is badged', async ({ page }) => {
+    const key = `FORM_${Date.now()}`
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+    await page.fill('#var-key', key)
+    await page.fill('#var-val', 'from-the-form')
+
+    await page.locator('label:has-text("Apply only") input[type="checkbox"]').check()
+    await page.click('form button:has-text("Add Variable")')
+
+    const row = page.locator(`tr:has-text("${key}")`)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await expect(row).toContainText('Apply only')
+  })
+
+  test('clearing the flag into a conflict explains it inside the panel', async ({ page }) => {
+    // The failure mode this feature introduces: two rows coexist, you clear the
+    // checkbox on one, and the pair becomes a duplicate. The server's 409 has to
+    // arrive where the operator is looking -- the page banner is at the top of a
+    // long list, so the panel renders it too.
+    const key = `CONFLICT_${Date.now()}`
+    await seedVariable(adminToken, wsId, key, 'standard', false)
+    await seedVariable(adminToken, wsId, key, 'apply-only', true)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const badged = page.locator(`tr:has-text("${key}")`).filter({ hasText: 'Apply only' })
+    await expect(badged).toHaveCount(1, { timeout: 10_000 })
+    await badged.getByRole('button', { name: 'Edit' }).click()
+
+    // Editing renders a panel in BOTH the desktop row and the mobile card, so
+    // the checkbox resolves twice -- take the visible one.
+    const panelCheckbox = page
+      .locator('label:has-text("Apply only") input[type="checkbox"]')
+      .filter({ visible: true })
+    // It must arrive CHECKED: the panel is seeded from the row, and that seeding
+    // was dead code until ESLint found the setter was never called.
+    await expect(panelCheckbox).toBeChecked()
+
+    await panelCheckbox.uncheck()
+    // 'Save', not 'Save changes': the panel renders tc('save'), which is
+    // workspaceDetail.actions.save. The Configuration tab's control is the one
+    // that says 'Save changes', and reading the label off the wrong component
+    // is how three specs failed on a click that looked like a timing problem.
+    // No visibility filter needed -- getByRole already skips the md:hidden
+    // mobile panel, which is display:none at this width.
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+    // The refusal, next to the control that caused it.
+    //
+    // Asserted on the MESSAGE rather than on role=alert. The panel renders in
+    // both the desktop row and the mobile card, so the same error is in the DOM
+    // twice and `getByRole('alert')` is a strict-mode violation on two elements
+    // -- which is what this spec failed on first time round. The message text is
+    // unambiguous and is also the thing an operator actually reads.
+    const refusal = page
+      .getByText(/already holds a plan\+apply variable/)
+      .filter({ visible: true })
+      .first()
+    await expect(refusal).toBeVisible({ timeout: 10_000 })
+    await expect(refusal).toContainText(key)
+    await expect(refusal).not.toContainText('violates a constraint')
+
+    // And nothing was saved: the row is still badged.
+    await expect(page.locator(`tr:has-text("${key}")`).filter({ hasText: 'Apply only' })).toHaveCount(1)
   })
 })

@@ -1024,7 +1024,9 @@
       "valueSourceVault": "R34d fr0m 0p3nB40/V4ul7",
       "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m 0p3nB40 (0r H45h1C0rp V4ul7) 47 run 71m3. N07h1ng 15 570r3d h3r3.",
       "categoryNative": "N471v3",
-      "structured": "57ruc7ur3d"
+      "structured": "57ruc7ur3d",
+      "applyOnly": "4pply 0nly",
+      "applyOnlyHint": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply. 4 pl4n run5 7h3 c0nf1gur4710n'5 c0d3, 50 4 cr3d3n714l 0nly 7h3 4pply n33d5 5h0uld n07 b3 1n 4 pl4n'5 3nv1r0nm3n7."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "N471v3",
       "structured": "57ruc7ur3d",
       "categoryTerraform": "73rr4f0rm",
-      "categoryPulumiConfig": "Pulum1 c0nf1g"
+      "categoryPulumiConfig": "Pulum1 c0nf1g",
+      "applyOnly": "4pply 0nly",
+      "applyOnlyHint": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply. 4 pl4n run5 7h3 c0nf1gur4710n'5 c0d3, 50 4 cr3d3n714l 0nly 7h3 4pply n33d5 5h0uld n07 b3 1n 4 pl4n'5 3nv1r0nm3n7."
     },
     "runs": {
       "options": "0p710n5",

@@ -672,6 +672,19 @@ def build_job_spec(
     if runner_config.azure_workload_identity:
         pod_labels["azure.workload.identity/use"] = "true"
 
+    # The phase's ServiceAccount, resolved HERE -- before the Job spec literal
+    # below -- because `automountServiceAccountToken` inside it is computed from
+    # whether an account is set. Resolving after the literal would leave the
+    # mount decision made from the base account while the pod ran as another
+    # (#2189). A positional test pins the ordering, the same shape as the
+    # flush-inside-try gate.
+    #
+    # The apply account is optional and absent by default, so every phase falls
+    # back to the base one and the rendered spec is byte-identical.
+    effective_service_account = runner_config.service_account_name
+    if phase == "apply" and runner_config.apply_service_account_name:
+        effective_service_account = runner_config.apply_service_account_name
+
     # Build Job spec
     job_spec = {
         "apiVersion": "batch/v1",
@@ -756,7 +769,7 @@ def build_job_spec(
                 "spec": {
                     "terminationGracePeriodSeconds": runner_config.termination_grace_period_seconds,
                     "restartPolicy": "Never",
-                    "automountServiceAccountToken": bool(runner_config.service_account_name),
+                    "automountServiceAccountToken": bool(effective_service_account),
                     "volumes": [
                         {"name": "workspace", "emptyDir": {}},
                         {"name": "tmp", "emptyDir": {}},
@@ -915,11 +928,11 @@ def build_job_spec(
             runner_config.extra_env_from
         )
 
-    # Service account (CSP identity) — from global runner config (Helm values)
-    if runner_config.service_account_name:
-        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = (
-            runner_config.service_account_name
-        )
+    # Service account (CSP identity) — from global runner config (Helm values),
+    # with the apply phase optionally taking its own (#2189). Resolved above the
+    # spec literal; see `effective_service_account`.
+    if effective_service_account:
+        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = effective_service_account
 
     # Scheduling and placement from runner config
     pod_spec = job_spec["spec"]["template"]["spec"]

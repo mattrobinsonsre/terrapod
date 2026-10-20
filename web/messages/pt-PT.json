@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Ler do OpenBao/Vault",
       "vaultHint": "O Terrapod lê o segredo do OpenBao (ou do HashiCorp Vault) durante a execução. Nada é armazenado aqui.",
       "categoryNative": "Nativa",
-      "structured": "Estruturada"
+      "structured": "Estruturada",
+      "applyOnly": "Apenas apply",
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Nativa",
       "structured": "Estruturada",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Configuração do Pulumi"
+      "categoryPulumiConfig": "Configuração do Pulumi",
+      "applyOnly": "Apenas apply",
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
     },
     "runs": {
       "options": "Opções",

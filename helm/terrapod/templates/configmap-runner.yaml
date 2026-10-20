@@ -18,6 +18,9 @@ data:
        bare name does not resolve. See terrapod.inClusterAPIURL. */}}
     server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (include "terrapod.inClusterAPIURL" .) | quote }}
     service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
+    {{- with (include "terrapod.runnerApplyServiceAccountName" .) }}
+    apply_service_account_name: {{ . | quote }}
+    {{- end }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
     debug_linger_seconds: {{ .Values.runners.debugLingerSeconds }}

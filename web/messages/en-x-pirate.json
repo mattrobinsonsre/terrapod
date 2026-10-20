@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Fetch from OpenBao/Vault",
       "vaultHint": "Terrapod fetches the secret from OpenBao (or HashiCorp Vault, if ye must) when the voyage sails. Naught be stowed here.",
       "categoryNative": "Ship''s own",
-      "structured": "Rigged"
+      "structured": "Rigged",
+      "applyOnly": "Apply only, matey",
+      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Ship''s own",
       "structured": "Rigged",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi riggin''"
+      "categoryPulumiConfig": "Pulumi riggin''",
+      "applyOnly": "Apply only, matey",
+      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold."
     },
     "runs": {
       "options": "Options",

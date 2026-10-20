@@ -445,6 +445,7 @@ export async function seedVariable(
   workspaceId: string,
   key: string,
   value = 'seed-value',
+  applyOnly = false,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/v2/workspaces/${workspaceId}/vars`, {
     method: 'POST',
@@ -455,7 +456,14 @@ export async function seedVariable(
     body: JSON.stringify({
       data: {
         type: 'vars',
-        attributes: { key, value, category: 'terraform', sensitive: false, hcl: false },
+        attributes: {
+          key,
+          value,
+          category: 'terraform',
+          sensitive: false,
+          hcl: false,
+          'apply-only': applyOnly,
+        },
       },
     }),
   });

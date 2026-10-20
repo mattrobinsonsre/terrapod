@@ -758,9 +758,9 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.21.2"
-        trivy_version: "0.75.0"
-        checkov_version: "3.3.26"
+        opa_version: "1.21.3"
+        trivy_version: "0.76.0"
+        checkov_version: "3.3.29"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         # Checkov comes from TERRAPOD's releases, not Checkov's, and that is
@@ -2115,6 +2115,26 @@ runners:
     #
     # GCP Workload Identity Federation:
     #   iam.gke.io/gcp-service-account: terrapod-runner@project.iam.gserviceaccount.com
+    annotations: {}
+
+  # OPTIONAL second ServiceAccount, used by the APPLY phase only (#2189).
+  #
+  # A plan executes the configuration's code — data sources, module sources,
+  # provider binaries — so a plan of a pull request runs untrusted code with
+  # whatever the Job holds. Giving the apply its own account lets you grant the
+  # plan a read-only cloud principal and keep write on the apply.
+  #
+  # Leave `create: false` and `name: ""` (the default) and nothing changes:
+  # every phase uses `serviceAccount` above, and neither the account nor its
+  # config key is rendered. The annotations are the whole point — they are how a
+  # ServiceAccount becomes a cloud principal, so an apply account without its
+  # own would simply be a differently-named account with no cloud identity.
+  #
+  # This mirrors the OIDC path, where an apply resolves to the base identity
+  # plus any extra apply identity. Base plus an optional extra, both ways.
+  applyServiceAccount:
+    create: false
+    name: ""
     annotations: {}
 
   # Azure Workload Identity requires a pod label on runner Jobs.

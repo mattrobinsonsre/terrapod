@@ -41,9 +41,14 @@ type Variable struct {
 	// Structured reports whether the value is a typed expression rather than a
 	// plain string. HCL is the same flag under its original name — /api/v2
 	// returns both, always equal, because tfci and go-tfe read "hcl" (#1435).
-	Structured  bool   `json:"structured"`
-	HCL         bool   `json:"hcl"`
-	Sensitive   bool   `json:"sensitive"`
+	Structured bool `json:"structured"`
+	HCL        bool `json:"hcl"`
+	Sensitive  bool `json:"sensitive"`
+	// ApplyOnly withholds this variable from a plan and delivers it only to
+	// an apply (#2189). A different value per phase is TWO variables with the
+	// same key, one flagged; the apply-only one wins on an apply. Orthogonal to
+	// Category -- the uniqueness tuple carries both.
+	ApplyOnly   bool   `json:"apply-only"`
 	Description string `json:"description,omitempty"`
 
 	// ValueSource is "static" (Value is the literal) or "vault" (Value is a
@@ -83,6 +88,7 @@ type CreateVariableRequest struct {
 	Structured  bool   `json:"structured,omitempty"`
 	HCL         bool   `json:"hcl,omitempty"`
 	Sensitive   bool   `json:"sensitive,omitempty"`
+	ApplyOnly   bool   `json:"apply-only,omitempty"`
 	Description string `json:"description,omitempty"`
 	// ValueSource defaults to "static" when empty. Set "vault" and put the
 	// JSON reference in Value; Terrapod forces Sensitive on either way. Add a
@@ -107,6 +113,7 @@ type UpdateVariableRequest struct {
 	Structured  *bool   `json:"structured,omitempty"`
 	HCL         *bool   `json:"hcl,omitempty"`
 	Sensitive   *bool   `json:"sensitive,omitempty"`
+	ApplyOnly   *bool   `json:"apply-only,omitempty"`
 	Description *string `json:"description,omitempty"`
 	ValueSource *string `json:"value-source,omitempty"`
 }
@@ -330,6 +337,9 @@ func variableCreateAttrs(req CreateVariableRequest) map[string]any {
 	if req.Sensitive {
 		attrs["sensitive"] = true
 	}
+	if req.ApplyOnly {
+		attrs["apply-only"] = true
+	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
@@ -361,6 +371,9 @@ func variableUpdateAttrs(req UpdateVariableRequest) map[string]any {
 	if req.Sensitive != nil {
 		attrs["sensitive"] = *req.Sensitive
 	}
+	if req.ApplyOnly != nil {
+		attrs["apply-only"] = *req.ApplyOnly
+	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
@@ -387,6 +400,7 @@ func variableFromResource(res *Resource) *Variable {
 		Structured:  GetBoolAttr(res, "structured"),
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
+		ApplyOnly:   GetBoolAttr(res, "apply-only"),
 		Description: GetStringAttr(res, "description"),
 		ValueSource: GetStringAttr(res, "value-source"),
 		// #1565. Absent on an older server, where it reads as false -- see the

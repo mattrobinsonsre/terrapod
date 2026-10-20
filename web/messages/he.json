@@ -1024,7 +1024,9 @@
       "valueSourceVault": "קרא מ-OpenBao/Vault",
       "vaultHint": "Terrapod קורא את הסוד מ-OpenBao (או HashiCorp Vault) בזמן ההרצה. דבר אינו נשמר כאן.",
       "categoryNative": "מקורי",
-      "structured": "מובנה"
+      "structured": "מובנה",
+      "applyOnly": "apply בלבד",
+      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "מקורי",
       "structured": "מובנה",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "תצורת Pulumi"
+      "categoryPulumiConfig": "תצורת Pulumi",
+      "applyOnly": "apply בלבד",
+      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan."
     },
     "runs": {
       "options": "אפשרויות",

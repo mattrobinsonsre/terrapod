@@ -1024,7 +1024,9 @@
       "valueSourceVault": "OpenBao/Vault에서 읽기",
       "vaultHint": "Terrapod가 실행 시 OpenBao(또는 HashiCorp Vault)에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다.",
       "categoryNative": "네이티브",
-      "structured": "구조화됨"
+      "structured": "구조화됨",
+      "applyOnly": "apply 전용",
+      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "네이티브",
       "structured": "구조화됨",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi 구성"
+      "categoryPulumiConfig": "Pulumi 구성",
+      "applyOnly": "apply 전용",
+      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다."
     },
     "runs": {
       "options": "옵션",

@@ -483,6 +483,7 @@ resource terrapod_user.is_active required=false optional=true computed=true sens
 resource terrapod_user.last_login_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_user.password required=false optional=true computed=false sensitive=true type=basetypes.StringType
 resource terrapod_user.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_variable.apply_only required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable.category required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
@@ -506,6 +507,7 @@ resource terrapod_variable_set.priority required=false optional=true computed=tr
 resource terrapod_variable_set.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.var_count required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_variable_set.workspace_count required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+resource terrapod_variable_set_variable.apply_only required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable_set_variable.category required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.description required=false optional=true computed=false sensitive=false type=basetypes.StringType

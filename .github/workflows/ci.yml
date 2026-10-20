@@ -2535,6 +2535,50 @@ jobs:
           done
           echo "cloud identity audience catalogue renders OK and is empty by default (#1901)"
 
+      - name: The apply ServiceAccount renders only when asked for (#2189)
+        run: |
+          # An apply-phase identity exists so a speculative plan -- which runs
+          # code from a pull request nobody has reviewed -- cannot reach the
+          # credentials that change infrastructure. It is only worth having if it
+          # is also invisible to every deployment that does not want it, so what
+          # needs proving here is BOTH directions, against a real render.
+          #
+          # Leg 4 of the config-channel contract. The source-level gates in
+          # services/tests/helm assert the conditionals are written; only a
+          # render shows what an operator actually gets.
+          out=$(helm template tp ./helm/terrapod \
+            --set runners.applyServiceAccount.create=true \
+            --set 'runners.applyServiceAccount.annotations.eks\.amazonaws\.com/role-arn=arn:aws:iam::111122223333:role/tp-apply')
+          echo "$out" | grep -q 'terrapod-runner-apply' \
+            || { echo "FAIL: the apply ServiceAccount is not rendered"; exit 1; }
+          echo "$out" | grep -q 'apply_service_account_name:' \
+            || { echo "FAIL: apply_service_account_name does not reach the runner ConfigMap"; exit 1; }
+          echo "$out" | grep -q 'role/tp-apply' \
+            || { echo "FAIL: the apply account's annotations do not render -- without them it is a differently-named account with no cloud identity"; exit 1; }
+          # The plan/default account must be untouched: this adds an identity, it
+          # does not move the existing one.
+          echo "$out" | grep -qE 'service_account_name: "[^"]*runner"' \
+            || { echo "FAIL: the default runner account is missing from the ConfigMap"; exit 1; }
+          # An operator may instead NAME an account they already manage, in which
+          # case the config key must render and the chart must create nothing.
+          named=$(helm template tp ./helm/terrapod \
+            --set runners.applyServiceAccount.name=preexisting-apply)
+          echo "$named" | grep -q 'apply_service_account_name: "preexisting-apply"' \
+            || { echo "FAIL: a named pre-existing apply account does not reach the ConfigMap"; exit 1; }
+          echo "$named" | awk '/^kind: ServiceAccount/{sa=1} sa && /name: preexisting-apply/{found=1} END{exit !found}' \
+            && { echo "FAIL: the chart created an account the operator said already exists"; exit 1; }
+          # Absent by default, on every profile. A stray default would put a
+          # second account in every namespace and point every apply at it.
+          for prof in values.yaml values-local.yaml values-eval.yaml; do
+            stock=$(helm template tp ./helm/terrapod -f "helm/terrapod/$prof") \
+              || { echo "FAIL: $prof does not render"; exit 1; }
+            echo "$stock" | grep -q 'apply_service_account_name:' \
+              && { echo "FAIL: $prof renders apply_service_account_name by default"; exit 1; }
+            echo "$stock" | grep -q 'terrapod-runner-apply' \
+              && { echo "FAIL: $prof creates an apply ServiceAccount by default"; exit 1; }
+          done
+          echo "apply ServiceAccount renders OK and is absent by default (#2189)"
+
       - name: An issuer-only webhook Ingress is a renderable configuration
         run: |
           # values.yaml advertises "enabling this block with ONLY those two

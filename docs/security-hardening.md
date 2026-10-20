@@ -659,6 +659,75 @@ that sets it hands it to every workspace it creates from now on. See
 [vcs-integration.md → Pull requests from
 forks](vcs-integration.md#pull-requests-from-forks).
 
+### Give the plan phase a narrower identity than the apply
+
+The gate above decides *whose* code runs. This is about what that code can reach
+once it does.
+
+A speculative plan is not a dry run. It executes the configuration on the pull
+request branch — `init` fetches its module sources and provider binaries, and the
+plan evaluates its `data` sources and refreshes state — with the Job's own
+credentials. If the identity a plan runs under can **write** to your cloud, then
+an unreviewed pull request is a path to changing or destroying infrastructure,
+and no amount of reviewing the plan output afterwards helps, because the code ran
+first.
+
+Terrapod runs `plan` and `apply` as separate Kubernetes Jobs, so the two phases
+can hold different identities. Three independent controls get you there, and they
+compose — none is a prerequisite for another:
+
+| Control | What it separates | Needs the OIDC issuer? |
+|---|---|---|
+| [`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase) | the Job's **Kubernetes ServiceAccount**, and therefore its IRSA / Workload Identity cloud role | no |
+| [the `phase` claim](cloud-identity.md#the-phase-claim-and-why-write-permissions-belong-behind-it) | the **role a federated token may assume**, decided by your cloud's trust policy | yes |
+| [apply-only variables](cloud-identity.md#apply-only-variables) | which **variable values** each phase receives | no |
+
+**The recommended posture**, for a deployment where pull requests drive plans:
+
+1. Annotate `runners.serviceAccount` onto a cloud role with **read** and no
+   write, and `runners.applyServiceAccount` onto the role that can write. Both
+   accounts are ordinary ServiceAccounts, so this is two IAM roles and two
+   annotations — see [Cloud Credentials → Apply-phase
+   ServiceAccount](cloud-credentials.md#apply-phase-serviceaccount).
+2. Mark any credential **only an apply needs** — a deploy token, a write-capable
+   API key — as `apply-only`, so it is not in a plan's environment at all. Where
+   the same key needs a weaker value for plans, declare it twice: once ordinary
+   with the read-only value, once `apply-only` with the write one.
+3. If the issuer is enabled, condition write permissions on `phase: apply` in the
+   cloud's trust policy as well. It is the same separation enforced in a second
+   place, by the cloud rather than by Kubernetes.
+4. Keep [`allow-fork-pr-plans`](vcs-integration.md#pull-requests-from-forks) off
+   except where the repository is meant to take outside contributions. None of
+   the above is a substitute for it: a narrower identity bounds what the code can
+   do, and that gate decides whether it runs.
+
+#### What this does not buy you
+
+Being precise here matters, because an operator who believes a plan is harmless
+stops auditing it.
+
+- **A plan still runs arbitrary code.** The isolation at the top of this section
+  — read-only root filesystem, dropped capabilities, no Postgres/Redis reach, a
+  run-scoped token — is what bounds it. A narrower cloud role adds to that; it
+  does not sandbox the code.
+- **A plan still needs read, and read is not nothing.** A plan role wide enough
+  to refresh every resource in state can enumerate your infrastructure. Treat
+  "the plan role" as a role that can read production, and scope it to the
+  services the configuration actually touches rather than reaching for a
+  blanket read-only policy and stopping there.
+- **A plan still receives every variable not marked `apply-only`** — `env`
+  values, sensitive values, OpenBao/Vault-resolved values, and minted git
+  credentials, because `init` and `plan` need them. The flag is opt-in per
+  variable; nothing is withheld until you mark it.
+- **Terrapod does not verify that the plan role is read-only, and cannot.** The
+  cloud role is yours; Terrapod only decides which ServiceAccount the Job runs
+  as. Two accounts annotated onto two roles that can both write is a valid
+  configuration that buys nothing, and nothing in Terrapod will warn you. Audit
+  the roles themselves.
+- **There is no approval step before a speculative plan.** A plan is dispatched
+  when the pull request is pushed. This control narrows what that run can do; it
+  does not add a human gate in front of it.
+
 ### Scope every VCS connection to an owner and a repository set
 
 A VCS connection holds a GitHub App installation or a GitLab access token and

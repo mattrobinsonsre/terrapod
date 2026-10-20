@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Darllen o OpenBao/Vault",
       "vaultHint": "Mae Terrapod yn darllen y gyfrinach o OpenBao (neu HashiCorp Vault) adeg rhedeg. Ni chedwir dim yma.",
       "categoryNative": "Brodorol",
-      "structured": "Strwythuredig"
+      "structured": "Strwythuredig",
+      "applyOnly": "Gweithredu yn unig",
+      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Brodorol",
       "structured": "Strwythuredig",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Ffurfweddiad Pulumi"
+      "categoryPulumiConfig": "Ffurfweddiad Pulumi",
+      "applyOnly": "Gweithredu yn unig",
+      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun."
     },
     "runs": {
       "options": "Opsiynau",

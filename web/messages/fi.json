@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Lue OpenBao/Vaultista",
       "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne.",
       "categoryNative": "Natiivi",
-      "structured": "Rakenteinen"
+      "structured": "Rakenteinen",
+      "applyOnly": "Vain apply",
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Natiivi",
       "structured": "Rakenteinen",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi-määritys"
+      "categoryPulumiConfig": "Pulumi-määritys",
+      "applyOnly": "Vain apply",
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
     },
     "runs": {
       "options": "Vaihtoehdot",

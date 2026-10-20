@@ -2301,6 +2301,7 @@ POST /api/tfe/v2/workspaces/{id}/vars
       "value": "eu-west-1",
       "category": "env",
       "sensitive": false,
+      "apply-only": false,
       "description": "AWS region for provider"
     }
   }
@@ -2326,6 +2327,38 @@ returned indefinitely**, because `tfci` and `go-tfe` send and read it; responses
 both keys and they always agree. Supplying both with *different* values is a `422`
 rather than a silent precedence rule — a client that disagrees with itself about
 whether a value is typed has a bug worth surfacing.
+
+<a id="apply-only-variables-api"></a>
+
+`apply-only` (boolean, default `false`) **withholds the variable from a plan and
+delivers it only to an apply**, so a credential only the apply needs is not in
+the environment of a plan — which executes the configuration's code, including a
+pull request's. It is accepted on create and on `PATCH`, returned on every read,
+and settable on a variable-set variable too (below).
+
+| Phase | What it receives |
+|---|---|
+| `plan` | Only variables with `apply-only: false`. A key that has *only* an apply-only row is **absent**, not present-and-empty. |
+| `apply` | Every variable, with an apply-only row shadowing a standard row of the same key **within its own precedence tier**. |
+
+**A different value per phase is two variables with the same `key`**, one of them
+flagged — so a key may appear twice on one workspace (or twice in one variable
+set) provided the two rows differ in `apply-only`. The uniqueness constraint is
+`(workspace, key, apply-only)`; a genuine duplicate, same key and same flag, is
+still refused with `409`.
+
+Precedence is otherwise unchanged — priority variable set > workspace variables >
+non-priority variable set — and the shadowing is **within a tier, never across
+the chain**: a priority set's standard row still beats a workspace apply-only
+row, so a workspace owner cannot escape a platform-mandated value on an apply.
+
+`apply-only` is independent of `sensitive` and of `category`: it says *which
+phase receives this value*, not how secret it is, and an apply-only variable is
+stored and audited exactly like any other, and covered by the same opt-in
+[app-layer encryption](encryption-at-rest.md) when that is enabled. Marking a `git_http_auth`
+or `git_ssh_auth` credential apply-only withholds it from the plan's `init`,
+which is rarely what is wanted. Full semantics:
+[Cloud Identity → Apply-only variables](cloud-identity.md#apply-only-variables).
 
 **Required permission:** `write` on the workspace.
 
@@ -2382,6 +2415,19 @@ POST   /api/tfe/v2/varsets/{varset_id}/relationships/vars
 PATCH  /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 DELETE /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 ```
+
+A variable-set variable carries the same attributes as a workspace variable —
+`key`, `value`, `category`, `hcl`, `sensitive`, `value-source`, `description` —
+and the same [`apply-only`](#apply-only-variables-api) boolean, with the same
+meaning and the same default of `false`. Its uniqueness constraint is
+`(variable set, key, apply-only)`, so one set may hold a standard and an
+apply-only row for the same key and a true duplicate is still `409`.
+
+The shadowing stays inside the set's own precedence tier: an apply-only row in a
+**priority** set beats that set's standard row on an apply, while a priority
+set's standard row still beats a workspace apply-only row. See
+[Cloud Identity → How it interacts with
+precedence](cloud-identity.md#how-it-interacts-with-precedence).
 
 ### Variable Set Workspace Assignments
 

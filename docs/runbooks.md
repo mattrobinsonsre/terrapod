@@ -2243,6 +2243,158 @@ the reference resolved; the value itself never appears in the log.
 
 ---
 
+## A plan or apply fails on a credential marked apply-only
+
+An [apply-only variable](cloud-identity.md#apply-only-variables) is delivered to
+an apply and **withheld from a plan**. That is the whole feature, and it is also
+the way it goes wrong: a value a plan turns out to need, marked apply-only,
+simply is not there — and a variable that is absent rather than empty produces an
+error from the engine about an undeclared or unset variable, not an error about
+Terrapod.
+
+Two directions, and the first is the more common one because it is the less
+obvious:
+
+| Symptom | Cause |
+|---|---|
+| **The plan** fails at `init` on a private module source — `could not download module`, a 401 or 403 against the git host | A `git_http_auth` / `git_ssh_auth` variable is marked apply-only. The runner's git-auth phase runs **before `init` in both phases**, so withholding the credential leaves the plan with no way to fetch the module. These credentials almost never want the flag. |
+| **The plan** fails on a missing or empty input — an unset `variable`, a provider that cannot authenticate, a `data` source returning nothing | A `terraform` or `env` variable the plan genuinely needs is marked apply-only, and a key that has *only* an apply-only row is absent from the plan rather than present and empty. |
+| **The apply** fails on a missing input while the plan succeeded | Not apply-only at all — apply-only values are *added* on an apply, never removed. Look instead at a value that moved, a variable set that stopped applying to the workspace, or an OpenBao/Vault reference that failed to resolve. |
+
+### Diagnosis
+
+List the workspace's variables and read the flag. Both the API and the SDK-backed
+tools return it:
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/v2/workspaces/$WS/vars" \
+  | jq -r '.data[] | [.attributes.key, .attributes.category,
+                      (.attributes["apply-only"]|tostring)] | @tsv'
+```
+
+A key appearing **twice** with different flags is the intended pair and is not a
+fault. A key appearing **once** with `apply-only: true` is the case to look at:
+the plan sees nothing for it.
+
+Remember variable sets. A set's variables carry the flag too, so check the sets
+that reach this workspace as well as its own variables:
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/terrapod/v1/workspaces/$WS/varsets" | jq -r '.data[].id'
+# then, per set id:
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/v2/varsets/$SET/relationships/vars" \
+  | jq -r '.data[] | [.attributes.key,
+                      (.attributes["apply-only"]|tostring)] | @tsv'
+```
+
+The run's own logs are the other half: the plan phase's log shows what `init` and
+`plan` could not do, and comparing it with the apply phase's log on an earlier
+successful run tells you whether the value was ever present at plan time.
+
+### Resolution
+
+Decide which the value really is, and there are only three answers:
+
+- **The plan needs it too** — clear the flag. The variable then reaches both
+  phases, as it did before anyone set it.
+- **The plan needs a *weaker* value** — declare the pair: keep the ordinary row
+  with the value a plan may hold, and add a second row with the same `key`,
+  `apply-only: true`, carrying the privileged value. The uniqueness constraint is
+  `(workspace, key, apply-only)`, so both rows coexist.
+- **Only the apply needs it** — leave the flag on and fix the configuration so
+  the plan does not require the value. Giving the `variable` a harmless
+  `default` is usually enough; note that a `data` source *is* evaluated on a
+  plan, so a value a data source needs has to reach the plan.
+
+A change to a variable takes effect on the workspace's **next run**; nothing needs
+restarting, and an in-flight run keeps the values it was dispatched with.
+
+### Verification
+
+Queue a plan-only run. It reaching `planned` means the plan has everything it
+needs. Then confirm an apply on a non-production workspace, because a pair is the
+one case where a passing plan says nothing about the apply.
+
+---
+
+## Which ServiceAccount did a Job actually use?
+
+Worth answering directly whenever a phase fails to authenticate to your cloud,
+or after configuring
+[`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase)
+and wanting to see that it took effect. The apply phase uses that account when it
+is configured; every other Job uses `runners.serviceAccount`.
+
+### Diagnosis
+
+Every runner Job carries `app.kubernetes.io/component=runner` plus
+`terrapod.io/run-id` and `terrapod.io/phase` labels, so ask Kubernetes directly
+in the runner namespace:
+
+```sh
+kubectl -n <runner-ns> get jobs -l app.kubernetes.io/component=runner \
+  -o custom-columns='JOB:.metadata.name,SA:.spec.template.spec.serviceAccountName,AUTOMOUNT:.spec.template.spec.automountServiceAccountToken'
+```
+
+A Job is named `tprun-<run-short-id>-<phase>`, so the phase is in the first
+column without having to read a label. Narrow to one run with
+`-l terrapod.io/run-id=<run-uuid>`. A Job whose TTL has
+expired is gone, so do this while the run is recent — or set the workspace's
+[debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod) if you need to
+inspect a failed phase's pod rather than its Job.
+
+Reading the result:
+
+- **`SA` is the answer** — the account that phase's pod actually ran as. Under
+  the Helm chart it always resolves to something: the apply account when one is
+  configured, otherwise `runners.serviceAccount`, which itself falls back to the
+  literal `default` when `create: false` and no `name` is given.
+- **A name that does not exist is not visible here**, because the pod never
+  starts. `kubectl -n <runner-ns> describe job <job>` reports
+  `error looking up service account <ns>/<name>` instead, which is the symptom of
+  `runners.applyServiceAccount.name` pointing at an account nothing created.
+- **`AUTOMOUNT`** tracks the account in the `SA` column rather than the base one,
+  so it cannot disagree with it.
+- **An account with no cloud annotations** looks completely healthy in this
+  output: the Job runs, the pod starts, and the phase simply has no cloud
+  identity. That shows up as an authorization error from your cloud, not here —
+  check the annotations with `kubectl -n <runner-ns> describe sa <name>`.
+
+Then check what the chart rendered, which is the other place the answer can be
+wrong:
+
+```sh
+helm get manifest <release> -n <ns> | grep -A2 'apply_service_account_name'
+kubectl -n <runner-ns> get sa -o name
+```
+
+`apply_service_account_name` absent from the rendered runner ConfigMap means the
+feature is off — which is the default — and every phase will use
+`runners.serviceAccount`.
+
+### Resolution
+
+Set both halves. `runners.applyServiceAccount.create: true` renders the account;
+its `annotations` are what give it a cloud identity, and an account without them
+is a differently-named account with no cloud role — which breaks the apply rather
+than narrowing the plan. With `create: false` and a `name`, the account must
+already exist in the runner namespace. See [Cloud Credentials → Apply-phase
+ServiceAccount](cloud-credentials.md#apply-phase-serviceaccount).
+
+### Verification
+
+Queue an apply on a non-production workspace and re-run the `kubectl get jobs`
+command above: the apply Job should name the apply account and the plan Job the
+base one. A cloud API call that then fails with an authorization error is a role
+or trust-policy problem rather than a Terrapod one — the troubleshooting table in
+[Cloud Credentials](cloud-credentials.md#troubleshooting-top-failure-modes) covers
+the usual causes.
+
+---
+
 ## A variable set is applying to workspaces I did not expect
 
 A variable set with an **assignment rule** selects workspaces by their

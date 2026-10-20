@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Reed frum OpenBao/Vault",
       "vaultHint": "Terrapod reedz da sekrit frum OpenBao (or HashiCorp Vault, u pick) at run tiem. Nuffin iz kept heer.",
       "categoryNative": "Naytiv",
-      "structured": "Strukchurd"
+      "structured": "Strukchurd",
+      "applyOnly": "apply onlee",
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Naytiv",
       "structured": "Strukchurd",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumiz confg"
+      "categoryPulumiConfig": "Pulumiz confg",
+      "applyOnly": "apply onlee",
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
     },
     "runs": {
       "options": "Opshunz",

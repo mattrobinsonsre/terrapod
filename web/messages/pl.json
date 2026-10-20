@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Odczytaj z OpenBao/Vault",
       "vaultHint": "Terrapod odczytuje sekret z OpenBao (lub HashiCorp Vault) podczas uruchomienia. Nic nie jest tu przechowywane.",
       "categoryNative": "Natywna",
-      "structured": "Strukturalna"
+      "structured": "Strukturalna",
+      "applyOnly": "Tylko apply",
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Natywna",
       "structured": "Strukturalna",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Konfiguracja Pulumi"
+      "categoryPulumiConfig": "Konfiguracja Pulumi",
+      "applyOnly": "Tylko apply",
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
     },
     "runs": {
       "options": "Opcje",

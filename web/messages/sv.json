@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Läs från OpenBao/Vault",
       "vaultHint": "Terrapod läser hemligheten från OpenBao (eller HashiCorp Vault) vid körning. Inget lagras här.",
       "categoryNative": "Nativ",
-      "structured": "Strukturerad"
+      "structured": "Strukturerad",
+      "applyOnly": "Endast apply",
+      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Nativ",
       "structured": "Strukturerad",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi-konfiguration"
+      "categoryPulumiConfig": "Pulumi-konfiguration",
+      "applyOnly": "Endast apply",
+      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö."
     },
     "runs": {
       "options": "Alternativ",

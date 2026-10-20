@@ -880,6 +880,12 @@ async def _sensitive_literals(db: AsyncSession, run: Run) -> list[str]:
     try:
         from terrapod.services.variable_service import resolve_variables
 
+        # Deliberately PHASE-BLIND (#2189). This builds the list of literals
+        # to scrub from the model prompt, so it wants every sensitive value
+        # that could appear -- including an apply-only one, which must still be
+        # redacted if it ever reaches a log. Passing a phase here would narrow
+        # the list and make redaction WEAKER, which no behavioural test would
+        # notice; `test_redaction_stays_phase_blind` exists to stop that.
         resolved = await resolve_variables(db, run.workspace_id)
     except Exception as exc:  # noqa: BLE001 - see the docstring
         logger.warning(

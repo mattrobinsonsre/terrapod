@@ -1024,7 +1024,9 @@
       "valueSourceVault": "From OpenBao/Vault, read",
       "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is.",
       "categoryNative": "Native it is",
-      "structured": "Structured"
+      "structured": "Structured",
+      "applyOnly": "Apply only, it is",
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Native it is",
       "structured": "Structured",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Config, Pulumi"
+      "categoryPulumiConfig": "Config, Pulumi",
+      "applyOnly": "Apply only, it is",
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
     },
     "runs": {
       "options": "Options",

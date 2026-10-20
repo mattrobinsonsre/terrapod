@@ -1024,7 +1024,9 @@
       "valueSourceVault": "從 OpenBao/Vault 讀取",
       "vaultHint": "Terrapod 於執行時從 OpenBao（或 HashiCorp Vault）讀取密鑰，此處不會儲存任何內容。",
       "categoryNative": "原生",
-      "structured": "結構化"
+      "structured": "結構化",
+      "applyOnly": "僅 apply",
+      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。"
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "原生",
       "structured": "結構化",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi 配置"
+      "categoryPulumiConfig": "Pulumi 配置",
+      "applyOnly": "僅 apply",
+      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。"
     },
     "runs": {
       "options": "選項",

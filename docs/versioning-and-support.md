@@ -161,6 +161,18 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   build time and again against the published digest, and a gate asserts the
   startup-probe requirement never exceeds what those builds check — otherwise an
   image of ours could pass its build and fail its own probe.
+- **chart ↔ listener:** the chart renders the runner ConfigMap and the listener
+  reads it, and `RunnerConfig` **ignores keys it does not recognise** — so a
+  runner-Job setting introduced in release `N` is inert on a listener image from
+  an earlier one, silently rather than with an error. An ordinary `helm upgrade`
+  moves them together (the listener Deployment carries a `checksum/runner-config`
+  annotation, so a ConfigMap change rolls it), which is why this is reachable
+  only where `listener.image.tag` is pinned behind the chart. The current example
+  is [`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase):
+  an older listener runs the apply phase on `runners.serviceAccount`, so a
+  deployment that believes its plans are on a narrower cloud role is not getting
+  the split. **Unpin, or upgrade listeners with the chart, before relying on a
+  new runner-Job setting.**
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 

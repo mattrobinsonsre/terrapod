@@ -1024,7 +1024,9 @@
       "valueSourceVault": "Читати з OpenBao/Vault",
       "vaultHint": "Terrapod читає секрет з OpenBao (або HashiCorp Vault) під час запуску. Тут нічого не зберігається.",
       "categoryNative": "Нативна",
-      "structured": "Структурована"
+      "structured": "Структурована",
+      "applyOnly": "Лише apply",
+      "applyOnlyHint": "Не передається в plan і доставляється лише в apply. plan виконує код конфігурації, тому дані для входу, потрібні лише apply, не повинні бути в середовищі plan."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "Нативна",
       "structured": "Структурована",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Конфігурація Pulumi"
+      "categoryPulumiConfig": "Конфігурація Pulumi",
+      "applyOnly": "Лише apply",
+      "applyOnlyHint": "Не передається в plan і доставляється лише в apply. plan виконує код конфігурації, тому дані для входу, потрібні лише apply, не повинні бути в середовищі plan."
     },
     "runs": {
       "options": "Опції",

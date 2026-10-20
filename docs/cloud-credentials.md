@@ -121,7 +121,7 @@ Runner Jobs use a separate ServiceAccount for Terraform workload permissions:
 | Priority | Source | Configured Via |
 |---|---|---|
 | 1 | **The workspace's own federated identity** | the resolved `oidc-audiences` map (deployment catalogue + workspace override) + your own provider block — see [per-workspace cloud identity](cloud-identity.md) |
-| 2 | **Global runner SA** | `runners.serviceAccount.name` in Helm values |
+| 2 | **The runner SA** | `runners.serviceAccount.name` in Helm values — and, on **apply** Jobs only, `runners.applyServiceAccount.name` instead when that is configured (off by default; see [Apply-phase ServiceAccount](#apply-phase-serviceaccount)) |
 | 3 | **K8s default SA** | Implicit namespace default |
 
 ```yaml
@@ -154,6 +154,58 @@ For multi-cloud or multi-account setups, deploy separate listener Deployments (a
 > keeps the pool's ServiceAccount in every case, and Terrapod sets no cloud
 > credential environment variable at all, so an IRSA-annotated pool and a
 > federated workspace coexist by **absence** rather than by precedence.
+
+### Apply-phase ServiceAccount
+
+Terrapod runs a run's `plan` and its `apply` as **separate Kubernetes Jobs**, and
+an operator may give the apply phase its own ServiceAccount:
+
+```yaml
+runners:
+  serviceAccount:            # used by plan Jobs, and by apply Jobs if the below is unset
+    create: true
+    name: "terrapod-runner-plan"
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-plan"
+
+  applyServiceAccount:       # OPTIONAL -- apply Jobs only
+    create: true
+    name: "terrapod-runner-apply"
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-apply"
+```
+
+Because a ServiceAccount is how a pod becomes a cloud principal, two accounts
+means the two phases can federate to **two different cloud roles** — a read-only
+one for plans and a writing one for applies. That is worth having because a
+speculative plan on a pull request executes code nobody has reviewed yet; see
+[Security Hardening → Give the plan phase a narrower identity than the
+apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply)
+for the threat and its limits, and [Cloud Identity → A separate ServiceAccount
+for the apply
+phase](cloud-identity.md#a-separate-serviceaccount-for-the-apply-phase) for a
+worked example per cloud.
+
+Three things follow from it being an ordinary ServiceAccount:
+
+- **The annotations are the whole point.** An apply account with no annotations is
+  a differently-named account with no cloud identity, which does not narrow the
+  plan — it breaks the apply. Annotate it the same way as
+  `runners.serviceAccount`, with the apply role.
+- **It changes nothing about credential *delivery*.** Terrapod sets no cloud
+  credential environment variable on a runner Job either way, so each phase picks
+  up whatever its own account federates to, through the cloud's own admission
+  webhook. Per-workspace cloud identity keeps working unchanged alongside it: a
+  federated workspace still gets its token files, and the account underneath is
+  the fall-through for every provider configuration that does not name one.
+- **It is off by default and renders nothing when unset.** With
+  `runners.applyServiceAccount` left at `create: false` / `name: ""` there is no
+  second account and no extra runner-config key, and every phase uses
+  `runners.serviceAccount` exactly as before.
+
+Both accounts are created only when `listener.enabled: true`, like the single
+account above. `runners.azureWorkloadIdentity` adds Azure's required pod label to
+every runner Job, so it covers both.
 
 ---
 
@@ -1020,7 +1072,11 @@ now three ways to get there, and the first is usually the right one:
    This is the direct answer to the ask, and it did not exist before.
 2. **Workload identity on the runner SA** (IRSA/WIF/WI), documented above. Still
    the right answer for everything that does not need per-workspace separation,
-   and still what a workspace falls through to when it names no audiences.
+   and still what a workspace falls through to when it names no audiences. Note
+   that this one separates **by phase** too if you want it to, with
+   [`runners.applyServiceAccount`](#apply-phase-serviceaccount) — a narrower role
+   for plans and a writing one for applies, without the issuer and without a
+   publicly reachable path.
 3. **A credential the run fetches itself**, via an [execution
    hook](execution-hooks.md) whose script reads the secret and exports it into
    the run environment, associated with the workspaces that need it. Reach for

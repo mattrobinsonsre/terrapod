@@ -1024,7 +1024,9 @@
       "valueSourceVault": "خواندن از OpenBao/Vault",
       "vaultHint": "Terrapod راز را هنگام اجرا از OpenBao (یا HashiCorp Vault) می‌خواند. چیزی اینجا ذخیره نمی‌شود.",
       "categoryNative": "بومی",
-      "structured": "ساختاریافته"
+      "structured": "ساختاریافته",
+      "applyOnly": "فقط apply",
+      "applyOnlyHint": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود. plan کد پیکربندی را اجرا می‌کند، بنابراین اعتبارنامه‌ای که تنها apply به آن نیاز دارد نباید در محیط plan باشد."
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "بومی",
       "structured": "ساختاریافته",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "پیکربندی Pulumi"
+      "categoryPulumiConfig": "پیکربندی Pulumi",
+      "applyOnly": "فقط apply",
+      "applyOnlyHint": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود. plan کد پیکربندی را اجرا می‌کند، بنابراین اعتبارنامه‌ای که تنها apply به آن نیاز دارد نباید در محیط plan باشد."
     },
     "runs": {
       "options": "گزینه‌ها",

@@ -46,6 +46,10 @@ SCENARIOS: dict[str, dict] = {
     },
     "refresh-options": {"phase": "plan", "refresh_only": True, "refresh": False},
     "allow-empty-apply": {"phase": "apply", "allow_empty_apply": True},
+    # #2189. The PLAN one is the property worth pinning: with an apply account
+    # configured, a plan must still run on `runners.serviceAccount`.
+    "apply-sa-on-apply": {"phase": "apply", "apply_service_account_name": "terrapod-runner-apply"},
+    "apply-sa-on-plan": {"phase": "plan", "apply_service_account_name": "terrapod-runner-apply"},
     "terragrunt": {
         "phase": "plan",
         "terragrunt_enabled": True,
@@ -173,6 +177,11 @@ def _cfg():
     """
     cfg = _runner_config()
     cfg.service_account_name = "terrapod-runner"
+    # Off, which is the default. The shared mock leaves it unset, so it arrives as
+    # a TRUTHY MagicMock and fires the apply-phase branch -- which silently moved
+    # every apply scenario's serviceAccountName to a mock repr (#2189). The two
+    # `apply-sa-*` scenarios below pin the feature ON.
+    cfg.apply_service_account_name = ""
     cfg.termination_grace_period_seconds = 120
     cfg.extra_env_from = []
     # The shared mock leaves this False, and the CA block is gated on
@@ -200,9 +209,14 @@ def _render(name: str) -> dict:
     scenario = dict(SCENARIOS[name])
     option_fields = {f.name for f in dataclasses.fields(TerraformRunOptions)}
     options = TerraformRunOptions(**{k: v for k, v in scenario.items() if k in option_fields})
+    cfg = _cfg()
+    # A scenario may set this one config attribute, because the feature it gates
+    # lives in the config rather than in the run options (#2189).
+    if "apply_service_account_name" in scenario:
+        cfg.apply_service_account_name = scenario.pop("apply_service_account_name")
     neutral = dict(BASE)
     neutral.update({k: v for k, v in scenario.items() if k not in option_fields})
-    return TerraformStrategy().build_job_spec(options=options, runner_config=_cfg(), **neutral)
+    return TerraformStrategy().build_job_spec(options=options, runner_config=cfg, **neutral)
 
 
 def _render_all() -> dict[str, dict]:

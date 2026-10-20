@@ -23,6 +23,14 @@ permissions without standing up a second listener.
 > zero-configuration path**: every target needs a provider block you write
 > yourself, naming a role or client id Terrapod never learns.
 
+The last third of this page covers two controls that separate a run's **plan**
+from its **apply** without the issuer being involved at all — [a second
+ServiceAccount for the apply phase](#a-separate-serviceaccount-for-the-apply-phase)
+and [apply-only variables](#apply-only-variables). They live here because they
+answer the same question as the [`phase`
+claim](#the-phase-claim-and-why-write-permissions-belong-behind-it), and both are
+off until an operator asks for them. Neither needs a publicly reachable path.
+
 ---
 
 ## The problem this solves
@@ -1116,6 +1124,315 @@ accounts.
 
 ---
 
+## A separate ServiceAccount for the apply phase
+
+The `phase` claim above separates the two phases **inside a federated token**, so
+the cloud does the deciding. There is a second, independent way to separate them,
+and it works whether or not the issuer is enabled: give the **apply** phase its
+own Kubernetes ServiceAccount.
+
+```yaml
+runners:
+  serviceAccount:            # the account every phase uses, as before
+    create: true
+    name: "terrapod-runner-plan"
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-plan
+
+  applyServiceAccount:       # OPTIONAL -- used by the apply phase only
+    create: true
+    name: "terrapod-runner-apply"
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-apply
+```
+
+`runners.applyServiceAccount` defaults to `create: false` and `name: ""`, and
+**that default renders nothing**: no second ServiceAccount in the namespace, and
+no `apply_service_account_name` key in the runner ConfigMap. A deployment that
+ignores this keeps one account for every phase, exactly as before.
+
+It is an ordinary Kubernetes ServiceAccount, so the cloud identity it carries is
+the one **you** annotate onto it — the same IRSA / Workload Identity annotations
+described in
+[Cloud Credentials](cloud-credentials.md#runner-serviceaccount). Terrapod sets no
+cloud credential environment of its own on a runner Job, so each phase simply
+picks up whatever its own account federates to.
+
+> **Why reach for this rather than the `phase` claim?** It needs no issuer, so it
+> needs **no publicly reachable path** — none of
+> [the trade](#the-trade-network-isolation-for-fine-grained-authorization) above
+> applies. A deployment with no inbound route from the internet can still put its
+> plan phase on a narrower cloud role. The two are independent and compose: a
+> workspace can federate *and* run its apply on a different ServiceAccount.
+
+### Which phase gets which account
+
+A runner Job has exactly two phases, `plan` and `apply`, and the rule is one
+line: **the apply phase uses `runners.applyServiceAccount` when it is set, and
+every other Job uses `runners.serviceAccount`.**
+
+| Job | ServiceAccount |
+|---|---|
+| `plan` — a speculative pull-request plan, a drift-detection run, a CLI-initiated plan on an agent-mode workspace, and the plan half of an apply-capable run | `runners.serviceAccount` |
+| `apply` — including a destroy apply | `runners.applyServiceAccount` if set, otherwise `runners.serviceAccount` |
+
+**Annotate both accounts, not just the apply one.** A plan is not a dry run: it
+refreshes state and evaluates `data` sources, so the plan account still needs
+**read** on everything the configuration touches. An account with no
+cloud-identity annotations — which is what you get if you create the apply
+account and forget `runners.serviceAccount.annotations`, or point either
+`name` at an account that does not exist — has no cloud identity at all, so the
+phase using it fails rather than running narrowly. Terrapod does not check this;
+the symptom is an authorization error from your cloud provider.
+
+### Worked example — AWS IRSA
+
+Two roles in the same account, each trusting its own ServiceAccount through the
+cluster's OIDC provider. The plan role gets a read-only policy; the apply role
+gets the one that can write.
+
+```sh
+CLUSTER_OIDC=oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E
+NS=terrapod
+
+# Trust policy for the PLAN account.
+cat > plan-trust.json <<JSON
+{"Version": "2012-10-17", "Statement": [{
+  "Effect": "Allow",
+  "Principal": {"Federated": "arn:aws:iam::123456789012:oidc-provider/${CLUSTER_OIDC}"},
+  "Action": "sts:AssumeRoleWithWebIdentity",
+  "Condition": {"StringEquals": {
+    "${CLUSTER_OIDC}:sub": "system:serviceaccount:${NS}:terrapod-runner-plan",
+    "${CLUSTER_OIDC}:aud": "sts.amazonaws.com"}}}]}
+JSON
+
+aws iam create-role --role-name terrapod-plan \
+  --assume-role-policy-document file://plan-trust.json
+aws iam attach-role-policy --role-name terrapod-plan \
+  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+
+# The APPLY account's trust policy is the same document with
+# `terrapod-runner-apply` as the `:sub`, and your writing policy attached.
+```
+
+```yaml
+# values.yaml
+runners:
+  serviceAccount:
+    create: true
+    name: "terrapod-runner-plan"
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-plan
+  applyServiceAccount:
+    create: true
+    name: "terrapod-runner-apply"
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-apply
+```
+
+`ReadOnlyAccess` is a convenient starting point rather than a recommendation;
+scope the plan role to the services the configuration actually reads. Note that a
+plan account wide enough to refresh every resource in state is already a
+substantial read grant — see
+[what this does not do](#what-a-second-serviceaccount-does-not-do).
+
+### Worked example — GCP Workload Identity
+
+Two Google service accounts, each bound to one Kubernetes ServiceAccount.
+
+```sh
+PROJECT=my-project
+NS=terrapod
+
+for PAIR in "terrapod-plan:terrapod-runner-plan" "terrapod-apply:terrapod-runner-apply"; do
+  GSA=${PAIR%%:*}; KSA=${PAIR##*:}
+  gcloud iam service-accounts create "$GSA" --project "$PROJECT"
+  gcloud iam service-accounts add-iam-policy-binding \
+    "${GSA}@${PROJECT}.iam.gserviceaccount.com" \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:${PROJECT}.svc.id.goog[${NS}/${KSA}]"
+done
+
+# The plan identity reads; the apply identity writes.
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member "serviceAccount:terrapod-plan@${PROJECT}.iam.gserviceaccount.com" \
+  --role roles/viewer
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member "serviceAccount:terrapod-apply@${PROJECT}.iam.gserviceaccount.com" \
+  --role roles/editor
+```
+
+```yaml
+# values.yaml
+runners:
+  serviceAccount:
+    create: true
+    name: "terrapod-runner-plan"
+    annotations:
+      iam.gke.io/gcp-service-account: terrapod-plan@my-project.iam.gserviceaccount.com
+  applyServiceAccount:
+    create: true
+    name: "terrapod-runner-apply"
+    annotations:
+      iam.gke.io/gcp-service-account: terrapod-apply@my-project.iam.gserviceaccount.com
+```
+
+`roles/viewer` and `roles/editor` are shorthand for the shape of the split, not a
+recommendation — scope each to what the configuration actually needs.
+
+### Worked example — Azure Workload Identity
+
+Two managed identities, each with a federated credential naming one Kubernetes
+ServiceAccount. Azure also needs a pod label, which
+`runners.azureWorkloadIdentity: true` adds to every runner Job — one switch
+covering both accounts.
+
+```sh
+RG=terrapod-rg
+NS=terrapod
+AKS_ISSUER=$(az aks show -g "$RG" -n my-cluster --query oidcIssuerProfile.issuerUrl -o tsv)
+
+for PAIR in "terrapod-plan:terrapod-runner-plan" "terrapod-apply:terrapod-runner-apply"; do
+  MI=${PAIR%%:*}; KSA=${PAIR##*:}
+  az identity create -g "$RG" -n "$MI"
+  az identity federated-credential create \
+    --identity-name "$MI" -g "$RG" -n "${MI}-fc" \
+    --issuer "$AKS_ISSUER" \
+    --subject "system:serviceaccount:${NS}:${KSA}" \
+    --audience api://AzureADTokenExchange
+done
+
+# Then assign each identity its own role -- Reader on the plan identity, and
+# something that can write (Contributor, or narrower) on the apply identity.
+```
+
+```yaml
+# values.yaml
+runners:
+  azureWorkloadIdentity: true     # adds the required pod label to runner Jobs
+  serviceAccount:
+    create: true
+    name: "terrapod-runner-plan"
+    annotations:
+      azure.workload.identity/client-id: "<plan-identity-client-id>"
+  applyServiceAccount:
+    create: true
+    name: "terrapod-runner-apply"
+    annotations:
+      azure.workload.identity/client-id: "<apply-identity-client-id>"
+```
+
+### What a second ServiceAccount does not do
+
+It narrows the blast radius of a run that executes unreviewed code. It is not a
+sandbox, and the limits are worth stating plainly:
+
+- **A plan still runs arbitrary code, with real credentials.** Everything in
+  [Runner Isolation](security-hardening.md#runner-isolation) still bounds what
+  that code can reach, and the plan account's own permissions bound what it can
+  do in your cloud — which normally includes **read** across the infrastructure
+  the workspace manages, because a plan refreshes state and resolves `data`
+  sources. Reading production is not nothing.
+- **A plan still receives the workspace's variables**, except the ones marked
+  [apply-only](#apply-only-variables): `env`-category values, sensitive values,
+  OpenBao/Vault-resolved values and minted git credentials all reach it, because
+  `init` and `plan` need them.
+- **Terrapod cannot make the plan account read-only, and does not check that it
+  is.** The account carries whatever your cloud role grants it. Annotating both
+  accounts onto roles that can write is a valid configuration that buys nothing,
+  and nothing in Terrapod will say so.
+- **There is no approval step for a speculative plan.** A pull-request plan is
+  dispatched when the pull request is pushed. If what you want is for unreviewed
+  code not to run at all, the control is
+  [`allow-fork-pr-plans`](vcs-integration.md#pull-requests-from-forks), not this.
+- **A listener image that predates the value ignores it, silently.** The Job spec
+  is built by the **listener**, which reads the setting from the runner ConfigMap
+  — and that config model ignores keys it does not know, so an older listener
+  runs every phase on `runners.serviceAccount` with nothing to report. An
+  ordinary `helm upgrade` moves the chart and the listener image together, so
+  this only bites a deployment that pins `listener.image.tag` to an older
+  release. Check that `kubectl -n <runner-ns> get jobs` shows an apply Job naming
+  the apply account before relying on the split — see [the
+  runbook](runbooks.md#which-serviceaccount-did-a-job-actually-use).
+
+---
+
+## Apply-only variables
+
+A variable — on a workspace or in a variable set — carries an **`apply-only`**
+flag. An apply-only variable is **withheld from a plan and delivered only to an
+apply**. It is the variable-level counterpart to the ServiceAccount above: the
+account decides what the Job's *cloud identity* can do, and this decides which
+*values* each phase receives.
+
+```json
+{ "data": { "type": "vars",
+            "attributes": { "key": "DEPLOY_TOKEN",
+                            "category": "env",
+                            "sensitive": true,
+                            "apply-only": true } } }
+```
+
+The default is `false`, so every existing variable reaches both phases exactly as
+it did. Set it from the workspace **Variables** tab or a variable set's detail
+page (the **Apply only** checkbox), the API, `terrapod_variable` /
+`terrapod_variable_set_variable`, or the `terrapod_variable_set` MCP tool.
+
+**A different value per phase is two variables with the same key**, one of them
+flagged — not one variable with two values. That is the whole shape of the
+feature:
+
+| Key | `apply-only` | Value |
+|---|---|---|
+| `AWS_ROLE_ARN` | `false` | `arn:aws:iam::123456789012:role/read-only` |
+| `AWS_ROLE_ARN` | `true` | `arn:aws:iam::123456789012:role/deploy` |
+
+A plan gets the read-only ARN; an apply gets the deploy one. A key may therefore
+appear **twice** in one workspace, or twice in one variable set, as long as the
+two rows differ in the flag. A genuine duplicate — same key, same flag — is still
+refused with `409`.
+
+### How it interacts with precedence
+
+Variable precedence is unchanged: a **priority** variable set beats **workspace**
+variables, which beat a **non-priority** variable set. Apply-only resolves
+*within* one of those tiers and never across them:
+
+- On an apply, an apply-only row **shadows a standard row of the same key in its
+  own tier**.
+- A **priority variable set's standard row still beats a workspace apply-only
+  row.** This is deliberate and load-bearing: the other way round, anyone with
+  workspace write access could escape a platform-mandated value by declaring an
+  apply-only twin of it.
+- On a plan, apply-only rows are **excluded entirely**. A key that has *only* an
+  apply-only row is therefore **absent** from the plan — not present and empty. An
+  empty value would reach the engine as a *declared* variable, which is a
+  different thing from an undeclared one.
+
+### What apply-only is not
+
+- **It is not an encryption or secrecy setting.** `sensitive` is unchanged and
+  orthogonal: an apply-only variable is stored and audited exactly like any
+  other, and covered by the same opt-in [app-layer
+  encryption](encryption-at-rest.md) when that is enabled. One that is not
+  `sensitive` still has its value returned by the API. The flag answers *which
+  phase receives this value*, nothing else.
+- **It is not a category.** A category says what role a value plays
+  (`terraform`, `env`, `git_http_auth`, `git_ssh_auth`); the flag is independent
+  of all four, and any of them can be apply-only. Marking a `git_http_auth` or
+  `git_ssh_auth` credential apply-only withholds it from the plan's `init`, which
+  is usually not what you want — see
+  [the runbook](runbooks.md#a-plan-or-apply-fails-on-a-credential-marked-apply-only).
+
+> **One upgrade note.** Create apply-only variables once the rollout has
+> finished. During a rolling upgrade a replica still on the previous version does
+> not know the flag — it writes new variables as ordinary plan-and-apply ones, and
+> when it resolves a key that has both rows it treats them as one duplicated key
+> and may hand either value to a plan. There is nothing to do beyond waiting for
+> the rollout, and nothing to undo afterwards.
+
+---
+
 ## The claim set
 
 Every token for every target carries the same claims; only `aud` differs.
@@ -1596,3 +1913,5 @@ validating a token Terrapod already minted.
 - [VCS Integration → Pull requests from forks](vcs-integration.md#pull-requests-from-forks) — the gate the `phase` claim complements but does not replace
 - [Runbooks → Rotating the OIDC issuer signing key](runbooks.md#rotating-the-oidc-issuer-signing-key)
 - [API Reference](api-reference.md#per-workspace-cloud-identity-oidc-federation) — the `oidc-audiences` attribute and the endpoints above
+- [Security Hardening → Give the plan phase a narrower identity than the apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply) — the threat the two phase-separation controls above address, and their limits
+- [Runners → Cloud Workload Identity](runners.md#cloud-workload-identity) — the Helm values for both runner ServiceAccounts

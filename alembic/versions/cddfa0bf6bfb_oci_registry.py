@@ -24,7 +24,7 @@ revision = "cddfa0bf6bfb"
 # this is "tidied" back, `alembic upgrade head` on such a database skips main's
 # OCI/package-cache work, or finds two heads.
 # tests/db/test_alembic_revision_graph.py fails if it is (#1594).
-down_revision = "3214ad466305"
+down_revision = "7a27d4747b9e"
 branch_labels = None
 depends_on = None
 

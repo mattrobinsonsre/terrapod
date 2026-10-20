@@ -180,6 +180,24 @@ resource "terrapod_variable" "region" {
   category     = "terraform"
 }
 
+# A different value per phase is TWO variables with the same `key`, one of them
+# `apply_only` — the plan gets the read-only role, the apply gets the one that
+# can write. See docs/cloud-identity.md, "Apply-only variables".
+resource "terrapod_variable" "role_arn_plan" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "AWS_ROLE_ARN"
+  category     = "env"
+  value        = "arn:aws:iam::123456789012:role/read-only"
+}
+
+resource "terrapod_variable" "role_arn_apply" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "AWS_ROLE_ARN"
+  category     = "env"
+  value        = "arn:aws:iam::123456789012:role/deploy"
+  apply_only   = true
+}
+
 # An OpenBao/Vault-sourced credential delivered as a file (see docs/vault.md). The
 # secret never reaches Terrapod's database, the Job spec or the environment:
 # the run sees GOOGLE_APPLICATION_CREDENTIALS=/var/run/terrapod/files/gcp/adc.json
@@ -273,6 +291,33 @@ time** whenever a workspace holds a non-empty value for one of these attributes
 that your configuration does not declare. If you meant to clear it, set `= []`;
 if the value is managed outside Terraform, declare the attribute explicitly to
 silence the warning.
+
+## `apply_only` on the two variable resources
+
+`terrapod_variable` and `terrapod_variable_set_variable` both carry an
+**`apply_only`** boolean: set it and the variable is withheld from a plan and
+delivered only to an apply, so a credential only the apply needs is not in the
+environment of a plan — which executes the configuration's code, including a
+pull request's.
+
+It is `Optional + Computed` with a default of `false`, so a configuration that
+does not mention it plans clean and nothing drifts. Because a *different value
+per phase* is two variables rather than one, declare the pair explicitly, as in
+the example above; the server's uniqueness constraint is
+`(workspace, key, apply_only)` (and `(varset, key, apply_only)`), so the two
+resources coexist and a true duplicate is refused with `409`.
+
+Two things to know before reaching for it:
+
+- **A plan is not a dry run**, so a plan still runs the configuration's code and
+  still needs read. The flag narrows what a plan holds; it does not sandbox it.
+  See [Security Hardening → Give the plan phase a narrower identity than the
+  apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply).
+- **Shadowing is within a precedence tier, never across the chain.** An
+  apply-only row beats a standard row of the same key in the *same* tier; a
+  priority variable set's standard row still beats a workspace apply-only row.
+  Full semantics: [Cloud Identity → Apply-only
+  variables](cloud-identity.md#apply-only-variables).
 
 ## Reserved-name note
 

@@ -1024,7 +1024,9 @@
       "valueSourceVault": "OpenBao/Vault から読み取る",
       "vaultHint": "Terrapod は実行時に OpenBao（または HashiCorp Vault）からシークレットを読み取ります。ここには保存されません。",
       "categoryNative": "ネイティブ",
-      "structured": "構造化"
+      "structured": "構造化",
+      "applyOnly": "apply のみ",
+      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。"
     }
   },
   "adminAutodiscovery": {
@@ -2780,7 +2782,9 @@
       "categoryNative": "ネイティブ",
       "structured": "構造化",
       "categoryTerraform": "Terraform",
-      "categoryPulumiConfig": "Pulumi 設定"
+      "categoryPulumiConfig": "Pulumi 設定",
+      "applyOnly": "apply のみ",
+      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。"
     },
     "runs": {
       "options": "オプション",

@@ -477,6 +477,9 @@
           "minimum": 0,
           "maximum": 14400,
           "description": "Seconds a failed runner pod is held open for exec when its workspace has debug mode on. 0 disables debug mode deployment-wide."
+        },
+        "applyServiceAccount": {
+          "$ref": "#/$defs/serviceAccountSpec"
         }
       }
     },
@@ -1827,7 +1830,10 @@
                 },
                 "subject_format": {
                   "type": "string",
-                  "enum": ["name-and-id", "name"]
+                  "enum": [
+                    "name-and-id",
+                    "name"
+                  ]
                 },
                 "require_phase": {
                   "type": "boolean"

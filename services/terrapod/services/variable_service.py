@@ -142,6 +142,7 @@ async def create_variable(
     description: str = "",
     structured: bool = False,
     sensitive: bool = False,
+    apply_only: bool = False,
     value_source: str = "static",
 ) -> Variable:
     """Create a workspace variable."""
@@ -159,6 +160,7 @@ async def create_variable(
         category=category,
         structured=structured,
         sensitive=sensitive,
+        apply_only=apply_only,
         value_source=value_source,
         version_id=_version_hash(key, value, category),
     )
@@ -176,6 +178,7 @@ async def update_variable(
     description: str | None = None,
     structured: bool | None = None,
     sensitive: bool | None = None,
+    apply_only: bool | None = None,
     value_source: str | None = None,
 ) -> Variable:
     """Update an existing variable."""
@@ -189,6 +192,9 @@ async def update_variable(
         var.category = _validated_category(category)
     if structured is not None:
         var.structured = structured
+
+    if apply_only is not None:
+        var.apply_only = apply_only
 
     was_sensitive = var.sensitive
 
@@ -246,7 +252,9 @@ async def delete_variable(db: AsyncSession, var: Variable) -> None:
     await db.flush()
 
 
-async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[ResolvedVariable]:
+async def resolve_variables(
+    db: AsyncSession, workspace_id: uuid.UUID, phase: str | None = None
+) -> list[ResolvedVariable]:
     """Resolve all variables for a workspace with proper precedence.
 
     Precedence (highest wins):
@@ -255,53 +263,89 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     3. Non-priority variable set vars
 
     Precedence applies within a `(category, key)`, never across categories
-    (#1898). Keying on `key` alone made a workspace `terraform:region` *remove* a
+    (#1898). Keying on `key` alone made a workspace `native:region` *remove* a
     variable-set `env:region` from the run -- not deprioritise it, remove it,
     because the later layer overwrote the entry whatever its category. Two
     variables that mean different things are two variables, and both are
     delivered.
 
+    `phase` selects which variables a run of that phase receives (#2189):
+
+    * ``"apply"`` — every variable, with an **apply-only** row shadowing a
+      standard row of the same `(category, key)` *within its own tier*.
+    * ``"plan"`` (or any other phase) — apply-only rows are excluded entirely.
+    * ``None`` — every row, **including both halves of a standard/apply-only
+      pair**, because the key carries `apply_only` too. Not "no filter":
+      without that the keyed dict would collapse such a pair to one value,
+      which is wrong for the only caller that passes nothing. Precedence
+      between tiers still applies, and should — a shadowed value is not
+      delivered to the run, so it cannot appear in output to redact.
+
+    **Apply-only resolves WITHIN a tier, never as a pass over the whole chain.**
+    A pass would let a *workspace* apply-only row beat a *priority variable
+    set's* standard row, so a workspace owner could escape a platform-mandated
+    value on applies — inverting the authority order priority sets exist to
+    establish, on the apply. Within-tier keeps it: a priority set's standard row
+    still beats a workspace apply-only row.
+
+    **Why ``None`` returns everything uncollapsed.** Its caller is prompt
+    redaction (`summariser._sensitive_literals`), which wants every sensitive
+    literal that could appear so it can scrub them — not a resolved set. Keying
+    on the pair there means a duplicate contributes BOTH values, so neither
+    secret escapes redaction. Narrowing that call to a phase, or letting it
+    collapse, would make redaction weaker; a gate asserts it stays phase-blind.
+
     Returns values ready for runner injection.
     """
-    resolved: dict[tuple[str, str], ResolvedVariable] = {}
+    # Keyed on `(category, key)` when resolving for a phase, so precedence
+    # applies within a category and never across one (#1898); extended with
+    # `apply_only` when no phase was asked for, so nothing is discarded (#2189).
+    # The two dimensions are independent: category separates an input variable
+    # from an environment variable of the same name, apply_only separates the
+    # plan's copy from the apply's.
+    resolved: dict[object, ResolvedVariable] = {}
+    include_apply_only = phase is None or phase == "apply"
 
-    # Layer 1: Non-priority variable sets (global + assigned)
-    varsets = await _get_applicable_varsets(db, workspace_id, priority=False)
-    for vs in varsets:
-        for vsv in vs.variables:
-            resolved[(vsv.category, vsv.key)] = ResolvedVariable(
-                key=vsv.key,
-                value=vsv.value,
-                category=vsv.category,
-                structured=vsv.structured,
-                sensitive=vsv.sensitive,
-                value_source=vsv.value_source,
-            )
+    def _key(category: str, k: str, apply_only: bool) -> object:
+        return (category, k) if phase is not None else (category, k, apply_only)
 
-    # Layer 2: Workspace variables (override non-priority sets)
-    ws_vars = await list_variables(db, workspace_id)
-    for var in ws_vars:
-        resolved[(var.category, var.key)] = ResolvedVariable(
-            key=var.key,
-            value=var.value,
-            category=var.category,
-            structured=var.structured,
-            sensitive=var.sensitive,
-            value_source=var.value_source,
+    def _put(row) -> None:
+        if row.apply_only and not include_apply_only:
+            return
+        resolved[_key(row.category, row.key, row.apply_only)] = ResolvedVariable(
+            key=row.key,
+            value=row.value,
+            category=row.category,
+            structured=row.structured,
+            sensitive=row.sensitive,
+            value_source=row.value_source,
         )
 
+    def _tier(rows) -> None:
+        """One precedence tier. Standard rows first, then apply-only, so an
+        apply-only row shadows its standard twin inside this tier and nowhere
+        else."""
+        rows = list(rows)
+        for row in rows:
+            if not row.apply_only:
+                _put(row)
+        # Second, so an apply-only row overwrites its standard twin's entry --
+        # but only inside this tier. `_put` drops it when the phase excludes it,
+        # so no branch is needed here.
+        for row in rows:
+            if row.apply_only:
+                _put(row)
+
+    # Layer 1: Non-priority variable sets (global + assigned)
+    for vs in await _get_applicable_varsets(db, workspace_id, priority=False):
+        _tier(vs.variables)
+
+    # Layer 2: Workspace variables (override non-priority sets)
+    _tier(await list_variables(db, workspace_id))
+
     # Layer 3: Priority variable sets (override everything)
-    priority_varsets = await _get_applicable_varsets(db, workspace_id, priority=True)
-    for vs in priority_varsets:
-        for vsv in vs.variables:
-            resolved[(vsv.category, vsv.key)] = ResolvedVariable(
-                key=vsv.key,
-                value=vsv.value,
-                category=vsv.category,
-                structured=vsv.structured,
-                sensitive=vsv.sensitive,
-                value_source=vsv.value_source,
-            )
+    for vs in await _get_applicable_varsets(db, workspace_id, priority=True):
+        _tier(vs.variables)
 
     return list(resolved.values())
 
