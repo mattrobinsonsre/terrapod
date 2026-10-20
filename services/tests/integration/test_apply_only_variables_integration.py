@@ -172,6 +172,130 @@ class TestTheConstraintPermitsThePairAndNothingMore:
         assert dup.status_code == 409, "the set's own constraint must refuse a true duplicate"
 
 
+class TestTheConflictAnEditCanCreate:
+    """Clearing the flag can collide with a twin it coexisted with a moment ago.
+
+    This is the failure mode the feature introduces, and the one an operator
+    cannot diagnose unaided: two rows sit happily side by side, you clear the
+    apply-only checkbox on one, and the pair becomes a duplicate. The global
+    integrity net answers that with "Resource already exists or violates a
+    constraint", which names neither the key nor the reason.
+
+    So the message must name the key and say which slot is taken. These assert
+    the message, not just the status, because the status alone is what left the
+    operator stuck.
+    """
+
+    async def test_clearing_apply_only_into_a_collision_says_what_collided(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"clear-{uuid.uuid4().hex[:8]}")
+        for flag in (False, True):
+            resp = await client.post(
+                f"/api/v2/workspaces/{ws}/vars",
+                json=_var_body("ROLE", f"v-{flag}", apply_only=flag),
+                headers=AUTH,
+            )
+            assert resp.status_code == 201, resp.text
+            if flag:
+                apply_only_id = resp.json()["data"]["id"]
+
+        # The edit that creates the conflict.
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws}/vars/{apply_only_id}",
+            json={"data": {"type": "vars", "attributes": {"apply-only": False}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 409, f"expected a conflict, got {resp.status_code}: {resp.text}"
+        detail = resp.json()["detail"]
+        assert "ROLE" in detail, f"the message must name the key: {detail!r}"
+        assert "a plan+apply variable" in detail, (
+            f"the message must say which slot is taken -- the caller asked for "
+            f"plan+apply and that is the one held: {detail!r}"
+        )
+        assert "apply-only" in detail, f"the message must state the rule: {detail!r}"
+        assert "violates a constraint" not in detail, (
+            "the generic integrity net must not be what answers this"
+        )
+
+    async def test_setting_apply_only_into_a_collision_names_that_slot_instead(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"set-{uuid.uuid4().hex[:8]}")
+        ids = {}
+        for flag in (False, True):
+            resp = await client.post(
+                f"/api/v2/workspaces/{ws}/vars",
+                json=_var_body("TOKEN", f"v-{flag}", apply_only=flag),
+                headers=AUTH,
+            )
+            assert resp.status_code == 201, resp.text
+            ids[flag] = resp.json()["data"]["id"]
+
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws}/vars/{ids[False]}",
+            json={"data": {"type": "vars", "attributes": {"apply-only": True}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert "TOKEN" in detail and "an apply-only variable" in detail, (
+            f"the held slot is the apply-only one here: {detail!r}"
+        )
+
+    async def test_a_create_collision_names_the_slot_too(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"create-{uuid.uuid4().hex[:8]}")
+        first = await client.post(
+            f"/api/v2/workspaces/{ws}/vars",
+            json=_var_body("DUP", "one", apply_only=True),
+            headers=AUTH,
+        )
+        assert first.status_code == 201, first.text
+        second = await client.post(
+            f"/api/v2/workspaces/{ws}/vars",
+            json=_var_body("DUP", "two", apply_only=True),
+            headers=AUTH,
+        )
+        assert second.status_code == 409
+        detail = second.json()["detail"]
+        assert "DUP" in detail and "an apply-only variable" in detail, detail
+
+    async def test_a_variable_set_edit_conflict_says_variable_set(self, app, client):
+        set_auth(app, admin_user())
+        created = await client.post(
+            VARSET_ENDPOINT,
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {"name": f"vs-{uuid.uuid4().hex[:8]}"},
+                }
+            },
+            headers=AUTH,
+        )
+        assert created.status_code == 201, created.text
+        vs = created.json()["data"]["id"]
+        ids = {}
+        for flag in (False, True):
+            resp = await client.post(
+                f"/api/v2/varsets/{vs}/relationships/vars",
+                json=_var_body("SHARED", f"v-{flag}", apply_only=flag),
+                headers=AUTH,
+            )
+            assert resp.status_code == 201, resp.text
+            ids[flag] = resp.json()["data"]["id"]
+
+        resp = await client.patch(
+            f"/api/v2/varsets/{vs}/relationships/vars/{ids[True]}",
+            json={"data": {"type": "vars", "attributes": {"apply-only": False}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert "SHARED" in detail, detail
+        assert "variable set" in detail, (
+            f"the scope must say variable set, not workspace: {detail!r}"
+        )
+
+
 class TestResolutionAgainstRealRows:
     async def test_the_phases_get_different_values_for_one_key(self, app, client):
         set_auth(app, admin_user())
