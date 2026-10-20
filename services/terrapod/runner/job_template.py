@@ -66,6 +66,13 @@ _EE_TMPDIR = f"{_EE_SHARED_DIR}/tmp"
 _EE_COLLECTIONS_DIR = f"{_EE_SHARED_DIR}/collections"
 _EE_ROLES_DIR = f"{_EE_SHARED_DIR}/roles"
 _EE_HOME = f"{_EE_SHARED_DIR}/home"
+#: Where the orchestrator writes the run's resolved inventory for the EE to
+#: read (#1972). It MUST be on the shared volume: ansible runs in the EE, which
+#: mounts only this volume and the workspace, so an inventory written to the
+#: orchestrator's own `/tmp` is invisible to the process that has to read it.
+#: Here rather than on the workspace volume because the file is Terrapod's, not
+#: part of the operator's fetched tree.
+_EE_INVENTORY_DIR = f"{_EE_SHARED_DIR}/inventory"
 #: The group both containers reach the shared volumes through. The orchestrator
 #: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
@@ -370,6 +377,7 @@ def _add_execution_environment(
             {"name": "TP_EE_IMAGE", "value": ee_image},
             {"name": "TP_EE_COLLECTIONS_DIR", "value": _EE_COLLECTIONS_DIR},
             {"name": "TP_EE_ROLES_DIR", "value": _EE_ROLES_DIR},
+            {"name": "TP_EE_INVENTORY_DIR", "value": _EE_INVENTORY_DIR},
             {
                 "name": _EE_TOKEN_ENV,
                 "valueFrom": {
@@ -393,6 +401,7 @@ def _add_execution_environment(
                 "/bin/sh",
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
+                f"{_EE_INVENTORY_DIR} "
                 f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
             ],
             "securityContext": {

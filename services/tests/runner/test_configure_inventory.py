@@ -49,6 +49,18 @@ DOCUMENT = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _shared_inventory_dir(monkeypatch, tmp_path):
+    """Point the shared-volume directory somewhere a test can write.
+
+    The default is `/tp/inventory`, which exists only inside a runner Job -- so
+    without this every test that materialises fails `Read-only file system:
+    '/tp'`, which reads as a defect in the module rather than as the absence of
+    a Job. The one test that asserts WHERE the file goes sets this itself.
+    """
+    monkeypatch.setenv("TP_EE_INVENTORY_DIR", str(tmp_path / "tp" / "inventory"))
+
+
 @pytest.fixture
 def cfg():
     from terrapod.runner.runner_config import RunnerConfig
@@ -154,6 +166,44 @@ class TestItFailsClosed:
         assert seen["url"].endswith("/runs/run-1/artifacts/resolved-inventory")
         assert seen["headers"] == {"Authorization": "Bearer t"}
         assert path.name == configure_inventory.RENDERED_NAME
+
+    def test_it_is_written_where_the_EXECUTION_ENVIRONMENT_can_read_it(
+        self, cfg, monkeypatch, tmp_path
+    ):
+        """The one property no behavioural test of this module would catch.
+
+        ansible runs in the EE container, and the EE mounts only the shared `tp`
+        volume and the workspace -- NOT the orchestrator's `tmp`. So writing this
+        file where every other substantial runner tempfile goes puts it somewhere
+        the process that must read it cannot see, and the configure fails on a
+        missing inventory file having downloaded and rendered it perfectly.
+
+        Asserted through `TP_EE_INVENTORY_DIR`, which is what the Job sets, so
+        the test fails if the module stops honouring the Job's volume layout.
+        """
+        shared = tmp_path / "tp" / "inventory"
+        monkeypatch.setenv("TP_EE_INVENTORY_DIR", str(shared))
+
+        def fake(url, dest, **kwargs):
+            Path(dest).write_text(json.dumps(DOCUMENT))
+            return type("R", (), {"ok": True, "status": 200})()
+
+        monkeypatch.setattr(configure_inventory, "download_to_file", fake)
+        path = materialise(cfg)
+        assert path.parent == shared, path
+        assert path.is_file()
+
+    def test_the_default_matches_the_jobs_own_constant(self):
+        """Derived, not restated.
+
+        `job_template` creates the directory and passes the path; the default
+        here is only for a runner-tier test with no Job. If the two drift, a
+        real Job is unaffected and every local test silently writes somewhere
+        else -- so the comparison is against the Job builder's own constant.
+        """
+        from terrapod.runner.job_template import _EE_INVENTORY_DIR
+
+        assert configure_inventory._DEFAULT_INVENTORY_DIR == _EE_INVENTORY_DIR
 
     def test_the_rendered_file_is_not_written_into_the_fetched_tree(self, cfg, monkeypatch):
         """It goes in its own scratch directory.

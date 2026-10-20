@@ -40,11 +40,23 @@ from terrapod.services.inventory_render import render_inventory_yaml
 
 logger = structlog.get_logger(__name__)
 
-#: The name the rendered file is given. Inside the run's own scratch directory,
-#: never in the fetched tree: writing into `config_directory` would put a file
-#: ansible then reads AS INVENTORY beside the operator's own, and a directory
-#: source would pick it up as a second source of the same hosts.
+#: The name the rendered file is given.
 RENDERED_NAME = "terrapod-resolved-inventory.yml"
+
+#: Where it is written. On the volume the EE SHARES with the orchestrator, which
+#: is not a detail: ansible runs in the EE, and the EE mounts only this volume
+#: and the workspace -- so a file written to the orchestrator's own `/tmp`, which
+#: is where every other substantial runner tempfile goes, is invisible to the
+#: process that has to read it and the configure fails on a missing inventory.
+#:
+#: And not on the workspace volume either, though that is shared too. The file is
+#: Terrapod's, not part of the operator's fetched tree: inside `config_directory`
+#: ansible would read it AS A SECOND SOURCE the moment their own `-i` names a
+#: directory, which is the ordinary arrangement (`inventory = hosts.d`).
+#:
+#: `job_template` creates it and passes the path; this default matches its
+#: constant so a runner-tier test needs no Job.
+_DEFAULT_INVENTORY_DIR = "/tp/inventory"
 
 
 class InventoryUnavailable(RuntimeError):
@@ -59,17 +71,15 @@ class InventoryUnavailable(RuntimeError):
     """
 
 
-def _resolve_tmpdir() -> str | None:
-    """The configured ephemeral directory, or None for the system default.
+def inventory_dir() -> Path:
+    """The shared directory the rendered inventory is written to.
 
-    A resolved inventory for a large fleet is a substantial document and the
-    runner's `/tmp` is not guaranteed to be disk-backed, so it follows the same
-    four-line resolver every other substantial tempfile here does.
+    From `TP_EE_INVENTORY_DIR`, which the Job sets. Read from the environment
+    rather than taken as an argument, for the same reason as
+    `ansible_collections.collections_dir`: the path is a property of the Job's
+    volume layout, not of the run.
     """
-    configured = os.environ.get("TP_SCRATCH_DIR")
-    if configured and os.path.isdir(configured):
-        return configured
-    return None
+    return Path(os.environ.get("TP_EE_INVENTORY_DIR") or _DEFAULT_INVENTORY_DIR)
 
 
 def document_to_source(document: dict[str, Any]) -> str:
@@ -119,9 +129,10 @@ def materialise(cfg: RunnerConfig, *, client: Any = None) -> Path:
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/resolved-inventory"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
 
-    fd, raw_name = tempfile.mkstemp(
-        prefix="resolved-inventory-", suffix=".json", dir=_resolve_tmpdir()
-    )
+    # The raw download lands in the ORCHESTRATOR's own temp space, deliberately:
+    # only the rendered result has to be visible to the EE, and this is deleted
+    # either way.
+    fd, raw_name = tempfile.mkstemp(prefix="resolved-inventory-", suffix=".json")
     os.close(fd)
     raw = Path(raw_name)
     try:
@@ -156,7 +167,11 @@ def materialise(cfg: RunnerConfig, *, client: Any = None) -> Path:
             f"(got keys {sorted(document)[:5] if isinstance(document, dict) else type(document).__name__})"
         )
 
-    rendered = Path(tempfile.mkdtemp(prefix="inventory-", dir=_resolve_tmpdir())) / RENDERED_NAME
+    target = inventory_dir()
+    # `parents=True` because a runner-tier test has no Job to have created it,
+    # `exist_ok` because in a Job the init container already has.
+    target.mkdir(parents=True, exist_ok=True)
+    rendered = target / RENDERED_NAME
     rendered.write_text(document_to_source(document))
     logger.info(
         "resolved inventory materialised",

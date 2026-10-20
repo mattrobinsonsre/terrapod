@@ -529,6 +529,10 @@
                   "value": "/tp/roles"
                 },
                 {
+                  "name": "TP_EE_INVENTORY_DIR",
+                  "value": "/tp/inventory"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -601,7 +605,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -916,6 +920,10 @@
                   "value": "/tp/roles"
                 },
                 {
+                  "name": "TP_EE_INVENTORY_DIR",
+                  "value": "/tp/inventory"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1029,7 +1037,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -1340,6 +1348,10 @@
                   "value": "/tp/roles"
                 },
                 {
+                  "name": "TP_EE_INVENTORY_DIR",
+                  "value": "/tp/inventory"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1412,7 +1424,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -2315,6 +2327,10 @@
                   "value": "/tp/roles"
                 },
                 {
+                  "name": "TP_EE_INVENTORY_DIR",
+                  "value": "/tp/inventory"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -2387,7 +2403,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -2973,6 +2989,10 @@
                   "value": "/tp/roles"
                 },
                 {
+                  "name": "TP_EE_INVENTORY_DIR",
+                  "value": "/tp/inventory"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -3045,7 +3065,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
