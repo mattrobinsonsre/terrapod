@@ -275,6 +275,65 @@ def _redact(buf: bytes) -> bytes:
     return buf
 
 
+class StreamRedactor:
+    """Redact a byte stream chunk by chunk, holding back a possible partial secret.
+
+    One producer for the straddle logic, because the bytes now arrive from two
+    places: a child this module starts, and the execution-environment agent's
+    streamed HTTP body (#1972, #2154). A second copy of the carry/ceiling
+    reasoning is a second thing to get wrong, and it fails silently -- a secret
+    split across two chunks passes through unredacted and the log looks fine.
+
+    How much of the tail to hold back between reads: a secret can STRADDLE a
+    chunk boundary, and a per-chunk replace would miss exactly that case. So the
+    tail holds back only the longest suffix that could be the START of a secret
+    (#2145), which for ordinary output is nothing at all.
+
+    Bytes are the wrong unit for this. With `bufsize=0` a `read()` is one syscall
+    returning whatever is available, typically a single line, so holding a fixed
+    `longest - 1` bytes meant a `tofu apply` emitting one ~50-byte "Still
+    creating..." line every ten seconds went quiet for nearly three minutes --
+    the log someone watches to find where a slow apply is stuck. An earlier fix
+    cut at the last newline instead, but only while no registered secret
+    contained one, so registering a multi-line secret (an SSH machine credential,
+    #1933) reverted the whole run to the byte bound: measured, nothing emitted at
+    all for two minutes. Matching on prefixes needs no newline assumption, so
+    that condition is gone rather than widened.
+
+    `ceiling` remains as the scan window and the bound on the carry, so one line
+    far longer than any secret cannot grow it without limit. With no secrets
+    registered -- every run on a deployment not using per-workspace cloud
+    identity -- `feed` returns its chunk unexamined.
+    """
+
+    def __init__(self) -> None:
+        self._carry = b""
+
+    def feed(self, chunk: bytes) -> bytes:
+        """The bytes safe to emit now, holding back a possible secret prefix."""
+        if not _SECRETS:
+            return chunk
+        buf = _redact(self._carry + chunk)
+        # Read live, per chunk, rather than snapshotted once: `_redact` above
+        # reads `_SECRETS` live, so a snapshot here could redact a secret whose
+        # PREFIX the split does not know to hold -- a straddle hole for exactly
+        # that secret. Two reads of the same state or neither; a tuple and a max
+        # over at most a handful of values is nothing against a 4 KB read.
+        secrets = tuple(_SECRETS)
+        send, self._carry = _split_tail(buf, secrets=secrets, ceiling=_scan_ceiling(secrets))
+        return send
+
+    def flush(self) -> bytes:
+        """The held-back tail.
+
+        Emitted as-is and NOT re-redacted: the carry is only ever a slice of
+        `_redact(carry + chunk)`, so every byte in it has already been through
+        the redactor.
+        """
+        tail, self._carry = self._carry, b""
+        return tail
+
+
 def run(
     argv: list[str],
     *,
@@ -349,61 +408,27 @@ def run(
                 except (BrokenPipeError, OSError):
                     pass
 
-        # How much of the tail to hold back between reads. A secret can STRADDLE a
-        # chunk boundary, and a per-chunk replace would miss exactly that case --
-        # silently, and look like it worked.
-        #
-        # So the tail holds back only the longest suffix that could be the START
-        # of a secret (#2145), which for ordinary output is nothing at all. Bytes
-        # are the wrong unit for this: with `bufsize=0` a `read()` is one syscall
-        # returning whatever is available, typically a single line, so holding a
-        # fixed `longest - 1` bytes meant a `tofu apply` emitting one ~50-byte
-        # "Still creating..." line every ten seconds went quiet for nearly three
-        # minutes -- the log someone watches to find where a slow apply is stuck.
-        #
-        # An earlier fix cut at the last newline instead, but only while no
-        # registered secret contained one, so registering a multi-line secret (an
-        # SSH machine credential, #1933) reverted the whole run to the byte bound:
-        # measured, nothing emitted at all for two minutes. Matching on prefixes
-        # needs no newline assumption, so that condition is gone rather than
-        # widened.
-        #
-        # `ceiling` remains as the scan window and the bound on the carry, so one
-        # line far longer than any secret cannot grow it without limit. With no
-        # secrets registered -- every run on a deployment not using per-workspace
-        # cloud identity -- the loop below skips all of this and emits the bytes
-        # unexamined.
-        carry = b""
+        # Straddle handling lives in `StreamRedactor` -- one producer, because the
+        # execution-environment agent's streamed body goes through the same logic
+        # (#1972). Its docstring carries the reasoning and the two measurements
+        # that shaped it.
+        redactor = StreamRedactor()
 
         # Read child output a chunk at a time. Larger chunks reduce
         # syscall overhead vs. readline().
         while True:
+            # Larger chunks reduce syscall overhead against readline().
             chunk = proc.stdout.read(4096)
             if not chunk:
                 break
-            if not _SECRETS:
-                _emit(chunk)
-                continue
-            buf = _redact(carry + chunk)
-            # Read live, per chunk, rather than snapshotted before the loop:
-            # `_redact` above reads `_SECRETS` live, so a snapshot here could
-            # redact a secret whose PREFIX the split does not know to hold --
-            # which is a straddle hole for exactly that secret. Two reads of the
-            # same state or neither; a tuple and a max over at most a handful of
-            # values is nothing against a 4 KB read.
-            secrets = tuple(_SECRETS)
-            send, carry = _split_tail(buf, secrets=secrets, ceiling=_scan_ceiling(secrets))
+            send = redactor.feed(chunk)
             if send:
                 _emit(send)
-        if carry:
-            # Emitted as-is, and NOT re-redacted: `carry` is only ever a slice of
-            # `_redact(carry + chunk)`, so every byte in it has already been
-            # through the redactor and a second pass provably cannot find
-            # anything. A `_redact` here would be a guard whose only evidence of
-            # working is this comment -- which is the shape worth deleting. What
-            # IS load-bearing is the flush itself: without it the held-back tail
-            # is dropped and the end of the log disappears.
-            _emit(carry)
+        if tail := redactor.flush():
+            # The flush is load-bearing: without it the held-back tail is
+            # dropped and the end of the log disappears. It is deliberately not
+            # re-redacted -- see `StreamRedactor.flush`.
+            _emit(tail)
     finally:
         if log_fh is not None:
             log_fh.close()
