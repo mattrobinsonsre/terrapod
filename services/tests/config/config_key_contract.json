@@ -1,5 +1,6 @@
 [
   "[runners.yaml] affinity",
+  "[runners.yaml] apply_service_account_name",
   "[runners.yaml] azure_workload_identity",
   "[runners.yaml] ca_bundle_enabled",
   "[runners.yaml] ca_bundle_source_path",

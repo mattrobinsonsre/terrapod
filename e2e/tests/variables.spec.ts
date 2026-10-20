@@ -663,11 +663,19 @@ test.describe('Apply-only variables (#2189)', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
 
     // The refusal, next to the control that caused it.
-    const alert = page.getByRole('alert')
-    await expect(alert).toBeVisible({ timeout: 10_000 })
-    await expect(alert).toContainText(key)
-    await expect(alert).toContainText('plan+apply')
-    await expect(alert).not.toContainText('violates a constraint')
+    //
+    // Asserted on the MESSAGE rather than on role=alert. The panel renders in
+    // both the desktop row and the mobile card, so the same error is in the DOM
+    // twice and `getByRole('alert')` is a strict-mode violation on two elements
+    // -- which is what this spec failed on first time round. The message text is
+    // unambiguous and is also the thing an operator actually reads.
+    const refusal = page
+      .getByText(/already holds a plan\+apply variable/)
+      .filter({ visible: true })
+      .first()
+    await expect(refusal).toBeVisible({ timeout: 10_000 })
+    await expect(refusal).toContainText(key)
+    await expect(refusal).not.toContainText('violates a constraint')
 
     // And nothing was saved: the row is still badged.
     await expect(page.locator(`tr:has-text("${key}")`).filter({ hasText: 'Apply only' })).toHaveCount(1)
