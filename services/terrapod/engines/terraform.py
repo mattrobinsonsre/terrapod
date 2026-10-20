@@ -59,6 +59,22 @@ class TerraformRunOptions:
     parallelism: int = 10
     #: The collections a configure installs, in `name[:version]` form (#1931).
     ansible_collections: list[str] | None = None
+    #: The Ansible config root, repo-root-relative (#1929). `""` is the
+    #: repository root; absent means this run performs no configure, which is
+    #: every plan and apply.
+    config_directory: str = ""
+    #: The playbook a configure runs. Resolved HERE rather than in the runner,
+    #: because "there is always a default and you override it" is the platform's
+    #: rule: the run's own choice where it made one, otherwise the workspace's
+    #: `default_playbook`. #1974 owns the per-run attribute, so today it is
+    #: always the workspace default -- and the resolution lives in one place so
+    #: adding the override is a one-line change rather than a new decision.
+    playbook: str = ""
+    #: `--limit`, narrowing this run the way `-target` narrows a plan. Same
+    #: run-then-workspace resolution as the playbook.
+    ansible_limit: str = ""
+    #: Ordered `-i` arguments. A list because order is PRECEDENCE in ansible.
+    inventory_paths: list[str] | None = None
     cost_estimation: bool = True
     cost_default_region: str = "us-east-1"
     working_directory: str = ""
@@ -131,6 +147,10 @@ class TerraformStrategy:
         terragrunt_enabled = options.terragrunt_enabled
         terragrunt_version = options.terragrunt_version
         plan_only = options.plan_only
+        config_directory = options.config_directory
+        playbook = options.playbook
+        ansible_limit = options.ansible_limit
+        inventory_paths = options.inventory_paths or []
         var_files = options.var_files
         target_addrs = options.target_addrs
         replace_addrs = options.replace_addrs
@@ -179,6 +199,25 @@ class TerraformStrategy:
         # the order these lines occupy).
         if ansible_collections:
             env.append({"name": "TP_ANSIBLE_COLLECTIONS", "value": json.dumps(ansible_collections)})
+        # The configure instructions, each only when it has a value, for the same
+        # reason as the line above: a terraform-only deployment's rendered Job
+        # spec stays byte-identical, which the golden spec matrix pins.
+        #
+        # The phase is what tells the runner there is a configure at all
+        # (`job_entrypoint` branches on `phase == "configure"`), NOT the presence
+        # of this variable -- so omitting it when the value is empty is safe, and
+        # an empty string and an absent variable mean the same correct thing: the
+        # configure root is the repository root. `configure.py` resolves both to
+        # the fetched tree. Do not "fix" this into a tri-state; the discriminator
+        # it would be guarding is somewhere else.
+        if config_directory:
+            env.append({"name": "TP_CONFIG_DIRECTORY", "value": config_directory})
+        if playbook:
+            env.append({"name": "TP_PLAYBOOK", "value": playbook})
+        if ansible_limit:
+            env.append({"name": "TP_ANSIBLE_LIMIT", "value": ansible_limit})
+        if inventory_paths:
+            env.append({"name": "TP_INVENTORY_PATHS", "value": json.dumps(inventory_paths)})
         if target_addrs:
             env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
         if replace_addrs:
@@ -284,6 +323,13 @@ class TerraformStrategy:
             is_destroy=attrs.get("is-destroy", False),
             parallelism=attrs.get("parallelism", 10),
             ansible_collections=attrs.get("ansible-collections", []),
+            config_directory=attrs.get("config-directory", ""),
+            # The run's own choice first, the workspace's default second. Both
+            # keys are read here so the precedence is stated once; until #1974
+            # adds the per-run attribute only the second ever has a value.
+            playbook=attrs.get("playbook") or attrs.get("default-playbook", ""),
+            ansible_limit=attrs.get("ansible-limit") or attrs.get("default-limit", ""),
+            inventory_paths=attrs.get("inventory-paths", []),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),

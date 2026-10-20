@@ -2895,6 +2895,25 @@ async def next_run(
     run_data["data"]["attributes"]["ansible-collections"] = (
         ansible_collection_arguments(ws.ansible_collections) if ws else []
     )
+    # What a configure needs to run (#1972), from the workspace's own columns
+    # (#1929). Emitted ONLY for the configure phase, and `config-directory` is
+    # what the runner keys on, so sending it on a plan or an apply would offer a
+    # configure to a run that has none -- and the runner's dispatch branches on
+    # the phase, so it would be inert noise in a Job spec the golden matrix pins.
+    #
+    # `None` and `""` differ on `config_directory`: NULL means the workspace has
+    # no configure operation at all, `""` means its Ansible root is the
+    # repository root. `or ""` would collapse them, so a workspace with no
+    # configure would claim the repository root -- hence the explicit test.
+    if phase == "configure" and ws is not None and ws.config_directory is not None:
+        attributes = run_data["data"]["attributes"]
+        attributes["config-directory"] = ws.config_directory
+        # The run's own choice would win here; #1974 owns that attribute, so
+        # today this is the workspace's default and the precedence is expressed
+        # in one place (`options_from_attrs`) rather than twice.
+        attributes["default-playbook"] = ws.default_playbook or ""
+        attributes["default-limit"] = ws.default_limit or ""
+        attributes["inventory-paths"] = list(ws.inventory_paths or [])
     run_data["data"]["attributes"]["phase"] = phase
     # Which stack a Pulumi run operates on (#1523). The engine reads this into
     # `--stack`; without it the CLI has nothing selected and every run fails with

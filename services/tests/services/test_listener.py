@@ -364,6 +364,65 @@ class TestAuthSecretNaming:
         prefix_apply = names[1].rsplit("-apply-", 1)[0]
         assert prefix_plan == prefix_apply
 
+    async def test_a_configure_gets_its_own_secret_names(self, fresh_shutdown_event):
+        """The same race, with a third phase (#1972).
+
+        A composite run is an apply Job and then a CONFIGURE Job driven by one
+        Run, so the two exist seconds apart exactly as plan and apply do. Each
+        Job's Secrets are owner-referenced to that Job, so a shared name does
+        not merely collide on create -- the surviving Secret is GC'd when the
+        earlier Job's cascade finalises, under a configure that is still using
+        it.
+
+        Asserted against BOTH earlier phases rather than just apply: a suffix
+        that happened to equal the plan phase's would be just as broken, and
+        a test comparing one pair cannot see it.
+        """
+        listener = _make_listener(fresh_shutdown_event)
+        listener._get_runner_token = AsyncMock(return_value="runtok:xyz")
+        listener._http_client = AsyncMock()
+        listener._create_auth_secret = AsyncMock(return_value="ok")
+        # Mocked because the env var below makes the launch path actually create
+        # it, and the shared mock's namespace is a MagicMock that the k8s client
+        # (pydantic since 37) refuses. Left real, the launch fails after the
+        # names are captured -- so the test would still pass, beside a broken
+        # path, which is the kind of green that teaches nothing.
+        listener._create_vars_secret = AsyncMock(return_value="ok")
+        listener.runner_config = MagicMock()
+
+        captured: dict[str, list] = {}
+
+        def fake_build(**kwargs):
+            captured.setdefault("calls", []).append(kwargs)
+            return {"kind": "Job"}
+
+        with (
+            patch("terrapod.runner.job_template.build_job_spec", side_effect=fake_build),
+            patch("terrapod.runner.job_manager.create_job", AsyncMock(return_value="job-x")),
+            patch("terrapod.runner.job_manager.get_job_uid", AsyncMock(return_value="uid-x")),
+        ):
+            run_id = "0123456789abcdef-zzzz"
+            for phase in ("plan", "apply", "configure"):
+                # One env var, because `vars_secret_name` is composed only when
+                # the run HAS variables -- without it the name is legitimately
+                # "" for every phase and the assertion below would be comparing
+                # three empty strings and passing for the wrong reason.
+                await listener._launch_run(
+                    run_id,
+                    {"phase": phase, "env-vars": [{"key": "FOO", "value": "bar"}]},
+                )
+
+        for key in ("auth_secret_name", "vars_secret_name"):
+            names = [c[key] for c in captured["calls"]]
+            assert len(set(names)) == 3, f"{key} must differ per phase, got {names}"
+            assert "configure" in names[2], names[2]
+            # Same run prefix throughout -- only the phase suffix moves.
+            prefixes = {
+                n.replace(f"-{p}-", "-", 1)
+                for n, p in zip(names, ("plan", "apply", "configure"), strict=True)
+            }
+            assert len(prefixes) == 1, prefixes
+
 
 # ── Per-run vars Secret ──────────────────────────────────────────────
 

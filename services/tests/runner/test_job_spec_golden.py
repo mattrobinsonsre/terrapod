@@ -153,6 +153,44 @@ SCENARIOS: dict[str, dict] = {
             {"key": "dbpass", "value": "s3cret", "structured": False, "sensitive": True},
         ],
     },
+    # A configure-only run (#1972). The phase is a THIRD value reaching
+    # `build_job_spec`, not a variant of apply, and the branch that reads it
+    # here is the PodFailurePolicy: a configure takes the
+    # never-retry-on-disruption path, correct for apply's own reason, since a
+    # playbook that ran may already have changed a host.
+    #
+    # It says nothing about the per-phase Secret names (`tprun-<run>-<phase>-*`):
+    # those are composed by the LISTENER and arrive as builder inputs, which
+    # `BASE` pins to a fixed string. A listener test owns that, not this golden.
+    # What it must NOT take is the apply ServiceAccount: a configure is not a
+    # terraform apply, so it keeps the pool's default identity even where the
+    # apply-SA feature is on. The `apply_service_account_name` below is what
+    # makes that an assertion rather than an accident of the fixture.
+    "configure-only": {
+        "phase": "configure",
+        "apply_service_account_name": "terrapod-runner-apply",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "config_directory": "ansible",
+        "playbook": "site.yml",
+        "ansible_limit": "webservers:!db",
+        "inventory_paths": ["hosts.d", "staging.ini"],
+    },
+    # The composite shape: one run that applies and then configures, so it
+    # carries the configure instructions while its phase is still `apply`.
+    # Pins that the two coexist -- the apply ServiceAccount AND the four
+    # TP_* configure variables in the same container. `config_directory` is
+    # deliberately empty: that is the repository-root configure, and it renders
+    # NO `TP_CONFIG_DIRECTORY` because the phase is the discriminator and the
+    # runner resolves an absent one to the tree root. This scenario is what
+    # makes that omission a pinned decision rather than a lost value.
+    "apply-then-configure": {
+        "phase": "apply",
+        "apply_service_account_name": "terrapod-runner-apply",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "config_directory": "",
+        "playbook": "site.yml",
+        "inventory_paths": ["hosts.d"],
+    },
 }
 
 #: Values held fixed so a diff can only come from the scenario or the code.
