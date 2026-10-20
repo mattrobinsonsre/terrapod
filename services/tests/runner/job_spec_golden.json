@@ -2278,10 +2278,6 @@
                   "value": "site.yml"
                 },
                 {
-                  "name": "TP_INVENTORY_PATHS",
-                  "value": "[\"hosts.d\"]"
-                },
-                {
                   "name": "TP_PARALLELISM",
                   "value": "10"
                 },
@@ -2938,10 +2934,6 @@
                 {
                   "name": "TP_ANSIBLE_LIMIT",
                   "value": "webservers:!db"
-                },
-                {
-                  "name": "TP_INVENTORY_PATHS",
-                  "value": "[\"hosts.d\", \"staging.ini\"]"
                 },
                 {
                   "name": "TP_PARALLELISM",

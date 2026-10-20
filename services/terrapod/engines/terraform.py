@@ -73,8 +73,6 @@ class TerraformRunOptions:
     #: `--limit`, narrowing this run the way `-target` narrows a plan. Same
     #: run-then-workspace resolution as the playbook.
     ansible_limit: str = ""
-    #: Ordered `-i` arguments. A list because order is PRECEDENCE in ansible.
-    inventory_paths: list[str] | None = None
     cost_estimation: bool = True
     cost_default_region: str = "us-east-1"
     working_directory: str = ""
@@ -150,7 +148,6 @@ class TerraformStrategy:
         config_directory = options.config_directory
         playbook = options.playbook
         ansible_limit = options.ansible_limit
-        inventory_paths = options.inventory_paths or []
         var_files = options.var_files
         target_addrs = options.target_addrs
         replace_addrs = options.replace_addrs
@@ -216,8 +213,6 @@ class TerraformStrategy:
             env.append({"name": "TP_PLAYBOOK", "value": playbook})
         if ansible_limit:
             env.append({"name": "TP_ANSIBLE_LIMIT", "value": ansible_limit})
-        if inventory_paths:
-            env.append({"name": "TP_INVENTORY_PATHS", "value": json.dumps(inventory_paths)})
         if target_addrs:
             env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
         if replace_addrs:
@@ -329,7 +324,6 @@ class TerraformStrategy:
             # adds the per-run attribute only the second ever has a value.
             playbook=attrs.get("playbook") or attrs.get("default-playbook", ""),
             ansible_limit=attrs.get("ansible-limit") or attrs.get("default-limit", ""),
-            inventory_paths=attrs.get("inventory-paths", []),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),

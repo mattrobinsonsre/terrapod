@@ -173,12 +173,11 @@ SCENARIOS: dict[str, dict] = {
         "config_directory": "ansible",
         "playbook": "site.yml",
         "ansible_limit": "webservers:!db",
-        "inventory_paths": ["hosts.d", "staging.ini"],
     },
     # The composite shape: one run that applies and then configures, so it
     # carries the configure instructions while its phase is still `apply`.
     # Pins that the two coexist -- the apply ServiceAccount AND the four
-    # TP_* configure variables in the same container. `config_directory` is
+    # TP_* configure instructions in the same container. `config_directory` is
     # deliberately empty: that is the repository-root configure, and it renders
     # NO `TP_CONFIG_DIRECTORY` because the phase is the discriminator and the
     # runner resolves an absent one to the tree root. This scenario is what
@@ -189,7 +188,6 @@ SCENARIOS: dict[str, dict] = {
         "ee_image": "ghcr.io/x/terrapod-ee:2.21",
         "config_directory": "",
         "playbook": "site.yml",
-        "inventory_paths": ["hosts.d"],
     },
 }
 

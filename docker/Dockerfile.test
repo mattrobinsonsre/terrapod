@@ -69,9 +69,16 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
 # Its OWN virtualenv, not the image's python: ansible-core shares jinja2, PyYAML
 # and packaging with the application, so installing it alongside would let its
 # ranges move the app's resolved versions and test something operators do not
-# run. It is how production gets it too (`services/api_ansible.py`), so this
-# also matches the real layout. Keep the version in step with
-# `api.config.default_ansible_version` in values.yaml.
+# run.
+#
+# Keep the version inside the `ansible-core` range in `services/pyproject.toml`
+# (`~2.21`), which is where the API image's own pin lives. It is NOT a Helm
+# value: `api.config.default_ansible_version` was removed in 2.0 along with the
+# machinery that created a venv on first use and pip-installed into it, so a
+# comment pointing at values.yaml or at `services/api_ansible.py` is pointing at
+# two things that no longer exist. The API now finds `ansible-inventory` on PATH
+# (`inventory_resolve._BINARY`), which is why the symlink below is what makes
+# this image match production rather than merely resemble it.
 ARG ANSIBLE_CORE_VERSION=2.21.5
 RUN python -m venv /opt/ansible \
     && /opt/ansible/bin/pip install --no-cache-dir --only-binary=:all: \

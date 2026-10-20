@@ -96,9 +96,6 @@ class RunnerConfig:
     #: `--limit`, narrowing THIS run the way `-target` narrows a plan. Empty means
     #: the whole resolved inventory.
     ansible_limit: str
-    #: Ordered `-i` arguments, relative to `config_directory`. Order is
-    #: PRECEDENCE in ansible, so this is a list and not a set (#1929).
-    inventory_paths: list[str]
     #: How many operations the engine runs at once (#1431). Set on every run
     #: by the API, so the runner never has to know an engine's own default.
     parallelism: int
@@ -194,7 +191,6 @@ class RunnerConfig:
             config_directory=e.get("TP_CONFIG_DIRECTORY", ""),
             playbook=e.get("TP_PLAYBOOK", ""),
             ansible_limit=e.get("TP_ANSIBLE_LIMIT", ""),
-            inventory_paths=_json_list("TP_INVENTORY_PATHS"),
             refresh=_bool("TP_REFRESH", default=True),
             parallelism=_int("TP_PARALLELISM", 10),
             refresh_only=_bool("TP_REFRESH_ONLY"),

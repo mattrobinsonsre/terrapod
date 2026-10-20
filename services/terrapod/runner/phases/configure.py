@@ -104,34 +104,47 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     return env
 
 
-def argv(cfg: RunnerConfig) -> list[str]:
+def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
     """`ansible-playbook`'s arguments for this run.
 
-    Built here and not inline so it can be asserted on directly: the ordering of
-    `-i` entries is PRECEDENCE in ansible, so a test that only checks membership
-    would pass on a reordering that changes which source wins.
+    Built here and not inline so it can be asserted on directly.
+
+    **Exactly ONE `-i`, and it is the run's resolved artifact** -- never the
+    workspace's `inventory_paths`. Those name the sources the API merged when it
+    resolved this run's inventory at creation (#2021), so passing them here
+    would have ansible re-read the repository's own inventory alongside the
+    merged result: the same hosts from two sources, and variable precedence
+    decided by the order they happened to be listed in rather than by what the
+    operator declared. The artifact is the answer; re-deriving it is how the
+    runner and the API come to disagree about what a configure targeted.
+
+    `--limit` IS passed, because the artifact is written unlimited -- run
+    creation calls `write_run_artifact(db, run)` with no limit, so the narrowing
+    is this run's to apply and ansible expands it through the rendered nesting.
     """
     if not cfg.playbook:
         raise ConfigureNotConfigured(
             "this run is a configure but names no playbook, and the workspace has "
             "no `default_playbook` to fall back to"
         )
-    out: list[str] = []
-    for source in cfg.inventory_paths:
-        out += ["-i", source]
+    out: list[str] = ["-i", str(inventory)]
     if cfg.ansible_limit:
         out += ["--limit", cfg.ansible_limit]
     out.append(cfg.playbook)
     return out
 
 
-def run(cfg: RunnerConfig, *, work_dir: Path, log_file: str | None = None) -> int:
+def run(cfg: RunnerConfig, *, work_dir: Path, inventory: Path, log_file: str | None = None) -> int:
     """Execute the playbook in the execution environment; return ansible's code.
 
     Args:
         cfg: the run's configuration. `config_directory`, `playbook` and
-            `inventory_paths` are the configure-specific parts.
+            and the resolved inventory are the configure-specific parts.
         work_dir: the fetched tree's root. `config_directory` is relative to it.
+        inventory: the materialised resolved inventory, from
+            `configure_inventory.materialise`. Passed in rather than fetched
+            here so the download is a separate, separately-failing step: an
+            inventory that cannot be read is not a playbook that failed.
         log_file: appended with the combined output for upload as the run log.
 
     Raises:
@@ -155,12 +168,12 @@ def run(cfg: RunnerConfig, *, work_dir: Path, log_file: str | None = None) -> in
             f"directory in the fetched tree; nothing to run a playbook from"
         )
 
-    arguments = argv(cfg)
+    arguments = argv(cfg, inventory=inventory)
     log.info(
         "configure starting",
         playbook=cfg.playbook,
         limit=cfg.ansible_limit or None,
-        inventory_sources=len(cfg.inventory_paths),
+        inventory=str(inventory),
         cwd=str(cwd),
     )
     result = ee_client.run(

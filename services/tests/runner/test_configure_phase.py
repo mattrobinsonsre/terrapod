@@ -9,12 +9,19 @@ runs, and which conditions refuse rather than returning an exit code.
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
 from terrapod.runner import ee_client
 from terrapod.runner.phases import configure
 from terrapod.runner.phases.configure import ConfigureNotConfigured
+
+#: Stands in for the materialised resolved inventory. A fixed path rather than
+#: a tmp_path fixture because every assertion below is about the ARGUMENTS, and
+#: `argv` never touches the file -- `configure_inventory` owns producing it and
+#: has its own tests.
+_INV = Path("/tmp/terrapod-resolved-inventory.yml")
 
 
 @pytest.fixture
@@ -34,7 +41,6 @@ def cfg():
         base,
         config_directory="ansible",
         playbook="site.yml",
-        inventory_paths=["inventory/production", "inventory/extra.yml"],
         ansible_limit="",
         parallelism=10,
     )
@@ -64,50 +70,50 @@ def ee(monkeypatch):
 
 
 class TestArgv:
-    def test_inventory_order_is_precedence_so_it_is_a_list(self, cfg):
-        """`-i` order decides which source wins a conflicting variable (#1929).
+    def test_there_is_exactly_one_inventory_and_it_is_the_artifact(self, cfg):
+        """One `-i`, the run's resolved artifact (#2021).
 
-        Asserted as a sequence rather than a set: a membership check passes on a
-        reordering that silently changes the merge.
+        Asserted as the WHOLE argument list, and as a count, because the defect
+        this replaces is an extra source rather than a wrong one: the API merged
+        the workspace's `inventory_paths` when it resolved this run, so passing
+        them here too would hand ansible the same hosts from two sources and let
+        `-i` ordering decide a precedence the operator never expressed. An
+        earlier version of this phase did exactly that, which is why the count
+        is pinned and not just the contents.
         """
-        assert configure.argv(cfg) == [
-            "-i",
-            "inventory/production",
-            "-i",
-            "inventory/extra.yml",
-            "site.yml",
-        ]
+        assert configure.argv(cfg, inventory=_INV) == ["-i", str(_INV), "site.yml"]
+        assert configure.argv(cfg, inventory=_INV).count("-i") == 1
 
     def test_the_limit_narrows_this_run_only_when_set(self, cfg):
-        assert "--limit" not in configure.argv(cfg)
-        assert configure.argv(replace(cfg, ansible_limit="web"))[-3:] == [
+        assert "--limit" not in configure.argv(cfg, inventory=_INV)
+        assert configure.argv(replace(cfg, ansible_limit="web"), inventory=_INV)[-3:] == [
             "--limit",
             "web",
             "site.yml",
         ]
 
     def test_the_playbook_is_last_so_it_is_never_read_as_a_flag_value(self, cfg):
-        assert configure.argv(replace(cfg, ansible_limit="web"))[-1] == "site.yml"
+        assert configure.argv(replace(cfg, ansible_limit="web"), inventory=_INV)[-1] == "site.yml"
 
     def test_no_playbook_refuses_rather_than_guessing(self, cfg):
         """Every available fallback is wrong: guessing runs something nobody
         asked for, and running none reports success for a configure that did
         nothing."""
         with pytest.raises(ConfigureNotConfigured) as e:
-            configure.argv(replace(cfg, playbook=""))
+            configure.argv(replace(cfg, playbook=""), inventory=_INV)
         assert "default_playbook" in str(e.value)
 
     def test_there_is_no_check_flag(self, cfg):
         """No dry run exists (user, 2026-10-14) -- check mode is unreliable per
         module, is not a diff, and misleads on anything gated by `when: changed`."""
-        assert "--check" not in configure.argv(replace(cfg, ansible_limit="web"))
+        assert "--check" not in configure.argv(replace(cfg, ansible_limit="web"), inventory=_INV)
 
 
 class TestTheForcedEnvironment:
     def test_the_plugin_dispatcher_is_disabled(self, cfg, tree, ee):
         """`auto` reads a file's own `plugin:` key and runs whatever it names,
         and `script` executes an inventory file. Neither is enabled (#1970)."""
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         env = ee.calls[0]["env"]
         assert env["ANSIBLE_INVENTORY_ENABLED"] == "yaml,ini"
         assert "auto" not in env["ANSIBLE_INVENTORY_ENABLED"]
@@ -117,14 +123,14 @@ class TestTheForcedEnvironment:
         """#1967: a source that cannot be read must not resolve to a partial
         host set. A configure reaching half a fleet and reporting success is
         worse than one that refuses."""
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         assert ee.calls[0]["env"]["ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED"] == "True"
 
     def test_no_ansible_config_is_ever_written(self, cfg, tree, ee):
         """Their `ansible.cfg` is single-file with no merging, so writing one
         would discard `roles_path`, `forks`, `become`, `remote_user` and
         `inventory` itself. Env beats the file, which is why this works."""
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         assert "ANSIBLE_CONFIG" not in ee.calls[0]["env"]
         assert not list((tree / "ansible").glob("ansible.cfg"))
 
@@ -137,7 +143,7 @@ class TestTheForcedEnvironment:
         the ones we think to override."""
         monkeypatch.setenv("ANSIBLE_INVENTORY_ENABLED", "auto")
         monkeypatch.setenv("ANSIBLE_STRATEGY", "free")
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         env = ee.calls[0]["env"]
         assert env["ANSIBLE_INVENTORY_ENABLED"] == "yaml,ini"
         assert "ANSIBLE_STRATEGY" not in env
@@ -147,11 +153,11 @@ class TestTheForcedEnvironment:
         usable temporary directory found", naming nothing useful. The Job
         supplies them (#2154)."""
         monkeypatch.setenv("ANSIBLE_LOCAL_TEMP", "/tp/tmp/local")
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         assert ee.calls[0]["env"]["ANSIBLE_LOCAL_TEMP"] == "/tp/tmp/local"
 
     def test_the_workspaces_parallelism_is_what_sets_forks(self, cfg, tree, ee):
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         assert ee.calls[0]["env"]["ANSIBLE_FORKS"] == "10"
 
 
@@ -160,18 +166,18 @@ class TestWhereItRuns:
         """Not the repository root. `group_vars` beside an inventory is found
         cwd-relative and nowhere else, and relative paths in their own
         `ansible.cfg` resolve against the cwd rather than the file (#1929)."""
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         assert ee.calls[0]["cwd"] == str((tree / "ansible").resolve())
 
     def test_an_empty_config_directory_means_the_repository_root(self, cfg, tree, ee):
         """`""` is the repo root; NULL means no configure operation at all, and
         the API does not dispatch one."""
-        configure.run(replace(cfg, config_directory=""), work_dir=tree)
+        configure.run(replace(cfg, config_directory=""), work_dir=tree, inventory=_INV)
         assert ee.calls[0]["cwd"] == str(tree)
 
     def test_a_config_root_missing_from_the_tree_refuses(self, cfg, tree, ee):
         with pytest.raises(ConfigureNotConfigured) as e:
-            configure.run(replace(cfg, config_directory="nope"), work_dir=tree)
+            configure.run(replace(cfg, config_directory="nope"), work_dir=tree, inventory=_INV)
         assert "nope" in str(e.value)
 
 
@@ -181,7 +187,7 @@ class TestItFailsClosed:
         fall back to -- and a returned exit code would read as ansible's."""
         monkeypatch.setattr(ee_client, "configured", lambda: False)
         with pytest.raises(ee_client.ExecutionEnvironmentUnavailable) as e:
-            configure.run(cfg, work_dir=tree)
+            configure.run(cfg, work_dir=tree, inventory=_INV)
         assert "no execution environment" in str(e.value)
 
     def test_an_agent_error_is_an_environment_failure_not_an_estate_one(self, cfg, tree, ee):
@@ -191,21 +197,21 @@ class TestItFailsClosed:
         ee.rc = 126
         ee.error = '"ansible-playbook" is not an ansible entry point this agent will run'
         with pytest.raises(ee_client.ExecutionEnvironmentUnavailable) as e:
-            configure.run(cfg, work_dir=tree)
+            configure.run(cfg, work_dir=tree, inventory=_INV)
         assert "could not run ansible-playbook" in str(e.value)
 
     def test_ansibles_own_non_zero_exit_is_returned_not_raised(self, cfg, tree, ee):
         """rc=2 is "some hosts failed" -- a real result the terminal mapping
         (#1973) reads, not a transport failure."""
         ee.rc = 2
-        assert configure.run(cfg, work_dir=tree) == 2
+        assert configure.run(cfg, work_dir=tree, inventory=_INV) == 2
 
     def test_rc_four_is_returned_unmolested_because_it_is_overloaded(self, cfg, tree, ee):
         """`4` is BOTH "hosts unreachable" and "playbook malformed". The
         discriminator is the stream and the PLAY RECAP, not the status, so this
         phase reports the code rather than interpreting it."""
         ee.rc = 4
-        assert configure.run(cfg, work_dir=tree) == 4
+        assert configure.run(cfg, work_dir=tree, inventory=_INV) == 4
 
 
 class TestTheGalaxyTokenDoesNotReachThePlaybook:
@@ -221,7 +227,7 @@ class TestTheGalaxyTokenDoesNotReachThePlaybook:
     """
 
     def test_the_playbook_environment_carries_no_galaxy_credential(self, cfg, tree, ee):
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         env = ee.calls[0]["env"]
         leaked = [k for k in env if "GALAXY" in k.upper() or "TOKEN" in k.upper()]
         assert leaked == [], f"the playbook was handed {leaked}"
@@ -229,6 +235,6 @@ class TestTheGalaxyTokenDoesNotReachThePlaybook:
     def test_nor_the_runner_token(self, cfg, tree, ee):
         """`TP_AUTH_TOKEN` is the run's own credential, which `exec_subprocess`
         already scrubs from an engine's environment for the same reason."""
-        configure.run(cfg, work_dir=tree)
+        configure.run(cfg, work_dir=tree, inventory=_INV)
         env = ee.calls[0]["env"]
         assert not any(k.startswith("TP_") for k in env), sorted(env)

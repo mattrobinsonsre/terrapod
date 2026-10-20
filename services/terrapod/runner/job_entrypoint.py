@@ -48,6 +48,7 @@ from terrapod.runner.phases import (
     backend_backstop,
     cloud_identity,
     configure,
+    configure_inventory,
     cost,
     discovery,
     execution_hooks,
@@ -946,11 +947,18 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
 
     Failures to reach or drive the execution environment are deliberately NOT
     caught: every caller above reads a returned integer as ansible's verdict, so
-    a configure that never ran must raise rather than return one.
+    a configure that never ran must raise rather than return one. The same holds
+    for the inventory: `InventoryUnavailable` is a refusal, not an exit code.
+
+    The inventory is materialised BEFORE the collection install, which is the
+    cheaper order to fail in. The install reaches Galaxy and can take minutes;
+    an unreadable inventory is knowable in one request, and a configure that
+    cannot know its target set is not going to run whatever the install does.
     """
     cwd = (work_dir / cfg.config_directory).resolve() if cfg.config_directory else work_dir
+    inventory = configure_inventory.materialise(cfg)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
-    return configure.run(cfg, work_dir=work_dir, log_file=str(_CONFIGURE_LOG))
+    return configure.run(cfg, work_dir=work_dir, inventory=inventory, log_file=str(_CONFIGURE_LOG))
 
 
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]

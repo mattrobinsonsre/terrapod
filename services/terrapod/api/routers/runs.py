@@ -2913,7 +2913,6 @@ async def next_run(
         # in one place (`options_from_attrs`) rather than twice.
         attributes["default-playbook"] = ws.default_playbook or ""
         attributes["default-limit"] = ws.default_limit or ""
-        attributes["inventory-paths"] = list(ws.inventory_paths or [])
     run_data["data"]["attributes"]["phase"] = phase
     # Which stack a Pulumi run operates on (#1523). The engine reads this into
     # `--stack`; without it the CLI has nothing selected and every run fails with

@@ -1,14 +1,19 @@
 """What the API tells a configure Job to do (#1972).
 
-The runner reads these four `TP_*` variables and nothing else tells it which
+The runner reads these three `TP_*` variables and nothing else tells it which
 playbook to run, so an omission here is a configure that refuses (no playbook) or
 one that runs in the wrong directory -- neither of which any runner-tier test can
 see, because they are handed a `RunnerConfig` that already has the values.
+
+There is deliberately NO inventory variable. The inventory a configure targets
+is the run's own resolved artifact (#2021), fetched by `configure_inventory`;
+the workspace's `inventory_paths` are sources the API already merged into it, so
+sending them would invite the runner to re-read them and merge the same hosts
+twice. The last test here is what keeps that absence deliberate.
 """
 
 from __future__ import annotations
 
-import json
 from types import SimpleNamespace
 
 from terrapod.engines.terraform import TerraformStrategy
@@ -30,24 +35,35 @@ def _env(**attrs) -> dict[str, str]:
 
 
 class TestTheConfigureInstructions:
-    def test_all_four_reach_the_job(self):
+    def test_all_three_reach_the_job(self):
         env = _env(
             **{
                 "config-directory": "ansible",
                 "default-playbook": "site.yml",
                 "default-limit": "web",
-                "inventory-paths": ["inventory/production", "inventory/extra.yml"],
             }
         )
         assert env["TP_CONFIG_DIRECTORY"] == "ansible"
         assert env["TP_PLAYBOOK"] == "site.yml"
         assert env["TP_ANSIBLE_LIMIT"] == "web"
-        # JSON, and ORDERED: `-i` order is precedence in ansible, so a set here
-        # would let the merge change without anything noticing.
-        assert json.loads(env["TP_INVENTORY_PATHS"]) == [
-            "inventory/production",
-            "inventory/extra.yml",
-        ]
+
+    def test_no_inventory_variable_is_sent(self):
+        """The absence is the design, so it is asserted rather than assumed.
+
+        A configure's `-i` is its resolved artifact and nothing else. The
+        workspace's `inventory_paths` ARE sent to the API's own resolver, so a
+        later change that plumbed them through to the Job as well would look
+        like consistency and would quietly double the merge -- same hosts from
+        two sources, precedence decided by argument order.
+        """
+        env = _env(
+            **{
+                "config-directory": "ansible",
+                "default-playbook": "site.yml",
+                "inventory-paths": ["inventory/production"],
+            }
+        )
+        assert not [k for k in env if "INVENTORY" in k], sorted(env)
 
     def test_the_runs_own_playbook_wins_over_the_workspace_default(self):
         """#1974 adds the per-run attribute; the precedence is expressed here so
