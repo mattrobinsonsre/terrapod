@@ -227,13 +227,21 @@ async def reconcile_runs() -> None:
 
     This is the main entry point, called every 2s by the scheduler.
 
-    Picks up two cohorts:
-    1. planning/applying with job_name set — drive on Job status reports
-    2. planning/applying with NO job_name set — the listener claimed the run
-       but never reported job-launched (auth failure, K8s outage at create
-       time, listener died mid-launch). Without picking these up they sit
-       indefinitely. `_check_stale` applies a shorter `launch_timeout` to
-       this cohort so failures surface in minutes, not hours.
+    Picks up two cohorts, each over every in-flight status — planning,
+    applying, configuring and canceling. The status list is the whole of what
+    makes a run visible here: one missing from it is not reconciled slowly, it
+    is never reconciled at all, and sits in that status for ever with no stale
+    check and no Job-status round trip (#1972).
+
+    1. in-flight with job_name set — drive on Job status reports
+    2. in-flight with NO job_name set — the listener claimed the run but never
+       reported job-launched (auth failure, K8s outage at create time, listener
+       died mid-launch). Without picking these up they sit indefinitely.
+       `_check_stale` applies a shorter `launch_timeout` to this cohort so
+       failures surface in minutes, not hours. It reads the phase's own start
+       timestamp via `_phase_start_of`, so a status in the query whose clock is
+       unmapped reaches this cohort and then returns early — which is why the
+       two belong together and are gated together.
     """
     async with get_db_session() as db:
         # Refresh the per-pool queued-backlog gauge first — queued runs exist
