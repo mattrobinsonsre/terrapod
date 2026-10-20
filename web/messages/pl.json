@@ -994,7 +994,8 @@
       "valueSource": "Źródło wartości",
       "valueSourceStatic": "Wprowadź wartość",
       "valueSourceVault": "Odczytaj z OpenBao/Vault",
-      "vaultHint": "Terrapod odczytuje sekret z OpenBao (lub HashiCorp Vault) podczas uruchomienia. Nic nie jest tu przechowywane."
+      "vaultHint": "Terrapod odczytuje sekret z OpenBao (lub HashiCorp Vault) podczas uruchomienia. Nic nie jest tu przechowywane.",
+      "applyOnly": "Tylko apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Kodowanie",
       "vaultFileEncodingNone": "Jak zapisano w OpenBao/Vault",
       "vaultFileEncodingBase64": "Dekoduj Base64",
-      "vaultFileEncodingHint": "Dekoduje pole przed zapisaniem. Wynik musi być tekstem; pliki binarne nie są obsługiwane."
+      "vaultFileEncodingHint": "Dekoduje pole przed zapisaniem. Wynik musi być tekstem; pliki binarne nie są obsługiwane.",
+      "applyOnly": "Tylko apply",
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
     },
     "runs": {
       "options": "Opcje",

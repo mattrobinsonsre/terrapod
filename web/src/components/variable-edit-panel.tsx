@@ -25,6 +25,7 @@ export interface VariableEditState {
   value: string
   category: string
   sensitive: boolean
+  applyOnly: boolean
   hcl: boolean
   source: 'static' | 'vault'
   vault: VaultReferenceValue
@@ -147,6 +148,15 @@ export function VariableEditPanel({
               className="rounded border-slate-600 bg-slate-700 text-brand-600"
             />
             <span className="text-xs text-slate-400">{t('sensitive')}</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer" title={t('applyOnlyHint')}>
+            <input
+              type="checkbox"
+              checked={state.applyOnly}
+              onChange={(e) => onChange({ applyOnly: e.target.checked })}
+              className="rounded border-slate-600 bg-slate-700 text-brand-600"
+            />
+            <span className="text-xs text-slate-400">{t('applyOnly')}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input

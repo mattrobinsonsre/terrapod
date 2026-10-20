@@ -994,7 +994,8 @@
       "valueSource": "Değer kaynağı",
       "valueSourceStatic": "Bir değer girin",
       "valueSourceVault": "OpenBao/Vault'tan oku",
-      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında OpenBao'dan (veya HashiCorp Vault'tan) okur. Burada hiçbir şey saklanmaz."
+      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında OpenBao'dan (veya HashiCorp Vault'tan) okur. Burada hiçbir şey saklanmaz.",
+      "applyOnly": "Yalnızca apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Kodlama",
       "vaultFileEncodingNone": "OpenBao/Vault içinde saklandığı gibi",
       "vaultFileEncodingBase64": "Base64 çöz",
-      "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez."
+      "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez.",
+      "applyOnly": "Yalnızca apply",
+      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır."
     },
     "runs": {
       "options": "Seçenekler",

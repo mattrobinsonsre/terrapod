@@ -994,7 +994,8 @@
       "valueSource": "값 출처",
       "valueSourceStatic": "값 입력",
       "valueSourceVault": "OpenBao/Vault에서 읽기",
-      "vaultHint": "Terrapod가 실행 시 OpenBao(또는 HashiCorp Vault)에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다."
+      "vaultHint": "Terrapod가 실행 시 OpenBao(또는 HashiCorp Vault)에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다.",
+      "applyOnly": "apply 전용"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "인코딩",
       "vaultFileEncodingNone": "OpenBao/Vault에 저장된 그대로",
       "vaultFileEncodingBase64": "Base64 디코딩",
-      "vaultFileEncodingHint": "쓰기 전에 필드를 디코딩합니다. 결과는 텍스트여야 하며, 바이너리 파일은 지원되지 않습니다."
+      "vaultFileEncodingHint": "쓰기 전에 필드를 디코딩합니다. 결과는 텍스트여야 하며, 바이너리 파일은 지원되지 않습니다.",
+      "applyOnly": "apply 전용",
+      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다."
     },
     "runs": {
       "options": "옵션",

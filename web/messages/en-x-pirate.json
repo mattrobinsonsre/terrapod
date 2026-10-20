@@ -994,7 +994,8 @@
       "valueSource": "Value source",
       "valueSourceStatic": "Enter a value",
       "valueSourceVault": "Fetch from OpenBao/Vault",
-      "vaultHint": "Terrapod fetches the secret from OpenBao (or HashiCorp Vault, if ye must) when the voyage sails. Naught be stowed here."
+      "vaultHint": "Terrapod fetches the secret from OpenBao (or HashiCorp Vault, if ye must) when the voyage sails. Naught be stowed here.",
+      "applyOnly": "Apply only, matey"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Encodin''",
       "vaultFileEncodingNone": "As it be stowed in the OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-decode, arr",
-      "vaultFileEncodingHint": "Decodes the field afore it be written. What comes out must be text; binary scrolls be not supported."
+      "vaultFileEncodingHint": "Decodes the field afore it be written. What comes out must be text; binary scrolls be not supported.",
+      "applyOnly": "Apply only, matey",
+      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold."
     },
     "runs": {
       "options": "Options",

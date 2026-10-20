@@ -994,7 +994,8 @@
       "valueSource": "מקור הערך",
       "valueSourceStatic": "הזן ערך",
       "valueSourceVault": "קרא מ-OpenBao/Vault",
-      "vaultHint": "Terrapod קורא את הסוד מ-OpenBao (או HashiCorp Vault) בזמן ההרצה. דבר אינו נשמר כאן."
+      "vaultHint": "Terrapod קורא את הסוד מ-OpenBao (או HashiCorp Vault) בזמן ההרצה. דבר אינו נשמר כאן.",
+      "applyOnly": "apply בלבד"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "קידוד",
       "vaultFileEncodingNone": "כפי שנשמר ב-OpenBao/Vault",
       "vaultFileEncodingBase64": "פענוח Base64",
-      "vaultFileEncodingHint": "מפענח את השדה לפני שהוא נכתב. התוצאה חייבת להיות טקסט; קבצים בינאריים אינם נתמכים."
+      "vaultFileEncodingHint": "מפענח את השדה לפני שהוא נכתב. התוצאה חייבת להיות טקסט; קבצים בינאריים אינם נתמכים.",
+      "applyOnly": "apply בלבד",
+      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan."
     },
     "runs": {
       "options": "אפשרויות",

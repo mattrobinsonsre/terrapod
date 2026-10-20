@@ -994,7 +994,8 @@
       "valueSource": "Zdroj hodnoty",
       "valueSourceStatic": "Zadat hodnotu",
       "valueSourceVault": "Načíst z OpenBao/Vault",
-      "vaultHint": "Terrapod načte tajemství z OpenBao (nebo HashiCorp Vault) při běhu. Zde se nic neukládá."
+      "vaultHint": "Terrapod načte tajemství z OpenBao (nebo HashiCorp Vault) při běhu. Zde se nic neukládá.",
+      "applyOnly": "Pouze apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Kódování",
       "vaultFileEncodingNone": "Jak je uloženo v OpenBao/Vault",
       "vaultFileEncodingBase64": "Dekódovat Base64",
-      "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány."
+      "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány.",
+      "applyOnly": "Pouze apply",
+      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan."
     },
     "runs": {
       "options": "Možnosti",

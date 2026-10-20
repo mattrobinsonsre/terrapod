@@ -994,7 +994,8 @@
       "valueSource": "Wertquelle",
       "valueSourceStatic": "Wert eingeben",
       "valueSourceVault": "Aus OpenBao/Vault lesen",
-      "vaultHint": "Terrapod liest das Secret zur Laufzeit aus OpenBao (oder HashiCorp Vault). Hier wird nichts gespeichert."
+      "vaultHint": "Terrapod liest das Secret zur Laufzeit aus OpenBao (oder HashiCorp Vault). Hier wird nichts gespeichert.",
+      "applyOnly": "Nur apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Kodierung",
       "vaultFileEncodingNone": "Wie in OpenBao/Vault gespeichert",
       "vaultFileEncodingBase64": "Base64-dekodieren",
-      "vaultFileEncodingHint": "Dekodiert das Feld, bevor es geschrieben wird. Das Ergebnis muss Text sein; Binärdateien werden nicht unterstützt."
+      "vaultFileEncodingHint": "Dekodiert das Feld, bevor es geschrieben wird. Das Ergebnis muss Text sein; Binärdateien werden nicht unterstützt.",
+      "applyOnly": "Nur apply",
+      "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen."
     },
     "runs": {
       "options": "Optionen",

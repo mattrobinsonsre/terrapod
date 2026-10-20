@@ -994,7 +994,8 @@
       "valueSource": "Ffynhonnell gwerth",
       "valueSourceStatic": "Rhowch werth",
       "valueSourceVault": "Darllen o OpenBao/Vault",
-      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o OpenBao (neu HashiCorp Vault) adeg rhedeg. Ni chedwir dim yma."
+      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o OpenBao (neu HashiCorp Vault) adeg rhedeg. Ni chedwir dim yma.",
+      "applyOnly": "Gweithredu yn unig"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Amgodio",
       "vaultFileEncodingNone": "Fel y''i storiwyd yn OpenBao/Vault",
       "vaultFileEncodingBase64": "Datgodio Base64",
-      "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd."
+      "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd.",
+      "applyOnly": "Gweithredu yn unig",
+      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun."
     },
     "runs": {
       "options": "Opsiynau",

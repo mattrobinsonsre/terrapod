@@ -994,7 +994,8 @@
       "valueSource": "Fons valoris",
       "valueSourceStatic": "Valorem inserere",
       "valueSourceVault": "Ex OpenBao/Vault legere",
-      "vaultHint": "Terrapod arcanum ex OpenBao (vel HashiCorp Vault) tempore cursus legit. Nihil hic servatur."
+      "vaultHint": "Terrapod arcanum ex OpenBao (vel HashiCorp Vault) tempore cursus legit. Nihil hic servatur.",
+      "applyOnly": "Tantum apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Codificatio",
       "vaultFileEncodingNone": "Ut in OpenBao/Vault servatum",
       "vaultFileEncodingBase64": "Base64 decodere",
-      "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur."
+      "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur.",
+      "applyOnly": "Tantum apply",
+      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent."
     },
     "runs": {
       "options": "Optiones",

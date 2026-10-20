@@ -994,7 +994,8 @@
       "valueSource": "V4lu3 50urc3",
       "valueSourceStatic": "3n73r 4 v4lu3",
       "valueSourceVault": "R34d fr0m 0p3nB40/V4ul7",
-      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m 0p3nB40 (0r H45h1C0rp V4ul7) 47 run 71m3. N07h1ng 15 570r3d h3r3."
+      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m 0p3nB40 (0r H45h1C0rp V4ul7) 47 run 71m3. N07h1ng 15 570r3d h3r3.",
+      "applyOnly": "4pply 0nly"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "3nc0d1ng",
       "vaultFileEncodingNone": "45 570r3d 1n 0p3nB40/V4ul7",
       "vaultFileEncodingBase64": "B45364-d3c0d3",
-      "vaultFileEncodingHint": "D3c0d35 7h3 f13ld b3f0r3 17 15 wr1773n. 7h3 r35ul7 mu57 b3 73x7; b1n4ry f1l35 4r3 n07 5upp0r73d."
+      "vaultFileEncodingHint": "D3c0d35 7h3 f13ld b3f0r3 17 15 wr1773n. 7h3 r35ul7 mu57 b3 73x7; b1n4ry f1l35 4r3 n07 5upp0r73d.",
+      "applyOnly": "4pply 0nly",
+      "applyOnlyHint": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply. 4 pl4n run5 7h3 c0nf1gur4710n'5 c0d3, 50 4 cr3d3n714l 0nly 7h3 4pply n33d5 5h0uld n07 b3 1n 4 pl4n'5 3nv1r0nm3n7."
     },
     "runs": {
       "options": "0p710n5",

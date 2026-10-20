@@ -994,7 +994,8 @@
       "valueSource": "Джерело значення",
       "valueSourceStatic": "Ввести значення",
       "valueSourceVault": "Читати з OpenBao/Vault",
-      "vaultHint": "Terrapod читає секрет з OpenBao (або HashiCorp Vault) під час запуску. Тут нічого не зберігається."
+      "vaultHint": "Terrapod читає секрет з OpenBao (або HashiCorp Vault) під час запуску. Тут нічого не зберігається.",
+      "applyOnly": "Лише apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "Кодування",
       "vaultFileEncodingNone": "Як збережено у OpenBao/Vault",
       "vaultFileEncodingBase64": "Декодувати Base64",
-      "vaultFileEncodingHint": "Декодує поле перед записом. Результат має бути текстом; двійкові файли не підтримуються."
+      "vaultFileEncodingHint": "Декодує поле перед записом. Результат має бути текстом; двійкові файли не підтримуються.",
+      "applyOnly": "Лише apply",
+      "applyOnlyHint": "Не передається в plan і доставляється лише в apply. plan виконує код конфігурації, тому дані для входу, потрібні лише apply, не повинні бути в середовищі plan."
     },
     "runs": {
       "options": "Опції",

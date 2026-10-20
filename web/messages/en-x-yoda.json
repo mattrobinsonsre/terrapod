@@ -994,7 +994,8 @@
       "valueSource": "Source, value",
       "valueSourceStatic": "A value, enter",
       "valueSourceVault": "From OpenBao/Vault, read",
-      "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is."
+      "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is.",
+      "applyOnly": "Apply only, it is"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "The encoding, it is",
       "vaultFileEncodingNone": "As in OpenBao/Vault stored, it stays",
       "vaultFileEncodingBase64": "Base64-decode it, you will",
-      "vaultFileEncodingHint": "Before it is written, the field decoded is. Text, the result must be; supported, binary files are not."
+      "vaultFileEncodingHint": "Before it is written, the field decoded is. Text, the result must be; supported, binary files are not.",
+      "applyOnly": "Apply only, it is",
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
     },
     "runs": {
       "options": "Options",

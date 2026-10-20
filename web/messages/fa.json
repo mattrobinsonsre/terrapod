@@ -994,7 +994,8 @@
       "valueSource": "منبع مقدار",
       "valueSourceStatic": "یک مقدار وارد کنید",
       "valueSourceVault": "خواندن از OpenBao/Vault",
-      "vaultHint": "Terrapod راز را هنگام اجرا از OpenBao (یا HashiCorp Vault) می‌خواند. چیزی اینجا ذخیره نمی‌شود."
+      "vaultHint": "Terrapod راز را هنگام اجرا از OpenBao (یا HashiCorp Vault) می‌خواند. چیزی اینجا ذخیره نمی‌شود.",
+      "applyOnly": "فقط apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "رمزگذاری",
       "vaultFileEncodingNone": "همان‌طور که در OpenBao/Vault ذخیره شده",
       "vaultFileEncodingBase64": "رمزگشایی Base64",
-      "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند."
+      "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند.",
+      "applyOnly": "فقط apply",
+      "applyOnlyHint": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود. plan کد پیکربندی را اجرا می‌کند، بنابراین اعتبارنامه‌ای که تنها apply به آن نیاز دارد نباید در محیط plan باشد."
     },
     "runs": {
       "options": "گزینه‌ها",

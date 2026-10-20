@@ -994,7 +994,8 @@
       "valueSource": "取值来源",
       "valueSourceStatic": "直接输入值",
       "valueSourceVault": "从 OpenBao/Vault 读取",
-      "vaultHint": "Terrapod 在运行时从 OpenBao（或 HashiCorp Vault）读取密钥，此处不存储任何内容。"
+      "vaultHint": "Terrapod 在运行时从 OpenBao（或 HashiCorp Vault）读取密钥，此处不存储任何内容。",
+      "applyOnly": "仅 apply"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2705,9 @@
       "vaultFileEncoding": "编码",
       "vaultFileEncodingNone": "按 OpenBao/Vault 中存储的原样",
       "vaultFileEncodingBase64": "Base64 解码",
-      "vaultFileEncodingHint": "在写入前解码该字段。结果必须是文本；不支持二进制文件。"
+      "vaultFileEncodingHint": "在写入前解码该字段。结果必须是文本；不支持二进制文件。",
+      "applyOnly": "仅 apply",
+      "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。"
     },
     "runs": {
       "options": "选项",

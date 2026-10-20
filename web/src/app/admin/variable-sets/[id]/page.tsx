@@ -51,6 +51,7 @@ interface Variable {
     'value-source'?: string
     hcl: boolean
     sensitive: boolean
+    'apply-only'?: boolean
     description: string
   }
 }
@@ -112,6 +113,7 @@ export default function VariableSetDetailPage() {
   const [varValue, setVarValue] = useState('')
   const [varCategory, setVarCategory] = useState('terraform')
   const [varSensitive, setVarSensitive] = useState(false)
+  const [varApplyOnly, setVarApplyOnly] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
@@ -131,6 +133,7 @@ export default function VariableSetDetailPage() {
   const [editVarValue, setEditVarValue] = useState('')
   const [editVarCategory, setEditVarCategory] = useState('terraform')
   const [editVarSensitive, setEditVarSensitive] = useState(false)
+  const [editVarApplyOnly, setEditVarApplyOnly] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
@@ -145,6 +148,7 @@ export default function VariableSetDetailPage() {
     value: editVarValue,
     category: editVarCategory,
     sensitive: editVarSensitive,
+    applyOnly: editVarApplyOnly,
     hcl: editVarHcl,
     source: editVarSource,
     vault: editVarVault,
@@ -155,6 +159,7 @@ export default function VariableSetDetailPage() {
     if (patch.value !== undefined) setEditVarValue(patch.value)
     if (patch.category !== undefined) setEditVarCategory(patch.category)
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
+    if (patch.applyOnly !== undefined) setEditVarApplyOnly(patch.applyOnly)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
     if (patch.vault !== undefined) setEditVarVault(patch.vault)
@@ -338,6 +343,7 @@ export default function VariableSetDetailPage() {
               // Vault-sourced is always sensitive (its reference resolves to a
               // secret); otherwise honour the checkbox.
               sensitive: isVaultSource ? true : varSensitive,
+              'apply-only': varApplyOnly,
               hcl: varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
             },
@@ -352,6 +358,7 @@ export default function VariableSetDetailPage() {
       setVarValue('')
       setVarCategory('terraform')
       setVarSensitive(false)
+      setVarApplyOnly(false)
       setVarHcl(false)
       setVarSource('static')
       setVarVault(emptyVaultReference())
@@ -379,6 +386,7 @@ export default function VariableSetDetailPage() {
     }
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
+    setEditVarApplyOnly(v.attributes['apply-only'] ?? false)
     setEditVarHcl(v.attributes.hcl)
   }
 
@@ -393,6 +401,7 @@ export default function VariableSetDetailPage() {
         key: editVarKey,
         category: editVarCategory,
         sensitive: isEditVault ? true : editVarSensitive,
+        'apply-only': editVarApplyOnly,
         hcl: editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
@@ -699,6 +708,11 @@ export default function VariableSetDetailPage() {
                       <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                       <span className="text-sm text-slate-300">{t('detail.sensitive')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                      <span className="text-sm text-slate-300">{t('detail.applyOnly')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)}
