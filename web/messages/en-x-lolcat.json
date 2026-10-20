@@ -994,7 +994,9 @@
       "valueSource": "Valyoo Sors",
       "valueSourceStatic": "Typ a valyoo",
       "valueSourceVault": "Reed frum OpenBao/Vault",
-      "vaultHint": "Terrapod reedz da sekrit frum OpenBao (or HashiCorp Vault, u pick) at run tiem. Nuffin iz kept heer."
+      "vaultHint": "Terrapod reedz da sekrit frum OpenBao (or HashiCorp Vault, u pick) at run tiem. Nuffin iz kept heer.",
+      "applyOnly": "apply onlee",
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "Enkodin",
       "vaultFileEncodingNone": "Liek it waz stord in OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-dekode",
-      "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd."
+      "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd.",
+      "applyOnly": "apply onlee",
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
     },
     "runs": {
       "options": "Opshunz",

@@ -994,7 +994,9 @@
       "valueSource": "Marklar marklar",
       "valueSourceStatic": "Enter a marklar",
       "valueSourceVault": "Read from Marklar/Marklar",
-      "vaultHint": "Marklar reads the marklar from Marklar (or Marklar Marklar) at marklar. No marklar is stored here."
+      "vaultHint": "Marklar reads the marklar from Marklar (or Marklar Marklar) at marklar. No marklar is stored here.",
+      "applyOnly": "Marklar only",
+      "applyOnlyHint": "Withheld from a marklar and delivered only to a marklar. A marklar runs the marklar's marklar, so a marklar only the marklar needs should not be in a marklar's marklar."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "Marklar",
       "vaultFileEncodingNone": "As stored in Marklar/Marklar",
       "vaultFileEncodingBase64": "Marklar-decode",
-      "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported."
+      "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported.",
+      "applyOnly": "Marklar only",
+      "applyOnlyHint": "Withheld from a marklar and delivered only to a marklar. A marklar runs the marklar's marklar, so a marklar only the marklar needs should not be in a marklar's marklar."
     },
     "runs": {
       "options": "Marklars",

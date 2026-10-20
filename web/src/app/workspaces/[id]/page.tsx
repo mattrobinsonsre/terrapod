@@ -153,6 +153,7 @@ interface Variable {
     category: string
     hcl: boolean
     sensitive: boolean
+    'apply-only'?: boolean
     description: string
     /** "static" or "vault" (#1439). */
     'value-source'?: string
@@ -385,6 +386,7 @@ function WorkspaceDetailContent() {
   const [varValue, setVarValue] = useState('')
   const [varCategory, setVarCategory] = useState('terraform')
   const [varSensitive, setVarSensitive] = useState(false)
+  const [varApplyOnly, setVarApplyOnly] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   // Git module-source auth builder (#1028): when the category is git_http_auth /
   // git_ssh_auth the form swaps to discrete credential fields that serialize into
@@ -478,6 +480,7 @@ function WorkspaceDetailContent() {
   const [editVarValue, setEditVarValue] = useState('')
   const [editVarCategory, setEditVarCategory] = useState('terraform')
   const [editVarSensitive, setEditVarSensitive] = useState(false)
+  const [editVarApplyOnly, setEditVarApplyOnly] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
 
@@ -1586,6 +1589,7 @@ function WorkspaceDetailContent() {
     value: editVarValue,
     category: editVarCategory,
     sensitive: editVarSensitive,
+    applyOnly: editVarApplyOnly,
     hcl: editVarHcl,
     source: editVarSource,
     vault: editVaultRef,
@@ -1596,6 +1600,7 @@ function WorkspaceDetailContent() {
     if (patch.value !== undefined) setEditVarValue(patch.value)
     if (patch.category !== undefined) setEditVarCategory(patch.category)
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
+    if (patch.applyOnly !== undefined) setEditVarApplyOnly(patch.applyOnly)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
     if (patch.vault) setEditVaultRef(patch.vault)
@@ -1621,6 +1626,7 @@ function WorkspaceDetailContent() {
                   : varValue,
               category: varCategory,
               sensitive: isGitCat || isVaultSource ? true : varSensitive,
+              'apply-only': varApplyOnly,
               hcl: varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
             },
@@ -1635,6 +1641,7 @@ function WorkspaceDetailContent() {
       setVarValue('')
       setVarCategory('terraform')
       setVarSensitive(false)
+      setVarApplyOnly(false)
       setVarHcl(false)
       setGitSource('vcs_connection')
       setGitVcsConnId('')
@@ -1781,6 +1788,7 @@ function WorkspaceDetailContent() {
     setEditVarKey(v.attributes.key)
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
+    setEditVarApplyOnly(v.attributes['apply-only'] ?? false)
     setEditVarHcl(v.attributes.hcl)
     ensureVaultAvailability()
 
@@ -1808,6 +1816,7 @@ function WorkspaceDetailContent() {
         key: editVarKey,
         category: editVarCategory,
         sensitive: isEditVault ? true : editVarSensitive,
+        'apply-only': editVarApplyOnly,
         hcl: editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
@@ -3488,6 +3497,10 @@ function WorkspaceDetailContent() {
                         <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                         <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
                       </label>
+                      <label className="flex items-center gap-2 cursor-pointer" title={t('variables.applyOnlyHint')}>
+                        <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-300">{t('variables.applyOnly')}</span>
+                      </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                         <span className="text-sm text-slate-300">HCL</span>
@@ -3603,13 +3616,21 @@ function WorkspaceDetailContent() {
                               vaultDefaultInstance={vaultDefaultInstance}
                               saving={savingVar}
                               onSave={handleSaveVar}
+                              saveError={error}
                               onCancel={() => setEditingVarId(null)}
                             />
                           </td>
                         </tr>
                       ) : (
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
-                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
+                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">
+                            <span className="inline-flex items-center gap-2">
+                              {v.attributes.key}
+                              {v.attributes['apply-only'] && (
+                                <span title={t('variables.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
@@ -3655,12 +3676,18 @@ function WorkspaceDetailContent() {
                           vaultDefaultInstance={vaultDefaultInstance}
                           saving={savingVar}
                           onSave={handleSaveVar}
+                          saveError={error}
                           onCancel={() => setEditingVarId(null)}
                         />
                     ) : (
                       <>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <span className="text-sm font-mono font-medium text-slate-200 break-all">{v.attributes.key}</span>
+                          <span className="text-sm font-mono font-medium text-slate-200 break-all">
+                            {v.attributes.key}
+                            {v.attributes['apply-only'] && (
+                              <span title={t('variables.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                            )}
+                          </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                           }`}>

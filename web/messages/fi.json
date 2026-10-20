@@ -994,7 +994,9 @@
       "valueSource": "Arvon lähde",
       "valueSourceStatic": "Syötä arvo",
       "valueSourceVault": "Lue OpenBao/Vaultista",
-      "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne."
+      "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne.",
+      "applyOnly": "Vain apply",
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "Koodaus",
       "vaultFileEncodingNone": "Kuten OpenBao/Vaultiin tallennettu",
       "vaultFileEncodingBase64": "Base64-dekoodaus",
-      "vaultFileEncodingHint": "Dekoodaa kentän ennen kirjoittamista. Tuloksen on oltava tekstiä; binääritiedostoja ei tueta."
+      "vaultFileEncodingHint": "Dekoodaa kentän ennen kirjoittamista. Tuloksen on oltava tekstiä; binääritiedostoja ei tueta.",
+      "applyOnly": "Vain apply",
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
     },
     "runs": {
       "options": "Vaihtoehdot",

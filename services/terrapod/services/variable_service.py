@@ -86,6 +86,7 @@ async def create_variable(
     description: str = "",
     hcl: bool = False,
     sensitive: bool = False,
+    apply_only: bool = False,
     value_source: str = "static",
 ) -> Variable:
     """Create a workspace variable."""
@@ -103,6 +104,7 @@ async def create_variable(
         category=category,
         hcl=hcl,
         sensitive=sensitive,
+        apply_only=apply_only,
         value_source=value_source,
         version_id=_version_hash(key, value, category),
     )
@@ -120,6 +122,7 @@ async def update_variable(
     description: str | None = None,
     hcl: bool | None = None,
     sensitive: bool | None = None,
+    apply_only: bool | None = None,
     value_source: str | None = None,
 ) -> Variable:
     """Update an existing variable."""
@@ -133,6 +136,9 @@ async def update_variable(
         var.category = _validated_category(category)
     if hcl is not None:
         var.hcl = hcl
+
+    if apply_only is not None:
+        var.apply_only = apply_only
 
     was_sensitive = var.sensitive
 
@@ -190,7 +196,9 @@ async def delete_variable(db: AsyncSession, var: Variable) -> None:
     await db.flush()
 
 
-async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[ResolvedVariable]:
+async def resolve_variables(
+    db: AsyncSession, workspace_id: uuid.UUID, phase: str | None = None
+) -> list[ResolvedVariable]:
     """Resolve all variables for a workspace with proper precedence.
 
     Precedence (highest wins):
@@ -198,47 +206,76 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     2. Workspace-level variables
     3. Non-priority variable set vars
 
+    `phase` selects which variables a run of that phase receives (#2189):
+
+    * ``"apply"`` — every variable, with an **apply-only** row shadowing a
+      standard row of the same key *within its own tier*.
+    * ``"plan"`` (or any other phase) — apply-only rows are excluded entirely.
+    * ``None`` — **every row, nothing collapsed.** Not "no filter": the keyed
+      dict would still collapse a colliding pair to one value, which is wrong
+      for the only caller that passes nothing. See below.
+
+    **Apply-only resolves WITHIN a tier, never as a pass over the whole chain.**
+    A pass would let a *workspace* apply-only row beat a *priority variable
+    set's* standard row, so a workspace owner could escape a platform-mandated
+    value on applies — inverting the authority order priority sets exist to
+    establish, on the apply. Within-tier keeps it: a priority set's standard row
+    still beats a workspace apply-only row.
+
+    **Why ``None`` returns everything uncollapsed.** Its caller is prompt
+    redaction (`summariser._sensitive_literals`), which wants every sensitive
+    literal that could appear so it can scrub them — not a resolved set. Keying
+    on the pair there means a duplicate contributes BOTH values, so neither
+    secret escapes redaction. Narrowing that call to a phase, or letting it
+    collapse, would make redaction weaker; a gate asserts it stays phase-blind.
+
     Returns values ready for runner injection.
     """
-    resolved: dict[str, ResolvedVariable] = {}
+    # Keyed on `key` when resolving for a phase, so precedence applies; keyed on
+    # (key, apply_only) when no phase was asked for, so nothing is discarded.
+    resolved: dict[object, ResolvedVariable] = {}
+    include_apply_only = phase is None or phase == "apply"
 
-    # Layer 1: Non-priority variable sets (global + assigned)
-    varsets = await _get_applicable_varsets(db, workspace_id, priority=False)
-    for vs in varsets:
-        for vsv in vs.variables:
-            resolved[vsv.key] = ResolvedVariable(
-                key=vsv.key,
-                value=vsv.value,
-                category=vsv.category,
-                hcl=vsv.hcl,
-                sensitive=vsv.sensitive,
-                value_source=vsv.value_source,
-            )
+    def _key(k: str, apply_only: bool) -> object:
+        return k if phase is not None else (k, apply_only)
 
-    # Layer 2: Workspace variables (override non-priority sets)
-    ws_vars = await list_variables(db, workspace_id)
-    for var in ws_vars:
-        resolved[var.key] = ResolvedVariable(
-            key=var.key,
-            value=var.value,
-            category=var.category,
-            hcl=var.hcl,
-            sensitive=var.sensitive,
-            value_source=var.value_source,
+    def _put(row) -> None:
+        if row.apply_only and not include_apply_only:
+            return
+        resolved[_key(row.key, row.apply_only)] = ResolvedVariable(
+            key=row.key,
+            value=row.value,
+            category=row.category,
+            hcl=row.hcl,
+            sensitive=row.sensitive,
+            value_source=row.value_source,
         )
 
+    def _tier(rows) -> None:
+        """One precedence tier. Standard rows first, then apply-only, so an
+        apply-only row shadows its standard twin inside this tier and nowhere
+        else."""
+        rows = list(rows)
+        for row in rows:
+            if not row.apply_only:
+                _put(row)
+        # Second, so an apply-only row overwrites its standard twin's entry --
+        # but only inside this tier. `_put` drops it when the phase excludes it,
+        # so no branch is needed here.
+        for row in rows:
+            if row.apply_only:
+                _put(row)
+
+    # Layer 1: Non-priority variable sets (global + assigned)
+    for vs in await _get_applicable_varsets(db, workspace_id, priority=False):
+        _tier(vs.variables)
+
+    # Layer 2: Workspace variables (override non-priority sets)
+    _tier(await list_variables(db, workspace_id))
+
     # Layer 3: Priority variable sets (override everything)
-    priority_varsets = await _get_applicable_varsets(db, workspace_id, priority=True)
-    for vs in priority_varsets:
-        for vsv in vs.variables:
-            resolved[vsv.key] = ResolvedVariable(
-                key=vsv.key,
-                value=vsv.value,
-                category=vsv.category,
-                hcl=vsv.hcl,
-                sensitive=vsv.sensitive,
-                value_source=vsv.value_source,
-            )
+    for vs in await _get_applicable_varsets(db, workspace_id, priority=True):
+        _tier(vs.variables)
 
     return list(resolved.values())
 

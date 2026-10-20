@@ -23,6 +23,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -140,6 +141,52 @@ def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
             "resolves to a single field. Put the credential's own secret fields in "
             "OpenBao/Vault and reference them from a static git-auth value instead.",
         )
+
+
+#: Postgres SQLSTATE, read off the driver exception rather than matched in the
+#: message text -- a constraint name in a message is not a contract and differs
+#: between backends, while this code is in the SQL standard.
+_UNIQUE_VIOLATION = "23505"
+
+
+def _variable_conflict(
+    exc: IntegrityError, key: str, apply_only: bool | None, *, scope: str
+) -> HTTPException:
+    """Say which slot is taken, because the caller cannot otherwise tell.
+
+    A key may be held twice -- once plan+apply, once apply-only (#2189) -- so the
+    uniqueness constraint is on the pair. That makes a collision possible in a
+    way it was not before: CLEARING the apply-only flag on a variable can bring
+    it into conflict with a standard variable of the same name that it coexisted
+    with a moment earlier. The global integrity net answers that with "Resource
+    already exists or violates a constraint", which names neither the key nor
+    the reason and leaves an operator with no way to work out what they did.
+
+    So name the key and the slot. When the caller did not send `apply-only` the
+    flag is not what moved, so the message does not claim to know which slot --
+    overstating it would send them to the wrong variable.
+    """
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate != _UNIQUE_VIOLATION:
+        # An integrity error that is not a duplicate is a genuine surprise, and
+        # guessing a 4xx would hide a server-side bug behind a message blaming
+        # the caller.
+        return HTTPException(status_code=500, detail="Could not save the variable")
+    rule = (
+        "A key can be held twice only when exactly one copy is apply-only, so "
+        "change the apply-only flag on one of them, or delete the other."
+    )
+    if apply_only is None:
+        return HTTPException(
+            status_code=409, detail=f"{scope} already holds a variable named {key!r}. {rule}"
+        )
+    # The article travels with the phrase: "a apply-only" otherwise, which a
+    # substring assertion on the slot name does not catch.
+    held = "an apply-only" if apply_only else "a plan+apply"
+    return HTTPException(
+        status_code=409,
+        detail=f"{scope} already holds {held} variable named {key!r}. {rule}",
+    )
 
 
 async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
@@ -264,6 +311,7 @@ def _var_json(var: Variable) -> dict:
             # without hiding anything that is actually sensitive.
             "value": _visible_value(var),
             "sensitive": var.sensitive,
+            "apply-only": var.apply_only,
             "category": var.category,
             "hcl": var.hcl,
             "value-source": var.value_source,
@@ -356,11 +404,17 @@ async def create_workspace_var(
             description=attrs.get("description", ""),
             hcl=attrs.get("hcl", False),
             sensitive=force_sensitive or attrs.get("sensitive", False),
+            apply_only=attrs.get("apply-only", False),
             value_source=value_source,
         )
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except IntegrityError as e:
+        await db.rollback()
+        raise _variable_conflict(
+            e, attrs.get("key", ""), attrs.get("apply-only", False), scope="This workspace"
+        ) from e
 
     from terrapod.redis.client import publish_workspace_event
 
@@ -413,11 +467,18 @@ async def update_workspace_var(
             description=attrs.get("description"),
             hcl=attrs.get("hcl"),
             sensitive=attrs.get("sensitive"),
+            apply_only=attrs.get("apply-only"),
             value_source=value_source,
         )
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except IntegrityError as e:
+        # `eff_key` was computed above, BEFORE the commit. Reading `var.key` here
+        # instead would lazy-load on a session whose flush has failed, and the
+        # caller gets PendingRollbackError rather than the 409 this exists for.
+        await db.rollback()
+        raise _variable_conflict(e, eff_key, attrs.get("apply-only"), scope="This workspace") from e
 
     from terrapod.redis.client import publish_workspace_event
 
@@ -742,6 +803,7 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
             # not a secret, so it is shown rather than masked (#1439).
             "value": _visible_value(vsv),
             "sensitive": vsv.sensitive,
+            "apply-only": vsv.apply_only,
             "category": vsv.category,
             "hcl": vsv.hcl,
             "value-source": vsv.value_source,
@@ -790,6 +852,10 @@ async def create_varset_var(
 
     value = attrs.get("value", "")
     sensitive = attrs.get("sensitive", False)
+    # Withheld from a plan, delivered to an apply (#2189). A separate ROW, not
+    # a phase attribute: a different value per phase is two rows with one
+    # flagged, which is why the uniqueness tuple carries the flag.
+    apply_only = attrs.get("apply-only", False)
     try:
         category = variable_service._validated_category(attrs.get("category", "terraform"))
     except ValueError as e:
@@ -817,10 +883,15 @@ async def create_varset_var(
         category=category,
         hcl=attrs.get("hcl", False),
         sensitive=sensitive,
+        apply_only=apply_only,
         version_id=variable_service._version_hash(key, value, category),
     )
     db.add(vsv)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise _variable_conflict(e, key, apply_only, scope="This variable set") from e
     await db.refresh(vsv)
 
     return JSONResponse(content={"data": _vsvar_json(vsv, varset_id)}, status_code=201)
@@ -889,6 +960,8 @@ async def update_varset_var(
         vsv.sensitive = True
     elif "sensitive" in attrs:
         vsv.sensitive = attrs["sensitive"]
+    if "apply-only" in attrs:
+        vsv.apply_only = bool(attrs["apply-only"])
 
     # Security: a sensitive → non-sensitive downgrade must not expose the
     # previously-hidden value. If no fresh value was supplied in the same
@@ -898,7 +971,14 @@ async def update_varset_var(
         vsv.value = ""
         vsv.version_id = variable_service._version_hash(vsv.key, "", vsv.category)
 
-    await db.commit()
+    requested_key = attrs.get("key") or vsv.key
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise _variable_conflict(
+            e, requested_key, attrs.get("apply-only"), scope="This variable set"
+        ) from e
     await db.refresh(vsv)
     return JSONResponse(content={"data": _vsvar_json(vsv, varset_id)})
 

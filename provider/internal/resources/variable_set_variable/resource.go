@@ -31,6 +31,7 @@ type variableSetVariableModel struct {
 	Category    types.String `tfsdk:"category"`
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
 	Description types.String `tfsdk:"description"`
 	ValueSource types.String `tfsdk:"value_source"`
 
@@ -70,13 +71,20 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 	resp.Schema = schema.Schema{
 		Description: "Manages a variable within a Terrapod variable set.",
 		Attributes: map[string]schema.Attribute{
-			"id":          schema.StringAttribute{Computed: true, Description: "Variable ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"varset_id":   schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"key":         schema.StringAttribute{Required: true, Description: "Variable name."},
-			"value":       schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
-			"category":    schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"hcl":         schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Parse value as HCL."},
-			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
+			"id":        schema.StringAttribute{Computed: true, Description: "Variable ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"varset_id": schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"key":       schema.StringAttribute{Required: true, Description: "Variable name."},
+			"value":     schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
+			"category":  schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"hcl":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Parse value as HCL."},
+			"sensitive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
+			"apply_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan and deliver it only to an " +
+					"apply. An apply-only row shadows its standard twin inside this set's own " +
+					"precedence tier only — a priority set's standard row still beats a " +
+					"workspace apply-only one.",
+			},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
 			"value_source": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
@@ -219,6 +227,9 @@ func buildCreateVSVRequest(m *variableSetVariableModel) terrapod.CreateVarsetVar
 	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		req.HCL = m.HCL.ValueBool()
 	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		req.ApplyOnly = m.ApplyOnly.ValueBool()
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
 	}
@@ -244,6 +255,10 @@ func buildUpdateVSVRequest(m *variableSetVariableModel) terrapod.UpdateVarsetVar
 		v := m.HCL.ValueBool()
 		req.HCL = &v
 	}
+	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
+		a := m.ApplyOnly.ValueBool()
+		req.ApplyOnly = &a
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
 		req.Sensitive = &v
@@ -265,6 +280,7 @@ func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel
 	m.Category = types.StringValue(v.Category)
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
+	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

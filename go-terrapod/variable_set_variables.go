@@ -11,12 +11,16 @@ import (
 // /api/v2/varsets/{id}/relationships/vars. Sensitive variables have
 // Value redacted on the wire.
 type VariableSetVariable struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"`
-	HCL         bool   `json:"hcl"`
-	Sensitive   bool   `json:"sensitive"`
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	Value     string `json:"value,omitempty"`
+	Category  string `json:"category"`
+	HCL       bool   `json:"hcl"`
+	Sensitive bool   `json:"sensitive"`
+	// See Variable.ApplyOnly (#2189). An apply-only row in a variable SET
+	// shadows its standard twin inside the set's own precedence tier only --
+	// a priority set's standard row still beats a workspace apply-only one.
+	ApplyOnly   bool   `json:"apply-only"`
 	Description string `json:"description,omitempty"`
 
 	// ValueSource is "static" or "vault" (#1439) — the same reference model as
@@ -40,6 +44,7 @@ type CreateVarsetVariableRequest struct {
 	Category    string
 	HCL         bool
 	Sensitive   bool
+	ApplyOnly   bool
 	Description string
 	ValueSource string
 }
@@ -51,6 +56,7 @@ type UpdateVarsetVariableRequest struct {
 	Category    string
 	HCL         *bool
 	Sensitive   *bool
+	ApplyOnly   *bool
 	Description *string
 	ValueSource *string
 }
@@ -144,6 +150,9 @@ func varsetVarCreateAttrs(req CreateVarsetVariableRequest) map[string]any {
 	if req.Sensitive {
 		attrs["sensitive"] = true
 	}
+	if req.ApplyOnly {
+		attrs["apply-only"] = true
+	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
@@ -170,6 +179,9 @@ func varsetVarUpdateAttrs(req UpdateVarsetVariableRequest) map[string]any {
 	if req.Sensitive != nil {
 		attrs["sensitive"] = *req.Sensitive
 	}
+	if req.ApplyOnly != nil {
+		attrs["apply-only"] = *req.ApplyOnly
+	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
@@ -195,6 +207,7 @@ func varsetVarFromResource(res *Resource) *VariableSetVariable {
 		Category:    GetStringAttr(res, "category"),
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
+		ApplyOnly:   GetBoolAttr(res, "apply-only"),
 		Description: GetStringAttr(res, "description"),
 		ValueSource: GetStringAttr(res, "value-source"),
 		VersionID:   GetStringAttr(res, "version-id"),

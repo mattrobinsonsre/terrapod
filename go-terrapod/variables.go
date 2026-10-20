@@ -15,12 +15,16 @@ import (
 // provider's resource layer does this; the migration tool's report
 // flags every sensitive variable for operator re-entry.
 type Variable struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
-	HCL         bool   `json:"hcl"`
-	Sensitive   bool   `json:"sensitive"`
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	Value     string `json:"value,omitempty"`
+	Category  string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	HCL       bool   `json:"hcl"`
+	Sensitive bool   `json:"sensitive"`
+	// ApplyOnly withholds this variable from a plan and delivers it only to
+	// an apply (#2189). A different value per phase is TWO variables with the
+	// same key, one flagged; the apply-only one wins on an apply.
+	ApplyOnly   bool   `json:"apply-only"`
 	Description string `json:"description,omitempty"`
 
 	// ValueSource is "static" (Value is the literal) or "vault" (Value is a
@@ -54,6 +58,7 @@ type CreateVariableRequest struct {
 	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
 	HCL         bool   `json:"hcl,omitempty"`
 	Sensitive   bool   `json:"sensitive,omitempty"`
+	ApplyOnly   bool   `json:"apply-only,omitempty"`
 	Description string `json:"description,omitempty"`
 	// ValueSource defaults to "static" when empty. Set "vault" and put the
 	// JSON reference in Value; Terrapod forces Sensitive on either way. Add a
@@ -77,6 +82,7 @@ type UpdateVariableRequest struct {
 	Category    string  `json:"category,omitempty"`
 	HCL         *bool   `json:"hcl,omitempty"`
 	Sensitive   *bool   `json:"sensitive,omitempty"`
+	ApplyOnly   *bool   `json:"apply-only,omitempty"`
 	Description *string `json:"description,omitempty"`
 	ValueSource *string `json:"value-source,omitempty"`
 }
@@ -240,6 +246,9 @@ func variableCreateAttrs(req CreateVariableRequest) map[string]any {
 	if req.Sensitive {
 		attrs["sensitive"] = true
 	}
+	if req.ApplyOnly {
+		attrs["apply-only"] = true
+	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
@@ -266,6 +275,9 @@ func variableUpdateAttrs(req UpdateVariableRequest) map[string]any {
 	if req.Sensitive != nil {
 		attrs["sensitive"] = *req.Sensitive
 	}
+	if req.ApplyOnly != nil {
+		attrs["apply-only"] = *req.ApplyOnly
+	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
@@ -291,6 +303,7 @@ func variableFromResource(res *Resource) *Variable {
 		Category:    GetStringAttr(res, "category"),
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
+		ApplyOnly:   GetBoolAttr(res, "apply-only"),
 		Description: GetStringAttr(res, "description"),
 		ValueSource: GetStringAttr(res, "value-source"),
 		VersionID:   GetStringAttr(res, "version-id"),

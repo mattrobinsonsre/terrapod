@@ -994,7 +994,9 @@
       "valueSource": "Origem do valor",
       "valueSourceStatic": "Introduzir um valor",
       "valueSourceVault": "Ler do OpenBao/Vault",
-      "vaultHint": "O Terrapod lê o segredo do OpenBao (ou do HashiCorp Vault) durante a execução. Nada é armazenado aqui."
+      "vaultHint": "O Terrapod lê o segredo do OpenBao (ou do HashiCorp Vault) durante a execução. Nada é armazenado aqui.",
+      "applyOnly": "Apenas apply",
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "Codificação",
       "vaultFileEncodingNone": "Tal como guardado no OpenBao/Vault",
       "vaultFileEncodingBase64": "Descodificar Base64",
-      "vaultFileEncodingHint": "Descodifica o campo antes de o escrever. O resultado tem de ser texto; ficheiros binários não são suportados."
+      "vaultFileEncodingHint": "Descodifica o campo antes de o escrever. O resultado tem de ser texto; ficheiros binários não são suportados.",
+      "applyOnly": "Apenas apply",
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
     },
     "runs": {
       "options": "Opções",

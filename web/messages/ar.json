@@ -994,7 +994,9 @@
       "valueSource": "مصدر القيمة",
       "valueSourceStatic": "إدخال قيمة",
       "valueSourceVault": "القراءة من OpenBao/Vault",
-      "vaultHint": "يقرأ Terrapod السر من OpenBao (أو HashiCorp Vault) وقت التشغيل. لا يُخزَّن شيء هنا."
+      "vaultHint": "يقرأ Terrapod السر من OpenBao (أو HashiCorp Vault) وقت التشغيل. لا يُخزَّن شيء هنا.",
+      "applyOnly": "التطبيق فقط",
+      "applyOnlyHint": "يُحجب عن الخطة ويُسلَّم إلى التطبيق فقط. تنفّذ الخطة شفرة الإعداد، لذا لا ينبغي أن تكون بيانات اعتماد يحتاجها التطبيق وحده في بيئة الخطة."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "الترميز",
       "vaultFileEncodingNone": "كما هو مخزّن في OpenBao/Vault",
       "vaultFileEncodingBase64": "فك ترميز Base64",
-      "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة."
+      "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة.",
+      "applyOnly": "التطبيق فقط",
+      "applyOnlyHint": "يُحجب عن الخطة ويُسلَّم إلى التطبيق فقط. تنفّذ الخطة شفرة الإعداد، لذا لا ينبغي أن تكون بيانات اعتماد يحتاجها التطبيق وحده في بيئة الخطة."
     },
     "runs": {
       "options": "الخيارات",

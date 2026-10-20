@@ -49,6 +49,7 @@ type variableModel struct {
 	Category    types.String `tfsdk:"category"`
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
 	Description types.String `tfsdk:"description"`
 	ValueSource types.String `tfsdk:"value_source"`
 

@@ -994,7 +994,9 @@
       "valueSource": "qach Dat",
       "valueSourceStatic": "qach yIQtIv",
       "valueSourceVault": "OpenBao/Vault-vo' yIlaD",
-      "vaultHint": "QaptaHvIS OpenBao-vo' (HashiCorp Vault-vo' joq) pegh laD Terrapod. naDev pagh pollu'."
+      "vaultHint": "QaptaHvIS OpenBao-vo' (HashiCorp Vault-vo' joq) pegh laD Terrapod. naDev pagh pollu'.",
+      "applyOnly": "lo' neH",
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2706,9 @@
       "vaultFileEncoding": "ngoq",
       "vaultFileEncodingNone": "OpenBao/Vault Daq pollu''bogh rur",
       "vaultFileEncodingBase64": "Base64 yIpoj",
-      "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''."
+      "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''.",
+      "applyOnly": "lo' neH",
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
     },
     "runs": {
       "options": "wIvmey",

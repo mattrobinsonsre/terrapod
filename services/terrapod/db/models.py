@@ -1770,6 +1770,21 @@ class Variable(Base):
     #: or terraform variable and inherits sets, scoping and precedence unchanged.
     value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Withhold this variable from a plan and deliver it only to an apply
+    #: (#2189). A credential only the apply needs — a write-capable token, a
+    #: deploy key — is then never in the environment of a plan, which executes
+    #: the configuration's code and so runs a pull request's code.
+    #:
+    #: The shape is DUPLICATION, not a phase attribute: "a different value per
+    #: phase" is two rows with the same key, one flagged. That is why the flag
+    #: joins the uniqueness tuple below — without it the pair cannot exist.
+    #:
+    #: Orthogonal to `category`, like `sensitive` and `value_source`: a category
+    #: answers "what role does this value play", this answers "which phase
+    #: receives it". Deliberately NOT a category, which would double every one.
+    apply_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -1782,7 +1797,7 @@ class Variable(Base):
     workspace: Mapped["Workspace"] = relationship(back_populates="variables")
 
     __table_args__ = (
-        sa.UniqueConstraint("workspace_id", "key", name="uq_variables_workspace_key"),
+        sa.UniqueConstraint("workspace_id", "key", "apply_only", name="uq_variables_workspace_key"),
         Index("ix_variables_workspace_id", "workspace_id"),
     )
 
@@ -1850,6 +1865,21 @@ class VariableSetVariable(Base):
     #: or terraform variable and inherits sets, scoping and precedence unchanged.
     value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Withhold this variable from a plan and deliver it only to an apply
+    #: (#2189). A credential only the apply needs — a write-capable token, a
+    #: deploy key — is then never in the environment of a plan, which executes
+    #: the configuration's code and so runs a pull request's code.
+    #:
+    #: The shape is DUPLICATION, not a phase attribute: "a different value per
+    #: phase" is two rows with the same key, one flagged. That is why the flag
+    #: joins the uniqueness tuple below — without it the pair cannot exist.
+    #:
+    #: Orthogonal to `category`, like `sensitive` and `value_source`: a category
+    #: answers "what role does this value play", this answers "which phase
+    #: receives it". Deliberately NOT a category, which would double every one.
+    apply_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -1862,7 +1892,9 @@ class VariableSetVariable(Base):
     variable_set: Mapped["VariableSet"] = relationship(back_populates="variables")
 
     __table_args__ = (
-        sa.UniqueConstraint("variable_set_id", "key", name="uq_variable_set_variables"),
+        sa.UniqueConstraint(
+            "variable_set_id", "key", "apply_only", name="uq_variable_set_variables"
+        ),
         Index("ix_variable_set_variables_set_id", "variable_set_id"),
     )
 

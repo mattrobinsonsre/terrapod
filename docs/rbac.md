@@ -19,6 +19,21 @@ Workspace permissions are strictly hierarchical -- each level includes all permi
 | **write** | plan + confirm/discard applies, create apply runs, CRUD variables, upload state/config, rollback state versions |
 | **admin** | write + update/delete workspace, change VCS/execution settings, change labels, delete state versions. Cannot change owner (platform admin only) |
 
+"CRUD variables" at the **write** level includes a variable's
+[`apply-only`](api-reference.md#apply-only-variables-api) flag, which decides
+whether a value reaches a plan as well as an apply. It is **not a new permission
+axis**: anyone who can write a variable can set, clear, or add an apply-only twin
+of it, because they could already change that variable's value outright. A
+variable-set variable is platform `admin` as all variable-set writes are.
+
+One consequence is worth knowing when you reason about who can influence an
+apply. An apply-only row shadows a standard row **only inside its own precedence
+tier**, so a workspace-level apply-only variable cannot override a value a
+**priority** variable set supplies — which is what keeps a platform-mandated
+value out of reach of workspace write. See
+[Cloud Identity → How it interacts with
+precedence](cloud-identity.md#how-it-interacts-with-precedence).
+
 ### Registry Permission Levels
 
 Modules and providers use a similar three-level hierarchy (no "plan" concept):
