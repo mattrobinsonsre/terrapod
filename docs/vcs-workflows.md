@@ -130,6 +130,24 @@ While a PR's run sits in `planned`, the **workspace is locked**. A second PR tou
 
 This matches Atlantis's per-project lock and is the price of "the user reviews the exact plan that gets applied". For workspaces with many concurrent PRs, consider whether `merge_then_apply` (with its speculative plans not holding the lock) is a better fit.
 
+### When a PR closes or merges
+
+Terrapod cancels the runs that pull request was still working on, and keeps the
+ones that had already finished.
+
+| the PR's run was | what happens |
+|---|---|
+| still `pending`, `queued` or `planning` | **cancelled** — nobody is waiting for it any more |
+| a finished *speculative* plan (`planned`, plan-only) | **kept**, with its log, plan output and AI summary. It is a result you may still be reading, and a merged PR is exactly when you want to read it |
+| a finished *apply-capable* plan (`planned`, apply-then-merge) | **cancelled** — nobody can apply it now the PR is gone, and leaving it would hold the workspace lock above against every other pull request |
+| already `applied`, `errored`, `discarded` or `canceled` | untouched |
+
+A run cancelled this way records **"Pull request #N is no longer open"** as its
+reason, so it is distinguishable from one a person cancelled. Previously every
+one of these was cancelled, including the finished speculative plans, and with
+no reason recorded — so a plan that disappeared when its PR merged was
+indistinguishable from a failure.
+
 ### Stale-plan handling
 
 `tofu apply tfplan` refuses to apply if state drifted between plan and apply (e.g. a sibling PR applied and changed state). Terrapod surfaces that on the PR comment with a prompt to comment `terrapod plan` to refresh. No bespoke staleness logic — we lean on the tool.

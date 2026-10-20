@@ -241,24 +241,48 @@ async def _cancel_stale_module_runs(
     module: RegistryModule,
     pr_number: int,
 ) -> None:
-    """Cancel active module-test runs for a closed/merged PR."""
+    """Cancel the module-test runs a closed/merged PR should take with it.
+
+    `pr_closure_cancels_sql`, not the complement of `TERMINAL_STATES` (#2173),
+    and this sweep was the worse of the two: every run it touches is created
+    `plan_only=True`, and a plan-only run finishes in `planned` and stays there.
+    `planned` is not terminal, so the complement cancelled the finished
+    module-impact plan on every consumer the moment the module PR merged --
+    which is precisely the blast-radius analysis somebody merged the PR to act
+    on. A run still planning is a different matter and is still cancelled.
+    """
     for link in module.workspace_links:
         result = await db.execute(
             select(Run).where(
                 Run.workspace_id == link.workspace_id,
                 Run.source == "module-test",
                 Run.vcs_pull_request_number == pr_number,
-                Run.status.notin_(run_service.TERMINAL_STATES),
+                run_service.pr_closure_cancels_sql(Run),
             )
         )
         for stale_run in result.scalars().all():
             try:
-                await run_service.cancel_run(db, stale_run, force=True)
+                # `force` and the reason — see the sibling sweep in
+                # `vcs_poller._reconcile_closed_pr_sessions` for why each.
+                await run_service.cancel_run(
+                    db,
+                    stale_run,
+                    force=True,
+                    reason=run_service.pr_closed_cancel_reason(pr_number),
+                )
                 logger.info(
                     "Canceled stale module-test run",
                     run_id=str(stale_run.id),
                     pr_number=pr_number,
                     module=module.name,
+                )
+            except ValueError as e:
+                logger.info(
+                    "Left module-test run alone; it is no longer cancelable",
+                    run_id=str(stale_run.id),
+                    status=stale_run.status,
+                    pr_number=pr_number,
+                    reason=str(e),
                 )
             except Exception as e:
                 logger.warning(

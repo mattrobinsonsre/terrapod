@@ -2467,6 +2467,58 @@ async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) 
 # `planned` speculative runs when a newer commit supersedes them; they
 # pass `force=True` below to bypass the user-action gate.
 CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
+#: `planned` is deliberately absent: a run that has finished planning has no work
+#: in flight to cancel. The PR-closure sweeps do NOT use this set -- they must
+#: still cancel an apply-capable `planned` run, or it holds the workspace for
+#: ever. See `pr_closure_cancels`.
+
+
+def pr_closure_cancels(run: Run) -> bool:
+    """Whether a pull request going away should cancel this run.
+
+    The two PR-closure sweeps asked "is this run not terminal", and `planned` is
+    not terminal, so they cancelled every run that had already FINISHED planning
+    (#2173) -- including the speculative plan a reviewer was reading, and the
+    module-impact analysis somebody merged the PR in order to act on. A finished
+    speculative plan is a RESULT, not work in flight, and nothing is waiting on
+    it: `planned` is where a plan-only run stays for ever, because nothing
+    supersedes it and plan expiry is off by default.
+
+    **An apply-capable run in `planned` is the opposite case and must still be
+    cancelled.** `claim_next_run`'s dispatch gate blocks a workspace on any
+    other run that is `plan_only=False` and in
+    `planning/planned/confirmed/applying/canceling`, so an apply-then-merge plan
+    abandoned by a closed PR would hold that workspace against every other pull
+    request, for ever, with nothing else to clear it. `docs/vcs-workflows.md`
+    states that lock; excluding all finished plans rather than only speculative
+    ones is the mistake this docstring exists to stop someone repeating.
+
+    A speculative run still RUNNING is cancelled too -- that really is work
+    nobody is waiting for any more.
+    """
+    if run.status in TERMINAL_STATES:
+        return False
+    return not (run.status == "planned" and bool(run.plan_only))
+
+
+def pr_closure_cancels_sql(model) -> object:
+    """`pr_closure_cancels` as a SQL predicate over `model` (Run or an alias)."""
+    return and_(
+        model.status.notin_(list(TERMINAL_STATES)),
+        or_(model.status != "planned", model.plan_only.is_(False)),
+    )
+
+
+def pr_closed_cancel_reason(pr_number: int) -> str:
+    """Why a run was cancelled when the pull request driving it went away.
+
+    Shared by `vcs_poller._reconcile_closed_pr_sessions` and
+    `module_impact_service._cancel_stale_module_runs` so the two cannot drift
+    into describing one event two ways. It claims only what those sweeps know:
+    both detect a closure by set difference against the provider's open-PR list,
+    which cannot tell a merge from a close.
+    """
+    return f"Pull request #{pr_number} is no longer open"
 
 
 async def cancel_run(

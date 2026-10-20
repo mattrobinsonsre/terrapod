@@ -1000,18 +1000,26 @@ async def _reconcile_closed_pr_sessions(
     for sess in sessions.scalars().all():
         if sess.pr_number in open_pr_numbers:
             continue
-        # PR no longer in the open list — cancel active runs, close session.
+        # PR no longer in the open list — cancel the runs still in flight,
+        # close the session.
         #
         # Scoped to the workspaces on this connection and repo. Matching the
         # PR number alone force-cancelled every active run carrying that
         # number in EVERY repository Terrapod tracks: PR numbers are small
         # integers, so two repositories sharing one is the ordinary case, not
-        # an edge. The victim run is cancelled with `force=True`, so nothing
-        # about it looks deliberate from the outside — it reads as flakiness.
+        # an edge.
+        #
+        # One predicate, shared with the module-impact sweep (#2173), because
+        # this one asked "is it not terminal" and `planned` is not terminal — so
+        # it cancelled every FINISHED speculative plan, which is a result
+        # somebody is reading rather than work in flight. An apply-capable
+        # `planned` run is still cancelled, and must be: it holds the workspace
+        # against every other PR until something clears it, and nothing else
+        # would.
         active = await db.execute(
             select(Run).where(
                 Run.vcs_pull_request_number == sess.pr_number,
-                Run.status.notin_(run_service.TERMINAL_STATES),
+                run_service.pr_closure_cancels_sql(Run),
                 Run.workspace_id.in_(
                     select(Workspace.id).where(
                         Workspace.vcs_connection_id == conn.id,
@@ -1022,12 +1030,34 @@ async def _reconcile_closed_pr_sessions(
         )
         for run in active.scalars().all():
             try:
-                await run_service.cancel_run(db, run, force=True)
+                # `force=True` stays, and the predicate above is what makes it
+                # safe: `cancel_run` refuses `planned` without it, and an
+                # apply-capable `planned` run is one we must still cancel. The
+                # reason is new — without one the row is byte-identical to a
+                # user-initiated cancel, which is why the symptom read as
+                # flakiness rather than as a decision.
+                await run_service.cancel_run(
+                    db,
+                    run,
+                    force=True,
+                    reason=run_service.pr_closed_cancel_reason(sess.pr_number),
+                )
                 logger.info(
                     "Canceled run for closed PR",
                     run_id=str(run.id),
                     pr_number=sess.pr_number,
                     repo=repo,
+                )
+            except ValueError as e:
+                # It left a cancelable state while we were deciding — almost
+                # always a plan that finished. Not a failure: the point of the
+                # fix is that a finished plan survives its PR closing.
+                logger.info(
+                    "Left run alone for closed PR; it is no longer cancelable",
+                    run_id=str(run.id),
+                    status=run.status,
+                    pr_number=sess.pr_number,
+                    reason=str(e),
                 )
             except Exception as e:
                 logger.warning(
