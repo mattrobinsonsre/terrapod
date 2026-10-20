@@ -1072,18 +1072,18 @@ class PlatformToolsConfig(BaseModel):
     """
 
     opa_version: str = Field(
-        default="1.21.2",
+        default="1.21.3",
         description="OPA version used for policy evaluation on the runner and Rego "
         "syntax validation on the API. Exact version — no partial resolution. "
         "Review this at every minor release.",
     )
     trivy_version: str = Field(
-        default="0.72.0",
+        default="0.76.0",
         description="Trivy version used for IaC security scanning on the runner "
         "(only fetched when trivy is the selected engine). Exact version.",
     )
     checkov_version: str = Field(
-        default="3.3.26",
+        default="3.3.29",
         description="Checkov version used for IaC security scanning on the runner "
         "(the default engine). Exact version.",
     )
