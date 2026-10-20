@@ -2878,10 +2878,13 @@ async def claim_next_run(
         except Exception:
             logger.exception("rollback after pre-plan gate pass failure also failed")
 
-    # Try queued runs first (plan phase), then confirmed runs (apply phase)
+    # Try queued runs first (plan phase), then confirmed runs (apply phase), then
+    # a standalone configure -- which is ALSO `queued`, because #1974 settled the
+    # shape as one Run carrying a flag rather than a second object type.
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),
         ("confirmed", "apply", "applying"),
+        ("queued", "configure", "configuring"),
     ]:
         conditions = [
             Run.status == target_status,
@@ -2891,15 +2894,37 @@ async def claim_next_run(
             ),
         ]
 
-        # Per-workspace serialization + manual-lock gate, applied only when
-        # STARTING a plan (queued → planning). An apply-capable (plan+apply)
-        # run may not start if its workspace is manually locked OR already has
-        # another apply-capable run in flight — only one mutating run executes
-        # per workspace at a time. Plan-only runs (speculative / CLI `plan`,
-        # drift) never mutate state, so they bypass the gate and run
+        # `is_configure` separates the two tuples that share `queued`, and
+        # WITHOUT it a configure run is claimed as a plan -- the first matching
+        # tuple wins -- so a listener launches a Job that runs `tofu plan`
+        # against a directory of playbooks.
+        #
+        # The apply tuple is deliberately NOT constrained. A COMPOSITE run (an
+        # apply followed by a configure, #1407 point 1a) carries
+        # `is_configure=True` and must still be claimable as an apply from
+        # `confirmed`; constraining it to False would strand every composite at
+        # its apply.
+        #
+        # Per-workspace serialization + manual-lock gate, applied to everything
+        # STARTING from `queued` -- a plan (queued → planning) and now a
+        # standalone configure (queued → configuring) alike. An apply-capable
+        # (plan+apply) run may not start if its workspace is manually locked OR
+        # already has another apply-capable run in flight — only one mutating run
+        # executes per workspace at a time. Plan-only runs (speculative / CLI
+        # `plan`, drift) never mutate state, so they bypass the gate and run
         # concurrently. The apply phase is the continuation of an
         # already-serialized run, so it is not re-gated here.
+        #
+        # A configure IS gated, and that is the conservative reading rather than
+        # a decided one: it mutates hosts, and `plan_only` is refused on a
+        # configure run (#2131), so it reads as apply-capable and the existing
+        # gate catches it without a special case. **What a configure should
+        # actually serialise against is #1975's**, which also owns the recorded
+        # cost that `plan_only` is dishonest in both directions here. Serialising
+        # too much is a throughput question; serialising too little is a
+        # correctness one, so this errs that way until #1975 decides.
         if target_status == "queued":
+            conditions.append(Run.is_configure.is_(phase == "configure"))
             other = aliased(Run)
             in_flight = (
                 select(other.id)
