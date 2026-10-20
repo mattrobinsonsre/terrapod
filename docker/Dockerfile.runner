@@ -133,6 +133,9 @@ COPY services/terrapod/runner/runner_config.py ./terrapod/runner/runner_config.p
 COPY services/terrapod/runner/download.py ./terrapod/runner/download.py
 COPY services/terrapod/runner/reserved_env.py ./terrapod/runner/reserved_env.py
 COPY services/terrapod/runner/exec_subprocess.py ./terrapod/runner/exec_subprocess.py
+# How the configure phase runs ansible: in the execution-environment container
+# beside this one, over loopback (#1972). The orchestrator ships no ansible.
+COPY services/terrapod/runner/ee_client.py ./terrapod/runner/ee_client.py
 COPY services/terrapod/runner/debug_linger.py ./terrapod/runner/debug_linger.py
 COPY services/terrapod/runner/lock_extender.py ./terrapod/runner/lock_extender.py
 COPY services/terrapod/runner/plan_artifacts.py ./terrapod/runner/plan_artifacts.py

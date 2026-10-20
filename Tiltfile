@@ -220,6 +220,7 @@ local_resource(
         'services/terrapod/runner/download.py',
         'services/terrapod/runner/reserved_env.py',
         'services/terrapod/runner/exec_subprocess.py',
+        'services/terrapod/runner/ee_client.py',
         'services/terrapod/runner/debug_linger.py',
         'services/terrapod/runner/lock_extender.py',
         'services/terrapod/runner/plan_artifacts.py',

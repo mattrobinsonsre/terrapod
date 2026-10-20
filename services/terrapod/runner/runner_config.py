@@ -81,6 +81,24 @@ class RunnerConfig:
     #: workspace entry overrides the repository's build of that collection and
     #: leaves every other one standing.
     ansible_collections: list[str]
+    #: Where the Ansible configuration root sits inside the fetched tree -- the
+    #: operator's `ansible.cfg`, their playbooks, their `roles/` (#1929). It is
+    #: the configure's WORKING DIRECTORY and nothing else will do: `group_vars`
+    #: beside an inventory is found cwd-relative, and relative paths in their own
+    #: `ansible.cfg` (`inventory`, `roles_path`, `library`) resolve against the
+    #: cwd rather than against the file. Empty on a plan or apply.
+    config_directory: str
+    #: The playbook this run executes, relative to `config_directory`. The run's
+    #: own choice where it made one, otherwise the workspace's `default_playbook`
+    #: -- resolved by the API, because "there is always a default and you
+    #: override it" is the platform's rule and the runner should not re-derive it.
+    playbook: str
+    #: `--limit`, narrowing THIS run the way `-target` narrows a plan. Empty means
+    #: the whole resolved inventory.
+    ansible_limit: str
+    #: Ordered `-i` arguments, relative to `config_directory`. Order is
+    #: PRECEDENCE in ansible, so this is a list and not a set (#1929).
+    inventory_paths: list[str]
     #: How many operations the engine runs at once (#1431). Set on every run
     #: by the API, so the runner never has to know an engine's own default.
     parallelism: int
@@ -173,6 +191,10 @@ class RunnerConfig:
             replace_addrs=_json_list("TP_REPLACE_ADDRS"),
             var_files=_json_list("TP_VAR_FILES"),
             ansible_collections=_json_list("TP_ANSIBLE_COLLECTIONS"),
+            config_directory=e.get("TP_CONFIG_DIRECTORY", ""),
+            playbook=e.get("TP_PLAYBOOK", ""),
+            ansible_limit=e.get("TP_ANSIBLE_LIMIT", ""),
+            inventory_paths=_json_list("TP_INVENTORY_PATHS"),
             refresh=_bool("TP_REFRESH", default=True),
             parallelism=_int("TP_PARALLELISM", 10),
             refresh_only=_bool("TP_REFRESH_ONLY"),

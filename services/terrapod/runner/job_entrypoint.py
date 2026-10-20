@@ -46,6 +46,7 @@ from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
     cloud_identity,
+    configure,
     cost,
     discovery,
     execution_hooks,
@@ -86,6 +87,7 @@ _COMBINED_LOG = Path("/tmp/combined.log")
 _INIT_LOG = Path("/tmp/init.log")
 _PLAN_LOG = Path("/tmp/plan.log")
 _APPLY_LOG = Path("/tmp/apply.log")
+_CONFIGURE_LOG = Path("/tmp/configure.log")
 _PLAN_JSON = Path("/tmp/plan.json")
 _TF_RC = Path("/tmp/terraform.rc")
 _OPA_WORK = Path("/tmp/opa")
@@ -804,6 +806,21 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     if os.environ.get("TP_ENGINE", "") == "pulumi":
         return _run_pulumi_phase(cfg, child_grace=_child_grace_seconds(cfg))
 
+    # 7c. A configure runs here, for the same reason and with the same boundary
+    # (#1972). It keeps what 7b keeps -- the configuration tarball, the chdir,
+    # private-git-module auth for a git-sourced role, and the operator's hooks --
+    # and skips what is Terraform's alone. The steps below would not merely fail
+    # to apply: step 10's backend backstop raises when `.terraform/terraform.tfstate`
+    # is MISSING, which is exactly what a directory of playbooks leaves behind,
+    # so a configure branching at step 11 would die before reaching ansible with
+    # advice about a committed `override.tf`.
+    #
+    # It is a THIRD branch rather than a phase of the apply because a configure is
+    # an independent operation: the composite case (an apply that is followed by a
+    # configure) is two runner Jobs driven by one Run, not one Job doing both.
+    if cfg.phase == "configure":
+        return _run_configure_phase(cfg, work_dir=work_dir)
+
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
     # The same var-files, resolved against the process directory, for a
@@ -912,6 +929,16 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         )
     log.error("unknown phase", phase=cfg.phase)
     return 1
+
+
+def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
+    """Run the playbook in the execution environment (#1972).
+
+    Failures to reach or drive the execution environment are deliberately NOT
+    caught: every caller above reads a returned integer as ansible's verdict, so
+    a configure that never ran must raise rather than return one.
+    """
+    return configure.run(cfg, work_dir=work_dir, log_file=str(_CONFIGURE_LOG))
 
 
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]
