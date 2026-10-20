@@ -33,7 +33,9 @@ Three things here are not obvious and each is load-bearing:
 
 from __future__ import annotations
 
+import contextlib
 import os
+import signal
 import sys
 from dataclasses import dataclass
 
@@ -94,6 +96,59 @@ def _endpoint() -> tuple[str, dict[str, str]]:
     return base.rstrip("/"), {"Authorization": f"Bearer {token}"}
 
 
+@contextlib.contextmanager
+def _forward_termination_to_the_execution_environment(binary: str):
+    """Turn a SIGTERM here into a cancellation there, for one invocation.
+
+    #2154 scope item 12. `exec_subprocess.run` forwards a signal to the child it
+    started; a configure has no local child -- ansible runs in another container,
+    parented by the agent -- so the same duty lands here, and nothing else would
+    do it. Without this a terminating pod leaves ansible running until the
+    kubelet kills the whole pod, part way through a fleet, with no chance to stop
+    cleanly between tasks.
+
+    **Cancellation is an endpoint rather than a signal**, because the agent is
+    ansible's parent and can signal it directly -- which is exactly why the Job
+    does not set `shareProcessNamespace` and why there is no pid here to signal
+    even if we wanted to.
+
+    **Once, not twice**, mirroring `exec_subprocess`'s own guard: the agent
+    forwards ONE SIGINT and a second makes ansible abort ungracefully, possibly
+    skipping what it was part way through. The handler is restored on the way
+    out, so this affects exactly the window where there is something to cancel.
+    """
+    state = {"sent": False}
+    previous: dict[int, object] = {}
+
+    def handler(signum: int, _frame) -> None:  # noqa: ARG001
+        if state["sent"]:
+            return
+        state["sent"] = True
+        log.warning(
+            "received signal — asking the execution environment to cancel",
+            received=signum,
+            binary=binary,
+        )
+        # Best-effort by construction: the run may already have finished, and a
+        # failure to cancel must not replace whatever the run was going to
+        # report. `cancel` swallows its own transport errors for that reason.
+        cancel()
+
+    for sig in (signal.SIGTERM, signal.SIGQUIT):
+        try:
+            previous[sig] = signal.signal(sig, handler)
+        except (ValueError, OSError):
+            # Not the main thread, or the platform refuses: the configure still
+            # runs, it just cannot be asked to stop early.
+            pass
+    try:
+        yield
+    finally:
+        for sig, original in previous.items():
+            with contextlib.suppress(ValueError, OSError, TypeError):
+                signal.signal(sig, original)  # type: ignore[arg-type]
+
+
 def run(
     binary: str,
     args: list[str],
@@ -149,7 +204,10 @@ def run(
             sys.stdout.buffer.flush()
 
     try:
-        with httpx.Client(timeout=_TIMEOUT) as client:
+        with (
+            httpx.Client(timeout=_TIMEOUT) as client,
+            _forward_termination_to_the_execution_environment(binary),
+        ):
             try:
                 with client.stream(
                     "POST", f"{base}/exec", headers=headers, json=payload

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -40,11 +41,17 @@ class _FakeAgent:
     then could not say how it ended.
     """
 
-    def __init__(self, chunks, verdict, *, exec_status=200, trailer_rc=None):
+    def __init__(self, chunks, verdict, *, exec_status=200, trailer_rc=None, chunk_delay=0.0):
         self.chunks = chunks
         self.verdict = verdict
         self.exec_status = exec_status
         self.trailer_rc = trailer_rc
+        # Space the chunks out, so a test can act WHILE the request is in
+        # flight. Without it the fake finishes in under a millisecond and a
+        # signal fired "during" the run actually lands after it -- which is a
+        # race in the test rather than in the code, and it passes or fails on
+        # machine speed.
+        self.chunk_delay = chunk_delay
         self.seen: list[dict] = []
         self.cancelled = False
         agent = self
@@ -86,8 +93,17 @@ class _FakeAgent:
                     self.send_header("Transfer-Encoding", "chunked")
                     self.end_headers()
                     for chunk in agent.chunks:
+                        # Stop when cancelled, as the real agent does: it SIGINTs
+                        # ansible, which exits, and the stream ends. That also
+                        # takes most of the timing out of the cancellation tests
+                        # -- they finish as soon as the cancellation is observed
+                        # rather than racing the end of a fixed-length stream.
+                        if agent.cancelled:
+                            break
                         self.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
                         self.wfile.flush()
+                        if agent.chunk_delay:
+                            time.sleep(agent.chunk_delay)
                     # A trailer the client is expected to ignore entirely.
                     if agent.trailer_rc is not None:
                         self.wfile.write(b"0\r\nX-Terrapod-RC: %d\r\n\r\n" % agent.trailer_rc)
@@ -157,6 +173,29 @@ def agent(monkeypatch):
     yield make
     for a in made:
         a.close()
+
+
+@pytest.fixture
+def absorb_sigterm():
+    """Make SIGTERM harmless for the duration of a test, then restore it.
+
+    The cancellation tests fire a real signal at this process, and the handler
+    under test is what stops the default action from killing it. So WITHOUT this
+    a regression that drops the handler does not fail those tests -- it kills
+    pytest, exit 143, with no `FAILED` line and 16 of 19 tests reported. That
+    reads as "nothing failed", which is the worst possible shape for a
+    mutation check and makes the suite fragile besides.
+
+    Installed BEFORE `ee_client` installs its own, so the context manager saves
+    this as the handler to restore and the window under test is unchanged.
+    """
+    import signal as signalmod
+
+    previous = signalmod.signal(signalmod.SIGTERM, lambda *_: None)
+    try:
+        yield
+    finally:
+        signalmod.signal(signalmod.SIGTERM, previous)
 
 
 @pytest.fixture(autouse=True)
@@ -332,3 +371,74 @@ class TestCancel:
         monkeypatch.setenv(ENDPOINT_ENV, "http://127.0.0.1:1")
         monkeypatch.setenv(TOKEN_ENV, TOKEN)
         assert cancel() is False
+
+
+class TestTerminationReachesTheExecutionEnvironment:
+    """#2154 item 12: the runner's SIGTERM contract now spans two containers.
+
+    `exec_subprocess.run` forwards a signal to the child it started. A configure
+    has no local child -- ansible runs in the EE, parented by the agent -- so
+    nothing else would carry the duty, and a terminating pod would leave ansible
+    running until the kubelet killed the whole pod part way through a fleet.
+    """
+
+    def test_a_sigterm_during_a_run_cancels_in_the_ee(self, agent, absorb_sigterm):
+        import os
+        import signal as signalmod
+        import threading
+
+        a = agent(chunks=[b"PLAY [x] ***\n"] * 40, chunk_delay=0.05)
+
+        # Fire the signal at ourselves while the request is in flight. Python
+        # delivers it on the main thread, which is where the handler is
+        # installed, so this exercises the real path rather than calling the
+        # handler directly.
+        def fire():
+            os.kill(os.getpid(), signalmod.SIGTERM)
+
+        timer = threading.Timer(0.05, fire)
+        timer.start()
+        try:
+            run("ansible-playbook", [], cwd="/w", tee_to_stdout=False)
+        finally:
+            timer.cancel()
+        assert a.cancelled is True, "a SIGTERM did not reach the execution environment"
+
+    def test_the_handler_is_restored_afterwards(self, agent, absorb_sigterm):
+        """It affects exactly the window where there is something to cancel."""
+        import signal as signalmod
+
+        agent()
+        before = signalmod.getsignal(signalmod.SIGTERM)
+        run("ansible-playbook", [], cwd="/w", tee_to_stdout=False)
+        assert signalmod.getsignal(signalmod.SIGTERM) is before
+
+    def test_only_one_cancellation_is_sent(self, monkeypatch, absorb_sigterm):
+        """The guard asserted directly, not through two racing signals.
+
+        The signal-driven version of this test was VACUOUS and the mutation
+        check is what showed it: the fake stops streaming when cancelled -- as
+        the real agent does, because it SIGINTs ansible and the stream ends -- so
+        a second signal fired at the process arrives after the request has
+        finished and the handler has been restored. It passed whether or not the
+        guard existed.
+
+        Invoking the installed handler twice tests the property itself: the agent
+        forwards ONE SIGINT, and a second makes ansible abort ungracefully,
+        possibly skipping what it was part way through. Mirrors
+        `exec_subprocess`'s own one-shot guard, for the same reason.
+        """
+        import signal as signalmod
+
+        import terrapod.runner.ee_client as mod
+
+        sent: list[int] = []
+        monkeypatch.setattr(mod, "cancel", lambda: sent.append(1) or True)
+
+        with mod._forward_termination_to_the_execution_environment("ansible-playbook"):
+            handler = signalmod.getsignal(signalmod.SIGTERM)
+            assert callable(handler), "no handler was installed to test"
+            handler(signalmod.SIGTERM, None)
+            handler(signalmod.SIGTERM, None)
+
+        assert len(sent) == 1, f"cancelled {len(sent)} times"
