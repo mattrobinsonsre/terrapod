@@ -35,12 +35,50 @@ var allowed = map[string]bool{
 // ONE SIGINT, because a second makes ansible abort ungracefully.
 const childGrace = 25 * time.Second
 
+// outcome is a completed child's verdict, kept so a caller that cannot read HTTP
+// trailers can still learn the exit code.
+//
+// The trailer alone was unreadable by this agent's only real consumer. Measured:
+// neither `httpx` nor the stdlib `http.client` exposes HTTP trailers at all --
+// both see the `Trailer:` announcement header and never the values -- and the
+// orchestrator is Python. The Go tests passed because Go's net/http populates
+// `resp.Trailer`, so the contract was verified only in the language it was
+// written in, which is the one language it is never consumed from.
+//
+// The trailer stays: it costs nothing, it is correct, and a Go client reading
+// this agent gets the code without a second request.
+type outcome struct {
+	Bin string `json:"bin"`
+	RC  int    `json:"rc"`
+	Err string `json:"error,omitempty"`
+}
+
 // runner owns the single child process. A configure is sequential, so one at a
 // time is the whole concurrency model — and it is what lets /cancel name "the"
-// child without an identifier.
+// child without an identifier, and /result name "the" verdict.
 type runner struct {
 	mu    sync.Mutex
 	child *exec.Cmd
+	last  *outcome
+}
+
+// record stores a verdict for /result. Called from start's deferred tail on
+// every return path, so a new early return cannot silently stop reporting.
+func (r *runner) record(bin string, rc int, err error) {
+	o := &outcome{Bin: bin, RC: rc}
+	if err != nil {
+		o.Err = err.Error()
+	}
+	r.mu.Lock()
+	r.last = o
+	r.mu.Unlock()
+}
+
+// result is the last completed child's verdict, or nil if none has completed.
+func (r *runner) result() *outcome {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.last
 }
 
 // scrubbed returns the environment a child should see: everything the agent has,
@@ -71,7 +109,21 @@ func scrubbed(parent []string, extra []string, tokenKey string) []string {
 // ("ERROR: Ansible requires blocking IO on stdin/stdout/stderr"), exiting before
 // it does any work and naming only the descriptor. The agent owns those
 // descriptors, so this is the agent's problem to get right.
-func (r *runner) start(bin string, args []string, env []string, dir string, sink io.Writer) (int, error) {
+func (r *runner) start(
+	bin string, args []string, env []string, dir string, sink io.Writer,
+) (rc int, err error) {
+	// Named returns plus a deferred record, so every path -- including a refusal
+	// before anything starts -- leaves something for /result to report. The one
+	// exception is below: a rejected concurrent request is not this agent's
+	// verdict on a child, and recording it would clobber the verdict of the
+	// child still running.
+	skipRecord := false
+	defer func() {
+		if !skipRecord {
+			r.record(bin, rc, err)
+		}
+	}()
+
 	if !allowed[bin] {
 		return 126, fmt.Errorf("%q is not an ansible entry point this agent will run", bin)
 	}
@@ -111,6 +163,7 @@ func (r *runner) start(bin string, args []string, env []string, dir string, sink
 	r.mu.Lock()
 	if r.child != nil {
 		r.mu.Unlock()
+		skipRecord = true
 		return 1, fmt.Errorf("a child is already running; this agent runs one at a time")
 	}
 	if err := cmd.Start(); err != nil {
@@ -130,7 +183,7 @@ func (r *runner) start(bin string, args []string, env []string, dir string, sink
 	r.child = nil
 	r.mu.Unlock()
 
-	rc := cmd.ProcessState.ExitCode()
+	rc = cmd.ProcessState.ExitCode()
 	if copyErr != nil && rc == 0 {
 		return rc, fmt.Errorf("reading %s output: %w", bin, copyErr)
 	}

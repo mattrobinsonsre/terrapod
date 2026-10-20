@@ -95,6 +95,28 @@ func (a *agent) handler() http.Handler {
 		}
 	})
 
+	mux.HandleFunc("/result", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "GET only", http.StatusMethodNotAllowed)
+			return
+		}
+		if !a.authorised(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		// The exit code again, out of band, because the orchestrator is Python
+		// and no Python client exposes HTTP trailers (see `outcome`). Read after
+		// the /exec body reaches EOF: `start` records under the mutex before it
+		// returns, so by then the verdict is already there.
+		o := a.runner.result()
+		if o == nil {
+			http.Error(w, "no child has completed in this agent", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(o)
+	})
+
 	mux.HandleFunc("/cancel", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST only", http.StatusMethodNotAllowed)

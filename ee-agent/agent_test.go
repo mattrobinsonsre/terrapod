@@ -269,3 +269,95 @@ func TestContractCatchesAnsibleThatWillNotRun(t *testing.T) {
 		t.Fatalf("the reason should carry ansible's own output, got: %s", reason)
 	}
 }
+
+// get is the read-only twin of post, for /result.
+func get(t *testing.T, url, token string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	return resp
+}
+
+func decodeOutcome(t *testing.T, resp *http.Response) outcome {
+	t.Helper()
+	var o outcome
+	if err := json.NewDecoder(resp.Body).Decode(&o); err != nil {
+		t.Fatalf("decoding /result: %v", err)
+	}
+	return o
+}
+
+func TestResultRequiresTheToken(t *testing.T) {
+	srv := testAgent(t, "")
+	if resp := get(t, srv.URL+"/result", ""); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("want 403 without a token, got %d", resp.StatusCode)
+	}
+}
+
+func TestResultIsNotFoundBeforeAnythingHasRun(t *testing.T) {
+	srv := testAgent(t, "")
+	if resp := get(t, srv.URL+"/result", "the-token"); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("want 404 before any child, got %d", resp.StatusCode)
+	}
+}
+
+// The property /result exists for: a caller that reads ONLY the body and this
+// endpoint -- never the trailer -- still learns the exit code. That is the
+// orchestrator's position exactly, because no Python HTTP client exposes
+// trailers (see the `outcome` doc comment). Asserting it here with the trailer
+// deliberately ignored is what makes the Go test speak for the Python consumer.
+func TestResultCarriesTheExitCodeWithoutReadingTheTrailer(t *testing.T) {
+	fakeAnsible(t, "ansible-playbook", `echo doing-work; exit 7`)
+	srv := testAgent(t, "")
+
+	resp := post(t, srv.URL+"/exec", "the-token", execRequest{Bin: "ansible-playbook"})
+	body, _ := io.ReadAll(resp.Body) // to EOF, which is when the verdict is recorded
+	if !strings.Contains(string(body), "doing-work") {
+		t.Fatalf("the child's output did not reach the caller: %q", body)
+	}
+
+	o := decodeOutcome(t, get(t, srv.URL+"/result", "the-token"))
+	if o.RC != 7 {
+		t.Fatalf("want rc 7 from /result, got %d", o.RC)
+	}
+	if o.Bin != "ansible-playbook" {
+		t.Fatalf("want the binary named, got %q", o.Bin)
+	}
+	if o.Err != "" {
+		t.Fatalf("a non-zero exit is ansible's verdict, not an agent error, got %q", o.Err)
+	}
+}
+
+// A refusal before anything starts must reach /result too, or the orchestrator
+// cannot tell "the playbook failed" from "the EE has no ansible-playbook" --
+// which it otherwise learns only from the X-Terrapod-Error trailer it cannot
+// read.
+func TestResultReportsARefusalThatNeverStartedAChild(t *testing.T) {
+	srv := testAgent(t, "")
+	_ = post(t, srv.URL+"/exec", "the-token", execRequest{Bin: "sh"})
+
+	o := decodeOutcome(t, get(t, srv.URL+"/result", "the-token"))
+	if o.RC != 126 {
+		t.Fatalf("want rc 126 for a non-allowlisted binary, got %d", o.RC)
+	}
+	if !strings.Contains(o.Err, "not an ansible entry point") {
+		t.Fatalf("want the refusal's reason, got %q", o.Err)
+	}
+}
+
+func TestOnlyGetReadsTheResult(t *testing.T) {
+	srv := testAgent(t, "")
+	if resp := post(t, srv.URL+"/result", "the-token", nil); resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("want 405 for POST /result, got %d", resp.StatusCode)
+	}
+}
