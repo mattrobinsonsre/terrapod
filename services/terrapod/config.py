@@ -154,6 +154,21 @@ class RunnerConfig(BaseSettings):
         default=5, description="Backoff between SSE reconnect attempts (s)."
     )
     service_account_name: str = Field(default="")
+    #: An OPTIONAL second account, used for the APPLY phase only (#2189), so an
+    #: operator can give the plan a read-only cloud principal. A plan executes
+    #: the configuration's code -- data sources, module sources, provider
+    #: binaries -- so a pull-request plan runs untrusted code with whatever the
+    #: Job holds, and today that is the same principal an apply uses.
+    #:
+    #: **Empty is the mechanism, not an edge case.** Absent, every phase uses
+    #: `service_account_name` exactly as before, the rendered Job spec is
+    #: unchanged, and the chart renders neither the account nor this key. That is
+    #: what keeps the default byte-identical.
+    #:
+    #: Mirrors the OIDC path rather than inventing a second vocabulary: there an
+    #: apply presents `phase: apply` and resolves to the base identity plus any
+    #: extra apply identity. Base plus an optional extra for the apply, both ways.
+    apply_service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
     #: How long a failed runner pod is held open for inspection when its
