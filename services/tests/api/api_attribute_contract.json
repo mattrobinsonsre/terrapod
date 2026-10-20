@@ -1006,6 +1006,7 @@
     "updated-at"
   ],
   "variables._var_json": [
+    "apply-only",
     "category",
     "created-at",
     "description",
@@ -1029,6 +1030,7 @@
     "workspace-count"
   ],
   "variables._vsvar_json": [
+    "apply-only",
     "category",
     "created-at",
     "description",
