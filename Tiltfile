@@ -228,6 +228,7 @@ local_resource(
         'services/terrapod/runner/phases',
         'services/terrapod/runner/saas_known_hosts',
         'services/terrapod/services/cost',
+        'services/terrapod/services/inventory_render.py',
     ],
     labels=['build'],
 )
