@@ -63,20 +63,27 @@ def upgrade() -> None:
             ),
         )
 
-    # `(workspace_id, key, category)` -> `(workspace_id, key, category, apply_only)`.
+    # `(workspace_id, key)` -> `(workspace_id, key, apply_only)`.
+    #
+    # `category` is deliberately absent, even though `main` ends up with it in
+    # this constraint. At THIS point in the chain it is not in the constraint
+    # yet: `2ff6b78f7163` (#1898) adds it later and exists only on `main`. So
+    # this revision does exactly what it does on the 1.11 release line, and the
+    # two lines converge at `2ff6b78f7163`, which widens to all four. One
+    # revision id, one effect, whichever line runs it.
     op.drop_constraint("uq_variables_workspace_key", "variables", type_="unique")
     op.create_unique_constraint(
         "uq_variables_workspace_key",
         "variables",
-        ["workspace_id", "key", "category", "apply_only"],
+        ["workspace_id", "key", "apply_only"],
     )
 
-    # `(variable_set_id, key, category)` -> `(..., category, apply_only)`.
+    # `(variable_set_id, key)` -> `(variable_set_id, key, apply_only)`.
     op.drop_constraint("uq_variable_set_variables", "variable_set_variables", type_="unique")
     op.create_unique_constraint(
         "uq_variable_set_variables",
         "variable_set_variables",
-        ["variable_set_id", "key", "category", "apply_only"],
+        ["variable_set_id", "key", "apply_only"],
     )
 
 
@@ -88,13 +95,9 @@ def downgrade() -> None:
     # operator is told what is in the way instead of losing a credential.
     op.drop_constraint("uq_variable_set_variables", "variable_set_variables", type_="unique")
     op.create_unique_constraint(
-        "uq_variable_set_variables",
-        "variable_set_variables",
-        ["variable_set_id", "key", "category"],
+        "uq_variable_set_variables", "variable_set_variables", ["variable_set_id", "key"]
     )
     op.drop_constraint("uq_variables_workspace_key", "variables", type_="unique")
-    op.create_unique_constraint(
-        "uq_variables_workspace_key", "variables", ["workspace_id", "key", "category"]
-    )
+    op.create_unique_constraint("uq_variables_workspace_key", "variables", ["workspace_id", "key"])
     for table in ("variable_set_variables", "variables"):
         op.drop_column(table, "apply_only")

@@ -21,6 +21,21 @@ things followed, and the third is why this is being fixed now (#1898):
 
 Widening the key fixes the first two and makes the third expressible.
 
+**`apply_only` is in this tuple too, and it has to be (#2189).** That column
+arrives earlier in the chain at `7a27d4747b9e` -- the 1.11 release line's own
+migration, carried to `main` at the point that line branched -- which leaves the
+constraint `(owner, key, apply_only)`, exactly what it does on 1.11, where
+`category` is not part of a variable's identity at all. So this revision widens
+three columns to four rather than two to three, and recreating it as
+`[owner, "key", "category"]` here would silently take `apply_only` back out: the
+model would say four, the migrated database would say three, and an apply-only
+variable could no longer share a key with a standard one, which is the whole of
+#2189. No pytest tier would have caught it -- they build their tables from the
+ORM models rather than by running this chain -- and E2E caught it only as a `409`
+from a variable-create helper, which reads as an API defect.
+`tests/integration/test_migrated_schema_matches_models.py` is the gate that
+names it.
+
 **This widens; it never narrows.** Every existing row already satisfies the new
 constraint, because anything unique on (workspace_id, key) is unique on
 (workspace_id, key, category) too. No backfill, no data change, no row is
@@ -71,7 +86,7 @@ _SCOPES = (
 def upgrade() -> None:
     for table, constraint, owner in _SCOPES:
         op.drop_constraint(constraint, table, type_="unique")
-        op.create_unique_constraint(constraint, table, [owner, "key", "category"])
+        op.create_unique_constraint(constraint, table, [owner, "key", "category", "apply_only"])
 
 
 def downgrade() -> None:
@@ -83,7 +98,7 @@ def downgrade() -> None:
             sa.text(
                 f"SELECT id, {owner} AS owner, key, category FROM ("  # noqa: S608 - identifiers are literals above
                 f"  SELECT id, {owner}, key, category, ROW_NUMBER() OVER ("  # noqa: S608
-                f"    PARTITION BY {owner}, key ORDER BY id"  # noqa: S608
+                f"    PARTITION BY {owner}, key, apply_only ORDER BY id"  # noqa: S608
                 f"  ) AS rn FROM {table}"  # noqa: S608
                 f") ranked WHERE rn > 1"
             )
@@ -101,4 +116,4 @@ def downgrade() -> None:
             )
 
         op.drop_constraint(constraint, table, type_="unique")
-        op.create_unique_constraint(constraint, table, [owner, "key"])
+        op.create_unique_constraint(constraint, table, [owner, "key", "apply_only"])
