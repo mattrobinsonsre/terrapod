@@ -36,7 +36,7 @@ import structlog
 
 from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
-from terrapod.services.inventory_render import render_inventory_yaml
+from terrapod.services.inventory_render import build_inventory_document
 
 logger = structlog.get_logger(__name__)
 
@@ -85,7 +85,7 @@ def inventory_dir() -> Path:
 def document_to_source(document: dict[str, Any]) -> str:
     """The stored document as a YAML inventory source.
 
-    Shares `render_inventory_yaml` with the API rather than rendering its own
+    Shares `build_inventory_document` with the API rather than rendering its own
     YAML: the shape carries group nesting, which is what `--limit` expands
     through, so two renderers that drifted would make a limit mean different
     things on the two sides of the same run.
@@ -111,13 +111,21 @@ def document_to_source(document: dict[str, Any]) -> str:
         if extra not in groups:
             group_rows.append((extra, {}))
 
-    return render_inventory_yaml(
+    document = build_inventory_document(
         hosts=sorted((name, vars_ or {}) for name, vars_ in hosts.items()),
         groups=sorted(group_rows),
         memberships=memberships,
         children=nesting,
         global_vars={},
     )
+    # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
+    # `requirements-runner.txt` deliberately ships no PyYAML -- so serialising
+    # here is what keeps this module importable in the runner image at all.
+    # Measured against ansible-core 2.21.5: a JSON-serialised inventory is
+    # accepted on `.yml`, resolves the same hosts, and expands `--limit` through
+    # the same group nesting. `sort_keys` so the same document renders the same
+    # bytes, as the API's YAML does.
+    return json.dumps(document, indent=2, sort_keys=True)
 
 
 def materialise(cfg: RunnerConfig, *, client: Any = None) -> Path:

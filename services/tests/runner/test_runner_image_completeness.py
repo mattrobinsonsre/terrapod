@@ -18,7 +18,9 @@ version of that check.
 from __future__ import annotations
 
 import ast
+import importlib.metadata
 import pathlib
+import sys
 
 import pytest
 
@@ -272,3 +274,132 @@ def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
         "test_every_module_the_job_imports_is_in_the_runner_image SKIPS in CI and "
         "the runner-image omission it exists to catch ships unnoticed"
     )
+
+
+# ── Third-party dependencies, which are the other half of "complete" ─────────
+
+
+#: Where the runner image's own dependency closure is pinned. It is deliberately
+#: minimal -- around twenty packages against the API's hundreds -- so a module
+#: the image ships may still import something the image cannot resolve.
+REQUIREMENTS = (ROOT / "services" / "requirements-runner.txt") if ROOT else None
+
+
+def _terrapod_package_root() -> pathlib.Path | None:
+    """`services/terrapod` in a checkout, `terrapod` in the image."""
+    if ROOT is None:
+        return None
+    for cand in (ROOT / "services" / "terrapod", ROOT / "terrapod"):
+        if cand.is_dir():
+            return cand
+    return None
+
+
+def _third_party_imports_reachable_from(start: pathlib.Path) -> dict[str, str]:
+    """Top-level non-stdlib, non-terrapod modules imported, and who imports them.
+
+    Follows BOTH the `terrapod.runner.*` chain and the other `terrapod.*` modules
+    the image COPIES in -- which is the half that matters, because the omission
+    this catches lived in `services/inventory_render.py`, a shipped non-runner
+    module, and a walk that only recorded its NAME never parsed its imports.
+
+    Module-level imports only. A function-local import is a deliberate deferral
+    and may legitimately name something absent, so long as the path that reaches
+    it is not one every run takes.
+    """
+    pkg = _terrapod_package_root()
+    if pkg is None:
+        return {}
+    found: dict[str, str] = {}
+    seen: set[pathlib.Path] = set()
+    queue = [start]
+    while queue:
+        f = queue.pop()
+        if f in seen or not f.exists():
+            continue
+        seen.add(f)
+        tree = ast.parse(f.read_text(), filename=str(f))
+        for node in tree.body:  # module level only, deliberately
+            names: list[str] = []
+            if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                names.append(node.module)
+            elif isinstance(node, ast.Import):
+                names += [a.name for a in node.names]
+            # Each imported NAME as well as the module, because a name may
+            # itself be a submodule: `from terrapod.runner.phases import
+            # configure_inventory` reaches `phases/configure_inventory.py`, and
+            # recording only `phases` stops the walk at an empty `__init__.py`.
+            # The walker at the top of this file says exactly that, and the first
+            # version of THIS one did it anyway -- it stayed green with the
+            # `import yaml` that broke every runner Job put back.
+            submodule_names = (
+                [a.name for a in node.names] if isinstance(node, ast.ImportFrom) else []
+            )
+            for dotted in names:
+                top = dotted.split(".")[0]
+                if top == "terrapod":
+                    rel = dotted.removeprefix("terrapod.").replace(".", "/")
+                    queue.append(pkg / f"{rel}.py")
+                    queue.append(pkg / rel / "__init__.py")
+                    for n in submodule_names:
+                        queue.append(pkg / rel / f"{n}.py")
+                        queue.append(pkg / rel / n / "__init__.py")
+                elif top not in sys.stdlib_module_names and top != "__future__":
+                    found.setdefault(top, f.name)
+    return found
+
+
+def test_every_third_party_module_the_job_imports_is_installed_in_the_image() -> None:
+    """A module the image ships is useless if its dependency is not pinned.
+
+    The sibling of the test at the top of this file, and the half it could not
+    see. `services/inventory_render.py` was added to the runner image's COPY list
+    correctly, passed that gate, and carried a module-level `import yaml` --
+    while `requirements-runner.txt` deliberately pins no PyYAML. Every runner Job
+    of every kind then died at import with `ModuleNotFoundError: No module named
+    'yaml'`, so no plan, apply or configure could execute, and only the eval-boot
+    job -- which builds the real image and runs a real Job -- caught it.
+
+    Resolved through `packages_distributions()` rather than by guessing the
+    distribution name, because the import name and the package name differ often
+    enough to make a guess worthless (`yaml` is PyYAML, `kubernetes` is
+    kubernetes). A module that cannot be resolved to a distribution FAILS rather
+    than being skipped: unresolvable means unverifiable, and a gate that skips
+    what it cannot check is the shape this file already records twice.
+    """
+    if ROOT is None or ENTRYPOINT is None or not REQUIREMENTS.is_file():
+        pytest.skip("no docker/ or requirements-runner.txt in this tree")
+
+    pinned = {
+        line.split("==")[0].strip().lower().replace("_", "-")
+        for line in REQUIREMENTS.read_text().splitlines()
+        if "==" in line and not line.lstrip().startswith("#")
+    }
+    assert len(pinned) >= 10, (
+        f"only {len(pinned)} pinned package(s) parsed out of {REQUIREMENTS.name} -- "
+        "the matcher has stopped matching, so this gate would pass on anything"
+    )
+
+    imports = _third_party_imports_reachable_from(ENTRYPOINT)
+    assert len(imports) >= 3, (
+        f"only {len(imports)} third-party import(s) found from {ENTRYPOINT.name} -- "
+        "the walk has stopped walking, so this gate would pass on anything"
+    )
+
+    mapping = importlib.metadata.packages_distributions()
+    problems: list[str] = []
+    for module, importer in sorted(imports.items()):
+        dists = mapping.get(module)
+        if not dists:
+            problems.append(
+                f"{module} (imported by {importer}) resolves to no installed "
+                "distribution, so this gate cannot verify it is in the image"
+            )
+            continue
+        if not any(d.lower().replace("_", "-") in pinned for d in dists):
+            problems.append(
+                f"{module} (imported by {importer}) comes from {dists}, none of "
+                f"which is pinned in {REQUIREMENTS.name} -- every runner Job will "
+                f"die at import with ModuleNotFoundError: No module named '{module}'"
+            )
+    assert not problems, "\n".join(problems)

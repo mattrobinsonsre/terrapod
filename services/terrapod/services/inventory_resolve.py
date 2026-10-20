@@ -57,12 +57,12 @@ import yaml
 
 from terrapod.config import settings
 
-# Rendering lives in its own module because the RUNNER needs it too, and a
-# second copy of a precedence-bearing renderer is how the two sides of one
-# run come to disagree about what a configure targeted (#1972). Imported
-# here rather than moved away, so every existing caller and test that reads
-# `inventory_resolve.render_inventory_yaml` keeps working.
-from terrapod.services.inventory_render import render_inventory_yaml
+# The DOCUMENT is built by its own module because the RUNNER needs the same
+# structure, and a second copy of a precedence-bearing builder is how the two
+# sides of one run come to disagree about what a configure targeted (#1972).
+# Serialising stays here: that module must import nothing, because the runner
+# image ships no PyYAML (see its docstring).
+from terrapod.services.inventory_render import build_inventory_document
 from terrapod.storage.keys import config_version_key, resolved_inventory_key
 
 logger = structlog.get_logger(__name__)
@@ -181,6 +181,22 @@ def _tmpdir() -> str | None:
 
 
 # ── Rendering the declared rows ──────────────────────────────────────────────
+
+
+def render_inventory_yaml(**kwargs: Any) -> str:
+    """The declared rows as one YAML inventory file, for `ansible-inventory`.
+
+    The API's serialisation of `build_inventory_document`. YAML rather than the
+    runner's JSON because this is the file a human debugging the resolver opens,
+    and this process has PyYAML while the runner's does not.
+
+    `default_flow_style=False` and `sort_keys=True` so the same rows render the
+    same bytes -- which is what makes a rendered file comparable between two
+    reads when something looks wrong.
+    """
+    return yaml.safe_dump(
+        build_inventory_document(**kwargs), default_flow_style=False, sort_keys=True
+    )
 
 
 # ── Refusing a plugin source ─────────────────────────────────────────────────
