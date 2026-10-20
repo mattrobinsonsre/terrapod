@@ -14,6 +14,9 @@ data:
       pull_policy: {{ .Values.runners.image.pullPolicy | quote }}
     server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
     service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
+    {{- with (include "terrapod.runnerApplyServiceAccountName" .) }}
+    apply_service_account_name: {{ . | quote }}
+    {{- end }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
     debug_linger_seconds: {{ .Values.runners.debugLingerSeconds }}

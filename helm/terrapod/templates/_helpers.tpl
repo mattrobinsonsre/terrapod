@@ -113,6 +113,21 @@ When create=false: uses runners.serviceAccount.name, or "default" if unset.
 {{- end }}
 
 {{/*
+The APPLY phase's runner service account name (#2189), or "" when the feature
+is off. Empty is the mechanism: the ConfigMap key and the ServiceAccount object
+are both rendered only when this is non-empty, so a deployment that sets
+nothing keeps one account for every phase and a byte-identical rendered spec.
+*/}}
+{{- define "terrapod.runnerApplyServiceAccountName" -}}
+{{- $sa := .Values.runners.applyServiceAccount | default dict }}
+{{- if $sa.create }}
+{{- default (printf "%s-runner-apply" (include "terrapod.fullname" .)) $sa.name }}
+{{- else }}
+{{- default "" $sa.name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Listener service account name.
 */}}
 {{- define "terrapod.listenerServiceAccountName" -}}
