@@ -255,6 +255,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
 		HCL         *bool  `json:"hcl,omitempty" jsonschema:"the value is a raw HCL expression (lists/objects); default false"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
+		ApplyOnly   *bool  `json:"apply_only,omitempty" jsonschema:"withhold this variable from a plan and deliver it only to an apply; default false. A plan executes the configuration's code, so a credential only the apply needs should not be in a plan's environment. For a different value per phase, set TWO variables with the same key — one ordinary, one apply_only — and the apply-only one wins on an apply"`
 		Description string `json:"description,omitempty" jsonschema:"optional human description"`
 		ValueSource string `json:"value_source,omitempty" jsonschema:"static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from OpenBao (or HashiCorp Vault) at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod. Add \"file\":{\"name\":\"gcp/adc.json\"} to the reference to deliver the secret as a file on the runner: the variable then holds the file's absolute path (usable as file(var.x), or by a tool reading a path from an env var). name defaults to the key; a relative name lands under /var/run/terrapod/files/, a name starting ~/ in the runner's home (e.g. ~/.aws/credentials). Not allowed with hcl=true. The file's content is exactly one of: the reference's field (add \"encoding\":\"base64\" inside file to decode it to UTF-8 text); \"template\" inside file with no field, a logic-less template over the one read such as \"[default]\\naws_access_key_id = {{ access_key }}\\n\" (dotted names reach into maps; filters json, base64decode, trim, lines, indent N; _lease.ttl, _lease.renewable, _lease.expires_at when the secret has a lease; at most 16 KiB); or \"format\" inside file with no field, json or env for the whole secret, optionally narrowed by \"fields\":[...]"`
 	}
@@ -263,7 +264,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Description: "Set a workspace variable — creates it if the key is new, updates it in place if it exists (an upsert keyed on `key`). " +
 			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set hcl=true for non-string values (lists/objects/numbers). " +
 			"Set value_source=vault to store a reference to an OpenBao (or HashiCorp Vault) secret instead of a literal, so the secret stays in OpenBao/Vault and is read per run — an unresolvable reference fails the run rather than delivering nothing. " +
-			"A reference with a \"file\" object delivers the secret as a file and the variable holds its path, for providers and tools that only read credentials from a file. Returns the variable.",
+			"A reference with a \"file\" object delivers the secret as a file and the variable holds its path, for providers and tools that only read credentials from a file. " +
+			"Set apply_only=true to withhold the variable from a plan and deliver it only to an apply, so a write-capable credential is never in the environment of a plan that runs a pull request's code. Returns the variable.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
@@ -283,6 +285,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 				Category:    category,
 				HCL:         in.HCL,
 				Sensitive:   in.Sensitive,
+				ApplyOnly:   in.ApplyOnly,
 				Description: strPtrOrNil(in.Description),
 				ValueSource: strPtrOrNil(in.ValueSource),
 			})
@@ -299,6 +302,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			Category:    category,
 			HCL:         boolOrFalse(in.HCL),
 			Sensitive:   boolOrFalse(in.Sensitive),
+			ApplyOnly:   boolOrFalse(in.ApplyOnly),
 			Description: in.Description,
 			ValueSource: in.ValueSource,
 		})

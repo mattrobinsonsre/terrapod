@@ -806,6 +806,13 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "apply_only": {
+          "description": "withhold this variable from a plan and deliver it only to an apply; default false. A plan executes the configuration's code, so a credential only the apply needs should not be in a plan's environment. For a different value per phase, set TWO variables with the same key — one ordinary, one apply_only — and the apply-only one wins on an apply",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "category": {
           "description": "terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive",
           "type": "string"
