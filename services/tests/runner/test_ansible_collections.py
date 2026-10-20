@@ -30,6 +30,22 @@ API = "https://terrapod.test"
 TOKEN = "runtok:run-1:apply:3600:0:deadbeef"
 
 
+@pytest.fixture(autouse=True)
+def _ee_install_dirs(tmp_path_factory, monkeypatch):
+    """Point the install targets somewhere that exists in a test.
+
+    They default to `/tp/...`, the volume shared with the execution-environment
+    container, which exists only inside a runner Job -- so without this every
+    test that reaches `install` fails on `mkdir` rather than on the thing it is
+    about. Setting the environment rather than patching the functions is
+    deliberate: it is the same channel the Job uses, so these tests exercise how
+    the paths are actually resolved.
+    """
+    base = tmp_path_factory.mktemp("ee-dirs")
+    monkeypatch.setenv("TP_EE_COLLECTIONS_DIR", str(base / "collections"))
+    monkeypatch.setenv("TP_EE_ROLES_DIR", str(base / "roles"))
+
+
 def _cfg(api_url: str = API, token: str = TOKEN):
     return SimpleNamespace(api_url=api_url, auth_token=token)
 
@@ -89,7 +105,7 @@ class TestTheEnvironment:
         would stop ansible finding them. Ours has to be on the path too, or `-p`
         installs successfully into somewhere nothing reads."""
         env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_COLLECTIONS_PATH": "/repo/collections"})
-        assert env["ANSIBLE_COLLECTIONS_PATH"] == f"{ac.COLLECTIONS_DIR}:/repo/collections"
+        assert env["ANSIBLE_COLLECTIONS_PATH"] == f"{ac.collections_dir()}:/repo/collections"
 
     def test_an_operators_ansible_home_wins(self) -> None:
         env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_HOME": "/repo/.ansible"})
@@ -97,7 +113,7 @@ class TestTheEnvironment:
 
     def test_a_vendored_roles_path_is_kept_after_ours(self) -> None:
         env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_ROLES_PATH": "/repo/roles"})
-        assert env["ANSIBLE_ROLES_PATH"] == f"{ac.ROLES_DIR}:/repo/roles"
+        assert env["ANSIBLE_ROLES_PATH"] == f"{ac.roles_dir()}:/repo/roles"
 
     def test_roles_and_collections_paths_are_distinct(self) -> None:
         env = ac.galaxy_env(API, TOKEN, base={})
@@ -165,15 +181,20 @@ class TestRolesAndCollectionsAreTwoMechanisms:
         return f
 
     def _argvs(self, run) -> list[list[str]]:
-        return [c.args[0] for c in run.call_args_list]
+        # The full argv, binary first. `ee_client.run` takes the entry point and
+        # its arguments as two parameters rather than one list -- the agent
+        # resolves the NAME inside the execution environment, where a path from
+        # here would mean nothing -- so this rejoins them, and every index below
+        # keeps meaning what it meant when the runner exec'd it directly.
+        return [[c.args[0], *c.args[1]] for c in run.call_args_list]
 
     def test_both_subcommands_run_for_one_requirements_file(self, tmp_path: Path) -> None:
         self._req(
             tmp_path, "roles:\n  - src: git+ssh://git@host/r.git\ncollections:\n  - name: a.b\n"
         )
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
         argvs = self._argvs(run)
         assert len(argvs) == 2, argvs
         assert argvs[0][1:3] == ["role", "install"], argvs[0]
@@ -183,18 +204,18 @@ class TestRolesAndCollectionsAreTwoMechanisms:
         """Not cosmetic: a collection may be a dependency of nothing, but a role
         a playbook needs should be on disk before anything that could fail."""
         self._req(tmp_path, "roles:\n  - src: git+ssh://git@host/r.git\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
         assert self._argvs(run)[0][1] == "role"
 
     def test_no_cache_is_only_on_the_collection_command(self, tmp_path: Path) -> None:
         """`ansible-galaxy install`/`role install` do not accept `--no-cache`;
         passing it would fail the whole invocation with an argparse error."""
         self._req(tmp_path, "collections:\n  - name: a.b\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
         role, coll = self._argvs(run)
         assert "--no-cache" not in role, role
         assert "--no-cache" in coll, coll
@@ -203,19 +224,19 @@ class TestRolesAndCollectionsAreTwoMechanisms:
         """ansible keeps the two search paths separate; a role installed into the
         collections tree is not found."""
         self._req(tmp_path, "collections:\n  - name: a.b\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
         role, coll = self._argvs(run)
-        assert str(ac.ROLES_DIR) in role and str(ac.COLLECTIONS_DIR) not in role
-        assert str(ac.COLLECTIONS_DIR) in coll and str(ac.ROLES_DIR) not in coll
+        assert str(ac.roles_dir()) in role and str(ac.collections_dir()) not in role
+        assert str(ac.collections_dir()) in coll and str(ac.roles_dir()) not in coll
 
     def test_a_failing_role_install_names_the_roles(self, tmp_path: Path) -> None:
         f = self._req(tmp_path, "roles:\n  - src: git+ssh://git@host/r.git\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=3)
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=3, error="")
             with pytest.raises(ac.CollectionInstallError) as e:
-                ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+                ac.install(_cfg(), tmp_path)
         assert "roles" in str(e.value) and str(f) in str(e.value)
         assert e.value.exit_code == 3
 
@@ -224,16 +245,21 @@ class TestTheWorkspacesOwnCollections:
     """The platform's list, installed last so it overrides."""
 
     def _argvs(self, run) -> list[list[str]]:
-        return [c.args[0] for c in run.call_args_list]
+        # The full argv, binary first. `ee_client.run` takes the entry point and
+        # its arguments as two parameters rather than one list -- the agent
+        # resolves the NAME inside the execution environment, where a path from
+        # here would mean nothing -- so this rejoins them, and every index below
+        # keeps meaning what it meant when the runner exec'd it directly.
+        return [[c.args[0], *c.args[1]] for c in run.call_args_list]
 
     def _cfg_with(self, declared: list[str]):
         return SimpleNamespace(api_url=API, auth_token=TOKEN, ansible_collections=declared)
 
     def test_they_are_installed_with_force_and_last(self, tmp_path: Path) -> None:
         (tmp_path / "requirements.yml").write_text("collections:\n  - name: a.b\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(self._cfg_with(["a.b:2.0.0"]), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(self._cfg_with(["a.b:2.0.0"]), tmp_path)
         argvs = self._argvs(run)
         assert len(argvs) == 3, argvs
         assert "--force" not in argvs[1], "the configuration's own install must not force"
@@ -242,24 +268,24 @@ class TestTheWorkspacesOwnCollections:
     def test_they_install_with_no_requirements_file_at_all(self, tmp_path: Path) -> None:
         """A workspace may declare collections for a configuration that declares
         none of its own."""
-        with patch.object(ac.exec_subprocess, "run") as run:
-            run.return_value = SimpleNamespace(exit_code=0)
-            ac.install(self._cfg_with(["a.b"]), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(self._cfg_with(["a.b"]), tmp_path)
         argvs = self._argvs(run)
         assert len(argvs) == 1 and "a.b" in argvs[0], argvs
 
     def test_nothing_runs_when_nothing_is_declared(self, tmp_path: Path) -> None:
-        with patch.object(ac.exec_subprocess, "run") as run:
-            ac.install(self._cfg_with([]), tmp_path, bin_dir=Path("/opt/bin"))
+        with patch.object(ac.ee_client, "run") as run:
+            ac.install(self._cfg_with([]), tmp_path)
         run.assert_not_called()
 
     def test_two_requirements_files_are_refused_before_anything_runs(self, tmp_path: Path) -> None:
         (tmp_path / "collections").mkdir()
         (tmp_path / "collections" / "requirements.yml").write_text("collections: []\n")
         (tmp_path / "requirements.yml").write_text("collections: []\n")
-        with patch.object(ac.exec_subprocess, "run") as run:
+        with patch.object(ac.ee_client, "run") as run:
             with pytest.raises(ac.CollectionInstallError) as e:
-                ac.install(_cfg(), tmp_path, bin_dir=Path("/opt/bin"))
+                ac.install(_cfg(), tmp_path)
         run.assert_not_called()
         assert "more than one place" in str(e.value)
 

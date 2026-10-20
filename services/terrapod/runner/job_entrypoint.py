@@ -44,6 +44,7 @@ import structlog
 
 from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
+    ansible_collections,
     backend_backstop,
     cloud_identity,
     configure,
@@ -932,12 +933,23 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
 
 def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
-    """Run the playbook in the execution environment (#1972).
+    """Install the content the playbook needs, then run it (#1972).
+
+    Both steps go through the SAME execution environment, which is a correctness
+    requirement: `requires_ansible` is not enforced at install time, so
+    installing with one ansible-core and running with another produces a set
+    that fails mid-play, after the configure has begun changing hosts.
+
+    The install runs FIRST and its failure stops the configure -- a playbook
+    whose collections are missing fails per-task, part way through a fleet,
+    which is the worst time to discover it.
 
     Failures to reach or drive the execution environment are deliberately NOT
     caught: every caller above reads a returned integer as ansible's verdict, so
     a configure that never ran must raise rather than return one.
     """
+    cwd = (work_dir / cfg.config_directory).resolve() if cfg.config_directory else work_dir
+    ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
     return configure.run(cfg, work_dir=work_dir, log_file=str(_CONFIGURE_LOG))
 
 

@@ -68,7 +68,7 @@ from pathlib import Path
 
 import structlog
 
-from terrapod.runner import exec_subprocess
+from terrapod.runner import ee_client
 
 # `structlog` directly rather than `terrapod.logging_config`: the runner image
 # ships only the modules Dockerfile.runner names and that one is not among them.
@@ -86,15 +86,39 @@ _API_PREFIX = "/api/terrapod/v1"
 #: build the per-server env var names, which ansible uppercases.
 SERVER_NAME = "terrapod"
 
-#: Where collections are installed to, and where ansible is told to look. Both,
-#: because `-p` outside the configured collections path installs successfully and
-#: then warns that nothing will pick them up.
-COLLECTIONS_DIR = Path("/tmp/ansible-collections")
+#: Fallbacks for the two install targets, used only when the Job did not say.
+#: The real values come from the environment -- see `collections_dir`.
+_DEFAULT_COLLECTIONS_DIR = "/tp/collections"
+_DEFAULT_ROLES_DIR = "/tp/roles"
 
-#: Where roles land. Separate from collections because ansible keeps the two
-#: search paths separate, and a role installed into the collections tree is not
-#: found.
-ROLES_DIR = Path("/tmp/ansible-roles")
+
+def collections_dir() -> Path:
+    """Where collections are installed to, and where ansible is told to look.
+
+    Both, because `-p` outside the configured collections path installs
+    successfully and then warns that nothing will pick them up.
+
+    **It must be on the volume BOTH containers see.** Ansible runs in the
+    execution-environment container and this installs from the orchestrator, so
+    the runner's own `emptyDir` is invisible to the thing that reads the result:
+    collections would install, report success, and no playbook would find one.
+    `job_template` mounts a single shared volume into both and names it in
+    `TP_EE_COLLECTIONS_DIR`.
+
+    A function rather than a constant because the value arrives in the Job's
+    environment, which a module-level read would freeze at import.
+    """
+    return Path(os.environ.get("TP_EE_COLLECTIONS_DIR") or _DEFAULT_COLLECTIONS_DIR)
+
+
+def roles_dir() -> Path:
+    """Where roles land, on that same shared volume.
+
+    Separate from collections because ansible keeps the two search paths
+    separate, and a role installed into the collections tree is not found.
+    """
+    return Path(os.environ.get("TP_EE_ROLES_DIR") or _DEFAULT_ROLES_DIR)
+
 
 #: The paths a requirements file is looked for at, in order, relative to the
 #: workspace's `config_directory`. Ansible's own convention: `ansible-galaxy`
@@ -163,13 +187,13 @@ def galaxy_env(api_url: str, token: str, *, base: dict[str, str] | None = None) 
     # sets this itself, and discarding it would stop ansible finding them. The
     # install target has to be on the path too, or `-p` installs successfully
     # into somewhere nothing reads.
-    search_path = str(COLLECTIONS_DIR)
+    search_path = str(collections_dir())
     if existing := source.get("ANSIBLE_COLLECTIONS_PATH", "").strip():
         search_path = f"{search_path}:{existing}"
 
     # Same rule for roles: a repository that vendors roles under its own
     # `roles/` directory sets this, and ours has to be on the path as well.
-    roles_path = str(ROLES_DIR)
+    roles_path = str(roles_dir())
     if existing_roles := source.get("ANSIBLE_ROLES_PATH", "").strip():
         roles_path = f"{roles_path}:{existing_roles}"
 
@@ -190,26 +214,51 @@ def galaxy_env(api_url: str, token: str, *, base: dict[str, str] | None = None) 
 def _run_install(
     argv_tail: list[str],
     *,
-    bin_dir: Path,
+    cwd: Path,
     env: dict[str, str],
-    child_grace: float,
     log_file: str | None,
     what: str,
 ) -> None:
-    """One `ansible-galaxy` invocation. `argv_tail` carries the subcommand, so a
-    caller chooses `role install` or `collection install` -- the two have
-    different flags and must not be built from one template."""
-    result = exec_subprocess.run(
-        [str(bin_dir / "ansible-galaxy"), *argv_tail],
-        log_file=log_file,
-        child_grace_seconds=child_grace,
-        tee_to_stdout=True,
+    """One `ansible-galaxy` invocation, run in the execution environment.
+
+    `argv_tail` carries the subcommand, so a caller chooses `role install` or
+    `collection install` -- the two have different flags and must not be built
+    from one template.
+
+    **It runs in the EE rather than here, and that is a correctness requirement
+    rather than tidiness.** `requires_ansible` is not enforced at install time --
+    measured, a collection declaring `>=2.20.0` installs on 2.16.19 at exit 0
+    with no warning -- so installing with one ansible-core and running with
+    another produces a set that fails mid-play, after a configure has already
+    begun changing hosts. The agent's allowlist carries `ansible-galaxy` for
+    exactly this reason.
+
+    The binary is a NAME, never a path: the agent resolves it with `LookPath`
+    inside the EE, where the orchestrator's filesystem does not reach.
+
+    No `child_grace` any more. The agent owns ansible's descriptors and parents
+    the process, so the grace is its own fixed contract (one SIGINT, then SIGKILL
+    after 25s) and a value passed from here would describe nothing.
+    """
+    result = ee_client.run(
+        "ansible-galaxy",
+        argv_tail,
+        cwd=str(cwd),
         env=env,
+        log_file=log_file,
     )
-    if result.exit_code != 0:
+    if result.error:
+        # The agent could not run the entry point at all, which is a failure of
+        # the execution environment rather than of the requirements.
+        raise CollectionInstallError(
+            f"the execution environment could not run ansible-galaxy to install "
+            f"{what}: {result.error}",
+            exit_code=result.rc,
+        )
+    if result.rc != 0:
         raise CollectionInstallError(
             f"installing {what} failed; the log above is ansible-galaxy's own output",
-            exit_code=result.exit_code,
+            exit_code=result.rc,
         )
 
 
@@ -227,8 +276,6 @@ def install(
     cfg,  # RunnerConfig
     config_dir: Path,
     *,
-    bin_dir: Path,
-    child_grace: float = 60.0,
     log_file: str | None = None,
 ) -> None:
     """Install the configuration's roles and collections, then the workspace's.
@@ -276,8 +323,11 @@ def install(
         )
 
     env = galaxy_env(cfg.api_url, cfg.auth_token)
-    COLLECTIONS_DIR.mkdir(parents=True, exist_ok=True)
-    ROLES_DIR.mkdir(parents=True, exist_ok=True)
+    collections = collections_dir()
+    roles = roles_dir()
+    # Created from here, on the shared volume, so the agent does not have to.
+    collections.mkdir(parents=True, exist_ok=True)
+    roles.mkdir(parents=True, exist_ok=True)
 
     if files:
         path = files[0]
@@ -288,19 +338,17 @@ def install(
         # written into git's own config.
         logger.info("installing the configuration's roles", requirements=str(path))
         _run_install(
-            ["role", "install", "-r", str(path), "-p", str(ROLES_DIR)],
-            bin_dir=bin_dir,
+            ["role", "install", "-r", str(path), "-p", str(roles)],
+            cwd=config_dir,
             env=env,
-            child_grace=child_grace,
             log_file=log_file,
             what=f"the roles declared in {path}",
         )
         logger.info("installing the configuration's collections", requirements=str(path))
         _run_install(
-            ["collection", "install", "-r", str(path), "-p", str(COLLECTIONS_DIR), "--no-cache"],
-            bin_dir=bin_dir,
+            ["collection", "install", "-r", str(path), "-p", str(collections), "--no-cache"],
+            cwd=config_dir,
             env=env,
-            child_grace=child_grace,
             log_file=log_file,
             what=f"the collections declared in {path}",
         )
@@ -318,13 +366,12 @@ def install(
                 "install",
                 *declared,
                 "-p",
-                str(COLLECTIONS_DIR),
+                str(collections),
                 "--force",
                 "--no-cache",
             ],
-            bin_dir=bin_dir,
+            cwd=config_dir,
             env=env,
-            child_grace=child_grace,
             log_file=log_file,
             what="the collections declared on the workspace",
         )

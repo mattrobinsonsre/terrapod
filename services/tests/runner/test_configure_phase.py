@@ -206,3 +206,29 @@ class TestItFailsClosed:
         phase reports the code rather than interpreting it."""
         ee.rc = 4
         assert configure.run(cfg, work_dir=tree) == 4
+
+
+class TestTheGalaxyTokenDoesNotReachThePlaybook:
+    """#2154 item 9: the token crosses a container boundary, and only one way.
+
+    `ansible-galaxy` needs it to authenticate against Terrapod's own registry.
+    `ansible-playbook` must never see it: a playbook is the operator's code, it
+    runs in the same container, and a credential in its environment is one it can
+    read and exfiltrate. The two invocations are separate `/exec` calls with
+    separate environments, which is what makes the boundary real rather than a
+    convention -- so it is worth asserting, because the cheap mistake is to build
+    one environment and reuse it.
+    """
+
+    def test_the_playbook_environment_carries_no_galaxy_credential(self, cfg, tree, ee):
+        configure.run(cfg, work_dir=tree)
+        env = ee.calls[0]["env"]
+        leaked = [k for k in env if "GALAXY" in k.upper() or "TOKEN" in k.upper()]
+        assert leaked == [], f"the playbook was handed {leaked}"
+
+    def test_nor_the_runner_token(self, cfg, tree, ee):
+        """`TP_AUTH_TOKEN` is the run's own credential, which `exec_subprocess`
+        already scrubs from an engine's environment for the same reason."""
+        configure.run(cfg, work_dir=tree)
+        env = ee.calls[0]["env"]
+        assert not any(k.startswith("TP_") for k in env), sorted(env)
