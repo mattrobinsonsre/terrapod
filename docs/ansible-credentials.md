@@ -14,8 +14,8 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | a host pattern — the literal `all`, or the name of a group the inventory declares | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | `0600` key file(s) on the volume shared with the execution environment, plus connection variables injected into the run's rendered inventory at **group** level for that scope |
-| `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0600` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
+| `ansible_machine_auth` | a host pattern — the literal `all`, or the name of a group the inventory declares | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | `0640` key file(s) on the volume shared with the execution environment, plus connection variables injected into the run's rendered inventory at **group** level for that scope |
+| `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0640` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
 [encryption at rest](encryption-at-rest.md) where the deployment has it enabled,
@@ -57,7 +57,7 @@ a configure that cannot connect.
 
 | Field | Becomes | Notes |
 |---|---|---|
-| `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
+| `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0640` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
 | `password` | `ansible_password` | |
 | `user` | `ansible_user` | |
 | `become` | `ansible_become` | a boolean. `true`/`yes`/`1`/`on` and `false`/`no`/`0`/`off` are accepted; anything else is refused, because a value ansible cannot read as true would read as false and silently drop privilege escalation |
@@ -182,12 +182,10 @@ request said, and it **cannot be downgraded** afterwards: a value entered as a
 secret does not become world-readable by flipping a flag. The stored value is
 never returned by the API.
 
-> **Write `sensitive = true` explicitly in HCL.** The provider's "this category
-> is always sensitive" plan modifier currently knows only the two `git_*_auth`
-> categories, so an `ansible_*_auth` variable that omits the attribute plans a
-> concrete `false` and then applies as `true` — which Terraform reports as
-> *"Provider produced inconsistent result after apply"*. Setting it yourself
-> makes the plan agree with the result. The examples on this page all do.
+> **You may omit `sensitive` in HCL, and the examples set it anyway.** The
+> provider plans `sensitive = true` for every credential category, so a config
+> that leaves it out plans and applies the same value. Writing it explicitly
+> costs nothing and says out loud what the server will do regardless.
 
 ## Neither category can take an OpenBao/Vault value source
 
@@ -221,7 +219,7 @@ files have to land somewhere both can see.
    spec, so nothing is readable through `kubectl describe job` or from etcd. The
    Secret carries an `ownerReference` to the Job, so it cascade-deletes with it.
 3. **Materialisation.** A runner phase runs **before** the collection install and
-   before the playbook, and writes each credential to a `0600` file on the volume
+   before the playbook, and writes each credential to a `0640` file on the volume
    **shared with the execution environment** — the directory the Job names in
    `TP_EE_CREDENTIALS_DIR`. The file is opened with that mode rather than
    chmod-ed afterwards, so there is no window in which it is readable.
@@ -365,11 +363,6 @@ The same validation applies on **every** write path — creating or patching a
 workspace variable, and adding or patching a variable-set variable — and it
 checks the credential as it will be *after* the write, so a PATCH that changes
 only the `key` is caught too.
-
-### Terraform reports "Provider produced inconsistent result after apply"
-
-Add `sensitive = true` to the resource. See
-[both categories are always sensitive](#both-categories-are-always-sensitive).
 
 ### A vault-encrypted value shows as ciphertext in the resolved inventory
 

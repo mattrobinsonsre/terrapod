@@ -2318,7 +2318,7 @@ The consumers accept both too, so which name you hold never has to depend on whi
 
 The **UI** names it in the words of the engine you are looking at: a Terraform or OpenTofu workspace shows **Terraform**, a Pulumi workspace shows **Pulumi config**, and a variable set — which is org-scoped and reaches workspaces of either kind — shows **Native**, because there is no single engine whose word would be right. The stored value is the same in all three.
 
-`env` vars are injected via `secretKeyRef`. The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+`env` vars are injected via `secretKeyRef`. The **credential categories** carry a JSON envelope rather than a literal, take the `key` as the credential's SCOPE rather than as a name, are always forced `sensitive`, and are consumed by a runner phase before the tool runs rather than by the engine: `git_http_auth` / `git_ssh_auth` scope by host/URL pattern for private git module sources and are materialised before `init` (see [Module Source Auth](module-auth.md)); `ansible_machine_auth` / `ansible_vault_auth` scope by host pattern and by vault ID label and are materialised before a playbook (see [Ansible Credentials](ansible-credentials.md)). None of them accepts an OpenBao/Vault value source.
 
 `structured` marks a value as a typed expression rather than a plain string. What that
 means is the engine's: for a Terraform run a raw HCL expression (list, object, number,
@@ -5801,7 +5801,7 @@ A workspace carries **one inventory**, made of the structures ansible's inventor
 
 Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read tier) for every read, and **`inventory:write`** (write tier — deliberately not admin, because the Terraform that declares a host runs under an apply) for every write. A **runner token** is handled separately: it may manage the inventory of **its own run's workspace** and nothing else, reads unphased and writes bound to the **apply** phase.
 
-**Configure operations do not exist yet.** These endpoints build an inventory and make it observable; they do not run playbooks.
+**These endpoints build the inventory; they do not run anything.** A configure is executed by a runner Job, which fetches the run's resolved inventory as an artifact and runs the playbook in an execution-environment container — see [Running a Configure](runners.md#what-a-configure-actually-runs). The credentials it connects and decrypts with are workspace variables in two categories, not resources here: see [Ansible Credentials](ansible-credentials.md).
 
 Typed id prefixes: `invhost-` (host), `invgroup-` (group), `invhg-` (host membership), `invgc-` (group nesting), `invhvar-` (host variable), `invgvar-` (group variable), `invvar-` (inventory variable). The inventory's roots and defaults are **workspace attributes** rather than a resource here — see [The configure-operation attributes](#the-configure-operation-attributes).
 
