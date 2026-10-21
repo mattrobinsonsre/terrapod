@@ -1,5 +1,6 @@
 """Build K8s Job specs for terraform/tofu plan and apply phases."""
 
+import hashlib
 import re
 
 from terrapod.config import RunnerConfig
@@ -8,6 +9,39 @@ from terrapod.runner.phases.cloud_identity import TOKEN_DIR as OIDC_TOKEN_DIR
 from terrapod.runner.reserved_env import is_reserved_env_key
 
 logger = get_logger(__name__)
+
+#: Hex characters of the per-run slug. 16 is 64 bits, and keeps the longest
+#: name built from it -- `tprun-<slug>-configure-vars`, 37 characters -- well
+#: inside Kubernetes' 63-character limit, with room to spare for the suffix the
+#: Job controller appends to derive a pod name.
+_RUN_SLUG_LEN = 16
+
+
+def run_object_slug(run_id: str) -> str:
+    """The per-run component of every Kubernetes object name for a run.
+
+    ONE producer, because the Job, its three Secrets and the API's
+    reconstruction fallback have to agree. A Secret named for a different run
+    than its Job would be a cross-run credential mount, and the only reason
+    that has never happened is incidental: the listener creates the Job first,
+    so a collision fails there before any Secret is written.
+
+    **Not `run_id[:16]`** (#2209). Run ids are UUIDv7, so the first thirteen
+    characters of the string are the millisecond timestamp plus the version
+    nibble, leaving the 16-character prefix exactly ONE random hex digit -- 16
+    values -- to separate runs created in the same millisecond. A single VCS
+    event fanning out to eight workspaces creates them together and collides
+    about 88% of the time, which is what it did: a speculative plan died on
+    `jobs.batch "tprun-01a15e7a-1809-75-plan" already exists`, owned by a
+    different run of the same millisecond, and needed a manual retry.
+
+    A digest uses the whole id instead. Nothing parses these names, and the
+    full run id stays on the `terrapod.io/run-id` label, which is what lookups
+    use -- so the only thing given up is that the name no longer carries a
+    readable timestamp, which `kubectl` reports as AGE anyway.
+    """
+    return hashlib.sha256(run_id.encode()).hexdigest()[:_RUN_SLUG_LEN]
+
 
 # Per-run vars Secret (mounted files). Keep in sync with
 # runner/job_entrypoint.py + runner/phases/execution_hooks.py which read the
@@ -535,7 +569,7 @@ def build_job_spec(
     if not namespace:
         namespace = runner_config.runner_namespace
 
-    run_short = run_id[:16]
+    run_short = run_object_slug(run_id)
     job_name = f"tprun-{run_short}-{phase}"
 
     # Build container env vars

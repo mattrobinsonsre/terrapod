@@ -41,6 +41,7 @@ from terrapod.auth.listener_pop import (
 from terrapod.config import load_runner_config
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import configure_logging, get_logger
+from terrapod.runner.job_template import run_object_slug
 
 logger = get_logger(__name__)
 
@@ -818,7 +819,10 @@ class RunnerListener:
             await self._report_launch_failed(run_id, f"OpenBao/Vault file delivery refused: {e}")
             return
 
-        run_short = run_id[:16]
+        # The SAME slug the Job gets, from the one producer: these Secrets
+        # carry the run's credentials and variables, so a slug that disagreed
+        # with the Job's would mount another run's secrets (#2209).
+        run_short = run_object_slug(run_id)
         # Phase is part of the Secret name to avoid a 409 AlreadyExists when
         # apply runs immediately after plan: the plan Job's auth Secret has
         # an ownerReference back to the plan Job, but K8s GC doesn't always

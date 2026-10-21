@@ -22,11 +22,19 @@ import pytest
 
 import terrapod.runner.listener as listener_module
 from terrapod import engines
+from terrapod.runner.job_template import run_object_slug
 from tests.runner.test_engine_options_seam import ATTRS, _runner_config
 from tests.services.test_listener import _make_listener
 
 SECRET = "S3CR3T-vault-file-content-must-not-reach-any-job-spec"
-VARS = "tprun-01a0871a3dd773a8-plan-vars"
+#: One run id, and the names DERIVED from it (#2209). This used to be a
+#: twenty-character id with the names hardcoded against its sixteen-character
+#: prefix -- which only matched because the prefix was the derivation. Deriving
+#: keeps the comparison builder and the listener naming the same objects
+#: whatever the derivation is.
+RUN_ID = "01a0871a3dd773a8aaaa"
+SLUG = run_object_slug(RUN_ID)
+VARS = f"tprun-{SLUG}-plan-vars"
 
 #: Every engine this build contains, gated or not. A new strategy lands here.
 ENGINES = sorted(engines._REGISTRY)
@@ -54,10 +62,10 @@ def _as_the_listener_calls_it(engine: str, vault_files: list[dict]) -> dict:
     s = engines._REGISTRY[engine]
     return s.build_job_spec(
         options=s.options_from_attrs(ATTRS, "plan"),
-        run_id="01a0871a3dd773a8",
+        run_id=RUN_ID,
         phase="plan",
         runner_config=_runner_config(),
-        auth_secret_name="tprun-01a0871a3dd773a8-plan-auth",
+        auth_secret_name=f"tprun-{SLUG}-plan-auth",
         vars_secret_name=VARS,
         env_vars=ENV_VARS,
         terraform_vars=[],
@@ -213,7 +221,7 @@ async def test_the_listener_launches_every_engine_with_the_files(engine, fresh_s
         patch("terrapod.runner.listener.arequest_with_retry", new=AsyncMock()),
         patch.object(listener_module, "logger") as log,
     ):
-        await listener._launch_run("01a0871a3dd773a8aaaa", attrs)
+        await listener._launch_run(RUN_ID, attrs)
 
     listener._report_launch_failed.assert_not_called()
     create.assert_awaited_once()

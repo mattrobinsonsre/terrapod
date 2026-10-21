@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.config import VaultConfig, settings
+from terrapod.runner.job_template import run_object_slug
 from terrapod.services import vault_lease_service as svc
 from terrapod.services.vault_client import GONE, REVOKED, VaultDenied, VaultLease
 
@@ -420,7 +421,12 @@ class TestWatchSchedulesOnlyOnATerminalJob:
         await svc.watch_pending(_db(run))
 
         enqueue.assert_not_awaited()
-        assert publish.await_args.args[1]["job_name"] == f"tprun-{str(run.id)[:16]}-plan"
+        # The reconstruction has to use the one producer the listener names
+        # the Job with, or the question is asked about a Job that never existed
+        # (#2209).
+        assert (
+            publish.await_args.args[1]["job_name"] == f"tprun-{run_object_slug(str(run.id))}-plan"
+        )
 
 
 class TestWatchBookkeeping:

@@ -199,7 +199,20 @@ def _job_for(run, phase: str, recorded: dict | None) -> dict | None:
     from terrapod.services.run_service import TERMINAL_STATES
 
     if run.status in TERMINAL_STATES:
-        return {"name": f"tprun-{str(run.id)[:16]}-{phase}", "namespace": run.job_namespace or ""}
+        # Reconstructed, so it must use the one producer the listener names the
+        # Job with (#2209). This is the only path that guesses a name rather
+        # than reading the recorded one, and it is reached only when the launch
+        # report was lost AND the run is already terminal. During a rolling
+        # upgrade that spans the #2209 change it can therefore name a Job a
+        # lagging listener created the old way; the consequence is bounded --
+        # the question goes unanswered and the lease record expires with its
+        # leases, which is what happens today for any run whose Job has gone.
+        from terrapod.runner.job_template import run_object_slug
+
+        return {
+            "name": f"tprun-{run_object_slug(str(run.id))}-{phase}",
+            "namespace": run.job_namespace or "",
+        }
     return None
 
 
