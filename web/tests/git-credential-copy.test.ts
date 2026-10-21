@@ -257,3 +257,140 @@ test('the hint points at the field label the catalogue actually carries', () => 
     )
   }
 })
+
+test('no en-x-leet value is left as plain English', () => {
+  // The same defect as the seventeen above, caught for the WHOLE catalogue
+  // rather than one namespace — because for this locale alone the transform is
+  // mechanical, so "is this still the English string" has an exact answer with
+  // nothing to exempt. 33 values were sitting here as plain English when #2198
+  // was written, most of the `runDetail.cost.*` block, invisible to every gate.
+  //
+  // This is deliberately NOT the stronger claim that the catalogue EQUALS the
+  // mechanical substitution. Measured, 39 values differ from it legitimately:
+  // a translator reached for a better leet than a character map produces
+  // (`Repository` is `R3p0`, not `R3p05170ry`) and substituted inside `<code>`
+  // spans and ICU sub-messages where the rule here is conservative. Asserting
+  // equality would fail on all of those and teach people to delete the gate;
+  // asserting "not still English" fails only on the real defect.
+  const map: Record<string, string> = { a: '4', e: '3', i: '1', o: '0', s: '5', t: '7' }
+  const leetify = (s: string) =>
+    [...s].map((ch) => map[ch] || map[ch.toLowerCase()] || ch).join('')
+  /**
+   * Spans that must survive verbatim: a code span's content, a rich-text tag
+   * NAME, the inventory placeholder, and any ICU construct — the last
+   * brace-matched to arbitrary depth, because a plural whose sub-message
+   * interpolates another argument is two deep and an under-matched span
+   * leetifies the `plural`/`one`/`other` keywords, which stops the message
+   * parsing at all.
+   */
+  const verbatim = /<code>[\s\S]*?<\/code>|<\/?[a-zA-Z][a-zA-Z0-9]*>|\$'\{'terrapod:[^'{}]*'\}'/g
+  const icuSpans = (s: string): [number, number][] => {
+    const out: [number, number][] = []
+    let depth = 0
+    let start = -1
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '{') {
+        if (depth === 0) start = i
+        depth++
+      } else if (s[i] === '}' && depth > 0) {
+        depth--
+        if (depth === 0) out.push([start, i + 1])
+      }
+    }
+    return out
+  }
+  const leet = (s: string) => {
+    const keep = [...[...s.matchAll(verbatim)].map((m) => [m.index!, m.index! + m[0].length] as [number, number]),
+                  ...icuSpans(s)].sort((a, b) => a[0] - b[0])
+    const merged: [number, number][] = []
+    for (const [a, b] of keep) {
+      const last = merged[merged.length - 1]
+      if (last && a <= last[1]) last[1] = Math.max(last[1], b)
+      else merged.push([a, b])
+    }
+    let out = ''
+    let pos = 0
+    for (const [a, b] of merged) {
+      out += leetify(s.slice(pos, a)) + s.slice(a, b)
+      pos = b
+    }
+    return out + leetify(s.slice(pos))
+  }
+
+  const cat = JSON.parse(readFileSync('messages/en-x-leet.json', 'utf8'))
+  const offenders: string[] = []
+  let changeable = 0
+  const walk = (src: Record<string, unknown>, loc: Record<string, unknown>, path = '') => {
+    for (const [k, v] of Object.entries(src)) {
+      const p = path ? `${path}.${k}` : k
+      if (v && typeof v === 'object') {
+        const sub = loc?.[k]
+        if (sub && typeof sub === 'object') walk(v as Record<string, unknown>, sub as Record<string, unknown>, p)
+      } else if (typeof v === 'string' && typeof loc?.[k] === 'string') {
+        // A value the transform cannot change — a bare argument list, a whole
+        // plural message — is correctly identical and is not a defect.
+        if (leet(v) === v) continue
+        changeable++
+        if (loc[k] === v) offenders.push(`${p}: ${JSON.stringify(v.slice(0, 60))}`)
+      }
+    }
+  }
+  walk(en as Record<string, unknown>, cat)
+  assert.ok(changeable >= 2500, `expected most of the catalogue to be transformable, counted ${changeable}`)
+  assert.deepEqual(offenders, [], `en-x-leet values still holding the English string:\n  ${offenders.join('\n  ')}`)
+})
+
+test('en-x-leet never leetifies an ICU argument name', () => {
+  // `settings.slackLinks.confirmRevoke` held `{u53r}` against a `{user}`
+  // argument, so the placeholder could not resolve — a functional defect, not
+  // a style one, and the only reason it was found is that deriving the
+  // transform for #2198 made the catalogue's own inconsistencies countable.
+  /**
+   * Argument names at ODD brace depth. ICU alternates: a placeholder opens at
+   * odd depth and its first identifier is the argument name, while a plural's
+   * sub-message opens at even depth and its first word is prose. A plain regex
+   * conflates them and reports `{count, plural, one {Scanned # repository.}}`
+   * as carrying an argument called `Scanned` — which is how my first version of
+   * this gate accused the catalogue of a defect it does not have. The trailing
+   * `,`/`}` requirement alone is not enough either: a one-word sub-message like
+   * `{count, plural, one {workspace} …}` satisfies it.
+   */
+  const en_args = (s: string): string[] => {
+    const out: string[] = []
+    let depth = 0
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '{') {
+        depth++
+        if (depth % 2 === 1) {
+          let j = i + 1
+          while (j < s.length && /\s/.test(s[j])) j++
+          let k = j
+          while (k < s.length && /[A-Za-z0-9_]/.test(s[k])) k++
+          if (k > j && /^[,}]/.test(s.slice(k).trimStart())) out.push(s.slice(j, k))
+        }
+      } else if (s[i] === '}' && depth > 0) depth--
+    }
+    return out
+  }
+  const cat = JSON.parse(readFileSync('messages/en-x-leet.json', 'utf8'))
+  let checked = 0
+  const walk = (src: Record<string, unknown>, loc: Record<string, unknown>, path = '') => {
+    for (const [k, v] of Object.entries(src)) {
+      const p = path ? `${path}.${k}` : k
+      if (v && typeof v === 'object') {
+        const sub = loc?.[k]
+        if (sub && typeof sub === 'object') walk(v as Record<string, unknown>, sub as Record<string, unknown>, p)
+      } else if (typeof v === 'string' && typeof loc?.[k] === 'string') {
+        const want = en_args(v)
+        if (!want.length) continue
+        checked++
+        const got = en_args(loc[k] as string)
+        for (const name of want) {
+          assert.ok(got.includes(name), `en-x-leet.${p} lost the ICU name ${name} (has ${JSON.stringify(got)})`)
+        }
+      }
+    }
+  }
+  walk(en as Record<string, unknown>, cat)
+  assert.ok(checked >= 100, `expected many ICU-bearing strings, checked ${checked}`)
+})
