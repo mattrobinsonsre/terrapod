@@ -639,11 +639,35 @@ class TestRefreshForRun:
         run.vcs_pull_request_number = pr_number
         return run
 
-    def _db_returning(self, sess):
+    def _workspace(self, repo_url="https://github.com/acme/repo-one"):
+        """A workspace the repo predicate can actually resolve (#2199).
+
+        `provider` and `vcs_repo_url` are real strings rather than MagicMock
+        attributes **on purpose**: `refresh_for_run` now derives the session's
+        `repo` from them via `vcs_provider.repo_path`, and refuses to resolve a
+        session at all when that returns None. With auto-mocked attributes the
+        provider matches neither "github" nor "gitlab", so every test here would
+        return early and pass without reaching the lookup -- which is exactly
+        how `test_no_session_yet_does_nothing` passed for the wrong reason while
+        this fixture was being written. Do not simplify them away.
+        """
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.vcs_connection_id = uuid.uuid4()
+        ws.vcs_repo_url = repo_url
+        ws.vcs_connection = MagicMock()
+        ws.vcs_connection.provider = "github"
+        return ws
+
+    def _db_returning(self, sess, ws=None):
         db = AsyncMock()
         result = MagicMock()
-        result.scalars.return_value.first.return_value = sess
+        # `one_or_none`, not `first`: with the repo in the predicate the match is
+        # exact by `uq_pr_session`, so the production call refuses an ambiguous
+        # result rather than choosing one of them (#2199).
+        result.scalars.return_value.one_or_none.return_value = sess
         db.execute.return_value = result
+        db.get.return_value = ws if ws is not None else self._workspace()
         return db
 
     def _session(self):
@@ -688,6 +712,46 @@ class TestRefreshForRun:
         boom = AsyncMock(side_effect=RuntimeError("redis is down"))
         with patch.object(mod, "enqueue_trigger", boom):
             await mod.refresh_for_run(self._db_returning(self._session()), self._run(), "plan")
+
+    async def test_an_unparseable_repo_url_refuses_rather_than_widening(self):
+        """The repo cannot be derived, so no session is resolved at all.
+
+        Refusing is the point: falling back to the predicate without the repo is
+        the defect (#2199), not a graceful degradation. It is logged rather than
+        silent, because silence is this bug's whole character.
+        """
+        import terrapod.services.vcs_status_comment as mod
+
+        ws = self._workspace(repo_url="not-a-url")
+        db = self._db_returning(self._session(), ws=ws)
+        with patch.object(mod, "enqueue_trigger", AsyncMock()) as enqueue:
+            await mod.refresh_for_run(db, self._run(), "plan")
+
+        enqueue.assert_not_awaited()
+        db.execute.assert_not_awaited()
+
+    async def test_the_lookup_is_scoped_to_the_workspaces_own_repo(self):
+        """The predicate carries the repo, not just the connection and number.
+
+        A connection is one app installation across a whole organisation, so
+        without this a run matched every same-numbered open PR in the org.
+        """
+        import terrapod.services.vcs_status_comment as mod
+
+        db = self._db_returning(self._session())
+        with patch.object(mod, "enqueue_trigger", AsyncMock()):
+            await mod.refresh_for_run(db, self._run(), "plan")
+
+        db.execute.assert_awaited_once()
+        # `.whereclause`, NOT `str(stmt)`. The full statement renders the
+        # SELECT column list, which names `pr_sessions.repo` whatever the
+        # predicate is -- so asserting on it passes with the repo filter
+        # deleted, which is this test's own mutation check having caught the
+        # first version of this assertion.
+        where = str(db.execute.await_args.args[0].whereclause)
+        assert "pr_sessions.repo" in where, where
+        assert "pr_sessions.pr_number" in where, where
+        assert "pr_sessions.vcs_connection_id" in where, where
 
     async def test_each_input_gets_its_own_dedup_key(self):
         """The bug this exists to prevent, pinned.
