@@ -482,7 +482,6 @@ uses, mints one token per matching target, and writes each to its own path:
 | `/var/run/terrapod/oidc/<target>/token` | **One JWT per provider configuration**, mode `0600`. `<target>` is the map key — `aws`, or `aws.west` | **file** |
 | `TERRAPOD_OIDC_TOKEN_DIR` | `/var/run/terrapod/oidc` — the **directory**, for a configuration that would rather not hard-code it | env |
 | `TERRAPOD_RUN_PHASE` | `plan` or `apply` | env |
-| `TF_VAR_terrapod_run_phase` | The same value as a Terraform variable. The variable **must be declared `ephemeral = true`** — see [switching on the phase inside HCL](#switching-on-the-phase-inside-hcl) — or the apply is refused | env |
 
 A provider block names the path directly:
 
@@ -1071,56 +1070,52 @@ a plan still runs the author's code with the workspace's `env` variables,
 sensitive values and OpenBao/Vault-resolved values. What it removes is that
 code's ability to **write** to your cloud.
 
-### Switching on the phase inside HCL
+### Switching role by phase
 
-A single provider block can choose its own role from the phase, using the
-variable the runner delivers:
+**Condition the role on the `phase` claim in the cloud's trust policy.** The
+token already carries `plan` or `apply`, taken from the runner's own phase-bound
+token, so the cloud does the switching and the configuration carries one role
+ARN:
 
 ```hcl
-variable "terrapod_run_phase" {
-  type      = string
-  default   = "plan"
-  ephemeral = true
-}
-
 provider "aws" {
   assume_role_with_web_identity {
-    role_arn                = var.terrapod_run_phase == "apply" ? var.apply_role_arn : var.plan_role_arn
+    role_arn                = var.role_arn
     web_identity_token_file = "/var/run/terrapod/oidc/aws/token"
   }
 }
 ```
 
-**`ephemeral = true` is required, not stylistic.** The runner applies the
-*saved* plan, and an ordinary variable's value is recorded in it — so the `plan`
-recorded at plan time and the `apply` the runner exports at apply time differ,
-and the engine refuses the apply outright:
-
-```
-Error: Mismatch between input and plan variable value
-
-Value saved in the plan file for variable "terrapod_run_phase" is different
-from the one given to the current command.
+```json
+{
+  "Condition": {
+    "StringEquals": { "terrapod.example.com:phase": "apply" }
+  }
+}
 ```
 
-That happens whether or not the configuration uses the variable, so declaring it
-as an ordinary variable breaks *every* apply on a run that was delivered a
-token. An ephemeral variable is not stored in the plan and is read afresh at
-apply, which is also the only way the apply phase can see `apply` at all.
-Ephemeral variables may be used in provider configuration from **OpenTofu 1.11**
-and **Terraform 1.10**; on an engine older than that, condition the role on the
-`phase` claim in the cloud's trust policy instead — which is the better answer
-anyway, below.
+This is enforced by the cloud rather than by the configuration, needs no engine
+version floor, and cannot be bypassed by a configuration that forgets to check.
 
-The `default` matters for the same reason as above: the variable is only
-exported on a run that delivered at least one token.
+**For two genuinely distinct roles — two accounts, say — use an
+[apply-only variable](#apply-only-variables) rather than a phase switch.** Hold the role
+ARN twice under one key: a standard row carrying the plan role, and an
+`apply-only` row carrying the apply role. The apply-only row shadows the
+standard one within its precedence tier, so a plan receives the read-only ARN
+and an apply receives the writing one, and the configuration is just
+`var.role_arn` with no conditional at all.
 
-This exists because HCL otherwise cannot see which phase it is in, so the apply
-increment would not be expressible at all. **One role whose trust policy
-conditions on the `phase` claim is simpler and usually better** — the cloud does
-the switching, and the configuration carries one role ARN. Reach for the variable
-when you need two genuinely distinct roles, for instance in two different
-accounts.
+> **There is deliberately no `TF_VAR_terrapod_run_phase`.** It existed until
+> 2.0 and was the only place Terrapod reached into an operator's own variable
+> namespace. It was also a trap: the runner applies the *saved* plan, so an
+> ordinary variable's recorded `plan` value conflicted with the `apply` supplied
+> at apply time and the engine refused the apply — **whether or not the
+> configuration used the variable** — meaning merely declaring
+> `variable "terrapod_run_phase"` broke every apply on a federated run unless it
+> was also marked `ephemeral = true`. See
+> [upgrading to 2.0](upgrading-to-2.0.md). `TERRAPOD_RUN_PHASE` is still
+> exported for a shell hook or an `external` program, which cannot read a
+> Terraform variable at all.
 
 ---
 

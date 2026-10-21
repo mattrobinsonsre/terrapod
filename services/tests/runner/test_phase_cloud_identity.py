@@ -428,28 +428,45 @@ class TestOneFilePerTarget:
             assert stat.S_IMODE(mode) == 0o600
 
     def test_the_phase_comes_from_the_api_not_the_runner(self, tmp_path):
-        """HCL cannot otherwise see which phase it is in, and switching role by
-        phase is the whole point of the apply increment. The API derives it from
-        the presented runner token, so its answer is the authority."""
+        """The API derives the phase from the presented runner token, so its
+        answer is the authority -- a runner asserting its own phase would be the
+        runner's claim rather than the platform's.
+
+        Exported for a shell hook or an `external` program. NOT as a Terraform
+        variable: see the gate below."""
         env, _ = self._run(tmp_path, mint=["aws"], phase="apply")
         assert env[cloud_identity.PHASE_ENV] == "apply"
-        assert env[cloud_identity.PHASE_TFVAR_ENV] == "apply"
 
-    def test_the_directory_is_never_exported_as_a_terraform_variable(self, tmp_path):
+    def test_nothing_is_ever_exported_as_a_terraform_variable(self, tmp_path):
         """Inverted from a test that asserted the opposite, and kept rather than
         deleted because it is what protects the decision.
 
-        Exporting `TF_VAR_terrapod_oidc_token_dir` reserved a name inside the
-        operator's own configuration in order to say something the documented
-        path already says. A provider block names
-        `/var/run/terrapod/oidc/<target>/token` directly. The plain env var
-        survives for a shell hook, which cannot read a Terraform variable at
-        all; what must not come back is a second, Terraform-shaped way to spell
-        the same path.
+        Terrapod does not reach into the operator's own variable namespace. Every
+        variable it supplies arrives as a tfvars FILE, and every environment
+        variable it sets is either `TERRAPOD_`-prefixed or belongs to the tool it
+        configures. A `TF_VAR_` reserves a name in the configuration to say
+        something Terrapod already says another way.
+
+        **Widened from the token directory to EVERY key**, because the narrow
+        version passed while `TF_VAR_terrapod_run_phase` was being exported two
+        lines away: it filtered on `"token_dir" in k`, so it could only ever
+        catch the one it was written for. A gate against a class of mistake has
+        to test the class.
+
+        That one was worse than a reserved name. The runner applies the SAVED
+        plan, so an ordinary variable's recorded `plan` value conflicted with the
+        `apply` supplied at apply time and the engine refused the apply --
+        whether or not the configuration used it -- meaning merely declaring
+        `variable "terrapod_run_phase"` broke every apply on a federated run
+        unless it was also `ephemeral = true`.
+
+        The plain env vars survive for a shell hook, which cannot read a
+        Terraform variable at all.
         """
-        env, _ = self._run(tmp_path, mint=["aws"])
+        env, _ = self._run(tmp_path, mint=["aws"], phase="apply")
         assert env[cloud_identity.TOKEN_DIR_ENV] == str(tmp_path / "oidc")
-        assert not [k for k in env if k.startswith("TF_VAR_") and "token_dir" in k]
+        assert env[cloud_identity.PHASE_ENV] == "apply"
+        assert not [k for k in env if k.startswith("TF_VAR_")], sorted(env)
 
     def test_no_per_cloud_env_is_set(self, tmp_path):
         """Setting AWS_WEB_IDENTITY_TOKEN_FILE and friends is what would break

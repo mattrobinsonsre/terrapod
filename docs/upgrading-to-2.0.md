@@ -15,6 +15,46 @@ If a surface is not listed here, it did not change.
 
 ## Breaking changes
 
+### `TF_VAR_terrapod_run_phase` is no longer exported
+
+**Affects:** a configuration that declares `variable "terrapod_run_phase"`, on a
+workspace using per-workspace cloud identity. If you do not use that feature, or
+do not declare that variable, nothing changes.
+
+Until 2.0 the runner exported `TF_VAR_terrapod_run_phase` alongside
+`TERRAPOD_RUN_PHASE` on any run that was delivered a token. It was the only
+place Terrapod reached into an operator's own Terraform variable namespace —
+every other variable it supplies arrives as a tfvars file, and every other
+environment variable it sets is either `TERRAPOD_`-prefixed or belongs to the
+tool it configures.
+
+It was also a trap rather than a convenience. The runner applies the *saved*
+plan, so an ordinary variable's recorded `plan` value conflicted with the
+`apply` supplied at apply time and the engine refused the apply:
+
+```
+Error: Mismatch between input and plan variable value
+```
+
+That happened **whether or not the configuration used the variable**, so merely
+declaring it broke every apply on a federated run unless it was also marked
+`ephemeral = true` — and ephemeral variables may be used in provider
+configuration only from OpenTofu 1.11 / Terraform 1.10, so on an older engine
+the pattern could not be used at all.
+
+**What to do instead**, in order of preference:
+
+| you want | do this |
+|---|---|
+| one role, different permissions per phase | condition the role's trust policy on the **`phase` claim** the token already carries. The cloud does the switching; the configuration carries one role ARN and no conditional. This was already the recommended route |
+| two genuinely distinct roles (two accounts, say) | hold the role ARN twice under one key as an **apply-only variable** — a standard row with the plan role, an `apply-only` row with the apply role. The apply-only row shadows the standard one within its tier, so the configuration is still just `var.role_arn` |
+| the phase in a shell hook or an `external` program | `TERRAPOD_RUN_PHASE`, unchanged |
+
+If you were already using the `ephemeral = true` pattern, delete the `variable`
+block and the conditional and move the choice into the trust policy or into an
+apply-only variable. Leaving the declaration in place is harmless once the
+export is gone — nothing supplies it, so it takes its `default`.
+
 ### The deprecated path aliases are removed
 
 **Affects:** anything still calling `/api/terrapod/v1/…` — your own scripts,

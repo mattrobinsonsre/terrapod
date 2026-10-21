@@ -127,16 +127,31 @@ TOKEN_DIR = Path("/var/run/terrapod/oidc")
 #: spell it is a misdirect.
 TOKEN_DIR_ENV = "TERRAPOD_OIDC_TOKEN_DIR"
 
-#: The run's phase, exported so a configuration can switch role by phase -- the
-#: only way to do that, because HCL cannot otherwise see which phase it is in.
-#: Also exported as a `TF_VAR_` so a configuration that declares
-#: `variable "terrapod_run_phase"` receives it. That variable MUST be declared
-#: `ephemeral = true` (#2078): the runner applies the SAVED plan, an ordinary
-#: variable's value is recorded in it, and the recorded `plan` then conflicts
-#: with the `apply` exported here -- refusing the apply whether or not the
-#: configuration uses the variable.
+#: The run's phase, for a shell hook or an `external` program that wants it.
+#:
+#: There is deliberately NO `TF_VAR_` counterpart, for the same reason the token
+#: directory above has none: it would reserve a name inside the operator's own
+#: configuration. This one used to export `TF_VAR_terrapod_run_phase` and was
+#: the ONLY place Terrapod reached into the configuration's variable namespace --
+#: every other variable Terrapod supplies arrives as a tfvars FILE, and every
+#: other environment variable it sets is either `TERRAPOD_`-prefixed or belongs
+#: to the tool it configures (git, pip, pulumi, ansible).
+#:
+#: It was worse than a reserved name. Because the runner applies the SAVED plan
+#: and an ordinary variable's value is recorded in it, the recorded `plan` then
+#: conflicted with the `apply` supplied at apply time and the engine refused the
+#: apply -- **whether or not the configuration used the variable** -- so merely
+#: declaring `variable "terrapod_run_phase"` broke every apply on a federated
+#: run unless it was also marked `ephemeral = true`. A platform-supplied
+#: variable that breaks an operator's configuration by existing is not a
+#: convenience.
+#:
+#: Switch role per phase in the cloud's trust policy instead, on the `phase`
+#: claim the token already carries -- which the cloud enforces rather than the
+#: configuration, and which needs no engine version floor. That was already the
+#: documented route for OpenTofu < 1.11 / Terraform < 1.10, where ephemeral
+#: variables cannot be used in a provider block at all.
 PHASE_ENV = "TERRAPOD_RUN_PHASE"
-PHASE_TFVAR_ENV = "TF_VAR_terrapod_run_phase"
 
 #: How long the engine gets to render the dependency graph. Generous: it is a
 #: graph build, not an evaluation, but a very large root module on a slow node
@@ -580,5 +595,4 @@ def run(
     env = {TOKEN_DIR_ENV: str(directory)}
     if phase:
         env[PHASE_ENV] = phase
-        env[PHASE_TFVAR_ENV] = phase
     return env

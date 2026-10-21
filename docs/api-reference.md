@@ -4427,7 +4427,7 @@ because a shortened token set looks complete and is not.
 
 | Status | Meaning | What the runner does |
 |---|---|---|
-| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` (a configuration declaring that variable **must** mark it `ephemeral = true`, or the saved-plan apply is refused — see [cloud identity](cloud-identity.md)) |
+| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR` and `TERRAPOD_RUN_PHASE`. **No `TF_VAR_` is exported** — switch role by phase in the cloud's trust policy, or hold the role ARN in an apply-only variable (see [cloud identity](cloud-identity.md)) |
 | **204** | The workspace maps nothing; the issuer is not enabled deployment-wide; the configuration declares no provider; or nothing it uses is mapped | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
 | **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
 | **409** | The resolved audiences changed since the run was created; discovery was not `ok` for a workspace that maps targets **and** whose engine discovers; or a non-discovering engine's workspace resolves more than 100 targets | **Fails the run**, carrying the reason |
