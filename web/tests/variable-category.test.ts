@@ -320,7 +320,10 @@ test('every offered locale carries the whole Ansible credential namespace', () =
 test('the novelty locales genuinely transform the credential copy', () => {
   // The completeness gate passes on a catalogue holding the English string, so
   // a joke locale left untranslated is invisible to it — which is how the git
-  // credential block came to be verbatim English in all thirty-three.
+  // credential block came to be verbatim English in all thirty-one locales
+  // that carry it (#2198; `en` is the source and `en-GB` carries no delta, so
+  // thirty-one, not thirty-three). It is translated now, and
+  // `git-credential-copy.test.ts` holds it there.
   //
   // Each exemption names the string and the reason. They are the two shapes
   // that legitimately do not move: a word the transform does not touch
