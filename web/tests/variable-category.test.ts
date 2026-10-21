@@ -324,6 +324,14 @@ test('the novelty locales genuinely transform the credential copy', () => {
     'en-x-yoda': {
       password: 'one word; there is no clause to reorder',
       user: 'one word; there is no clause to reorder',
+      // Added when the label became `Scope`: it was `Host scope` while a scope
+      // was a set of hosts, which yoda reordered, and a scope can now be one
+      // host. Exempt on the same ground as the two above AND on the
+      // catalogue's own standing convention -- its other two bare "Scope"
+      // labels, `adminVariableSets.table.scope` and
+      // `adminPolicySets.columns.scope`, have always been plain `Scope` too,
+      // which the assertion below checks rather than takes on trust.
+      scope: 'one word; there is no clause to reorder',
     },
   }
   const novelty = ['tlh', 'en-x-marklar', 'en-x-lolcat', 'en-x-leet', 'en-x-pirate', 'en-x-yoda']
@@ -339,6 +347,17 @@ test('the novelty locales genuinely transform the credential copy', () => {
       }
     }
   }
+})
+
+test('the yoda scope exemption matches the catalogue own standing convention', () => {
+  // The exemption above leans on "yoda leaves a bare Scope label alone". That is
+  // a claim about the catalogue, so it is asserted rather than trusted: if those
+  // siblings were ever translated, the exemption would be the odd one out and
+  // should go with them.
+  const yoda = JSON.parse(readFileSync('messages/en-x-yoda.json', 'utf8'))
+  assert.equal(yoda.adminVariableSets.table.scope, 'Scope')
+  assert.equal(yoda.adminPolicySets.columns.scope, 'Scope')
+  assert.equal(yoda.ansibleCredentials.scope, 'Scope')
 })
 
 test('en-x-leet applies its own substitution and leaves a typed-in value alone', () => {

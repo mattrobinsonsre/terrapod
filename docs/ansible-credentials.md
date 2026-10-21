@@ -379,7 +379,7 @@ an operator to the wrong place. The cases are:
 | a `become` value that is not one of the accepted spellings | a value ansible cannot read as true reads as false, silently dropping escalation |
 | a vault credential with an empty or absent `password` | nothing to decrypt with |
 | a vault ID label containing `,` or `@` | the label is interpolated into `ANSIBLE_VAULT_IDENTITY_LIST`, so either character produces a different list rather than a rejected one |
-| a machine scope that is not `all` or a valid group name | the credential is delivered as inventory variables for that scope, so a name ansible will not resolve to a group applies to nothing |
+| a machine scope usable as neither a host name, a group name, nor `all` | the credential is delivered as inventory variables for that scope, so a name ansible cannot resolve applies to nothing. Whitespace and the `--limit` operators `,`&nbsp;`:`&nbsp;`!`&nbsp;`&`&nbsp;`~` are what this excludes |
 | `ungrouped` as a machine scope | it is derived, so its membership changes whenever any group does |
 | `value_source: "vault"` on either category | an envelope is an object; a reference resolves to one field |
 
