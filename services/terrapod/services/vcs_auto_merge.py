@@ -72,17 +72,20 @@ async def _latest_run_for_pr(
 
 async def _affected_workspaces(db, sess: PRSession) -> list[Workspace]:
     """Workspaces with runs for this PR on this connection+repo."""
+    # Narrowed in SQL by connection and PR, then matched on the PARSED repo
+    # (#2199). The suffix match this replaced dropped every workspace whose URL
+    # ends `.git`, so `handle_vcs_apply_completed` returned at `if not affected`
+    # and auto-merge never fired -- the symptom #2199 set out to fix.
     result = await db.execute(
         select(Workspace)
         .join(Run, Run.workspace_id == Workspace.id)
         .where(
             Run.vcs_pull_request_number == sess.pr_number,
             Workspace.vcs_connection_id == sess.vcs_connection_id,
-            Workspace.vcs_repo_url.endswith(sess.repo),
         )
         .distinct()
     )
-    return list(result.scalars().all())
+    return [ws for ws in result.scalars().all() if vcs_provider.workspace_repo_is(ws, sess.repo)]
 
 
 async def handle_vcs_apply_completed(payload: dict[str, Any]) -> None:
