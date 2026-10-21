@@ -95,14 +95,18 @@ PHASES_SEEING_APPLY_ONLY = frozenset({"apply", "configure"})
 #: Ansible's two credential classes (#1933). `key` is the SCOPE in both, exactly
 #: as it is a URL pattern for git auth:
 #:
-#: * `ansible_machine_auth` — `key` is a host pattern (`all` for every host),
-#:   `value` is `{"private_key"?, "password"?, "user"?, "become_method"?,
-#:   "become_password"?}`. The runner writes the key material to a `0600` file on
-#:   the shared volume and injects the *paths* into the resolved inventory as
-#:   vars for that pattern, so ansible's own group precedence does the scoping.
-#: * `ansible_vault_auth` — `key` is the vault ID label, `value` is
-#:   `{"password": "…"}`. Several entries become one
-#:   `ANSIBLE_VAULT_IDENTITY_LIST`, which is how multiple vault IDs work.
+#: * `ansible_machine_auth` — `key` is a host pattern (`all` for every host).
+#:   The runner writes the key material to a mode-restricted file on the shared
+#:   volume and injects the *paths* into the resolved inventory as vars for that
+#:   pattern, so ansible's own group precedence does the scoping.
+#: * `ansible_vault_auth` — `key` is the vault ID label. Several entries become
+#:   one `ANSIBLE_VAULT_IDENTITY_LIST`, which is how multiple vault IDs work.
+#:
+#: **The envelope's fields are NOT restated here.** `services/ansible_auth.py`
+#: is their one producer, shared with the runner so the two cannot disagree, and
+#: this comment had already drifted from it -- it listed five machine fields
+#: where `MACHINE_VALUE_FIELDS` carries six, omitting `become` and
+#: `become_user`. A field list in prose has no gate behind it.
 ANSIBLE_AUTH_CATEGORIES = frozenset({"ansible_machine_auth", "ansible_vault_auth"})
 
 #: Every category whose `value` is a JSON credential envelope rather than a

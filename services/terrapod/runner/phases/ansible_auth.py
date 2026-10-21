@@ -23,7 +23,9 @@ container:
 
 * **The files go on the shared volume, not the orchestrator's `/tmp`.** The EE
   mounts only `/tp` and `/workspace`, so the PVC-tempfile rule's usual
-  destination is invisible to the only process that must read these.
+  destination is invisible to the only process that must read these. Which is
+  also why their mode is `0640` rather than `0600` -- see
+  `_CREDENTIAL_FILE_MODE`, because the reader may not share our uid.
 
 * **The environment is RETURNED, never exported.** `configure._forced_env`
   strips every inherited `ANSIBLE_*` before setting its own -- which is what
@@ -135,17 +137,36 @@ def _load(path: Path = _AUTH_FILE) -> list[dict]:
     return data
 
 
-def _write_secret_file(directory: Path, name: str, content: str) -> Path:
-    """Write `content` to a `0600` file and return its path.
+#: Owner read/write plus GROUP READ, and the group bit is load-bearing rather
+#: than lax.
+#:
+#: These files are written by the orchestrator and read by ansible in the EE
+#: container, and `job_template._ee_security_context` deliberately sets no
+#: `runAsUser` on that sidecar -- its own docstring says pinning 1000 "would
+#: break an operator's image whose files belong to a different user", and that
+#: `fsGroup` is what satisfies the contract "a uid able to read the shared
+#: volume" for ANY uid. `fsGroup` grants access through the GROUP, which `0600`
+#: excludes. So `0600` would work only for an EE that happens to run as uid
+#: 1000 -- ours -- and an operator-supplied EE on any other uid would fail to
+#: read its own credentials, after the configure had started.
+#:
+#: "Other" still gets nothing, which is the same trade `_vault_file_mode` makes
+#: for the projected Secret files (0440 with an fsGroup, 0444 without): the
+#: group is the pod's, so group-readable means readable by the containers of
+#: this one Job and nothing else.
+_CREDENTIAL_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP  # 0o640
 
-    `0600` before the content, not after: a key written world-readable and then
-    chmod-ed is readable for the window in between, and both containers in the
-    pod run as the same uid.
+
+def _write_secret_file(directory: Path, name: str, content: str) -> Path:
+    """Write `content` to a `0640` file and return its path.
+
+    The mode is set at CREATION rather than chmod-ed afterwards: a key written
+    with default permissions and then narrowed is readable for the window in
+    between.
     """
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / name
-    # Opened with the mode set at creation rather than chmod-ed afterwards.
-    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, _CREDENTIAL_FILE_MODE)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(content)
     return target

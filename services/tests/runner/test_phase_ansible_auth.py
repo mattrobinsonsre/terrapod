@@ -140,14 +140,52 @@ class TestTheVaultPassword:
         labels = [part.split("@", 1)[0] for part in env["ANSIBLE_VAULT_IDENTITY_LIST"].split(",")]
         assert labels == ["dev", "prod"]
 
-    def test_the_password_is_written_0600(self, tmp_path):
-        """Both containers in the pod run as the same uid, so the mode is the
-        only thing between the credential and anything else in the EE."""
+    def test_the_password_is_group_readable_and_nothing_wider(self, tmp_path):
+        """`0640`, and the group bit is load-bearing rather than lax.
+
+        `job_template._ee_security_context` sets NO `runAsUser` on the EE
+        sidecar -- deliberately, so an operator-supplied image may run as its
+        own uid -- and `fsGroup` is what grants that uid access to the shared
+        volume. `fsGroup` works through the GROUP, which `0600` excludes. So
+        `0600` would have worked only for an EE running as uid 1000, ours, and
+        an operator's image on any other uid would have failed to read its own
+        credentials after the configure had started.
+
+        "Other" must still get nothing: the group is the pod's, so group-read
+        means this Job's containers and nothing else.
+        """
         env, _ = ansible_auth.run(
             path=_auth_file(tmp_path, [_vault("prod", "pw-long-enough-to-register")])
         )
         path = Path(env["ANSIBLE_VAULT_IDENTITY_LIST"].split("@", 1)[1])
-        assert oct(path.stat().st_mode & 0o777) == "0o600"
+        mode = path.stat().st_mode & 0o777
+        assert mode == 0o640, f"expected 0o640, got {oct(mode)}"
+
+    def test_the_private_key_has_the_same_mode(self, tmp_path):
+        """ssh refuses a key it considers too permissive, so this is the mode
+        that has to be right in both directions at once."""
+        _, injections = ansible_auth.run(
+            path=_auth_file(tmp_path, [_machine("all", private_key="-----BEGIN-----\nk")])
+        )
+        path = Path(injections["all"]["ansible_ssh_private_key_file"])
+        assert path.stat().st_mode & 0o777 == 0o640
+
+    def test_no_credential_file_is_readable_by_other(self, tmp_path):
+        """Derived over everything the phase wrote, so a future credential kind
+        cannot be the one that lands world-readable."""
+        entries = [
+            _vault("prod", "pw-long-enough-to-register"),
+            _machine(
+                "all",
+                private_key="-----BEGIN-----\nk",
+                password="a-long-connection-password",
+            ),
+        ]
+        ansible_auth.run(path=_auth_file(tmp_path, entries))
+        written = sorted((tmp_path / "credentials").iterdir())
+        assert written, "the phase wrote nothing, so this proves nothing"
+        for path in written:
+            assert not path.stat().st_mode & 0o007, f"{path.name} is readable by other"
 
     def test_it_is_registered_with_the_log_redactor(self, tmp_path):
         ansible_auth.run(path=_auth_file(tmp_path, [_vault("prod", "pw-long-enough-to-register")]))
