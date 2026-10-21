@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sys
 
 
@@ -50,19 +51,97 @@ _TRIVY_ECOSYSTEM = {
 }
 
 
-def from_trivy(data) -> list[dict]:
+#: The one package an EE image pins to its own ansible-core line, per
+#: `docker/Dockerfile.ee`: `pip install "ansible-core==${ANSIBLE_CORE_VERSION}"`.
+#: Everything else that image installs (`pip`, `wheel`) is unpinned and upgraded,
+#: so a rebuild takes the newest. A name rather than a derivation because the
+#: pinning is a fact about the Dockerfile, and
+#: `test_ee_scan_reachability.py::test_the_dockerfile_still_pins_only_this`
+#: fails if that stops being true.
+LINE_PINNED = "ansible-core"
+
+#: A stable release: digits and dots only. Anything carrying a letter is a
+#: pre-release or a local/dev version, and the deployment-wide pre-release policy
+#: refuses those by default -- so offering one as "the fix" would recommend
+#: something the platform would not install. Deliberately a shape test rather
+#: than a list of suffixes, which would have to enumerate every spelling PEP 440
+#: permits.
+_STABLE = re.compile(r"^\d+(?:\.\d+)*$")
+
+
+def _fix_versions(fixed: str) -> list[str]:
+    """Trivy reports `FixedVersion` as one comma-separated string."""
+    return [part.strip() for part in (fixed or "").split(",") if part.strip()]
+
+
+def reachable(finding: dict, release: str) -> tuple[bool, str]:
+    """Can a REBUILD of this image install the version Trivy names as the fix?
+
+    `ignore-unfixed: true` is read as making every reported finding actionable,
+    and that inference is only sound where the fix is obtainable. It holds for
+    Debian packages, since `apt-get upgrade` stays inside the distribution. It
+    fails in two ways that a scan of these images hits immediately, and the
+    first EE scan reported five findings of which a rebuild would have cleared
+    **none** (#2201):
+
+      * **A vendored copy.** `FixedVersion` names the standalone distribution,
+        but the finding is about a copy inside another one -- `setuptools`
+        carries its own `jaraco.context` and `wheel`, and `pip` ships a
+        `bom.cdx.json` declaring `certifi`, `msgpack`, `setuptools` and
+        `urllib3`. Installing the named version changes none of them; only a
+        new release of the vendoring package does. Measured: the image's real
+        `wheel` was already 0.48.0 while the finding reported 0.45.1, which is
+        setuptools' copy.
+      * **A package pinned to this image's line.** The image *is* the line, so a
+        fix published only in a later one is unreachable by construction -- and
+        taking it would destroy the reason that line is built, since the older
+        lines exist precisely to reach a Python 2.6/2.7 target. "Fix 2.12 by
+        installing 2.17" is not a fix, it is a different image.
+
+    Returns `(True, "")` when a rebuild could clear it, else `(False, reason)`.
+    The reason is recorded on the finding rather than used for reporting, so a
+    maintainer reading the raw artifact can see what was judged and why.
+    """
+    path = finding.get("path") or ""
+    if "/_vendor/" in path:
+        return False, f"vendored inside another distribution ({path})"
+    if not path and finding.get("from_sbom"):
+        # No installed distribution to upgrade: Trivy found this in an SBOM
+        # embedded in the image, which for these images is pip's own
+        # `_vendor/bom.cdx.json`. It carries a `BOMRef` and no `PkgPath`.
+        return False, "declared by a vendored SBOM, not an installed distribution"
+    if finding.get("package") == LINE_PINNED:
+        line = release.removeprefix("ee-")
+        in_line = [v for v in _fix_versions(finding.get("fixed", "")) if v.startswith(f"{line}.")]
+        stable = [v for v in in_line if _STABLE.match(v)]
+        if not in_line:
+            return False, f"fixed only outside the {line} line, which this image is pinned to"
+        if not stable:
+            return False, f"fixed in the {line} line only by a pre-release ({', '.join(in_line)})"
+    return True, ""
+
+
+def from_trivy(data, release: str = "") -> list[dict]:
     out = []
     for result in (data or {}).get("Results") or []:
         ecosystem = _TRIVY_ECOSYSTEM.get(result.get("Type", ""), "other")
         for v in result.get("Vulnerabilities") or []:
-            out.append({
+            finding = {
                 "id": v.get("VulnerabilityID", "?"),
                 "package": v.get("PkgName", "?"),
                 "installed": v.get("InstalledVersion", "?"),
                 "fixed": v.get("FixedVersion", "?"),
                 "severity": v.get("Severity", "?"),
                 "ecosystem": ecosystem,
-            })
+                # Carried so reachability is derived from Trivy's own output
+                # rather than from a list of package names that would rot.
+                "path": v.get("PkgPath") or "",
+                "from_sbom": bool((v.get("PkgIdentifier") or {}).get("BOMRef")),
+            }
+            ok, why = reachable(finding, release)
+            finding["reachable"] = ok
+            finding["unreachable"] = why
+            out.append(finding)
     return out
 
 
@@ -186,7 +265,7 @@ def main() -> int:
     data = _read(pathlib.Path(src))
 
     if kind == "trivy":
-        findings, report_kind = from_trivy(data), "dependency"
+        findings, report_kind = from_trivy(data, release), "dependency"
     elif kind == "pip-audit":
         findings, report_kind = from_pip_audit(data), "dependency"
     elif kind == "npm-audit":
@@ -217,7 +296,14 @@ def main() -> int:
         "kind": report_kind,
         "findings": findings,
     }, indent=2))
-    print(f"{label}: {len(findings)} finding(s)")
+    # Say how many a rebuild could actually clear, not just how many were found.
+    # The raw count alone reads as the size of the problem, and on the EE images
+    # it was five when the answer was none (#2201).
+    clearable = sum(1 for f in findings if f.get("reachable", True))
+    if clearable == len(findings):
+        print(f"{label}: {len(findings)} finding(s)")
+    else:
+        print(f"{label}: {len(findings)} finding(s), {clearable} a rebuild can clear")
     return 0
 
 
