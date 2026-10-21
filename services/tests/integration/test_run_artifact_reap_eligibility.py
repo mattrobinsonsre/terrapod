@@ -181,7 +181,7 @@ async def test_module_override_tarballs_of_a_plan_only_run_are_reaped():
     """
     tag = uuid.uuid4().hex[:8]
     path = f"module_overrides/{tag}/acme/vpc/aws.tar.gz"
-    ws_id, (run_id,) = await _seed(
+    await _seed(
         {
             "status": "planned",
             "plan_only": True,
@@ -204,7 +204,7 @@ async def test_module_override_tarballs_of_a_live_run_survive():
     """A run still planning needs its own override tarballs."""
     tag = uuid.uuid4().hex[:8]
     path = f"module_overrides/{tag}/acme/vpc/aws.tar.gz"
-    ws_id, (run_id,) = await _seed(
+    await _seed(
         {
             "status": "planning",
             "plan_only": True,

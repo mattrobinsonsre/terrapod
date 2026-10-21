@@ -54,7 +54,9 @@ def _function(tree: ast.Module, name: str) -> ast.FunctionDef | ast.AsyncFunctio
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == name:
             return node
-    pytest.fail(f"{name} not found — renamed? This gate pins its signature, so fix the gate.")
+    raise AssertionError(
+        f"{name} not found — renamed? This gate pins its signature, so fix the gate."
+    )
 
 
 class TestNothingFetchesAnsible:

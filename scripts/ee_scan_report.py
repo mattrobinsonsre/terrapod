@@ -111,14 +111,18 @@ def render(lines: dict[str, set[str]], digest: str, advisories: dict[str, str]) 
     affected = len(lines)
     total = len({i for ids in lines.values() for i in ids})
     out = [
-        "The scheduled scan found findings in the published Ansible "
-        "execution-environment images that **a rebuild would fix**.",
+        (
+            "The scheduled scan found findings in the published Ansible "
+            "execution-environment images that **a rebuild would fix**."
+        ),
         "",
-        f"**{total} advisory/advisories across {affected} ansible-core line(s).** "
-        "The detail — which line, which package, which advisory — is in the "
-        "**draft security advisory**, which is private to maintainers. It is "
-        "deliberately not here: naming an image alongside what is wrong with it "
-        "is a map for anyone deciding where to look.",
+        (
+            f"**{total} advisory/advisories across {affected} ansible-core line(s).** "
+            "The detail — which line, which package, which advisory — is in the "
+            "**draft security advisory**, which is private to maintainers. It is "
+            "deliberately not here: naming an image alongside what is wrong with it "
+            "is a map for anyone deciding where to look."
+        ),
         "",
     ]
     if advisories:
@@ -128,33 +132,41 @@ def render(lines: dict[str, set[str]], digest: str, advisories: dict[str, str]) 
         out += [""]
     else:
         out += [
-            "> No draft advisory URL was recorded for this run — check the "
-            "`Record EE findings in draft advisories` step. The detail is not in "
-            "this issue by design, so a missing advisory means the detail is "
-            "nowhere and the step needs fixing.",
+            (
+                "> No draft advisory URL was recorded for this run — check the "
+                "`Record EE findings in draft advisories` step. The detail is not in "
+                "this issue by design, so a missing advisory means the detail is "
+                "nowhere and the step needs fixing."
+            ),
             "",
         ]
     out += [
         "## Clearing them",
         "",
-        "A rebuild picks up current Debian packages through the `apt-get upgrade` "
-        "in `docker/Dockerfile.ee`, **whether or not the base tag's digest has "
-        "moved** — the official python images compile CPython into `/usr/local`, "
-        "so it is not dpkg-owned, while the libraries around it are.",
+        (
+            "A rebuild picks up current Debian packages through the `apt-get upgrade` "
+            "in `docker/Dockerfile.ee`, **whether or not the base tag's digest has "
+            "moved** — the official python images compile CPython into `/usr/local`, "
+            "so it is not dpkg-owned, while the libraries around it are."
+        ),
         "",
-        "The scheduled build will **not** pick these up on its own: it rebuilds "
-        "when PyPI or the base digest moves, and a Debian fix that upstream has "
-        "not yet rebuilt into `python:3.X-slim` moves neither. The advisory names "
-        "the affected lines; dispatch per line:",
+        (
+            "The scheduled build will **not** pick these up on its own: it rebuilds "
+            "when PyPI or the base digest moves, and a Debian fix that upstream has "
+            "not yet rebuilt into `python:3.X-slim` moves neither. The advisory names "
+            "the affected lines; dispatch per line:"
+        ),
         "",
         "```",
         "gh workflow run ee-build.yml -f line=<LINE> -f force=true",
         "```",
         "",
-        "If a rebuild does **not** clear a finding it is not fixable by us — it "
-        "goes to `pentest/trivy/.trivyignore` with a stated exit condition, and "
-        "the EE images are in the weekly register review so the entry is "
-        "re-tested rather than renewed by neglect.",
+        (
+            "If a rebuild does **not** clear a finding it is not fixable by us — it "
+            "goes to `pentest/trivy/.trivyignore` with a stated exit condition, and "
+            "the EE images are in the weekly register review so the entry is "
+            "re-tested rather than renewed by neglect."
+        ),
         "",
         f"<!-- {MARKER}:{digest} -->",
     ]
