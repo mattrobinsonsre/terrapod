@@ -4,8 +4,10 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.services import variable_service
 from terrapod.services.variable_service import (
     _version_hash,
     create_variable,
@@ -196,6 +198,72 @@ class TestUpdateVariable:
 
         await update_variable(db, var, description="new desc")
         assert var.value == "keep-me"
+
+    async def test_the_credential_categories_are_exactly_the_four(self):
+        """The floor the two derived tests below cannot be.
+
+        Measured: narrowing `CREDENTIAL_CATEGORIES` back to the git pair left
+        all 80 tests in this file green, because a test parametrized over the
+        set simply runs over fewer categories -- which is the whole of the
+        "a derived gate can pass on nothing" trap, in a gate written to catch
+        a related one. The provider's own map carries the same floor for the
+        same reason.
+
+        Stated as the union of its two halves rather than as four literals, so
+        a category added to either half must be added here deliberately.
+        """
+        assert variable_service.CREDENTIAL_CATEGORIES == (
+            variable_service.GIT_AUTH_CATEGORIES | variable_service.ANSIBLE_AUTH_CATEGORIES
+        )
+        assert variable_service.GIT_AUTH_CATEGORIES == {"git_http_auth", "git_ssh_auth"}
+        assert variable_service.ANSIBLE_AUTH_CATEGORIES == {
+            "ansible_machine_auth",
+            "ansible_vault_auth",
+        }
+        # And every one of them is a category the API will actually accept.
+        assert variable_service.CREDENTIAL_CATEGORIES <= variable_service.VALID_CATEGORIES
+
+    @pytest.mark.parametrize(
+        "category",
+        sorted(variable_service.CREDENTIAL_CATEGORIES),
+    )
+    async def test_every_credential_category_is_forced_sensitive_on_create(self, category):
+        """DERIVED from `CREDENTIAL_CATEGORIES`, not a list of names.
+
+        The rule is "this value is a JSON credential envelope, so it cannot be
+        anything but a secret". A test listing the categories would have passed
+        unchanged when #1933 added two more -- which is the shape that let the
+        provider's own always-sensitive map go stale at the same time.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        var = await variable_service.create_variable(
+            db,
+            uuid.uuid4(),
+            key="scope",
+            value="{}",
+            category=category,
+            sensitive=False,
+        )
+        assert var.sensitive is True, f"{category} must be forced sensitive"
+
+    @pytest.mark.parametrize(
+        "category",
+        sorted(variable_service.CREDENTIAL_CATEGORIES),
+    )
+    async def test_every_credential_category_resists_a_downgrade_on_update(self, category):
+        """And the value survives: the downgrade-clears-value path must not fire
+        for a credential, or a valid one would be silently wiped."""
+        db = AsyncMock(spec=AsyncSession)
+        var = MagicMock()
+        var.key = "scope"
+        var.value = '{"password":"p"}'
+        var.sensitive = True
+        var.category = category
+        var.value_source = "static"
+
+        await update_variable(db, var, sensitive=False)
+        assert var.sensitive is True
+        assert var.value == '{"password":"p"}'
 
     async def test_git_auth_update_cannot_downgrade_sensitive_or_clear_value(self):
         """#1028 audit C-3: a git-auth credential is force-sensitive — an update

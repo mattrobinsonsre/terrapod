@@ -114,6 +114,80 @@ class TestTheRenderedSource:
         assert parsed == {"all": None}
 
 
+class TestCredentialInjections:
+    """#1933's machine credential enters the rendered document, and only it.
+
+    What ansible DOES with the result is pinned in
+    `tests/runner/test_phase_ansible_auth.py`, which drives the real binary.
+    These pin the renderer's own contract: where a scope lands, and what
+    happens to a scope that names nothing.
+    """
+
+    DOCUMENT = {
+        "hosts": {"w1": {"ansible_port": 22}},
+        "groups": {"web": ["w1"], "db": []},
+        "children": {"infra": ["web"]},
+    }
+
+    def _render(self, injections):
+        return json.loads(
+            configure_inventory.document_to_source(self.DOCUMENT, injections=injections)
+        )
+
+    def test_no_injections_renders_exactly_what_it_rendered_before(self):
+        """The parameter is optional and every existing caller omits it, so the
+        default must be byte-identical to the previous behaviour -- otherwise
+        this feature changes what a configure with no credentials targets."""
+        before = configure_inventory.document_to_source(self.DOCUMENT)
+        after = configure_inventory.document_to_source(self.DOCUMENT, injections={})
+        assert before == after
+        assert configure_inventory.document_to_source(self.DOCUMENT, injections=None) == before
+
+    def test_a_group_scope_lands_on_that_group(self):
+        out = self._render({"web": {"ansible_user": "deploy"}})
+        assert out["all"]["children"]["web"]["vars"] == {"ansible_user": "deploy"}
+
+    def test_the_all_scope_lands_on_the_documents_root(self):
+        """Which is ansible's own `group_vars/all`, and the reason `all` cannot
+        also be a declared group name."""
+        out = self._render({"all": {"ansible_password": "p"}})
+        assert out["all"]["vars"] == {"ansible_password": "p"}
+
+    def test_a_scope_naming_a_group_that_exists_only_as_a_PARENT_is_accepted(self):
+        """`infra` holds no hosts directly and is still a real group, so a
+        credential may scope to it -- its children's hosts inherit."""
+        out = self._render({"infra": {"ansible_user": "deploy"}})
+        assert out["all"]["children"]["infra"]["vars"] == {"ansible_user": "deploy"}
+
+    def test_a_scope_naming_no_group_at_all_is_REFUSED(self):
+        """Emitted instead, it would apply to no host, and the configure would
+        fail as an unreachable fleet -- naming neither the credential nor the
+        stale scope."""
+        with pytest.raises(configure_inventory.InventoryUnavailable) as exc:
+            self._render({"webb": {"ansible_user": "deploy"}})
+        assert "'webb'" in str(exc.value)
+        # and it says which groups DO exist, because that is the fix
+        assert "web" in str(exc.value) and "db" in str(exc.value)
+
+    def test_an_empty_group_is_still_a_valid_scope(self):
+        """`db` has no hosts today and may have some tomorrow. Refusing it would
+        make a credential's validity depend on the fleet's current size."""
+        out = self._render({"db": {"ansible_user": "deploy"}})
+        assert out["all"]["children"]["db"]["vars"] == {"ansible_user": "deploy"}
+
+    def test_injecting_does_not_disturb_the_hosts_or_the_nesting(self):
+        """The nesting is what `--limit` expands through, so a renderer that
+        rearranged it would change what a limit selects."""
+        plain = json.loads(configure_inventory.document_to_source(self.DOCUMENT))
+        out = self._render({"web": {"ansible_user": "deploy"}, "all": {"ansible_password": "p"}})
+        assert out["all"]["hosts"] == plain["all"]["hosts"]
+        assert set(out["all"]["children"]) == set(plain["all"]["children"])
+        assert (
+            out["all"]["children"]["infra"]["children"]
+            == plain["all"]["children"]["infra"]["children"]
+        )
+
+
 class TestItFailsClosed:
     """Every refusal here beats its alternative, which is a configure that
     succeeds against a host set nobody chose."""
@@ -301,6 +375,44 @@ class TestTheRoundTripThroughRealAnsible:
         out = self._list(document_to_source(DOCUMENT))
         assert out["_meta"]["hostvars"]["web1"]["ansible_host"] == "10.0.0.11"
         assert out["_meta"]["hostvars"]["web1"]["role"] == "web"
+
+    def test_the_file_MATERIALISE_WRITES_carries_the_injected_credentials(self, cfg, monkeypatch):
+        """Through `materialise`, for the same reason as the test below it.
+
+        Measured: dropping `injections=` from the one `write_text` -- so the
+        parameter is accepted and ignored, which is the shape of every
+        flag-nothing-reads in this repo -- left all 28 of the other tests
+        green, because they drive `document_to_source` directly. This is the
+        test that fails, and it asserts through REAL ansible so the claim is
+        "the credential reaches the host" rather than "a key is in a dict".
+        """
+
+        def fake(url, dest, **kwargs):
+            Path(dest).write_text(json.dumps(DOCUMENT))
+            return type("R", (), {"ok": True, "status": 200})()
+
+        monkeypatch.setattr(configure_inventory, "download_to_file", fake)
+        group = next(iter(DOCUMENT["groups"]))
+        written = materialise(
+            cfg,
+            injections={
+                group: {"ansible_user": "scoped-deploy"},
+                "all": {"ansible_password": "every-host"},
+            },
+        )
+
+        hostvars = (self._list(written.read_text()).get("_meta") or {}).get("hostvars") or {}
+        assert hostvars, "the rendered file resolved no hosts at all"
+        assert all(v.get("ansible_password") == "every-host" for v in hostvars.values()), (
+            "the all-scoped credential did not reach every host"
+        )
+        in_group = set(DOCUMENT["groups"][group])
+        assert in_group, "the fixture's first group is empty, so this proves nothing"
+        for host, vars_ in hostvars.items():
+            expected = "scoped-deploy" if host in in_group else None
+            assert vars_.get("ansible_user") == expected, (
+                f"{host} got ansible_user={vars_.get('ansible_user')!r}, expected {expected!r}"
+            )
 
     def test_the_file_MATERIALISE_WRITES_resolves_to_the_right_hosts(self, cfg, monkeypatch):
         """Through `materialise`, not through the renderer.

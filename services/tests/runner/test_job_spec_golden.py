@@ -189,6 +189,31 @@ SCENARIOS: dict[str, dict] = {
         "config_directory": "",
         "playbook": "site.yml",
     },
+    # A configure carrying Ansible credentials (#1933). What this pins is the
+    # part of the delivery the Job spec decides: `ansible-auth.json` becomes an
+    # item of the per-run Secret's projected volume, mounted beside the tfvars
+    # file -- and NOT an env entry, because a credential envelope in the Job
+    # spec would be readable by anyone who can describe the Job.
+    #
+    # It also pins `TP_EE_CREDENTIALS_DIR` and the `agent-copy` mkdir that
+    # creates it. That pair is the whole reason this scenario exists rather
+    # than being folded into `configure-only`: the directory has to be on the
+    # volume the EE SHARES, because ansible runs in the other container and a
+    # credential written anywhere else is materialised correctly and invisible
+    # to the only process that reads it.
+    #
+    # The values are not credentials, deliberately -- the golden is committed.
+    # The builder never parses them, so a placeholder pins the same spec.
+    "configure-with-credentials": {
+        "phase": "configure",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "config_directory": "ansible",
+        "playbook": "site.yml",
+        "ansible_auth": [
+            {"category": "ansible_vault_auth", "key": "prod", "value": "{}"},
+            {"category": "ansible_machine_auth", "key": "all", "value": "{}"},
+        ],
+    },
 }
 
 #: Values held fixed so a diff can only come from the scenario or the code.

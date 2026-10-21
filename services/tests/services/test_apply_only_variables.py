@@ -72,6 +72,37 @@ class TestTheDuplicatePair:
         seed(workspace=self.PAIR)
         assert await _resolve("apply") == [("TOKEN", "write")]
 
+    async def test_a_CONFIGURE_gets_the_apply_only_value(self, seed):
+        """A configure is on the apply side of this line (#1933).
+
+        It ran on the plan side until `PHASES_SEEING_APPLY_ONLY` existed, so a
+        configure silently dropped every apply-only variable: #2189 added the
+        filter when `apply` and `plan` were the only phases, #2194 added
+        `configure`, and it fell into "any other phase". Each shipped correct
+        and they were wrong together.
+
+        A configure runs the repository's playbooks against real hosts, so it is
+        a write with apply-equivalent blast radius (#1976), not a speculative
+        read of a pull request's code. Asserting the apply-only VALUE is
+        present, not merely that something came back -- the standard value
+        would satisfy the weaker assertion.
+        """
+        seed(workspace=self.PAIR)
+        assert await _resolve("configure") == [("TOKEN", "write")]
+
+    async def test_the_phases_seeing_apply_only_are_exactly_apply_and_configure(self):
+        """Pinned as a set, so adding a phase is a decision rather than a
+        default. A new phase that silently inherits either answer is how this
+        went wrong the first time."""
+        assert variable_service.PHASES_SEEING_APPLY_ONLY == {"apply", "configure"}
+
+    async def test_an_unknown_phase_still_excludes_apply_only(self, seed):
+        """Fail-closed stays the default for anything not named: withholding a
+        credential is recoverable, handing one to a phase that runs pull-request
+        code is not."""
+        seed(workspace=self.PAIR)
+        assert await _resolve("some-future-phase") == [("TOKEN", "read-only")]
+
     async def test_a_phase_blind_call_returns_BOTH_and_collapses_nothing(self, seed):
         seed(workspace=self.PAIR)
         # Redaction's caller. Collapsing here would drop one secret from the list

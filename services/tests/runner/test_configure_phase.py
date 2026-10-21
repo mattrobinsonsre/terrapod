@@ -8,6 +8,7 @@ runs, and which conditions refuse rather than returning an exit code.
 
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 from pathlib import Path
 
@@ -159,6 +160,155 @@ class TestTheForcedEnvironment:
     def test_the_workspaces_parallelism_is_what_sets_forks(self, cfg, tree, ee):
         configure.run(cfg, work_dir=tree, inventory=_INV)
         assert ee.calls[0]["env"]["ANSIBLE_FORKS"] == "10"
+
+
+class TestTheCredentialEnvironment:
+    """#1933. The vault identity list reaches ansible as an ARGUMENT.
+
+    It cannot travel through `os.environ`: `_forced_env` strips every inherited
+    `ANSIBLE_*` before setting its own, which is what stops an inherited
+    `ANSIBLE_INVENTORY_ENABLED=auto` re-enabling the plugin dispatcher. So an
+    exported identity list would be stripped on the way out and the configure
+    would run with no vault password, silently -- the exact shape these tests
+    exist to pin, because nothing else in the suite would notice.
+    """
+
+    def test_the_credential_environment_reaches_the_execution_environment(self, cfg, tree, ee):
+        configure.run(
+            cfg,
+            work_dir=tree,
+            inventory=_INV,
+            extra_env={"ANSIBLE_VAULT_IDENTITY_LIST": "prod@/tp/credentials/vault-prod"},
+        )
+        assert (
+            ee.calls[0]["env"]["ANSIBLE_VAULT_IDENTITY_LIST"] == "prod@/tp/credentials/vault-prod"
+        )
+
+    def test_an_EXPORTED_vault_list_is_stripped_which_is_why_it_is_an_argument(
+        self, cfg, tree, ee, monkeypatch
+    ):
+        """The negative half, and the reason the argument exists at all."""
+        monkeypatch.setenv("ANSIBLE_VAULT_IDENTITY_LIST", "prod@/exported")
+        configure.run(cfg, work_dir=tree, inventory=_INV)
+        assert "ANSIBLE_VAULT_IDENTITY_LIST" not in ee.calls[0]["env"]
+
+    def test_a_credential_cannot_override_a_forced_setting(self, cfg, tree, ee):
+        """`_forced_env` is merged LAST. Otherwise a credential -- or a variable
+        that reached this dict by any future route -- could re-enable the plugin
+        dispatcher #1970 disabled, which is the one thing the forced set is
+        for."""
+        configure.run(
+            cfg,
+            work_dir=tree,
+            inventory=_INV,
+            extra_env={"ANSIBLE_INVENTORY_ENABLED": "auto", "ANSIBLE_FORCE_COLOR": "1"},
+        )
+        assert ee.calls[0]["env"]["ANSIBLE_INVENTORY_ENABLED"] == "yaml,ini"
+        assert ee.calls[0]["env"]["ANSIBLE_FORCE_COLOR"] == "0"
+
+    def test_no_credentials_changes_nothing(self, cfg, tree, ee):
+        configure.run(cfg, work_dir=tree, inventory=_INV, extra_env={})
+        assert "ANSIBLE_VAULT_IDENTITY_LIST" not in ee.calls[0]["env"]
+
+
+class TestTheConfigureFlowIsWired:
+    """The call site, not the functions.
+
+    Every test above drives `configure.run` directly, so dropping `extra_env`
+    from the entrypoint's call would leave all of them green while the vault
+    password never left the phase that materialised it. There is no seam in the
+    middle of `_run_configure_phase`, so the assertion is over its source --
+    the same shape as the `db.flush()`-inside-`try` gate.
+    """
+
+    def _function(self):
+        import ast
+        import pathlib
+
+        from terrapod.runner import job_entrypoint
+
+        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        found = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "_run_configure_phase"
+        ]
+        assert len(found) == 1, "_run_configure_phase was renamed; fix this gate"
+        return found[0]
+
+    def _call(self, fn, *, module: str, func_attr: str):
+        """The one `module.func_attr(...)` call in the function.
+
+        Matched on the MODULE as well as the attribute, because `.run` alone is
+        ambiguous here -- `ansible_auth.run()` and `configure.run()` are both in
+        this function, and a matcher that took the first would have asserted the
+        ordering between the wrong two positions while passing.
+        """
+        calls = [
+            n
+            for n in ast.walk(fn)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == func_attr
+            and isinstance(n.func.value, ast.Name)
+            and n.func.value.id == module
+        ]
+        assert len(calls) == 1, (
+            f"expected exactly one {module}.{func_attr}() call, found {len(calls)}"
+        )
+        return calls[0]
+
+    def test_the_credential_phase_is_called(self):
+        src = __import__("ast").dump(self._function())
+        assert "ansible_auth" in src, "nothing materialises the credentials"
+
+    def test_the_vault_environment_is_PASSED_to_the_configure(self):
+        """Inspecting the keyword's VALUE, not merely that a keyword named
+        `extra_env` exists: `extra_env={}` would satisfy the weaker check and
+        restore the defect in full."""
+        fn = self._function()
+        call = self._call(fn, module="configure", func_attr="run")
+        passed = {k.arg: k.value for k in call.keywords}
+        assert "extra_env" in passed, "configure.run is called without extra_env"
+        assert isinstance(passed["extra_env"], ast.Name), (
+            "extra_env must be the name the credential phase returned, not a literal"
+        )
+        # ...and that name must be what `ansible_auth.run()` was unpacked into.
+        assigned = {
+            t.id
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Assign) and "ansible_auth" in ast.dump(node.value)
+            for t in ast.walk(node.targets[0])
+            if isinstance(t, ast.Name)
+        }
+        assert passed["extra_env"].id in assigned, (
+            f"extra_env is {passed['extra_env'].id!r}, which is not assigned from "
+            f"ansible_auth.run() (that assigns {sorted(assigned)})"
+        )
+
+    def test_the_machine_credential_is_PASSED_to_the_inventory(self):
+        """Its other half. The connection variables reach ansible through the
+        rendered inventory, so a `materialise` call without them renders a
+        document with no credential in it and the configure reaches nothing."""
+        fn = self._function()
+        call = self._call(fn, module="configure_inventory", func_attr="materialise")
+        passed = {k.arg: k.value for k in call.keywords}
+        assert "injections" in passed, "materialise is called without injections"
+        assert isinstance(passed["injections"], ast.Name)
+
+    def test_credentials_are_resolved_BEFORE_the_inventory_and_the_install(self):
+        """They are a local file read that can refuse without touching the
+        network, so they are the cheapest of the three to fail in -- and a
+        configure with an unusable credential is not going to run whatever the
+        other two produce."""
+        fn = self._function()
+        cred = min(
+            n.lineno
+            for n in ast.walk(fn)
+            if isinstance(n, ast.Call) and "ansible_auth" in ast.dump(n)
+        )
+        assert cred < self._call(fn, module="configure_inventory", func_attr="materialise").lineno
+        assert cred < self._call(fn, module="ansible_collections", func_attr="install").lineno
 
 
 class TestWhereItRuns:

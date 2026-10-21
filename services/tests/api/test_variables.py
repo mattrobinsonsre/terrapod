@@ -845,9 +845,14 @@ def _vault_var(key="T", value=None, hcl=False, category="env"):
 
 
 @pytest.mark.usefixtures("_no_boot")
-class TestVaultFileDeliveryWrites:
-    """Every write path — workspace and set variables, create and patch —
-    validates `file` against the variable as it will be after the write."""
+class _WritePaths:
+    """The four variable write paths, driven end to end.
+
+    A mixin rather than a base class with tests of its own, and NOT named
+    `Test*` so pytest does not collect it: anything asserting a rule holds on
+    every write path needs all four, and a second copy of this scaffolding is
+    how two such rules come to be checked on different sets of paths.
+    """
 
     async def _create_ws(self, attrs):
         app, _ = _make_app(_user(roles=["admin"]))
@@ -951,6 +956,11 @@ class TestVaultFileDeliveryWrites:
                     headers=_AUTH,
                 )
         return resp, mock_db
+
+
+class TestVaultFileDeliveryWrites(_WritePaths):
+    """Every write path — workspace and set variables, create and patch —
+    validates `file` against the variable as it will be after the write."""
 
     @staticmethod
     def _vault(key, value, **extra):
@@ -1295,3 +1305,148 @@ class TestVaultAvailability:
             settings.vault = prior
         for leaked in ("vault.internal", "8200", "team-a", "terrapod-role", "kubernetes"):
             assert leaked not in body, f"{leaked!r} leaked from the availability probe"
+
+
+@pytest.mark.usefixtures("_no_boot")
+class TestAnsibleCredentialCategoryWrites(_WritePaths):
+    """#1933's two categories, refused at the write boundary.
+
+    Refused HERE rather than dropped at resolution, which is where git auth
+    handles a malformed envelope. That was survivable for git -- the operator
+    meets it as an `init` failure -- and is not for a configure, which spends
+    the mistake part way through a fleet, on a host it has already changed.
+
+    Every rule is asserted on all four write paths, because
+    `_credential_envelope_guard` is only a rule if it is called at all four;
+    called at three it is a check somebody remembered.
+    """
+
+    MACHINE = "ansible_machine_auth"
+    VAULT = "ansible_vault_auth"
+
+    @staticmethod
+    def _cred(key, category, envelope, **extra):
+        return {"key": key, "value": json.dumps(envelope), "category": category, **extra}
+
+    async def test_a_valid_vault_password_is_stored_as_written(self):
+        resp, created = await self._create_ws(self._cred("prod", self.VAULT, {"password": "p"}))
+        assert resp.status_code == 201, resp.text
+        # Stored byte for byte: an altered credential is worse than a refused
+        # one, which is the whole of the v1.9.0 transform lesson.
+        assert json.loads(created["value"]) == {"password": "p"}
+
+    async def test_a_credential_is_always_sensitive_on_the_varset_path(self):
+        """Asserted on the varset path because that is where the ROUTER forces
+        it. The workspace paths force it inside `variable_service`, which this
+        fixture replaces with a fake -- so the same assertion there would be
+        about the fake. `tests/services/test_variable_service.py` owns that
+        half, and the two together are the four paths.
+        """
+        resp, _ = await self._create_set(
+            self._cred("prod", self.VAULT, {"password": "p"}, sensitive=False)
+        )
+        assert resp.status_code in (200, 201), resp.text
+
+    async def test_a_valid_machine_credential_is_stored(self):
+        resp, created = await self._create_ws(
+            self._cred("web", self.MACHINE, {"private_key": "k", "user": "deploy"})
+        )
+        assert resp.status_code == 201, resp.text
+        assert json.loads(created["value"])["user"] == "deploy"
+
+    # ── the envelope, on every write path ──────────────────────────────
+
+    async def test_an_empty_vault_envelope_is_422_on_workspace_create(self):
+        resp, _ = await self._create_ws(self._cred("prod", self.VAULT, {}))
+        assert resp.status_code == 422
+        assert "password" in resp.text
+
+    async def test_an_empty_vault_envelope_is_422_on_workspace_patch(self):
+        var = _mock_var(key="prod", sensitive=True)
+        var.category = self.VAULT
+        resp, _ = await self._patch_ws(var, {"value": json.dumps({})})
+        assert resp.status_code == 422, resp.text
+        assert "password" in resp.text
+
+    async def test_an_empty_vault_envelope_is_422_on_varset_create(self):
+        resp, _ = await self._create_set(self._cred("prod", self.VAULT, {}))
+        assert resp.status_code == 422, resp.text
+        assert "password" in resp.text
+
+    async def test_an_empty_vault_envelope_is_422_on_varset_patch(self):
+        vsv = _mock_var(key="prod", sensitive=True)
+        vsv.category = self.VAULT
+        resp, _ = await self._patch_set(vsv, {"value": json.dumps({})})
+        assert resp.status_code == 422, resp.text
+        assert "password" in resp.text
+
+    # ── the scope ─────────────────────────────────────────────────────
+
+    async def test_a_vault_label_carrying_an_identity_delimiter_is_422(self):
+        """`,` and `@` are ANSIBLE_VAULT_IDENTITY_LIST's own delimiters, so a
+        label carrying one produces a different list rather than a rejected
+        one."""
+        resp, _ = await self._create_ws(self._cred("a,b", self.VAULT, {"password": "p"}))
+        assert resp.status_code == 422
+        assert "label" in resp.text
+
+    async def test_a_machine_scope_that_is_not_a_group_or_all_is_422(self):
+        resp, _ = await self._create_ws(
+            self._cred("not a group", self.MACHINE, {"private_key": "k"})
+        )
+        assert resp.status_code == 422
+        assert "scope" in resp.text
+
+    async def test_all_is_accepted_as_a_machine_scope(self):
+        resp, _ = await self._create_ws(self._cred("all", self.MACHINE, {"private_key": "k"}))
+        assert resp.status_code == 201, resp.text
+
+    async def test_a_machine_credential_with_no_way_to_authenticate_is_422(self):
+        resp, _ = await self._create_ws(self._cred("all", self.MACHINE, {"user": "deploy"}))
+        assert resp.status_code == 422
+        assert "private_key" in resp.text
+
+    async def test_an_unknown_envelope_field_is_422_and_named(self):
+        resp, _ = await self._create_ws(
+            self._cred("all", self.MACHINE, {"private_key": "k", "becom_method": "sudo"})
+        )
+        assert resp.status_code == 422
+        assert "becom_method" in resp.text
+
+    # ── the value source ──────────────────────────────────────────────
+
+    async def test_an_openbao_vault_source_is_422_on_an_ansible_credential(self):
+        """An envelope is an object; an OpenBao/Vault reference resolves to a
+        single field. The rule already existed for the git categories and now
+        keys on the property, so these are covered by it rather than by a
+        second copy -- which is what `CREDENTIAL_CATEGORIES` is for."""
+        resp, _ = await self._create_ws(
+            {
+                "key": "prod",
+                "value": _file_ref(),
+                "value-source": "vault",
+                "category": self.VAULT,
+            }
+        )
+        assert resp.status_code == 422
+        assert "vault" in resp.text.lower()
+
+    async def test_the_existing_git_refusal_still_holds(self):
+        """The generalisation must not have narrowed what it already covered."""
+        resp, _ = await self._create_ws(
+            {
+                "key": "github.com",
+                "value": _file_ref(),
+                "value-source": "vault",
+                "category": "git_ssh_auth",
+            }
+        )
+        assert resp.status_code == 422
+
+    async def test_an_ordinary_variable_is_untouched_by_any_of_this(self):
+        """The negative path. The guard sees every category, so a plain
+        terraform variable whose value is not JSON must pass straight through --
+        otherwise the feature breaks every workspace in the estate."""
+        resp, created = await self._create_ws({"key": "region", "value": "eu-west-1"})
+        assert resp.status_code == 201, resp.text
+        assert created["value"] == "eu-west-1"

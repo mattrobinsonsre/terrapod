@@ -465,6 +465,58 @@ class TestCreateVarsSecret:
         owner = body.metadata.owner_references[0]
         assert owner.kind == "Job" and owner.uid == "uid-1"
 
+    async def test_ansible_credentials_become_their_own_secret_key(self, fresh_shutdown_event):
+        """#1933. Its own key rather than sharing `git-auth.json`, because the
+        Job mounts the ansible blob only for a configure -- folded in, these
+        would ride into every plan's Job, and a plan executes a pull request's
+        code.
+        """
+        import json as _json
+
+        listener = _make_listener(fresh_shutdown_event)
+        core_api = MagicMock()
+        with patch("terrapod.runner.job_manager._get_core_api", return_value=core_api):
+            await listener._create_vars_secret(
+                "tprun-r1-configure-vars",
+                "r1",
+                terraform_vars=[],
+                env_vars=[],
+                job_name="tprun-r1-configure",
+                job_uid="uid-1",
+                ansible_auth=[
+                    {
+                        "category": "ansible_vault_auth",
+                        "key": "prod",
+                        "value": '{"password":"p"}',
+                    }
+                ],
+            )
+        sd = core_api.create_namespaced_secret.call_args.kwargs["body"].string_data
+        assert "ansible-auth.json" in sd
+        assert "git-auth.json" not in sd, "the two channels must stay separate"
+        entry = _json.loads(sd["ansible-auth.json"])[0]
+        assert entry == {
+            "category": "ansible_vault_auth",
+            "key": "prod",
+            "value": '{"password":"p"}',
+        }
+
+    async def test_no_ansible_auth_key_when_none_was_delivered(self, fresh_shutdown_event):
+        """The ordinary state of every plan and apply."""
+        listener = _make_listener(fresh_shutdown_event)
+        core_api = MagicMock()
+        with patch("terrapod.runner.job_manager._get_core_api", return_value=core_api):
+            await listener._create_vars_secret(
+                "tprun-r1-plan-vars",
+                "r1",
+                terraform_vars=[],
+                env_vars=[{"key": "FOO", "value": "bar"}],
+                job_name="tprun-r1-plan",
+                job_uid="uid-1",
+            )
+        sd = core_api.create_namespaced_secret.call_args.kwargs["body"].string_data
+        assert "ansible-auth.json" not in sd
+
     async def test_no_tfvars_key_when_only_env_vars(self, fresh_shutdown_event):
         listener = _make_listener(fresh_shutdown_event)
         core_api = MagicMock()
