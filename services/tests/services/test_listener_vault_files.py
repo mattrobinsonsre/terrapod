@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import terrapod.runner.listener as listener_module
+from terrapod.runner.job_template import run_object_slug
 from tests.services.test_listener import _make_listener
 
 RunnerListener = listener_module.RunnerListener
@@ -172,7 +173,9 @@ class TestLaunch:
             listener, {"phase": "plan", "vault-files": _files("gcp/adc.json")}
         )
         listener._report_launch_failed.assert_not_called()
-        assert captured["vars_secret_name"] == "tprun-r1-plan-vars"
+        # Derived, not hardcoded: this asserts the name the LISTENER built,
+        # so it has to come from the same producer the listener uses (#2209).
+        assert captured["vars_secret_name"] == f"tprun-{run_object_slug('r1')}-plan-vars"
         assert captured["vault_files"] == [{"name": "gcp/adc.json", "secret_key": "vault-file-0"}]
         # The builder never receives a value.
         kwargs = {k: v for k, v in captured.items() if k != "runner_config"}
