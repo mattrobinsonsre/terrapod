@@ -39,7 +39,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_links
+from terrapod.services import github_service, gitlab_service, run_links, vcs_provider
 from terrapod.services.scheduler import enqueue_trigger
 
 logger = get_logger(__name__)
@@ -1003,11 +1003,39 @@ async def refresh_for_run(db, run: Run, reason: str) -> None:
     """
     try:
         ws = await db.get(Workspace, run.workspace_id)
-        if ws is None or ws.vcs_connection_id is None:
+        if ws is None or ws.vcs_connection_id is None or ws.vcs_connection is None:
             return
+        # `uq_pr_session` is (vcs_connection_id, repo, pr_number), and a
+        # connection is one app installation covering a whole organisation --
+        # so a predicate without the repo matches every same-numbered open PR
+        # in the org and `.first()` picked one of them with no ORDER BY
+        # (#2199). The losing PR's comment then froze on the snapshot the
+        # poller enqueued at run creation, for ever, because that was the only
+        # enqueue ever to carry its real session id.
+        #
+        # The workspace's repository IS the session's repository for both
+        # branches below: a speculative run plans the PR's own repo, and a
+        # cross-repo module-impact run goes through `refresh_module_pr_comment`
+        # instead. `Workspace.vcs_connection` is lazy="joined", so this costs
+        # no read beyond the `db.get` above.
+        repo = vcs_provider.repo_path(ws.vcs_connection, ws.vcs_repo_url)
+        if repo is None:
+            # Refusing, not falling back to the broader predicate -- the broader
+            # predicate IS the defect. But said out loud, because a silent skip
+            # is the shape of the bug this fix is for: a VCS-connected workspace
+            # whose repo URL will not parse gets no status comment, and nobody
+            # would otherwise know why.
+            logger.warning(
+                "Cannot resolve the PR session: unparseable workspace repo URL",
+                workspace_id=str(ws.id),
+                repo_url=ws.vcs_repo_url,
+                provider=ws.vcs_connection.provider,
+            )
+            return
+        where = [PRSession.repo == repo]
         if run.vcs_pull_request_number is not None:
             # A speculative run on the PR: found by the PR it belongs to.
-            where = [
+            where += [
                 PRSession.pr_number == run.vcs_pull_request_number,
                 PRSession.state.in_(_LIVE_SESSION_STATES),
             ]
@@ -1016,13 +1044,19 @@ async def refresh_for_run(db, run: Run, reason: str) -> None:
             # no PR number, so the merge commit the poller attributed is the
             # join. A commit that closed no PR matches nothing and this is a
             # cheap miss, which is the common case for a direct push.
-            where = [PRSession.merge_commit_sha == run.vcs_commit_sha]
+            where += [PRSession.merge_commit_sha == run.vcs_commit_sha]
         else:
             return
         result = await db.execute(
             select(PRSession).where(PRSession.vcs_connection_id == ws.vcs_connection_id, *where)
         )
-        sess = result.scalars().first()
+        # `one_or_none` rather than `first`: with the repo present the PR branch
+        # matches at most one row by `uq_pr_session`, and a merge commit is
+        # unique within a repo by git's own construction. So more than one row
+        # means an assumption here has broken, and saying so beats choosing --
+        # the raise is caught below and logged, which is what the silent pick
+        # never did.
+        sess = result.scalars().one_or_none()
         if sess is None:
             return
         await enqueue_trigger(
@@ -1068,4 +1102,16 @@ async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
         # the next refresh believe there is no comment and post a second one.
         if comment_id:
             sess.status_comment_id = comment_id
+        # The one line that makes a refresh traceable. Diagnosing #2199 cost an
+        # hour of elimination precisely because the success path said nothing:
+        # the refreshes were enqueued and executed, and left no record of which
+        # comment they had touched, so there was no way to see that a run's
+        # refresh had landed on another PR's session.
+        logger.info(
+            "PR status comment refreshed",
+            session_id=str(sess.id),
+            repo=sess.repo,
+            pr_number=sess.pr_number,
+            comment_id=comment_id,
+        )
         await db.commit()

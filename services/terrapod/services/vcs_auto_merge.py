@@ -35,7 +35,7 @@ from sqlalchemy import select
 from terrapod.db.models import PRSession, Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
+from terrapod.services import github_service, gitlab_service, vcs_provider
 from terrapod.services.scheduler import enqueue_trigger
 
 logger = get_logger(__name__)
@@ -100,12 +100,39 @@ async def handle_vcs_apply_completed(payload: dict[str, Any]) -> None:
         return
     async with get_db_session() as db:
         ws = await db.get(Workspace, uuid.UUID(workspace_id_str))
-        if ws is None or ws.vcs_connection_id is None:
+        if ws is None or ws.vcs_connection_id is None or ws.vcs_connection is None:
+            return
+        # The repo is part of `uq_pr_session` and was missing here, exactly as
+        # it was in `vcs_status_comment.refresh_for_run` (#2199) -- one
+        # connection is one app installation across a whole organisation, so
+        # `(connection, pr_number)` matches every same-numbered open PR in it.
+        # This call site used `scalar_one_or_none`, so the symptom was the
+        # opposite of the comment one and worse: two such PRs raised
+        # `MultipleResultsFound`, the scheduler logged it and counted it, and
+        # auto-merge simply never fired for either of them.
+        #
+        # `_affected_workspaces` below has always scoped by repo, so once the
+        # session is right the rest of this handler was never wrong.
+        repo = vcs_provider.repo_path(ws.vcs_connection, ws.vcs_repo_url)
+        if repo is None:
+            # Same refusal as the status-comment path, and said out loud for the
+            # same reason: not merging is the safe answer, but not merging in
+            # silence is how this class of bug survives.
+            logger.warning(
+                "Cannot resolve the PR session: unparseable workspace repo URL",
+                workspace_id=str(ws.id),
+                repo_url=ws.vcs_repo_url,
+                provider=ws.vcs_connection.provider,
+            )
             return
         sess_result = await db.execute(
             select(PRSession).where(
                 PRSession.vcs_connection_id == ws.vcs_connection_id,
+                PRSession.repo == repo,
                 PRSession.pr_number == pr_number,
+                # `open` only, not `_LIVE_SESSION_STATES`: this is about to
+                # merge, and a session already recorded as merged must not be
+                # merged again.
                 PRSession.state == "open",
             )
         )
