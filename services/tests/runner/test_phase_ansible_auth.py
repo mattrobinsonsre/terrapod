@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,51 @@ from terrapod.services.ansible_auth import (
     placeholder_for,
 )
 
-ANSIBLE = shutil.which("ansible-inventory")
+
+def _working(name: str) -> str | None:
+    """A usable `name` on PATH, or None -- **probed, not merely located**.
+
+    `shutil.which` finding a file says nothing about it working. This machine
+    carries leftover `~/Library/Python/3.13/bin/ansible-*` shims whose `ansible`
+    module is long gone, so the located-only guard did not skip and every test
+    below instead failed inside the subprocess with `ModuleNotFoundError: No
+    module named 'ansible'` -- a host-environment failure wearing the shape of a
+    product defect, which is exactly the noise that makes a known-failing set
+    unreadable.
+
+    The pattern is `test_inventory_resolve._working_ansible`, whose docstring
+    found this first; these two files simply did not adopt it. Skipping rather
+    than failing is right HERE and nowhere else: a stale shim on a developer's
+    machine must not fail the suite, while the test image's own install is gated
+    at BUILD time by `ansible-inventory --version` in `docker/Dockerfile.test`,
+    so a broken install in CI fails the image build where it belongs.
+    """
+    found = shutil.which(name)
+    if found is None:
+        return None
+    # Probed under the SAME env the tests impose, which is the whole point.
+    # These tests override HOME to isolate ansible, and Python derives the user
+    # site-packages directory FROM HOME -- so on a machine whose ansible is a
+    # user-site install (`~/Library/Python/3.x/...`), relocating HOME hides it
+    # and the console script dies with `ModuleNotFoundError: No module named
+    # 'ansible'`. Probing with the inherited HOME reports the binary as usable
+    # and the tests then fail anyway, which is how the first version of this
+    # guard changed nothing.
+    with tempfile.TemporaryDirectory() as probe_home:
+        try:
+            probe = subprocess.run(  # noqa: S603 -- the path came from `which`
+                [found, "--version"],
+                capture_output=True,
+                timeout=30,
+                check=False,
+                env={"PATH": os.environ.get("PATH", ""), "HOME": probe_home},
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return found if probe.returncode == 0 else None
+
+
+ANSIBLE = _working("ansible-inventory")
 
 
 @pytest.fixture(autouse=True)
@@ -332,7 +377,7 @@ class TestTheMachineCredential:
         assert set(resolved) == {"never-referred-to.private_key"}
 
 
-@pytest.mark.skipif(ANSIBLE is None, reason="needs a real ansible-inventory on PATH")
+@pytest.mark.skipif(ANSIBLE is None, reason="needs a WORKING ansible-inventory on PATH")
 class TestRealAnsibleResolvesTheSubstitutedInventory:
     """The behaviour, not the shape.
 
