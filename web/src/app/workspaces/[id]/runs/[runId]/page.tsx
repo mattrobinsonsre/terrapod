@@ -20,6 +20,7 @@ import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
 import { createLogFollower, type LogFollower } from '@/lib/log-follower'
+import { logPaneHeightPx } from '@/lib/log-pane-height'
 import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
@@ -571,9 +572,59 @@ function LogPanel({
   // line, and you can park at the bottom and let the output come to you.
   //
   // Only while streaming. A finished short log shrinks to fit rather than
-  // sitting in a mostly empty 70vh box, and a phase that never runs (the apply
-  // tab of a plan-only run) keeps its one-line empty state.
+  // sitting in a mostly empty reserved box, and a phase that never runs (the
+  // apply tab of a plan-only run) keeps its one-line empty state.
   const reserve = isStreaming
+
+  // #2217: the pane is sized to the space actually left below it, measured,
+  // rather than to a fraction of the viewport.
+  //
+  // `70vh` was wrong in both directions at once. As a cap it left a gap that
+  // moved with the window — negative on an ordinary laptop (the pane ran off
+  // the bottom) and a growing band of dead space on a tall monitor — because
+  // 70% of the viewport has nothing to do with how much room is left under a
+  // header of a given height. As a floor it was worse: once the content above
+  // exceeds 30vh a 70vh box cannot fit inside the viewport at all, so the
+  // floor GUARANTEED the overflow the cap was there to prevent.
+  //
+  // The top is measured DOCUMENT-relative (`+ window.scrollY`). Viewport
+  // relative would shrink and grow the pane as the page scrolls, which is both
+  // visually unpleasant and a resize feedback loop waiting to happen; the nav
+  // is `sticky top-0` so the document-relative top is stable under scroll, and
+  // at rest the two agree — which is the state the requirement is about.
+  //
+  // Touch is deliberately untouched: the effect returns before measuring, so
+  // the custom property is never set there and the `fine:`-gated classes that
+  // read it have nothing to apply. The pane grows to its content and the PAGE
+  // scrolls, exactly as #722 and #1547 left it. If this effect never runs at
+  // all, that is also what a precise pointer falls back to — an unset variable
+  // is an invalid length, so the cap simply does not apply. There is no `vh`
+  // fallback on purpose: it would reintroduce the bug it replaced.
+  const [reserveEl, setReserveEl] = useState<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    if (isTouch || !reserveEl) return
+    let last = -1
+    const apply = () => {
+      const top = reserveEl.getBoundingClientRect().top + window.scrollY
+      const px = logPaneHeightPx(top, window.innerHeight)
+      // Writing unconditionally is a layout change, which re-fires the observer
+      // below; only writing on a change is what stops that being a loop.
+      if (px === last) return
+      last = px
+      reserveEl.style.setProperty('--log-avail', `${px}px`)
+    }
+    apply()
+    window.addEventListener('resize', apply, { passive: true })
+    // The pane also moves when something ABOVE it changes height — a title
+    // wrapping, a policy banner arriving, the tab row growing — and no resize
+    // event reports any of that.
+    const observer = new ResizeObserver(apply)
+    observer.observe(document.body)
+    return () => {
+      window.removeEventListener('resize', apply)
+      observer.disconnect()
+    }
+  }, [isTouch, reserveEl])
 
   if (loading && !reserve) {
     return (
@@ -761,8 +812,9 @@ function LogPanel({
           attach exactly as they did (#1271) — nothing about when the scroll
           listener registers has changed, only the box it sits in. */}
       <div
+        ref={setReserveEl}
         data-testid={`log-reserve-${phase}`}
-        className={reserve ? 'fine:min-h-[70vh]' : undefined}
+        className={reserve ? 'fine:min-h-[var(--log-avail)]' : undefined}
       >
         {!log ? (
           loading ? (
@@ -782,7 +834,7 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {indexedLines.map((line, i) => (
               <div
@@ -799,14 +851,14 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
         ) : (
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {plainContent}
           </pre>
