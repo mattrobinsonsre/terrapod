@@ -134,14 +134,20 @@ test.describe('Run log pane height', () => {
       return gap;
     }
 
-    const tall = await gapAt(1400);
-    const shorter = await gapAt(1000);
+    // Derive the two heights from the pane's MEASURED top rather than picking
+    // them. A header taller than this spec assumed would put a hardcoded
+    // height below the floor, where the pane deliberately stops tracking — and
+    // the equality below would then fail for a reason that has nothing to do
+    // with the property under test.
+    const top = (await page.getByTestId('log-pane-plan').boundingBox())!.y;
+    const tall = await gapAt(Math.round(top) + 900);
+    const shorter = await gapAt(Math.round(top) + 600);
 
     // The whole requirement. Note this cannot be satisfied by the pane being
-    // stuck at its floor: a fixed height against two different window heights
-    // gives two gaps 400px apart, so equality here IS the tracking property and
-    // needs no floor constant of its own. The old 70vh rule gives gaps 120px
-    // apart, and both negative — the pane ran off the bottom.
+    // stuck at its floor: a fixed height against two window heights 300px apart
+    // gives two gaps 300px apart, so equality here IS the tracking property and
+    // needs no floor constant of its own. The old 70vh rule gives gaps that
+    // differ by 210px, both of them negative — the pane ran off the bottom.
     expect(Math.abs(tall - shorter)).toBeLessThanOrEqual(2);
     // And constant-but-enormous is not a pass either.
     expect(tall).toBeLessThanOrEqual(64);
