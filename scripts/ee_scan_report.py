@@ -6,13 +6,18 @@ releases and an EE is not one -- conflating them would make that title stop bein
 true, and would mix "a release we ship has a finding" with "an image a configure
 runs on has one", which have different owners and different fixes.
 
-**Every finding here is fixable by construction**, because the scan runs with
-`ignore-unfixed: true`. That is what makes the report actionable rather than
-informative: a rebuild picks up current Debian packages through the
-`apt-get upgrade` in `Dockerfile.ee`, whether or not the base tag's digest has
-moved. An EE on an EOL ansible-core line carries unfixable CVEs for ever -- every
-route to a Python 2 target is an EOL core -- and those are excluded before they
-reach here, because reporting them would be noise nobody can act on.
+**Every finding here is one a rebuild can clear**, and that is now checked rather
+than assumed. `ignore-unfixed: true` means Trivy reports only findings with a fix
+published *somewhere*, which is not the same as a fix this image's build can
+install -- and reading the one as the other is how the first EE scan raised five
+findings of which a rebuild would have cleared none (#2201). The judgement is
+`rescan_normalise.reachable`, derived from Trivy's own `PkgPath` and
+`PkgIdentifier`: a copy vendored inside another distribution cannot be upgraded
+by installing the standalone version, and `ansible-core` is pinned to this
+image's own line, so a fix published only in a later line is unreachable by
+construction. An EE on an EOL line therefore carries unfixable CVEs for ever --
+every route to a Python 2 target is an EOL core -- and those are excluded before
+they reach here, because reporting them would be noise nobody can act on.
 
 **The issue is PUBLIC, so it carries no detail** — no advisory ids, no package
 versions, not which ansible-core lines are affected. That is the same split
@@ -80,6 +85,16 @@ def by_line(reports: list[dict]) -> dict[str, set[str]]:
     for report in reports:
         line = str(report.get("release", "")).removeprefix("ee-")
         for finding in report.get("findings", []):
+            # The exclusion this module's docstring has always claimed and never
+            # performed (#2201). `reachable` is decided in `rescan_normalise`
+            # from Trivy's own `PkgPath` and `PkgIdentifier`, so a finding whose
+            # named fix this image's build cannot install never reaches the
+            # issue. Defaults to True so a report produced before the field
+            # existed, or by a leg that does not set it, is reported rather than
+            # silently dropped -- an absent signal must not read as "nothing to
+            # do" here of all places.
+            if not finding.get("reachable", True):
+                continue
             if finding.get("id"):
                 lines[line].add(finding["id"])
     return {line: ids for line, ids in lines.items() if ids}

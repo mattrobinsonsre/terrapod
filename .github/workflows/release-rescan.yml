@@ -228,11 +228,17 @@ jobs:
           format: json
           output: raw.json
           severity: HIGH,CRITICAL
-          # The setting that makes "try the update" the right first move every
-          # time: a reported finding is, by construction, one with a fix
-          # available somewhere, so a rebuild is a reasoned response rather than
-          # a shot in the dark. An EE on an EOL line has unfixable CVEs that no
-          # rebuild clears, and those belong in the register, not in a report.
+          # Reports only findings with a fix published SOMEWHERE. That is not
+          # the same as a fix this image's build can install, and reading the one
+          # as the other is how the first EE scan reported five findings a
+          # rebuild would have cleared none of (#2201): `ansible-core` is pinned
+          # to the image's own line, while `certifi`, `jaraco.context` and
+          # `wheel` were vendored copies inside pip and setuptools. So the
+          # reachability judgement is `rescan_normalise.reachable`, made from
+          # Trivy's own `PkgPath` and `PkgIdentifier` on the output below -- NOT
+          # here, and not in the register either, which cannot scope an entry to
+          # one image and so would over-suppress a line where the fix genuinely
+          # is in reach.
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
           exit-code: '0'          # reporter, not a gate

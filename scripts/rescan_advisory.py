@@ -65,6 +65,13 @@ def load(directory: pathlib.Path) -> dict[str, list[dict]]:
             continue
         bucket = out.setdefault(data["release"], {})
         for f in data.get("findings") or []:
+            # Only what a rebuild can clear, decided in `rescan_normalise` from
+            # Trivy's own fields (#2201). A line with nothing actionable then
+            # produces no draft at all, rather than a draft recommending a
+            # version this image's build cannot install. `True` by default so a
+            # leg that does not set the field is unaffected.
+            if not f.get("reachable", True):
+                continue
             bucket.setdefault(f"{f.get('id')}|{f.get('package')}", f)
     return {r: list(v.values()) for r, v in out.items()}
 
