@@ -255,13 +255,18 @@ The runner entrypoint marks a workspace as "state diverged" when an `apply` succ
      https://<terrapod>/api/tfe/v2/workspaces/<ws-id> | jq '.data.attributes["state-diverged"]'
    ```
 
-2. **Check the runner Job logs:**
+2. **Check the runner Job logs.** Job and pod names embed a *hash* of the run
+   id rather than the id itself (#2209), so find them by label instead of
+   constructing one:
    ```bash
+   kubectl get pods -n <runner-ns> -l terrapod.io/run-id=<run-uuid>
    kubectl logs job/<job-name> -n <runner-ns>
    ```
-   Or via Loki:
+   Or via Loki, using the pod name from the command above. Loki carries
+   `namespace` and `pod` labels rather than the Kubernetes object's own labels,
+   so `terrapod.io/run-id` cannot be used as a selector there:
    ```logql
-   {namespace="<runner-ns>", pod=~"tprun-<run-short>.*"} |= "state"
+   {namespace="<runner-ns>", pod=~"<pod-name>.*"} |= "state"
    ```
 
 3. **Check object storage health:**

@@ -202,11 +202,20 @@ def _job_for(run, phase: str, recorded: dict | None) -> dict | None:
         # Reconstructed, so it must use the one producer the listener names the
         # Job with (#2209). This is the only path that guesses a name rather
         # than reading the recorded one, and it is reached only when the launch
-        # report was lost AND the run is already terminal. During a rolling
-        # upgrade that spans the #2209 change it can therefore name a Job a
-        # lagging listener created the old way; the consequence is bounded --
-        # the question goes unanswered and the lease record expires with its
-        # leases, which is what happens today for any run whose Job has gone.
+        # report was lost AND the run is already terminal.
+        #
+        # It names a Job that does not exist for any run launched before the
+        # #2209 change -- the name is derived rather than stored, so changing the
+        # derivation invalidates reconstruction for every earlier run, and a
+        # rolling upgrade spanning it is only the narrowest case. Be clear about
+        # what follows, because it is NOT "the question goes unanswered": the
+        # listener reports a missing Job as `deleted` (runner/listener.py), which
+        # is in TERMINAL_JOB_STATUSES, so `_phase_job_ended` is True and this
+        # phase's leases are revoked on a false "the Job has gone". For an
+        # already-terminal run that is usually the wanted outcome and is what
+        # happens anyway once a Job is reaped; the case worth knowing about is a
+        # cancelled run whose apply Job is still inside its SIGTERM/state-upload
+        # window, which loses its credentials mid-upload.
         from terrapod.runner.job_template import run_object_slug
 
         return {
