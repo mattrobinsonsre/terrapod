@@ -74,6 +74,39 @@ def _fix_versions(fixed: str) -> list[str]:
     return [part.strip() for part in (fixed or "").split(",") if part.strip()]
 
 
+def vendored(finding: dict) -> tuple[bool, str]:
+    """Is this finding about a copy INSIDE another distribution?
+
+    Its own producer because two reporters need the fact and only one of them
+    wants the rest of `reachable` (#2202). `register_review` applies this and
+    deliberately NOT the line-pinned test below -- that one is a version
+    comparison of ours, and this module's sibling exists on the principle of not
+    re-deriving what the scanner already knows. A path is not a comparison: it is
+    something Trivy reports and the register review was discarding.
+
+    Two clauses, and the second is invisible until you dump real output:
+
+      * `PkgPath` under `/_vendor/` -- `setuptools` carries its own
+        `jaraco.context` and `wheel`, so `FixedVersion` names the standalone
+        distribution and installing it changes nothing. Measured: a finding read
+        `wheel 0.45.1 -> 0.46.2` while the image's real `wheel-0.48.0.dist-info`
+        sat beside `setuptools/_vendor/wheel-0.45.1.dist-info`.
+      * **no `PkgPath` at all but a `BOMRef`** -- Trivy read it from an SBOM
+        embedded in the image, which for these images is pip's own
+        `_vendor/bom.cdx.json`, declaring `certifi`, `msgpack`, `setuptools` and
+        `urllib3`. A path test alone misses every one of them, which is exactly
+        the set the register already holds entries for.
+
+    Returns `(True, "")` when the finding is about an installed distribution.
+    """
+    path = finding.get("path") or ""
+    if "/_vendor/" in path:
+        return False, f"vendored inside another distribution ({path})"
+    if not path and finding.get("from_sbom"):
+        return False, "declared by a vendored SBOM, not an installed distribution"
+    return True, ""
+
+
 def reachable(finding: dict, release: str) -> tuple[bool, str]:
     """Can a REBUILD of this image install the version Trivy names as the fix?
 
@@ -102,14 +135,9 @@ def reachable(finding: dict, release: str) -> tuple[bool, str]:
     The reason is recorded on the finding rather than used for reporting, so a
     maintainer reading the raw artifact can see what was judged and why.
     """
-    path = finding.get("path") or ""
-    if "/_vendor/" in path:
-        return False, f"vendored inside another distribution ({path})"
-    if not path and finding.get("from_sbom"):
-        # No installed distribution to upgrade: Trivy found this in an SBOM
-        # embedded in the image, which for these images is pip's own
-        # `_vendor/bom.cdx.json`. It carries a `BOMRef` and no `PkgPath`.
-        return False, "declared by a vendored SBOM, not an installed distribution"
+    ok, why = vendored(finding)
+    if not ok:
+        return False, why
     if finding.get("package") == LINE_PINNED:
         line = release.removeprefix("ee-")
         in_line = [v for v in _fix_versions(finding.get("fixed", "")) if v.startswith(f"{line}.")]
