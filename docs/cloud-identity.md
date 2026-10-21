@@ -1360,8 +1360,11 @@ sandbox, and the limits are worth stating plainly:
 ## Apply-only variables
 
 A variable — on a workspace or in a variable set — carries an **`apply-only`**
-flag. An apply-only variable is **withheld from a plan and delivered only to an
-apply**. It is the variable-level counterpart to the ServiceAccount above: the
+flag. An apply-only variable is **withheld from a plan** and delivered to the
+phases that change things — an **apply**, and a **configure** (which runs the
+repository's playbooks against real hosts, so it is a write with
+apply-equivalent blast radius rather than a speculative read of a pull request's
+code). It is the variable-level counterpart to the ServiceAccount above: the
 account decides what the Job's *cloud identity* can do, and this decides which
 *values* each phase receives.
 
@@ -1418,11 +1421,16 @@ variables, which beat a **non-priority** variable set. Apply-only resolves
   `sensitive` still has its value returned by the API. The flag answers *which
   phase receives this value*, nothing else.
 - **It is not a category.** A category says what role a value plays
-  (`terraform`, `env`, `git_http_auth`, `git_ssh_auth`); the flag is independent
-  of all four, and any of them can be apply-only. Marking a `git_http_auth` or
-  `git_ssh_auth` credential apply-only withholds it from the plan's `init`, which
-  is usually not what you want — see
+  (`terraform`, `env`, `git_http_auth`, `git_ssh_auth`, `ansible_machine_auth`,
+  `ansible_vault_auth`); the flag is independent of every one of them, and any of
+  them can be apply-only. Marking a `git_http_auth` or `git_ssh_auth` credential
+  apply-only withholds it from the plan's `init`, which is usually not what you
+  want — see
   [the runbook](runbooks.md#a-plan-or-apply-fails-on-a-credential-marked-apply-only).
+  The two [Ansible credential](ansible-credentials.md) categories are the one
+  place the flag does nothing useful: a **configure** is on the apply side of this
+  line, and a configure is the only phase those categories are delivered to at
+  all.
 
 > **One upgrade note.** Create apply-only variables once the rollout has
 > finished. During a rolling upgrade a replica still on the previous version does
