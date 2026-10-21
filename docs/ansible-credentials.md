@@ -14,7 +14,7 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | a **host**, a **group**, or **`all`** for the whole inventory — they compose, and host beats group beats `all` | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | `0640` key file(s) on the volume shared with the execution environment, plus connection variables injected into the run's rendered inventory at the level the scope names |
+| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | a `0640` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
 | `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0640` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
@@ -69,61 +69,87 @@ a configure that cannot connect.
 ansible has no way to authenticate and the credential does nothing, so it is
 refused rather than stored.
 
-### `key` is the scope, and ansible does the scoping
+### `key` is the credential's name, and the inventory says where it is used
 
-`key` names the thing the credential belongs to, and there are **three levels**,
-because a real estate needs all three:
+`key` names the credential. Nothing about it decides which hosts it reaches —
+that is said in the **inventory**, by a placeholder the runner substitutes while
+rendering the inventory for the run:
 
-- **a host** — just that machine. This is the level for an estate where
-  different hosts carry different keys, which is the common case once a fleet
-  has grown by acquisition rather than by template.
-- **a group** — that group's hosts, including the ones it holds only through its
-  children, because ansible expands group nesting.
-- **`all`** — the whole inventory's default. This is ansible's own root group, so
-  the credential's variables become the equivalent of `group_vars/all`.
+```
+${terrapod:<name>.<field>}
+```
 
-**They compose, and the more specific one wins**, because the levels are
-ansible's own and so is the precedence: host beats group beats `all`. So the
-ordinary arrangement is one `all`-scoped credential as the estate's default, a
-group-scoped one for a tier that differs, and a host-scoped one for the
-individual machine nobody has got round to re-keying — all three at once, with
-no ordering for you to express.
+`<name>` is the variable's `key`; `<field>` is a field of its envelope. So a
+credential named `web-key` carrying a `private_key` is referred to as
+`${terrapod:web-key.private_key}`.
 
-`ungrouped` is refused specifically, because it is derived from which hosts are
-in no other group, so its membership changes whenever any group does — scoping a
-credential to a set you cannot see or control is not a promise Terrapod will
-make. A name that is **both** a host and a group in the same inventory is also
-refused: ansible permits it, so which hosts the credential would reach is not
-predictable, and a credential landing somewhere you did not mean is worth
-refusing a run over.
+**Placement belongs to the inventory because that is already where you say which
+host gets what.** Scoping the credential as well would be a second place to say
+the same thing, and a second place for the two to disagree. It would also only
+ever fill the connection variables Terrapod thought to enumerate — where a
+placeholder fills any of them.
 
-A scope naming nothing in the run's inventory is refused with the hosts and
-groups that do exist, rather than applying to nothing — see
-[troubleshooting](#a-configure-refuses-with-a-stale-credential-scope).
+Write it wherever you already express a per-host or per-group difference. In an
+INI inventory:
 
-**The name is checked for shape when you write it and for existence when the run
-starts**, deliberately: a credential is commonly declared before the host it
-names — Terraform declares both in one apply and the order is yours — so
-refusing an unknown name at write time would make the two resources
-order-dependent.
+```ini
+[web:vars]
+ansible_ssh_private_key_file=${terrapod:web-key.private_key}
 
-The scoping itself costs Terrapod no logic: the credential's variables are
-injected into the run's rendered inventory **at the level its scope names** —
-host variables for a host, group variables for a group, the root's variables for
-`all` — and **ansible's own precedence does the rest**. A per-host key is
-therefore exactly
-as cheap as a fleet-wide one, and several credentials with different scopes
-coexist without ordering rules.
+[databases]
+db1.example.com ansible_ssh_private_key_file=${terrapod:db-key.private_key}
+db2.example.com ansible_ssh_private_key_file=${terrapod:db-key.private_key}
+```
+
+…or in a YAML one, or in `group_vars`, or in a declared
+[`terrapod_inventory_group_var`](ansible-inventory.md). They are all the same
+inventory to Terrapod, and all resolved before substitution happens.
+
+**It can be part of a longer value, which is the point.** A fleet whose per-group
+difference is expressed through ssh arguments rather than through
+`ansible_ssh_private_key_file` works without Terrapod knowing that variable
+exists:
+
+```ini
+[legacy:vars]
+ansible_ssh_common_args=-o IdentityFile=${terrapod:legacy-key.private_key} -o ProxyJump=bastion
+```
+
+#### Why a `${...}` string and not a `!terrapod` tag
+
+A YAML tag would read better — it is how an Ansible Vault value looks — and it
+does not work. Measured: **`ansible-inventory` cannot parse an inventory
+containing an unknown YAML tag, and it fails silently**, exiting 0 having
+resolved zero hosts. `!vault` works only because Ansible registers a constructor
+for it in its own loader, and teaching Ansible a Terrapod tag would mean
+shipping a plugin into your execution environment.
+
+A `${...}` string is also an ordinary scalar to a generic YAML parser, which a
+tag is not — `yaml.safe_load` refuses `!vault` too. So a placeholder leaves your
+inventory no less parseable than it already was. It needs no quoting in YAML or
+in INI.
+
+#### An unresolvable reference refuses the run
+
+If a placeholder names a credential that was not delivered — a typo in the name,
+a variable that does not exist on the workspace or any variable set it uses, or
+a field that credential does not carry — the configure refuses before running
+anything, naming every reference it could not resolve.
+
+Neither alternative is acceptable. Left in place, Ansible hands ssh the literal
+`${terrapod:web-key.private_key}` as a key path; blanked, it connects with no
+key at all. Both arrive as an unreachable host, naming neither the credential
+nor the typo.
 
 ### Several keys, one fleet
 
-Declare one entry per scope. A common shape is a fleet-wide fallback plus a
-narrower key for the group that needs its own:
+Declare one credential per key, and let the inventory place them. A common shape
+is a fleet-wide default with a narrower key for the group that needs its own:
 
 ```hcl
 resource "terrapod_variable" "fleet_key" {
   workspace_id = terrapod_workspace.fleet.id
-  key          = "all"
+  key          = "fleet-key"
   category     = "ansible_machine_auth"
   sensitive    = true
   value = jsonencode({
@@ -136,7 +162,7 @@ resource "terrapod_variable" "fleet_key" {
 
 resource "terrapod_variable" "database_key" {
   workspace_id = terrapod_workspace.fleet.id
-  key          = "databases" # a group the inventory declares
+  key          = "db-key"
   category     = "ansible_machine_auth"
   sensitive    = true
   value = jsonencode({
@@ -146,8 +172,25 @@ resource "terrapod_variable" "database_key" {
 }
 ```
 
-Hosts in the `databases` group connect as `dbadmin` with that key; every other
-host connects as `deploy`. You do not order them.
+The inventory then decides who gets which — and because these are ordinary
+inventory variables, **Ansible's own precedence settles the overlap**: a host
+variable beats a group variable, which beats one on `all`.
+
+```ini
+[all:vars]
+ansible_user=${terrapod:fleet-key.user}
+ansible_ssh_private_key_file=${terrapod:fleet-key.private_key}
+ansible_become=${terrapod:fleet-key.become}
+ansible_become_method=${terrapod:fleet-key.become_method}
+
+[databases:vars]
+ansible_user=${terrapod:db-key.user}
+ansible_ssh_private_key_file=${terrapod:db-key.private_key}
+```
+
+Hosts in `databases` connect as `dbadmin` with that key; every other host
+connects as `deploy`. You do not order them, and a single host that needs its
+own key is one more line against that host rather than a new kind of thing.
 
 ## The Ansible Vault password: `ansible_vault_auth`
 
@@ -274,24 +317,34 @@ Three consequences are worth stating plainly:
 
 ## What outranks what
 
-**Host variables in your inventory outrank what a machine credential injects,
-and that is the intended order.** The credential's variables enter at group
-level; a host variable beats a group variable in ansible. So an operator who
-declared `ansible_user` on a host — in a declared
-[host variable](ansible-inventory.md#the-seven-structures) or in a committed
-`host_vars` file — keeps it, and the credential supplies only what they did not
-say.
+**Ansible's own precedence decides, because a substituted placeholder is an
+ordinary inventory variable.** Terrapod adds no precedence rule of its own, and
+that is the whole benefit of placing credentials in the inventory rather than
+scoping them: a host variable beats a group variable, which beats one on `all`,
+exactly as it does for every other variable you set.
 
-That is the right way round: their declaration is explicit, specific and visible
-in the resolved inventory, while the credential is a default for everything else.
-If a credential appears not to be taking effect, this is the first thing to
-check.
+So the overlap resolves the way you would expect:
 
-Our own forced ansible settings outrank anything a credential contributes, for
-the same reason they outrank the operator's `ansible.cfg`: a credential must not
-be able to re-enable the inventory-plugin dispatcher by supplying a variable of
-its own. See
-[what a configure actually runs](runners.md#what-a-configure-actually-runs).
+```ini
+[all:vars]
+ansible_ssh_private_key_file=${terrapod:fleet-key.private_key}
+
+[databases:vars]
+ansible_ssh_private_key_file=${terrapod:db-key.private_key}
+
+[databases]
+db1.example.com ansible_ssh_private_key_file=${terrapod:db1-own-key.private_key}
+```
+
+`db1` uses its own key, its siblings in `databases` use the group's, and
+everything else uses the fleet's. There is nothing to order and no Terrapod rule
+to learn.
+
+One consequence worth stating: a value you set **without** a placeholder wins
+over one with it at a lower level, for the same reason. A committed
+`host_vars/db1.yml` setting `ansible_ssh_private_key_file` to a path of your own
+outranks a reference in `[databases:vars]` — which is correct, and is the first
+thing to check when a credential appears not to be taking effect.
 
 ## Apply-only, and the phase a credential reaches
 
@@ -337,33 +390,39 @@ runs under is the one Terrapod hands it, plus the execution environment's own.
 
 ### The configure fails as an unreachable fleet
 
-Check the credential's **scope** first. A machine credential scoped to a group
-name is validated for *shape* when you write it, but whether that group exists is
-a property of the inventory the run resolved — so renaming or removing a group
-leaves a credential pointing at nothing.
+The credential was delivered and ansible did not use it, or used the wrong one.
+Where it is used is said in the inventory, so that is where to look.
 
-Terrapod refuses that rather than running: a configure whose credential applies
-to no host would report an unreachable fleet, naming neither the credential nor
-the stale scope. The refusal names the scope that does not resolve **and lists
-the groups the run's inventory does contain**, so the fix is usually visible in
-the message. Rename the credential's `key` to match, or use `all`.
+Read the run's **resolved inventory** on the workspace's inventory view: it
+answers for the same rows the run resolved from, and it shows the placeholders
+as written. If the variable you expected to carry a reference does not, the
+inventory never named the credential for that host.
 
-The run's resolved inventory is the authority on which groups exist — read it on
-the workspace's inventory view, which answers for the same rows the run resolved
-from.
+If the reference is there but the host still cannot be reached, the value it
+resolved to is a path on the Job's shared volume, so it is the *credential* that
+is wrong rather than its placement — a key for the wrong fleet, a `user` the
+host does not have, or escalation the playbook needs and the envelope omits.
+
+A reference naming a credential that was not delivered does **not** reach this
+point: the configure refuses before running, and that is
+[its own entry](#a-configure-refuses-with-an-unresolvable-credential-reference).
 
 ### The credential is configured but ansible is not using it
 
-Look for a **host variable** setting the same thing. Host variables outrank the
-credential's group-level injection (see
-[what outranks what](#what-outranks-what)), so a declared `ansible_user`, or an
-`ansible_user` in a committed `host_vars` file, wins — correctly, but it is not
-always what the operator remembered declaring.
+Look for something else setting the same variable at a higher precedence. These
+are ordinary inventory variables once substituted, so **Ansible's own precedence
+decides**: a host variable beats a group variable, which beats one on `all`. A
+committed `host_vars` file setting `ansible_user` outranks a reference you put
+in `[all:vars]` — correctly, but not always what you remembered writing.
 
-The other possibility is the scope: a credential keyed to a group only applies to
-that group's hosts, so check the host you are looking at is actually in it.
-Ansible expands nesting, so a host that reaches the group only through a child
-group *is* covered.
+The quickest check is the resolved inventory for the host in question, which
+shows the value that actually won.
+
+The other possibility is that nothing names the credential at all. A credential
+with no reference anywhere is delivered and simply unused — Terrapod does not
+warn, because which credentials an inventory uses is the inventory's business
+and an unreferenced one is a legitimate thing to have declared ahead of the
+inventory that will use it.
 
 ### A write is refused with a 422
 
@@ -388,27 +447,35 @@ workspace variable, and adding or patching a variable-set variable — and it
 checks the credential as it will be *after* the write, so a PATCH that changes
 only the `key` is caught too.
 
-### A configure refuses with a stale credential scope
+### A configure refuses with an unresolvable credential reference
 
-The configure refused before running anything, naming the scope and listing the
-hosts and groups the run's inventory does contain. The credential's `key` matches
-none of them.
+The configure refused before running anything, naming every
+`${terrapod:<name>.<field>}` in the inventory that it could not resolve.
 
-That is deliberate rather than tolerant. A scope matching nothing applies to no
-host, so the credential would be delivered and used by nobody — and the first
-thing you would see is a playbook that cannot authenticate, reported as an
-unreachable fleet, naming neither the credential nor the stale name. The refusal
-costs you a run that was going to fail anyway and tells you which name to fix.
+That is deliberate rather than tolerant. A reference that resolves to nothing
+would otherwise be handed to Ansible as a literal — ssh would treat
+`${terrapod:web-key.private_key}` as a key path and fail — or, if it were blanked
+instead, the host would be contacted with no key at all. Both arrive as an
+unreachable host, naming neither the credential nor the typo. The refusal costs
+you a run that was going to fail and tells you which string to fix.
 
-Common causes: a group or host renamed in the inventory and not in the
-credential; a credential scoped to a group that only ever existed in a different
-workspace; or a scope that was correct when written and whose host has since
-been removed. The fix is the credential's `key` — or `all`, if what you wanted
-was the whole inventory.
+Check, in this order:
 
-Note that `--limit` is **not** this: the run's inventory is resolved unlimited,
-so a credential scoped to `db` is still valid on a run limited to `web`. It
-simply applies to nothing in that run, which is correct and is not refused.
+1. **The name matches.** `<name>` is the variable's `key`, spelled identically in
+   both places. `web_key` and `web-key` are different credentials.
+2. **The variable is visible to this workspace.** It must be a variable on the
+   workspace, or on a variable set the workspace uses.
+3. **The field exists on that credential.** `${terrapod:web-key.password}` cannot
+   resolve if the envelope carries only `private_key`. The field names are listed
+   under [the envelope](#the-envelope).
+4. **The category is right.** Only `ansible_machine_auth` fields are referable.
+   An Ansible Vault password is delivered through the environment and has nothing
+   in the inventory to name — see
+   [the Vault password](#the-ansible-vault-password-ansible_vault_auth).
+
+Note that `--limit` is not this: the run's inventory is resolved unlimited, so a
+reference on a host the limit excludes still resolves normally. It simply is not
+used by that run.
 
 ### A vault-encrypted value shows as ciphertext in the resolved inventory
 
@@ -434,7 +501,7 @@ reason this is a feature rather than a gap:
 
 - [Running a configure](runners.md#what-a-configure-actually-runs) — the one
   command a configure runs, and the settings it forces
-- [Ansible inventory](ansible-inventory.md) — the hosts and groups a scope names,
+- [Ansible inventory](ansible-inventory.md) — the hosts, groups and variables a placeholder is written into,
   and the variable precedence a credential sits inside
 - [Private module source authentication](module-auth.md) — the same credential
   mechanism, for private git module sources

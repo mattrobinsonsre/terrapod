@@ -28,10 +28,9 @@ type Variable struct {
 	//   git_http_auth         private-git-module credentials, materialized
 	//   git_ssh_auth          before init (#1028).
 	//   ansible_machine_auth  the machine credential a configure connects
-	//                         with. Key names a HOST, a GROUP, or `all` for the
-	//                         whole inventory -- so a key may belong to one
-	//                         machine, to a tier, or be the default, and host
-	//                         beats group beats `all` (#1933).
+	//                         with. Key is its NAME; the INVENTORY says where it
+	//                         is used, with a ${terrapod:<name>.<field>}
+	//                         placeholder the runner substitutes (#1933).
 	//   ansible_vault_auth    an Ansible Vault password; Key is the vault ID
 	//                         label, and several become one identity list.
 	//

@@ -95,12 +95,12 @@ PHASES_SEEING_APPLY_ONLY = frozenset({"apply", "configure"})
 #: Ansible's two credential classes (#1933). `key` is the SCOPE in both, exactly
 #: as it is a URL pattern for git auth:
 #:
-#: * `ansible_machine_auth` — `key` names a HOST, a GROUP, or `all` for the
-#:   whole inventory, so a key can belong to one machine, to a tier, or be the
-#:   default. Host beats group beats `all`, by ansible's own precedence.
-#:   The runner writes the key material to a mode-restricted file on the shared
-#:   volume and injects the *paths* into the resolved inventory as vars for that
-#:   pattern, so ansible's own group precedence does the scoping.
+#: * `ansible_machine_auth` — `key` is the credential's NAME. The INVENTORY
+#:   says where it is used, by a `${terrapod:<name>.<field>}` placeholder the
+#:   runner substitutes while rendering; the runner writes key material to a
+#:   mode-restricted file on the shared volume and substitutes its PATH, never
+#:   the key. Placement is the inventory's because that is already where an
+#:   operator says which host gets what.
 #: * `ansible_vault_auth` — `key` is the vault ID label. Several entries become
 #:   one `ANSIBLE_VAULT_IDENTITY_LIST`, which is how multiple vault IDs work.
 #:

@@ -94,13 +94,14 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"provider plans it true for them so the apply does not contradict the " +
 					"plan. None of them accepts `value_source = \"vault\"`: an envelope is an " +
 					"object and an OpenBao/Vault reference resolves to a single field.\n\n" +
-					"In the two `ansible_*` categories `key` is the SCOPE, not a name. For " +
-					"`ansible_machine_auth` it names a host, a group, or `all` for the whole " +
-					"workspace's inventory -- and the credential is delivered as that " +
-					"scope's connection variables. For `ansible_vault_auth` it is the vault " +
-					"ID label, so several of them become one identity list and multiple " +
-					"vault IDs work. See the Ansible credentials documentation for each " +
-					"envelope's fields.",
+					"In the two `ansible_*` categories `key` is the credential's NAME. For " +
+					"`ansible_machine_auth` the INVENTORY says where it is used, with a " +
+					"`${terrapod:<name>.<field>}` placeholder the runner substitutes while " +
+					"rendering -- so it can fill any connection variable, including " +
+					"`ansible_ssh_common_args`, and nothing here decides placement. For " +
+					"`ansible_vault_auth` the name is also the vault ID label, so several of " +
+					"them become one identity list and multiple vault IDs work. See the " +
+					"Ansible credentials documentation for each envelope's fields.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"structured": schema.BoolAttribute{
