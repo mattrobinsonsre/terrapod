@@ -132,7 +132,15 @@ test('the variable-set page never passes an engine', () => {
 // Ansible credential categories (#1933)
 // ---------------------------------------------------------------------------
 
-const PANEL = readFileSync('src/components/variable-edit-panel.tsx', 'utf8')
+// The credential FIELDS live in their own module beside `vault-reference-fields`
+// -- the same kind of thing, a shared field group for a variable whose value is
+// a structured envelope. The panel itself is read separately below, because two
+// of the assertions here are about the panel's own behaviour (what it offers for
+// a credential category) rather than about the fields.
+const FIELDS = readFileSync('src/components/ansible-credential-fields.tsx', 'utf8')
+const PANEL_SRC = readFileSync('src/components/variable-edit-panel.tsx', 'utf8')
+// Both, for the assertions that do not care which file a thing is in.
+const PANEL = FIELDS + PANEL_SRC
 const WS_PAGE = readFileSync('src/app/workspaces/[id]/page.tsx', 'utf8')
 const VARSET_PAGE = readFileSync('src/app/admin/variable-sets/[id]/page.tsx', 'utf8')
 /** The server's own definition of the two envelopes — see the gate below. */

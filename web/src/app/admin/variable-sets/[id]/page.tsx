@@ -12,13 +12,15 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import {
+  VariableEditPanel,
+  type VariableEditState,
+} from '@/components/variable-edit-panel'
+import {
   ANSIBLE_MACHINE_CATEGORY,
   ANSIBLE_VAULT_CATEGORY,
   AnsibleCredentialFields,
-  VariableEditPanel,
   isAnsibleAuthCategory,
-  type VariableEditState,
-} from '@/components/variable-edit-panel'
+} from '@/components/ansible-credential-fields'
 import {
   VaultReferenceFields,
   buildVaultReference,

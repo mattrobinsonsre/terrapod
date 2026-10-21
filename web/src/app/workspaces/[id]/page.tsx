@@ -45,12 +45,14 @@ import {
 } from '@/components/template-editors'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import {
+  VariableEditPanel,
+} from '@/components/variable-edit-panel'
+import {
   ANSIBLE_MACHINE_CATEGORY,
   ANSIBLE_VAULT_CATEGORY,
   AnsibleCredentialFields,
-  VariableEditPanel,
   isAnsibleAuthCategory,
-} from '@/components/variable-edit-panel'
+} from '@/components/ansible-credential-fields'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
