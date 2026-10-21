@@ -363,6 +363,35 @@ def parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | None
     return None
 
 
+def repo_path(conn: VCSConnection, repo_url: str) -> str | None:
+    """`owner/name` for a repo URL, in the form `PRSession.repo` stores.
+
+    One producer, because `PRSession.repo` is written as exactly this, from
+    exactly this parser -- the poller passes `f"{owner}/{repo}"` from
+    `parse_repo_url` into `_upsert_pr_session`. Two separate modules then
+    resolved a session from a workspace and *both* omitted the column
+    entirely (#2199), so the derivation lives here rather than being spelled
+    out at each call site.
+
+    Not a suffix match against the URL, which is the tempting shortcut
+    because `_collect_rows` filters workspaces with
+    `Workspace.vcs_repo_url.endswith(sess.repo)`. That direction is
+    ambiguous for a GitLab nested group: a URL ending `/group/sub/proj`
+    suffix-matches both `sub/proj` and `group/sub/proj`, so it can select the
+    wrong row for the same reason the missing predicate did. Equality on the
+    parsed pair is exact against `uq_pr_session`.
+
+    `None` when the URL cannot be parsed -- the caller must then refuse to
+    resolve rather than fall back to a broader predicate, since a broader
+    predicate is the defect.
+    """
+    pair = parse_repo_url(conn, repo_url)
+    if pair is None:
+        return None
+    owner, name = pair
+    return f"{owner}/{name}"
+
+
 async def get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
     """Get branch HEAD SHA via the appropriate provider."""
     from terrapod.services import github_service, gitlab_service
