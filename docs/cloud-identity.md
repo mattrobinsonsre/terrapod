@@ -1527,7 +1527,7 @@ if you set `TERRAFORM_VAULT_LOG_BODY`).
 **Terrapod strips its own tokens from the run log**, by exact value rather than by
 JWT shape: the runner knows the literal strings because it wrote them, so this
 cannot mangle a plan that legitimately contains a JWT and cannot miss the token it
-delivered. A redacted occurrence reads `[redacted: cloud identity token]`.
+delivered. A redacted occurrence reads `[redacted]`.
 
 That covers the tokens Terrapod minted for the run. It does **not** cover a
 credential of your own that a provider prints, so `TF_LOG` remains what HCP

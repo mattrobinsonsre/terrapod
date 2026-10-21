@@ -793,6 +793,19 @@ class RunnerListener:
             }
             for g in attrs.get("git-auth", [])
         ]
+        # Ansible credentials (#1933), the same ferrying job as git-auth above:
+        # the machine credential and the Ansible Vault password(s), already
+        # resolved server-side. The API sends these ONLY for a configure, so an
+        # empty list here is the ordinary state of every plan and apply rather
+        # than a workspace with nothing configured.
+        ansible_auth = [
+            {
+                "category": a.get("category", ""),
+                "key": a.get("key", ""),
+                "value": a.get("value", ""),
+            }
+            for a in attrs.get("ansible-auth", [])
+        ]
         # Vault file delivery (#1619). Each file's content becomes a key of the
         # per-run vars Secret; the Job mounts it read-only. Only names reach the
         # Job builder and the logs — the values go to the Secret and nowhere else.
@@ -820,7 +833,14 @@ class RunnerListener:
         # mirrors the auth Secret; ownerReference GCs it with the Job.
         vars_secret_name = (
             f"tprun-{run_short}-{phase}-vars"
-            if (env_vars or native_vars or execution_hooks or git_auth or vault_file_mounts)
+            if (
+                env_vars
+                or native_vars
+                or execution_hooks
+                or git_auth
+                or ansible_auth
+                or vault_file_mounts
+            )
             else ""
         )
         # Per-run CA Secret (#592): ships the custom outbound CA into the runner
@@ -861,6 +881,7 @@ class RunnerListener:
                 terraform_vars=native_vars,
                 execution_hooks=execution_hooks,
                 git_auth=git_auth,
+                ansible_auth=ansible_auth,
                 vault_files=vault_file_mounts,
                 workspace_id=attrs.get("workspace-id", ""),
                 resource_cpu=attrs.get("resource-cpu", "1"),
@@ -943,6 +964,7 @@ class RunnerListener:
                     job_uid,
                     execution_hooks=execution_hooks,
                     git_auth=git_auth,
+                    ansible_auth=ansible_auth,
                     vault_file_values=vault_file_values,
                 )
             except Exception as e:
@@ -1313,6 +1335,7 @@ class RunnerListener:
         job_uid: str,
         execution_hooks: list[dict] | None = None,
         git_auth: list[dict] | None = None,
+        ansible_auth: list[dict] | None = None,
         vault_file_values: dict[str, str] | None = None,
     ) -> None:
         """Create a K8s Secret holding all workspace variable values, with an
@@ -1333,6 +1356,11 @@ class RunnerListener:
             — mounted as a file; the entrypoint runs each hook at its boundary.
           - `git-auth.json`: JSON blob [{category, key, value}] (#1028) — mounted
             as a file; the git_auth phase materializes git credentials before init.
+          - `ansible-auth.json`: JSON blob [{category, key, value}] (#1933) —
+            mounted as a file; the ansible_auth phase writes each credential to a
+            `0600` file on the execution environment's shared volume and injects
+            the paths into the resolved inventory. Present only on a configure,
+            because the API sends the attribute only for that phase.
           - one key per env-category var — sourced via secretKeyRef in the Job.
 
         Values never appear in the Job spec, so they aren't readable via
@@ -1381,6 +1409,17 @@ class RunnerListener:
                     for g in git_auth
                 ]
             )
+        if ansible_auth:
+            string_data["ansible-auth.json"] = json.dumps(
+                [
+                    {
+                        "category": a.get("category", ""),
+                        "key": a.get("key", ""),
+                        "value": a.get("value", ""),
+                    }
+                    for a in ansible_auth
+                ]
+            )
         for var in env_vars:
             string_data[var["key"]] = var["value"]
         # _plan_vault_files already refused a clash with an env key, so this
@@ -1397,6 +1436,7 @@ class RunnerListener:
             "terraform vars": len(string_data.get("terraform.tfvars.json", "").encode()),
             "execution hooks": len(string_data.get("execution-hooks.json", "").encode()),
             "git auth": len(string_data.get("git-auth.json", "").encode()),
+            "ansible auth": len(string_data.get("ansible-auth.json", "").encode()),
             "env vars": sum(
                 len(str(v["key"]).encode()) + len(str(v["value"]).encode()) for v in env_vars
             ),

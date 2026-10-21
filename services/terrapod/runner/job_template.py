@@ -23,6 +23,11 @@ _HOOKS_FILENAME = "execution-hooks.json"
 # mounted alongside the tfvars file; read by runner/phases/git_auth.py.
 _GIT_AUTH_SECRET_KEY = "git-auth.json"
 _GIT_AUTH_FILENAME = "git-auth.json"
+# Ansible credentials (#1933). Same channel, own key: these are mounted only
+# into a configure's Job, because the API sends the attribute only for that
+# phase, and a plan executes a pull request's code.
+_ANSIBLE_AUTH_SECRET_KEY = "ansible-auth.json"
+_ANSIBLE_AUTH_FILENAME = "ansible-auth.json"
 # Vault file delivery (#1619) — more keys of the same per-run vars Secret, each
 # mounted read-only at its own path. See runner/vault_files.py.
 _VAULT_FILES_VOLUME = "vault-files"
@@ -73,6 +78,12 @@ _EE_HOME = f"{_EE_SHARED_DIR}/home"
 #: Here rather than on the workspace volume because the file is Terrapod's, not
 #: part of the operator's fetched tree.
 _EE_INVENTORY_DIR = f"{_EE_SHARED_DIR}/inventory"
+#: Where the ansible_auth phase writes `0600` credential files (#1933). It has
+#: to be on the SHARED volume: ansible runs in the EE container, which mounts
+#: only this volume and `workspace`, so a key written to the orchestrator's own
+#: `/tmp` -- where the PVC-tempfile rule otherwise sends runner tempfiles -- is
+#: materialised correctly and invisible to the one process that must read it.
+_EE_CREDENTIALS_DIR = f"{_EE_SHARED_DIR}/credentials"
 #: The group both containers reach the shared volumes through. The orchestrator
 #: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
@@ -378,6 +389,7 @@ def _add_execution_environment(
             {"name": "TP_EE_COLLECTIONS_DIR", "value": _EE_COLLECTIONS_DIR},
             {"name": "TP_EE_ROLES_DIR", "value": _EE_ROLES_DIR},
             {"name": "TP_EE_INVENTORY_DIR", "value": _EE_INVENTORY_DIR},
+            {"name": "TP_EE_CREDENTIALS_DIR", "value": _EE_CREDENTIALS_DIR},
             {
                 "name": _EE_TOKEN_ENV,
                 "valueFrom": {
@@ -401,7 +413,7 @@ def _add_execution_environment(
                 "/bin/sh",
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
-                f"{_EE_INVENTORY_DIR} "
+                f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} "
                 f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
             ],
             "securityContext": {
@@ -457,6 +469,7 @@ def build_job_spec(
     terraform_vars: list[dict[str, str]],
     execution_hooks: list[dict] | None = None,
     git_auth: list[dict] | None = None,
+    ansible_auth: list[dict] | None = None,
     vault_files: list[dict] | None = None,
     vars_secret_name: str = "",
     workspace_id: str = "",
@@ -855,6 +868,8 @@ def build_job_spec(
         secret_items.append({"key": _HOOKS_SECRET_KEY, "path": _HOOKS_FILENAME})
     if git_auth:
         secret_items.append({"key": _GIT_AUTH_SECRET_KEY, "path": _GIT_AUTH_FILENAME})
+    if ansible_auth:
+        secret_items.append({"key": _ANSIBLE_AUTH_SECRET_KEY, "path": _ANSIBLE_AUTH_FILENAME})
     if vars_secret_name and secret_items:
         pod = job_spec["spec"]["template"]["spec"]
         pod["volumes"].append(

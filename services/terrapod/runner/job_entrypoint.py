@@ -44,6 +44,7 @@ import structlog
 
 from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
+    ansible_auth,
     ansible_collections,
     backend_backstop,
     cloud_identity,
@@ -954,11 +955,30 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
     cheaper order to fail in. The install reaches Galaxy and can take minutes;
     an unreadable inventory is knowable in one request, and a configure that
     cannot know its target set is not going to run whatever the install does.
+
+    Credentials (#1933) come FIRST, ahead of both, for the same reason in a
+    stronger form: they are a local file read, they can refuse without reaching
+    the network at all, and a configure with an unusable credential is not going
+    to run whatever the other two produce. Their `AnsibleAuthUnavailable` is a
+    refusal rather than an exit code, like `InventoryUnavailable`.
+
+    The machine credential's variables reach ansible THROUGH the inventory and
+    the vault password through the environment, which is why the returns of the
+    first step are the arguments of the other two rather than process state:
+    `configure._forced_env` strips every inherited `ANSIBLE_*`, so an exported
+    vault identity list would be stripped on the way out.
     """
     cwd = (work_dir / cfg.config_directory).resolve() if cfg.config_directory else work_dir
-    inventory = configure_inventory.materialise(cfg)
+    credential_env, injections = ansible_auth.run()
+    inventory = configure_inventory.materialise(cfg, injections=injections)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
-    return configure.run(cfg, work_dir=work_dir, inventory=inventory, log_file=str(_CONFIGURE_LOG))
+    return configure.run(
+        cfg,
+        work_dir=work_dir,
+        inventory=inventory,
+        log_file=str(_CONFIGURE_LOG),
+        extra_env=credential_env,
+    )
 
 
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]

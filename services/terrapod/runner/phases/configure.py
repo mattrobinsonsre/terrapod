@@ -134,7 +134,14 @@ def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
     return out
 
 
-def run(cfg: RunnerConfig, *, work_dir: Path, inventory: Path, log_file: str | None = None) -> int:
+def run(
+    cfg: RunnerConfig,
+    *,
+    work_dir: Path,
+    inventory: Path,
+    log_file: str | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> int:
     """Execute the playbook in the execution environment; return ansible's code.
 
     Args:
@@ -146,6 +153,13 @@ def run(cfg: RunnerConfig, *, work_dir: Path, inventory: Path, log_file: str | N
             here so the download is a separate, separately-failing step: an
             inventory that cannot be read is not a playbook that failed.
         log_file: appended with the combined output for upload as the run log.
+        extra_env: environment the credential phase returned (#1933) -- today
+            `ANSIBLE_VAULT_IDENTITY_LIST`. It travels as an ARGUMENT and not
+            through `os.environ` because `_forced_env` strips every inherited
+            `ANSIBLE_*`: exported, it would be stripped on the way out and the
+            configure would run with no vault password, silently. The forced
+            settings still win over it, so a credential cannot re-enable the
+            plugin dispatcher by supplying a variable of its own.
 
     Raises:
         ConfigureNotConfigured: the run names no playbook.
@@ -176,11 +190,15 @@ def run(cfg: RunnerConfig, *, work_dir: Path, inventory: Path, log_file: str | N
         inventory=str(inventory),
         cwd=str(cwd),
     )
+    # `_forced_env` LAST, so the non-negotiables outrank anything a credential
+    # contributed -- the same precedence the Job spec gives our own env over an
+    # operator's `extraEnv`, and for the same reason.
+    env = {**(extra_env or {}), **_forced_env(cfg)}
     result = ee_client.run(
         "ansible-playbook",
         arguments,
         cwd=str(cwd),
-        env=_forced_env(cfg),
+        env=env,
         log_file=log_file,
     )
     if result.error:

@@ -229,6 +229,7 @@ local_resource(
         'services/terrapod/runner/saas_known_hosts',
         'services/terrapod/services/cost',
         'services/terrapod/services/inventory_render.py',
+        'services/terrapod/services/ansible_auth.py',
     ],
     labels=['build'],
 )

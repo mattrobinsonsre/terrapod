@@ -151,6 +151,7 @@ COPY services/terrapod/services/cost/ ./terrapod/services/cost/
 # which is what lets it come as one file rather than dragging the resolver's
 # database and storage dependencies into this image.
 COPY services/terrapod/services/inventory_render.py ./terrapod/services/inventory_render.py
+COPY services/terrapod/services/ansible_auth.py ./terrapod/services/ansible_auth.py
 
 # /home/runner is the writable HOME for UID 1000, and UID 1000 gets a real
 # /etc/passwd entry. The passwd entry matters twice over:

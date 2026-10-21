@@ -430,7 +430,7 @@ class TestTheLogStreamRedactsRegisteredSecrets:
         out = self._emit(tmp_path, f"calling sts\nWebIdentityToken={self.TOKEN}\nok\n")
 
         assert self.TOKEN not in out
-        assert "[redacted: cloud identity token]" in out
+        assert "[redacted]" in out
         # The surrounding output survives -- a redactor that ate the log would be
         # a worse failure than the one it prevents.
         assert "calling sts" in out
@@ -473,7 +473,7 @@ class TestTheLogStreamRedactsRegisteredSecrets:
 
         assert self.TOKEN not in out
         assert second not in out
-        assert out.count("[redacted: cloud identity token]") == 2
+        assert out.count("[redacted]") == 2
 
     def test_a_short_value_is_SKIPPED_rather_than_registered(self) -> None:
         """A short string would match ordinary output and mangle the log, which is

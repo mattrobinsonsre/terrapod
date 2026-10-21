@@ -82,14 +82,31 @@ def inventory_dir() -> Path:
     return Path(os.environ.get("TP_EE_INVENTORY_DIR") or _DEFAULT_INVENTORY_DIR)
 
 
-def document_to_source(document: dict[str, Any]) -> str:
+def document_to_source(
+    document: dict[str, Any], *, injections: dict[str, dict[str, Any]] | None = None
+) -> str:
     """The stored document as a YAML inventory source.
 
     Shares `build_inventory_document` with the API rather than rendering its own
     YAML: the shape carries group nesting, which is what `--limit` expands
     through, so two renderers that drifted would make a limit mean different
     things on the two sides of the same run.
+
+    `injections` is `{scope: {variable: value}}` from the `ansible_auth` phase
+    (#1933) -- a machine credential's connection variables, scoped to `all` or
+    to a group. They enter at GROUP level, which is where a scope belongs and is
+    also safe for the reason the group-vars comment below gives: unlike the
+    document's own group variables these are not already inside the host
+    variables, so emitting them here applies them once rather than twice.
+
+    Raises:
+        InventoryUnavailable: a credential is scoped to a group the inventory
+            does not have. Refused rather than emitted: the scope applies to
+            nothing, so the configure would run with no credential for those
+            hosts and fail as an unreachable fleet -- a message naming neither
+            the credential nor the stale group.
     """
+    injections = injections or {}
     hosts = document.get("hosts") or {}
     groups = document.get("groups") or {}
     children = document.get("children") or {}
@@ -105,18 +122,34 @@ def document_to_source(document: dict[str, Any]) -> str:
     # a group that genuinely exists. Group vars are NOT passed: they are
     # already inside each host's variables, and re-emitting them at group level
     # would let a later read apply them twice with the lower precedence.
-    group_rows: list[tuple[str, dict[str, Any]]] = [(name, {}) for name in sorted(groups)]
+    group_rows: list[tuple[str, dict[str, Any]]] = [
+        (name, dict(injections.get(name, {}))) for name in sorted(groups)
+    ]
     # A group that appears only as a parent or a child still has to exist.
+    known = set(groups)
     for extra in sorted({p for p, _ in nesting} | {c for _, c in nesting}):
-        if extra not in groups:
-            group_rows.append((extra, {}))
+        if extra not in known:
+            group_rows.append((extra, dict(injections.get(extra, {}))))
+            known.add(extra)
+
+    stale = sorted(set(injections) - known - {"all"})
+    if stale:
+        raise InventoryUnavailable(
+            f"a machine credential is scoped to {', '.join(repr(s) for s in stale)}, which "
+            f"this run's inventory does not contain (its groups are "
+            f"{', '.join(sorted(known)) or 'none'}). The credential would apply to no host, "
+            f"so the configure would fail as an unreachable fleet rather than naming the "
+            f"stale scope. Rename the credential's scope, or use 'all'."
+        )
 
     document = build_inventory_document(
         hosts=sorted((name, vars_ or {}) for name, vars_ in hosts.items()),
         groups=sorted(group_rows),
         memberships=memberships,
         children=nesting,
-        global_vars={},
+        # A credential scoped to `all` is ansible's own `group_vars/all`, which
+        # is what this argument renders.
+        global_vars=dict(injections.get("all", {})),
     )
     # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
     # `requirements-runner.txt` deliberately ships no PyYAML -- so serialising
@@ -128,11 +161,23 @@ def document_to_source(document: dict[str, Any]) -> str:
     return json.dumps(document, indent=2, sort_keys=True)
 
 
-def materialise(cfg: RunnerConfig, *, client: Any = None) -> Path:
+def materialise(
+    cfg: RunnerConfig,
+    *,
+    client: Any = None,
+    injections: dict[str, dict[str, Any]] | None = None,
+) -> Path:
     """Fetch the run's resolved inventory and write it as a YAML source.
 
     Returns the path to pass as the single `-i`. Raises `InventoryUnavailable`
-    if the artifact cannot be fetched or is not the document it must be.
+    if the artifact cannot be fetched, is not the document it must be, or an
+    `injections` scope names a group it does not contain.
+
+    `injections` carries the machine credential's connection variables (#1933).
+    They are merged into the RENDERED file and nowhere else -- not into the
+    stored artifact, which the API wrote and which carries no credential -- so a
+    password delivered this way exists on the Job's shared volume and in no
+    durable surface.
     """
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/resolved-inventory"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
@@ -180,7 +225,7 @@ def materialise(cfg: RunnerConfig, *, client: Any = None) -> Path:
     # `exist_ok` because in a Job the init container already has.
     target.mkdir(parents=True, exist_ok=True)
     rendered = target / RENDERED_NAME
-    rendered.write_text(document_to_source(document))
+    rendered.write_text(document_to_source(document, injections=injections))
     logger.info(
         "resolved inventory materialised",
         run_id=cfg.run_id,

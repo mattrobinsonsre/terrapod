@@ -244,7 +244,19 @@ def _split_tail(buf: bytes, *, secrets: tuple[bytes, ...], ceiling: int) -> tupl
 #: credential this exists to hide.
 _MIN_SECRET_LEN = 24
 
-_REDACTED = b"[redacted: cloud identity token]"
+#: What a stripped secret is replaced with. Deliberately NOT naming a kind of
+#: secret: it said `cloud identity token` while that was the only caller, and
+#: #1933 registers Ansible Vault passwords and SSH private keys through the same
+#: door -- so the old text would have told an operator reading a configure's log
+#: that their vault password was a cloud identity token. A placeholder that
+#: misidentifies what it hid is worse than a generic one, because it sends
+#: someone to the wrong feature.
+#:
+#: One value for every kind, rather than a per-secret label, because the
+#: replacement happens inside `_redact`'s loop over a set of BYTES -- the set
+#: carries no provenance, and giving it some would mean a registry keyed on the
+#: secret itself, i.e. a second place a secret is stored.
+_REDACTED = b"[redacted]"
 
 
 def register_secret(value: str) -> bool:
