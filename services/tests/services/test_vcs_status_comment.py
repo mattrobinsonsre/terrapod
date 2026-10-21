@@ -532,10 +532,22 @@ class TestCollectRowsEnrichment:
         run.cost_diff_min = 25.0
         run.cost_diff_max = 25.0
 
+        class _Conn:
+            provider = "github"
+            server_url = ""
+
         class _Workspace:
             id = _uuid.uuid4()
             name = "prod-network"
             vcs_workflow = "apply_then_merge"
+            # `_collect_rows` matches the repo on the PARSED pair (#2199), so a
+            # row needs a URL and a connection to be in scope at all.
+            # Deliberately the `.git` clone URL: the suffix match this replaced
+            # would drop this row, because "…/acme/infra.git" does not end with
+            # "acme/infra". That is the whole defect, so the fixture carries the
+            # form that exposes it.
+            vcs_repo_url = "https://github.com/acme/infra.git"
+            vcs_connection = _Conn()
 
         class _FakeResult:
             def __init__(self, rows):

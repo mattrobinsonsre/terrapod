@@ -69,6 +69,9 @@ from terrapod.services.vcs_provider import (
 from terrapod.services.vcs_provider import (
     pull_requests_for_commit as _provider_pulls_for_commit,
 )
+from terrapod.services.vcs_provider import (
+    workspace_repo_is as _provider_workspace_repo_is,
+)
 from terrapod.services.workspace_autodiscovery_service import autodiscover_for_paths
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -997,6 +1000,22 @@ async def _reconcile_closed_pr_sessions(
             PRSession.state == "open",
         )
     )
+    # The workspaces on this (connection, repo), resolved once rather than per
+    # session. Matched on the PARSED repo (#2199): the suffix match this
+    # replaced missed every workspace whose URL ends `.git`, so a closed PR's
+    # runs were never cancelled and an apply-capable `planned` run went on
+    # holding the workspace lock -- exactly what the comment below says must
+    # not happen.
+    #
+    # Not `_select_workspace_ids(repo=..., provider=...)`, which does the same
+    # exact-match but scopes by PROVIDER: with two GitHub connections holding
+    # the same `owner/repo`, that would widen this from one connection to both,
+    # and a broader predicate is the defect being fixed.
+    scoped = await db.execute(select(Workspace).where(Workspace.vcs_connection_id == conn.id))
+    scoped_ws_ids = [
+        ws.id for ws in scoped.scalars().all() if _provider_workspace_repo_is(ws, repo)
+    ]
+
     for sess in sessions.scalars().all():
         if sess.pr_number in open_pr_numbers:
             continue
@@ -1020,12 +1039,7 @@ async def _reconcile_closed_pr_sessions(
             select(Run).where(
                 Run.vcs_pull_request_number == sess.pr_number,
                 run_service.pr_closure_cancels_sql(Run),
-                Run.workspace_id.in_(
-                    select(Workspace.id).where(
-                        Workspace.vcs_connection_id == conn.id,
-                        Workspace.vcs_repo_url.endswith(repo),
-                    )
-                ),
+                Run.workspace_id.in_(scoped_ws_ids),
             )
         )
         for run in active.scalars().all():

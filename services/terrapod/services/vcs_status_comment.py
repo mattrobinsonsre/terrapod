@@ -701,13 +701,15 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
         .where(
             Run.vcs_pull_request_number == sess.pr_number,
             Workspace.vcs_connection_id == sess.vcs_connection_id,
-            (Workspace.vcs_repo_url.endswith(sess.repo)),
         )
         .order_by(Workspace.name, Run.created_at.desc())
     )
-    # Reduce to latest run per workspace.
+    # Reduce to latest run per workspace, matching the repo on the PARSED pair
+    # (#2199) -- a suffix match misses every `.git` URL.
     latest_per_ws: dict[uuid.UUID, tuple[Workspace, Run]] = {}
     for run, ws in result.all():
+        if not vcs_provider.workspace_repo_is(ws, sess.repo):
+            continue
         latest_per_ws.setdefault(ws.id, (ws, run))
 
     post_merge = await _post_merge_runs(db, sess)
@@ -751,10 +753,10 @@ async def _post_merge_runs(db, sess: PRSession) -> dict[uuid.UUID, tuple[Workspa
             Run.vcs_commit_sha == sess.merge_commit_sha,
             Run.vcs_pull_request_number.is_(None),
             Workspace.vcs_connection_id == sess.vcs_connection_id,
-            (Workspace.vcs_repo_url.endswith(sess.repo)),
         )
         .order_by(Workspace.name, Run.created_at.desc())
     )
+    # Repo matched on the PARSED pair (#2199), not a URL suffix.
     latest: dict[uuid.UUID, tuple[Workspace, Run]] = {}
     for run, ws in result.all():
         latest.setdefault(ws.id, (ws, run))

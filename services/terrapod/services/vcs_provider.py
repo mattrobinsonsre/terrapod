@@ -392,6 +392,34 @@ def repo_path(conn: VCSConnection, repo_url: str) -> str | None:
     return f"{owner}/{name}"
 
 
+def workspace_repo_is(ws, repo: str) -> bool:
+    """Whether a workspace's VCS URL names exactly `repo` (`owner/name`).
+
+    The predicate four queries needed and none of them had. They each filtered
+    `Workspace.vcs_repo_url.endswith(sess.repo)` in SQL, and `repo_path` above
+    strips `.git` before parsing -- so for a workspace configured with the clone
+    URL GitHub hands out, `https://host/acme/infra.git`, the stored URL does not
+    end with `acme/infra` and every one of those queries silently returned
+    nothing. The symptoms were an auto-merge that never fired, a status comment
+    with no workspace rows, and a closed PR whose runs were never cancelled --
+    the last of which holds the workspace lock against every other PR.
+
+    It is also unanchored in the other direction: a URL ending `/xacme/infra`
+    suffix-matches `acme/infra`.
+
+    This is a Python predicate rather than a SQL clause because the parser is
+    Python; callers narrow in SQL by connection and then filter with this.
+
+    `False` when the URL will not parse or the workspace has no connection --
+    the caller must refuse rather than widen, since a broader predicate is the
+    defect (#2199).
+    """
+    conn = getattr(ws, "vcs_connection", None)
+    if conn is None:
+        return False
+    return repo_path(conn, ws.vcs_repo_url or "") == repo
+
+
 async def get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
     """Get branch HEAD SHA via the appropriate provider."""
     from terrapod.services import github_service, gitlab_service
