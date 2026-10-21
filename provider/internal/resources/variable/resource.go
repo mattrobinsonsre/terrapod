@@ -80,7 +80,7 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					"plan. None of them accepts `value_source = \"vault\"`: an envelope is an " +
 					"object and an OpenBao/Vault reference resolves to a single field.\n\n" +
 					"In the two `ansible_*` categories `key` is the SCOPE, not a name. For " +
-					"`ansible_machine_auth` it is a host pattern -- `all`, or a group in the " +
+					"`ansible_machine_auth` it names a host, a group, or `all` for the whole " +
 					"workspace's inventory -- and the credential is delivered as that " +
 					"scope's connection variables. For `ansible_vault_auth` it is the vault " +
 					"ID label, so several of them become one identity list and multiple " +

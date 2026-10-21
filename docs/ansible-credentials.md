@@ -14,7 +14,7 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | a host pattern — the literal `all`, or the name of a group the inventory declares | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | `0640` key file(s) on the volume shared with the execution environment, plus connection variables injected into the run's rendered inventory at **group** level for that scope |
+| `ansible_machine_auth` | a **host**, a **group**, or **`all`** for the whole inventory — they compose, and host beats group beats `all` | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | `0640` key file(s) on the volume shared with the execution environment, plus connection variables injected into the run's rendered inventory at the level the scope names |
 | `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0640` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
@@ -71,23 +71,47 @@ refused rather than stored.
 
 ### `key` is the scope, and ansible does the scoping
 
-`key` is a host pattern, and there are only two useful things it can be:
+`key` names the thing the credential belongs to, and there are **three levels**,
+because a real estate needs all three:
 
-- **`all`** — every host in the run. This is ansible's own root group, so the
-  credential's variables become the equivalent of `group_vars/all`.
-- **the name of a group the inventory declares** — the credential applies to
-  that group's hosts, including the ones it holds only through its children,
-  because ansible expands group nesting.
+- **a host** — just that machine. This is the level for an estate where
+  different hosts carry different keys, which is the common case once a fleet
+  has grown by acquisition rather than by template.
+- **a group** — that group's hosts, including the ones it holds only through its
+  children, because ansible expands group nesting.
+- **`all`** — the whole inventory's default. This is ansible's own root group, so
+  the credential's variables become the equivalent of `group_vars/all`.
 
-Nothing else is accepted. A group name must match the inventory's own
-[group-name rule](ansible-inventory.md#group-names); `ungrouped` is refused
-specifically, because it is derived from which hosts are in no other group, so
-its membership changes whenever any group does — scoping a credential to a set
-the operator cannot see or control is not a promise Terrapod will make.
+**They compose, and the more specific one wins**, because the levels are
+ansible's own and so is the precedence: host beats group beats `all`. So the
+ordinary arrangement is one `all`-scoped credential as the estate's default, a
+group-scoped one for a tier that differs, and a host-scoped one for the
+individual machine nobody has got round to re-keying — all three at once, with
+no ordering for you to express.
+
+`ungrouped` is refused specifically, because it is derived from which hosts are
+in no other group, so its membership changes whenever any group does — scoping a
+credential to a set you cannot see or control is not a promise Terrapod will
+make. A name that is **both** a host and a group in the same inventory is also
+refused: ansible permits it, so which hosts the credential would reach is not
+predictable, and a credential landing somewhere you did not mean is worth
+refusing a run over.
+
+A scope naming nothing in the run's inventory is refused with the hosts and
+groups that do exist, rather than applying to nothing — see
+[troubleshooting](#a-configure-refuses-with-a-stale-credential-scope).
+
+**The name is checked for shape when you write it and for existence when the run
+starts**, deliberately: a credential is commonly declared before the host it
+names — Terraform declares both in one apply and the order is yours — so
+refusing an unknown name at write time would make the two resources
+order-dependent.
 
 The scoping itself costs Terrapod no logic: the credential's variables are
-injected into the run's rendered inventory **at group level** for that scope, and
-**ansible's own precedence does the rest**. A per-group key is therefore exactly
+injected into the run's rendered inventory **at the level its scope names** —
+host variables for a host, group variables for a group, the root's variables for
+`all` — and **ansible's own precedence does the rest**. A per-host key is
+therefore exactly
 as cheap as a fleet-wide one, and several credentials with different scopes
 coexist without ordering rules.
 
@@ -363,6 +387,28 @@ The same validation applies on **every** write path — creating or patching a
 workspace variable, and adding or patching a variable-set variable — and it
 checks the credential as it will be *after* the write, so a PATCH that changes
 only the `key` is caught too.
+
+### A configure refuses with a stale credential scope
+
+The configure refused before running anything, naming the scope and listing the
+hosts and groups the run's inventory does contain. The credential's `key` matches
+none of them.
+
+That is deliberate rather than tolerant. A scope matching nothing applies to no
+host, so the credential would be delivered and used by nobody — and the first
+thing you would see is a playbook that cannot authenticate, reported as an
+unreachable fleet, naming neither the credential nor the stale name. The refusal
+costs you a run that was going to fail anyway and tells you which name to fix.
+
+Common causes: a group or host renamed in the inventory and not in the
+credential; a credential scoped to a group that only ever existed in a different
+workspace; or a scope that was correct when written and whose host has since
+been removed. The fix is the credential's `key` — or `all`, if what you wanted
+was the whole inventory.
+
+Note that `--limit` is **not** this: the run's inventory is resolved unlimited,
+so a credential scoped to `db` is still valid on a run limited to `web`. It
+simply applies to nothing in that run, which is correct and is not refused.
 
 ### A vault-encrypted value shows as ciphertext in the resolved inventory
 

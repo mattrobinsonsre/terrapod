@@ -95,7 +95,9 @@ PHASES_SEEING_APPLY_ONLY = frozenset({"apply", "configure"})
 #: Ansible's two credential classes (#1933). `key` is the SCOPE in both, exactly
 #: as it is a URL pattern for git auth:
 #:
-#: * `ansible_machine_auth` — `key` is a host pattern (`all` for every host).
+#: * `ansible_machine_auth` — `key` names a HOST, a GROUP, or `all` for the
+#:   whole inventory, so a key can belong to one machine, to a tier, or be the
+#:   default. Host beats group beats `all`, by ansible's own precedence.
 #:   The runner writes the key material to a mode-restricted file on the shared
 #:   volume and injects the *paths* into the resolved inventory as vars for that
 #:   pattern, so ansible's own group precedence does the scoping.

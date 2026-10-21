@@ -376,6 +376,56 @@ class TestRealAnsibleResolvesTheInjectedInventory:
         assert out.returncode == 0, out.stderr
         assert json.loads(out.stdout)["_meta"]["hostvars"]["w1"]["ansible_user"] == "theirs"
 
+    def test_host_beats_group_beats_the_inventory_default(self, tmp_path):
+        """The three levels, proven by ansible rather than by where we put them.
+
+        This is the assertion the feature is for: an estate where most hosts
+        take the default key, a tier takes its own, and one machine takes its
+        own again -- expressed as three credentials with no ordering for the
+        operator to state, because the ordering is ansible's.
+        """
+        hostvars = self._resolve(
+            tmp_path,
+            {
+                "all": {"ansible_ssh_private_key_file": "/tp/credentials/DEFAULT.key"},
+                "web": {"ansible_ssh_private_key_file": "/tp/credentials/WEB.key"},
+                "w1": {"ansible_ssh_private_key_file": "/tp/credentials/W1-OWN.key"},
+            },
+        )
+        # w1 is in `web`, so all three scopes reach it and the host one wins.
+        assert hostvars["w1"]["ansible_ssh_private_key_file"].endswith("W1-OWN.key")
+        # d1 is in `db`, which no credential names, so it takes the default.
+        assert hostvars["d1"]["ansible_ssh_private_key_file"].endswith("DEFAULT.key")
+
+    def test_a_group_scoped_key_reaches_a_sibling_the_host_scope_does_not(self, tmp_path):
+        """The middle level earning its place: with only `all` and per-host
+        scopes, a tier of twenty machines would need twenty credentials.
+        """
+        document = {
+            "hosts": {"w1": {}, "w2": {}, "d1": {}},
+            "groups": {"web": ["w1", "w2"], "db": ["d1"]},
+            "children": {},
+        }
+        source = tmp_path / configure_inventory.RENDERED_NAME
+        source.write_text(
+            configure_inventory.document_to_source(
+                document, injections={"web": {"ansible_user": "deploy"}}
+            )
+        )
+        out = subprocess.run(  # noqa: S603
+            [ANSIBLE, "-i", str(source), "--list"],
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+            env={"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
+            check=False,
+        )
+        assert out.returncode == 0, out.stderr
+        hostvars = json.loads(out.stdout)["_meta"]["hostvars"]
+        assert hostvars["w1"]["ansible_user"] == "deploy"
+        assert hostvars["w2"]["ansible_user"] == "deploy"
+        assert "ansible_user" not in hostvars.get("d1", {})
+
     def test_limit_still_expands_through_the_nesting(self, tmp_path):
         """Injecting group variables must not disturb what `--limit` selects --
         the nesting is what a limit expands through."""

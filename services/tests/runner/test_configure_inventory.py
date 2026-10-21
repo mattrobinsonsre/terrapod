@@ -159,6 +159,60 @@ class TestCredentialInjections:
         out = self._render({"infra": {"ansible_user": "deploy"}})
         assert out["all"]["children"]["infra"]["vars"] == {"ansible_user": "deploy"}
 
+    def test_a_HOST_scope_lands_on_that_host(self):
+        """The level an estate with per-machine keys needs. Host beats group in
+        ansible, so a host-scoped key overrides its group's without either side
+        knowing about the other."""
+        out = self._render({"w1": {"ansible_user": "just-this-one"}})
+        assert out["all"]["hosts"]["w1"]["ansible_user"] == "just-this-one"
+
+    def test_all_three_levels_compose_with_the_specific_one_winning(self):
+        """One `all` default, one group override, one host override, at once --
+        which is the ordinary arrangement rather than an edge case."""
+        out = self._render(
+            {
+                "all": {"ansible_ssh_private_key_file": "/tp/credentials/DEFAULT"},
+                "web": {"ansible_ssh_private_key_file": "/tp/credentials/WEB"},
+                "w1": {"ansible_ssh_private_key_file": "/tp/credentials/W1"},
+            }
+        )
+        # Each lands at its own level; ansible resolves the precedence, and
+        # `TestRealAnsibleResolvesTheInjectedInventory` is where that is proven.
+        assert out["all"]["vars"]["ansible_ssh_private_key_file"].endswith("DEFAULT")
+        assert out["all"]["children"]["web"]["vars"]["ansible_ssh_private_key_file"].endswith("WEB")
+        assert out["all"]["hosts"]["w1"]["ansible_ssh_private_key_file"].endswith("W1")
+
+    def test_the_documents_own_host_variable_wins_over_an_injected_one(self):
+        """Their visible declaration beats a platform credential. The reverse
+        would have Terrapod silently replace a committed value, which is the
+        worse direction of the two."""
+        document = {
+            "hosts": {"w1": {"ansible_user": "theirs"}},
+            "groups": {"web": ["w1"]},
+            "children": {},
+        }
+        out = json.loads(
+            configure_inventory.document_to_source(
+                document, injections={"w1": {"ansible_user": "ours"}}
+            )
+        )
+        assert out["all"]["hosts"]["w1"]["ansible_user"] == "theirs"
+
+    def test_a_name_that_is_BOTH_a_host_and_a_group_is_refused(self):
+        """Ansible permits the collision, so which hosts the credential reaches
+        is not predictable -- and a credential landing somewhere the operator
+        did not mean is worth refusing a run over."""
+        document = {
+            "hosts": {"web": {}, "w1": {}},
+            "groups": {"web": ["w1"]},
+            "children": {},
+        }
+        with pytest.raises(configure_inventory.InventoryUnavailable) as exc:
+            configure_inventory.document_to_source(
+                document, injections={"web": {"ansible_user": "x"}}
+            )
+        assert "both a host and a group" in str(exc.value)
+
     def test_a_scope_naming_no_group_at_all_is_REFUSED(self):
         """Emitted instead, it would apply to no host, and the configure would
         fail as an unreachable fleet -- naming neither the credential nor the

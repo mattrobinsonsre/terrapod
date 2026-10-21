@@ -84,21 +84,27 @@ def validate_group_name(name: str) -> str:
 def validate_machine_scope(name: str) -> str:
     """Return `name` if a machine credential (#1933) can be scoped to it, else raise.
 
-    A machine credential's `key` is a host pattern, and the only two things it
-    can usefully be are `all` -- every host in the run -- or the name of a group
-    the inventory declares. So this is `validate_group_name`'s rule with `all`
-    admitted, sharing `_GROUP_NAME` rather than restating it: the credential is
-    injected as inventory variables for this scope, so a name ansible would not
-    accept as a group is a credential that applies to nothing.
+    Three levels, because a real estate needs all three: a credential may belong
+    to **one host**, to a **group** of them, or to the **whole inventory** as its
+    default. So this is the union of the two name rules plus `all`, sharing both
+    rather than restating either.
 
     `all` is admitted here and refused by `validate_group_name` for the same
     reason in both directions -- it is derived, so nothing may declare its
-    MEMBERSHIP, while variables on it are ansible's own `group_vars/all`.
+    MEMBERSHIP, while variables on it are ansible's own `group_vars/all`, which
+    is exactly what an inventory-wide default is.
+
+    **The name is validated for SHAPE here and for existence on the runner**,
+    deliberately. A credential is commonly written before the host it names --
+    Terraform declares both in one apply and the order is the practitioner's --
+    so refusing an unknown name at the write boundary would make the two
+    resources order-dependent. The runner refuses a scope that matches nothing
+    in the run's resolved inventory, where the host set is known.
     """
     if not isinstance(name, str) or not name:
         raise InventoryValidationError(
-            "a machine credential's scope must be a non-empty string: the group it "
-            "applies to, or 'all' for every host in the run"
+            "a machine credential's scope must be a non-empty string: a host, a group, "
+            "or 'all' for the whole inventory"
         )
     if name == "all":
         return name
@@ -108,16 +114,22 @@ def validate_machine_scope(name: str) -> str:
         raise InventoryValidationError(
             "'ungrouped' cannot scope a machine credential: it is derived from which "
             "hosts are in no other group, so the set changes whenever any group does. "
-            "Scope the credential to 'all' or to a group you declare."
+            "Scope the credential to 'all', to a group, or to the host itself."
         )
-    if not _GROUP_NAME.match(name):
+    # A group name is the stricter rule; a host name allows dots and dashes. The
+    # scope is whichever it turns out to be in the inventory, so accepting the
+    # union is correct and the runner resolves which.
+    try:
+        return validate_group_name(name)
+    except InventoryValidationError:
+        pass
+    try:
+        return validate_host_name(name)
+    except InventoryValidationError as exc:
         raise InventoryValidationError(
-            f"machine credential scope {name!r} must be 'all' or a group name: starting "
-            f"with a letter or underscore and containing only letters, digits and "
-            f"underscores. The credential is delivered as inventory variables for this "
-            f"scope, so a name ansible does not resolve to a group applies to nothing."
-        )
-    return name
+            f"machine credential scope {name!r} is not usable as a host name, a group "
+            f"name, or 'all'. {exc}"
+        ) from exc
 
 
 def validate_host_name(name: str) -> str:

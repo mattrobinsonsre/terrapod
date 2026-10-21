@@ -23,7 +23,8 @@ escalation and no error. One producer removes the class.
 
 ## The machine credential
 
-`key` is a host pattern: the literal `all`, or the name of a group in the
+`key` names a HOST, a GROUP, or the literal `all` for the whole inventory --
+three levels, because a real estate needs all three. Formerly in the
 workspace's inventory. The runner writes key material to a `0600` file on the
 shared volume and injects the *path* -- never the key -- into the resolved
 inventory as variables for that scope, so **ansible's own group precedence does
@@ -49,6 +50,28 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+
+#: The mode for ANY file on the EE's shared volume that carries credential
+#: material: owner read/write plus GROUP READ, and nothing for other.
+#:
+#: The group bit is load-bearing rather than lax.
+#: `job_template._ee_security_context` deliberately sets no `runAsUser` on the
+#: EE sidecar -- its docstring says pinning 1000 "would break an operator's
+#: image whose files belong to a different user", and `fsGroup` is what
+#: satisfies the contract "a uid able to read the shared volume" for ANY uid.
+#: `fsGroup` grants access through the GROUP, which `0600` excludes, so `0600`
+#: would work only for an EE running as uid 1000 -- ours -- and an
+#: operator-supplied EE on any other uid would fail to read its own credentials
+#: after the configure had started. "Other" still gets nothing: the group is the
+#: pod's, so group-readable means this one Job's containers.
+#:
+#: **One producer, because there are now two kinds of file that need it** and
+#: they are written by different modules. The credential phase writes the key
+#: material; the inventory renderer writes a document that carries
+#: `ansible_password` and `ansible_become_password` as VARIABLES, because
+#: ansible has no `ansible_password_file` and a connection password can only be
+#: a variable. Two copies of this number is how one of them ends up `0644`.
+CREDENTIAL_FILE_MODE = 0o640
 
 MACHINE_CATEGORY = "ansible_machine_auth"
 VAULT_CATEGORY = "ansible_vault_auth"
@@ -132,7 +155,8 @@ def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
         category: `ansible_machine_auth` or `ansible_vault_auth`. Any other
             category returns `{}` -- this is called from a shared write guard
             that sees every category.
-        key: the credential's scope. A host pattern for a machine credential, a
+        key: the credential's scope. A host, a group or `all` for a machine
+            credential; a
             vault ID label for a vault password.
         value: the JSON envelope as written.
 

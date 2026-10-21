@@ -36,6 +36,8 @@ import structlog
 
 from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
+from terrapod.services import ansible_auth
+from terrapod.services.ansible_auth import ALL_HOSTS
 from terrapod.services.inventory_render import build_inventory_document
 
 logger = structlog.get_logger(__name__)
@@ -126,30 +128,60 @@ def document_to_source(
         (name, dict(injections.get(name, {}))) for name in sorted(groups)
     ]
     # A group that appears only as a parent or a child still has to exist.
-    known = set(groups)
+    known_groups = set(groups)
     for extra in sorted({p for p, _ in nesting} | {c for _, c in nesting}):
-        if extra not in known:
+        if extra not in known_groups:
             group_rows.append((extra, dict(injections.get(extra, {}))))
-            known.add(extra)
+            known_groups.add(extra)
 
-    stale = sorted(set(injections) - known - {"all"})
+    # A credential scoped to a HOST lands in that host's own variables, which is
+    # the whole point of the three levels: host beats group in ansible, so a
+    # per-host key overrides the group's without either side knowing about the
+    # other. An estate where different hosts carry different keys is the case
+    # this exists for.
+    #
+    # The document's OWN host variables win on a collision. They are the
+    # operator's visible declaration -- already effective, merged by the API's
+    # `ansible-inventory` run -- and a platform credential silently replacing a
+    # committed value is the worse direction of the two. So the injection is the
+    # base and the document is laid over it.
+    host_rows = [
+        (name, {**injections.get(name, {}), **(vars_ or {})}) for name, vars_ in hosts.items()
+    ]
+
+    stale = sorted(set(injections) - known_groups - set(hosts) - {ALL_HOSTS})
     if stale:
         raise InventoryUnavailable(
             f"a machine credential is scoped to {', '.join(repr(s) for s in stale)}, which "
-            f"this run's inventory does not contain (its groups are "
-            f"{', '.join(sorted(known)) or 'none'}). The credential would apply to no host, "
-            f"so the configure would fail as an unreachable fleet rather than naming the "
-            f"stale scope. Rename the credential's scope, or use 'all'."
+            f"this run's inventory contains neither as a host nor as a group (hosts: "
+            f"{', '.join(sorted(hosts)) or 'none'}; groups: "
+            f"{', '.join(sorted(known_groups)) or 'none'}). The credential would apply to "
+            f"nothing, so the configure would fail as an unreachable fleet rather than "
+            f"naming the stale scope. Fix the scope, or use {ALL_HOSTS!r}."
+        )
+
+    # A name that is BOTH a host and a group is refused rather than guessed.
+    # Ansible permits it and resolves variables by its own precedence, so
+    # applying the credential to either would be defensible and neither is
+    # predictable to the operator -- and a credential landing somewhere they did
+    # not mean is the one outcome worth refusing a run over.
+    ambiguous = sorted(set(injections) & known_groups & set(hosts))
+    if ambiguous:
+        raise InventoryUnavailable(
+            f"the machine credential scope(s) {', '.join(repr(a) for a in ambiguous)} name "
+            f"both a host and a group in this inventory, so which hosts the credential "
+            f"applies to is not predictable. Rename one of them, or scope the credential to "
+            f"{ALL_HOSTS!r}."
         )
 
     document = build_inventory_document(
-        hosts=sorted((name, vars_ or {}) for name, vars_ in hosts.items()),
+        hosts=sorted(host_rows),
         groups=sorted(group_rows),
         memberships=memberships,
         children=nesting,
         # A credential scoped to `all` is ansible's own `group_vars/all`, which
-        # is what this argument renders.
-        global_vars=dict(injections.get("all", {})),
+        # is what this argument renders -- the inventory-wide default.
+        global_vars=dict(injections.get(ALL_HOSTS, {})),
     )
     # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
     # `requirements-runner.txt` deliberately ships no PyYAML -- so serialising
@@ -225,7 +257,21 @@ def materialise(
     # `exist_ok` because in a Job the init container already has.
     target.mkdir(parents=True, exist_ok=True)
     rendered = target / RENDERED_NAME
-    rendered.write_text(document_to_source(document, injections=injections))
+    # ALWAYS written at the credential mode, not only when `injections` carry a
+    # secret. A machine credential's connection password reaches ansible as a
+    # VARIABLE -- there is no `ansible_password_file`, so a password can only be
+    # one -- which makes this document secret-bearing whenever one is declared.
+    # Unconditional rather than conditional because a mode chosen by a branch is
+    # a mode that can be chosen wrongly, and nothing but the EE reads this file:
+    # it is Terrapod's own render, not part of the operator's fetched tree.
+    #
+    # `os.open` with the mode at CREATION rather than `write_text` then chmod:
+    # the default would be `0644`, so a narrowed-afterwards file is readable for
+    # the window in between. Measured before fixing -- the file was `0644` with
+    # the password in plaintext.
+    fd = os.open(rendered, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, ansible_auth.CREDENTIAL_FILE_MODE)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(document_to_source(document, injections=injections))
     logger.info(
         "resolved inventory materialised",
         run_id=cfg.run_id,

@@ -151,18 +151,39 @@ class TestTheMachineScope:
         with pytest.raises(InventoryValidationError, match="ungrouped"):
             validate_machine_scope("ungrouped")
 
-    @pytest.mark.parametrize("scope", ["", "9web", "web-servers", "web servers", "a:b"])
-    def test_a_name_ansible_would_not_resolve_to_a_group_is_refused(self, scope):
+    @pytest.mark.parametrize("scope", ["db1.example.com", "host-01", "9web", "web-servers"])
+    def test_a_HOST_name_is_accepted_even_where_a_group_name_would_not_be(self, scope):
+        """The third level, and the reason the rule is a UNION rather than the
+        group rule alone.
+
+        A host name allows dots and digits-first and dashes, which the group
+        rule refuses -- so scoping a credential to `db1.example.com` was
+        impossible while this accepted only `all` or a group, and an estate
+        where different hosts carry different keys could not be expressed at
+        all.
+        """
+        assert validate_machine_scope(scope) == scope
+
+    @pytest.mark.parametrize("scope", ["", "web servers", "a:b", "a,b", "!web", "x&y", "~re"])
+    def test_a_name_usable_as_neither_a_host_nor_a_group_is_refused(self, scope):
+        """What survives the union: whitespace and the `--limit` operators, each
+        of which makes a name either unselectable or actively change which other
+        hosts a pattern selects."""
         with pytest.raises(InventoryValidationError):
             validate_machine_scope(scope)
 
-    def test_it_shares_the_group_rule_rather_than_restating_it(self):
-        """The two must agree on everything but `all`, or a credential could be
-        scoped to a name no group can have."""
-        from terrapod.services.inventory_resolution import validate_group_name
+    def test_it_shares_BOTH_name_rules_rather_than_restating_either(self):
+        """A credential must not be scopeable to a name the inventory itself
+        could not hold, in either direction."""
+        from terrapod.services.inventory_resolution import (
+            validate_group_name,
+            validate_host_name,
+        )
 
         for name in ("web", "_x", "a9", "db_primary"):
             assert validate_machine_scope(name) == validate_group_name(name)
+        for name in ("db1.example.com", "host-01", "9web"):
+            assert validate_machine_scope(name) == validate_host_name(name)
 
 
 class TestDeliveryEntries:
