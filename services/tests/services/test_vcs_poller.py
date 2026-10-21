@@ -1763,12 +1763,25 @@ class TestClosedPRSessionCancelsOnlyThisRepositorysRuns:
         db = self._db([self._session()], [])
         await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
 
-        # The second execute() is the active-run lookup. Assert on the WHERE
-        # clause, not the whole statement: `select(Run)` lists workspace_id in
-        # its SELECT columns, so checking the rendered statement passes whether
-        # or not the filter is there.
-        where = str(db.execute.await_args_list[1].args[0].whereclause)
-        assert "workspace_id" in where, where
+        # Assert on the WHERE clause, not the rendered statement: `select(Run)`
+        # names workspace_id among its SELECT columns, so checking the whole
+        # statement passes whether or not the filter is present.
+        #
+        # And FIND the query over runs rather than indexing the call list. The
+        # repo scoping moved from a SQL suffix match to a Python predicate
+        # (#2199), which put a workspace query ahead of this one -- so
+        # `await_args_list[1]` silently started reading that instead, and this
+        # assertion passed or failed for a reason unrelated to its subject.
+        wheres = [
+            str(call.args[0].whereclause)
+            for call in db.execute.await_args_list
+            if getattr(call.args[0], "whereclause", None) is not None
+            and "runs." in str(call.args[0].whereclause)
+        ]
+        assert wheres, [
+            str(getattr(c.args[0], "whereclause", None)) for c in db.execute.await_args_list
+        ]
+        assert any("workspace_id" in w for w in wheres), wheres
 
     async def test_a_closed_pr_still_closes_its_session(self):
         from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions

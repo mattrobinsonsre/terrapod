@@ -683,13 +683,15 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
         .where(
             Run.vcs_pull_request_number == sess.pr_number,
             Workspace.vcs_connection_id == sess.vcs_connection_id,
-            (Workspace.vcs_repo_url.endswith(sess.repo)),
         )
         .order_by(Workspace.name, Run.created_at.desc())
     )
-    # Reduce to latest run per workspace.
+    # Reduce to latest run per workspace, matching the repo on the PARSED pair
+    # (#2199) -- a suffix match misses every `.git` URL.
     latest_per_ws: dict[uuid.UUID, tuple[Workspace, Run]] = {}
     for run, ws in result.all():
+        if not vcs_provider.workspace_repo_is(ws, sess.repo):
+            continue
         latest_per_ws.setdefault(ws.id, (ws, run))
 
     rows: list[_Row] = []

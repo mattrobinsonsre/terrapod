@@ -49,11 +49,14 @@ const ETX = '\x03'
 /**
  * Padding, so the pane actually overflows and there is something to scroll.
  *
- * The pane is `fine:max-h-[70vh]`, and Desktop Chrome is 720px tall, so it
- * caps at roughly 503px — about 25 lines. The plan body alone is 25 lines, so
- * without this the pane does not overflow, `scrollTop` is pinned at its
- * initial value, and a jump assertion can never pass however correct the jump
- * is. `log-follow` pads its fixture for the same reason.
+ * The pane is capped at the space left below it (#2217), floored at 400px.
+ * Desktop Chrome is 720px tall and the pane starts ~490px down, so the floor
+ * binds and it caps at 400px — about 18 lines. Padding keeps the body well
+ * past that: without it `scrollTop` is pinned at its initial value and a jump
+ * assertion can never pass however correct the jump is. The wrap geometry is
+ * the independent reason — a line long enough to wrap makes the rendered
+ * height exceed the line count — so this does not rest on the cap's exact
+ * value. `log-follow` pads its fixture for the same reason.
  */
 const PADDING = Array.from({ length: 120 }, (_, i) =>
   // Every tenth line is long enough to wrap several times. The pane wraps

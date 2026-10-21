@@ -18,7 +18,8 @@
  * The only two states a streaming pane can be in are "no output yet" and "some
  * output", so the test measures both on one streaming run and requires the same
  * height — no SSE timing, no race. And the other half, so the reservation cannot
- * spread: a finished short log shrinks to fit rather than sitting in a 70vh box.
+ * spread: a finished short log shrinks to fit rather than sitting in a mostly
+ * empty reserved box.
  *
  * The E2E stack has no runner pool, so the run's status and its plan log are
  * served by interception; everything else goes through the real BFF chain.
