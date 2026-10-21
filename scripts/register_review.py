@@ -53,6 +53,14 @@ import os
 import pathlib
 import sys
 
+# One producer for "is this a copy inside another distribution" (#2202). The
+# import resolves because Python puts the SCRIPT's directory on `sys.path[0]`,
+# which is how these scripts stay dependency-free while still sharing a fact;
+# the test harness loads `rescan_normalise` first, so it is already in
+# `sys.modules` there. Duplicating the predicate instead is how this module and
+# its sibling came to disagree about `isSemVerMajor` for months.
+from rescan_normalise import vendored
+
 MARKER = "terrapod-register-review"
 _REPO = os.environ.get("GITHUB_REPOSITORY", "mattrobinsonsre/terrapod")
 
@@ -116,6 +124,11 @@ def from_trivy(data) -> dict[str, dict]:
                     "package": v.get("PkgName", "?"),
                     "installed": v.get("InstalledVersion", "?"),
                     "fixed": v.get("FixedVersion", ""),
+                    # Carried so `classify` can tell a fix we could take from one
+                    # naming a copy we cannot reach (#2202). Discarding these is
+                    # why four pip-vendored entries were reported as "bump to it".
+                    "path": v.get("PkgPath") or "",
+                    "from_sbom": bool((v.get("PkgIdentifier") or {}).get("BOMRef")),
                 },
             )
     return found
@@ -219,7 +232,7 @@ def collect(scan_dir: pathlib.Path) -> tuple[dict[str, dict[str, dict]], set[str
 
 
 def classify(registers: dict[str, list[str]], found: dict[str, dict[str, dict]]):
-    fixable, unmatched, holding, major = [], [], [], []
+    fixable, unmatched, holding, major, unreachable = [], [], [], [], []
     for scanner, ids in registers.items():
         for vid in ids:
             hit = found.get(scanner, {}).get(vid)
@@ -227,13 +240,22 @@ def classify(registers: dict[str, list[str]], found: dict[str, dict[str, dict]])
             if hit is None:
                 unmatched.append(row)
             elif hit.get("fixed"):
+                # A published fix is not necessarily one we can install. Four
+                # entries were reported as "bump to it" when the package was a
+                # copy inside pip -- the fix names the standalone distribution,
+                # and installing it changes nothing pip vendors (#2202). Not the
+                # same state as "no fix upstream", so not the same bucket.
+                reachable_here, why = vendored(hit)
+                if not reachable_here:
+                    unreachable.append({**row, "why": why})
+                    continue
                 # A major-version offer is a decision, not a bump, so it is
                 # reported separately. Filing it under "take the fix" is how the
                 # review comes to recommend something that fixes nothing.
                 (major if hit.get("major") else fixable).append(row)
             else:
                 holding.append(row)
-    return fixable, unmatched, holding, major
+    return fixable, unmatched, holding, major, unreachable
 
 
 def _table(rows: list[dict], with_fix: bool) -> list[str]:
@@ -262,7 +284,7 @@ def main() -> int:
 
     registers = {s: read_register(pathlib.Path(p)) for s, p in REGISTERS.items()}
     found, scanned = collect(scan_dir)
-    fixable, unmatched, holding, major = classify(registers, found)
+    fixable, unmatched, holding, major, unreachable = classify(registers, found)
 
     # A scanner whose output never arrived cannot distinguish "this entry
     # matches nothing" from "nothing looked for it", so its entries are not
@@ -359,6 +381,30 @@ def main() -> int:
                 f"| `{r['id']}` | {REGISTERS.get(r['scanner'], r['scanner'])} |"
                 for r in unmatched
             ],
+            "",
+        ]
+
+    if unreachable:
+        # Its own section rather than folded into `holding`: a fix exists
+        # upstream, it is simply not one this artifact's build can install, and
+        # collapsing the two states loses the distinction the review is for.
+        # Collapsed and NOT counted as a finding, for the same reason `holding`
+        # is not -- the register is doing its job.
+        body += [
+            f"<details><summary>{len(unreachable)} doing their job (a fix exists "
+            "upstream, but not one we can install)</summary>",
+            "",
+            *_table(unreachable, with_fix=True),
+            "",
+            *[f"- `{r['id']}` — {r.get('why', '?')}" for r in unreachable],
+            "",
+            (
+                "A vendored package is upgraded by its vendoring parent, not by "
+                "installing the version the advisory names. These stay, and rule 1 "
+                "has nothing to bump."
+            ),
+            "",
+            "</details>",
             "",
         ]
 

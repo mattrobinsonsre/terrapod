@@ -154,7 +154,7 @@ def test_entry_with_a_fix_is_fixable_and_one_without_is_holding():
     """The distinction the whole report rests on. Getting it backwards would
     either bury a real bump among entries doing their job, or nag weekly about
     something with nothing to bump to."""
-    fixable, unmatched, holding, major = rr.classify(
+    fixable, unmatched, holding, major, unreachable = rr.classify(
         {"trivy": ["CVE-A"], "pip-audit": ["PYSEC-B"], "npm-audit": []},
         {
             "trivy": {"CVE-A": {"package": "p", "installed": "1", "fixed": "2"}},
@@ -192,7 +192,7 @@ def test_an_unfixed_trivy_finding_is_holding_not_stale():
             ]
         }
     )
-    fixable, unmatched, holding, major = rr.classify(
+    fixable, unmatched, holding, major, unreachable = rr.classify(
         {"trivy": ["CVE-2025-69720"], "pip-audit": [], "npm-audit": []},
         {"trivy": found},
     )
@@ -231,7 +231,7 @@ def test_the_workflow_does_not_scan_fix_only():
 
 
 def test_entry_reported_by_nobody_is_stale():
-    fixable, unmatched, holding, major = rr.classify(
+    fixable, unmatched, holding, major, unreachable = rr.classify(
         {"trivy": ["CVE-GONE"], "pip-audit": [], "npm-audit": []}, {"trivy": {}}
     )
     assert [r["id"] for r in unmatched] == ["CVE-GONE"]
@@ -267,7 +267,7 @@ def test_a_major_only_offer_is_not_reported_as_take_the_fix():
     npm's only offer is a two-major DOWNGRADE of eslint-config-next. Filing that
     under "take the fix" tells the reader to make a large risky change that
     resolves nothing — and then repeats it weekly until the issue is ignored."""
-    fixable, unmatched, holding, major = rr.classify(
+    fixable, unmatched, holding, major, unreachable = rr.classify(
         {"trivy": [], "pip-audit": [], "npm-audit": ["GHSA-major", "GHSA-minor"]},
         {
             "npm-audit": {
@@ -481,3 +481,143 @@ def test_the_real_registers_parse(tmp_path):
                 f"{rel}: {entry!r} does not look like an advisory id — either the "
                 f"file grew a new format or a comment marker was missed"
             )
+
+
+# ── a published fix is not always one we can install (#2202) ─────────
+
+
+def test_a_vendored_fix_is_not_reported_as_take_the_fix():
+    """The #2202 regression. All four entries in the register are copies inside
+    pip, so `FixedVersion` names the standalone distribution and installing it
+    changes nothing pip vendors -- measured: pip is at its current release and
+    still declares `setuptools==70.3.0`. Reported as "bump to it", the review
+    recommends an impossible action, which is how a scheduled job gets muted.
+    """
+    found = rr.from_trivy(
+        {
+            "Results": [
+                {
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2025-47273",
+                            "PkgName": "setuptools",
+                            "InstalledVersion": "70.3.0",
+                            "FixedVersion": "78.1.1",
+                            # pip's `_vendor/bom.cdx.json`: a BOMRef and NO PkgPath
+                            "PkgIdentifier": {"BOMRef": "pkg:pypi/setuptools@70.3.0"},
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    fixable, unmatched, holding, major, unreachable = rr.classify(
+        {"trivy": ["CVE-2025-47273"], "pip-audit": [], "npm-audit": []},
+        {"trivy": found},
+    )
+    assert fixable == [], "a vendored copy must never be offered as a bump"
+    assert [r["id"] for r in unreachable] == ["CVE-2025-47273"]
+    assert "SBOM" in unreachable[0]["why"]
+    assert unmatched == [], "and it is certainly not stale"
+
+
+def test_a_vendored_path_is_caught_as_well_as_an_sbom_entry():
+    """Both clauses, because the register holds entries of both shapes and a
+    path test alone misses every SBOM-declared one."""
+    found = rr.from_trivy(
+        {
+            "Results": [
+                {
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-PATH",
+                            "PkgName": "wheel",
+                            "InstalledVersion": "0.45.1",
+                            "FixedVersion": "0.46.2",
+                            "PkgPath": "usr/local/lib/python3.10/site-packages/setuptools/_vendor/wheel-0.45.1.dist-info/METADATA",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    _, _, _, _, unreachable = rr.classify(
+        {"trivy": ["CVE-PATH"], "pip-audit": [], "npm-audit": []}, {"trivy": found}
+    )
+    assert [r["id"] for r in unreachable] == ["CVE-PATH"]
+    assert "vendored inside" in unreachable[0]["why"]
+
+
+def test_a_real_installed_package_with_a_fix_is_STILL_fixable():
+    """The direction that matters most. A filter that swallowed every fix would
+    satisfy #2202 and make the review useless -- its entire value is telling you
+    when an accepted risk has become a bump you should take."""
+    found = rr.from_trivy(
+        {
+            "Results": [
+                {
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-REAL",
+                            "PkgName": "wheel",
+                            "InstalledVersion": "0.45.1",
+                            "FixedVersion": "0.46.2",
+                            "PkgPath": "usr/local/lib/python3.10/site-packages/wheel-0.45.1.dist-info/METADATA",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    fixable, _, _, _, unreachable = rr.classify(
+        {"trivy": ["CVE-REAL"], "pip-audit": [], "npm-audit": []}, {"trivy": found}
+    )
+    assert [r["id"] for r in fixable] == ["CVE-REAL"]
+    assert unreachable == []
+
+
+def test_the_other_scanners_are_unaffected_by_the_new_test():
+    """`pip-audit` and `npm-audit` carry no path or BOMRef, so `vendored` must
+    pass them through rather than classifying an absent field as vendored."""
+    fixable, _, _, major, unreachable = rr.classify(
+        {"trivy": [], "pip-audit": ["PYSEC-A"], "npm-audit": ["GHSA-B"]},
+        {
+            "pip-audit": {"PYSEC-A": {"package": "p", "installed": "1", "fixed": "2"}},
+            "npm-audit": {
+                "GHSA-B": {"package": "q", "installed": "1", "fixed": "3", "major": True}
+            },
+        },
+    )
+    assert [r["id"] for r in fixable] == ["PYSEC-A"]
+    assert [r["id"] for r in major] == ["GHSA-B"]
+    assert unreachable == []
+
+
+def test_an_unreachable_entry_alone_is_not_a_finding(tmp_path):
+    """Consistent with the EE reporter: the register is doing its job, so there
+    is nothing to raise. `has_findings=false` does not close an open issue, so
+    this is "do not raise or refresh" rather than "resolved"."""
+    found = rr.from_trivy(
+        {
+            "Results": [
+                {
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2025-47273",
+                            "PkgName": "setuptools",
+                            "InstalledVersion": "70.3.0",
+                            "FixedVersion": "78.1.1",
+                            "PkgIdentifier": {"BOMRef": "pkg:pypi/setuptools@70.3.0"},
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    fixable, unmatched, _, major, unreachable = rr.classify(
+        {"trivy": ["CVE-2025-47273"], "pip-audit": [], "npm-audit": []}, {"trivy": found}
+    )
+    assert unreachable and not (fixable or unmatched or major), (
+        "has_findings is (fixable or unmatched or major); an unreachable entry "
+        "must not make it true"
+    )
