@@ -36,7 +36,11 @@ import structlog
 
 from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
-from terrapod.services import ansible_auth
+from terrapod.services.ansible_auth import (
+    CREDENTIAL_FILE_MODE,
+    substitute,
+    unresolved,
+)
 from terrapod.services.inventory_render import build_inventory_document
 
 logger = structlog.get_logger(__name__)
@@ -134,7 +138,7 @@ def document_to_source(document: dict[str, Any], *, resolved: dict[str, str] | N
     # variable, a group variable, or inside a longer string such as
     # `ansible_ssh_common_args="-o IdentityFile=${terrapod:web.private_key}"`,
     # which is how a real estate expresses a per-group key.
-    built = ansible_auth.substitute(built, resolved or {})
+    built = substitute(built, resolved or {})
     _refuse_unresolved(built)
     # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
     # `requirements-runner.txt` deliberately ships no PyYAML -- so serialising
@@ -159,7 +163,7 @@ def _refuse_unresolved(built: dict[str, Any]) -> None:
     The message names every unresolved reference, because the fix is to correct
     that string or declare that credential, and a count tells them neither.
     """
-    missing = ansible_auth.unresolved(built)
+    missing = unresolved(built)
     if not missing:
         return
     raise InventoryUnavailable(
@@ -248,7 +252,7 @@ def materialise(
     # the default would be `0644`, so a narrowed-afterwards file is readable for
     # the window in between. Measured before fixing -- the file was `0644` with
     # the password in plaintext.
-    fd = os.open(rendered, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, ansible_auth.CREDENTIAL_FILE_MODE)
+    fd = os.open(rendered, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, CREDENTIAL_FILE_MODE)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(document_to_source(document, resolved=resolved))
     logger.info(
