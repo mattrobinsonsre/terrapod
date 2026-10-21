@@ -642,8 +642,8 @@ function LogPanel({
   // line, and you can park at the bottom and let the output come to you.
   //
   // Only while streaming. A finished short log shrinks to fit rather than
-  // sitting in a mostly empty 70vh box, and a phase that never runs (the apply
-  // tab of a plan-only run) keeps its one-line empty state.
+  // sitting in a mostly empty reserved box, and a phase that never runs (the
+  // apply tab of a plan-only run) keeps its one-line empty state.
   const reserve = isStreaming
 
   // #2217: the pane is sized to the space actually left below it, measured,
