@@ -152,12 +152,12 @@ def _write_secret_file(directory: Path, name: str, content: str) -> Path:
 
 
 def _safe_name(category: str, key: str) -> str:
-    """A filename for a credential's scope that cannot escape its directory.
+    """A filename for a credential's NAME that cannot escape its directory.
 
-    The scope is already validated at the write boundary -- a vault label and a
-    group name are both restricted to characters that cannot traverse -- so this
-    is the belt to that braces: a row written before the guard existed, or a
-    future scope rule that widens, must not be able to name `../`.
+    The name is already validated at the write boundary -- `CREDENTIAL_NAME`
+    restricts it to characters that cannot traverse -- so this is the belt to
+    that braces: a row written before the guard existed, or a future name rule
+    that widens, must not be able to name `../`.
     """
     cleaned = "".join(c if c.isalnum() or c in "._-" else "_" for c in key) or "default"
     suffix = "vault" if category == VAULT_CATEGORY else "machine"

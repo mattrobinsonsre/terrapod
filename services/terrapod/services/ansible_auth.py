@@ -176,13 +176,14 @@ def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
         category: `ansible_machine_auth` or `ansible_vault_auth`. Any other
             category returns `{}` -- this is called from a shared write guard
             that sees every category.
-        key: the credential's scope. A host, a group or `all` for a machine
-            credential; a
-            vault ID label for a vault password.
+        key: the credential's NAME -- what an inventory refers to it by, as
+            `${terrapod:<name>.<field>}`. For a vault password the name is also
+            the vault ID label. Nothing here is about WHERE the credential is
+            used; that is said in the inventory.
         value: the JSON envelope as written.
 
     Raises:
-        AnsibleAuthError: the scope or the envelope cannot be used. The message
+        AnsibleAuthError: the name or the envelope cannot be used. The message
             names the field, because "invalid credential" sends an operator to
             the wrong place.
     """
