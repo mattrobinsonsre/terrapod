@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Nyckelnamn visas bara för den som även får köra en plan i den här arbetsytan.",
     "noteLocal": "Den här arbetsytan körs lokalt, där en OpenBao/Vault-referens aldrig löses upp.",
     "noteDisabled": "OpenBao/Vault som värdekälla är inte aktiverad."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible-maskinuppgifter",
+    "categoryVault": "Ansible Vault-lösenord",
+    "machineHint": "Hur Ansible ansluter till värdarna i det här omfånget. Ange en privat nyckel eller ett lösenord, eller båda. Nyckelmaterialet skrivs till en fil på körningens volym och bara sökvägen når inventariet, så själva hemligheten lagras aldrig i det upplösta inventariet.",
+    "vaultHint": "Lösenordet för ett Ansible Vault-ID. Flera poster blir en enda identitetslista, så att en playbook kan dekryptera hemligheter som hålls under olika etiketter.",
+    "scope": "Värdomfång",
+    "scopeHint": "Använd \"all\" för varje värd i körningen, eller namnet på en grupp i inventariet.",
+    "vaultLabel": "Etikett för Vault-ID",
+    "vaultLabelHint": "Endast bokstäver, siffror, understreck, punkt och bindestreck. Etiketten infogas i vault-identitetslistan, där kommatecken och snabel-a skiljer posterna.",
+    "privateKey": "Privat SSH-nyckel",
+    "password": "Lösenord",
+    "user": "Användare",
+    "become": "Behörighetshöjning",
+    "becomeUnset": "Inte angivet",
+    "becomeYes": "Aktiverad",
+    "becomeNo": "Inaktiverad",
+    "becomeMethod": "Metod för behörighetshöjning",
+    "becomeUser": "Höj till användare",
+    "becomePassword": "Lösenord för behörighetshöjning",
+    "replaceHint": "Att spara ersätter hela uppgiften, så fyll i varje fält som behövs — inte bara det du ändrar. Lämnar du alla tomma behålls de lagrade uppgifterna som de är."
   }
 }

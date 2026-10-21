@@ -44,7 +44,13 @@ import {
   type OidcAudiences,
 } from '@/components/template-editors'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
-import { VariableEditPanel } from '@/components/variable-edit-panel'
+import {
+  ANSIBLE_MACHINE_CATEGORY,
+  ANSIBLE_VAULT_CATEGORY,
+  AnsibleCredentialFields,
+  VariableEditPanel,
+  isAnsibleAuthCategory,
+} from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -352,6 +358,11 @@ function WorkspaceDetailContent() {
   const tPhase = useTranslations()
   // The platform's own run-status words, shared with the workspace list.
   const tStatus = useTranslations('status')
+  // Ansible credential copy (#1933), in its own top-level namespace because
+  // the same three surfaces write one — this page, the variable-set page and
+  // the shared edit panel — and a second copy under `adminVariableSets` is a
+  // second thing to translate into thirty-three locales and keep in step.
+  const ta = useTranslations('ansibleCredentials')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -536,6 +547,45 @@ function WorkspaceDetailContent() {
   const [gitKnownHosts, setGitKnownHosts] = useState('')
   const [gitRewrite, setGitRewrite] = useState<'none' | 'to_https' | 'to_ssh'>('none')
   const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  // Ansible credentials (#1933): the same shape of thing — discrete fields
+  // serialising into a JSON value — but the builder is shared with the
+  // variable-set form and the edit panel, so it needs no state of its own
+  // here. `varValue` carries the whole envelope and the builder owns the
+  // parse/serialise, which is why the raw value field is simply swapped out
+  // rather than mirrored by seven more useState calls.
+  const isAnsibleCat = isAnsibleAuthCategory(varCategory)
+  // An envelope category and a plain one cannot share typed-in content: a
+  // value typed for `native` is not JSON, and it would reach the builder as an
+  // unreadable envelope (so: blank fields) and then be submitted as whatever
+  // survived. Clearing on the way in or out of an envelope category is the
+  // honest reset.
+  function changeVarCategory(next: string) {
+    if (isAnsibleAuthCategory(next) !== isAnsibleCat) setVarValue('')
+    setVarCategory(next)
+    if (next === 'git_http_auth') ensureVcsConnections()
+  }
+  const varKeyLabel = isGitCat
+    ? t('variables.gitUrlPattern')
+    : varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scope')
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? ta('vaultLabel')
+        : t('variables.key')
+  const varKeyHint =
+    varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scopeHint')
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? ta('vaultLabelHint')
+        : ''
+  // Identifiers, not copy: a host pattern, the root group's own name, and a
+  // vault label an operator would recognise.
+  const varKeyPlaceholder = isGitCat
+    ? 'github.com/my-org'
+    : varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? 'all'
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? 'prod'
+        : 'AWS_REGION'
   /** The category as a person reads it, in this workspace's engine's words. */
   const categoryLabel = (category: string, engine?: string) => {
     const key = categoryKey(category, engine)
@@ -546,7 +596,10 @@ function WorkspaceDetailContent() {
   // server-side at run time. Discrete fields, never raw JSON.
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
   const [vaultRef, setVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
-  const isVaultSource = varSource === 'vault' && !isGitCat
+  // An Ansible credential is an envelope too, and the API refuses a Vault
+  // value source on it for the same reason it refuses one on a git credential
+  // (#1933): a reference resolves to a single field.
+  const isVaultSource = varSource === 'vault' && !isGitCat && !isAnsibleCat
   // Offered only where the deployment has Vault configured — presenting a
   // source that is not set up produces a variable that fails its first run.
   const [vaultAvailable, setVaultAvailable] = useState(false)
@@ -1817,7 +1870,10 @@ function WorkspaceDetailContent() {
                   ? buildVaultReference(vaultRef)
                   : varValue,
               category: varCategory,
-              sensitive: isGitCat || isVaultSource ? true : varSensitive,
+              // An Ansible credential is forced sensitive by the API (#1933),
+              // so send what will be stored rather than a checkbox the form
+              // does not show for it.
+              sensitive: isGitCat || isAnsibleCat || isVaultSource ? true : varSensitive,
               'apply-only': varApplyOnly,
               hcl: varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
@@ -2008,13 +2064,20 @@ function WorkspaceDetailContent() {
     setSavingVar(true)
     setError('')
     try {
-      const isEditVault = editVarSource === 'vault'
+      // The category is editable inside the panel, so a variable can arrive
+      // here as `vault`-sourced and structured and leave as an Ansible
+      // credential, which the API refuses on both counts (#1933). The panel
+      // hides those controls for a credential category; this is the other half
+      // — not sending the state they left behind, which would spend the edit on
+      // a 422 about a control the operator can no longer see.
+      const isEditAnsible = isAnsibleAuthCategory(editVarCategory)
+      const isEditVault = editVarSource === 'vault' && !isEditAnsible
       const attrs: Record<string, unknown> = {
         key: editVarKey,
         category: editVarCategory,
-        sensitive: isEditVault ? true : editVarSensitive,
+        sensitive: isEditVault || isEditAnsible ? true : editVarSensitive,
         'apply-only': editVarApplyOnly,
-        hcl: editVarHcl,
+        hcl: isEditAnsible ? false : editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
       if (isEditVault) {
@@ -4107,7 +4170,7 @@ function WorkspaceDetailContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.category')}</label>
-                    <select id="var-cat" value={varCategory} onChange={(e) => { setVarCategory(e.target.value); if (e.target.value === 'git_http_auth') ensureVcsConnections() }} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                    <select id="var-cat" value={varCategory} onChange={(e) => changeVarCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       {/* One category for the engine's own parameters,
                           whatever the workspace runs (#1898): Terraform input
                           variables, Pulumi stack config, Ansible extra vars are
@@ -4118,15 +4181,48 @@ function WorkspaceDetailContent() {
                       <option value="env">{t('variables.categoryEnv')}</option>
                       <option value="git_http_auth">Git HTTPS credential</option>
                       <option value="git_ssh_auth">Git SSH credential</option>
+                      {/* Translated, unlike the git pair above: those predate
+                          the i18n gate and are allowlisted, and a new
+                          user-facing option is held to the rule the gate
+                          states (#1933). */}
+                      <option value={ANSIBLE_MACHINE_CATEGORY}>{ta('categoryMachine')}</option>
+                      <option value={ANSIBLE_VAULT_CATEGORY}>{ta('categoryVault')}</option>
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{isGitCat ? t('variables.gitUrlPattern') : t('variables.key')}</label>
-                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder={isGitCat ? 'github.com/my-org' : 'AWS_REGION'} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    {/* `key` is the credential's SCOPE on all four credential
+                        categories, and each scopes a different thing — a git
+                        URL pattern, a host pattern, a vault ID label. One
+                        "Key" label over all of them is how a group name ends
+                        up in the field that wants a vault label. */}
+                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{varKeyLabel}</label>
+                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder={varKeyPlaceholder} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    {varKeyHint && <p className="mt-1 text-xs text-slate-500">{varKeyHint}</p>}
                   </div>
                 </div>
 
-                {!isGitCat && vaultOfferable && (
+                {isAnsibleCat && (
+                  <>
+                    <AnsibleCredentialFields
+                      idPrefix="add"
+                      category={varCategory}
+                      value={varValue}
+                      onChange={setVarValue}
+                    />
+                    {/* Apply-only still applies, and on a credential it is the
+                        flag that matters most (#2189): a machine credential
+                        the configure needs is one the plan has no use for.
+                        There is no Sensitive checkbox — the API forces an
+                        Ansible credential sensitive, so a tickbox here would
+                        be a choice the operator does not have. */}
+                    <label className="flex items-center gap-2 cursor-pointer" title={t('variables.applyOnlyHint')}>
+                      <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                      <span className="text-sm text-slate-300">{t('variables.applyOnly')}</span>
+                    </label>
+                  </>
+                )}
+
+                {!isGitCat && !isAnsibleCat && vaultOfferable && (
                   <div>
                     <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.valueSource')}</label>
                     <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -4151,7 +4247,7 @@ function WorkspaceDetailContent() {
                   />
                 )}
 
-                {!isGitCat && !isVaultSource && (
+                {!isGitCat && !isAnsibleCat && !isVaultSource && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>

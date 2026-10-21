@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Os nomes das chaves só são mostrados a quem também pode executar um plano neste workspace.",
     "noteLocal": "Este workspace é executado localmente, onde uma referência do OpenBao/Vault nunca é resolvida.",
     "noteDisabled": "A origem de valores do OpenBao/Vault não está ativada."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Credencial de máquina do Ansible",
+    "categoryVault": "Palavra-passe do Ansible Vault",
+    "machineHint": "Como o Ansible se liga aos anfitriões deste âmbito. Indique uma chave privada ou uma palavra-passe, ou ambas. O material da chave é escrito num ficheiro no volume da execução e apenas o respetivo caminho chega ao inventário, pelo que o segredo em si nunca é guardado no inventário resolvido.",
+    "vaultHint": "A palavra-passe de um ID do Ansible Vault. Várias entradas formam uma única lista de identidades, para que um playbook possa desencriptar segredos guardados sob etiquetas diferentes.",
+    "scope": "Âmbito de anfitriões",
+    "scopeHint": "Utilize \"all\" para todos os anfitriões da execução, ou o nome de um grupo do inventário.",
+    "vaultLabel": "Etiqueta do ID do Vault",
+    "vaultLabelHint": "Apenas letras, dígitos, sublinhado, ponto e hífen. A etiqueta é interpolada na lista de identidades do vault, onde a vírgula e a arroba separam as entradas.",
+    "privateKey": "Chave privada SSH",
+    "password": "Palavra-passe",
+    "user": "Utilizador",
+    "become": "Elevação de privilégios",
+    "becomeUnset": "Não definido",
+    "becomeYes": "Ativada",
+    "becomeNo": "Desativada",
+    "becomeMethod": "Método de elevação",
+    "becomeUser": "Elevar para o utilizador",
+    "becomePassword": "Palavra-passe de elevação",
+    "replaceHint": "Guardar substitui a credencial completa, pelo que deve preencher todos os campos necessários — não apenas o que está a alterar. Se os deixar todos vazios, a credencial guardada permanece como está."
   }
 }

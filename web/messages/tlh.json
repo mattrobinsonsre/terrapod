@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Qumwe'vam nab qaSmoHlaHbogh ghot neH ngaQHa'moHwI' pongmey legh.",
     "noteLocal": "Qumwe'vam naDev qaS, pa' OpenBao/Vault ghItlh Qapbe' reH.",
     "noteDisabled": "OpenBao/Vault lo'laHghach Qapbe'."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible jonta' ngaQHa'wI'",
+    "categoryVault": "Ansible Vault mu'qaD",
+    "machineHint": "ngaSwI'vam tlhejtaHbogh qachmey rur Ansible chel'a'. pegh ngaQHa'wI' ghap mu'qaD ghap cha'logh yInob. qachDaq ngaQHa'wI' De' qonlu', 'ej He neH ngaSwI'Daq jaH; vaj pegh 'e' Dab inventory pollu'be' reH.",
+    "vaultHint": "wa' Ansible Vault ID mu'qaD. qechmey law' wa' per tetlh moj, vaj playbook peghmey pIm perchajDaq polbogh HIq laH.",
+    "scope": "qach ngaSwI'",
+    "scopeHint": "Hoch qachmey vIghaj 'e' DaneHchugh \"all\" yIlo', pagh ngaSwI'Daq ghom pong yIlo'.",
+    "vaultLabel": "Vault ID per",
+    "vaultLabelHint": "ghItlhmey, mI'mey, bIng tlhegh, tut, 'ej 'etlh neH. vault per tetlhDaq per chelu', pa' comma 'ej @ Degh qechmey chevlu'.",
+    "privateKey": "SSH pegh ngaQHa'wI'",
+    "password": "mu'qaD",
+    "user": "lo'wI'",
+    "become": "woQ nIvmoHghach",
+    "becomeUnset": "wIvbe'lu'",
+    "becomeYes": "chu'lu'",
+    "becomeNo": "chu'Ha'lu'",
+    "becomeMethod": "nIvmoHghach mIw",
+    "becomeUser": "lo'wI'Daq yInIvmoH",
+    "becomePassword": "nIvmoHghach mu'qaD",
+    "replaceHint": "QaDmeH ngaQHa'wI' naQ chollu'; vaj poQbogh Hoch yav yIbuy'moH, choHbogh yav neH yIbuy'moHQo'. Hoch chIm DalIHchugh, ngaQHa'wI' pollu'bogh choHbe'lu'."
   }
 }

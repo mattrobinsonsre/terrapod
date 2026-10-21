@@ -22,6 +22,230 @@ const INPUT =
 const MONO = `${INPUT} font-mono`
 const LABEL = 'block text-xs text-slate-400 mb-1'
 
+/* -------------------------------------------------------------------------
+ * Ansible credentials (#1933)
+ *
+ * Two categories whose value is a JSON envelope, exactly as the git pair's is
+ * (#1028). They live here rather than in a page because all three surfaces
+ * that can write a variable — the workspace add form, the variable-set add
+ * form, and this edit panel — have to offer the same fields: a field present
+ * on one and absent from another is a credential an operator can set in one
+ * place and not the other, which reads as the feature being broken rather
+ * than as a missing input.
+ *
+ * The field names are the server's, and the ONE place they are written on
+ * this side. `services/terrapod/services/ansible_auth.py` says why that
+ * matters: a disagreement about a single key — `become_pass` against
+ * `become_password` — is invisible. The API accepts the credential and the
+ * configure runs with no escalation and no error.
+ * ------------------------------------------------------------------------- */
+
+export const ANSIBLE_MACHINE_CATEGORY = 'ansible_machine_auth'
+export const ANSIBLE_VAULT_CATEGORY = 'ansible_vault_auth'
+
+/** Whether this category's value is one of the two Ansible envelopes. */
+export function isAnsibleAuthCategory(category: string): boolean {
+  return category === ANSIBLE_MACHINE_CATEGORY || category === ANSIBLE_VAULT_CATEGORY
+}
+
+/**
+ * Whether the category carries a JSON credential envelope at all.
+ *
+ * The git pair and the Ansible pair share every consequence of that: the API
+ * forces them sensitive, and it refuses a Vault value source on them, because
+ * a reference resolves to a single field and an envelope is an object (#1439).
+ * So the form must not offer the source rather than offer it and meet a 422.
+ */
+export function isCredentialCategory(category: string): boolean {
+  return (
+    category === 'git_http_auth' ||
+    category === 'git_ssh_auth' ||
+    isAnsibleAuthCategory(category)
+  )
+}
+
+// Ansible's own boolean spellings, mirroring `ansible_auth.parse_boolean`. A
+// value written through the provider or the CLI may use any of them, and a
+// tri-state select that read `yes` as "not set" would quietly offer to drop
+// privilege escalation on the next save.
+const ANSIBLE_TRUE = new Set(['true', 'yes', '1', 'on'])
+const ANSIBLE_FALSE = new Set(['false', 'no', '0', 'off'])
+
+type AnsibleEnvelope = Record<string, string>
+
+/** The stored value as an envelope; `{}` for anything unreadable. */
+function parseAnsibleEnvelope(value: string): AnsibleEnvelope {
+  if (!value.trim()) return {}
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out: AnsibleEnvelope = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'string') out[k] = v
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * The envelope as the API stores it, or `''` when every field is empty.
+ *
+ * Empty fields are OMITTED rather than sent as empty strings: the server reads
+ * `private_key: ""` as a supplied-but-empty key and refuses the credential for
+ * having neither secret, which names the wrong problem. And an envelope with
+ * nothing in it serialises to `''`, not `'{}'`, because the edit path sends
+ * `value` only when it is non-empty — so clearing every field leaves the
+ * stored credential alone instead of replacing it with an empty object the
+ * server would refuse.
+ */
+function serializeAnsibleEnvelope(fields: AnsibleEnvelope): string {
+  const out: AnsibleEnvelope = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (v !== '') out[k] = v
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : ''
+}
+
+/**
+ * Discrete inputs for an Ansible credential, serialising into its JSON value.
+ *
+ * A raw JSON textarea would be the regression the git builder already avoided:
+ * the operator hand-writes an envelope whose field names only the server
+ * knows, and a typo is accepted as an unknown field (refused) or lands under a
+ * name nothing reads. Discrete fields make the envelope's shape the form's
+ * problem rather than theirs.
+ *
+ * `value` is the whole envelope and `onChange` receives the whole envelope, so
+ * a caller needs no per-field state — the same single `value` string it
+ * already holds for a plain variable carries this one.
+ */
+export function AnsibleCredentialFields({
+  idPrefix,
+  category,
+  value,
+  onChange,
+}: {
+  idPrefix: string
+  category: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const t = useTranslations('ansibleCredentials')
+  const fields = parseAnsibleEnvelope(value)
+  const set = (field: string, next: string) =>
+    onChange(serializeAnsibleEnvelope({ ...fields, [field]: next }))
+
+  const becomeState = ANSIBLE_TRUE.has((fields.become ?? '').trim().toLowerCase())
+    ? 'true'
+    : ANSIBLE_FALSE.has((fields.become ?? '').trim().toLowerCase())
+      ? 'false'
+      : ''
+
+  const secret = (field: string, rows: number, placeholder?: string) => (
+    <SensitiveValueInput
+      id={`${idPrefix}-ansible-${field}`}
+      value={fields[field] ?? ''}
+      onChange={(next) => set(field, next)}
+      sensitive
+      placeholder={placeholder}
+      rows={rows}
+      className={`${MONO} resize-y`}
+    />
+  )
+
+  const text = (field: string, placeholder?: string) => (
+    <input
+      id={`${idPrefix}-ansible-${field}`}
+      type="text"
+      value={fields[field] ?? ''}
+      onChange={(e) => set(field, e.target.value)}
+      placeholder={placeholder}
+      className={INPUT}
+    />
+  )
+
+  if (category === ANSIBLE_VAULT_CATEGORY) {
+    return (
+      <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
+        <p className="text-xs text-slate-400">{t('vaultHint')}</p>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-password`} className={LABEL}>
+            {t('password')}
+          </label>
+          {secret('password', 2)}
+        </div>
+        <p className="text-xs text-slate-500">{t('replaceHint')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
+      <p className="text-xs text-slate-400">{t('machineHint')}</p>
+      {/* One column on a phone, two from `sm` up: seven fields stacked at
+          412px is a long form, but a two-column grid there puts an escalation
+          password beside a key and neither is wide enough to read. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor={`${idPrefix}-ansible-private_key`} className={LABEL}>
+            {t('privateKey')}
+          </label>
+          {secret('private_key', 4, '-----BEGIN OPENSSH PRIVATE KEY-----')}
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-password`} className={LABEL}>
+            {t('password')}
+          </label>
+          {secret('password', 2)}
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-user`} className={LABEL}>{t('user')}</label>
+          {text('user', 'ansible')}
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-become`} className={LABEL}>{t('become')}</label>
+          <select
+            id={`${idPrefix}-ansible-become`}
+            className={INPUT}
+            value={becomeState}
+            onChange={(e) => set('become', e.target.value)}
+          >
+            {/* Three states, not a checkbox: unset is not the same as off.
+                An absent `become` leaves whatever the inventory or the
+                playbook already says, where `false` overrides it. */}
+            <option value="">{t('becomeUnset')}</option>
+            <option value="true">{t('becomeYes')}</option>
+            <option value="false">{t('becomeNo')}</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-become_method`} className={LABEL}>
+            {t('becomeMethod')}
+          </label>
+          {/* Free text rather than a list: the methods are plugin-provided, so
+              a fixed list would refuse a deployment's own one. */}
+          {text('become_method', 'sudo')}
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-become_user`} className={LABEL}>
+            {t('becomeUser')}
+          </label>
+          {text('become_user', 'root')}
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-ansible-become_password`} className={LABEL}>
+            {t('becomePassword')}
+          </label>
+          {secret('become_password', 2)}
+        </div>
+      </div>
+      <p className="text-xs text-slate-500">{t('replaceHint')}</p>
+    </div>
+  )
+}
+
 export interface VariableEditState {
   key: string
   value: string
@@ -78,19 +302,39 @@ export function VariableEditPanel({
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const tc = useTranslations('workspaceDetail.actions')
+  const ta = useTranslations('ansibleCredentials')
   // A git credential is a JSON envelope; a Vault reference resolves to a single
   // field, so the pair cannot work and the API refuses it (#1439). The category
   // is editable inside this panel, so the exclusion has to live here rather
   // than only in the caller's gate.
-  const isGitCat = state.category === 'git_http_auth' || state.category === 'git_ssh_auth'
-  const isVault = state.source === 'vault' && !isGitCat
+  //
+  // The two Ansible categories are envelopes for the same reason (#1933), so
+  // the Vault source is refused on them too. `isCredentialCategory` is the one
+  // predicate for "this value is an envelope", rather than a second list of
+  // categories to keep in step with the first.
+  const isAnsibleCat = isAnsibleAuthCategory(state.category)
+  const isVault = state.source === 'vault' && !isCredentialCategory(state.category)
+  // `key` is the credential's SCOPE on both Ansible categories, and they scope
+  // different things — a host pattern against the inventory, or a vault ID
+  // label. Labelling both "Key" is how an operator types a group name into the
+  // field that wants a vault label.
+  const keyLabel = isAnsibleCat
+    ? state.category === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scope')
+      : ta('vaultLabel')
+    : t('key')
+  const keyHint = isAnsibleCat
+    ? state.category === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scopeHint')
+      : ta('vaultLabelHint')
+    : ''
   return (
     <div className="space-y-4">
       {/* Identity and shape first — what the variable is, before where its
           value comes from. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
-          <label htmlFor={`${idPrefix}-key`} className={LABEL}>{t('key')}</label>
+          <label htmlFor={`${idPrefix}-key`} className={LABEL}>{keyLabel}</label>
           <input
             id={`${idPrefix}-key`}
             type="text"
@@ -98,6 +342,7 @@ export function VariableEditPanel({
             value={state.key}
             onChange={(e) => onChange({ key: e.target.value })}
           />
+          {keyHint && <p className="mt-1 text-xs text-slate-500">{keyHint}</p>}
         </div>
         <div>
           <label htmlFor={`${idPrefix}-cat`} className={LABEL}>{t('category')}</label>
@@ -120,9 +365,15 @@ export function VariableEditPanel({
             <option value="env">{t('categoryEnv')}</option>
             <option value="git_http_auth">Git HTTPS credential{/* i18n-ignore: category value */}</option>
             <option value="git_ssh_auth">Git SSH credential{/* i18n-ignore: category value */}</option>
+            {/* Translated, unlike the git pair above. Those predate the
+                i18n gate and are allowlisted; a new user-facing option is held
+                to the rule the gate states, so the two sit side by side until
+                the git pair is caught up. */}
+            <option value={ANSIBLE_MACHINE_CATEGORY}>{ta('categoryMachine')}</option>
+            <option value={ANSIBLE_VAULT_CATEGORY}>{ta('categoryVault')}</option>
           </select>
         </div>
-        {vaultAvailable && !isGitCat && (
+        {vaultAvailable && !isCredentialCategory(state.category) && (
           <div>
             <label htmlFor={`${idPrefix}-src`} className={LABEL}>{t('valueSource')}</label>
             <select
@@ -148,6 +399,13 @@ export function VariableEditPanel({
           checkUrl={vaultCheckUrl}
           variableKey={state.key}
         />
+      ) : isAnsibleCat ? (
+        <AnsibleCredentialFields
+          idPrefix={idPrefix}
+          category={state.category}
+          value={state.value}
+          onChange={(value) => onChange({ value })}
+        />
       ) : (
         <div>
           <label htmlFor={`${idPrefix}-val`} className={LABEL}>{t('value')}</label>
@@ -165,14 +423,19 @@ export function VariableEditPanel({
 
       {/* Flags and actions on one baseline: the decisions above, the commit
           below. Sensitive is locked on for a Vault reference — what it resolves
-          to is a secret however the row is ticked. */}
+          to is a secret however the row is ticked — and for an Ansible
+          credential, which the API forces sensitive (#1933). Offering a
+          checkbox the server overrides shows the operator a choice they do not
+          have, and the row comes back ticked after the save either way. */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <div className="flex flex-wrap items-center gap-4">
-          <label className={`flex items-center gap-2 ${isVault ? 'opacity-60' : 'cursor-pointer'}`}>
+          <label
+            className={`flex items-center gap-2 ${isVault || isAnsibleCat ? 'opacity-60' : 'cursor-pointer'}`}
+          >
             <input
               type="checkbox"
-              checked={isVault ? true : state.sensitive}
-              disabled={isVault}
+              checked={isVault || isAnsibleCat ? true : state.sensitive}
+              disabled={isVault || isAnsibleCat}
               onChange={(e) => onChange({ sensitive: e.target.checked })}
               className="rounded border-slate-600 bg-slate-700 text-brand-600"
             />

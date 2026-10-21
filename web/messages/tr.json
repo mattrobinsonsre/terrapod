@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Anahtar adları yalnızca bu çalışma alanında plan da çalıştırabilen kişilere gösterilir.",
     "noteLocal": "Bu çalışma alanı yerelde çalışır; orada bir OpenBao/Vault başvurusu asla çözümlenmez.",
     "noteDisabled": "OpenBao/Vault değer kaynağı etkin değil."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible makine kimlik bilgisi",
+    "categoryVault": "Ansible Vault parolası",
+    "machineHint": "Ansible'ın bu kapsamdaki ana makinelere nasıl bağlandığı. Bir özel anahtar ya da parola girin; ikisini birlikte de verebilirsiniz. Anahtar malzemesi çalıştırma biriminde bir dosyaya yazılır ve envantere yalnızca yolu ulaşır; dolayısıyla sırrın kendisi çözümlenmiş envanterde hiç saklanmaz.",
+    "vaultHint": "Tek bir Ansible Vault kimliğinin parolası. Birkaç kayıt tek bir kimlik listesine dönüşür, böylece bir playbook farklı etiketler altında tutulan sırları çözebilir.",
+    "scope": "Ana makine kapsamı",
+    "scopeHint": "Çalıştırmadaki tüm ana makineler için \"all\" yazın ya da envanterdeki bir grubun adını girin.",
+    "vaultLabel": "Vault kimlik etiketi",
+    "vaultLabelHint": "Yalnızca harf, rakam, alt çizgi, nokta ve kısa çizgi. Etiket vault kimlik listesine yerleştirilir; o listede kayıtları virgül ve @ işareti ayırır.",
+    "privateKey": "SSH özel anahtarı",
+    "password": "Parola",
+    "user": "Kullanıcı",
+    "become": "Yetki yükseltme",
+    "becomeUnset": "Ayarlanmadı",
+    "becomeYes": "Etkin",
+    "becomeNo": "Devre dışı",
+    "becomeMethod": "Yükseltme yöntemi",
+    "becomeUser": "Yükseltilecek kullanıcı",
+    "becomePassword": "Yükseltme parolası",
+    "replaceHint": "Kaydetmek kimlik bilgisinin tamamını değiştirir; bu yüzden yalnızca değiştirdiğiniz alanı değil, gereken her alanı doldurun. Hepsini boş bırakırsanız kayıtlı kimlik bilgisi olduğu gibi kalır."
   }
 }

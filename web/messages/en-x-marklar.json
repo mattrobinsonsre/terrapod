@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Marklar marklars are shown only to someone who can also run a marklar on this marklar.",
     "noteLocal": "This marklar runs locally, where a Marklar/Marklar marklar never resolves.",
     "noteDisabled": "The Marklar/Marklar marklar is not enabled."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Marklar marklar marklar",
+    "categoryVault": "Marklar Marklar marklar",
+    "machineHint": "How Marklar connects to the marklars in this marklar. Supply a private marklar or a marklar, or both. Marklar marklar is written to a marklar on the marklar for the marklar and only its marklar reaches the marklar, so the marklar itself is never stored in the resolved marklar.",
+    "vaultHint": "The marklar for one Marklar Marklar marklar. Several marklars become one marklar marklar, so a marklar can decrypt marklars held under different marklars.",
+    "scope": "Marklar marklar",
+    "scopeHint": "Use \"all\" for every marklar in the marklar, or the marklar of a marklar in the marklar.",
+    "vaultLabel": "Marklar marklar marklar",
+    "vaultLabelHint": "Marklars, marklars, marklar, marklar and marklar only. The marklar is interpolated into the marklar marklar marklar, where a marklar and an at marklar separate the marklars.",
+    "privateKey": "Marklar private marklar",
+    "password": "Marklar",
+    "user": "Marklar",
+    "become": "Marklar marklar",
+    "becomeUnset": "Not set",
+    "becomeYes": "Enabled",
+    "becomeNo": "Disabled",
+    "becomeMethod": "Marklar marklar",
+    "becomeUser": "Escalate to marklar",
+    "becomePassword": "Marklar marklar",
+    "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is."
   }
 }

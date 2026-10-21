@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "キー名は、このワークスペースでプランも実行できるユーザーにのみ表示されます。",
     "noteLocal": "このワークスペースはローカルで実行されるため、OpenBao/Vault 参照は解決されません。",
     "noteDisabled": "OpenBao/Vault 値ソースが有効になっていません。"
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible マシン認証情報",
+    "categoryVault": "Ansible Vault パスワード",
+    "machineHint": "このスコープのホストに Ansible が接続する方法です。秘密鍵かパスワード、またはその両方を指定してください。鍵の内容は実行用ボリューム上のファイルに書き込まれ、インベントリーに渡るのはそのパスだけです。したがって秘密そのものが解決済みインベントリーに保存されることはありません。",
+    "vaultHint": "1 つの Ansible Vault ID のパスワードです。複数のエントリーは 1 つの ID リストにまとめられるため、Playbook は異なるラベルで保管された秘密を復号できます。",
+    "scope": "ホストスコープ",
+    "scopeHint": "実行中のすべてのホストには \"all\"、それ以外はインベントリー内のグループ名を指定します。",
+    "vaultLabel": "Vault ID ラベル",
+    "vaultLabelHint": "使用できるのは英数字、アンダースコア、ピリオド、ハイフンだけです。ラベルは vault の ID リストに埋め込まれ、そこではカンマとアットマークがエントリーの区切り文字になります。",
+    "privateKey": "SSH 秘密鍵",
+    "password": "パスワード",
+    "user": "ユーザー",
+    "become": "権限昇格",
+    "becomeUnset": "未設定",
+    "becomeYes": "有効",
+    "becomeNo": "無効",
+    "becomeMethod": "昇格方法",
+    "becomeUser": "昇格先のユーザー",
+    "becomePassword": "昇格用パスワード",
+    "replaceHint": "保存すると認証情報全体が置き換わります。変更する項目だけでなく、必要なすべての項目を入力してください。すべて空のままにすると、保存済みの認証情報はそのまま残ります。"
   }
 }

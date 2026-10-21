@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Názvy klíčů vidí jen ten, kdo v tomto pracovním prostoru smí také spustit plán.",
     "noteLocal": "Tento pracovní prostor běží lokálně, kde se odkaz na OpenBao/Vault nikdy nerozliší.",
     "noteDisabled": "Zdroj hodnot OpenBao/Vault není zapnutý."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Přihlašovací údaje stroje Ansible",
+    "categoryVault": "Heslo Ansible Vault",
+    "machineHint": "Jak se Ansible připojuje k hostitelům v tomto rozsahu. Zadejte privátní klíč nebo heslo, případně obojí. Materiál klíče se zapisuje do souboru na svazku běhu a do inventáře se dostane jen jeho cesta, takže samotné tajemství se v rozřešeném inventáři nikdy neukládá.",
+    "vaultHint": "Heslo pro jedno ID Ansible Vault. Několik záznamů tvoří jeden seznam identit, takže playbook může dešifrovat tajemství uložená pod různými označeními.",
+    "scope": "Rozsah hostitelů",
+    "scopeHint": "Pro všechny hostitele běhu použijte \"all\", jinak název skupiny z inventáře.",
+    "vaultLabel": "Označení ID Vault",
+    "vaultLabelHint": "Pouze písmena, číslice, podtržítko, tečka a spojovník. Označení se vkládá do seznamu identit vault, v němž záznamy oddělují čárka a zavináč.",
+    "privateKey": "Privátní klíč SSH",
+    "password": "Heslo",
+    "user": "Uživatel",
+    "become": "Zvýšení oprávnění",
+    "becomeUnset": "Nenastaveno",
+    "becomeYes": "Zapnuto",
+    "becomeNo": "Vypnuto",
+    "becomeMethod": "Metoda zvýšení oprávnění",
+    "becomeUser": "Zvýšit na uživatele",
+    "becomePassword": "Heslo pro zvýšení oprávnění",
+    "replaceHint": "Uložení nahradí celé přihlašovací údaje, vyplňte proto každé potřebné pole, ne jen to, které měníte. Když necháte všechna prázdná, uložené údaje zůstanou beze změny."
   }
 }

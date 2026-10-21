@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Dim ond rhywun sydd hefyd yn gallu rhedeg cynllun ar y weithfan hon sy’n gweld enwau’r allweddi.",
     "noteLocal": "Mae’r weithfan hon yn rhedeg yn lleol, lle nad yw cyfeirnod OpenBao/Vault byth yn datrys.",
     "noteDisabled": "Nid yw ffynhonnell gwerthoedd OpenBao/Vault wedi’i galluogi."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Tystlythyr peiriant Ansible",
+    "categoryVault": "Cyfrinair Ansible Vault",
+    "machineHint": "Sut mae Ansible yn cysylltu â'r gwesteiwyr yn y cwmpas hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau. Ysgrifennir deunydd yr allwedd i ffeil ar gyfrol y rhediad, a dim ond ei llwybr sy'n cyrraedd y rhestr eiddo, felly nid yw'r gyfrinach ei hun byth yn cael ei storio yn y rhestr eiddo a ddatryswyd.",
+    "vaultHint": "Y cyfrinair ar gyfer un ID Ansible Vault. Daw sawl cofnod yn un rhestr hunaniaeth, felly gall llyfr chwarae ddadgryptio cyfrinachau a gedwir dan labeli gwahanol.",
+    "scope": "Cwmpas gwesteiwr",
+    "scopeHint": "Defnyddiwch \"all\" ar gyfer pob gwesteiwr yn y rhediad, neu enw grŵp yn y rhestr eiddo.",
+    "vaultLabel": "Label ID Vault",
+    "vaultLabelHint": "Llythrennau, digidau, tanlinell, dot a chysylltnod yn unig. Mae'r label yn cael ei fewnosod yn y rhestr hunaniaeth vault, lle mae coma ac arwydd at yn gwahanu'r cofnodion.",
+    "privateKey": "Allwedd breifat SSH",
+    "password": "Cyfrinair",
+    "user": "Defnyddiwr",
+    "become": "Dyrchafu breintiau",
+    "becomeUnset": "Heb ei osod",
+    "becomeYes": "Wedi'i alluogi",
+    "becomeNo": "Wedi'i analluogi",
+    "becomeMethod": "Dull dyrchafu",
+    "becomeUser": "Dyrchafu i'r defnyddiwr",
+    "becomePassword": "Cyfrinair dyrchafu",
+    "replaceHint": "Mae cadw yn disodli'r tystlythyr cyfan, felly llwythwch bob maes sydd ei angen — nid dim ond yr un sy'n cael ei newid. Mae gadael pob un yn wag yn cadw'r tystlythyr a storiwyd fel y mae."
   }
 }

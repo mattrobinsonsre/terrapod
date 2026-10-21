@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Schlüsselnamen sieht nur, wer in diesem Workspace auch einen Plan ausführen darf.",
     "noteLocal": "Dieser Workspace läuft lokal, wo eine OpenBao/Vault-Referenz nie aufgelöst wird.",
     "noteDisabled": "Die OpenBao/Vault-Wertquelle ist nicht aktiviert."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible-Maschinen-Zugangsdaten",
+    "categoryVault": "Ansible-Vault-Passwort",
+    "machineHint": "Wie Ansible sich mit den Hosts in diesem Bereich verbindet. Geben Sie einen privaten Schlüssel oder ein Passwort an, oder beides. Das Schlüsselmaterial wird in eine Datei auf dem Volume des Laufs geschrieben, und nur dessen Pfad erreicht das Inventar — das Geheimnis selbst wird im aufgelösten Inventar nie gespeichert.",
+    "vaultHint": "Das Passwort für eine Ansible-Vault-ID. Mehrere Einträge werden zu einer Identitätsliste, sodass ein Playbook Geheimnisse unter verschiedenen Labels entschlüsseln kann.",
+    "scope": "Host-Bereich",
+    "scopeHint": "Verwenden Sie \"all\" für jeden Host im Lauf oder den Namen einer Gruppe im Inventar.",
+    "vaultLabel": "Vault-ID-Label",
+    "vaultLabelHint": "Nur Buchstaben, Ziffern, Unterstrich, Punkt und Bindestrich. Das Label wird in die Vault-Identitätsliste eingesetzt, in der Komma und At-Zeichen die Einträge trennen.",
+    "privateKey": "Privater SSH-Schlüssel",
+    "password": "Passwort",
+    "user": "Benutzer",
+    "become": "Rechteerweiterung",
+    "becomeUnset": "Nicht gesetzt",
+    "becomeYes": "Aktiviert",
+    "becomeNo": "Deaktiviert",
+    "becomeMethod": "Methode der Rechteerweiterung",
+    "becomeUser": "Erweitern auf Benutzer",
+    "becomePassword": "Passwort für Rechteerweiterung",
+    "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert."
   }
 }

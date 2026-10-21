@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "키 이름은 이 워크스페이스에서 플랜도 실행할 수 있는 사용자에게만 표시됩니다.",
     "noteLocal": "이 워크스페이스는 로컬에서 실행되므로 OpenBao/Vault 참조가 해석되지 않습니다.",
     "noteDisabled": "OpenBao/Vault 값 소스가 활성화되어 있지 않습니다."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible 머신 자격 증명",
+    "categoryVault": "Ansible Vault 암호",
+    "machineHint": "이 범위의 호스트에 Ansible이 연결하는 방식입니다. 개인 키나 암호를 입력하세요. 둘 다 입력해도 됩니다. 키 자료는 실행 볼륨의 파일에 기록되고 인벤토리에는 그 경로만 전달되므로, 비밀 자체가 확인된 인벤토리에 저장되는 일은 없습니다.",
+    "vaultHint": "하나의 Ansible Vault ID에 대한 암호입니다. 여러 항목이 하나의 ID 목록으로 합쳐지므로 플레이북이 서로 다른 레이블로 보관된 비밀을 복호화할 수 있습니다.",
+    "scope": "호스트 범위",
+    "scopeHint": "실행의 모든 호스트에는 \"all\"을, 그 밖에는 인벤토리의 그룹 이름을 사용하세요.",
+    "vaultLabel": "Vault ID 레이블",
+    "vaultLabelHint": "문자, 숫자, 밑줄, 마침표, 하이픈만 사용할 수 있습니다. 레이블은 vault ID 목록에 삽입되며, 그 목록에서는 쉼표와 @ 기호가 항목을 구분합니다.",
+    "privateKey": "SSH 개인 키",
+    "password": "암호",
+    "user": "사용자",
+    "become": "권한 상승",
+    "becomeUnset": "설정되지 않음",
+    "becomeYes": "사용",
+    "becomeNo": "사용 안 함",
+    "becomeMethod": "권한 상승 방식",
+    "becomeUser": "상승 대상 사용자",
+    "becomePassword": "권한 상승 암호",
+    "replaceHint": "저장하면 자격 증명 전체가 교체됩니다. 변경하는 항목만이 아니라 필요한 모든 항목을 입력하세요. 모두 비워 두면 저장된 자격 증명이 그대로 유지됩니다."
   }
 }

@@ -11,7 +11,14 @@ import { AssignmentRuleEditor, AssignmentRuleSummary, type AssignmentRule } from
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
-import { VariableEditPanel, type VariableEditState } from '@/components/variable-edit-panel'
+import {
+  ANSIBLE_MACHINE_CATEGORY,
+  ANSIBLE_VAULT_CATEGORY,
+  AnsibleCredentialFields,
+  VariableEditPanel,
+  isAnsibleAuthCategory,
+  type VariableEditState,
+} from '@/components/variable-edit-panel'
 import {
   VaultReferenceFields,
   buildVaultReference,
@@ -76,6 +83,10 @@ export default function VariableSetDetailPage() {
   // The Vault reference "Check" action (#1663) posts here.
   const vaultCheckUrl = `/api/terrapod/v1/varsets/${varsetId}/vault-reference-checks`
   const t = useTranslations('adminVariableSets')
+  // Ansible credential copy (#1933). Its own top-level namespace, shared with
+  // the workspace page and the edit panel — the same words on all three, and
+  // one set of strings to translate rather than a copy per page.
+  const ta = useTranslations('ansibleCredentials')
   const { confirmDelete } = useConfirm()
 
   const [varset, setVarset] = useState<Varset | null>(null)
@@ -123,6 +134,18 @@ export default function VariableSetDetailPage() {
   // field, so the pair cannot work and the API refuses it (#1439). Mirrors the
   // workspace page: don't offer the source, and don't send it.
   const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  // An Ansible credential is an envelope on the same terms (#1933). A set is
+  // the reason the vault category carries them at all: one vault password
+  // shared by every workspace that needs it, rather than the same secret
+  // pasted into each.
+  const isAnsibleCat = isAnsibleAuthCategory(varCategory)
+  // A value typed for a plain variable is not an envelope, and an envelope is
+  // not a plain value, so neither survives the other's form. Clear on the way
+  // in or out rather than submitting whatever was left behind.
+  function changeVarCategory(next: string) {
+    if (isAnsibleAuthCategory(next) !== isAnsibleCat) setVarValue('')
+    setVarCategory(next)
+  }
   /**
    * No engine is passed: a set is org-scoped and reaches workspaces of either
    * kind, so there is no engine whose word for the category would be right.
@@ -131,7 +154,27 @@ export default function VariableSetDetailPage() {
     const key = categoryKey(category)
     return key ? t(`detail.${key}`) : category
   }
-  const isVaultSource = varSource === 'vault' && !isGitCat
+  const isVaultSource = varSource === 'vault' && !isGitCat && !isAnsibleCat
+  const varKeyLabel =
+    varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scope')
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? ta('vaultLabel')
+        : t('detail.varKey')
+  const varKeyHint =
+    varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? ta('scopeHint')
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? ta('vaultLabelHint')
+        : ''
+  // Identifiers, not copy: the root group's own name, and a vault label an
+  // operator would recognise.
+  const varKeyPlaceholder =
+    varCategory === ANSIBLE_MACHINE_CATEGORY
+      ? 'all'
+      : varCategory === ANSIBLE_VAULT_CATEGORY
+        ? 'prod'
+        : 'AWS_REGION'
   const [vaultAvailable, setVaultAvailable] = useState(false)
   const [vaultInstances, setVaultInstances] = useState<string[]>([])
   const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
@@ -350,10 +393,11 @@ export default function VariableSetDetailPage() {
               value: isVaultSource ? buildVaultReference(varVault) : varValue,
               category: varCategory,
               // Vault-sourced is always sensitive (its reference resolves to a
-              // secret); otherwise honour the checkbox.
-              sensitive: isVaultSource ? true : varSensitive,
+              // secret), and so is an Ansible credential — the API forces it
+              // (#1933). Otherwise honour the checkbox.
+              sensitive: isVaultSource || isAnsibleCat ? true : varSensitive,
               'apply-only': varApplyOnly,
-              structured: varHcl,
+              structured: isAnsibleCat ? false : varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
             },
           },
@@ -404,14 +448,20 @@ export default function VariableSetDetailPage() {
     setSavingVar(true)
     setError('')
     try {
-      // Same rule as the create form: a git credential cannot be vault-sourced.
-      const isEditVault = editVarSource === 'vault' && !isEditGitCat
+      // Same rule as the create form: a credential cannot be vault-sourced.
+      // The category is editable inside the panel, so a variable can arrive as
+      // vault-sourced and structured and leave as an Ansible credential, which
+      // the API refuses on both counts — sending the state those hidden
+      // controls left behind would spend the edit on a 422 about something the
+      // operator can no longer see (#1933).
+      const isEditAnsible = isAnsibleAuthCategory(editVarCategory)
+      const isEditVault = editVarSource === 'vault' && !isEditGitCat && !isEditAnsible
       const attrs: Record<string, unknown> = {
         key: editVarKey,
         category: editVarCategory,
-        sensitive: isEditVault ? true : editVarSensitive,
+        sensitive: isEditVault || isEditAnsible ? true : editVarSensitive,
         'apply-only': editVarApplyOnly,
-        structured: editVarHcl,
+        structured: isEditAnsible ? false : editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
       if (isEditVault) {
@@ -674,11 +724,16 @@ export default function VariableSetDetailPage() {
               <form onSubmit={handleAddVariable} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varKey')}</label>
-                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION"
+                    {/* `key` is the credential's SCOPE on an Ansible category
+                        — a host pattern, or a vault ID label — and labelling
+                        both "Key" is how a group name reaches the field that
+                        wants a vault label (#1933). */}
+                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{varKeyLabel}</label>
+                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder={varKeyPlaceholder}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    {varKeyHint && <p className="mt-1 text-xs text-slate-500">{varKeyHint}</p>}
                   </div>
-                  {vaultAvailable && !isGitCat && (
+                  {vaultAvailable && !isGitCat && !isAnsibleCat && (
                     <div>
                       <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.valueSource')}</label>
                       <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')}
@@ -695,6 +750,12 @@ export default function VariableSetDetailPage() {
                         checkUrl={vaultCheckUrl} variableKey={varKey}
                         instances={vaultInstances} defaultInstance={vaultDefaultInstance} />
                     </div>
+                  ) : isAnsibleCat ? (
+                    // Full width: seven fields do not belong in the value
+                    // column of a two-column grid.
+                    <div className="sm:col-span-2">
+                      <AnsibleCredentialFields idPrefix="add" category={varCategory} value={varValue} onChange={setVarValue} />
+                    </div>
                   ) : (
                     <div>
                       <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
@@ -704,7 +765,7 @@ export default function VariableSetDetailPage() {
                   )}
                   <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varCategory')}</label>
-                    <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)}
+                    <select id="var-cat" value={varCategory} onChange={(e) => changeVarCategory(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       {/* One category for the engine's own parameters,
                           whatever the workspace runs (#1898): Terraform input
@@ -716,24 +777,39 @@ export default function VariableSetDetailPage() {
                       <option value="env">{t('detail.categoryEnv')}</option>
                       <option value="git_http_auth">Git HTTPS credential</option>
                       <option value="git_ssh_auth">Git SSH credential</option>
+                      {/* Translated, unlike the git pair above: those predate
+                          the i18n gate and are allowlisted, and a new
+                          user-facing option is held to the rule the gate
+                          states (#1933). */}
+                      <option value={ANSIBLE_MACHINE_CATEGORY}>{ta('categoryMachine')}</option>
+                      <option value={ANSIBLE_VAULT_CATEGORY}>{ta('categoryVault')}</option>
                     </select>
                   </div>
                   <div className="flex items-end gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">{t('detail.sensitive')}</span>
-                    </label>
+                    {/* Sensitive and Structured are not offered on an Ansible
+                        credential: the API forces the first and refuses the
+                        second, so both would be controls whose state the save
+                        discards (#1933). Apply-only is offered — on a
+                        credential it is the flag that matters most. */}
+                    {!isAnsibleCat && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-300">{t('detail.sensitive')}</span>
+                      </label>
+                    )}
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                       <span className="text-sm text-slate-300">{t('detail.applyOnly')}</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">{t('detail.structured')}</span>
-                    </label>
+                    {!isAnsibleCat && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-300">{t('detail.structured')}</span>
+                      </label>
+                    )}
                   </div>
                 </div>
                 <button type="submit" disabled={addingVar}

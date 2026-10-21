@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Sleutelnamen zijn alleen zichtbaar voor wie in deze workspace ook een plan mag uitvoeren.",
     "noteLocal": "Deze workspace draait lokaal, waar een OpenBao/Vault-verwijzing nooit wordt opgelost.",
     "noteDisabled": "De OpenBao/Vault-waardebron is niet ingeschakeld."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible-machine-inloggegevens",
+    "categoryVault": "Ansible Vault-wachtwoord",
+    "machineHint": "Hoe Ansible verbinding maakt met de hosts in dit bereik. Geef een privésleutel of een wachtwoord op, of beide. Het sleutelmateriaal wordt naar een bestand op het volume van de run geschreven en alleen het pad bereikt de inventaris; het geheim zelf wordt nooit in de opgeloste inventaris opgeslagen.",
+    "vaultHint": "Het wachtwoord voor één Ansible Vault-ID. Meerdere vermeldingen vormen samen één identiteitslijst, zodat een playbook geheimen onder verschillende labels kan ontsleutelen.",
+    "scope": "Hostbereik",
+    "scopeHint": "Gebruik \"all\" voor elke host in de run, of de naam van een groep in de inventaris.",
+    "vaultLabel": "Vault-ID-label",
+    "vaultLabelHint": "Alleen letters, cijfers, liggend streepje, punt en koppelteken. Het label wordt in de vault-identiteitslijst ingevoegd, waarin de komma en het apenstaartje de vermeldingen scheiden.",
+    "privateKey": "SSH-privésleutel",
+    "password": "Wachtwoord",
+    "user": "Gebruiker",
+    "become": "Rechtenescalatie",
+    "becomeUnset": "Niet ingesteld",
+    "becomeYes": "Ingeschakeld",
+    "becomeNo": "Uitgeschakeld",
+    "becomeMethod": "Escalatiemethode",
+    "becomeUser": "Escaleren naar gebruiker",
+    "becomePassword": "Escalatiewachtwoord",
+    "replaceHint": "Opslaan vervangt de volledige inloggegevens, dus vul elk veld in dat nodig is — niet alleen het veld dat je wijzigt. Laat je ze allemaal leeg, dan blijven de opgeslagen inloggegevens ongewijzigd."
   }
 }

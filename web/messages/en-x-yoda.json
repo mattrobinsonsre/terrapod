@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Shown only to one who also a plan on this workspace can run, key names are.",
     "noteLocal": "Locally this workspace runs, where resolve an OpenBao/Vault reference never does.",
     "noteDisabled": "Enabled, the OpenBao/Vault value source is not."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Credential, Ansible machine",
+    "categoryVault": "Password, Ansible Vault",
+    "machineHint": "To the hosts in this scope, how Ansible connects. A private key or a password, supply — or both. To a file on the volume for the run, key material is written, and only its path the inventory reaches; so stored in the resolved inventory, the secret itself never is.",
+    "vaultHint": "For one Ansible Vault ID, the password. One identity list, several entries become — so secrets held under different labels, a playbook can decrypt.",
+    "scope": "Scope, host",
+    "scopeHint": "For every host in the run, \"all\" use — or the name of a group in the inventory.",
+    "vaultLabel": "Label, Vault ID",
+    "vaultLabelHint": "Letters, digits, underscore, dot and hyphen only, there are. Into the vault identity list, the label is interpolated — where the entries, a comma and an at sign separate.",
+    "privateKey": "Private key, SSH",
+    "password": "Password",
+    "user": "User",
+    "become": "Escalation, privilege",
+    "becomeUnset": "Set, it is not",
+    "becomeYes": "Enabled, it is",
+    "becomeNo": "Disabled, it is",
+    "becomeMethod": "Method, escalation",
+    "becomeUser": "To user, escalate",
+    "becomePassword": "Password, escalation",
+    "replaceHint": "The whole credential, saving replaces — so every field it needs, fill in; not only the one being changed. Empty, leaving all of them keeps the stored credential as it is."
   }
 }

@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "鍵名只會向同時能在此工作區執行計畫的人顯示。",
     "noteLocal": "此工作區在本機執行，OpenBao/Vault 參照在那裡永遠不會被解析。",
     "noteDisabled": "未啟用 OpenBao/Vault 值來源。"
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible 機器憑證",
+    "categoryVault": "Ansible Vault 密碼",
+    "machineHint": "Ansible 連線到此範圍內主機的方式。請提供私密金鑰或密碼，也可以同時提供兩者。金鑰內容會寫入執行磁碟區上的檔案，只有該路徑會進入清查，因此祕密本身絕不會存入已解析的清查。",
+    "vaultHint": "單一 Ansible Vault ID 的密碼。多筆項目會合併為一份身分清單，因此 playbook 可以解密以不同標籤保存的祕密。",
+    "scope": "主機範圍",
+    "scopeHint": "若要套用到執行中的所有主機請使用 \"all\"，否則填寫清查中某個群組的名稱。",
+    "vaultLabel": "Vault ID 標籤",
+    "vaultLabelHint": "僅允許字母、數字、底線、點與連字號。此標籤會插入 vault 身分清單，其中逗號與 @ 符號用來分隔項目。",
+    "privateKey": "SSH 私密金鑰",
+    "password": "密碼",
+    "user": "使用者",
+    "become": "權限提升",
+    "becomeUnset": "未設定",
+    "becomeYes": "已啟用",
+    "becomeNo": "已停用",
+    "becomeMethod": "提升方式",
+    "becomeUser": "提升至的使用者",
+    "becomePassword": "提升密碼",
+    "replaceHint": "儲存會取代整份憑證，因此請填寫它需要的每個欄位，而不只是正在變更的那一個。全部留空則會保留已儲存的憑證不變。"
   }
 }

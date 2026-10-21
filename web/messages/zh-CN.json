@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "键名只向同时能在此工作区运行计划的人显示。",
     "noteLocal": "此工作区在本地运行，OpenBao/Vault 引用在那里永远不会被解析。",
     "noteDisabled": "未启用 OpenBao/Vault 值来源。"
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible 机器凭据",
+    "categoryVault": "Ansible Vault 密码",
+    "machineHint": "Ansible 连接此范围内主机的方式。请提供私钥或密码，也可以同时提供两者。密钥内容会写入运行卷上的文件，只有该路径会进入清单，因此机密本身绝不会存入已解析的清单。",
+    "vaultHint": "单个 Ansible Vault ID 的密码。多个条目会合并为一个身份列表，因此 playbook 可以解密以不同标签保存的机密。",
+    "scope": "主机范围",
+    "scopeHint": "对运行中的所有主机使用 \"all\"，否则填写清单中某个组的名称。",
+    "vaultLabel": "Vault ID 标签",
+    "vaultLabelHint": "仅允许字母、数字、下划线、点和连字符。该标签会插入 vault 身份列表，其中逗号和 @ 符号用于分隔条目。",
+    "privateKey": "SSH 私钥",
+    "password": "密码",
+    "user": "用户",
+    "become": "权限提升",
+    "becomeUnset": "未设置",
+    "becomeYes": "已启用",
+    "becomeNo": "已禁用",
+    "becomeMethod": "提升方式",
+    "becomeUser": "提升到的用户",
+    "becomePassword": "提升密码",
+    "replaceHint": "保存会替换整条凭据，因此请填写它需要的每个字段，而不只是正在修改的那个。全部留空则保留已存储的凭据不变。"
   }
 }

@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Nøglenavne vises kun for den, der også må køre en plan i dette arbejdsområde.",
     "noteLocal": "Dette arbejdsområde kører lokalt, hvor en OpenBao/Vault-reference aldrig opløses.",
     "noteDisabled": "OpenBao/Vault som værdikilde er ikke aktiveret."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible-maskinlegitimation",
+    "categoryVault": "Ansible Vault-adgangskode",
+    "machineHint": "Hvordan Ansible forbinder til værterne i dette omfang. Angiv en privat nøgle eller en adgangskode, eller begge. Nøglematerialet skrives til en fil på kørslens volume, og kun stien når frem til inventaret, så selve hemmeligheden gemmes aldrig i det opløste inventar.",
+    "vaultHint": "Adgangskoden til ét Ansible Vault-id. Flere poster bliver én identitetsliste, så en playbook kan dekryptere hemmeligheder, der er gemt under forskellige etiketter.",
+    "scope": "Værtsomfang",
+    "scopeHint": "Brug \"all\" for alle værter i kørslen, eller navnet på en gruppe i inventaret.",
+    "vaultLabel": "Etiket for Vault-id",
+    "vaultLabelHint": "Kun bogstaver, tal, understregning, punktum og bindestreg. Etiketten indsættes i vault-identitetslisten, hvor komma og snabel-a adskiller posterne.",
+    "privateKey": "Privat SSH-nøgle",
+    "password": "Adgangskode",
+    "user": "Bruger",
+    "become": "Rettighedsforøgelse",
+    "becomeUnset": "Ikke angivet",
+    "becomeYes": "Aktiveret",
+    "becomeNo": "Deaktiveret",
+    "becomeMethod": "Metode til rettighedsforøgelse",
+    "becomeUser": "Forøg til bruger",
+    "becomePassword": "Adgangskode til rettighedsforøgelse",
+    "replaceHint": "Når du gemmer, erstattes hele legitimationen, så udfyld hvert felt den har brug for — ikke kun det, du ændrer. Lader du dem alle stå tomme, bevares den gemte legitimation, som den er."
   }
 }

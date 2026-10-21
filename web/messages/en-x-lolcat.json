@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Kee naymz iz only showd to kittehs hoo can also run a plan heer.",
     "noteLocal": "Dis werkspace runz on ur own box, wer a OpenBao/Vault referens nevr wurkz.",
     "noteDisabled": "Da OpenBao/Vault valyu sorce iz not turnd on."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible masheen kredenshul",
+    "categoryVault": "Ansible Vault passwurd",
+    "machineHint": "How Ansible talkz to da hostz in dis scoep. Giv a privat key or a passwurd, or both. Da key stuf getz writ to a fyle on da volyoom for da run, an only da path reechez da inventree, so da sekrit itself nevr getz kept in da resolvd inventree.",
+    "vaultHint": "Da passwurd for wun Ansible Vault ID. Lotsa entreez becum wun identitee list, so a playbook can unlok sekritz kept undr diffrent labelz. srsly.",
+    "scope": "Host scoep",
+    "scopeHint": "Use \"all\" for evry host in da run, or da naem of a groop in da inventree.",
+    "vaultLabel": "Vault ID labul",
+    "vaultLabelHint": "Onlee letterz, numberz, undrscore, dot an hyfen. Da labul getz stuft into da vault identitee list, wer a comma an a at sign splitz da entreez.",
+    "privateKey": "SSH privat key",
+    "password": "Passwurd",
+    "user": "Usr",
+    "become": "Privlij eskalayshun",
+    "becomeUnset": "Not setted",
+    "becomeYes": "Turnd on",
+    "becomeNo": "Turnd off",
+    "becomeMethod": "Eskalayshun methud",
+    "becomeUser": "Eskalate to usr",
+    "becomePassword": "Eskalayshun passwurd",
+    "replaceHint": "Saving swapz out da hole kredenshul, so fil in evry feeld it needz — not just da wun u iz changin. Leeving dem all emptee keepz da kept kredenshul liek it iz."
   }
 }

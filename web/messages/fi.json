@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Avainten nimet näytetään vain sille, joka voi myös ajaa suunnitelman tässä työtilassa.",
     "noteLocal": "Tämä työtila ajetaan paikallisesti, jossa OpenBao/Vault-viittaus ei koskaan ratkea.",
     "noteDisabled": "OpenBao/Vault-arvolähde ei ole käytössä."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible-konetunnistetiedot",
+    "categoryVault": "Ansible Vault -salasana",
+    "machineHint": "Miten Ansible yhdistää tämän laajuuden koneisiin. Anna yksityinen avain tai salasana, tai molemmat. Avainaines kirjoitetaan tiedostoon ajon taltiolle, ja inventaarioon päätyy vain sen polku, joten salaisuutta itseään ei koskaan talleteta selvitettyyn inventaarioon.",
+    "vaultHint": "Yhden Ansible Vault -tunnuksen salasana. Useista merkinnöistä muodostuu yksi identiteettiluettelo, joten playbook voi purkaa eri tunnisteilla säilytettyjä salaisuuksia.",
+    "scope": "Koneiden laajuus",
+    "scopeHint": "Käytä \"all\" kaikille ajon koneille tai inventaarion ryhmän nimeä.",
+    "vaultLabel": "Vault-tunnuksen tunniste",
+    "vaultLabelHint": "Vain kirjaimet, numerot, alaviiva, piste ja yhdysmerkki. Tunniste sijoitetaan vaultin identiteettiluetteloon, jossa pilkku ja ät-merkki erottavat merkinnät.",
+    "privateKey": "Yksityinen SSH-avain",
+    "password": "Salasana",
+    "user": "Käyttäjä",
+    "become": "Oikeuksien korotus",
+    "becomeUnset": "Ei asetettu",
+    "becomeYes": "Käytössä",
+    "becomeNo": "Ei käytössä",
+    "becomeMethod": "Korotustapa",
+    "becomeUser": "Korota käyttäjäksi",
+    "becomePassword": "Korotuksen salasana",
+    "replaceHint": "Tallennus korvaa koko tunnistetiedon, joten täytä jokainen tarvittava kenttä — ei vain sitä, jota muutat. Jos jätät kaikki tyhjiksi, tallennettu tunnistetieto säilyy ennallaan."
   }
 }

@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "I nomi delle chiavi sono mostrati solo a chi può anche eseguire un piano su questo workspace.",
     "noteLocal": "Questo workspace viene eseguito in locale, dove un riferimento OpenBao/Vault non si risolve mai.",
     "noteDisabled": "La sorgente di valori OpenBao/Vault non è abilitata."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Credenziale macchina Ansible",
+    "categoryVault": "Password di Ansible Vault",
+    "machineHint": "Come Ansible si connette agli host di questo ambito. Fornisci una chiave privata o una password, o entrambe. Il materiale della chiave viene scritto in un file sul volume dell'esecuzione e solo il suo percorso raggiunge l'inventario, quindi il segreto stesso non viene mai memorizzato nell'inventario risolto.",
+    "vaultHint": "La password di un ID Ansible Vault. Più voci formano un unico elenco di identità, così un playbook può decifrare segreti conservati con etichette diverse.",
+    "scope": "Ambito host",
+    "scopeHint": "Usa \"all\" per tutti gli host dell'esecuzione, oppure il nome di un gruppo dell'inventario.",
+    "vaultLabel": "Etichetta ID Vault",
+    "vaultLabelHint": "Solo lettere, cifre, trattino basso, punto e trattino. L'etichetta viene interpolata nell'elenco di identità vault, dove la virgola e la chiocciola separano le voci.",
+    "privateKey": "Chiave privata SSH",
+    "password": "Password",
+    "user": "Utente",
+    "become": "Elevazione dei privilegi",
+    "becomeUnset": "Non impostato",
+    "becomeYes": "Attivata",
+    "becomeNo": "Disattivata",
+    "becomeMethod": "Metodo di elevazione",
+    "becomeUser": "Eleva all'utente",
+    "becomePassword": "Password di elevazione",
+    "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata."
   }
 }

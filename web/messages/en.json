@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "Key names are shown only to someone who can also run a plan on this workspace.",
     "noteLocal": "This workspace runs locally, where an OpenBao/Vault reference never resolves.",
     "noteDisabled": "The OpenBao/Vault value source is not enabled."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "Ansible machine credential",
+    "categoryVault": "Ansible Vault password",
+    "machineHint": "How Ansible connects to the hosts in this scope. Supply a private key or a password, or both. Key material is written to a file on the volume for the run and only its path reaches the inventory, so the secret itself is never stored in the resolved inventory.",
+    "vaultHint": "The password for one Ansible Vault ID. Several entries become one identity list, so a playbook can decrypt secrets held under different labels.",
+    "scope": "Host scope",
+    "scopeHint": "Use \"all\" for every host in the run, or the name of a group in the inventory.",
+    "vaultLabel": "Vault ID label",
+    "vaultLabelHint": "Letters, digits, underscore, dot and hyphen only. The label is interpolated into the vault identity list, where a comma and an at sign separate the entries.",
+    "privateKey": "SSH private key",
+    "password": "Password",
+    "user": "User",
+    "become": "Privilege escalation",
+    "becomeUnset": "Not set",
+    "becomeYes": "Enabled",
+    "becomeNo": "Disabled",
+    "becomeMethod": "Escalation method",
+    "becomeUser": "Escalate to user",
+    "becomePassword": "Escalation password",
+    "replaceHint": "Saving replaces the whole credential, so fill in every field it needs — not only the one being changed. Leaving all of them empty keeps the stored credential as it is."
   }
 }

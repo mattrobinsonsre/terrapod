@@ -3868,5 +3868,26 @@
     "noteKeysNeedPlan": "K3y n4m35 4r3 5h0wn 0nly 70 50m30n3 wh0 c4n 4l50 run 4 pl4n 0n 7h15 w0rk5p4c3.",
     "noteLocal": "7h15 w0rk5p4c3 run5 l0c4lly, wh3r3 4n 0p3nB40/V4ul7 r3f3r3nc3 n3v3r r350lv35.",
     "noteDisabled": "7h3 0p3nB40/V4ul7 v4lu3 50urc3 15 n07 3n4bl3d."
+  },
+  "ansibleCredentials": {
+    "categoryMachine": "4n51bl3 m4ch1n3 cr3d3n714l",
+    "categoryVault": "4n51bl3 V4ul7 p455w0rd",
+    "machineHint": "H0w 4n51bl3 c0nn3c75 70 7h3 h0575 1n 7h15 5c0p3. 5upply 4 pr1v473 k3y 0r 4 p455w0rd, 0r b07h. K3y m473r14l 15 wr1773n 70 4 f1l3 0n 7h3 v0lum3 f0r 7h3 run 4nd 0nly 175 p47h r34ch35 7h3 1nv3n70ry, 50 7h3 53cr37 1753lf 15 n3v3r 570r3d 1n 7h3 r350lv3d 1nv3n70ry.",
+    "vaultHint": "7h3 p455w0rd f0r 0n3 4n51bl3 V4ul7 1D. 53v3r4l 3n7r135 b3c0m3 0n3 1d3n717y l157, 50 4 pl4yb00k c4n d3cryp7 53cr375 h3ld und3r d1ff3r3n7 l4b3l5.",
+    "scope": "H057 5c0p3",
+    "scopeHint": "U53 \"all\" f0r 3v3ry h057 1n 7h3 run, 0r 7h3 n4m3 0f 4 gr0up 1n 7h3 1nv3n70ry.",
+    "vaultLabel": "V4ul7 1D l4b3l",
+    "vaultLabelHint": "L3773r5, d1g175, und3r5c0r3, d07 4nd hyph3n 0nly. 7h3 l4b3l 15 1n73rp0l473d 1n70 7h3 v4ul7 1d3n717y l157, wh3r3 4 c0mm4 4nd 4n 47 51gn 53p4r473 7h3 3n7r135.",
+    "privateKey": "55H pr1v473 k3y",
+    "password": "P455w0rd",
+    "user": "U53r",
+    "become": "Pr1v1l3g3 35c4l4710n",
+    "becomeUnset": "N07 537",
+    "becomeYes": "3n4bl3d",
+    "becomeNo": "D154bl3d",
+    "becomeMethod": "35c4l4710n m37h0d",
+    "becomeUser": "35c4l473 70 u53r",
+    "becomePassword": "35c4l4710n p455w0rd",
+    "replaceHint": "54v1ng r3pl4c35 7h3 wh0l3 cr3d3n714l, 50 f1ll 1n 3v3ry f13ld 17 n33d5 — n07 0nly 7h3 0n3 b31ng ch4ng3d. L34v1ng 4ll 0f 7h3m 3mp7y k33p5 7h3 570r3d cr3d3n714l 45 17 15."
   }
 }
