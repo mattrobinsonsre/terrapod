@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Credencial de máquina do Ansible",
     "categoryVault": "Senha do Ansible Vault",
-    "machineHint": "Como o Ansible se conecta aos hosts deste escopo. Informe uma chave privada ou uma senha, ou as duas. O material da chave é gravado em um arquivo no volume da execução e apenas o caminho dele chega ao inventário, então o segredo em si nunca é armazenado no inventário resolvido.",
+    "machineHint": "Como o Ansible se conecta aos hosts que se referem a esta credencial. Informe uma chave privada ou uma senha, ou as duas. O material da chave é gravado em um arquivo no volume da execução e apenas o caminho dele chega ao inventário, então o segredo em si nunca é armazenado no inventário resolvido.",
     "vaultHint": "A senha de um ID do Ansible Vault. Várias entradas formam uma única lista de identidades, de modo que um playbook pode descriptografar segredos guardados sob rótulos diferentes.",
-    "scope": "Escopo",
-    "scopeHint": "O nome de um host, o nome de um grupo ou \"all\" para todo o inventário. Os escopos se combinam e o mais específico vence.",
+    "name": "Nome da credencial",
+    "nameHint": "O nome pelo qual um inventário se refere a esta credencial: uma credencial chamada web-key é escrita lá como $'{'terrapod:web-key.private_key'}'. Quais hosts ela alcança é dito no inventário, não aqui.",
     "vaultLabel": "Rótulo do ID do Vault",
     "vaultLabelHint": "Apenas letras, dígitos, sublinhado, ponto e hífen. O rótulo é interpolado na lista de identidades do vault, onde a vírgula e o arroba separam as entradas.",
     "privateKey": "Chave privada SSH",

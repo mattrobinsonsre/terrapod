@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible-maskinlegitimasjon",
     "categoryVault": "Ansible Vault-passord",
-    "machineHint": "Hvordan Ansible kobler seg til vertene i dette omfanget. Oppgi en privat nøkkel eller et passord, eller begge. Nøkkelmaterialet skrives til en fil på volumet for kjøringen, og bare stien når inventaret, så selve hemmeligheten lagres aldri i det oppløste inventaret.",
+    "machineHint": "Hvordan Ansible kobler seg til vertene som viser til denne legitimasjonen. Oppgi en privat nøkkel eller et passord, eller begge. Nøkkelmaterialet skrives til en fil på volumet for kjøringen, og bare stien når inventaret, så selve hemmeligheten lagres aldri i det oppløste inventaret.",
     "vaultHint": "Passordet for én Ansible Vault-ID. Flere oppføringer blir én identitetsliste, slik at en playbook kan dekryptere hemmeligheter som er lagret under ulike etiketter.",
-    "scope": "Omfang",
-    "scopeHint": "Navnet på en vert, navnet på en gruppe eller \"all\" for hele inventaret. Omfang kombineres, og det mest spesifikke vinner.",
+    "name": "Navn på legitimasjonen",
+    "nameHint": "Navnet inventaret viser til denne legitimasjonen med: en legitimasjon som heter web-key skrives der som $'{'terrapod:web-key.private_key'}'. Hvilke verter den når, står i inventaret, ikke her.",
     "vaultLabel": "Etikett for Vault-ID",
     "vaultLabelHint": "Bare bokstaver, tall, understrek, punktum og bindestrek. Etiketten settes inn i vault-identitetslisten, der komma og krøllalfa skiller oppføringene.",
     "privateKey": "Privat SSH-nøkkel",

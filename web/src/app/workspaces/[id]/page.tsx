@@ -569,22 +569,22 @@ function WorkspaceDetailContent() {
   const varKeyLabel = isGitCat
     ? t('variables.gitUrlPattern')
     : varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scope')
+      ? ta('name')
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? ta('vaultLabel')
         : t('variables.key')
   const varKeyHint =
     varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scopeHint')
+      ? ta('nameHint')
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? ta('vaultLabelHint')
         : ''
-  // Identifiers, not copy: a host pattern, the root group's own name, and a
-  // vault label an operator would recognise.
+  // Identifiers, not copy: a repository prefix, a credential name an inventory
+  // would refer to, and a vault label an operator would recognise.
   const varKeyPlaceholder = isGitCat
     ? 'github.com/my-org'
     : varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? 'all'
+      ? 'web-key'
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? 'prod'
         : 'AWS_REGION'

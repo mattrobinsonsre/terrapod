@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Marklar marklar marklar",
     "categoryVault": "Marklar Marklar marklar",
-    "machineHint": "How Marklar connects to the marklars in this marklar. Supply a private marklar or a marklar, or both. Marklar marklar is written to a marklar on the marklar for the marklar and only its marklar reaches the marklar, so the marklar itself is never stored in the resolved marklar.",
+    "machineHint": "How Marklar connects to the marklars that refer to this marklar. Supply a private marklar or a marklar, or both. Marklar marklar is written to a marklar on the marklar for the marklar and only its marklar reaches the marklar, so the marklar itself is never stored in the resolved marklar.",
     "vaultHint": "The marklar for one Marklar Marklar marklar. Several marklars become one marklar marklar, so a marklar can decrypt marklars held under different marklars.",
-    "scope": "Marklar",
-    "scopeHint": "A marklar marklar, a marklar marklar, or \"all\" for the whole marklar. Marklars combine, and the most specific one wins.",
+    "name": "Marklar marklar",
+    "nameHint": "The marklar a marklar refers to this marklar by: a marklar named web-key is written there as $'{'terrapod:web-key.private_key'}'. Which marklars it reaches is said in the marklar, not here.",
     "vaultLabel": "Marklar marklar marklar",
     "vaultLabelHint": "Marklars, marklars, marklar, marklar and marklar only. The marklar is interpolated into the marklar marklar marklar, where a marklar and an at marklar separate the marklars.",
     "privateKey": "Marklar private marklar",

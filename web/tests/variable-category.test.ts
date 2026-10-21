@@ -147,20 +147,24 @@ const VARSET_PAGE = readFileSync('src/app/admin/variable-sets/[id]/page.tsx', 'u
 const SERVER_AUTH = readFileSync('../services/terrapod/services/ansible_auth.py', 'utf8')
 const EN_ANSIBLE: Record<string, string> = en.ansibleCredentials
 
-/** The `"key":` literals inside one `NAME = { … }` / `NAME: ann = { … }` block. */
-function pythonDictKeys(source: string, name: string): string[] {
-  const start = source.indexOf(name)
-  assert.notEqual(start, -1, `${name} is not in ansible_auth.py`)
-  const open = source.indexOf('{', start)
-  const close = source.indexOf('}', open)
-  assert.ok(open !== -1 && close > open, `could not read the ${name} block`)
-  return [...source.slice(open, close).matchAll(/"([a-z_]+)"\s*:/g)].map((m) => m[1]).sort()
+/**
+ * Where `NAME` is ASSIGNED, not where it is first mentioned.
+ *
+ * `indexOf(name)` finds the module docstring, which names these sets in prose —
+ * and the next `{` after that prose is the Ansible Vault section's
+ * `{"password": …}` example. So `MACHINE_FILE_FIELDS` read back as `password`
+ * rather than `private_key`: a gate quietly asserting the panel writes the
+ * wrong field. Anchor on the assignment so the region is the definition.
+ */
+function pythonAssignment(source: string, name: string): number {
+  const at = source.search(new RegExp(`^${name}(?::[^=\\n]*)? = `, 'm'))
+  assert.notEqual(at, -1, `${name} is not assigned in ansible_auth.py`)
+  return at
 }
 
 /** The `"key"` literals inside one `NAME = frozenset({ … })` block. */
 function pythonSetMembers(source: string, name: string): string[] {
-  const start = source.indexOf(name)
-  assert.notEqual(start, -1, `${name} is not in ansible_auth.py`)
+  const start = pythonAssignment(source, name)
   const open = source.indexOf('{', start)
   const close = source.indexOf('}', open)
   assert.ok(open !== -1 && close > open, `could not read the ${name} block`)
@@ -210,11 +214,17 @@ test('the machine form writes exactly the fields the server accepts', () => {
   // API accepts the credential, the runner finds nothing under the name it
   // expects, and the configure runs with no escalation and no error." Nothing
   // but this compares the two sides.
+  //
+  // Both are `frozenset({…})`, so they are read with the SET helper. They were
+  // read with a dict-key helper matching `"x":`, which a frozenset has none of,
+  // so the gate could only ever fail — see `pythonAssignment` for the second
+  // half of why it could not pass.
   const expected = [
-    ...pythonDictKeys(SERVER_AUTH, 'MACHINE_FILE_FIELDS'),
-    ...pythonDictKeys(SERVER_AUTH, 'MACHINE_VALUE_FIELDS'),
+    ...pythonSetMembers(SERVER_AUTH, 'MACHINE_FILE_FIELDS'),
+    ...pythonSetMembers(SERVER_AUTH, 'MACHINE_VALUE_FIELDS'),
   ].sort()
   assert.ok(expected.length >= 7, `read only ${expected.length} machine fields from the server`)
+  assert.ok(expected.includes('private_key'), 'the file-delivered field should be among them')
   assert.deepEqual(formFields(panelBranches().machine), expected)
 })
 
@@ -315,6 +325,14 @@ test('the novelty locales genuinely transform the credential copy', () => {
   // Each exemption names the string and the reason. They are the two shapes
   // that legitimately do not move: a word the transform does not touch
   // (marklar swaps NOUNS only), and a single word with no clause to invert.
+  //
+  // `scope` was once exempt for yoda, as a bare one-word label with no clause
+  // to reorder. The key is now `name` and the label `Credential name`, a
+  // two-word noun phrase -- which yoda DOES move, by the catalogue's own
+  // standing convention for exactly this shape (`vaultLabel` is
+  // `Label, Vault ID`; `becomeMethod` is `Method, escalation`). So the
+  // exemption is gone rather than carried over, and the test that backed it
+  // went with it.
   const exempt: Record<string, Record<string, string>> = {
     'en-x-marklar': {
       becomeUnset: 'adjectival — marklar replaces nouns, not adjectives',
@@ -324,14 +342,6 @@ test('the novelty locales genuinely transform the credential copy', () => {
     'en-x-yoda': {
       password: 'one word; there is no clause to reorder',
       user: 'one word; there is no clause to reorder',
-      // Added when the label became `Scope`: it was `Host scope` while a scope
-      // was a set of hosts, which yoda reordered, and a scope can now be one
-      // host. Exempt on the same ground as the two above AND on the
-      // catalogue's own standing convention -- its other two bare "Scope"
-      // labels, `adminVariableSets.table.scope` and
-      // `adminPolicySets.columns.scope`, have always been plain `Scope` too,
-      // which the assertion below checks rather than takes on trust.
-      scope: 'one word; there is no clause to reorder',
     },
   }
   const novelty = ['tlh', 'en-x-marklar', 'en-x-lolcat', 'en-x-leet', 'en-x-pirate', 'en-x-yoda']
@@ -349,15 +359,15 @@ test('the novelty locales genuinely transform the credential copy', () => {
   }
 })
 
-test('the yoda scope exemption matches the catalogue own standing convention', () => {
-  // The exemption above leans on "yoda leaves a bare Scope label alone". That is
-  // a claim about the catalogue, so it is asserted rather than trusted: if those
-  // siblings were ever translated, the exemption would be the odd one out and
-  // should go with them.
-  const yoda = JSON.parse(readFileSync('messages/en-x-yoda.json', 'utf8'))
-  assert.equal(yoda.adminVariableSets.table.scope, 'Scope')
-  assert.equal(yoda.adminPolicySets.columns.scope, 'Scope')
-  assert.equal(yoda.ansibleCredentials.scope, 'Scope')
+test('the yoda credential name follows the catalogue own standing convention', () => {
+  // The exemption list above drops `scope` on the ground that yoda moves a
+  // two-word noun phrase. That is a claim about the catalogue, so it is
+  // asserted rather than trusted — and it is what makes `Name, credential` the
+  // expected shape rather than one translator's choice.
+  const yoda = JSON.parse(readFileSync('messages/en-x-yoda.json', 'utf8')).ansibleCredentials
+  assert.equal(yoda.vaultLabel, 'Label, Vault ID')
+  assert.equal(yoda.becomeMethod, 'Method, escalation')
+  assert.equal(yoda.name, 'Name, credential')
 })
 
 test('en-x-leet applies its own substitution and leaves a typed-in value alone', () => {
@@ -365,16 +375,40 @@ test('en-x-leet applies its own substitution and leaves a typed-in value alone',
   // against the rule rather than against a snapshot of itself. Two things the
   // existing catalogue does not substitute: an ICU placeholder name, and the
   // content of a <code> span. A value the operator types verbatim is the same
-  // class, which is why "all" survives in the scope hint.
+  // class — which is why the credential placeholder and the example name it
+  // interpolates survive in the name hint. `7errap0d` there would be actively
+  // wrong: the operator writes that string into an inventory. Leet-ing one
+  // occurrence of `web-key` and not the one inside the placeholder would break
+  // the correspondence the example exists to show, so both are preserved.
+  const verbatim = String.raw`\$'\{'terrapod:[^'{}]*'\}'|web-key`
   const map: Record<string, string> = { a: '4', e: '3', i: '1', o: '0', s: '5', t: '7' }
   const leetify = (s: string) =>
     [...s].map((ch) => map[ch] || map[ch.toLowerCase()] || ch).join('')
+  /**
+   * Leetify everything except the spans an operator types verbatim. Split on a
+   * CAPTURING group, so the delimiters land at the odd indices and are rejoined
+   * untouched.
+   */
+  const leetSource = (s: string) =>
+    s
+      .split(new RegExp(`(${verbatim})`))
+      .map((part, i) => (i % 2 ? part : leetify(part)))
+      .join('')
   const cat = JSON.parse(readFileSync('messages/en-x-leet.json', 'utf8')).ansibleCredentials
   for (const key of Object.keys(EN_ANSIBLE)) {
-    const expected = EN_ANSIBLE[key].split('"all"').map(leetify).join('"all"')
-    assert.equal(cat[key], expected, `en-x-leet.${key} is not the substitution of the source`)
+    assert.equal(
+      cat[key],
+      leetSource(EN_ANSIBLE[key]),
+      `en-x-leet.${key} is not the substitution of the source`,
+    )
   }
-  assert.ok(cat.scopeHint.includes('"all"'), 'the literal an operator types should survive')
+  // The guard only means something if the source still carries a verbatim span
+  // for it to preserve — otherwise it is satisfied by a plain substitution.
+  assert.match(EN_ANSIBLE.nameHint, new RegExp(verbatim), 'the source should carry a verbatim span')
+  assert.ok(
+    cat.nameHint.includes("$'{'terrapod:web-key.private_key'}'"),
+    'the placeholder an operator types should survive',
+  )
 })
 
 test('the two category values are the server constants, character for character', () => {

@@ -115,18 +115,18 @@ export function VariableEditPanel({
   // categories to keep in step with the first.
   const isAnsibleCat = isAnsibleAuthCategory(state.category)
   const isVault = state.source === 'vault' && !isCredentialCategory(state.category)
-  // `key` is the credential's SCOPE on both Ansible categories, and they scope
-  // different things — a host pattern against the inventory, or a vault ID
-  // label. Labelling both "Key" is how an operator types a group name into the
-  // field that wants a vault label.
+  // `key` is a NAME on both Ansible categories, and they name different things
+  // — the credential an inventory refers to as `${terrapod:<name>.<field>}`, or
+  // a vault ID label. Labelling both "Key" is how an operator types a
+  // credential name into the field that wants a vault label.
   const keyLabel = isAnsibleCat
     ? state.category === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scope')
+      ? ta('name')
       : ta('vaultLabel')
     : t('key')
   const keyHint = isAnsibleCat
     ? state.category === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scopeHint')
+      ? ta('nameHint')
       : ta('vaultLabelHint')
     : ''
   return (

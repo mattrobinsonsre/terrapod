@@ -159,21 +159,21 @@ export default function VariableSetDetailPage() {
   const isVaultSource = varSource === 'vault' && !isGitCat && !isAnsibleCat
   const varKeyLabel =
     varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scope')
+      ? ta('name')
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? ta('vaultLabel')
         : t('detail.varKey')
   const varKeyHint =
     varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? ta('scopeHint')
+      ? ta('nameHint')
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? ta('vaultLabelHint')
         : ''
-  // Identifiers, not copy: the root group's own name, and a vault label an
-  // operator would recognise.
+  // Identifiers, not copy: a credential name an inventory would refer to, and a
+  // vault label an operator would recognise.
   const varKeyPlaceholder =
     varCategory === ANSIBLE_MACHINE_CATEGORY
-      ? 'all'
+      ? 'web-key'
       : varCategory === ANSIBLE_VAULT_CATEGORY
         ? 'prod'
         : 'AWS_REGION'

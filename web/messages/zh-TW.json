@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible 機器憑證",
     "categoryVault": "Ansible Vault 密碼",
-    "machineHint": "Ansible 連線到此範圍內主機的方式。請提供私密金鑰或密碼，也可以同時提供兩者。金鑰內容會寫入執行磁碟區上的檔案，只有該路徑會進入清查，因此祕密本身絕不會存入已解析的清查。",
+    "machineHint": "Ansible 連線到引用此憑證的主機的方式。請提供私密金鑰或密碼，也可以同時提供兩者。金鑰內容會寫入執行磁碟區上的檔案，只有該路徑會進入清查，因此祕密本身絕不會存入已解析的清查。",
     "vaultHint": "單一 Ansible Vault ID 的密碼。多筆項目會合併為一份身分清單，因此 playbook 可以解密以不同標籤保存的祕密。",
-    "scope": "作用域",
-    "scopeHint": "填寫主機名稱、群組名稱，或以 \"all\" 表示整份清查。多個作用域可以疊加，最明確的作用域優先。",
+    "name": "憑證名稱",
+    "nameHint": "清查引用這份憑證時使用的名稱。名為 web-key 的憑證在清查裡寫成 $'{'terrapod:web-key.private_key'}'。它作用於哪些主機由清查決定，而不是這裡。",
     "vaultLabel": "Vault ID 標籤",
     "vaultLabelHint": "僅允許字母、數字、底線、點與連字號。此標籤會插入 vault 身分清單，其中逗號與 @ 符號用來分隔項目。",
     "privateKey": "SSH 私密金鑰",

@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible machine credential",
     "categoryVault": "Ansible Vault password",
-    "machineHint": "How Ansible connects to the hosts in this scope. Supply a private key or a password, or both. Key material is written to a file on the volume for the run and only its path reaches the inventory, so the secret itself is never stored in the resolved inventory.",
+    "machineHint": "How Ansible connects to the hosts that refer to this credential. Supply a private key or a password, or both. Key material is written to a file on the volume for the run and only its path reaches the inventory, so the secret itself is never stored in the resolved inventory.",
     "vaultHint": "The password for one Ansible Vault ID. Several entries become one identity list, so a playbook can decrypt secrets held under different labels.",
-    "scope": "Scope",
-    "scopeHint": "A host name, a group name, or \"all\" for the whole inventory. Scopes combine, and the most specific one wins.",
+    "name": "Credential name",
+    "nameHint": "The name an inventory refers to this credential by: a credential named web-key is written there as $'{'terrapod:web-key.private_key'}'. Which hosts it reaches is said in the inventory, not here.",
     "vaultLabel": "Vault ID label",
     "vaultLabelHint": "Letters, digits, underscore, dot and hyphen only. The label is interpolated into the vault identity list, where a comma and an at sign separate the entries.",
     "privateKey": "SSH private key",

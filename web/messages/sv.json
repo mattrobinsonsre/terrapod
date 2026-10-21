@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible-maskinuppgifter",
     "categoryVault": "Ansible Vault-lösenord",
-    "machineHint": "Hur Ansible ansluter till värdarna i det här omfånget. Ange en privat nyckel eller ett lösenord, eller båda. Nyckelmaterialet skrivs till en fil på körningens volym och bara sökvägen når inventariet, så själva hemligheten lagras aldrig i det upplösta inventariet.",
+    "machineHint": "Hur Ansible ansluter till de värdar som hänvisar till den här uppgiften. Ange en privat nyckel eller ett lösenord, eller båda. Nyckelmaterialet skrivs till en fil på körningens volym och bara sökvägen når inventariet, så själva hemligheten lagras aldrig i det upplösta inventariet.",
     "vaultHint": "Lösenordet för ett Ansible Vault-ID. Flera poster blir en enda identitetslista, så att en playbook kan dekryptera hemligheter som hålls under olika etiketter.",
-    "scope": "Omfattning",
-    "scopeHint": "Namnet på en värd, namnet på en grupp eller \"all\" för hela inventariet. Omfattningar kombineras, och den mest specifika vinner.",
+    "name": "Namn på uppgiften",
+    "nameHint": "Namnet som inventariet hänvisar till den här uppgiften med: en uppgift som heter web-key skrivs där som $'{'terrapod:web-key.private_key'}'. Vilka värdar den når anges i inventariet, inte här.",
     "vaultLabel": "Etikett för Vault-ID",
     "vaultLabelHint": "Endast bokstäver, siffror, understreck, punkt och bindestreck. Etiketten infogas i vault-identitetslistan, där kommatecken och snabel-a skiljer posterna.",
     "privateKey": "Privat SSH-nyckel",

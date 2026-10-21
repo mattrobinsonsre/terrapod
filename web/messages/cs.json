@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Přihlašovací údaje stroje Ansible",
     "categoryVault": "Heslo Ansible Vault",
-    "machineHint": "Jak se Ansible připojuje k hostitelům v tomto rozsahu. Zadejte privátní klíč nebo heslo, případně obojí. Materiál klíče se zapisuje do souboru na svazku běhu a do inventáře se dostane jen jeho cesta, takže samotné tajemství se v rozřešeném inventáři nikdy neukládá.",
+    "machineHint": "Jak se Ansible připojuje k hostitelům, kteří odkazují na tyto přihlašovací údaje. Zadejte privátní klíč nebo heslo, případně obojí. Materiál klíče se zapisuje do souboru na svazku běhu a do inventáře se dostane jen jeho cesta, takže samotné tajemství se v rozřešeném inventáři nikdy neukládá.",
     "vaultHint": "Heslo pro jedno ID Ansible Vault. Několik záznamů tvoří jeden seznam identit, takže playbook může dešifrovat tajemství uložená pod různými označeními.",
-    "scope": "Rozsah",
-    "scopeHint": "Název hostitele, název skupiny nebo \"all\" pro celý inventář. Rozsahy se kombinují a vítězí ten nejkonkrétnější.",
+    "name": "Název přihlašovacích údajů",
+    "nameHint": "Název, pod kterým na tyto přihlašovací údaje odkazuje inventář: údaje s názvem web-key se tam zapisují jako $'{'terrapod:web-key.private_key'}'. Kterých hostitelů se týkají, říká inventář, ne toto pole.",
     "vaultLabel": "Označení ID Vault",
     "vaultLabelHint": "Pouze písmena, číslice, podtržítko, tečka a spojovník. Označení se vkládá do seznamu identit vault, v němž záznamy oddělují čárka a zavináč.",
     "privateKey": "Privátní klíč SSH",

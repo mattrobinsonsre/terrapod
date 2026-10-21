@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Tystlythyr peiriant Ansible",
     "categoryVault": "Cyfrinair Ansible Vault",
-    "machineHint": "Sut mae Ansible yn cysylltu â'r gwesteiwyr yn y cwmpas hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau. Ysgrifennir deunydd yr allwedd i ffeil ar gyfrol y rhediad, a dim ond ei llwybr sy'n cyrraedd y rhestr eiddo, felly nid yw'r gyfrinach ei hun byth yn cael ei storio yn y rhestr eiddo a ddatryswyd.",
+    "machineHint": "Sut mae Ansible yn cysylltu â'r gwesteiwyr sy'n cyfeirio at y tystlythyr hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau. Ysgrifennir deunydd yr allwedd i ffeil ar gyfrol y rhediad, a dim ond ei llwybr sy'n cyrraedd y rhestr eiddo, felly nid yw'r gyfrinach ei hun byth yn cael ei storio yn y rhestr eiddo a ddatryswyd.",
     "vaultHint": "Y cyfrinair ar gyfer un ID Ansible Vault. Daw sawl cofnod yn un rhestr hunaniaeth, felly gall llyfr chwarae ddadgryptio cyfrinachau a gedwir dan labeli gwahanol.",
-    "scope": "Cwmpas",
-    "scopeHint": "Enw gwesteiwr, enw grŵp, neu \"all\" ar gyfer y rhestr eiddo gyfan. Mae cwmpasau yn cyfuno, a'r un mwyaf penodol sy'n ennill.",
+    "name": "Enw'r tystlythyr",
+    "nameHint": "Yr enw y mae rhestr eiddo yn cyfeirio at y tystlythyr hwn drwyddo: ysgrifennir tystlythyr o'r enw web-key yno fel $'{'terrapod:web-key.private_key'}'. Yn y rhestr eiddo, nid yma, y dywedir pa westeiwyr y mae'n eu cyrraedd.",
     "vaultLabel": "Label ID Vault",
     "vaultLabelHint": "Llythrennau, digidau, tanlinell, dot a chysylltnod yn unig. Mae'r label yn cael ei fewnosod yn y rhestr hunaniaeth vault, lle mae coma ac arwydd at yn gwahanu'r cofnodion.",
     "privateKey": "Allwedd breifat SSH",

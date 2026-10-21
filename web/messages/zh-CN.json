@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible 机器凭据",
     "categoryVault": "Ansible Vault 密码",
-    "machineHint": "Ansible 连接此范围内主机的方式。请提供私钥或密码，也可以同时提供两者。密钥内容会写入运行卷上的文件，只有该路径会进入清单，因此机密本身绝不会存入已解析的清单。",
+    "machineHint": "Ansible 连接引用此凭据的主机的方式。请提供私钥或密码，也可以同时提供两者。密钥内容会写入运行卷上的文件，只有该路径会进入清单，因此机密本身绝不会存入已解析的清单。",
     "vaultHint": "单个 Ansible Vault ID 的密码。多个条目会合并为一个身份列表，因此 playbook 可以解密以不同标签保存的机密。",
-    "scope": "作用域",
-    "scopeHint": "填写主机名、组名，或用 \"all\" 表示整个清单。多个作用域可以叠加，最具体的作用域优先。",
+    "name": "凭据名称",
+    "nameHint": "清单引用这条凭据时使用的名称。名为 web-key 的凭据在清单里写作 $'{'terrapod:web-key.private_key'}'。它作用于哪些主机由清单决定，而不是这里。",
     "vaultLabel": "Vault ID 标签",
     "vaultLabelHint": "仅允许字母、数字、下划线、点和连字符。该标签会插入 vault 身份列表，其中逗号和 @ 符号用于分隔条目。",
     "privateKey": "SSH 私钥",

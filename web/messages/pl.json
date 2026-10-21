@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Dane uwierzytelniające maszyny Ansible",
     "categoryVault": "Hasło Ansible Vault",
-    "machineHint": "Sposób, w jaki Ansible łączy się z hostami w tym zakresie. Podaj klucz prywatny lub hasło — albo oba. Materiał klucza jest zapisywany do pliku na woluminie przebiegu, a do inwentarza trafia tylko jego ścieżka, więc sam sekret nigdy nie jest przechowywany w rozwiązanym inwentarzu.",
+    "machineHint": "Sposób, w jaki Ansible łączy się z hostami, które odwołują się do tych danych uwierzytelniających. Podaj klucz prywatny lub hasło — albo oba. Materiał klucza jest zapisywany do pliku na woluminie przebiegu, a do inwentarza trafia tylko jego ścieżka, więc sam sekret nigdy nie jest przechowywany w rozwiązanym inwentarzu.",
     "vaultHint": "Hasło do jednego identyfikatora Ansible Vault. Kilka wpisów tworzy jedną listę tożsamości, dzięki czemu playbook może odszyfrować sekrety przechowywane pod różnymi etykietami.",
-    "scope": "Zasięg",
-    "scopeHint": "Nazwa hosta, nazwa grupy albo \"all\" dla całego inwentarza. Zasięgi się łączą, a wygrywa najbardziej szczegółowy.",
+    "name": "Nazwa danych uwierzytelniających",
+    "nameHint": "Nazwa, pod którą inwentarz odwołuje się do tych danych uwierzytelniających: dane o nazwie web-key zapisuje się tam jako $'{'terrapod:web-key.private_key'}'. To, których hostów dotyczą, mówi inwentarz, a nie to pole.",
     "vaultLabel": "Etykieta identyfikatora Vault",
     "vaultLabelHint": "Tylko litery, cyfry, podkreślenie, kropka i łącznik. Etykieta jest wstawiana do listy tożsamości vault, w której przecinek i znak @ rozdzielają wpisy.",
     "privateKey": "Klucz prywatny SSH",

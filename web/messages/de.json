@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible-Maschinen-Zugangsdaten",
     "categoryVault": "Ansible-Vault-Passwort",
-    "machineHint": "Wie Ansible sich mit den Hosts in diesem Bereich verbindet. Geben Sie einen privaten Schlüssel oder ein Passwort an, oder beides. Das Schlüsselmaterial wird in eine Datei auf dem Volume des Laufs geschrieben, und nur dessen Pfad erreicht das Inventar — das Geheimnis selbst wird im aufgelösten Inventar nie gespeichert.",
+    "machineHint": "Wie Ansible sich mit den Hosts verbindet, die auf diese Zugangsdaten verweisen. Geben Sie einen privaten Schlüssel oder ein Passwort an, oder beides. Das Schlüsselmaterial wird in eine Datei auf dem Volume des Laufs geschrieben, und nur dessen Pfad erreicht das Inventar — das Geheimnis selbst wird im aufgelösten Inventar nie gespeichert.",
     "vaultHint": "Das Passwort für eine Ansible-Vault-ID. Mehrere Einträge werden zu einer Identitätsliste, sodass ein Playbook Geheimnisse unter verschiedenen Labels entschlüsseln kann.",
-    "scope": "Geltungsbereich",
-    "scopeHint": "Der Name eines Hosts, der Name einer Gruppe oder \"all\" für das gesamte Inventar. Geltungsbereiche ergänzen sich, und der spezifischste gewinnt.",
+    "name": "Name der Zugangsdaten",
+    "nameHint": "Der Name, mit dem ein Inventar auf diese Zugangsdaten verweist: Zugangsdaten namens web-key werden dort als $'{'terrapod:web-key.private_key'}' geschrieben. Welche Hosts sie erreichen, sagt das Inventar, nicht dieses Feld.",
     "vaultLabel": "Vault-ID-Label",
     "vaultLabelHint": "Nur Buchstaben, Ziffern, Unterstrich, Punkt und Bindestrich. Das Label wird in die Vault-Identitätsliste eingesetzt, in der Komma und At-Zeichen die Einträge trennen.",
     "privateKey": "Privater SSH-Schlüssel",

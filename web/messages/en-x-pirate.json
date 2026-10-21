@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible machine papers",
     "categoryVault": "Ansible Vault watchword",
-    "machineHint": "How Ansible hails the hosts in this reach. Hand over a private key or a watchword, or both. The key be writ to a file on the volume o' the voyage, an' only its path reaches the manifest — so the secret itself never be stowed in the resolved manifest.",
+    "machineHint": "How Ansible hails the hosts that call on these papers. Hand over a private key or a watchword, or both. The key be writ to a file on the volume o' the voyage, an' only its path reaches the manifest — so the secret itself never be stowed in the resolved manifest.",
     "vaultHint": "The watchword for one Ansible Vault mark. Several entries become one roll o' identities, so a playbook can unlock secrets held under different brands.",
-    "scope": "Reach",
-    "scopeHint": "The name o' a host, the name o' a band, or \"all\" for the whole manifest. The reaches stack, an' the narrowest o' them holds sway.",
+    "name": "Name o' the papers",
+    "nameHint": "The name a manifest calls these papers by: papers named web-key be writ there as $'{'terrapod:web-key.private_key'}'. Which hosts they reach be said in the manifest, not here.",
     "vaultLabel": "Vault ID brand",
     "vaultLabelHint": "Letters, digits, underscore, dot an' hyphen only. The brand be set into the vault roll o' identities, where a comma an' an at sign part the entries.",
     "privateKey": "Yer own SSH key",

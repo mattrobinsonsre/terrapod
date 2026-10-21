@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Testimonium machinae Ansible",
     "categoryVault": "Tessera Ansible Vault",
-    "machineHint": "Quomodo Ansible ad hospites huius ambitus se coniungit. Clavem privatam aut tesseram praebe, vel utramque. Materia clavis in tabellam in volumine cursus scribitur et sola eius semita ad inventarium pervenit; itaque secretum ipsum numquam in inventario resoluto conditur.",
+    "machineHint": "Quomodo Ansible ad hospites se coniungit qui hoc testimonium appellant. Clavem privatam aut tesseram praebe, vel utramque. Materia clavis in tabellam in volumine cursus scribitur et sola eius semita ad inventarium pervenit; itaque secretum ipsum numquam in inventario resoluto conditur.",
     "vaultHint": "Tessera unius ID Ansible Vault. Plures inscriptiones in unum indicem identitatum coeunt, ut playbook secreta sub diversis titulis condita decifrare possit.",
-    "scope": "Ambitus",
-    "scopeHint": "Nomen hospitis, nomen gregis, aut \"all\" pro toto inventario. Ambitus inter se componuntur, et specialissimus vincit.",
+    "name": "Nomen testimonii",
+    "nameHint": "Nomen quo inventarium hoc testimonium appellat: testimonium nomine web-key ibi scribitur ut $'{'terrapod:web-key.private_key'}'. Quos hospites attingat, inventarium dicit, non hic campus.",
     "vaultLabel": "Titulus ID Vault",
     "vaultLabelHint": "Solae litterae, numeri, linea subscripta, punctum et lineola. Titulus in indicem identitatum vault inseritur, ubi comma et signum @ inscriptiones dividunt.",
     "privateKey": "Clavis privata SSH",

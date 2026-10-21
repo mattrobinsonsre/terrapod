@@ -3872,10 +3872,10 @@
   "ansibleCredentials": {
     "categoryMachine": "Ansible-konetunnistetiedot",
     "categoryVault": "Ansible Vault -salasana",
-    "machineHint": "Miten Ansible yhdistää tämän laajuuden koneisiin. Anna yksityinen avain tai salasana, tai molemmat. Avainaines kirjoitetaan tiedostoon ajon taltiolle, ja inventaarioon päätyy vain sen polku, joten salaisuutta itseään ei koskaan talleteta selvitettyyn inventaarioon.",
+    "machineHint": "Miten Ansible yhdistää niihin koneisiin, jotka viittaavat tähän tunnistetietoon. Anna yksityinen avain tai salasana, tai molemmat. Avainaines kirjoitetaan tiedostoon ajon taltiolle, ja inventaarioon päätyy vain sen polku, joten salaisuutta itseään ei koskaan talleteta selvitettyyn inventaarioon.",
     "vaultHint": "Yhden Ansible Vault -tunnuksen salasana. Useista merkinnöistä muodostuu yksi identiteettiluettelo, joten playbook voi purkaa eri tunnisteilla säilytettyjä salaisuuksia.",
-    "scope": "Laajuus",
-    "scopeHint": "Koneen nimi, ryhmän nimi tai \"all\" koko inventaariolle. Laajuudet yhdistyvät, ja tarkin niistä voittaa.",
+    "name": "Tunnistetiedon nimi",
+    "nameHint": "Nimi, jolla inventaario viittaa tähän tunnistetietoon: web-key-niminen tunnistetieto kirjoitetaan siellä muodossa $'{'terrapod:web-key.private_key'}'. Mihin koneisiin se ulottuu, sanotaan inventaariossa eikä tässä.",
     "vaultLabel": "Vault-tunnuksen tunniste",
     "vaultLabelHint": "Vain kirjaimet, numerot, alaviiva, piste ja yhdysmerkki. Tunniste sijoitetaan vaultin identiteettiluetteloon, jossa pilkku ja ät-merkki erottavat merkinnät.",
     "privateKey": "Yksityinen SSH-avain",
