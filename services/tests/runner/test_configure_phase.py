@@ -286,15 +286,18 @@ class TestTheConfigureFlowIsWired:
             f"ansible_auth.run() (that assigns {sorted(assigned)})"
         )
 
-    def test_the_machine_credential_is_PASSED_to_the_inventory(self):
-        """Its other half. The connection variables reach ansible through the
-        rendered inventory, so a `materialise` call without them renders a
-        document with no credential in it and the configure reaches nothing."""
+    def test_the_credential_REFERENCES_are_PASSED_to_the_inventory(self):
+        """Its other half. The machine credential reaches ansible through the
+        rendered inventory -- the inventory names it with a placeholder and the
+        render substitutes -- so a `materialise` call without them renders a
+        document whose references cannot resolve, and the render refuses."""
         fn = self._function()
         call = self._call(fn, module="configure_inventory", func_attr="materialise")
         passed = {k.arg: k.value for k in call.keywords}
-        assert "injections" in passed, "materialise is called without injections"
-        assert isinstance(passed["injections"], ast.Name)
+        assert "resolved" in passed, "materialise is called without resolved"
+        assert isinstance(passed["resolved"], ast.Name), (
+            "resolved must be the name the credential phase returned, not a literal"
+        )
 
     def test_credentials_are_resolved_BEFORE_the_inventory_and_the_install(self):
         """They are a local file read that can refuse without touching the

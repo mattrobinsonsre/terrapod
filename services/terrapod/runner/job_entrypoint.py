@@ -962,15 +962,16 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
     to run whatever the other two produce. Their `AnsibleAuthUnavailable` is a
     refusal rather than an exit code, like `InventoryUnavailable`.
 
-    The machine credential's variables reach ansible THROUGH the inventory and
-    the vault password through the environment, which is why the returns of the
-    first step are the arguments of the other two rather than process state:
-    `configure._forced_env` strips every inherited `ANSIBLE_*`, so an exported
-    vault identity list would be stripped on the way out.
+    The machine credential reaches ansible THROUGH the inventory -- the
+    inventory names it with a `${terrapod:...}` placeholder and the render
+    substitutes -- and the vault password through the environment. Which is why
+    the returns of the first step are the ARGUMENTS of the other two rather than
+    process state: `configure._forced_env` strips every inherited `ANSIBLE_*`,
+    so an exported vault identity list would be stripped on the way out.
     """
     cwd = (work_dir / cfg.config_directory).resolve() if cfg.config_directory else work_dir
-    credential_env, injections = ansible_auth.run()
-    inventory = configure_inventory.materialise(cfg, injections=injections)
+    credential_env, credential_refs = ansible_auth.run()
+    inventory = configure_inventory.materialise(cfg, resolved=credential_refs)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
     return configure.run(
         cfg,

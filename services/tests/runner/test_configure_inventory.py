@@ -28,6 +28,7 @@ from terrapod.runner.phases.configure_inventory import (
     document_to_source,
     materialise,
 )
+from terrapod.services.ansible_auth import placeholder_for
 
 #: Every shape that carries a distinct risk: a host with variables, a var-less
 #: host, a host in no group, direct membership, a declared empty group, and a
@@ -114,13 +115,13 @@ class TestTheRenderedSource:
         assert parsed == {"all": None}
 
 
-class TestCredentialInjections:
-    """#1933's machine credential enters the rendered document, and only it.
+class TestCredentialSubstitution:
+    """#1933. The inventory names a credential; this render substitutes it.
 
     What ansible DOES with the result is pinned in
     `tests/runner/test_phase_ansible_auth.py`, which drives the real binary.
-    These pin the renderer's own contract: where a scope lands, and what
-    happens to a scope that names nothing.
+    These pin the renderer's own contract: that substitution happens here, that
+    it reaches every depth, and that an unresolvable reference refuses.
     """
 
     DOCUMENT = {
@@ -129,117 +130,107 @@ class TestCredentialInjections:
         "children": {"infra": ["web"]},
     }
 
-    def _render(self, injections):
+    def _render(self, document=None, resolved=None):
         return json.loads(
-            configure_inventory.document_to_source(self.DOCUMENT, injections=injections)
+            configure_inventory.document_to_source(
+                document if document is not None else self.DOCUMENT, resolved=resolved
+            )
         )
 
-    def test_no_injections_renders_exactly_what_it_rendered_before(self):
-        """The parameter is optional and every existing caller omits it, so the
-        default must be byte-identical to the previous behaviour -- otherwise
-        this feature changes what a configure with no credentials targets."""
+    def test_no_references_renders_exactly_what_it_rendered_before(self):
+        """The parameter is optional and a document with no placeholder must be
+        byte-identical either way, or this feature changes what a configure with
+        no credentials targets."""
         before = configure_inventory.document_to_source(self.DOCUMENT)
-        after = configure_inventory.document_to_source(self.DOCUMENT, injections={})
-        assert before == after
-        assert configure_inventory.document_to_source(self.DOCUMENT, injections=None) == before
+        assert configure_inventory.document_to_source(self.DOCUMENT, resolved={}) == before
+        assert configure_inventory.document_to_source(self.DOCUMENT, resolved=None) == before
 
-    def test_a_group_scope_lands_on_that_group(self):
-        out = self._render({"web": {"ansible_user": "deploy"}})
-        assert out["all"]["children"]["web"]["vars"] == {"ansible_user": "deploy"}
-
-    def test_the_all_scope_lands_on_the_documents_root(self):
-        """Which is ansible's own `group_vars/all`, and the reason `all` cannot
-        also be a declared group name."""
-        out = self._render({"all": {"ansible_password": "p"}})
-        assert out["all"]["vars"] == {"ansible_password": "p"}
-
-    def test_a_scope_naming_a_group_that_exists_only_as_a_PARENT_is_accepted(self):
-        """`infra` holds no hosts directly and is still a real group, so a
-        credential may scope to it -- its children's hosts inherit."""
-        out = self._render({"infra": {"ansible_user": "deploy"}})
-        assert out["all"]["children"]["infra"]["vars"] == {"ansible_user": "deploy"}
-
-    def test_a_HOST_scope_lands_on_that_host(self):
-        """The level an estate with per-machine keys needs. Host beats group in
-        ansible, so a host-scoped key overrides its group's without either side
-        knowing about the other."""
-        out = self._render({"w1": {"ansible_user": "just-this-one"}})
-        assert out["all"]["hosts"]["w1"]["ansible_user"] == "just-this-one"
-
-    def test_all_three_levels_compose_with_the_specific_one_winning(self):
-        """One `all` default, one group override, one host override, at once --
-        which is the ordinary arrangement rather than an edge case."""
-        out = self._render(
-            {
-                "all": {"ansible_ssh_private_key_file": "/tp/credentials/DEFAULT"},
-                "web": {"ansible_ssh_private_key_file": "/tp/credentials/WEB"},
-                "w1": {"ansible_ssh_private_key_file": "/tp/credentials/W1"},
-            }
-        )
-        # Each lands at its own level; ansible resolves the precedence, and
-        # `TestRealAnsibleResolvesTheInjectedInventory` is where that is proven.
-        assert out["all"]["vars"]["ansible_ssh_private_key_file"].endswith("DEFAULT")
-        assert out["all"]["children"]["web"]["vars"]["ansible_ssh_private_key_file"].endswith("WEB")
-        assert out["all"]["hosts"]["w1"]["ansible_ssh_private_key_file"].endswith("W1")
-
-    def test_the_documents_own_host_variable_wins_over_an_injected_one(self):
-        """Their visible declaration beats a platform credential. The reverse
-        would have Terrapod silently replace a committed value, which is the
-        worse direction of the two."""
+    def test_a_host_variable_reference_is_substituted(self):
         document = {
-            "hosts": {"w1": {"ansible_user": "theirs"}},
-            "groups": {"web": ["w1"]},
+            "hosts": {
+                "w1": {"ansible_ssh_private_key_file": placeholder_for("web", "private_key")}
+            },
+            "groups": {},
             "children": {},
         }
-        out = json.loads(
-            configure_inventory.document_to_source(
-                document, injections={"w1": {"ansible_user": "ours"}}
-            )
-        )
-        assert out["all"]["hosts"]["w1"]["ansible_user"] == "theirs"
+        out = self._render(document, {"web.private_key": "/tp/credentials/k"})
+        assert out["all"]["hosts"]["w1"]["ansible_ssh_private_key_file"] == "/tp/credentials/k"
 
-    def test_a_name_that_is_BOTH_a_host_and_a_group_is_refused(self):
-        """Ansible permits the collision, so which hosts the credential reaches
-        is not predictable -- and a credential landing somewhere the operator
-        did not mean is worth refusing a run over."""
+    def test_a_reference_inside_a_longer_string_is_substituted(self):
+        """The shape a per-group key actually takes in a real estate."""
         document = {
-            "hosts": {"web": {}, "w1": {}},
-            "groups": {"web": ["w1"]},
+            "hosts": {
+                "w1": {
+                    "ansible_ssh_common_args": f"-o IdentityFile={placeholder_for('web', 'private_key')}"
+                }
+            },
+            "groups": {},
+            "children": {},
+        }
+        out = self._render(document, {"web.private_key": "/tp/credentials/k"})
+        assert out["all"]["hosts"]["w1"]["ansible_ssh_common_args"] == (
+            "-o IdentityFile=/tp/credentials/k"
+        )
+
+    def test_an_unresolvable_reference_REFUSES_naming_it(self):
+        """Neither left in place nor blanked. Left, ansible hands ssh the
+        literal as a key path; blanked, it connects with no key -- and both
+        arrive as an unreachable host, naming neither the credential nor the
+        typo."""
+        document = {
+            "hosts": {
+                "w1": {"ansible_ssh_private_key_file": placeholder_for("typo", "private_key")}
+            },
+            "groups": {},
             "children": {},
         }
         with pytest.raises(configure_inventory.InventoryUnavailable) as exc:
-            configure_inventory.document_to_source(
-                document, injections={"web": {"ansible_user": "x"}}
-            )
-        assert "both a host and a group" in str(exc.value)
+            self._render(document, {"web.private_key": "/tp/credentials/k"})
+        assert "${terrapod:typo.private_key}" in str(exc.value)
 
-    def test_a_scope_naming_no_group_at_all_is_REFUSED(self):
-        """Emitted instead, it would apply to no host, and the configure would
-        fail as an unreachable fleet -- naming neither the credential nor the
-        stale scope."""
+    def test_every_unresolvable_reference_is_named_not_just_the_first(self):
+        """Fixing one and re-running to find the next is the experience this
+        avoids."""
+        document = {
+            "hosts": {
+                "w1": {"a": placeholder_for("one", "private_key")},
+                "w2": {"b": placeholder_for("two", "password")},
+            },
+            "groups": {},
+            "children": {},
+        }
         with pytest.raises(configure_inventory.InventoryUnavailable) as exc:
-            self._render({"webb": {"ansible_user": "deploy"}})
-        assert "'webb'" in str(exc.value)
-        # and it says which groups DO exist, because that is the fix
-        assert "web" in str(exc.value) and "db" in str(exc.value)
+            self._render(document, {})
+        assert "one.private_key" in str(exc.value) and "two.password" in str(exc.value)
 
-    def test_an_empty_group_is_still_a_valid_scope(self):
-        """`db` has no hosts today and may have some tomorrow. Refusing it would
-        make a credential's validity depend on the fleet's current size."""
-        out = self._render({"db": {"ansible_user": "deploy"}})
-        assert out["all"]["children"]["db"]["vars"] == {"ansible_user": "deploy"}
+    def test_a_field_typo_is_refused_rather_than_ignored(self):
+        """The grammar does not know the field set, so a wrong FIELD is an
+        unresolved reference rather than ordinary text that passes through."""
+        document = {
+            "hosts": {"w1": {"k": "${terrapod:web.privatekey}"}},
+            "groups": {},
+            "children": {},
+        }
+        with pytest.raises(configure_inventory.InventoryUnavailable):
+            self._render(document, {"web.private_key": "/tp/credentials/k"})
 
-    def test_injecting_does_not_disturb_the_hosts_or_the_nesting(self):
+    def test_a_string_that_merely_mentions_terrapod_is_left_alone(self):
+        """The negative path: the pattern must not be so loose that ordinary
+        prose in a variable becomes a failed reference."""
+        document = {
+            "hosts": {"w1": {"note": "managed by terrapod, see ${HOME}/notes"}},
+            "groups": {},
+            "children": {},
+        }
+        out = self._render(document, {})
+        assert out["all"]["hosts"]["w1"]["note"] == "managed by terrapod, see ${HOME}/notes"
+
+    def test_substituting_does_not_disturb_the_hosts_or_the_nesting(self):
         """The nesting is what `--limit` expands through, so a renderer that
         rearranged it would change what a limit selects."""
         plain = json.loads(configure_inventory.document_to_source(self.DOCUMENT))
-        out = self._render({"web": {"ansible_user": "deploy"}, "all": {"ansible_password": "p"}})
-        assert out["all"]["hosts"] == plain["all"]["hosts"]
-        assert set(out["all"]["children"]) == set(plain["all"]["children"])
-        assert (
-            out["all"]["children"]["infra"]["children"]
-            == plain["all"]["children"]["infra"]["children"]
-        )
+        out = self._render(self.DOCUMENT, {"web.private_key": "/x"})
+        assert out == plain
 
 
 class TestItFailsClosed:
@@ -430,43 +421,40 @@ class TestTheRoundTripThroughRealAnsible:
         assert out["_meta"]["hostvars"]["web1"]["ansible_host"] == "10.0.0.11"
         assert out["_meta"]["hostvars"]["web1"]["role"] == "web"
 
-    def test_the_file_MATERIALISE_WRITES_carries_the_injected_credentials(self, cfg, monkeypatch):
+    def test_the_file_MATERIALISE_WRITES_substitutes_the_references(self, cfg, monkeypatch):
         """Through `materialise`, for the same reason as the test below it.
 
-        Measured: dropping `injections=` from the one `write_text` -- so the
+        Measured: dropping `resolved=` from the one `write_text` -- so the
         parameter is accepted and ignored, which is the shape of every
-        flag-nothing-reads in this repo -- left all 28 of the other tests
+        flag-nothing-reads in this repo -- leaves every other test in this file
         green, because they drive `document_to_source` directly. This is the
         test that fails, and it asserts through REAL ansible so the claim is
         "the credential reaches the host" rather than "a key is in a dict".
         """
+        host = next(iter(DOCUMENT["hosts"]))
+        document = {
+            **DOCUMENT,
+            "hosts": {
+                **DOCUMENT["hosts"],
+                host: {
+                    **(DOCUMENT["hosts"][host] or {}),
+                    "ansible_ssh_private_key_file": placeholder_for("web-key", "private_key"),
+                },
+            },
+        }
 
         def fake(url, dest, **kwargs):
-            Path(dest).write_text(json.dumps(DOCUMENT))
+            Path(dest).write_text(json.dumps(document))
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        group = next(iter(DOCUMENT["groups"]))
-        written = materialise(
-            cfg,
-            injections={
-                group: {"ansible_user": "scoped-deploy"},
-                "all": {"ansible_password": "every-host"},
-            },
-        )
+        written = materialise(cfg, resolved={"web-key.private_key": "/tp/credentials/WEB"})
 
+        # No placeholder survives into the file ansible reads...
+        assert "${terrapod:" not in written.read_text()
+        # ...and ansible resolves the substituted value for that host.
         hostvars = (self._list(written.read_text()).get("_meta") or {}).get("hostvars") or {}
-        assert hostvars, "the rendered file resolved no hosts at all"
-        assert all(v.get("ansible_password") == "every-host" for v in hostvars.values()), (
-            "the all-scoped credential did not reach every host"
-        )
-        in_group = set(DOCUMENT["groups"][group])
-        assert in_group, "the fixture's first group is empty, so this proves nothing"
-        for host, vars_ in hostvars.items():
-            expected = "scoped-deploy" if host in in_group else None
-            assert vars_.get("ansible_user") == expected, (
-                f"{host} got ansible_user={vars_.get('ansible_user')!r}, expected {expected!r}"
-            )
+        assert hostvars[host]["ansible_ssh_private_key_file"] == "/tp/credentials/WEB"
 
     def test_the_file_MATERIALISE_WRITES_resolves_to_the_right_hosts(self, cfg, monkeypatch):
         """Through `materialise`, not through the renderer.

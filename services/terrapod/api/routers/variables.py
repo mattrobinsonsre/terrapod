@@ -45,7 +45,6 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import (
     ansible_auth,
-    inventory_resolution,
     variable_service,
     workspace_search_service,
 )
@@ -258,14 +257,19 @@ def _credential_envelope_guard(*, category: str | None, key: str, value: str | N
     handles a malformed envelope. That was survivable for git -- the operator
     meets it as an `init` failure -- and is not for a configure: the credential
     is spent part way through a fleet, on a host that has already been changed.
+
+    It validates the envelope and the credential's NAME, and nothing about where
+    the credential is USED: that is said in the inventory, by a
+    `${terrapod:<name>.<field>}` placeholder, and the runner refuses a render
+    carrying one it cannot resolve. Validating placement here would mean a
+    second place that says where a credential applies, and a second place for
+    the two to disagree.
     """
     if not ansible_auth.is_ansible_auth(category or ""):
         return
     try:
         ansible_auth.validate_envelope(category or "", key, value or "")
-        if category == ansible_auth.MACHINE_CATEGORY:
-            inventory_resolution.validate_machine_scope(key)
-    except (ansible_auth.AnsibleAuthError, inventory_resolution.InventoryValidationError) as exc:
+    except ansible_auth.AnsibleAuthError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 

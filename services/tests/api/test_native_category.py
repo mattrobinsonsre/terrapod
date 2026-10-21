@@ -131,12 +131,45 @@ class TestTheStoredNameIsTheHonestOne:
         assert "terraform" not in variable_service.VALID_CATEGORIES
         assert "pulumi_config" not in variable_service.VALID_CATEGORIES
 
-    def test_there_are_exactly_four(self) -> None:
-        """`native` plus `env` plus the two git-auth ones. Pinned as a set so a
-        fifth engine-named category cannot be added without this failing —
-        which is the mistake #1898 exists to stop repeating."""
+    def test_there_is_exactly_one_engine_named_category(self) -> None:
+        """`native` plus `env` plus the four credential ones.
+
+        Pinned as a set, which is what makes it fail when a category is added --
+        the mistake #1898 exists to stop repeating is a SECOND engine-named
+        category (a `pulumi_config` beside `terraform`), and the set is how that
+        gets caught.
+
+        It was `test_there_are_exactly_four` until #1933 added two credential
+        categories, and the rename matters: "four" was never the property. The
+        property is that `native` is the only engine-named one, and a credential
+        category is orthogonal to it -- its value is an envelope the runner
+        materialises, not a parameter any engine consumes. Asserted below rather
+        than left implicit in a count.
+        """
         assert variable_service.VALID_CATEGORIES == frozenset(
-            {"native", "env", "git_http_auth", "git_ssh_auth"}
+            {
+                "native",
+                "env",
+                "git_http_auth",
+                "git_ssh_auth",
+                "ansible_machine_auth",
+                "ansible_vault_auth",
+            }
+        )
+
+    def test_native_is_the_only_engine_named_category(self) -> None:
+        """The property the count was standing in for.
+
+        Every category that is not `native` or `env` is a CREDENTIAL category,
+        so a new one can only be a credential or a second engine name -- and the
+        second is what must never happen, because one engine's parameter channel
+        is every engine's (#1898).
+        """
+        non_credential = variable_service.VALID_CATEGORIES - variable_service.CREDENTIAL_CATEGORIES
+        assert non_credential == {"native", "env"}, (
+            f"{sorted(non_credential)} are neither `native`, `env`, nor credential "
+            f"categories. A new category must be one of those three things; a second "
+            f"engine-named one is the mistake #1898 removed."
         )
 
 

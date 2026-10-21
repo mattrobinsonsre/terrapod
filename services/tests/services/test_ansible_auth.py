@@ -12,10 +12,6 @@ import json
 import pytest
 
 from terrapod.services import ansible_auth as aa
-from terrapod.services.inventory_resolution import (
-    InventoryValidationError,
-    validate_machine_scope,
-)
 
 
 class TestItIsPure:
@@ -138,52 +134,117 @@ class TestTheEnvelopeItself:
         assert aa.validate_envelope("git_ssh_auth", "github.com", "{}") == {}
 
 
-class TestTheMachineScope:
-    def test_all_is_accepted_because_it_is_ansibles_own_root_group(self):
-        assert validate_machine_scope("all") == "all"
+class TestTheCredentialName:
+    """`key` is the credential's NAME, not a scope (#1933).
 
-    def test_a_group_name_is_accepted(self):
-        assert validate_machine_scope("web_servers") == "web_servers"
+    Placement is said in the inventory by a placeholder, so there is nothing
+    here about hosts or groups -- the name only has to be a string a
+    placeholder can carry, and the same rule serves both categories because a
+    vault label is also a name.
+    """
 
-    def test_ungrouped_is_refused_with_its_reason(self):
-        """Its membership changes whenever any group does, so scoping a
-        credential to it promises something the operator cannot control."""
-        with pytest.raises(InventoryValidationError, match="ungrouped"):
-            validate_machine_scope("ungrouped")
+    @pytest.mark.parametrize("category", [aa.MACHINE_CATEGORY, aa.VAULT_CATEGORY])
+    @pytest.mark.parametrize("name", ["web", "web-key", "db.primary", "_x", "9lives", "a_b-c.d"])
+    def test_a_usable_name_is_accepted(self, category, name):
+        envelope = {"password": "p"} if category == aa.VAULT_CATEGORY else {"private_key": "k"}
+        assert aa.validate_envelope(category, name, json.dumps(envelope))
 
-    @pytest.mark.parametrize("scope", ["db1.example.com", "host-01", "9web", "web-servers"])
-    def test_a_HOST_name_is_accepted_even_where_a_group_name_would_not_be(self, scope):
-        """The third level, and the reason the rule is a UNION rather than the
-        group rule alone.
+    @pytest.mark.parametrize("category", [aa.MACHINE_CATEGORY, aa.VAULT_CATEGORY])
+    @pytest.mark.parametrize("name", ["", "a,b", "a@b", "has space", "-leading", "a:b", "a{b}"])
+    def test_a_name_a_placeholder_could_not_carry_is_refused(self, category, name):
+        """The character set is the PLACEHOLDER's, not an inventory name's: a
+        reference that does not match the pattern is not a rejected reference,
+        it is a literal string handed to ssh as a key path."""
+        envelope = {"password": "p"} if category == aa.VAULT_CATEGORY else {"private_key": "k"}
+        with pytest.raises(aa.AnsibleAuthError, match="name"):
+            aa.validate_envelope(category, name, json.dumps(envelope))
 
-        A host name allows dots and digits-first and dashes, which the group
-        rule refuses -- so scoping a credential to `db1.example.com` was
-        impossible while this accepted only `all` or a group, and an estate
-        where different hosts carry different keys could not be expressed at
-        all.
-        """
-        assert validate_machine_scope(scope) == scope
+    def test_the_refusal_says_why_per_category(self):
+        """A vault label and a machine name are refused for different reasons --
+        an identity list's delimiters, and a placeholder's grammar -- and an
+        operator fixing one needs to know which."""
+        with pytest.raises(aa.AnsibleAuthError, match="IDENTITY_LIST"):
+            aa.validate_envelope(aa.VAULT_CATEGORY, "a,b", json.dumps({"password": "p"}))
+        with pytest.raises(aa.AnsibleAuthError, match=r"terrapod:"):
+            aa.validate_envelope(aa.MACHINE_CATEGORY, "a,b", json.dumps({"private_key": "k"}))
 
-    @pytest.mark.parametrize("scope", ["", "web servers", "a:b", "a,b", "!web", "x&y", "~re"])
-    def test_a_name_usable_as_neither_a_host_nor_a_group_is_refused(self, scope):
-        """What survives the union: whitespace and the `--limit` operators, each
-        of which makes a name either unselectable or actively change which other
-        hosts a pattern selects."""
-        with pytest.raises(InventoryValidationError):
-            validate_machine_scope(scope)
+    def test_every_name_the_validator_accepts_round_trips_through_a_placeholder(self):
+        """The two rules must agree, or a name the API stored could not be
+        referred to. Derived rather than listed: whatever `CREDENTIAL_NAME`
+        accepts, `PLACEHOLDER` must match back."""
+        for name in ("web", "web-key", "db.primary", "_x", "9lives"):
+            for field in sorted(aa.MACHINE_FIELDS):
+                text = aa.placeholder_for(name, field)
+                match = aa.PLACEHOLDER.fullmatch(text)
+                assert match, f"{text} is not matched by PLACEHOLDER"
+                assert match.group(1) == name and match.group(2) == field
 
-    def test_it_shares_BOTH_name_rules_rather_than_restating_either(self):
-        """A credential must not be scopeable to a name the inventory itself
-        could not hold, in either direction."""
-        from terrapod.services.inventory_resolution import (
-            validate_group_name,
-            validate_host_name,
-        )
 
-        for name in ("web", "_x", "a9", "db_primary"):
-            assert validate_machine_scope(name) == validate_group_name(name)
-        for name in ("db1.example.com", "host-01", "9web"):
-            assert validate_machine_scope(name) == validate_host_name(name)
+class TestThePlaceholder:
+    """The grammar, and the reason it is a string rather than a `!terrapod` tag."""
+
+    def test_it_is_an_ordinary_string_a_generic_yaml_parser_accepts(self):
+        """Measured, and the reason the tag form was rejected: `ansible-inventory`
+        cannot parse an unknown YAML tag and fails SILENTLY, exiting 0 with zero
+        hosts resolved. A `${...}` string is a plain scalar to every parser."""
+        text = aa.placeholder_for("web", "private_key")
+        assert text == "${terrapod:web.private_key}"
+        assert not text.startswith("!")
+
+    def test_one_producer_for_the_grammar(self):
+        """`placeholder_for` and `PLACEHOLDER` must agree, or the docs show a
+        form the code does not resolve."""
+        assert aa.PLACEHOLDER.fullmatch(aa.placeholder_for("n", "private_key"))
+
+    def test_substitution_reaches_inside_a_longer_string(self):
+        """The case that makes this better than scoping: a per-group key is
+        commonly expressed through `ansible_ssh_common_args`, where the
+        reference is one fragment of an ssh argument list."""
+        value = f"-o IdentityFile={aa.placeholder_for('web', 'private_key')} -o Port=22"
+        out = aa.substitute(value, {"web.private_key": "/tp/credentials/k"})
+        assert out == "-o IdentityFile=/tp/credentials/k -o Port=22"
+
+    def test_it_substitutes_at_every_depth(self):
+        doc = {
+            "all": {
+                "hosts": {"h1": {"k": aa.placeholder_for("web", "private_key")}},
+                "vars": {"list": [aa.placeholder_for("web", "user")]},
+            }
+        }
+        out = aa.substitute(doc, {"web.private_key": "/p", "web.user": "deploy"})
+        assert out["all"]["hosts"]["h1"]["k"] == "/p"
+        assert out["all"]["vars"]["list"] == ["deploy"]
+
+    def test_a_non_string_passes_through_untouched(self):
+        assert aa.substitute({"a": 1, "b": True, "c": None}, {}) == {"a": 1, "b": True, "c": None}
+
+    def test_an_unknown_reference_is_LEFT_rather_than_blanked(self):
+        """So the caller can refuse naming it. Blanked, ansible would connect
+        with no key and the failure would arrive as an unreachable host, naming
+        neither the credential nor the reference."""
+        text = aa.placeholder_for("missing", "private_key")
+        assert aa.substitute(text, {}) == text
+
+    def test_unresolved_reports_every_reference_deduplicated(self):
+        doc = {
+            "a": aa.placeholder_for("x", "private_key"),
+            "b": aa.placeholder_for("x", "private_key"),
+            "c": [aa.placeholder_for("y", "password")],
+        }
+        assert aa.unresolved(doc) == [
+            aa.placeholder_for("x", "private_key"),
+            aa.placeholder_for("y", "password"),
+        ]
+
+    def test_unresolved_is_empty_once_substituted(self):
+        doc = {"a": aa.placeholder_for("x", "private_key")}
+        assert aa.unresolved(aa.substitute(doc, {"x.private_key": "/p"})) == []
+
+    def test_a_field_name_that_is_not_a_field_still_parses_as_a_reference(self):
+        """Deliberately: the grammar does not know the field set, so a typo in
+        the FIELD is reported as an unresolved reference by the renderer rather
+        than silently ignored as ordinary text."""
+        assert aa.PLACEHOLDER.fullmatch("${terrapod:web.not_a_field}")
 
 
 class TestDeliveryEntries:

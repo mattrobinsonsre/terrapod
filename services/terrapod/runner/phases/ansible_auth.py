@@ -60,7 +60,6 @@ import structlog
 
 from terrapod.runner import exec_subprocess
 from terrapod.services.ansible_auth import (
-    ALL_HOSTS,
     CREDENTIAL_FILE_MODE,
     MACHINE_CATEGORY,
     MACHINE_FILE_FIELDS,
@@ -167,19 +166,26 @@ def _safe_name(category: str, key: str) -> str:
 
 def run(
     *, path: Path = _AUTH_FILE, directory: Path | None = None
-) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+) -> tuple[dict[str, str], dict[str, str]]:
     """Materialise this run's Ansible credentials.
 
-    Returns `(env, injections)`:
+    Returns `(env, resolved)`:
 
     * `env` is merged by the caller into the environment `ee_client` hands the
       EE. Empty when no vault password was delivered.
-    * `injections` maps a scope -- `all`, or a group name -- to the inventory
-      variables for it, which `configure_inventory` merges into the document it
-      renders. Empty when no machine credential was delivered.
+    * `resolved` maps `"<name>.<field>"` to what a placeholder referring to it
+      stands for -- the PATH of the file written, for a field delivered as a
+      file, or the value itself. `configure_inventory` substitutes these into
+      the document it renders.
 
     Both empty means no credentials were declared, which is an ordinary
     configure against hosts reachable with the EE's own defaults.
+
+    **Every field of every machine credential is resolved, whether or not the
+    inventory refers to it.** Which ones are used is the inventory's business,
+    and a phase that tried to resolve only the referenced ones would have to
+    read the inventory to find out -- coupling the two steps for nothing, since
+    an unreferenced credential costs one file nobody opens.
 
     Raises:
         AnsibleAuthUnavailable: credentials were delivered and could not be
@@ -191,7 +197,7 @@ def run(
 
     target = directory if directory is not None else credentials_dir()
     identities: list[str] = []
-    injections: dict[str, dict[str, Any]] = {}
+    resolved: dict[str, str] = {}
     failures: list[str] = []
 
     for entry in entries:
@@ -205,11 +211,11 @@ def run(
             if category == VAULT_CATEGORY:
                 identities.append(_apply_vault(target, key, envelope))
             elif category == MACHINE_CATEGORY:
-                injections[key or ALL_HOSTS] = _apply_machine(target, key, envelope)
+                resolved.update(_apply_machine(target, key, envelope))
             else:
                 # Delivered under a category this phase does not handle. Not a
-                # failure: the file is shared with nothing today, but a future
-                # category would arrive here on a lagging runner.
+                # failure: a future category would arrive here on a lagging
+                # runner, and refusing would break a forward-compatible delivery.
                 logger.warning("ignoring an unknown ansible credential category", category=category)
         except (AnsibleAuthError, OSError, ValueError) as exc:
             failures.append(f"{category} {key!r}: {exc}")
@@ -231,9 +237,10 @@ def run(
     logger.info(
         "ansible credentials materialised",
         vault_ids=len(identities),
-        machine_scopes=sorted(injections),
+        # The REFERENCES, never the values: this line goes to the run log.
+        resolvable=sorted(resolved),
     )
-    return env, injections
+    return env, resolved
 
 
 def _apply_vault(directory: Path, key: str, envelope: dict[str, Any]) -> str:
@@ -243,19 +250,24 @@ def _apply_vault(directory: Path, key: str, envelope: dict[str, Any]) -> str:
         raise AnsibleAuthError("it carries no 'password', so there is nothing to decrypt with")
     # Registered BEFORE the file exists, so there is no window in which ansible
     # could print it unredacted. Short values are not registered -- see
-    # `exec_subprocess.register_secret` -- and that is why the mechanism
-    # matters more than the backstop: the password reaches ansible as a FILE,
-    # never on an argv and never in an environment variable's value.
+    # `exec_subprocess.register_secret` -- and that is why the mechanism matters
+    # more than the backstop: the password reaches ansible as a FILE, never on
+    # an argv and never as an environment variable's value.
     exec_subprocess.register_secret(password)
     written = _write_secret_file(directory, _safe_name(VAULT_CATEGORY, key), password)
     label = key or "default"
     return f"{label}@{written}"
 
 
-def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[str, Any]:
-    """Write a machine credential's key material; return its inventory variables."""
-    out: dict[str, Any] = {}
-    for field, variable in MACHINE_FILE_FIELDS.items():
+def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[str, str]:
+    """Resolve one machine credential's fields; return `{"name.field": value}`.
+
+    A field in `MACHINE_FILE_FIELDS` resolves to the PATH of a file this writes.
+    Everything else resolves to its own value. That split is the whole reason a
+    placeholder names a field rather than just a credential.
+    """
+    out: dict[str, str] = {}
+    for field in sorted(MACHINE_FILE_FIELDS):
         material = envelope.get(field)
         if not material:
             continue
@@ -263,16 +275,22 @@ def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[
         # A private key must end in a newline or ssh refuses it with "invalid
         # format", which names neither the key nor the missing byte.
         body = material if material.endswith("\n") else material + "\n"
-        out[variable] = str(
-            _write_secret_file(directory, f"{_safe_name(MACHINE_CATEGORY, key)}.key", body)
+        written = _write_secret_file(
+            directory, f"{_safe_name(MACHINE_CATEGORY, key)}.{field}", body
         )
-    for field, variable in MACHINE_VALUE_FIELDS.items():
+        out[f"{key}.{field}"] = str(written)
+    for field in sorted(MACHINE_VALUE_FIELDS):
         value = envelope.get(field)
         if value is None or value == "":
             continue
+        if field == "become":
+            # Validated at the write boundary; normalised here so an inventory
+            # substituting it gets something ansible reads as a boolean.
+            out[f"{key}.{field}"] = "true" if parse_boolean(str(value)) else "false"
+            continue
         if field in MACHINE_SECRET_FIELDS:
             exec_subprocess.register_secret(str(value))
-        out[variable] = parse_boolean(str(value)) if field == "become" else value
+        out[f"{key}.{field}"] = str(value)
     if not out:
         raise AnsibleAuthError("it carries no usable field")
     return out

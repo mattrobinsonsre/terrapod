@@ -81,57 +81,6 @@ def validate_group_name(name: str) -> str:
     return name
 
 
-def validate_machine_scope(name: str) -> str:
-    """Return `name` if a machine credential (#1933) can be scoped to it, else raise.
-
-    Three levels, because a real estate needs all three: a credential may belong
-    to **one host**, to a **group** of them, or to the **whole inventory** as its
-    default. So this is the union of the two name rules plus `all`, sharing both
-    rather than restating either.
-
-    `all` is admitted here and refused by `validate_group_name` for the same
-    reason in both directions -- it is derived, so nothing may declare its
-    MEMBERSHIP, while variables on it are ansible's own `group_vars/all`, which
-    is exactly what an inventory-wide default is.
-
-    **The name is validated for SHAPE here and for existence on the runner**,
-    deliberately. A credential is commonly written before the host it names --
-    Terraform declares both in one apply and the order is the practitioner's --
-    so refusing an unknown name at the write boundary would make the two
-    resources order-dependent. The runner refuses a scope that matches nothing
-    in the run's resolved inventory, where the host set is known.
-    """
-    if not isinstance(name, str) or not name:
-        raise InventoryValidationError(
-            "a machine credential's scope must be a non-empty string: a host, a group, "
-            "or 'all' for the whole inventory"
-        )
-    if name == "all":
-        return name
-    if name == "ungrouped":
-        # Admitting it would promise scoping to a set the operator cannot see or
-        # control, and whose membership changes whenever any group changes.
-        raise InventoryValidationError(
-            "'ungrouped' cannot scope a machine credential: it is derived from which "
-            "hosts are in no other group, so the set changes whenever any group does. "
-            "Scope the credential to 'all', to a group, or to the host itself."
-        )
-    # A group name is the stricter rule; a host name allows dots and dashes. The
-    # scope is whichever it turns out to be in the inventory, so accepting the
-    # union is correct and the runner resolves which.
-    try:
-        return validate_group_name(name)
-    except InventoryValidationError:
-        pass
-    try:
-        return validate_host_name(name)
-    except InventoryValidationError as exc:
-        raise InventoryValidationError(
-            f"machine credential scope {name!r} is not usable as a host name, a group "
-            f"name, or 'all'. {exc}"
-        ) from exc
-
-
 def validate_host_name(name: str) -> str:
     """Return `name` if it can be targeted, else raise.
 

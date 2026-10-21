@@ -1390,15 +1390,28 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         assert resp.status_code == 422
         assert "label" in resp.text
 
-    async def test_a_machine_scope_that_is_not_a_group_or_all_is_422(self):
+    async def test_a_name_a_placeholder_could_not_carry_is_422(self):
+        """`key` is the credential's NAME, and an inventory refers to it as
+        `${terrapod:<name>.<field>}` -- so a character the placeholder's own
+        grammar uses would make the reference unresolvable rather than
+        rejected."""
         resp, _ = await self._create_ws(
-            self._cred("not a group", self.MACHINE, {"private_key": "k"})
+            self._cred("not a name", self.MACHINE, {"private_key": "k"})
         )
         assert resp.status_code == 422
-        assert "scope" in resp.text
+        assert "name" in resp.text
 
-    async def test_all_is_accepted_as_a_machine_scope(self):
-        resp, _ = await self._create_ws(self._cred("all", self.MACHINE, {"private_key": "k"}))
+    async def test_an_ordinary_credential_name_is_accepted(self):
+        resp, _ = await self._create_ws(self._cred("web-key", self.MACHINE, {"private_key": "k"}))
+        assert resp.status_code == 201, resp.text
+
+    async def test_nothing_about_PLACEMENT_is_validated_here(self):
+        """A name that is not a host or a group in any inventory is perfectly
+        valid: where the credential applies is said in the inventory, and
+        validating it here would be a second place that says so."""
+        resp, _ = await self._create_ws(
+            self._cred("nothing.in.any.inventory", self.MACHINE, {"private_key": "k"})
+        )
         assert resp.status_code == 201, resp.text
 
     async def test_a_machine_credential_with_no_way_to_authenticate_is_422(self):

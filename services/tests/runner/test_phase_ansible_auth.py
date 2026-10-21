@@ -22,7 +22,11 @@ import pytest
 
 from terrapod.runner import exec_subprocess
 from terrapod.runner.phases import ansible_auth, configure_inventory
-from terrapod.services.ansible_auth import MACHINE_CATEGORY, VAULT_CATEGORY
+from terrapod.services.ansible_auth import (
+    MACHINE_CATEGORY,
+    VAULT_CATEGORY,
+    placeholder_for,
+)
 
 ANSIBLE = shutil.which("ansible-inventory")
 
@@ -164,10 +168,10 @@ class TestTheVaultPassword:
     def test_the_private_key_has_the_same_mode(self, tmp_path):
         """ssh refuses a key it considers too permissive, so this is the mode
         that has to be right in both directions at once."""
-        _, injections = ansible_auth.run(
+        _, resolved = ansible_auth.run(
             path=_auth_file(tmp_path, [_machine("all", private_key="-----BEGIN-----\nk")])
         )
-        path = Path(injections["all"]["ansible_ssh_private_key_file"])
+        path = Path(resolved["all.private_key"])
         assert path.stat().st_mode & 0o777 == 0o640
 
     def test_no_credential_file_is_readable_by_other(self, tmp_path):
@@ -204,26 +208,35 @@ class TestTheVaultPassword:
 
 
 class TestTheMachineCredential:
-    def test_the_key_becomes_a_file_and_the_document_gets_its_PATH(self, tmp_path):
-        """The distinction is the security property: the key never enters the
-        inventory, only the path to it."""
-        _, injections = ansible_auth.run(
+    """Every field resolves to a REFERENCE an inventory can substitute (#1933).
+
+    The phase no longer decides where a credential applies -- the inventory does,
+    by naming it -- so what these assert is the mapping from
+    `"<name>.<field>"` to what a placeholder standing for it becomes: a PATH for
+    a field delivered as a file, the value itself for the rest.
+    """
+
+    def test_a_file_field_resolves_to_a_PATH_and_the_key_is_not_in_the_mapping(self, tmp_path):
+        """The security property: only the path is ever substituted into a
+        document, so the key cannot reach the inventory however the operator
+        refers to it."""
+        _, resolved = ansible_auth.run(
             path=_auth_file(tmp_path, [_machine("web", private_key="-----BEGIN-----\nkeymaterial")])
         )
-        value = injections["web"]["ansible_ssh_private_key_file"]
-        assert "keymaterial" not in json.dumps(injections)
-        assert Path(value).read_text().startswith("-----BEGIN-----")
+        assert set(resolved) == {"web.private_key"}
+        assert "keymaterial" not in json.dumps(resolved)
+        assert Path(resolved["web.private_key"]).read_text().startswith("-----BEGIN-----")
 
     def test_the_key_file_ends_in_a_newline(self, tmp_path):
         """ssh refuses a key without one as "invalid format", which names
         neither the key nor the missing byte."""
-        _, injections = ansible_auth.run(
+        _, resolved = ansible_auth.run(
             path=_auth_file(tmp_path, [_machine("web", private_key="-----BEGIN-----\nnotrailing")])
         )
-        assert Path(injections["web"]["ansible_ssh_private_key_file"]).read_text().endswith("\n")
+        assert Path(resolved["web.private_key"]).read_text().endswith("\n")
 
-    def test_every_value_field_becomes_its_ansible_variable(self, tmp_path):
-        _, injections = ansible_auth.run(
+    def test_a_value_field_resolves_to_its_own_value(self, tmp_path):
+        _, resolved = ansible_auth.run(
             path=_auth_file(
                 tmp_path,
                 [
@@ -237,28 +250,47 @@ class TestTheMachineCredential:
                 ],
             )
         )
-        assert injections["web"] == {
-            "ansible_password": "a-long-connection-password",
-            "ansible_user": "deploy",
-            "ansible_become_method": "sudo",
-            "ansible_become_user": "root",
+        assert resolved == {
+            "web.password": "a-long-connection-password",
+            "web.user": "deploy",
+            "web.become_method": "sudo",
+            "web.become_user": "root",
         }
 
-    def test_become_arrives_as_a_boolean_not_a_string(self, tmp_path):
-        """ "yes" as a string is truthy to Python and NOT a boolean to ansible's
-        own templating, so the string form is the one that silently misbehaves."""
-        _, injections = ansible_auth.run(
+    def test_become_resolves_to_a_string_ansible_reads_as_a_boolean(self, tmp_path):
+        """It is substituted INTO a document, so it has to be a string -- and
+        one ansible's own templating reads as true, not the operator's spelling
+        of it."""
+        _, resolved = ansible_auth.run(
             path=_auth_file(
                 tmp_path, [_machine("web", password="a-long-connection-password", become="yes")]
             )
         )
-        assert injections["web"]["ansible_become"] is True
-
-    def test_an_empty_scope_falls_back_to_every_host(self, tmp_path):
-        _, injections = ansible_auth.run(
-            path=_auth_file(tmp_path, [_machine("", password="a-long-connection-password")])
+        assert resolved["web.become"] == "true"
+        _, off = ansible_auth.run(
+            path=_auth_file(
+                tmp_path, [_machine("web", password="a-long-connection-password", become="no")]
+            )
         )
-        assert set(injections) == {"all"}
+        assert off["web.become"] == "false"
+
+    def test_several_credentials_resolve_side_by_side(self, tmp_path):
+        """Which is what makes per-host keys expressible at all: the operator
+        declares one credential per key and the inventory says which host gets
+        which."""
+        _, resolved = ansible_auth.run(
+            path=_auth_file(
+                tmp_path,
+                [
+                    _machine("web-key", private_key="-----BEGIN-----\nWEB"),
+                    _machine("db-key", private_key="-----BEGIN-----\nDB"),
+                ],
+            )
+        )
+        assert set(resolved) == {"web-key.private_key", "db-key.private_key"}
+        assert resolved["web-key.private_key"] != resolved["db-key.private_key"]
+        assert "WEB" in Path(resolved["web-key.private_key"]).read_text()
+        assert "DB" in Path(resolved["db-key.private_key"]).read_text()
 
     def test_the_secret_fields_are_registered_and_the_others_are_not(self, tmp_path):
         """A username is not a secret, and registering one would redact an
@@ -280,36 +312,39 @@ class TestTheMachineCredential:
         assert b"a-become-password-long-enough-to-register" in exec_subprocess._SECRETS
         assert b"deploy" not in exec_subprocess._SECRETS
 
-    def test_a_scope_cannot_escape_its_directory(self, tmp_path):
+    def test_a_name_cannot_escape_the_credentials_directory(self, tmp_path):
         """Belt to the write guard's braces: a row written before the guard
-        existed, or a future rule that widens, must not name `../`."""
-        _, injections = ansible_auth.run(
+        existed must not name `../`."""
+        _, resolved = ansible_auth.run(
             path=_auth_file(tmp_path, [_machine("../../etc/evil", private_key="k")])
         )
-        written = Path(next(iter(injections.values()))["ansible_ssh_private_key_file"])
+        written = Path(next(iter(resolved.values())))
         assert written.parent == (tmp_path / "credentials")
+
+    def test_a_credential_nothing_refers_to_is_still_resolved(self, tmp_path):
+        """Deliberately. Which credentials the inventory uses is its business,
+        and a phase that resolved only the referenced ones would have to read
+        the inventory to find out -- coupling the two steps for nothing, since
+        an unreferenced credential costs one file nobody opens."""
+        _, resolved = ansible_auth.run(
+            path=_auth_file(tmp_path, [_machine("never-referred-to", private_key="k")])
+        )
+        assert set(resolved) == {"never-referred-to.private_key"}
 
 
 @pytest.mark.skipif(ANSIBLE is None, reason="needs a real ansible-inventory on PATH")
-class TestRealAnsibleResolvesTheInjectedInventory:
+class TestRealAnsibleResolvesTheSubstitutedInventory:
     """The behaviour, not the shape.
 
     Everything above asserts what the phase RETURNS. These assert what ansible
-    does with it, which is the only form in which "a credential scoped to a
-    group reaches that group" is a claim about anything.
+    does with a document the inventory placed the references in -- which is the
+    only form in which "the operator decides where each key goes" is a claim
+    about anything.
     """
 
-    DOCUMENT = {
-        "hosts": {"w1": {"ansible_port": 22}, "d1": {}},
-        "groups": {"web": ["w1"], "db": ["d1"]},
-        "children": {"infra": ["web", "db"]},
-    }
-
-    def _resolve(self, tmp_path, injections, *extra):
+    def _resolve(self, tmp_path, document, resolved, *extra):
         source = tmp_path / configure_inventory.RENDERED_NAME
-        source.write_text(
-            configure_inventory.document_to_source(self.DOCUMENT, injections=injections)
-        )
+        source.write_text(configure_inventory.document_to_source(document, resolved=resolved))
         out = subprocess.run(  # noqa: S603
             [ANSIBLE, "-i", str(source), "--list", *extra],
             capture_output=True,
@@ -326,109 +361,77 @@ class TestRealAnsibleResolvesTheInjectedInventory:
         assert out.returncode == 0, f"ansible refused the document:\n{out.stderr}"
         return json.loads(out.stdout)["_meta"]["hostvars"]
 
-    def test_a_group_scoped_credential_reaches_that_group_and_no_other(self, tmp_path):
+    def test_a_per_host_reference_reaches_only_that_host(self, tmp_path):
+        """The case the scope model could not express: two hosts, two keys,
+        chosen in the inventory."""
+        document = {
+            "hosts": {
+                "w1": {"ansible_ssh_private_key_file": placeholder_for("web-key", "private_key")},
+                "d1": {"ansible_ssh_private_key_file": placeholder_for("db-key", "private_key")},
+            },
+            "groups": {"all_hosts": ["w1", "d1"]},
+            "children": {},
+        }
         hostvars = self._resolve(
             tmp_path,
+            document,
             {
-                "web": {
-                    "ansible_user": "deploy",
-                    "ansible_ssh_private_key_file": "/tp/credentials/k",
+                "web-key.private_key": "/tp/credentials/WEB",
+                "db-key.private_key": "/tp/credentials/DB",
+            },
+        )
+        assert hostvars["w1"]["ansible_ssh_private_key_file"] == "/tp/credentials/WEB"
+        assert hostvars["d1"]["ansible_ssh_private_key_file"] == "/tp/credentials/DB"
+
+    def test_a_reference_inside_ssh_common_args_resolves(self, tmp_path):
+        """The mechanism a real estate actually uses for a per-group key: the
+        reference is one fragment of an ssh argument list, not the whole value.
+        A scope-based injection could never have filled this."""
+        document = {
+            "hosts": {
+                "w1": {
+                    "ansible_ssh_common_args": (
+                        f"-o IdentityFile={placeholder_for('web-key', 'private_key')} -o Port=2222"
+                    )
                 }
             },
-        )
-        assert hostvars["w1"]["ansible_user"] == "deploy"
-        assert "ansible_user" not in hostvars.get("d1", {}), (
-            "the credential leaked to another group"
-        )
-
-    def test_an_all_scoped_credential_reaches_every_host(self, tmp_path):
-        hostvars = self._resolve(tmp_path, {"all": {"ansible_password": "global-password"}})
-        assert hostvars["w1"]["ansible_password"] == "global-password"
-        assert hostvars["d1"]["ansible_password"] == "global-password"
-
-    def test_become_survives_as_a_boolean_through_ansible(self, tmp_path):
-        hostvars = self._resolve(tmp_path, {"web": {"ansible_become": True}})
-        assert hostvars["w1"]["ansible_become"] is True
-
-    def test_a_host_variable_outranks_an_injected_group_variable(self, tmp_path):
-        """The documented order, and it has to be ansible's answer rather than
-        ours: an operator who declared `ansible_user` in their own inventory
-        keeps it, because host beats group."""
-        document = {
-            "hosts": {"w1": {"ansible_user": "theirs"}},
-            "groups": {"web": ["w1"]},
+            "groups": {},
             "children": {},
         }
-        source = tmp_path / configure_inventory.RENDERED_NAME
-        source.write_text(
-            configure_inventory.document_to_source(
-                document, injections={"web": {"ansible_user": "ours"}}
-            )
+        hostvars = self._resolve(tmp_path, document, {"web-key.private_key": "/tp/credentials/WEB"})
+        assert hostvars["w1"]["ansible_ssh_common_args"] == (
+            "-o IdentityFile=/tp/credentials/WEB -o Port=2222"
         )
-        out = subprocess.run(  # noqa: S603
-            [ANSIBLE, "-i", str(source), "--list"],
-            capture_output=True,
-            text=True,
-            cwd=tmp_path,
-            env={"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
-            check=False,
-        )
-        assert out.returncode == 0, out.stderr
-        assert json.loads(out.stdout)["_meta"]["hostvars"]["w1"]["ansible_user"] == "theirs"
 
-    def test_host_beats_group_beats_the_inventory_default(self, tmp_path):
-        """The three levels, proven by ansible rather than by where we put them.
-
-        This is the assertion the feature is for: an estate where most hosts
-        take the default key, a tier takes its own, and one machine takes its
-        own again -- expressed as three credentials with no ordering for the
-        operator to state, because the ordering is ansible's.
-        """
-        hostvars = self._resolve(
-            tmp_path,
-            {
-                "all": {"ansible_ssh_private_key_file": "/tp/credentials/DEFAULT.key"},
-                "web": {"ansible_ssh_private_key_file": "/tp/credentials/WEB.key"},
-                "w1": {"ansible_ssh_private_key_file": "/tp/credentials/W1-OWN.key"},
-            },
-        )
-        # w1 is in `web`, so all three scopes reach it and the host one wins.
-        assert hostvars["w1"]["ansible_ssh_private_key_file"].endswith("W1-OWN.key")
-        # d1 is in `db`, which no credential names, so it takes the default.
-        assert hostvars["d1"]["ansible_ssh_private_key_file"].endswith("DEFAULT.key")
-
-    def test_a_group_scoped_key_reaches_a_sibling_the_host_scope_does_not(self, tmp_path):
-        """The middle level earning its place: with only `all` and per-host
-        scopes, a tier of twenty machines would need twenty credentials.
-        """
+    def test_become_resolves_to_something_ansible_reads_as_true(self, tmp_path):
         document = {
-            "hosts": {"w1": {}, "w2": {}, "d1": {}},
-            "groups": {"web": ["w1", "w2"], "db": ["d1"]},
+            "hosts": {"w1": {"ansible_become": placeholder_for("web", "become")}},
+            "groups": {},
             "children": {},
         }
-        source = tmp_path / configure_inventory.RENDERED_NAME
-        source.write_text(
-            configure_inventory.document_to_source(
-                document, injections={"web": {"ansible_user": "deploy"}}
-            )
-        )
-        out = subprocess.run(  # noqa: S603
-            [ANSIBLE, "-i", str(source), "--list"],
-            capture_output=True,
-            text=True,
-            cwd=tmp_path,
-            env={"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
-            check=False,
-        )
-        assert out.returncode == 0, out.stderr
-        hostvars = json.loads(out.stdout)["_meta"]["hostvars"]
-        assert hostvars["w1"]["ansible_user"] == "deploy"
-        assert hostvars["w2"]["ansible_user"] == "deploy"
-        assert "ansible_user" not in hostvars.get("d1", {})
+        hostvars = self._resolve(tmp_path, document, {"web.become": "true"})
+        # Substituted as a string; ansible's own boolean coercion does the rest,
+        # which is why "true" and not "yes".
+        assert hostvars["w1"]["ansible_become"] in (True, "true")
 
     def test_limit_still_expands_through_the_nesting(self, tmp_path):
-        """Injecting group variables must not disturb what `--limit` selects --
-        the nesting is what a limit expands through."""
-        injections = {"web": {"ansible_user": "deploy"}, "all": {"ansible_password": "p"}}
-        assert sorted(self._resolve(tmp_path, injections, "--limit", "web")) == ["w1"]
-        assert sorted(self._resolve(tmp_path, injections, "--limit", "infra")) == ["d1", "w1"]
+        """Substituting must not disturb what `--limit` selects -- the nesting
+        is what a limit expands through."""
+        # Every host carries a variable, deliberately: `ansible-inventory --list`
+        # OMITS a host from `_meta.hostvars` when it has none, so a var-less `d1`
+        # would be absent from the result and read as "the limit did not select
+        # it" -- which is the opposite of what this asserts.
+        document = {
+            "hosts": {
+                "w1": {"k": placeholder_for("web", "user")},
+                "d1": {"ansible_port": 22},
+            },
+            "groups": {"web": ["w1"], "db": ["d1"]},
+            "children": {"infra": ["web", "db"]},
+        }
+        resolved = {"web.user": "deploy"}
+        assert sorted(self._resolve(tmp_path, document, resolved, "--limit", "web")) == ["w1"]
+        assert sorted(self._resolve(tmp_path, document, resolved, "--limit", "infra")) == [
+            "d1",
+            "w1",
+        ]

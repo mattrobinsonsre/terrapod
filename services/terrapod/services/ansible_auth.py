@@ -3,8 +3,7 @@
 Two credential classes reach a configure, both carried by the existing
 credential-category mechanism (#1028's `git_http_auth`/`git_ssh_auth`): the
 machine credential ansible connects with, and the Ansible Vault password it
-decrypts its own secrets with. `key` is the SCOPE in both, exactly as it is a
-URL pattern for git auth.
+decrypts its own secrets with. `key` is the credential's NAME in both.
 
 **This module is PURE and must stay so -- `typing` and the standard library,
 nothing from Terrapod.** It ships in the runner image, which installs 21
@@ -21,28 +20,47 @@ time. A disagreement about a single key -- `become_pass` against
 finds nothing under the name it expects, and the configure runs with no
 escalation and no error. One producer removes the class.
 
-## The machine credential
+## Where a credential is USED is said in the inventory
 
-`key` names a HOST, a GROUP, or the literal `all` for the whole inventory --
-three levels, because a real estate needs all three. Formerly in the
-workspace's inventory. The runner writes key material to a `0600` file on the
-shared volume and injects the *path* -- never the key -- into the resolved
-inventory as variables for that scope, so **ansible's own group precedence does
-the scoping** and a per-group credential costs no logic of ours.
+A credential is a NAMED secret and nothing more. The inventory refers to it by a
+placeholder, which the runner substitutes while rendering:
 
-The injected document is the runner's local copy, rendered into the Job's
-shared volume from the artifact the API stored at run creation. So a password
-delivered this way reaches a file beside ansible and **never** the stored
-artifact, the Resolved view, or anything holding inventory read.
+    [web:vars]
+    ansible_ssh_private_key_file=${terrapod:web-key.private_key}
+
+    [db1]
+    db1.example.com ansible_ssh_private_key_file=${terrapod:db-key.private_key}
+
+**Placement belongs to the inventory because that is already where an operator
+says which host gets what.** Scoping the credential as well would be a second
+place to say the same thing and a second place for the two to disagree -- and it
+would only ever fill the connection variables this module thought to enumerate,
+where a placeholder fills any of them. An estate whose per-host difference is
+expressed through `ansible_ssh_common_args` and a ProxyCommand is served by the
+same mechanism as one using `ansible_ssh_private_key_file`, with nothing here
+knowing the difference.
+
+It also makes "the API ships no secrets" structural rather than policed: the
+artifact the API stores carries the PLACEHOLDER, because that is what the
+inventory says, and substitution happens only in the runner's own local render.
+
+The field selector is not decoration. `private_key` substitutes the PATH of a
+mode-restricted file the runner writes; `password` substitutes the value. One
+credential genuinely has both shapes, and `MACHINE_FILE_FIELDS` below is the
+one place that says which is which.
 
 ## The Ansible Vault password
 
-`key` is the vault ID label and `value` is `{"password": …}`. Several entries
-become one `ANSIBLE_VAULT_IDENTITY_LIST`, which is how multiple vault IDs work
-(measured, ansible-core 2.18.3: a labelled list decrypts both secrets, and an
-unlabelled `!vault` block is tried against each identity in turn, so the
-single-password case needs no special handling). A label is therefore part of an
-env var whose delimiters are `,` and `@`, which is why both are refused.
+`key` is the vault ID label -- which is its name, used as the label -- and
+`value` is `{"password": …}`. Several entries become one
+`ANSIBLE_VAULT_IDENTITY_LIST`, which is how multiple vault IDs work (measured,
+ansible-core 2.18.3: a labelled list decrypts both secrets, and an unlabelled
+`!vault` block is tried against each identity in turn, so the single-password
+case needs no special handling). The label is part of an env var whose
+delimiters are `,` and `@`, which is why both are refused.
+
+A vault password needs no placeholder: it is delivered by the environment rather
+than by a variable, so there is nowhere in the inventory for it to be named.
 """
 
 from __future__ import annotations
@@ -76,41 +94,44 @@ CREDENTIAL_FILE_MODE = 0o640
 MACHINE_CATEGORY = "ansible_machine_auth"
 VAULT_CATEGORY = "ansible_vault_auth"
 
-#: The scope meaning "every host in this run". Ansible's own root group, which
-#: is also why `inventory_resolution.DERIVED_GROUPS` refuses it as a *declared*
-#: group name: it is derived, so nothing may control its membership -- but it is
-#: exactly the right name for a credential that applies to everything.
-ALL_HOSTS = "all"
+#: What a placeholder looks like: `${terrapod:<name>.<field>}`.
+#:
+#: **An ordinary YAML string, deliberately, and NOT a `!terrapod` tag.** The tag
+#: form reads better -- it is how `!vault` looks -- and it does not work.
+#: Measured: `ansible-inventory` cannot parse an inventory containing an unknown
+#: tag, and it fails SILENTLY, exiting 0 having resolved ZERO hosts. `!vault`
+#: works only because ansible registers a constructor for it in its own loader,
+#: and teaching ansible ours would mean shipping a plugin into the operator's own
+#: execution environment -- the thing #2154 exists to avoid.
+#:
+#: A `${...}` string also parses in a GENERIC YAML parser, which a tag does not:
+#: `yaml.safe_load` refuses `!vault` too. So this leaves an inventory no less
+#: parseable than it already was, which was the requirement. Unquoted is fine in
+#: YAML (a plain scalar may begin with `$`) and in an INI inventory, both
+#: measured.
+PLACEHOLDER = re.compile(r"\$\{terrapod:([A-Za-z0-9_][A-Za-z0-9_.-]*)\.([a-z_]+)\}")
 
-#: Envelope field -> the inventory variable whose value is a FILE PATH we write.
-#: Separate from the value fields because the file has to be materialised, and
-#: because the distinction is the security property: the key never appears in
-#: the document, only the path to it.
-MACHINE_FILE_FIELDS: dict[str, str] = {
-    "private_key": "ansible_ssh_private_key_file",
-}
+#: A credential's `key` is its NAME, and a name is interpolated into a
+#: placeholder whose own grammar is the delimiter -- so the character set is the
+#: placeholder's, not an inventory name's.
+CREDENTIAL_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 
-#: Envelope field -> the inventory variable carrying the value verbatim.
-MACHINE_VALUE_FIELDS: dict[str, str] = {
-    "user": "ansible_user",
-    "password": "ansible_password",
-    "become": "ansible_become",
-    "become_method": "ansible_become_method",
-    "become_user": "ansible_become_user",
-    "become_password": "ansible_become_password",
-}
+#: Envelope field -> nothing; the field names are the placeholder's second half.
+#: `MACHINE_FILE_FIELDS` is the one place that says a field's value is delivered
+#: as a FILE, so a placeholder naming it substitutes that file's path.
+MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key"})
 
-MACHINE_FIELDS = frozenset(MACHINE_FILE_FIELDS) | frozenset(MACHINE_VALUE_FIELDS)
+#: The fields whose value a placeholder substitutes verbatim.
+MACHINE_VALUE_FIELDS: frozenset[str] = frozenset(
+    {"password", "user", "become", "become_method", "become_user", "become_password"}
+)
+
+MACHINE_FIELDS = MACHINE_FILE_FIELDS | MACHINE_VALUE_FIELDS
 VAULT_FIELDS = frozenset({"password"})
 
 #: The fields whose value is secret, so the runner can register them with the
 #: log redactor without re-deriving which is which.
 MACHINE_SECRET_FIELDS = frozenset({"private_key", "password", "become_password"})
-
-#: A vault ID label is interpolated into `ANSIBLE_VAULT_IDENTITY_LIST`, whose
-#: syntax is `label@file,label@file`. A label containing either delimiter does
-#: not produce a broken label -- it produces a DIFFERENT, silently wrong list.
-_VAULT_LABEL = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 
 #: `become` is a boolean in ansible; accept the strings an operator would write
 #: and refuse anything else rather than letting a typo read as false.
@@ -201,13 +222,14 @@ def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
     if "become" in parsed:
         parse_boolean(parsed["become"])
 
+    _validate_name(category, key)
+
     if category == VAULT_CATEGORY:
         if not parsed.get("password"):
             raise AnsibleAuthError(
                 "an Ansible Vault credential needs a non-empty 'password'; without one "
                 "there is nothing to decrypt with and the configure would fail mid-play"
             )
-        _validate_vault_label(key)
         return parsed
 
     if not (parsed.get("private_key") or parsed.get("password")):
@@ -247,11 +269,76 @@ def delivery_entries(resolved: Any) -> list[dict[str, str]]:
     return out
 
 
-def _validate_vault_label(key: str) -> None:
-    if not _VAULT_LABEL.match(key or ""):
-        raise AnsibleAuthError(
-            f"vault ID label {key!r} must start with a letter, digit or underscore and "
-            f"contain only those plus '.' and '-'. The label is interpolated into "
-            f"ANSIBLE_VAULT_IDENTITY_LIST, whose syntax is 'label@file,label@file', so "
-            f"a ',' or '@' in it produces a different list rather than a rejected one."
+def _validate_name(category: str, key: str) -> None:
+    """A credential's name, which is also how a placeholder refers to it."""
+    if CREDENTIAL_NAME.match(key or ""):
+        return
+    where = (
+        "it is interpolated into ANSIBLE_VAULT_IDENTITY_LIST, whose syntax is "
+        "'label@file,label@file', so a ',' or '@' in it produces a different list "
+        "rather than a rejected one"
+        if category == VAULT_CATEGORY
+        else "an inventory refers to the credential by it, as "
+        "${terrapod:<name>.<field>}, so a character the placeholder's own grammar "
+        "uses would make the reference unresolvable"
+    )
+    raise AnsibleAuthError(
+        f"credential name {key!r} must start with a letter, digit or underscore and "
+        f"contain only those plus '.' and '-': {where}."
+    )
+
+
+def placeholder_for(name: str, field: str) -> str:
+    """The placeholder an inventory writes to refer to one field of one credential.
+
+    One producer, so the docs, the tests and any future validator cannot drift
+    from `PLACEHOLDER` -- a reference that does not match the pattern is not a
+    rejected reference, it is a literal string handed to ssh as a key path.
+    """
+    return f"${{terrapod:{name}.{field}}}"
+
+
+def substitute(value: Any, resolved: dict[str, str]) -> Any:
+    """Replace every placeholder in `value`, recursively. Non-strings pass through.
+
+    `resolved` maps `"<name>.<field>"` to what it stands for: the path of the
+    file the runner wrote, for a field delivered as a file, or the value itself.
+
+    An UNKNOWN placeholder is left in place rather than blanked, which is what
+    lets the caller refuse the render naming it. Substituting an empty string
+    would hand ansible a connection with no key and no error -- the failure then
+    arrives as an unreachable host, naming neither the credential nor the
+    reference.
+    """
+    if isinstance(value, str):
+        return PLACEHOLDER.sub(
+            lambda m: resolved.get(f"{m.group(1)}.{m.group(2)}", m.group(0)), value
         )
+    if isinstance(value, dict):
+        return {k: substitute(v, resolved) for k, v in value.items()}
+    if isinstance(value, list):
+        return [substitute(v, resolved) for v in value]
+    return value
+
+
+def unresolved(value: Any) -> list[str]:
+    """Every placeholder still present, deduplicated and sorted.
+
+    The caller refuses on a non-empty result. Reported as the whole reference
+    rather than a count, because the fix is to correct that string or add that
+    credential and a number tells the operator neither.
+    """
+    found: set[str] = set()
+
+    def walk(node: Any) -> None:
+        if isinstance(node, str):
+            found.update(m.group(0) for m in PLACEHOLDER.finditer(node))
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(value)
+    return sorted(found)

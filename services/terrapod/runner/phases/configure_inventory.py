@@ -37,7 +37,6 @@ import structlog
 from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
 from terrapod.services import ansible_auth
-from terrapod.services.ansible_auth import ALL_HOSTS
 from terrapod.services.inventory_render import build_inventory_document
 
 logger = structlog.get_logger(__name__)
@@ -84,31 +83,24 @@ def inventory_dir() -> Path:
     return Path(os.environ.get("TP_EE_INVENTORY_DIR") or _DEFAULT_INVENTORY_DIR)
 
 
-def document_to_source(
-    document: dict[str, Any], *, injections: dict[str, dict[str, Any]] | None = None
-) -> str:
-    """The stored document as a YAML inventory source.
+def document_to_source(document: dict[str, Any], *, resolved: dict[str, str] | None = None) -> str:
+    """The stored document as a YAML inventory source, with placeholders resolved.
 
     Shares `build_inventory_document` with the API rather than rendering its own
     YAML: the shape carries group nesting, which is what `--limit` expands
     through, so two renderers that drifted would make a limit mean different
     things on the two sides of the same run.
 
-    `injections` is `{scope: {variable: value}}` from the `ansible_auth` phase
-    (#1933) -- a machine credential's connection variables, scoped to `all` or
-    to a group. They enter at GROUP level, which is where a scope belongs and is
-    also safe for the reason the group-vars comment below gives: unlike the
-    document's own group variables these are not already inside the host
-    variables, so emitting them here applies them once rather than twice.
+    `resolved` maps `"<name>.<field>"` to what a `${terrapod:...}` placeholder
+    standing for it substitutes (#1933) -- the path of a file the credential
+    phase wrote, or a value. Substitution happens HERE and nowhere else: the
+    stored artifact carries the placeholder, because that is what the inventory
+    said, and this render is local to the Job.
 
     Raises:
-        InventoryUnavailable: a credential is scoped to a group the inventory
-            does not have. Refused rather than emitted: the scope applies to
-            nothing, so the configure would run with no credential for those
-            hosts and fail as an unreachable fleet -- a message naming neither
-            the credential nor the stale group.
+        InventoryUnavailable: a placeholder could not be resolved. Refused
+            rather than left in place or blanked -- see `_refuse_unresolved`.
     """
-    injections = injections or {}
     hosts = document.get("hosts") or {}
     groups = document.get("groups") or {}
     children = document.get("children") or {}
@@ -124,65 +116,26 @@ def document_to_source(
     # a group that genuinely exists. Group vars are NOT passed: they are
     # already inside each host's variables, and re-emitting them at group level
     # would let a later read apply them twice with the lower precedence.
-    group_rows: list[tuple[str, dict[str, Any]]] = [
-        (name, dict(injections.get(name, {}))) for name in sorted(groups)
-    ]
+    group_rows: list[tuple[str, dict[str, Any]]] = [(name, {}) for name in sorted(groups)]
     # A group that appears only as a parent or a child still has to exist.
-    known_groups = set(groups)
     for extra in sorted({p for p, _ in nesting} | {c for _, c in nesting}):
-        if extra not in known_groups:
-            group_rows.append((extra, dict(injections.get(extra, {}))))
-            known_groups.add(extra)
+        if extra not in groups:
+            group_rows.append((extra, {}))
 
-    # A credential scoped to a HOST lands in that host's own variables, which is
-    # the whole point of the three levels: host beats group in ansible, so a
-    # per-host key overrides the group's without either side knowing about the
-    # other. An estate where different hosts carry different keys is the case
-    # this exists for.
-    #
-    # The document's OWN host variables win on a collision. They are the
-    # operator's visible declaration -- already effective, merged by the API's
-    # `ansible-inventory` run -- and a platform credential silently replacing a
-    # committed value is the worse direction of the two. So the injection is the
-    # base and the document is laid over it.
-    host_rows = [
-        (name, {**injections.get(name, {}), **(vars_ or {})}) for name, vars_ in hosts.items()
-    ]
-
-    stale = sorted(set(injections) - known_groups - set(hosts) - {ALL_HOSTS})
-    if stale:
-        raise InventoryUnavailable(
-            f"a machine credential is scoped to {', '.join(repr(s) for s in stale)}, which "
-            f"this run's inventory contains neither as a host nor as a group (hosts: "
-            f"{', '.join(sorted(hosts)) or 'none'}; groups: "
-            f"{', '.join(sorted(known_groups)) or 'none'}). The credential would apply to "
-            f"nothing, so the configure would fail as an unreachable fleet rather than "
-            f"naming the stale scope. Fix the scope, or use {ALL_HOSTS!r}."
-        )
-
-    # A name that is BOTH a host and a group is refused rather than guessed.
-    # Ansible permits it and resolves variables by its own precedence, so
-    # applying the credential to either would be defensible and neither is
-    # predictable to the operator -- and a credential landing somewhere they did
-    # not mean is the one outcome worth refusing a run over.
-    ambiguous = sorted(set(injections) & known_groups & set(hosts))
-    if ambiguous:
-        raise InventoryUnavailable(
-            f"the machine credential scope(s) {', '.join(repr(a) for a in ambiguous)} name "
-            f"both a host and a group in this inventory, so which hosts the credential "
-            f"applies to is not predictable. Rename one of them, or scope the credential to "
-            f"{ALL_HOSTS!r}."
-        )
-
-    document = build_inventory_document(
-        hosts=sorted(host_rows),
+    built = build_inventory_document(
+        hosts=sorted((name, vars_ or {}) for name, vars_ in hosts.items()),
         groups=sorted(group_rows),
         memberships=memberships,
         children=nesting,
-        # A credential scoped to `all` is ansible's own `group_vars/all`, which
-        # is what this argument renders -- the inventory-wide default.
-        global_vars=dict(injections.get(ALL_HOSTS, {})),
+        global_vars={},
     )
+    # Substituted over the WHOLE built document rather than per variable, so a
+    # placeholder is resolved wherever the inventory happened to put it -- a host
+    # variable, a group variable, or inside a longer string such as
+    # `ansible_ssh_common_args="-o IdentityFile=${terrapod:web.private_key}"`,
+    # which is how a real estate expresses a per-group key.
+    built = ansible_auth.substitute(built, resolved or {})
+    _refuse_unresolved(built)
     # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
     # `requirements-runner.txt` deliberately ships no PyYAML -- so serialising
     # here is what keeps this module importable in the runner image at all.
@@ -190,25 +143,51 @@ def document_to_source(
     # accepted on `.yml`, resolves the same hosts, and expands `--limit` through
     # the same group nesting. `sort_keys` so the same document renders the same
     # bytes, as the API's YAML does.
-    return json.dumps(document, indent=2, sort_keys=True)
+    return json.dumps(built, indent=2, sort_keys=True)
+
+
+def _refuse_unresolved(built: dict[str, Any]) -> None:
+    """Refuse a render still carrying a placeholder.
+
+    Neither left in place nor blanked, and both alternatives are worse in the
+    same direction. Left in place, ansible hands ssh the literal
+    `${terrapod:web.private_key}` as a key path and the run fails as an
+    unreachable host -- naming neither the credential nor the reference.
+    Blanked, it connects with no key at all and the failure is the same shape.
+    Either way the operator is told about the symptom rather than the typo.
+
+    The message names every unresolved reference, because the fix is to correct
+    that string or declare that credential, and a count tells them neither.
+    """
+    missing = ansible_auth.unresolved(built)
+    if not missing:
+        return
+    raise InventoryUnavailable(
+        "this run's inventory refers to credentials that were not delivered: "
+        + ", ".join(missing)
+        + ". Each `${terrapod:<name>.<field>}` names a variable of that category "
+        "whose `key` is <name>; check the name is spelled the same in both places, "
+        "that the variable exists on this workspace or a variable set it uses, and "
+        "that <field> is a field that credential actually carries."
+    )
 
 
 def materialise(
     cfg: RunnerConfig,
     *,
     client: Any = None,
-    injections: dict[str, dict[str, Any]] | None = None,
+    resolved: dict[str, str] | None = None,
 ) -> Path:
     """Fetch the run's resolved inventory and write it as a YAML source.
 
     Returns the path to pass as the single `-i`. Raises `InventoryUnavailable`
-    if the artifact cannot be fetched, is not the document it must be, or an
-    `injections` scope names a group it does not contain.
+    if the artifact cannot be fetched, is not the document it must be, or a
+    placeholder in it cannot be resolved.
 
-    `injections` carries the machine credential's connection variables (#1933).
-    They are merged into the RENDERED file and nowhere else -- not into the
-    stored artifact, which the API wrote and which carries no credential -- so a
-    password delivered this way exists on the Job's shared volume and in no
+    `resolved` carries what each `${terrapod:...}` placeholder stands for
+    (#1933). Substitution happens in the RENDERED file and nowhere else -- the
+    stored artifact carries the placeholder, which is what the inventory said --
+    so a password delivered this way exists on the Job's shared volume and in no
     durable surface.
     """
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/resolved-inventory"
@@ -257,7 +236,7 @@ def materialise(
     # `exist_ok` because in a Job the init container already has.
     target.mkdir(parents=True, exist_ok=True)
     rendered = target / RENDERED_NAME
-    # ALWAYS written at the credential mode, not only when `injections` carry a
+    # ALWAYS written at the credential mode, not only when a placeholder resolved to a
     # secret. A machine credential's connection password reaches ansible as a
     # VARIABLE -- there is no `ansible_password_file`, so a password can only be
     # one -- which makes this document secret-bearing whenever one is declared.
@@ -271,7 +250,7 @@ def materialise(
     # the password in plaintext.
     fd = os.open(rendered, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, ansible_auth.CREDENTIAL_FILE_MODE)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(document_to_source(document, injections=injections))
+        handle.write(document_to_source(document, resolved=resolved))
     logger.info(
         "resolved inventory materialised",
         run_id=cfg.run_id,
