@@ -10,11 +10,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// gitAuthCategories mirrors GIT_AUTH_CATEGORIES in
-// services/terrapod/services/variable_service.py.
-var gitAuthCategories = map[string]bool{
-	"git_http_auth": true,
-	"git_ssh_auth":  true,
+// credentialCategories mirrors CREDENTIAL_CATEGORIES in
+// services/terrapod/services/variable_service.py -- every category whose value
+// is a JSON credential envelope rather than a literal the engine consumes.
+//
+// It tracks that set and not the git pair alone, which is the whole point of
+// the server having one producer for the property: the two ansible categories
+// (#1933) are forced sensitive by exactly the same server rule, so a map that
+// listed only the git pair would plan `sensitive` as a known false and apply it
+// as true -- the "Provider produced inconsistent result after apply" this
+// modifier exists to prevent, reintroduced for the newest categories while the
+// oldest stayed correct.
+var credentialCategories = map[string]bool{
+	"git_http_auth":        true,
+	"git_ssh_auth":         true,
+	"ansible_machine_auth": true,
+	"ansible_vault_auth":   true,
 }
 
 // sensitiveForSecretBearingVariable forces `sensitive` to true in the PLAN for
@@ -76,7 +87,7 @@ func (m sensitiveForSecretBearingVariable) PlanModifyBool(
 	switch {
 	case source.ValueString() == "vault":
 		reason = `value_source is "vault", so the value resolves to a secret at run time`
-	case gitAuthCategories[category.ValueString()]:
+	case credentialCategories[category.ValueString()]:
 		reason = fmt.Sprintf("category %q always holds a credential", category.ValueString())
 	default:
 		return

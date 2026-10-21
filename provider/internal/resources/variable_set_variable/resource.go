@@ -80,7 +80,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"category": schema.StringAttribute{
 				Required: true,
 				Description: "Category: terraform (or its equivalent name native), env, git_http_auth, " +
-					"or git_ssh_auth.\n\n" +
+					"git_ssh_auth, ansible_machine_auth or ansible_vault_auth.\n\n" +
 					"`terraform` is the engine's own parameter channel -- Terraform input " +
 					"variables, Pulumi stack config, Ansible extra vars. One role, delivered " +
 					"by whichever engine the workspace runs. `native` is accepted as an " +
@@ -88,7 +88,19 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"that spelling, the compatibility surface this provider reads uses " +
 					"`terraform`, and they are one category.\n\n" +
 					"On a Pulumi workspace `sensitive` makes a real Pulumi secret and " +
-					"`structured` sets a nested config value rather than a literal dotted key.",
+					"`structured` sets a nested config value rather than a literal dotted key.\n\n" +
+					"The four credential categories carry a JSON envelope rather than a " +
+					"literal and are ALWAYS sensitive, whatever `sensitive` says -- the " +
+					"provider plans it true for them so the apply does not contradict the " +
+					"plan. None of them accepts `value_source = \"vault\"`: an envelope is an " +
+					"object and an OpenBao/Vault reference resolves to a single field.\n\n" +
+					"In the two `ansible_*` categories `key` is the SCOPE, not a name. For " +
+					"`ansible_machine_auth` it is a host pattern -- `all`, or a group in the " +
+					"workspace's inventory -- and the credential is delivered as that " +
+					"scope's connection variables. For `ansible_vault_auth` it is the vault " +
+					"ID label, so several of them become one identity list and multiple " +
+					"vault IDs work. See the Ansible credentials documentation for each " +
+					"envelope's fields.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"structured": schema.BoolAttribute{

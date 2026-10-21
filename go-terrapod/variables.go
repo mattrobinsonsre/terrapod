@@ -18,14 +18,26 @@ type Variable struct {
 	ID    string `json:"id"`
 	Key   string `json:"key"`
 	Value string `json:"value,omitempty"`
-	// Category is the variable's kind. Four are stored:
+	// Category is the variable's kind. Six are stored:
 	//
-	//   native         the engine's own parameter channel -- Terraform input
-	//                  variables, Pulumi stack config, Ansible extra vars.
-	//                  One role, delivered by whichever engine runs (#1898).
-	//   env            an environment variable for the run's process.
-	//   git_http_auth  private-git-module credentials, materialized before
-	//   git_ssh_auth   init. Always sensitive; a JSON value (#1028).
+	//   native                the engine's own parameter channel -- Terraform
+	//                         input variables, Pulumi stack config, Ansible
+	//                         extra vars. One role, delivered by whichever
+	//                         engine runs (#1898).
+	//   env                   an environment variable for the run's process.
+	//   git_http_auth         private-git-module credentials, materialized
+	//   git_ssh_auth          before init (#1028).
+	//   ansible_machine_auth  the machine credential a configure connects
+	//                         with; Key is a host pattern -- `all`, or a group
+	//   ansible_vault_auth    in the workspace's inventory. An Ansible Vault
+	//                         password; Key is the vault ID label (#1933).
+	//
+	// The last four are the CREDENTIAL categories: Value is a JSON envelope
+	// rather than a literal, all four are always sensitive whatever you ask
+	// for, and none accepts ValueSource "vault" -- an envelope is an object
+	// and a Vault reference resolves to a single field. In the two ansible
+	// categories Key is the credential's SCOPE rather than a name, which is
+	// the same slot the git categories use for a URL pattern.
 	//
 	// The TFE-compatible surface (/api/tfe/v2 and its /api/v2 alias) calls
 	// `native` **terraform**, for ever: tfci and go-tfe hold that as a
@@ -79,9 +91,11 @@ type Variable struct {
 type CreateVariableRequest struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
-	// Category takes `terraform`, `native`, `env`, `git_http_auth` or
-	// `git_ssh_auth`; `pulumi_config` is also accepted and means `terraform`.
-	// See Variable.Category for which name comes back.
+	// Category takes `terraform`, `native`, `env`, `git_http_auth`,
+	// `git_ssh_auth`, `ansible_machine_auth` or `ansible_vault_auth`;
+	// `pulumi_config` is also accepted and means `terraform`.
+	// See Variable.Category for which name comes back, and for what Key means
+	// in each of the four credential categories.
 	Category string `json:"category"`
 	// Set either; Structured is preferred. Setting both to different values is
 	// rejected by the server rather than silently resolved (#1435).

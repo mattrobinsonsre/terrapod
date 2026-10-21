@@ -73,13 +73,54 @@ func TestVaultSourcedPlansSensitiveTrue(t *testing.T) {
 	}
 }
 
-// The server forces sensitive for the git-auth categories too, by the same
+// The server forces sensitive for every credential category too, by the same
 // mechanism and with the same consequence.
-func TestGitAuthCategoriesPlanSensitiveTrue(t *testing.T) {
-	for _, cat := range []string{"git_http_auth", "git_ssh_auth"} {
+//
+// DERIVED from the map rather than listing the categories, which is the
+// difference between a test that tracks the rule and one that tracks whoever
+// last edited it: this listed the two git categories by name, so #1933's two
+// ansible categories were added to the map with the test still asserting only
+// the pair it already knew. A hand-kept list here cannot fail for the category
+// most likely to be wrong, which is always the newest one.
+//
+// The floor is what stops it passing on nothing: an emptied or renamed map
+// would otherwise satisfy a loop over no entries.
+func TestEveryCredentialCategoryPlansSensitiveTrue(t *testing.T) {
+	if len(credentialCategories) < 4 {
+		t.Fatalf("expected at least the four known credential categories, got %d: %v",
+			len(credentialCategories), credentialCategories)
+	}
+	for cat := range credentialCategories {
 		resp := run(t, str("static"), str(cat), false, types.BoolNull())
 		if !resp.PlanValue.ValueBool() {
 			t.Errorf("category %q must plan sensitive=true, got %v", cat, resp.PlanValue)
+		}
+		if resp.Diagnostics.HasError() {
+			t.Errorf("category %q: %v", cat, resp.Diagnostics)
+		}
+	}
+}
+
+// The server's list is the authority, so a category here that it does not force
+// would make the provider plan a secret the server leaves alone -- the mismatch
+// in the other direction. Pinned as a literal set because the Python side is not
+// importable here; the comment on `credentialCategories` names the constant it
+// mirrors so a reader knows where to look.
+func TestCredentialCategoriesMatchesTheServersSet(t *testing.T) {
+	want := map[string]bool{
+		"git_http_auth":        true,
+		"git_ssh_auth":         true,
+		"ansible_machine_auth": true,
+		"ansible_vault_auth":   true,
+	}
+	for cat := range want {
+		if !credentialCategories[cat] {
+			t.Errorf("%q is forced sensitive by the server and missing here", cat)
+		}
+	}
+	for cat := range credentialCategories {
+		if !want[cat] {
+			t.Errorf("%q is forced sensitive here and not by the server", cat)
 		}
 	}
 }
