@@ -43,7 +43,12 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import variable_service, workspace_search_service
+from terrapod.services import (
+    ansible_auth,
+    inventory_resolution,
+    variable_service,
+    workspace_search_service,
+)
 from terrapod.services.vault_source_service import (
     VALUE_SOURCES,
     VaultSourceError,
@@ -140,8 +145,8 @@ def _reject_vault_on_local(ws, value_source: str) -> None:
         )
 
 
-def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
-    """A git-auth credential is a JSON envelope; a Vault field is one string.
+def _reject_vault_on_credential_envelope(value_source: str, category: str | None) -> None:
+    """A credential category's value is a JSON envelope; a Vault field is one string.
 
     `resolve_git_auth` json.loads a git-auth value and skips it when that fails,
     so a vault-sourced one is dropped and the run fails to fetch its modules
@@ -149,16 +154,22 @@ def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
     through verbatim, handing the runner a bare secret where it expects
     {private_key, known_hosts, rewrite}. The workspace UI already refuses the
     pair; refuse it in the API too, for every write path.
+
+    Keyed on `CREDENTIAL_CATEGORIES` rather than on the git pair, so #1933's two
+    ansible categories are covered by the rule that already existed instead of
+    by a second copy of it -- they are the same shape and fail the same way,
+    and a vault-sourced `{"password": …}` envelope would reach the runner as a
+    bare string where a configure expects an object.
     """
     if value_source != "vault":
         return
-    if category in variable_service.GIT_AUTH_CATEGORIES:
+    if category in variable_service.CREDENTIAL_CATEGORIES:
         raise HTTPException(
             status_code=422,
             detail=f"category '{category}' cannot use value-source 'vault': a "
-            "git credential is a JSON object, while an OpenBao/Vault reference "
-            "resolves to a single field. Put the credential's own secret fields in "
-            "OpenBao/Vault and reference them from a static git-auth value instead.",
+            "credential in this category is a JSON object, while an OpenBao/Vault "
+            "reference resolves to a single field. Put the credential's own secret "
+            "fields in OpenBao/Vault and reference them from a static value instead.",
         )
 
 
@@ -235,6 +246,29 @@ async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
     )
 
 
+def _credential_envelope_guard(*, category: str | None, key: str, value: str | None) -> None:
+    """Refuse an unusable Ansible credential (#1933), on the written state.
+
+    A sibling of `_file_delivery_guard` and called at the same four write paths,
+    which is what makes it a rule rather than a check somebody remembered: a
+    workspace create, a workspace PATCH, a variable-set add and a variable-set
+    PATCH all pass the credential as it will be AFTER the write.
+
+    Refused here rather than dropped at resolution, which is where git auth
+    handles a malformed envelope. That was survivable for git -- the operator
+    meets it as an `init` failure -- and is not for a configure: the credential
+    is spent part way through a fleet, on a host that has already been changed.
+    """
+    if not ansible_auth.is_ansible_auth(category or ""):
+        return
+    try:
+        ansible_auth.validate_envelope(category or "", key, value or "")
+        if category == ansible_auth.MACHINE_CATEGORY:
+            inventory_resolution.validate_machine_scope(key)
+    except (ansible_auth.AnsibleAuthError, inventory_resolution.InventoryValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 def _file_delivery_guard(
     *, value_source: str, value: str | None, key: str, structured: bool
 ) -> None:
@@ -281,7 +315,7 @@ def _apply_value_source(
     ``file`` name defaults to.
     """
     src = _validated_value_source(attrs, current)
-    _reject_vault_on_git_auth(src, category)
+    _reject_vault_on_credential_envelope(src, category)
     if src != "vault":
         if current == "vault" and "value" not in attrs:
             # Symmetric with the flip the other way. Without this the JSON
@@ -473,6 +507,9 @@ async def create_workspace_var(
         key=key,
         structured=bool(_structured_from(attrs, default=False)),
     )
+    _credential_envelope_guard(
+        category=attrs.get("category", "terraform"), key=key, value=attrs.get("value", "")
+    )
 
     try:
         var = await variable_service.create_variable(
@@ -540,6 +577,11 @@ async def update_workspace_var(
             value=attrs["value"] if "value" in attrs else var.value,
             key=eff_key,
             structured=bool(_structured_from(attrs, default=bool(var.structured))),
+        )
+        _credential_envelope_guard(
+            category=attrs.get("category", var.category),
+            key=eff_key,
+            value=attrs["value"] if "value" in attrs else var.value,
         )
         var = await variable_service.update_variable(
             db,
@@ -953,8 +995,8 @@ async def create_varset_var(
         category = variable_service._validated_category(attrs.get("category", "terraform"))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
-    if category in variable_service.GIT_AUTH_CATEGORIES:
-        sensitive = True  # git-auth values are always secret
+    if category in variable_service.CREDENTIAL_CATEGORIES:
+        sensitive = True  # a credential envelope is always secret
 
     value_source, force_sensitive = _apply_value_source(attrs, category=category, key=key)
     _file_delivery_guard(
@@ -963,6 +1005,7 @@ async def create_varset_var(
         key=key,
         structured=bool(_structured_from(attrs, default=False)),
     )
+    _credential_envelope_guard(category=category, key=key, value=value)
     if value_source == "vault":
         await _reject_vault_varset_on_local(
             db, vs, when="Cannot add an OpenBao/Vault-sourced variable"
@@ -1046,18 +1089,23 @@ async def update_varset_var(
         key=vsv.key,
         structured=bool(vsv.structured),
     )
+    _credential_envelope_guard(
+        category=attrs.get("category", vsv.category),
+        key=vsv.key,
+        value=attrs["value"] if "value" in attrs else vsv.value,
+    )
     if vsv.value_source == "vault":
         await _reject_vault_varset_on_local(db, vs, when="Cannot set an OpenBao/Vault source")
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
-    # git-auth categories are always secret and can never be downgraded.
+    # A credential category is always secret and can never be downgraded.
     # `or value_source == "vault"` matches variable_service.update_variable.
     # Omitting it let a PATCH carrying `sensitive: false` downgrade a
     # vault-sourced varset variable, whose resolved value is always a secret.
     force_sensitive = (
-        vsv.category in variable_service.GIT_AUTH_CATEGORIES or vsv.value_source == "vault"
+        vsv.category in variable_service.CREDENTIAL_CATEGORIES or vsv.value_source == "vault"
     )
     if force_sensitive:
         vsv.sensitive = True

@@ -81,6 +81,45 @@ def validate_group_name(name: str) -> str:
     return name
 
 
+def validate_machine_scope(name: str) -> str:
+    """Return `name` if a machine credential (#1933) can be scoped to it, else raise.
+
+    A machine credential's `key` is a host pattern, and the only two things it
+    can usefully be are `all` -- every host in the run -- or the name of a group
+    the inventory declares. So this is `validate_group_name`'s rule with `all`
+    admitted, sharing `_GROUP_NAME` rather than restating it: the credential is
+    injected as inventory variables for this scope, so a name ansible would not
+    accept as a group is a credential that applies to nothing.
+
+    `all` is admitted here and refused by `validate_group_name` for the same
+    reason in both directions -- it is derived, so nothing may declare its
+    MEMBERSHIP, while variables on it are ansible's own `group_vars/all`.
+    """
+    if not isinstance(name, str) or not name:
+        raise InventoryValidationError(
+            "a machine credential's scope must be a non-empty string: the group it "
+            "applies to, or 'all' for every host in the run"
+        )
+    if name == "all":
+        return name
+    if name == "ungrouped":
+        # Admitting it would promise scoping to a set the operator cannot see or
+        # control, and whose membership changes whenever any group changes.
+        raise InventoryValidationError(
+            "'ungrouped' cannot scope a machine credential: it is derived from which "
+            "hosts are in no other group, so the set changes whenever any group does. "
+            "Scope the credential to 'all' or to a group you declare."
+        )
+    if not _GROUP_NAME.match(name):
+        raise InventoryValidationError(
+            f"machine credential scope {name!r} must be 'all' or a group name: starting "
+            f"with a letter or underscore and containing only letters, digits and "
+            f"underscores. The credential is delivered as inventory variables for this "
+            f"scope, so a name ansible does not resolve to a group applies to nothing."
+        )
+    return name
+
+
 def validate_host_name(name: str) -> str:
     """Return `name` if it can be targeted, else raise.
 

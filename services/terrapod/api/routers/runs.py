@@ -74,6 +74,7 @@ from terrapod.engines import TERRAFORM
 from terrapod.logging_config import get_logger
 from terrapod.services import (
     agent_pool_service,
+    ansible_auth,
     plan_graph_service,
     pool_set,
     run_service,
@@ -2856,6 +2857,22 @@ async def next_run(
     run_data["data"]["attributes"]["terraform-vars"] = native_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["git-auth"] = git_auth
+    # Ansible credentials (#1933): the machine credential ansible connects with
+    # and the Ansible Vault password(s) it decrypts with, as
+    # [{category, key, value}] -- the same envelope shape as git-auth above,
+    # because the transport is the same: resolved here, delivered through the
+    # per-run Secret, materialised by a runner phase before the tool runs.
+    #
+    # Its own attribute and its own Secret key rather than sharing git-auth's,
+    # for the reason the next line enforces: these are mounted only into a
+    # CONFIGURE's Job. Folded into git-auth they would ride into every plan's
+    # Job too, and a plan executes a pull request's code -- which is the whole
+    # reason apply-only exists. A lagging listener that ignores the attribute
+    # delivers no ansible credentials, and the runner then raises rather than
+    # running a playbook that cannot authenticate (#1442).
+    run_data["data"]["attributes"]["ansible-auth"] = (
+        ansible_auth.delivery_entries(resolved) if phase == "configure" else []
+    )
     # Vault file delivery (#1619): [{key, name, value}]. The listener writes
     # each value as a key of the per-run vars Secret and the Job mounts it
     # read-only; the variable itself already carries the path (above).
