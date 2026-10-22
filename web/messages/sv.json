@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "En push som ändrar Ansible-konfigurationskatalogen kör playbooken. Utan angiven standardgräns är det hela inventariet.",
       "autoConfigureEnabledHintLimited": "En push som ändrar Ansible-konfigurationskatalogen kör playbooken mot {limit}.",
       "configureAfterApply": "Konfigurera efter tillämpning",
-      "configureAfterApplyHint": "Varje tillämpning här följs av en konfigurering i samma körning, så även en tillämpning från CLI strömmar playbookens utdata. En förstörelse konfigurerar aldrig."
+      "configureAfterApplyHint": "Varje tillämpning här följs av en konfigurering i samma körning, så även en tillämpning från CLI strömmar playbookens utdata. En förstörelse konfigurerar aldrig.",
+      "configureAllHosts": "Konfigurera alla värdar",
+      "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

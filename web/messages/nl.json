@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Een push die de Ansible-configuratiemap wijzigt, voert het playbook uit. Zonder ingestelde standaardlimiet is dat de hele inventaris.",
       "autoConfigureEnabledHintLimited": "Een push die de Ansible-configuratiemap wijzigt, voert het playbook uit tegen {limit}.",
       "configureAfterApply": "Configureren na de apply",
-      "configureAfterApplyHint": "Op elke apply hier volgt het configureren in dezelfde run, dus ook een apply via de CLI streamt de uitvoer van het playbook. Een destroy configureert nooit."
+      "configureAfterApplyHint": "Op elke apply hier volgt het configureren in dezelfde run, dus ook een apply via de CLI streamt de uitvoer van het playbook. Een destroy configureert nooit.",
+      "configureAllHosts": "Alle hosts configureren",
+      "configureAllHostsHint": "Een configure-run die het platform zelf start, bereikt alleen de hosts die door een wijziging in de inventaris zijn geraakt, tenzij de Ansible-code sinds de vorige run is gewijzigd. Zet dit aan om altijd de hele inventaris te doorlopen."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

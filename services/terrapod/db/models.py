@@ -2998,9 +2998,17 @@ class Run(Base):
     #: plan. Empty means the workspace's `default_limit`, which may itself be
     #: empty, meaning the whole resolved inventory.
     #:
-    #: A git-driven or otherwise platform-decided configure leaves both of
-    #: these empty: a push carries no run options, so it runs the workspace's
-    #: declared defaults, and that is what bounds its blast radius (#1974).
+    #: A git-driven or otherwise platform-decided configure leaves `playbook`
+    #: empty: a push carries no run options, so it runs the workspace's declared
+    #: default, and that is what bounds its blast radius (#1974).
+    #:
+    #: It may, however, carry a COMPUTED `ansible_limit` (#2229). A configure the
+    #: platform derived -- from an inventory change, or chained onto an apply --
+    #: is narrowed to the hosts whose resolved configuration actually moved,
+    #: intersected with the workspace's own `default_limit`, so the stored value
+    #: is never wider than the default it replaces. Empty still means "the
+    #: workspace's default", which is what a wide derived run and every
+    #: operator-queued run without a limit both record.
     ansible_limit: Mapped[str] = mapped_column(
         String(500), nullable=False, server_default="", default=""
     )

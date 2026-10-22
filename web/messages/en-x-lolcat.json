@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "A push wot changez teh Ansibul konfig root runz teh playbook. Wif no defawlt limit set, dats teh WHOLE inventree.",
       "autoConfigureEnabledHintLimited": "A push wot changez teh Ansibul konfig root runz teh playbook agenst {limit}.",
       "configureAfterApply": "Konfigur aftr apply",
-      "configureAfterApplyHint": "Evry apply heer is followd by a konfigur on teh same run, so a CLI apply streemz teh playbook outputz too. A destroy nevr konfigurz."
+      "configureAfterApplyHint": "Evry apply heer is followd by a konfigur on teh same run, so a CLI apply streemz teh playbook outputz too. A destroy nevr konfigurz.",
+      "configureAllHosts": "Konfigur all teh hostz",
+      "configureAllHostsHint": "A konfigur wot teh platfurm startz fer u only getz teh hostz wot an inventoree change touchd, unless teh Ansibul code moovd sinse teh last wun. Turn dis on 2 alwayz sweep teh whole inventoree. srsly"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

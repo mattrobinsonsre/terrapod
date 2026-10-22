@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "改动 Ansible 配置目录的推送会执行该 playbook。未设置默认 limit 时，目标就是整个清单。",
       "autoConfigureEnabledHintLimited": "改动 Ansible 配置目录的推送会针对 {limit} 执行该 playbook。",
       "configureAfterApply": "应用后配置",
-      "configureAfterApplyHint": "此处的每一次应用之后，都会在同一次运行中紧接一次配置，因此从 CLI 发起的应用也会流式输出 playbook 的日志。销毁运行从不执行配置。"
+      "configureAfterApplyHint": "此处的每一次应用之后，都会在同一次运行中紧接一次配置，因此从 CLI 发起的应用也会流式输出 playbook 的日志。销毁运行从不执行配置。",
+      "configureAllHosts": "配置所有主机",
+      "configureAllHostsHint": "由平台自动发起的配置仅以清单变更触及的主机为目标；若自上次配置以来 Ansible 代码有所改动，则不受此限制。开启后，始终以整个清单为目标。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

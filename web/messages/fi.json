@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Työntö, joka muuttaa Ansible-asetushakemistoa, ajaa playbookin. Jos oletusrajausta ei ole asetettu, se on koko inventaario.",
       "autoConfigureEnabledHintLimited": "Työntö, joka muuttaa Ansible-asetushakemistoa, ajaa playbookin rajauksella {limit}.",
       "configureAfterApply": "Määritys käyttöönoton jälkeen",
-      "configureAfterApplyHint": "Jokaista käyttöönottoa täällä seuraa määritys samalla ajolla, joten myös CLI:n käyttöönotto suoratoistaa playbookin tulosteen. Tuhoaminen ei määritä koskaan."
+      "configureAfterApplyHint": "Jokaista käyttöönottoa täällä seuraa määritys samalla ajolla, joten myös CLI:n käyttöönotto suoratoistaa playbookin tulosteen. Tuhoaminen ei määritä koskaan.",
+      "configureAllHosts": "Kaikkien isäntien määritys",
+      "configureAllHostsHint": "Alustan itse käynnistämä määritys kohdistuu vain niihin isäntiin, joihin inventaarion muutos osui, ellei Ansible-koodi ole muuttunut edellisen määrityksen jälkeen. Ota tämä käyttöön kohdistaaksesi aina koko inventaarioon."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

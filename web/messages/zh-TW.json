@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "變動 Ansible 設定目錄的推送會執行該 playbook。未指定預設 limit 時，目標就是整份清冊。",
       "autoConfigureEnabledHintLimited": "變動 Ansible 設定目錄的推送會針對 {limit} 執行該 playbook。",
       "configureAfterApply": "套用後執行設定",
-      "configureAfterApplyHint": "此處的每一次套用之後，都會在同一次執行中緊接一次設定，因此從 CLI 發起的套用也會串流輸出 playbook 的紀錄。銷毀執行從不進行設定。"
+      "configureAfterApplyHint": "此處的每一次套用之後，都會在同一次執行中緊接一次設定，因此從 CLI 發起的套用也會串流輸出 playbook 的紀錄。銷毀執行從不進行設定。",
+      "configureAllHosts": "設定所有主機",
+      "configureAllHostsHint": "由平台自動發起的設定僅以清冊變動觸及的主機為目標；若自上次設定以來 Ansible 程式碼有所變動，則不受此限制。開啟後，一律以整份清冊為目標。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

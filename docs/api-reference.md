@@ -548,6 +548,7 @@ and neither means anything without `configure-enabled` — see
 |---|---|---|---|
 | `auto-configure-enabled` | bool | `false` | A push that changes a file under `config-directory` queues a configure. It runs `default-playbook` against `default-limit`, because a push carries no run options — which is also what bounds it |
 | `configure-after-apply` | bool | `false` | Every apply on this workspace is followed by a configure **on the same run**, so a `tofu apply` against the remote backend streams the playbook's output too. A **destroy** apply never chains one |
+| `configure-all-hosts` | bool | `false` | A configure the platform *derived* — from an inventory change, or chained onto an apply — targets every host rather than only the hosts whose resolved configuration changed. The default narrows, conditioned on the Ansible code under `config-directory` being unchanged since the last successful configure; the narrowed set is intersected with `default-limit`, so this can never reach beyond it. The override **widens** |
 
 There is deliberately **no scheduled configure**. An operator who wants one
 drives `POST /api/v1/runs` from their own scheduler.

@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Push do repozitáře, který mění konfigurační adresář Ansible, spustí playbook. Pokud není nastaven výchozí limit, je to celý inventář.",
       "autoConfigureEnabledHintLimited": "Push do repozitáře, který mění konfigurační adresář Ansible, spustí playbook s limitem {limit}.",
       "configureAfterApply": "Konfigurace po použití",
-      "configureAfterApplyHint": "Po každém použití zde následuje konfigurace ve stejném běhu, takže použití z CLI streamuje i výstup playbooku. Zničení nikdy nekonfiguruje."
+      "configureAfterApplyHint": "Po každém použití zde následuje konfigurace ve stejném běhu, takže použití z CLI streamuje i výstup playbooku. Zničení nikdy nekonfiguruje.",
+      "configureAllHosts": "Konfigurace všech hostitelů",
+      "configureAllHostsHint": "Konfigurace, kterou platforma spustí sama, zasáhne jen hostitele, jichž se dotkla změna inventáře — pokud se od předchozí konfigurace nezměnil kód Ansible. Zapněte to, chcete-li vždy zasáhnout celý inventář."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

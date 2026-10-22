@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Ansible yapılandırma dizinini değiştiren bir depo gönderimi playbook'u çalıştırır. Varsayılan bir limit ayarlanmamışsa bu, tüm envanterdir.",
       "autoConfigureEnabledHintLimited": "Ansible yapılandırma dizinini değiştiren bir depo gönderimi playbook'u {limit} üzerinde çalıştırır.",
       "configureAfterApply": "Uygulamadan sonra yapılandırma",
-      "configureAfterApplyHint": "Buradaki her uygulamanın ardından aynı çalıştırmada bir yapılandırma gelir; bu yüzden CLI üzerinden yapılan bir uygulama playbook'un çıktısını da akıtır. Yok etme asla yapılandırma yapmaz."
+      "configureAfterApplyHint": "Buradaki her uygulamanın ardından aynı çalıştırmada bir yapılandırma gelir; bu yüzden CLI üzerinden yapılan bir uygulama playbook'un çıktısını da akıtır. Yok etme asla yapılandırma yapmaz.",
+      "configureAllHosts": "Tüm ana makineleri yapılandırma",
+      "configureAllHostsHint": "Ansible kodu son yapılandırmadan bu yana değişmedikçe, platformun sizin yerinize başlattığı bir yapılandırma yalnızca bir envanter değişikliğinin dokunduğu ana makineleri hedefler. Her zaman tüm envanteri hedeflemek için bunu açın."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

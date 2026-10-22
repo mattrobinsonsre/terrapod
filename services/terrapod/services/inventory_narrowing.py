@@ -71,6 +71,26 @@ from terrapod.storage.keys import config_version_key, inventory_baseline_key
 
 logger = get_logger(__name__)
 
+#: The sources that mean "the PLATFORM decided this run", as against somebody
+#: asking for one. Narrowing applies to a derived configure only: a configure
+#: a person queued with no limit means "the workspace's default", so narrowing
+#: it would be overriding a request rather than bounding a side effect.
+#:
+#: A COMPOSITE is derived whatever its source -- the apply decided it -- and is
+#: narrowed at the hand-over instead of here, because its inventory is only
+#: knowable once the apply has finished moving the estate (#2230).
+DERIVED_SOURCES = frozenset({"auto-configure", "vcs"})
+
+
+def is_derived_configure(run: Run) -> bool:
+    """A standalone configure the platform started by itself."""
+    return (
+        bool(run.is_configure)
+        and not bool(run.configure_after_apply)
+        and run.source in DERIVED_SOURCES
+    )
+
+
 #: Why a run went wide, for the log line and for the tests to assert on.
 WIDE_OVERRIDE = "configure_all_hosts is set"
 WIDE_NO_BASELINE = "no previous successful configure to compare against"
@@ -196,14 +216,37 @@ async def _code_changed(db: AsyncSession, run: Run, ws: Workspace, baseline_cv: 
         path = str(entry.get("path") or "")
         if path.startswith(prefix):
             return True
+
+    # A file over the per-file cap is EXCLUDED from `files` and listed in
+    # `oversized` instead, so reading `files` alone says "unchanged" about a
+    # large playbook or role that may well have moved -- a fail-open in the one
+    # direction this module promises never to fail in. An oversized path under
+    # the config root means we cannot tell, which is the same answer as changed.
+    for path in diff.get("oversized") or []:
+        if str(path).startswith(prefix):
+            logger.info(
+                "Treating the ansible code as changed: a file under the config root "
+                "was too large to diff",
+                workspace_id=str(ws.id),
+                path=str(path),
+            )
+            return True
     return False
 
 
 async def limit_for(db: AsyncSession, run: Run, ws: Workspace, *, current: dict) -> str:
     """The `--limit` a derived configure should carry.
 
-    Returns the workspace's own `default_limit` whenever it cannot prove
-    narrowing is safe, so every failure mode is "configure more".
+    Returns `""` whenever it cannot prove narrowing is safe, so every failure
+    mode is "configure more".
+
+    **Empty rather than the workspace's `default_limit`, though the two dispatch
+    identically.** `build_job_spec` already falls back to `default-limit` when
+    the run carries none, so an empty value means exactly "this run adds no
+    narrowing of its own" -- which leaves a wide derived run recorded, served
+    and dispatched precisely as it is today. Writing the default onto the run
+    would start serialising an `ansible-limit` attribute that is absent now,
+    for no change in what runs.
     """
     ws_id = str(ws.id)
     default = ws.default_limit or ""
@@ -215,7 +258,7 @@ async def limit_for(db: AsyncSession, run: Run, ws: Workspace, *, current: dict)
             run_id=str(run.id),
             reason=reason,
         )
-        return default
+        return ""
 
     if ws.configure_all_hosts:
         return wide(WIDE_OVERRIDE)

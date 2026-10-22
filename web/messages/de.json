@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Ein Push, der das Ansible-Konfigurationsverzeichnis ändert, führt das Playbook aus. Ohne gesetztes Standard-Limit ist das das ganze Inventar.",
       "autoConfigureEnabledHintLimited": "Ein Push, der das Ansible-Konfigurationsverzeichnis ändert, führt das Playbook gegen {limit} aus.",
       "configureAfterApply": "Konfigurieren nach der Anwendung",
-      "configureAfterApplyHint": "Auf jede Anwendung hier folgt ein Konfigurieren im selben Lauf, sodass auch eine Anwendung über die CLI die Ausgabe des Playbooks streamt. Ein Destroy konfiguriert nie."
+      "configureAfterApplyHint": "Auf jede Anwendung hier folgt ein Konfigurieren im selben Lauf, sodass auch eine Anwendung über die CLI die Ausgabe des Playbooks streamt. Ein Destroy konfiguriert nie.",
+      "configureAllHosts": "Alle Hosts konfigurieren",
+      "configureAllHostsHint": "Ein Konfigurationslauf, den die Plattform selbst startet, erreicht nur die Hosts, die eine Änderung am Inventar berührt hat — es sei denn, der Ansible-Code hat sich seit dem vorigen Lauf geändert. Aktivieren Sie dies, damit immer das ganze Inventar durchlaufen wird."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "A push that shifts th'' Ansible config quarters runs th'' playbook. With no standin'' limit set, that be th'' whole manifest.",
       "autoConfigureEnabledHintLimited": "A push that shifts th'' Ansible config quarters runs th'' playbook against {limit}.",
       "configureAfterApply": "Rig after th'' apply",
-      "configureAfterApplyHint": "Every apply here be followed by a riggin'' on th'' same run, so a CLI apply carries th'' playbook''s output too. A scuttle never rigs."
+      "configureAfterApplyHint": "Every apply here be followed by a riggin'' on th'' same run, so a CLI apply carries th'' playbook''s output too. A scuttle never rigs.",
+      "configureAllHosts": "Rig all hands",
+      "configureAllHostsHint": "A riggin'' order th'' platform sets sail fer ye takes only th'' hands a manifest change touched, unless th'' Ansible code shifted since th'' last one. Hoist this t'' always sweep th'' whole manifest, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

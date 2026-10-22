@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Qu'' paq qaSmoH Ansible Qum tetlh choHbogh chum. veH motlh Hutlhchugh, Hoch tetlh ''oH.",
       "autoConfigureEnabledHintLimited": "{limit}-vaD Qu'' paq qaSmoH Ansible Qum tetlh choHbogh chum.",
       "configureAfterApply": "lo''lu''DI'' Qum",
-      "configureAfterApplyHint": "Sar rapDaq naDev Hoch lo'' tlha'' Qum, vaj Qu'' paq chel lI'' CLI lo'' je. not Qum Qaw''."
+      "configureAfterApplyHint": "Sar rapDaq naDev Hoch lo'' tlha'' Qum, vaj Qu'' paq chel lI'' CLI lo'' je. not Qum Qaw''.",
+      "configureAllHosts": "Hoch hostmey Qum",
+      "configureAllHostsHint": "Qum Qav-vo'' Ansible De'' choHbe''chugh, ghom tetlh choH Hotbogh hostmey neH nID pat taghbogh Qum. reH Hoch ghom tetlh-vaD Qu'' paq qaSmoHmeH, yIchu''."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

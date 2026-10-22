@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Et push, der ændrer Ansible-konfigurationsmappen, kører playbooken. Uden en angivet standardgrænse er det hele inventaret.",
       "autoConfigureEnabledHintLimited": "Et push, der ændrer Ansible-konfigurationsmappen, kører playbooken mod {limit}.",
       "configureAfterApply": "Konfigurer efter anvendelse",
-      "configureAfterApplyHint": "Hver anvendelse her følges af en konfigurering i samme kørsel, så også en anvendelse fra CLI streamer playbookens output. En nedrivning konfigurerer aldrig."
+      "configureAfterApplyHint": "Hver anvendelse her følges af en konfigurering i samme kørsel, så også en anvendelse fra CLI streamer playbookens output. En nedrivning konfigurerer aldrig.",
+      "configureAllHosts": "Konfigurer alle værter",
+      "configureAllHostsHint": "En konfigurationskørsel, som platformen selv starter, når kun de værter, som en ændring i inventaret berørte, medmindre Ansible-koden har ændret sig siden den forrige. Slå dette til for altid at køre hele inventaret igennem."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

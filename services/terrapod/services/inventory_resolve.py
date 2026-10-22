@@ -613,11 +613,19 @@ def _coerce(var) -> Any:  # type: ignore[no-untyped-def]
         return var.value
 
 
-async def write_run_artifact(db, run, *, limit: str | None = None) -> str:
+async def write_run_artifact(db, run, *, limit: str | None = None) -> tuple[str, dict[str, Any]]:
     """Resolve the run's inventory and store it as the run's own artifact (#2021).
 
-    Returns the storage key. Called from run creation, read by the configure
-    phase through `GET /runs/{run_id}/artifacts/resolved-inventory`.
+    Returns the storage key AND the document it stored. Called from run
+    creation and from the composite hand-over, read by the configure phase
+    through `GET /runs/{run_id}/artifacts/resolved-inventory`.
+
+    **The document comes back because the caller that narrows is the caller
+    that wrote it (#2229), and the two must agree.** Narrowing diffs the
+    resolved inventory against the stored baseline and emits a `--limit`
+    naming hosts; resolving a second time to get that document would let the
+    limit name a host the artifact does not contain, and a `--limit` matching
+    nothing exits 1 (measured). One resolution, used for both.
 
     **It raises rather than degrading, and that is deliberate.** A configure
     whose target set could not be resolved must not be dispatched: the Job would
@@ -649,7 +657,7 @@ async def write_run_artifact(db, run, *, limit: str | None = None) -> str:
         groups=len(document.get("groups") or {}),
         from_config_version=str(run.configuration_version_id or ""),
     )
-    return key
+    return key, document
 
 
 async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any]:

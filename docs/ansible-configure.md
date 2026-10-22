@@ -126,6 +126,60 @@ A workspace whose `default-limit` names a canary group **cannot be made to fire
 wider by a git push**, because a push carries no run options. If you want an
 estate-wide auto-configure, leave the limit empty on purpose.
 
+## A configure the platform derived targets only the hosts that changed
+
+A configure **you** queue runs against the limit you gave it, or the workspace's
+`default-limit`. A configure **the platform derived** — one an inventory change
+produced, or one chained onto an apply — is narrowed to the hosts whose resolved
+configuration actually moved.
+
+The condition is the thing that justifies breadth. New playbook or role code has
+to reach every host; a changed *host* is no reason at all to touch the others.
+So a derived configure narrows when the Ansible code under `config-directory` is
+unchanged since the last successful configure, and goes wide when it moved.
+
+**`default-limit` is still the outer bound.** The narrowed set is intersected
+with it, so a workspace whose limit names a canary group can never be made to
+reach beyond that group by this — only to reach less of it.
+
+### What counts as changed, and why the diff is over the resolved inventory
+
+The comparison is between the **resolved** inventory this run targets and the
+one the last successful configure targeted — ansible's own output, not the rows
+Terrapod stores. That matters because the resolved form has already attributed
+every value to every host: a host variable, a group variable and a
+`group_vars/all` variable all come out as "these hosts differ", with no group
+DAG for Terrapod to walk and no second implementation of ansible's precedence.
+A change under `all` therefore returns every host and the run is not narrowed at
+all, which is correct and needs no special case.
+
+A host counts as changed when its effective variables moved, when its group
+membership moved, or when it is new. Group membership is included because moving
+a host into a group that carries no variables is an ordinary way to bring it into
+scope — what reaches it is `hosts: webservers`, not a variable.
+
+### When it goes wide anyway
+
+| reason | why |
+|---|---|
+| `configure-all-hosts` is set | the operator's override |
+| there is no baseline | the first configure, or the last one failed — hosts may be unconfigured for reasons no diff can see |
+| the Ansible code under `config-directory` changed | new code has to reach every host |
+| the group *nesting* changed | a `children` edit changes what a pattern resolves to without necessarily changing any host's own membership |
+| nothing changed | a `--limit` matching nothing exits 1, so a run with nothing to do runs the workspace's default rather than failing |
+
+Every one of those falls back to the workspace's `default-limit`, so the failure
+direction is always "configure more", never less.
+
+### The override
+
+`configure-all-hosts` on the workspace makes every derived configure sweep the
+whole inventory. It is settable on the workspace, in bulk, and on an
+autodiscovery rule, so a fleet can declare it once.
+
+It **widens**, deliberately: a flag someone forgets leaves them configuring
+more, not less.
+
 ## A destroy never configures
 
 An apply that is tearing infrastructure down is never followed by a configure,

@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Un push qui modifie le répertoire de configuration Ansible exécute le playbook. Sans limite par défaut définie, cela vise l''inventaire entier.",
       "autoConfigureEnabledHintLimited": "Un push qui modifie le répertoire de configuration Ansible exécute le playbook sur {limit}.",
       "configureAfterApply": "Configurer après application",
-      "configureAfterApplyHint": "Chaque application ici est suivie d''une configuration dans la même exécution, de sorte qu''une application depuis la CLI diffuse aussi la sortie du playbook. Une destruction ne configure jamais."
+      "configureAfterApplyHint": "Chaque application ici est suivie d''une configuration dans la même exécution, de sorte qu''une application depuis la CLI diffuse aussi la sortie du playbook. Une destruction ne configure jamais.",
+      "configureAllHosts": "Configurer tous les hôtes",
+      "configureAllHostsHint": "Une configuration que la plateforme lance d''elle-même ne vise que les hôtes qu''un changement d''inventaire a touchés, sauf si le code Ansible a changé depuis la dernière. Activez ceci pour toujours viser l''inventaire entier."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

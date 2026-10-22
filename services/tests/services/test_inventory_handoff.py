@@ -351,7 +351,7 @@ class TestTheArtifactIsStored:
 
         monkeypatch.setattr(storage_mod, "get_storage", lambda: store)
 
-        key = asyncio.run(inventory_resolve.write_run_artifact(object(), run))
+        key, _doc = asyncio.run(inventory_resolve.write_run_artifact(object(), run))
 
         assert key == resolved_inventory_key(str(ws.id), str(run.id))
         assert json.loads(store.written[key])["hosts"] == {"web1": {}}
@@ -373,7 +373,7 @@ class TestTheArtifactIsStored:
 
         monkeypatch.setattr(storage_mod, "get_storage", lambda: store)
 
-        key = asyncio.run(inventory_resolve.write_run_artifact(object(), run))
+        key, _doc = asyncio.run(inventory_resolve.write_run_artifact(object(), run))
         assert key in store.written
         assert json.loads(store.written[key]) == {"hosts": {}, "groups": {}, "children": {}}
 

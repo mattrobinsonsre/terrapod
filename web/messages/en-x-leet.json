@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "4 pu5h 7h47 ch4ng35 7h3 4n51bl3 c0nf1g r007 run5 7h3 pl4yb00k. W17h n0 d3f4ul7 l1m17 537, 7h47 15 7h3 wh0l3 1nv3n70ry.",
       "autoConfigureEnabledHintLimited": "4 pu5h 7h47 ch4ng35 7h3 4n51bl3 c0nf1g r007 run5 7h3 pl4yb00k 4g41n57 {limit}.",
       "configureAfterApply": "C0nf1gur3 4f73r 4pply",
-      "configureAfterApplyHint": "3v3ry 4pply h3r3 15 f0ll0w3d by 4 c0nf1gur3 0n 7h3 54m3 run, 50 4 CL1 4pply 57r34m5 7h3 pl4yb00k'5 0u7pu7 700. 4 d357r0y n3v3r c0nf1gur35."
+      "configureAfterApplyHint": "3v3ry 4pply h3r3 15 f0ll0w3d by 4 c0nf1gur3 0n 7h3 54m3 run, 50 4 CL1 4pply 57r34m5 7h3 pl4yb00k'5 0u7pu7 700. 4 d357r0y n3v3r c0nf1gur35.",
+      "configureAllHosts": "C0nf1gur3 4ll h0575",
+      "configureAllHostsHint": "4 c0nf1gur3 7h3 pl47f0rm 574r75 f0r y0u 74rg375 0nly 7h3 h0575 4n 1nv3n70ry ch4ng3 70uch3d, unl355 7h3 4n51bl3 c0d3 m0v3d 51nc3 7h3 l457 0n3. 7urn 7h15 0n 70 4lw4y5 5w33p 7h3 wh0l3 1nv3n70ry."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

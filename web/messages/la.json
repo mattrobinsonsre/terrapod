@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Impulsus qui directorium configurationis Ansible mutat libellum ludendi exsequitur. Nullo limite praedefinito posito, id totum inventarium petit.",
       "autoConfigureEnabledHintLimited": "Impulsus qui directorium configurationis Ansible mutat libellum ludendi adversus {limit} exsequitur.",
       "configureAfterApply": "Configurare post applicationem",
-      "configureAfterApplyHint": "Quamque applicationem hic configuratio in eodem cursu sequitur, ideo applicatio ex CLI etiam egressum libelli ludendi transmittit. Destructio numquam configurat."
+      "configureAfterApplyHint": "Quamque applicationem hic configuratio in eodem cursu sequitur, ideo applicatio ex CLI etiam egressum libelli ludendi transmittit. Destructio numquam configurat.",
+      "configureAllHosts": "Configurare omnes hospites",
+      "configureAllHostsHint": "Configuratio quam suggestus sua sponte incipit solos hospites petit quos mutatio inventarii tetigit, nisi codex Ansible post ultimam mutatus est. Hoc accende ut semper totum inventarium petatur."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Mae gwthiad sy'n newid cyfeiriadur cyfluniad Ansible yn rhedeg y llyfr chwarae. Heb derfyn rhagosodedig wedi'i osod, y rhestr eiddo gyfan yw hynny.",
       "autoConfigureEnabledHintLimited": "Mae gwthiad sy'n newid cyfeiriadur cyfluniad Ansible yn rhedeg y llyfr chwarae yn erbyn {limit}.",
       "configureAfterApply": "Cyflunio ar ôl gweithredu",
-      "configureAfterApplyHint": "Mae cyflunio yn dilyn pob gweithrediad yma ar yr un rhediad, felly mae gweithrediad o'r CLI yn ffrydio allbwn y llyfr chwarae hefyd. Nid yw dinistrio byth yn cyflunio."
+      "configureAfterApplyHint": "Mae cyflunio yn dilyn pob gweithrediad yma ar yr un rhediad, felly mae gweithrediad o'r CLI yn ffrydio allbwn y llyfr chwarae hefyd. Nid yw dinistrio byth yn cyflunio.",
+      "configureAllHosts": "Cyflunio pob gwesteiwr",
+      "configureAllHostsHint": "Mae cyflunio a gychwynnir gan y platfform ar eich rhan yn targedu dim ond y gwesteiwyr yr effeithiodd newid i''r rhestr eiddo arnynt, oni bai bod cod Ansible wedi newid ers y cyflunio diwethaf. Trowch hyn ymlaen i ysgubo''r rhestr eiddo gyfan bob tro."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

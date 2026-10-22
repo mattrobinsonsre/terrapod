@@ -2646,7 +2646,9 @@
       "autoConfigureEnabledHint": "A push that changes the Ansible config root runs the playbook. With no default limit set, that is the whole inventory.",
       "autoConfigureEnabledHintLimited": "A push that changes the Ansible config root runs the playbook against {limit}.",
       "configureAfterApply": "Configure after apply",
-      "configureAfterApplyHint": "Every apply here is followed by a configure on the same run, so a CLI apply streams the playbook's output too. A destroy never configures."
+      "configureAfterApplyHint": "Every apply here is followed by a configure on the same run, so a CLI apply streams the playbook's output too. A destroy never configures.",
+      "configureAllHosts": "Configure all hosts",
+      "configureAllHostsHint": "A configure the platform starts for you targets only the hosts an inventory change touched, unless the Ansible code moved since the last one. Turn this on to always sweep the whole inventory."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

@@ -2638,7 +2638,9 @@
       "autoConfigureEnabledHint": "Wypchnięcie do repozytorium, które zmienia katalog konfiguracji Ansible, uruchamia playbook. Gdy nie ustawiono domyślnego limitu, jest to cały inwentarz.",
       "autoConfigureEnabledHintLimited": "Wypchnięcie do repozytorium, które zmienia katalog konfiguracji Ansible, uruchamia playbook z limitem {limit}.",
       "configureAfterApply": "Konfiguracja po zastosowaniu",
-      "configureAfterApplyHint": "Po każdym zastosowaniu tutaj następuje konfiguracja w tym samym uruchomieniu, więc zastosowanie z CLI przesyła strumieniowo także wyjście playbooka. Niszczenie nigdy nie konfiguruje."
+      "configureAfterApplyHint": "Po każdym zastosowaniu tutaj następuje konfiguracja w tym samym uruchomieniu, więc zastosowanie z CLI przesyła strumieniowo także wyjście playbooka. Niszczenie nigdy nie konfiguruje.",
+      "configureAllHosts": "Konfiguracja wszystkich hostów",
+      "configureAllHostsHint": "Konfiguracja, którą platforma uruchamia sama, obejmuje tylko hosty, których dotknęła zmiana w inwentarzu — chyba że kod Ansible zmienił się od poprzedniej konfiguracji. Włącz to, aby zawsze objąć cały inwentarz."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
