@@ -79,7 +79,10 @@ test.describe('Configure triggers', () => {
     const wsId = await createWorkspace(token, uniqueName('e2enobtn'))
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    await expect(page.getByRole('button', { name: 'Queue plan' })).toBeVisible()
+    // `Plan`, not "Queue plan": the button's accessible name is
+    // `phases.terraform.words.queuePlan`, whose VALUE is `Plan` — the key name
+    // is not the label, and reading one off the other is what failed here.
+    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Configure', exact: true }).filter({ visible: true }),
     ).toHaveCount(0)

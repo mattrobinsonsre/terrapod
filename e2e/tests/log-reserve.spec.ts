@@ -127,8 +127,27 @@ test.describe('Run log pane height', () => {
       let gap = NaN;
       // The height is applied by a layout effect and a ResizeObserver, so let
       // it settle rather than racing the first frame after the resize.
+      //
+      // `gap >= 0` alone was NOT a settle condition, and this flaked on it: it
+      // is satisfied the instant the pane is anywhere above the fold, including
+      // before the observer has applied the new height — so the first poll
+      // returned a gap measured against the PREVIOUS viewport, and the
+      // equality below failed by the difference between the two (426px once).
+      //
+      // The honest condition is the mechanism rather than the symptom: the
+      // pane's rendered height equals `--log-avail`, which is the custom
+      // property the layout effect writes for the CURRENT viewport. Both
+      // `min-h` and `max-h` are set to it (#2217), so with content taller than
+      // the pane the two agree exactly once the effect has run.
       await expect(async () => {
+        const avail = await page.evaluate(() =>
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--log-avail'),
+          ),
+        );
         const box = (await page.getByTestId('log-pane-plan').boundingBox())!;
+        expect(avail).toBeGreaterThan(0);
+        expect(Math.abs(box.height - avail)).toBeLessThanOrEqual(1);
         gap = height - (box.y + box.height);
         expect(gap).toBeGreaterThanOrEqual(0);
       }).toPass({ timeout: 10_000 });
