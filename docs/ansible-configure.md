@@ -157,6 +157,42 @@ than ignored — `target-addrs`, `replace-addrs`, `refresh-only`, `save-plan`,
 configure has neither. `plan-only` is refused too: ansible's dry run is
 `--check`, which is its own option, not this one.
 
+## A play that targets the execution environment itself needs `ansible_remote_tmp`
+
+Most configures target managed nodes over SSH and need nothing here. But a play
+that targets the execution environment — `connection: local`, `hosts: localhost`,
+or anything driving a cloud API from the controller — needs one host variable, and
+without it **every task fails as UNREACHABLE** with a message about permissions
+that points away from the cause:
+
+```
+Failed to create temporary directory ... Failed command was:
+( umask 77 && mkdir -p "` echo /home/ansible/.ansible/tmp `" ...
+```
+
+Ansible resolves `remote_tmp`'s leading `~` against the **target user's passwd
+entry**, not `$HOME`. Inside the execution environment that is `/home/ansible`,
+which sits on the EE's read-only root filesystem, so the directory cannot be
+created. The `$HOME` the Job sets (`/tp/home`, on the writable shared volume) is
+not consulted for this.
+
+Point it at the shared volume instead:
+
+```yaml
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_remote_tmp: /tp/tmp/ansible-remote
+```
+
+It can equally go in `group_vars`, or in your own `ansible.cfg` as
+`remote_tmp` — Terrapod never overwrites that file, so a value you set there is
+honoured. What Terrapod does **not** do is set `ANSIBLE_REMOTE_TEMP` to a shared
+volume path globally: that variable names a path on the *target*, and `/tp` does
+not exist on a managed node, so a global value would break every SSH-targeted
+play to fix the local case.
+
 ## Troubleshooting
 
 | What you see | Why |

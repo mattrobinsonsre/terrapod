@@ -75,6 +75,8 @@ from terrapod.logging_config import get_logger
 from terrapod.services import (
     agent_pool_service,
     ansible_auth,
+    ansible_ee_service,
+    inventory_resolve,
     plan_graph_service,
     pool_set,
     run_service,
@@ -908,6 +910,27 @@ async def create_run(
             playbook=attrs.get("playbook", "") or "",
             ansible_limit=attrs.get("limit", "") or "",
         )
+    except ansible_ee_service.UnknownExecutionEnvironment as exc:
+        # Its own docstring asks for exactly this -- "so a router can answer 422
+        # naming the field" -- and no router did, so a workspace whose EE label
+        # had since been dropped from the Helm map answered 500. The map is local
+        # configuration, so "cannot tell" cannot arise here.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except inventory_resolve.InventoryResolutionFailed as exc:
+        # `create_run` raises this deliberately rather than dispatch a Job that
+        # would fail inside the phase, and its comment says "the refusal reaches
+        # whoever asked for the run". It did not: nothing translated it, so an
+        # unparseable inventory answered `Internal server error` with no reason,
+        # while the READ route answered 503 naming the offending file. Same
+        # status as that route on purpose -- two paths answering differently for
+        # one condition is the drift this codebase keeps paying for. Whether a
+        # cause that is plainly the operator's deserves a 4xx is one question for
+        # BOTH paths, not something to answer differently here.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
@@ -1350,6 +1373,27 @@ async def retry_run(
         new_run.vcs_branch = run.vcs_branch
         new_run.vcs_pull_request_number = run.vcs_pull_request_number
         new_run.module_overrides = run.module_overrides
+    except ansible_ee_service.UnknownExecutionEnvironment as exc:
+        # Its own docstring asks for exactly this -- "so a router can answer 422
+        # naming the field" -- and no router did, so a workspace whose EE label
+        # had since been dropped from the Helm map answered 500. The map is local
+        # configuration, so "cannot tell" cannot arise here.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except inventory_resolve.InventoryResolutionFailed as exc:
+        # `create_run` raises this deliberately rather than dispatch a Job that
+        # would fail inside the phase, and its comment says "the refusal reaches
+        # whoever asked for the run". It did not: nothing translated it, so an
+        # unparseable inventory answered `Internal server error` with no reason,
+        # while the READ route answered 503 naming the offending file. Same
+        # status as that route on purpose -- two paths answering differently for
+        # one condition is the drift this codebase keeps paying for. Whether a
+        # cause that is plainly the operator's deserves a 4xx is one question for
+        # BOTH paths, not something to answer differently here.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,

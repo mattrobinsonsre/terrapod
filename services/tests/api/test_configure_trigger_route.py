@@ -31,6 +31,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
+from terrapod.services import ansible_ee_service, inventory_resolve
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -67,6 +68,13 @@ def _ws(*, configure_enabled=True, plan_apply_enabled=True, configure_after_appl
     ws.auto_configure_enabled = False
     ws.default_playbook = "site.yml"
     ws.default_limit = ""
+    # Same reason as the pair above, one layer down: `create_run` now resolves
+    # the EE image for a configure, and `effective_ee_image` treats a truthy
+    # `ee_label` as an operator label it must find in the Helm map. A MagicMock
+    # is truthy, so leaving these would make every configure test here fail as
+    # an unknown execution environment rather than reaching its own assertion.
+    ws.ansible_version = ""
+    ws.ansible_execution_environment = ""
     return ws
 
 
@@ -431,3 +439,51 @@ class TestTheCapabilityIsOneProducer:
                 "is_destroy",
                 "is_configure",
             }, f"`{name}` calls it with the wrong arguments"
+
+
+class TestTheTwoRefusalsThatUsedToBe500s:
+    """Both were raised deliberately and translated by nothing (#1972).
+
+    Found by a live run, not by a test: the first configure ever created died
+    with `Internal server error` and no reason, while the READ route answered
+    503 naming the offending file. One condition, two paths, two answers -- and
+    the one an operator reaches from the Configure button was the uninformative
+    one.
+    """
+
+    @_boot
+    async def test_an_unparseable_inventory_is_refused_with_its_reason(self, *_):
+        ws = _ws(plan_apply_enabled=False)
+        app, _db = _app(_user(roles=["admin"]), ws)
+        reason = "ansible-inventory failed (exit 1): could not parse site.yml"
+        with patch.object(
+            inventory_resolve,
+            "write_run_artifact",
+            AsyncMock(side_effect=inventory_resolve.InventoryResolutionFailed(reason)),
+        ):
+            r = await _post(app, {"is-configure": True}, ws)
+        assert r.status_code == 503, r.text
+        # The REASON, not a generic string: `create_run`'s own comment promises
+        # "the refusal reaches whoever asked for the run", and a 500 body does
+        # not tell them which file ansible refused.
+        assert "site.yml" in r.json()["errors"][0]["detail"]
+
+    @_boot
+    async def test_an_unknown_execution_environment_is_refused_naming_the_field(self, *_):
+        ws = _ws(plan_apply_enabled=False)
+        app, _db = _app(_user(roles=["admin"]), ws)
+        with patch.object(
+            ansible_ee_service,
+            "effective_ee_image",
+            MagicMock(
+                side_effect=ansible_ee_service.UnknownExecutionEnvironment(
+                    "ansible-execution-environment 'hardened' is not configured on this deployment"
+                )
+            ),
+        ):
+            r = await _post(app, {"is-configure": True}, ws)
+        # 422 rather than 503: the map is local configuration, so unlike a
+        # resolution failure "cannot tell" does not arise. Its own docstring
+        # asks for exactly this.
+        assert r.status_code == 422, r.text
+        assert "hardened" in r.json()["errors"][0]["detail"]

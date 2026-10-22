@@ -1466,6 +1466,31 @@ async def create_run(
         )
         pinned_version = requested_version
 
+    # The execution environment the configure runs in. Resolved HERE because the
+    # Job spec keys the entire EE sidecar on this one value: with it empty
+    # `build_job_spec` adds no sidecar, no shared `tp` volume and no `fsGroup`,
+    # and the configure phase then dies on its first write with
+    # `[Errno 30] Read-only file system: '/tp'`. That is what EVERY configure did
+    # -- the column, the wire key, the listener's read, the Job-spec branch and
+    # the reconciler's EE timeout message were all built and NOTHING SET IT --
+    # and it was unreachable until #1974 made a configure run creatable at all.
+    #
+    # `effective_ee_image` is the single resolver by design (its own docstring
+    # and `test_ee_image_resolution.py` say so, and the availability endpoint
+    # already states in a comment that the run path uses it, which was not true
+    # until this call existed), so this calls it rather than composing a
+    # reference of its own. It also owns the empty-string fallback, so
+    # `ansible_version` is passed through untouched: `""` is the #2010
+    # convention for "the deployment's default", not an absence.
+    ee_image = ""
+    if is_configure:
+        from terrapod.services import ansible_ee_service
+
+        ee_image = ansible_ee_service.effective_ee_image(
+            ansible_version=workspace.ansible_version,
+            ee_label=workspace.ansible_execution_environment,
+        )
+
     run = Run(
         workspace_id=workspace.id,
         configuration_version_id=configuration_version_id,
@@ -1474,6 +1499,7 @@ async def create_run(
         is_destroy=is_destroy,
         is_configure=is_configure,
         configure_after_apply=configure_after_apply,
+        ee_image=ee_image,
         playbook=playbook,
         ansible_limit=ansible_limit,
         auto_apply=auto_apply,

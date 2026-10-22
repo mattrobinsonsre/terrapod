@@ -1459,7 +1459,16 @@ def main(argv: list[str] | None = None) -> int:
             exit_code = 1
         finally:
             # Roll per-phase logs into combined before uploading.
-            for f in (_INIT_LOG, _PLAN_LOG, _APPLY_LOG):
+            #
+            # `_CONFIGURE_LOG` belongs here and was missing: the configure phase
+            # writes ansible's ENTIRE output to it -- every task, the PLAY RECAP,
+            # and on a failure the only diagnostic there is -- and without this
+            # line none of it reached the uploaded artifact. The stored log held
+            # the orchestrator's own structlog lines and nothing else, so a
+            # configure that failed looked like a configure that did nothing.
+            # Found by running one; `test_every_phase_log_is_rolled_in` derives
+            # this tuple from the constants so the next phase cannot repeat it.
+            for f in (_INIT_LOG, _PLAN_LOG, _APPLY_LOG, _CONFIGURE_LOG):
                 combined.append_file(f)
             # Flush stdout/stderr so anything buffered before the
             # LogCapture handle closes is visible in `kubectl logs`.
