@@ -399,7 +399,7 @@ matters is an operator waiting for a newly published line to appear in a form.
 
 ### What a configure actually runs
 
-> How a configure **starts** — manually, on a push, or on the same run as an
+> How a configure **starts** — manually, on a push, on an inventory change, or on the same run as an
 > apply — is [Running a Configure](ansible-configure.md). This section is what
 > happens once one has been started.
 

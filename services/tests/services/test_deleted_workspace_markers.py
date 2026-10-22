@@ -237,6 +237,13 @@ class TestMarkerContents:
         # would be restoring a stale observation.
         runtime_or_identity = {
             "id",
+            # Runtime state, and restoring it would be worse than losing it:
+            # a stale token says "we already configured this inventory" about an
+            # inventory that may have moved while the workspace was deleted, so
+            # the first cycle after a restore would skip the configure that is
+            # due. NULL instead means "adopt the current inventory", which is
+            # the safe direction (#2224).
+            "auto_configure_inventory_stamp",
             "name",
             "created_at",
             "updated_at",

@@ -618,6 +618,14 @@ class TestEveryWorkspaceSettingIsTemplatedOrLedgered:
 
     #: Workspace columns an autodiscovery rule deliberately does not template.
     NOT_TEMPLATED: dict[str, str] = {
+        "auto_configure_inventory_stamp": (
+            "not a setting (#2224) — it is the inventory equality token the "
+            "platform last acted on, and a rule cannot know a workspace's token "
+            "before the workspace exists. A materialised workspace starts NULL, "
+            "which the cycle reads as 'adopt the current inventory as the "
+            "baseline', so a freshly discovered workspace does not configure a "
+            "fleet the moment it appears"
+        ),
         "trigger_prefixes": (
             "computed at materialisation — scoped to the discovered directory, so a "
             "templated value would break the poller's targeting"

@@ -492,6 +492,22 @@ class Workspace(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
+    #: The inventory equality token the last auto-configure was created for
+    #: (#2224). Server-managed, and never a setting: an operator sets
+    #: `auto_configure_enabled`; this is how the platform remembers what it has
+    #: already acted on, which is why it is in `NEVER_BULK_SETTABLE`.
+    #:
+    #: Compared against `inventory_resolve.platform_rev`, a COUNT and a maximum
+    #: `updated_at` per contributing table. The count is what makes a DELETE
+    #: visible, so "any inventory change" covers removing a host from a group --
+    #: which a timestamp-only stamp would serve straight past.
+    #:
+    #: Written at run CREATION rather than on success, deliberately: one change
+    #: produces one run, and a configure that keeps failing does not re-fire for
+    #: ever against an inventory that has not moved. Retrying a failure is
+    #: #1930's question, not this one.
+    auto_configure_inventory_stamp: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
     #: The Ansible config root -- `ansible.cfg`, playbooks, `roles/`,

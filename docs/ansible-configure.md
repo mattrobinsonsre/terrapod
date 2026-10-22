@@ -9,13 +9,15 @@ object — so it has a run id, a log, a status, notifications, an audit trail an
 a cancel button, exactly as a plan or an apply does. `applied` means applied
 **and** configured.
 
-Two routes start one, and both are off until you turn them on:
+Four routes start one. The manual route needs only the operation declared; every
+automatic one is off until you turn it on:
 
 | Route | What triggers it | What it runs |
 |---|---|---|
 | **Manual** | the Configure button on the workspace's Runs tab, `POST /api/v1/runs` with `is-configure: true`, or the `terrapod_run_create` MCP tool | the workspace's `default-playbook` against its `default-limit`, or whatever the invocation overrides |
 | **On push** (`auto-configure-enabled`) | a commit that changes a file under the workspace's `config-directory` | the declared defaults — a push carries no run options |
 | **After an apply** (`configure-after-apply`) | every apply on this workspace, on the **same run** | the declared defaults |
+| **On an inventory change** (the same `auto-configure-enabled`) | any change to the declared inventory that did **not** arrive through git — a host, group, membership or variable written through the API, the MCP tools, the UI, or by a Terraform apply declaring `terrapod_inventory_*` rows | the declared defaults |
 
 There is deliberately **no scheduled configure**. An operator who wants a
 periodic one drives `POST /api/v1/runs` from their own scheduler — anything
@@ -40,6 +42,62 @@ resource "terrapod_workspace" "fleet" {
 `configure_enabled` is the declaration; the other two are triggers and mean
 nothing without it. All three default to **false** for an existing workspace,
 so upgrading changes nothing about what runs.
+
+## An inventory change configures, and the debounce is a settle
+
+The on-push trigger watches `config-directory`, so it sees a playbook or an
+inventory **file** change. An inventory change written any other way — the API,
+the MCP tools, the UI, or a Terraform apply declaring `terrapod_inventory_*`
+rows — fires the same trigger, under the same `auto-configure-enabled` flag.
+There is no second switch.
+
+**Any change counts, including a deletion.** The signal is an equality token over
+the declared rows: a count *and* a latest-modification time per table. The count
+is what makes a removal visible, so taking a host out of a group fires a
+configure — which matters, because every pattern naming that group now resolves
+to a different set.
+
+**A burst becomes one run.** A single `for_each` over fifty instances writes
+fifty hosts, fifty host variables and fifty memberships. A configure is queued
+only once the inventory has been **unchanged for a full cycle**, so that apply
+produces one run rather than one per cycle while it is still writing. The cycle
+is 60 seconds, which is therefore both the longest a change waits and the
+shortest gap between two consecutive auto-configures.
+
+**Enabling it does not configure anything.** The first cycle after you turn it on
+records the inventory as it stands and queues nothing; a configure follows the
+first change *after* that. So switching the flag on for a fleet that already has
+hosts is safe — it is not a licence for an immediate estate-wide run.
+
+**It runs the declared defaults, like every other automatic route** — the
+workspace's `default-playbook` against its `default-limit`. Narrowing a derived
+configure to just the hosts a change actually affected is a separate question,
+tracked in #2229: this trigger knows that *something* changed, never *what*, so
+narrowing needs a comparison of two resolved inventories rather than a token.
+
+A **locked** workspace is skipped, and a configure is never
+queued behind one that is already on its way — the change is simply picked up by
+a later cycle rather than dropped.
+
+### With `configure-after-apply` on the same workspace, one apply configures twice
+
+If a workspace has **both** triggers and an apply writes inventory rows — a
+`for_each` over `terrapod_inventory_host`, say — it gets two configures: the one
+chained to that apply, and another when the next cycle notices the inventory
+moved.
+
+**Today the second one is doing real work, not repeating the first.** A
+composite run resolves its inventory when the run is created, which is before
+its own plan, so the configure chained to an apply does not see the hosts that
+apply just created — that is #2230. The cycle's run resolves afresh, so it is
+what actually configures them. Turning this trigger off on such a workspace
+would leave newly provisioned hosts unconfigured until something else fired.
+
+Once #2230 lands, the chained configure will see its own apply's hosts and the
+second run becomes redundant rather than load-bearing. Suppressing it then wants
+`changed_hosts_only` (#2229), which can tell whether the configure that just ran
+already covered the hosts that moved — something this trigger cannot know,
+because its signal says *something* changed and never *what*.
 
 ## `default-limit` is the blast radius, and empty means everything
 

@@ -77,6 +77,14 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
     # Drift *results*, as distinct from the drift settings below.
     "drift_last_checked_at": "drift run result, not a setting",
     "drift_status": "drift run result, not a setting",
+    "auto_configure_inventory_stamp": (
+        "what the platform has already acted on, not a setting (#2224) — the "
+        "setting is `auto_configure_enabled`. One value written across a match "
+        "set would be meaningless anyway: it is an equality token over THIS "
+        "workspace's own inventory rows, so another workspace's token could only "
+        "match by accident, and writing one would either suppress a configure "
+        "that is due or fire one that is not"
+    ),
     "drift_latest_run_id": "drift run result, not a setting",
     "state_diverged": "set by the runner when a state upload fails; cleared by resolving it",
     # Lifecycle and provenance, owned by the autodiscovery and catalog services.

@@ -458,6 +458,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Check workspaces for infrastructure drift",
         )
 
+    # Auto-configure on an inventory change that did not arrive through git
+    # (#2224). Always registered: the handler's own query filters on
+    # `auto_configure_enabled`, which is off by default, so a deployment that
+    # does not use Ansible does one indexed SELECT returning nothing per tick.
+    # Gating the registration on a setting instead would be a config key whose
+    # only job is to skip that SELECT.
+    #
+    # 60s is the debounce as well as the interval: a run is created only when the
+    # token has been stable since the previous tick, so this is the longest a
+    # burst of inventory writes can keep deferring its configure, and the
+    # shortest gap between two of them.
+    from terrapod.services.inventory_auto_configure import auto_configure_cycle
+
+    register_periodic_task(
+        "inventory_auto_configure",
+        interval_seconds=60,
+        handler=auto_configure_cycle,
+        description="Queue a configure for workspaces whose declared inventory changed",
+    )
+
     # AI plan summariser (#401). Always registered when feature is enabled
     # — runs that don't qualify (workspace disabled, budget exhausted) are
     # handled inside the handler so the trigger queue is uniform.
