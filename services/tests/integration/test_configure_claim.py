@@ -198,7 +198,15 @@ class TestTheCompositeHandsOverToItsConfigure:
         # stream before the configure it is attached to had run.
         async with get_db_session() as db:
             stored = (await db.execute(select(Run).where(Run.id == run.id))).scalar_one()
-            await run_service.complete_apply(db, stored)
+            # Stubbed for the same reason `_queue` stubs it, and now at a second
+            # call site: the hand-over RE-RESOLVES the inventory (#2230), because
+            # a composite resolved at creation would configure the state from
+            # before its own apply. `_seed`'s configuration version is a row with
+            # no archive behind it, so a real resolution here fails and the
+            # refusal errors the run -- which is correct behaviour meeting an
+            # unrepresentative fixture. This file is about the claim query.
+            with patch.object(inventory_resolve, "write_run_artifact", AsyncMock()):
+                await run_service.complete_apply(db, stored)
             await db.commit()
 
         async with get_db_session() as db:
@@ -252,7 +260,15 @@ class TestTheCompositeHandsOverToItsConfigure:
         )
         async with get_db_session() as db:
             stored = (await db.execute(select(Run).where(Run.id == run.id))).scalar_one()
-            await run_service.complete_apply(db, stored)
+            # Stubbed for the same reason `_queue` stubs it, and now at a second
+            # call site: the hand-over RE-RESOLVES the inventory (#2230), because
+            # a composite resolved at creation would configure the state from
+            # before its own apply. `_seed`'s configuration version is a row with
+            # no archive behind it, so a real resolution here fails and the
+            # refusal errors the run -- which is correct behaviour meeting an
+            # unrepresentative fixture. This file is about the claim query.
+            with patch.object(inventory_resolve, "write_run_artifact", AsyncMock()):
+                await run_service.complete_apply(db, stored)
             await db.commit()
 
         first = await _claim(pool.id)
