@@ -60,7 +60,19 @@ async def _run(workspaces, *, redis, current, in_flight=False, cv=_ABSENT):
     db.execute = AsyncMock(return_value=result)
     db.commit = AsyncMock()
 
-    created = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+    def _make(*a, **kw):
+        r = MagicMock(id=uuid.uuid4())
+        r.status = "pending"
+        return r
+
+    created = AsyncMock(side_effect=_make)
+
+    async def _queue(_db, r):
+        # What `queue_run` does, and the only part these tests care about.
+        r.status = "queued"
+        return r
+
+    queued = AsyncMock(side_effect=_queue)
 
     class _Session:
         async def __aenter__(self):
@@ -76,8 +88,10 @@ async def _run(workspaces, *, redis, current, in_flight=False, cv=_ABSENT):
         patch.object(iac, "_configure_in_flight", AsyncMock(return_value=in_flight)),
         patch.object(iac.run_service, "get_latest_uploaded_cv", AsyncMock(return_value=cv)),
         patch.object(iac.run_service, "create_run", created),
+        patch.object(iac.run_service, "queue_run", queued),
     ):
         await iac.auto_configure_cycle()
+    created.queued = queued
     return created, db
 
 
@@ -205,6 +219,7 @@ class TestOneWorkspaceNeverKillsTheCycle:
                 AsyncMock(return_value=MagicMock(id=uuid.uuid4())),
             ),
             patch.object(iac.run_service, "create_run", _flaky),
+            patch.object(iac.run_service, "queue_run", AsyncMock(side_effect=lambda _d, r: r)),
         ):
             await iac.auto_configure_cycle()
 
@@ -236,3 +251,34 @@ class TestTheInFlightSetExcludesAwaitingConfirm:
         assert "planned" not in iac._CONFIGURE_IN_FLIGHT
         assert "confirmed" not in iac._CONFIGURE_IN_FLIGHT
         assert "configuring" in iac._CONFIGURE_IN_FLIGHT
+
+
+@pytest.mark.asyncio
+class TestTheRunIsActuallyQUEUED:
+    """The assertion that was missing, and its absence shipped an inert feature.
+
+    Every test here used to assert `create_run` **was called** -- a presence
+    check, not an application check. `create_run` leaves the run `pending`, the
+    claim loop matches `queued`/`confirmed`/`applying`, and nothing sweeps
+    pending; so the whole trigger did nothing while twelve tests and three
+    mutations passed. Asserting the STATUS is what a reader checks, and it is
+    the only thing that distinguishes a configure that will happen from one that
+    will not.
+    """
+
+    async def test_a_created_run_reaches_queued(self):
+        ws = _ws()
+        redis = _Redis({f"tp:inv_settle:{ws.id}": _TOKEN_NEW})
+        created, _ = await _run([ws], redis=redis, current=_TOKEN_NEW)
+        created.assert_called_once()
+        created.queued.assert_awaited_once()
+        assert created.queued.await_args.args[1].status == "queued"
+
+    async def test_nothing_is_queued_when_nothing_is_created(self):
+        """The contrast, so the assertion above cannot be satisfied by queueing
+        unconditionally."""
+        ws = _ws(stamp=_TOKEN_OLD)
+        redis = _Redis({f"tp:inv_settle:{ws.id}": _TOKEN_OLD})
+        created, _ = await _run([ws], redis=redis, current=_TOKEN_OLD)
+        created.assert_not_called()
+        created.queued.assert_not_awaited()

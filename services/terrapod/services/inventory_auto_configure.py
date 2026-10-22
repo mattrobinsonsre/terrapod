@@ -113,7 +113,7 @@ async def _create_run(db: AsyncSession, ws: Workspace) -> Run | None:
         )
         return None
     try:
-        return await run_service.create_run(
+        run = await run_service.create_run(
             db,
             workspace=ws,
             message="Auto-configure: the inventory changed",
@@ -121,6 +121,17 @@ async def _create_run(db: AsyncSession, ws: Workspace) -> Run | None:
             configuration_version_id=cv.id,
             is_configure=True,
         )
+        # `create_run` leaves the run `pending` and does NOT queue it -- the
+        # claim loop matches `queued`, `confirmed` and `applying`, and nothing
+        # sweeps a pending run. Every other platform-decided creator queues
+        # explicitly for the same reason: drift detection, the catalog service
+        # and the lifecycle destroy retry all do.
+        #
+        # Without this the feature was inert, and silently so in the worst way:
+        # the run sat at `pending` for ever, and because `_CONFIGURE_IN_FLIGHT`
+        # includes `pending`, every later cycle then saw a configure "already on
+        # its way" and skipped. One dead run per workspace, then nothing at all.
+        return await run_service.queue_run(db, run)
     except (run_service.PlanApplyNotEnabled, workspace_settings.ConfigureNotEnabled):
         # A run the PLATFORM decided on, so the refusal is caught and skipped
         # rather than raised: erroring once per cycle about a workspace behaving
