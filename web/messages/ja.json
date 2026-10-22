@@ -2548,7 +2548,7 @@
       "ansibleVersionPlaceholder": "例: 2.21.5",
       "ansibleVersionTitle": "このワークスペースの ansible-core バージョン。空欄にするとデプロイメントのデフォルトに従います。",
       "ansibleCollections": "Ansible コレクション",
-      "ansibleCollectionsHint": "configure の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。構成自体の requirements ファイルより後にインストールされて上書きするため、ここで指定したバージョンがリポジトリにコミットされたものより優先されます。",
+      "ansibleCollectionsHint": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。構成自体の requirements ファイルより後にインストールされて上書きするため、ここで指定したバージョンがリポジトリにコミットされたものより優先されます。",
       "ansibleCollectionsPlaceholder": "例: community.general:9.2.0",
       "ansibleCollectionsAdd": "コレクションを追加",
       "operations": "操作",

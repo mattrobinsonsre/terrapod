@@ -375,3 +375,265 @@ class TestTheBaseline:
         storage.get = AsyncMock(return_value=b"not json at all")
         with patch("terrapod.storage.get_storage", return_value=storage):
             assert await narrow.load_baseline("ws-1") is None
+
+
+# --------------------------------------------------------------------------
+# The call sites. A correct `limit_for` that nothing calls is the defect this
+# half exists to catch -- the same shape as #2116's declaration that fifteen
+# run creators never read, and as #2224 shipping a cycle that created runs no
+# claim loop would ever match.
+# --------------------------------------------------------------------------
+
+
+def _full_ws(**kw):
+    """A workspace complete enough for `create_run` to build a Run from."""
+    import uuid as _uuid
+
+    ws = MagicMock()
+    ws.id = _uuid.uuid4()
+    ws.name = "narrow-ws"
+    ws.auto_apply = False
+    ws.engine_version = "1.11"
+    ws.terragrunt_enabled = False
+    ws.resource_cpu = "1"
+    ws.resource_memory = "2Gi"
+    ws.ee_resource_cpu = ""
+    ws.ee_resource_memory = ""
+    ws.parallelism = 10
+    ws.agent_pool_links = []
+    ws.plan_apply_enabled = kw.get("plan_apply_enabled", True)
+    ws.configure_enabled = True
+    ws.configure_after_apply = kw.get("configure_after_apply", False)
+    ws.auto_configure_enabled = False
+    ws.ansible_version = ""
+    ws.ansible_execution_environment = ""
+    ws.default_limit = kw.get("default_limit", "")
+    ws.configure_all_hosts = False
+    ws.config_directory = "ansible"
+    return ws
+
+
+@pytest.mark.asyncio
+class TestCreateRunNarrowsADerivedConfigure:
+    async def _create(self, ws, **kw):
+        """Create a run; return (the Run instance, the patched limit_for)."""
+        import uuid as _uuid
+
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        from terrapod.services import inventory_resolve
+        from terrapod.services.run_service import create_run
+
+        db = AsyncMock(spec=AsyncSession)
+        limit = AsyncMock(return_value="h1:h2")
+        doc = _doc(hosts={"h1": {}, "h2": {}})
+        with (
+            patch("terrapod.services.run_service.Run") as MockRun,
+            patch.object(
+                inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", doc))
+            ),
+            patch.object(narrow, "limit_for", limit),
+        ):
+            inst = MockRun.return_value
+            inst.id = _uuid.uuid4()
+            inst.status = "pending"
+            inst.is_configure = kw.get("is_configure", False)
+            inst.configure_after_apply = kw.get("configure_after_apply", False)
+            inst.source = kw.get("source", "tfe-api")
+            inst.ansible_limit = kw.get("ansible_limit", "")
+            await create_run(db, ws, message="m", **kw)
+            return inst, limit, doc
+
+    async def test_an_auto_configure_run_is_narrowed(self):
+        inst, limit, doc = await self._create(
+            _full_ws(plan_apply_enabled=False), is_configure=True, source="auto-configure"
+        )
+        limit.assert_awaited_once()
+        assert inst.ansible_limit == "h1:h2"
+        # Against the document just written, never a second resolution: the
+        # limit may only name hosts the artifact contains.
+        assert limit.await_args.kwargs["current"] is doc
+
+    async def test_a_push_driven_configure_is_narrowed(self):
+        inst, limit, _ = await self._create(
+            _full_ws(plan_apply_enabled=False), is_configure=True, source="vcs"
+        )
+        limit.assert_awaited_once()
+        assert inst.ansible_limit == "h1:h2"
+
+    async def test_a_configure_somebody_ASKED_for_is_NOT_narrowed(self):
+        """A person who queues a configure without a limit means "the
+        workspace's default". Narrowing that overrides a request."""
+        inst, limit, _ = await self._create(
+            _full_ws(plan_apply_enabled=False), is_configure=True, source="tfe-api"
+        )
+        limit.assert_not_awaited()
+        assert inst.ansible_limit == ""
+
+    async def test_an_explicit_limit_is_never_overwritten(self):
+        _inst, limit, _ = await self._create(
+            _full_ws(plan_apply_enabled=False),
+            is_configure=True,
+            source="auto-configure",
+            ansible_limit="canary",
+        )
+        limit.assert_not_awaited()
+
+    async def test_a_composite_is_not_narrowed_at_CREATION(self):
+        """Its inventory is only knowable once the apply has moved the estate
+        (#2230), so a limit computed here would name a pre-apply host set."""
+        _inst, limit, _ = await self._create(_full_ws(configure_after_apply=True))
+        limit.assert_not_awaited()
+
+    async def test_a_plain_plan_resolves_nothing_and_narrows_nothing(self):
+        _inst, limit, _ = await self._create(_full_ws())
+        limit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+class TestTheCompositeNarrowsAtTheHandOver:
+    async def _complete(self, *, existing_limit=""):
+        from terrapod.db.models import Workspace  # noqa: F401
+        from terrapod.services import inventory_resolve, run_service
+
+        run = MagicMock()
+        run.id = "run-1"
+        run.workspace_id = "ws-1"
+        run.status = "applying"
+        run.is_configure = True
+        run.configure_after_apply = True
+        run.is_destroy = False
+        run.ansible_limit = existing_limit
+        # Explicitly None: the hand-over's idempotency guard is
+        # `apply_finished_at is not None`, and a MagicMock attribute is not
+        # None -- so leaving it unset makes `complete_apply` return early as
+        # though the hand-over had already happened, and every assertion below
+        # would be about a function that did nothing.
+        run.apply_finished_at = None
+
+        async def _transition(_db, r, status, **_kw):
+            r.status = status
+            return r
+
+        doc = _doc(hosts={"new-host": {}})
+        limit = AsyncMock(return_value="new-host")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=_ws())
+        with (
+            patch.object(
+                inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", doc))
+            ),
+            patch.object(narrow, "limit_for", limit),
+            patch.object(run_service, "transition_run", AsyncMock(side_effect=_transition)),
+            patch.object(run_service, "_after_apply_landed", AsyncMock()),
+            patch("terrapod.redis.client.delete_job_status", new_callable=AsyncMock),
+        ):
+            await run_service.complete_apply(db, run)
+        return run, limit, doc
+
+    async def test_the_hand_over_narrows_against_the_RE_RESOLVED_document(self):
+        """The whole reason it is computed here rather than at creation: the
+        apply has only now finished changing what the inventory resolves to, so
+        a host the apply just created is in this document and not in the one
+        run creation saw."""
+        run, limit, doc = await self._complete()
+        limit.assert_awaited_once()
+        assert limit.await_args.kwargs["current"] is doc
+        assert run.ansible_limit == "new-host"
+
+    async def test_a_composite_created_with_an_explicit_limit_keeps_it(self):
+        run, limit, _ = await self._complete(existing_limit="canary")
+        limit.assert_not_awaited()
+        assert run.ansible_limit == "canary"
+
+
+@pytest.mark.asyncio
+class TestTheBaselineIsRecordedOnSuccessOnly:
+    async def _complete_configure(self, *, store=None, resolve=None):
+        from terrapod.services import inventory_resolve, run_service
+
+        run = MagicMock()
+        run.id = "run-1"
+        run.workspace_id = "ws-1"
+        run.status = "configuring"
+        run.configuration_version_id = "cv-7"
+
+        async def _transition(_db, r, status, **_kw):
+            r.status = status
+            return r
+
+        store = store or AsyncMock()
+        resolve = resolve or AsyncMock(return_value=_doc(hosts={"a": {}}))
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=_ws())
+        with (
+            patch.object(narrow, "store_baseline", store),
+            patch.object(inventory_resolve, "resolve_for_run", resolve),
+            patch.object(run_service, "transition_run", AsyncMock(side_effect=_transition)),
+            patch.object(run_service, "_after_apply_landed", AsyncMock()),
+        ):
+            out = await run_service.complete_configure(db, run)
+        return out, store
+
+    async def test_a_successful_configure_records_what_it_targeted(self):
+        out, store = await self._complete_configure()
+        assert out.status == "applied"
+        store.assert_awaited_once()
+        assert store.await_args.kwargs["document"] == _doc(hosts={"a": {}})
+        assert store.await_args.kwargs["config_version_id"] == "cv-7"
+
+    async def test_a_run_that_is_not_configuring_records_nothing(self):
+        """`complete_configure` returns early, so a failed configure never
+        leaves a baseline -- which is what makes the next derived run go wide
+        rather than diffing against a half-applied estate."""
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.status = "errored"
+        store = AsyncMock()
+        with patch.object(narrow, "store_baseline", store):
+            await run_service.complete_configure(AsyncMock(), run)
+        store.assert_not_awaited()
+
+    async def test_a_failure_to_store_does_not_fail_the_configure(self):
+        """A baseline we could not store is a baseline the next run does not
+        have, and the consequence of that is a WIDER run. Failing the configure
+        over it would turn a safe degradation into a reported failure on a
+        playbook that had already succeeded."""
+        out, _ = await self._complete_configure(
+            store=AsyncMock(side_effect=RuntimeError("storage down"))
+        )
+        assert out.status == "applied"
+
+    async def test_a_failure_to_RESOLVE_does_not_fail_the_configure_either(self):
+        out, store = await self._complete_configure(
+            resolve=AsyncMock(side_effect=RuntimeError("ansible-inventory exploded"))
+        )
+        assert out.status == "applied"
+        store.assert_not_awaited()
+
+
+def test_the_baseline_is_written_from_exactly_one_place():
+    """Derived, not listed: a second writer is a second thing that can record a
+    baseline for a configure that did NOT succeed, which is the one condition
+    the whole narrowing rests on."""
+    import ast
+    import pathlib
+
+    src_root = pathlib.Path(narrow.__file__).resolve().parent.parent
+    callers = []
+    for f in sorted(src_root.rglob("*.py")):
+        for node in ast.walk(ast.parse(f.read_text())):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+            if name == "store_baseline" and f.name != "inventory_narrowing.py":
+                callers.append(f"{f.relative_to(src_root)}:{node.lineno}")
+    assert len(callers) == 1, (
+        f"`store_baseline` is called from {len(callers)} places: {callers}. It must be "
+        "called from exactly one, inside the success path of `complete_configure` — a "
+        "second caller could record a baseline for a configure that did not succeed, "
+        "and the next derived run would then narrow against an estate no diff describes."
+    )
+    assert callers[0].endswith("run_service.py:" + callers[0].split(":")[-1])
+    assert "run_service.py" in callers[0], callers[0]

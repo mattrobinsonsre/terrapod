@@ -60,6 +60,7 @@ def _mock_rule(
     # #1974's pair, serialised beside them.
     r.auto_configure_enabled = False
     r.configure_after_apply = False
+    r.configure_all_hosts = False
     r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""

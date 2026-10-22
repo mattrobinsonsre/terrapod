@@ -67,7 +67,7 @@ async def _make(ws, **kw) -> dict:
     db = AsyncMock(spec=AsyncSession)
     with (
         patch("terrapod.services.run_service.Run") as MockRun,
-        patch.object(inventory_resolve, "write_run_artifact", AsyncMock()),
+        patch.object(inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", {}))),
     ):
         inst = MockRun.return_value
         inst.id = uuid.uuid4()

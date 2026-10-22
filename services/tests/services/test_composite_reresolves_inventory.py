@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.api.routers.runs import _apply_status
-from terrapod.services import inventory_resolve, run_service
+from terrapod.services import inventory_narrowing, inventory_resolve, run_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -47,9 +47,13 @@ def _run(*, composite: bool, apply_finished=None):
 async def _complete(run, *, artifact=None):
     db = AsyncMock()
     db.get = AsyncMock(return_value=MagicMock())
-    write = artifact if artifact is not None else AsyncMock(return_value="key")
+    write = artifact if artifact is not None else AsyncMock(return_value=("key", {}))
     with (
         patch.object(inventory_resolve, "write_run_artifact", write),
+        # The hand-over also narrows the configure now (#2229). Stubbed at the
+        # boundary below the thing under test, so these tests stay about the
+        # re-resolution; the narrowing has its own tests.
+        patch.object(inventory_narrowing, "limit_for", AsyncMock(return_value="")),
         patch.object(run_service, "transition_run", AsyncMock(side_effect=_fake_transition)),
         patch.object(run_service, "_after_apply_landed", AsyncMock()),
         patch("terrapod.redis.client.delete_job_status", new_callable=AsyncMock),

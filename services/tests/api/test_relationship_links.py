@@ -80,6 +80,7 @@ class TestAutodiscoveryRule:
             # #1974's pair, serialised beside them.
             auto_configure_enabled=False,
             configure_after_apply=False,
+            configure_all_hosts=False,
             config_directory="",
             inventory_paths=[],
             default_playbook="",

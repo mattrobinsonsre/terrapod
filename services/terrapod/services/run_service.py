@@ -1574,9 +1574,28 @@ async def create_run(
     # phase, and have consumed a runner slot to report something that was
     # already knowable here. The refusal reaches whoever asked for the run.
     if is_configure:
-        from terrapod.services import inventory_resolve
+        from terrapod.services import inventory_narrowing, inventory_resolve
 
-        await inventory_resolve.write_run_artifact(db, run)
+        _key, document = await inventory_resolve.write_run_artifact(db, run)
+
+        # A configure the PLATFORM derived is narrowed to the hosts whose
+        # resolved configuration actually moved (#2229). One somebody ASKED for
+        # is not: a person who queues a configure without a limit means "the
+        # workspace's default", so narrowing it would override a request rather
+        # than bound a side effect.
+        #
+        # A COMPOSITE is excluded here and narrowed at the hand-over instead.
+        # Its inventory is only knowable once the apply has finished moving the
+        # estate (#2230), so a limit computed now would name a pre-apply host
+        # set -- the exact staleness that fix exists to remove.
+        #
+        # Narrowed against the SAME document that was just written, never a
+        # second resolution: the limit may only name hosts the artifact
+        # contains, and a `--limit` matching nothing exits 1.
+        if not ansible_limit and inventory_narrowing.is_derived_configure(run):
+            run.ansible_limit = await inventory_narrowing.limit_for(
+                db, run, workspace, current=document
+            )
 
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages
@@ -2357,10 +2376,10 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
         # state for a listener to race against. Synchronous for the same reason
         # `create_run` resolves synchronously: it is the same operation in the
         # same kind of place, and deferring it would reintroduce the window.
-        from terrapod.services import inventory_resolve
+        from terrapod.services import inventory_narrowing, inventory_resolve
 
         try:
-            await inventory_resolve.write_run_artifact(db, run)
+            _key, document = await inventory_resolve.write_run_artifact(db, run)
         except Exception as exc:  # noqa: BLE001
             # The apply SUCCEEDED and the configure cannot run. Never fall back
             # to the stale artifact: configuring a host set known to be wrong is
@@ -2388,6 +2407,21 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
                 err=str(exc),
             )
             return await transition_run(db, run, "errored")
+
+        # Narrow the composite's configure to the hosts the estate actually
+        # moved on (#2229), against the document just resolved above -- which is
+        # why it is computed HERE and not at creation: the apply has only now
+        # finished changing what the inventory resolves to.
+        #
+        # Only when the run carries no limit of its own. A composite created
+        # with an explicit limit was asked for that limit, and the apply
+        # chaining a configure onto it does not make it the platform's choice.
+        if not run.ansible_limit:
+            ws = await db.get(Workspace, run.workspace_id)
+            if ws is not None:
+                run.ansible_limit = await inventory_narrowing.limit_for(
+                    db, run, ws, current=document
+                )
 
         run.apply_finished_at = now_utc()
         # Exactly what entering `applying` does to the plan's Job state, and
@@ -2446,8 +2480,45 @@ async def complete_configure(db: AsyncSession, run: Run) -> Run:
         standalone=is_standalone_configure(run),
     )
 
+    # Record what this configure targeted, as the next derived one's baseline
+    # (#2229). ONLY on success, and that is the whole design: a failed configure
+    # leaves hosts in a state no diff can describe, so the next run finds no new
+    # baseline, cannot prove narrowing is safe, and goes wide.
+    #
+    # Best-effort. A baseline we failed to store is a baseline the next run does
+    # not have, and the consequence of that is a WIDER run -- so failing the
+    # configure over it would turn a safe degradation into a reported failure on
+    # a playbook that had already succeeded.
+    await _store_configure_baseline(db, run)
+
     await _after_apply_landed(db, run)
     return run
+
+
+async def _store_configure_baseline(db: AsyncSession, run: Run) -> None:
+    """The successful configure's host set, for the next one to diff against."""
+    try:
+        from terrapod.services import inventory_narrowing, inventory_resolve
+
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws is None:
+            return
+        document = await inventory_resolve.resolve_for_run(db, run)
+        await inventory_narrowing.store_baseline(
+            str(run.workspace_id),
+            document=document,
+            config_version_id=(
+                str(run.configuration_version_id) if run.configuration_version_id else None
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Could not record the configure baseline; the next derived configure "
+            "will target every host",
+            run_id=str(run.id),
+            workspace_id=str(run.workspace_id),
+            err=str(exc),
+        )
 
 
 async def _invalidate_sibling_pr_plans(

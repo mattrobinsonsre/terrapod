@@ -84,7 +84,9 @@ async def _queue(
         # BELOW what is under test: `create_run` still runs in full, including
         # the declaration guard and the shape resolver whose answer the claim
         # then keys on.
-        with patch.object(inventory_resolve, "write_run_artifact", AsyncMock()):
+        with patch.object(
+            inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", {}))
+        ):
             run = await run_service.create_run(
                 db,
                 ws,
@@ -205,7 +207,9 @@ class TestTheCompositeHandsOverToItsConfigure:
             # no archive behind it, so a real resolution here fails and the
             # refusal errors the run -- which is correct behaviour meeting an
             # unrepresentative fixture. This file is about the claim query.
-            with patch.object(inventory_resolve, "write_run_artifact", AsyncMock()):
+            with patch.object(
+                inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", {}))
+            ):
                 await run_service.complete_apply(db, stored)
             await db.commit()
 
@@ -267,7 +271,9 @@ class TestTheCompositeHandsOverToItsConfigure:
             # no archive behind it, so a real resolution here fails and the
             # refusal errors the run -- which is correct behaviour meeting an
             # unrepresentative fixture. This file is about the claim query.
-            with patch.object(inventory_resolve, "write_run_artifact", AsyncMock()):
+            with patch.object(
+                inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", {}))
+            ):
                 await run_service.complete_apply(db, stored)
             await db.commit()
 
