@@ -1469,13 +1469,6 @@ def _apply_status(run: Run) -> str:
         # branches on `errored` to mean "state may be partially applied" will
         # be over-cautious here, and the release notes say so.
         #
-        # A third case arrives with the configure phase: apply succeeded,
-        # configure failed. That run is `errored` with the apply genuinely
-        # finished and a state version committed, so it must report `finished`
-        # here rather than `errored` -- and it needs a signal this function does
-        # not have yet (`configure_started_at`). It lands with the run spine
-        # (#1988); do not guess at it from these two timestamps, which is what
-        # produced this bug.
         # Apply succeeded, configure failed (#1988). The apply genuinely
         # happened and a state version is committed, so reporting `errored`
         # here would tell the CLI the infrastructure change failed when it
