@@ -569,10 +569,10 @@ def require_plan_apply_operation(workspace) -> None:
       per poll cycle would be noise about a workspace behaving exactly as
       declared.
 
-    `configure_enabled` is deliberately **not** checked here: configure
-    operations do not exist yet (#1972 and its neighbours), so a workspace
-    declaring one has nothing to run and nothing to refuse. When a configure
-    run arrives it will not come through this guard -- it is not a plan/apply.
+    `configure_enabled` is not checked here, because this guard answers one
+    question. `require_run_operations` below is what dispatches on the run's
+    kind, and that is the function `create_run` calls -- the note above about
+    one call site now belongs to it.
     """
     if not workspace.plan_apply_enabled:
         raise PlanApplyNotEnabled(
@@ -580,6 +580,60 @@ def require_plan_apply_operation(workspace) -> None:
             "(plan-apply-enabled is false), so it cannot plan or apply; "
             "set plan-apply-enabled on the workspace to allow it"
         )
+
+
+class ConfigureNotEnabled(ValueError):
+    """Raised when a configure is asked for on a workspace that declares none.
+
+    `PlanApplyNotEnabled`'s twin, for the same reasons: a `ValueError` so a
+    bare `except ValueError` still catches it, and a distinct type so a router
+    can answer 422 while a platform-decided trigger skips quietly.
+    """
+
+
+def require_configure_operation(workspace) -> None:
+    """Refuse a configure on a workspace that does not declare one (#1974)."""
+    if not workspace.configure_enabled:
+        raise ConfigureNotEnabled(
+            "this workspace declares no configure operation "
+            "(configure-enabled is false), so it cannot run a playbook; "
+            "set configure-enabled on the workspace to allow it"
+        )
+
+
+def require_run_operations(workspace, *, is_configure: bool, configure_after_apply: bool) -> None:
+    """Refuse a run the workspace's declaration excludes -- whatever kind it is.
+
+    **The one place the declaration is enforced, and the only caller is
+    `run_service.create_run`** (#2116, #1974). That is the only `Run`
+    constructor on the live path, so one call there cannot be bypassed and no
+    caller has to remember the rule. What a caller chooses is only how to
+    react: a run somebody asked for becomes a 4xx naming the column, and a run
+    the platform decided on its own catches and skips -- see
+    `require_plan_apply_operation` for why those are the two reactions.
+
+    It dispatches on the kind because a workspace may declare either operation
+    or both, and the check has to be the one that matches:
+
+    * a plan/apply run needs `plan_apply_enabled`;
+    * a STANDALONE configure needs `configure_enabled` **and nothing else** --
+      which is the whole point of a configure-only workspace, and what a single
+      unconditional `require_plan_apply_operation` got wrong: it refused every
+      configure on exactly the workspaces that exist to run them;
+    * a COMPOSITE needs **both**, because it is an apply and a configure on one
+      run, and either declaration missing means half of it cannot happen.
+
+    The plan/apply half is checked first on a composite, so a workspace with
+    neither operation reports the plan/apply refusal rather than the configure
+    one. Both are true and the order only decides which is said; the
+    plan/apply half is the one an operator is likelier to have meant.
+    """
+    if is_configure and not configure_after_apply:
+        require_configure_operation(workspace)
+        return
+    require_plan_apply_operation(workspace)
+    if is_configure:
+        require_configure_operation(workspace)
 
 
 def _validate_path_list(raw: object, field: str, cap: int) -> list[str]:

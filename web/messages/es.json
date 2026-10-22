@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Uno de los entornos de ejecución propios de esta instalación, por etiqueta. Sustituye a la versión de Ansible, por lo que un espacio de trabajo con etiqueta ignora su línea. Déjalo vacío para usar la imagen integrada de la línea.",
       "ansibleExecutionEnvironmentPlaceholder": "p. ej. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Ninguno configurado en esta instalación",
-      "ansibleVersionUnconfirmed": "No se pudieron confirmar las versiones disponibles: escribe una"
+      "ansibleVersionUnconfirmed": "No se pudieron confirmar las versiones disponibles: escribe una",
+      "autoConfigureEnabled": "Configurar en cada push",
+      "autoConfigureEnabledHint": "Un push que modifique el directorio de configuración de Ansible ejecuta el playbook. Si no hay ningún límite predeterminado, eso abarca todo el inventario.",
+      "autoConfigureEnabledHintLimited": "Un push que modifique el directorio de configuración de Ansible ejecuta el playbook contra {limit}.",
+      "configureAfterApply": "Configurar tras apply",
+      "configureAfterApplyHint": "Cada apply de aquí va seguido de una configuración en la misma ejecución, así que un apply desde la CLI también transmite la salida del playbook. Una destrucción nunca configura."
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publicación de módulo",
       "awaitingDecision": "esperando una decisión",
       "typeSavedPlan": "plan guardado",
-      "typeSavedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado."
+      "typeSavedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado.",
+      "queueConfigure": "Configurar",
+      "queueConfigureTitle": "Ejecutar ahora el playbook contra el inventario. Ningún plan lo precede.",
+      "queueConfigureConfirmAll": "¿Ejecutar el playbook contra TODO EL INVENTARIO? Esto cambia hosts reales y no se puede deshacer.",
+      "queueConfigureConfirmLimited": "¿Ejecutar el playbook contra {limit}? Esto cambia hosts reales y no se puede deshacer.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "el predeterminado del espacio de trabajo",
+      "configureLimit": "Límite",
+      "configureLimitPlaceholder": "todo el inventario",
+      "configureLimitHint": "Qué hosts, grupos o patrones alcanzar. Vacío significa todos los hosts del inventario.",
+      "typeConfigure": "configuración",
+      "typeConfigureHint": "Ejecuta el playbook contra el inventario. Sin plan y sin apply.",
+      "typeConfigureAfterApplyHint": "Al apply le sigue una configuración en esta misma ejecución."
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventario",
-        "body": "Los hosts y los grupos que contiene este espacio de trabajo, y a qué los resuelve ansible. Cada fila se puede editar aquí; ejecutar un playbook contra ellos todavía no está disponible."
+        "body": "Los hosts y los grupos que contiene este espacio de trabajo, y a qué los resuelve ansible. Cada fila se puede editar aquí."
       },
       "nav": {
         "label": "Secciones del inventario",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Comprobación manual de desviación desde la interfaz",
       "queued": "Puesta en cola desde la interfaz",
       "queuedSpeculative": "Puesta en cola desde la interfaz (especulativa)",
-      "destroyQueued": "Destrucción puesta en cola desde la interfaz"
+      "destroyQueued": "Destrucción puesta en cola desde la interfaz",
+      "queuedConfigure": "Configuración puesta en cola desde la interfaz"
     },
     "errors": {
       "loadWorkspace": "No se pudo cargar el espacio de trabajo",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "No se pudo subir el archivo de estado",
       "updateSecurityScan": "No se pudo actualizar el análisis de seguridad",
       "updateDebugMode": "No se pudo actualizar el modo de depuración",
-      "updateForkPlans": "No se pudieron actualizar los planes de pull requests desde forks"
+      "updateForkPlans": "No se pudieron actualizar los planes de pull requests desde forks",
+      "queueConfigure": "No se pudo poner la configuración en cola",
+      "queueConfigureStatus": "No se pudo poner la configuración en cola ({status})"
     },
     "subtabs": {
       "state": "Estado",

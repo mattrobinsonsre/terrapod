@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Eine der eigenen Ausführungsumgebungen dieser Installation, per Label. Sie überschreibt die Ansible-Version, sodass ein Workspace mit gesetztem Label seine Linie ignoriert. Leer lassen, um das integrierte Image der Linie zu verwenden.",
       "ansibleExecutionEnvironmentPlaceholder": "z. B. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Keine in dieser Installation konfiguriert",
-      "ansibleVersionUnconfirmed": "Verfügbare Versionen konnten nicht bestätigt werden – bitte eingeben"
+      "ansibleVersionUnconfirmed": "Verfügbare Versionen konnten nicht bestätigt werden – bitte eingeben",
+      "autoConfigureEnabled": "Konfigurieren bei Push",
+      "autoConfigureEnabledHint": "Ein Push, der das Ansible-Konfigurationsverzeichnis ändert, führt das Playbook aus. Ohne gesetztes Standard-Limit ist das das ganze Inventar.",
+      "autoConfigureEnabledHintLimited": "Ein Push, der das Ansible-Konfigurationsverzeichnis ändert, führt das Playbook gegen {limit} aus.",
+      "configureAfterApply": "Konfigurieren nach der Anwendung",
+      "configureAfterApplyHint": "Auf jede Anwendung hier folgt ein Konfigurieren im selben Lauf, sodass auch eine Anwendung über die CLI die Ausgabe des Playbooks streamt. Ein Destroy konfiguriert nie."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "Modul-Veröffentlichung",
       "awaitingDecision": "wartet auf Entscheidung",
       "typeSavedPlan": "gespeicherter Plan",
-      "typeSavedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird."
+      "typeSavedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird.",
+      "queueConfigure": "Konfigurieren",
+      "queueConfigureTitle": "Das Playbook jetzt gegen das Inventar ausführen. Es geht kein Plan voraus.",
+      "queueConfigureConfirmAll": "Das Playbook gegen das GANZE Inventar ausführen? Dies verändert echte Hosts und kann nicht rückgängig gemacht werden.",
+      "queueConfigureConfirmLimited": "Das Playbook gegen {limit} ausführen? Dies verändert echte Hosts und kann nicht rückgängig gemacht werden.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "der Standard des Workspace",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "das ganze Inventar",
+      "configureLimitHint": "Welche Hosts, Gruppen oder Muster erreicht werden sollen. Leer bedeutet jeden Host im Inventar.",
+      "typeConfigure": "Konfigurieren",
+      "typeConfigureHint": "Führt das Playbook gegen das Inventar aus. Kein Plan und keine Anwendung.",
+      "typeConfigureAfterApplyHint": "Auf die Anwendung folgt im selben Lauf ein Konfigurieren."
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "Die Hosts und Gruppen dieses Workspace und das, was Ansible daraus auflöst. Jede Zeile ist hier bearbeitbar; ein Playbook dagegen auszuführen ist noch nicht verfügbar."
+        "body": "Die Hosts und Gruppen dieses Workspace und das, was Ansible daraus auflöst. Jede Zeile ist hier bearbeitbar."
       },
       "nav": {
         "label": "Inventarbereiche",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manuelle Drift-Prüfung über die Benutzeroberfläche",
       "queued": "Über die Benutzeroberfläche eingereiht",
       "queuedSpeculative": "Über die Benutzeroberfläche eingereiht (spekulativ)",
-      "destroyQueued": "Destroy über die Benutzeroberfläche eingereiht"
+      "destroyQueued": "Destroy über die Benutzeroberfläche eingereiht",
+      "queuedConfigure": "Konfigurieren über die Benutzeroberfläche eingereiht"
     },
     "errors": {
       "loadWorkspace": "Arbeitsbereich konnte nicht geladen werden",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden",
       "updateSecurityScan": "Sicherheitsprüfung konnte nicht aktualisiert werden",
       "updateDebugMode": "Debugmodus konnte nicht aktualisiert werden",
-      "updateForkPlans": "Pläne für Pull Requests aus Forks konnten nicht aktualisiert werden"
+      "updateForkPlans": "Pläne für Pull Requests aus Forks konnten nicht aktualisiert werden",
+      "queueConfigure": "Konfigurieren konnte nicht eingereiht werden",
+      "queueConfigureStatus": "Konfigurieren konnte nicht eingereiht werden ({status})"
     },
     "subtabs": {
       "state": "Zustand",

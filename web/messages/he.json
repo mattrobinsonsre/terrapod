@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "אחת מסביבות ההרצה של פריסה זו, לפי תווית. היא עוקפת את גרסת Ansible, ולכן סביבת עבודה עם תווית מתעלמת מהקו שלה. השאר ריק כדי להשתמש בתמונה המשובצת של הקו.",
       "ansibleExecutionEnvironmentPlaceholder": "לדוגמה rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "לא הוגדר אף אחד בפריסה זו",
-      "ansibleVersionUnconfirmed": "לא ניתן לאמת את הגרסאות הזמינות — הקלד גרסה"
+      "ansibleVersionUnconfirmed": "לא ניתן לאמת את הגרסאות הזמינות — הקלד גרסה",
+      "autoConfigureEnabled": "תצורה בדחיפה",
+      "autoConfigureEnabledHint": "דחיפה שמשנה את ספריית התצורה של Ansible מריצה את ספר ההרצה. ללא מגבלה כברירת מחדל, זה כל המלאי.",
+      "autoConfigureEnabledHintLimited": "דחיפה שמשנה את ספריית התצורה של Ansible מריצה את ספר ההרצה מול {limit}.",
+      "configureAfterApply": "תצורה לאחר החלה",
+      "configureAfterApplyHint": "אחרי כל החלה כאן באה תצורה באותה ריצה, כך שגם החלה מה-CLI מזרימה את הפלט של ספר ההרצה. השמדה אינה מריצה תצורה מעולם."
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "פרסום מודול",
       "awaitingDecision": "ממתין להחלטה",
       "typeSavedPlan": "תוכנית שמורה",
-      "typeSavedPlanHint": "ההחלה נדחתה: ריצה זו אינה תופסת את סביבת העבודה עד שהתוכנית השמורה מוחלת."
+      "typeSavedPlanHint": "ההחלה נדחתה: ריצה זו אינה תופסת את סביבת העבודה עד שהתוכנית השמורה מוחלת.",
+      "queueConfigure": "תצורה",
+      "queueConfigureTitle": "הריצו את ספר ההרצה מול המלאי עכשיו. אין תוכנית שקודמת לכך.",
+      "queueConfigureConfirmAll": "להריץ את ספר ההרצה מול כל המלאי, מול כל מארח שבו? זה משנה מארחים אמיתיים ולא ניתן לבטל זאת.",
+      "queueConfigureConfirmLimited": "להריץ את ספר ההרצה מול {limit}? זה משנה מארחים אמיתיים ולא ניתן לבטל זאת.",
+      "configurePlaybook": "ספר הרצה",
+      "configurePlaybookPlaceholder": "ברירת המחדל של סביבת העבודה",
+      "configureLimit": "מגבלה",
+      "configureLimitPlaceholder": "כל המלאי",
+      "configureLimitHint": "אילו מארחים, קבוצות או תבניות להגיע אליהם. ריק פירושו כל מארח במלאי.",
+      "typeConfigure": "תצורה",
+      "typeConfigureHint": "מריץ את ספר ההרצה מול המלאי. ללא תוכנית וללא החלה.",
+      "typeConfigureAfterApplyHint": "אחרי ההחלה באה תצורה באותה ריצה עצמה."
     },
     "state": {
       "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "מלאי",
-        "body": "המארחים והקבוצות שסביבת העבודה הזו מחזיקה, ומה ansible פותר אותם אליו. כל שורה ניתנת לעריכה כאן; הרצת playbook מולם עדיין אינה זמינה."
+        "body": "המארחים והקבוצות שסביבת העבודה הזו מחזיקה, ומה ansible פותר אותם אליו. כל שורה ניתנת לעריכה כאן."
       },
       "nav": {
         "label": "מקטעי המלאי",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "בדיקת סטייה ידנית מהממשק",
       "queued": "נוסף לתור מהממשק",
       "queuedSpeculative": "נוסף לתור מהממשק (ספקולטיבי)",
-      "destroyQueued": "השמדה נוספה לתור מהממשק"
+      "destroyQueued": "השמדה נוספה לתור מהממשק",
+      "queuedConfigure": "תצורה נוספה לתור מהממשק"
     },
     "errors": {
       "loadWorkspace": "טעינת סביבת העבודה נכשלה",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "העלאת קובץ המצב נכשלה",
       "updateSecurityScan": "עדכון סריקת האבטחה נכשל",
       "updateDebugMode": "עדכון מצב ניפוי השגיאות נכשל",
-      "updateForkPlans": "עדכון התוכניות לבקשות משיכה מ-fork נכשל"
+      "updateForkPlans": "עדכון התוכניות לבקשות משיכה מ-fork נכשל",
+      "queueConfigure": "הוספת התצורה לתור נכשלה",
+      "queueConfigureStatus": "הוספת התצורה לתור נכשלה ({status})"
     },
     "subtabs": {
       "state": "מצב",

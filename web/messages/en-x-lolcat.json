@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "WAN OF DIS deployments OWN execushun enviroments, BY LABEL. IT OVERRIDEZ TEH Ansibul vershun, SO A WORKSPACE WIF A LABEL SET IGNORES ITS LINE. LEAV EMPTY 2 USE TEH BUILT-IN IMAGE 4 TEH LINE. KTHXBAI",
       "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "NUFFIN CONFIGURD ON DIS deployment",
-      "ansibleVersionUnconfirmed": "AVAILABLE VERSHUNS COULD NOT BE CONFIRMD — TIPE WAN KTHX"
+      "ansibleVersionUnconfirmed": "AVAILABLE VERSHUNS COULD NOT BE CONFIRMD — TIPE WAN KTHX",
+      "autoConfigureEnabled": "Konfigur on push",
+      "autoConfigureEnabledHint": "A push wot changez teh Ansibul konfig root runz teh playbook. Wif no defawlt limit set, dats teh WHOLE inventree.",
+      "autoConfigureEnabledHintLimited": "A push wot changez teh Ansibul konfig root runz teh playbook agenst {limit}.",
+      "configureAfterApply": "Konfigur aftr apply",
+      "configureAfterApplyHint": "Evry apply heer is followd by a konfigur on teh same run, so a CLI apply streemz teh playbook outputz too. A destroy nevr konfigurz."
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "module publish",
       "awaitingDecision": "waitin fer decizun",
       "typeSavedPlan": "sayvd plan",
-      "typeSavedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai"
+      "typeSavedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai",
+      "queueConfigure": "Konfigur",
+      "queueConfigureTitle": "Run teh playbook agenst teh inventree nao. No plan cumz b4 it.",
+      "queueConfigureConfirmAll": "Run teh playbook agenst teh WHOLE inventree? Dis changez reel hostz an can not be undun.",
+      "queueConfigureConfirmLimited": "Run teh playbook agenst {limit}? Dis changez reel hostz an can not be undun.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "teh workspace defawlt",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "teh whole inventree",
+      "configureLimitHint": "Wich hostz, groupz or patternz ta reech. Empti meanz evry host in teh inventree.",
+      "typeConfigure": "konfigur",
+      "typeConfigureHint": "Runz teh playbook agenst teh inventree. No plan an no apply.",
+      "typeConfigureAfterApplyHint": "Teh apply is followd by a konfigur on dis same run."
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventree",
-        "body": "Teh hostz an groupz dis werkspace holdz, an wut ansibul turnz em into. Evry row u can edit rite heer; runnin a playbuk at em is not redy yet."
+        "body": "Teh hostz an groupz dis werkspace holdz, an wut ansibul turnz em into. Evry row u can edit rite heer."
       },
       "nav": {
         "label": "Inventree bitz",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manual drift chek from teh UI",
       "queued": "Kweued from teh UI",
       "queuedSpeculative": "Kweued from teh UI (speculativ)",
-      "destroyQueued": "Destroy kweued from teh UI"
+      "destroyQueued": "Destroy kweued from teh UI",
+      "queuedConfigure": "Konfigur kweued from teh UI"
     },
     "errors": {
       "loadWorkspace": "Failz ta load teh workspace",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Failz ta uplod teh state file",
       "updateSecurityScan": "Faild 2 updayt sekurity scannin",
       "updateDebugMode": "Failz ta updat teh debug mode",
-      "updateForkPlans": "Failz ta updat da fork pull rekwest planz"
+      "updateForkPlans": "Failz ta updat da fork pull rekwest planz",
+      "queueConfigure": "Failz ta kweue teh konfigur",
+      "queueConfigureStatus": "Failz ta kweue teh konfigur ({status})"
     },
     "subtabs": {
       "state": "Stayt",

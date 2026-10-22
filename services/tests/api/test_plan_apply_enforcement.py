@@ -41,6 +41,16 @@ import pytest
 _SRC = pathlib.Path(__file__).resolve().parents[2] / "terrapod"
 _EXC = "PlanApplyNotEnabled"
 _RULE = "require_plan_apply_operation"
+#: What `create_run` actually calls (#1974). The rule above answers one
+#: question -- does this workspace declare plan/apply -- and the dispatcher
+#: chooses which question to ask from the run's kind, because a STANDALONE
+#: configure needs `configure_enabled` and nothing else while a COMPOSITE needs
+#: both. The chokepoint gate below therefore pins the dispatcher, plus the fact
+#: that the dispatcher still consults both halves: a dispatcher that stopped
+#: calling one would leave the declaration unenforced for that run kind, which
+#: is #2116 again with a narrower blast radius.
+_DISPATCHER = "require_run_operations"
+_CONFIGURE_RULE = "require_configure_operation"
 
 #: A floor, so a rename cannot make this gate pass by matching nothing.
 #: Fifteen callers today; the floor leaves room for a few to be retired
@@ -101,20 +111,96 @@ class TestTheChokepointEnforces:
             c
             for c in ast.walk(fn)
             if isinstance(c, ast.Call)
-            and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == _RULE
+            and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == _DISPATCHER
         ]
         assert calls, (
-            f"`create_run` no longer calls `{_RULE}`. That call is the ONLY thing "
-            "enforcing the workspace's plan/apply declaration — without it, "
+            f"`create_run` no longer calls `{_DISPATCHER}`. That call is the ONLY "
+            "thing enforcing the workspace's operation declaration — without it, "
             "`plan-apply-enabled: false` is accepted by every write surface and "
-            "ignored by all fifteen run creators (#2116)."
+            "ignored by all fifteen run creators (#2116), and `configure-enabled` "
+            "is ignored by every configure trigger (#1974)."
         )
         # ...and it is handed the workspace, not something derived from it.
         arg = calls[0].args[0] if calls[0].args else None
         assert isinstance(arg, ast.Name) and arg.id == "workspace", (
-            f"`{_RULE}` must be passed `workspace` directly; got "
+            f"`{_DISPATCHER}` must be passed `workspace` directly; got "
             f"{ast.dump(arg) if arg else 'no positional argument'}."
         )
+
+    @pytest.mark.parametrize(
+        ("plan_apply", "configure", "is_configure", "after_apply", "refused"),
+        [
+            # A plan/apply run needs the plan/apply declaration.
+            (True, False, False, False, None),
+            (False, True, False, False, "plan-apply-enabled"),
+            # A STANDALONE configure needs the configure declaration AND
+            # NOTHING ELSE -- which is the whole point of a configure-only
+            # workspace, and what one unconditional plan/apply check got wrong:
+            # it refused every configure on exactly the workspaces that exist
+            # to run them.
+            (False, True, True, False, None),
+            (True, False, True, False, "configure-enabled"),
+            # A COMPOSITE needs both, because it is an apply and a configure on
+            # one run and either half missing means half of it cannot happen.
+            (True, True, True, True, None),
+            (True, False, True, True, "configure-enabled"),
+            (False, True, True, True, "plan-apply-enabled"),
+        ],
+    )
+    def test_the_dispatcher_refuses_by_kind(
+        self, plan_apply, configure, is_configure, after_apply, refused
+    ):
+        """Behavioural, not structural, and that is deliberate (#1974).
+
+        The AST check below asks whether the dispatcher calls both halves, and
+        one call satisfies it -- so a dispatcher that consulted the configure
+        declaration on the COMPOSITE path and not on the standalone one would
+        pass it while leaving `configure-enabled` unenforced for every
+        standalone configure. This matrix cannot be satisfied that way.
+        """
+        from unittest.mock import MagicMock
+
+        from terrapod.services import workspace_settings
+
+        ws = MagicMock()
+        ws.plan_apply_enabled = plan_apply
+        ws.configure_enabled = configure
+
+        def call():
+            workspace_settings.require_run_operations(
+                ws, is_configure=is_configure, configure_after_apply=after_apply
+            )
+
+        if refused is None:
+            call()
+            return
+        with pytest.raises(ValueError) as exc:
+            call()
+        assert refused in str(exc.value)
+
+    def test_the_dispatcher_consults_both_declarations(self):
+        """And it is not a no-op (#1974).
+
+        `create_run` calls one function now, so that function is where the
+        enforcement lives: if it stopped calling either half, the declaration
+        would go unread for one kind of run with every gate here still green.
+        """
+        src = (_SRC / "services" / "workspace_settings.py").read_text()
+        fn = next(
+            n
+            for n in ast.walk(ast.parse(src))
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == _DISPATCHER
+        )
+        called = {
+            getattr(c.func, "attr", None) or getattr(c.func, "id", None)
+            for c in ast.walk(fn)
+            if isinstance(c, ast.Call)
+        }
+        for half in (_RULE, _CONFIGURE_RULE):
+            assert half in called, (
+                f"`{_DISPATCHER}` does not call `{half}`, so the declaration it "
+                "guards is unenforced for that kind of run."
+            )
 
     def test_it_is_enforced_before_the_run_is_built(self):
         """A check after the `Run(...)` would let the row exist first."""
@@ -129,7 +215,7 @@ class TestTheChokepointEnforces:
             c.lineno
             for c in ast.walk(fn)
             if isinstance(c, ast.Call)
-            and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == _RULE
+            and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == _DISPATCHER
         )
         run_line = min(
             c.lineno
@@ -137,7 +223,7 @@ class TestTheChokepointEnforces:
             if isinstance(c, ast.Call) and getattr(c.func, "id", None) == "Run"
         )
         assert rule_line < run_line, (
-            f"`{_RULE}` is called at line {rule_line}, after the `Run(...)` at "
+            f"`{_DISPATCHER}` is called at line {rule_line}, after the `Run(...)` at "
             f"{run_line}. The refusal has to come first, or the row is built for a "
             "run that cannot exist."
         )
@@ -188,7 +274,7 @@ class TestEveryCallSiteDecides:
         )
 
 
-@pytest.mark.parametrize("name", [_EXC, _RULE])
+@pytest.mark.parametrize("name", [_EXC, _RULE, _CONFIGURE_RULE, _DISPATCHER])
 def test_the_rule_and_its_exception_still_exist(name):
     src = (_SRC / "services" / "workspace_settings.py").read_text()
     assert name in src, (

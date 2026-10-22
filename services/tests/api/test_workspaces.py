@@ -80,6 +80,9 @@ def _mock_workspace(
     # `configure_enabled` (#1966), which defaults False.
     ws.plan_apply_enabled = True
     ws.configure_enabled = False
+    # #1974's pair, serialised beside them.
+    ws.auto_configure_enabled = False
+    ws.configure_after_apply = False
     ws.config_directory = ""
     ws.inventory_paths = []
     ws.default_playbook = ""

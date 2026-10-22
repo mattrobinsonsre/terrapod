@@ -510,6 +510,32 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the Configure button and its options are reachable at phone width (#1974)', async ({
+    page,
+  }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-configure'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'site.yml',
+    })
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+
+    // A THIRD button on the row the #1340 test already calls the point where a
+    // phone starts scrolling sideways — so this is the case that would break it.
+    await expect(
+      page.getByRole('button', { name: 'Configure', exact: true }).filter({ visible: true }),
+    ).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // And the per-run overrides: two more inputs inside the options panel,
+    // which is where a monospace placeholder can push a phone wide.
+    await page.getByRole('button', { name: 'Options', exact: true }).click()
+    await expect(page.getByLabel('Limit', { exact: true })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('a long lock reason wraps inside the lock card at phone width (#1705)', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2eresp-lockreason'))

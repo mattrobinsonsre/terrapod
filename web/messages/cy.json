@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Un o amgylcheddau gweithredu'r gosodiad hwn, drwy label. Mae'n disodli fersiwn Ansible, felly bydd gweithle â label yn anwybyddu ei linell. Gadewch yn wag i ddefnyddio delwedd fewnol y llinell.",
       "ansibleExecutionEnvironmentPlaceholder": "e.e. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Dim un wedi'i ffurfweddu ar y gosodiad hwn",
-      "ansibleVersionUnconfirmed": "Methwyd cadarnhau'r fersiynau sydd ar gael — teipiwch un"
+      "ansibleVersionUnconfirmed": "Methwyd cadarnhau'r fersiynau sydd ar gael — teipiwch un",
+      "autoConfigureEnabled": "Cyflunio ar wthiad",
+      "autoConfigureEnabledHint": "Mae gwthiad sy'n newid cyfeiriadur cyfluniad Ansible yn rhedeg y llyfr chwarae. Heb derfyn rhagosodedig wedi'i osod, y rhestr eiddo gyfan yw hynny.",
+      "autoConfigureEnabledHintLimited": "Mae gwthiad sy'n newid cyfeiriadur cyfluniad Ansible yn rhedeg y llyfr chwarae yn erbyn {limit}.",
+      "configureAfterApply": "Cyflunio ar ôl gweithredu",
+      "configureAfterApplyHint": "Mae cyflunio yn dilyn pob gweithrediad yma ar yr un rhediad, felly mae gweithrediad o'r CLI yn ffrydio allbwn y llyfr chwarae hefyd. Nid yw dinistrio byth yn cyflunio."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "cyhoeddi modiwl",
       "awaitingDecision": "yn aros am benderfyniad",
       "typeSavedPlan": "cynllun wedi'i gadw",
-      "typeSavedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu."
+      "typeSavedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu.",
+      "queueConfigure": "Cyflunio",
+      "queueConfigureTitle": "Rhedeg y llyfr chwarae yn erbyn y rhestr eiddo nawr. Nid oes cynllun yn dod o'i flaen.",
+      "queueConfigureConfirmAll": "Rhedeg y llyfr chwarae yn erbyn y rhestr eiddo GYFAN, pob gwesteiwr ynddi? Mae hyn yn newid gwesteiwyr go iawn ac ni ellir ei ddadwneud.",
+      "queueConfigureConfirmLimited": "Rhedeg y llyfr chwarae yn erbyn {limit}? Mae hyn yn newid gwesteiwyr go iawn ac ni ellir ei ddadwneud.",
+      "configurePlaybook": "Llyfr chwarae",
+      "configurePlaybookPlaceholder": "rhagosodiad y weithfan",
+      "configureLimit": "Terfyn",
+      "configureLimitPlaceholder": "y rhestr eiddo gyfan",
+      "configureLimitHint": "Pa westeiwyr, grwpiau neu batrymau i'w cyrraedd. Mae gwag yn golygu pob gwesteiwr yn y rhestr eiddo.",
+      "typeConfigure": "cyflunio",
+      "typeConfigureHint": "Yn rhedeg y llyfr chwarae yn erbyn y rhestr eiddo. Dim cynllun a dim gweithredu.",
+      "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn."
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Rhestr Eiddo",
-        "body": "Y gwesteiwyr a’r grwpiau y mae’r gweithfan hon yn eu dal, a’r hyn y mae ansible yn eu datrys iddo. Mae pob rhes yn olygadwy yma; nid yw rhedeg playbook yn eu herbyn ar gael eto."
+        "body": "Y gwesteiwyr a’r grwpiau y mae’r gweithfan hon yn eu dal, a’r hyn y mae ansible yn eu datrys iddo. Mae pob rhes yn olygadwy yma."
       },
       "nav": {
         "label": "Adrannau’r rhestr eiddo",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Gwiriad drifft â llaw o'r rhyngwyneb",
       "queued": "Ciwiwyd o'r rhyngwyneb",
       "queuedSpeculative": "Ciwiwyd o'r rhyngwyneb (tybiannol)",
-      "destroyQueued": "Ciwiwyd dinistrio o'r rhyngwyneb"
+      "destroyQueued": "Ciwiwyd dinistrio o'r rhyngwyneb",
+      "queuedConfigure": "Ciwiwyd cyflunio o'r rhyngwyneb"
     },
     "errors": {
       "loadWorkspace": "Methwyd llwytho'r weithfan",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny",
       "updateSecurityScan": "Methwyd diweddaru'r sgan diogelwch",
       "updateDebugMode": "Methwyd diweddaru'r modd dadfygio",
-      "updateForkPlans": "Methwyd diweddaru cynlluniau ceisiadau tynnu o fforch"
+      "updateForkPlans": "Methwyd diweddaru cynlluniau ceisiadau tynnu o fforch",
+      "queueConfigure": "Methwyd ciwio'r cyflunio",
+      "queueConfigureStatus": "Methwyd ciwio'r cyflunio ({status})"
     },
     "subtabs": {
       "state": "Cyflwr",

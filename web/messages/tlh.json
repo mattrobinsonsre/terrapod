@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "naDev vumwI' Daqmey wa'. Ansible mI' chenmoHlaHbe'; per ghajbogh Daq lulIjlaH lInDaj. chIm yIlan 'ej lIn Dochvam lo'.",
       "ansibleExecutionEnvironmentPlaceholder": "ghob rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "naDev pagh chenmoHlu'pu'",
-      "ansibleVersionUnconfirmed": "lo'laHbogh mI'mey ngu'laHbe' — yIqon"
+      "ansibleVersionUnconfirmed": "lo'laHbogh mI'mey ngu'laHbe' — yIqon",
+      "autoConfigureEnabled": "chumlu''DI'' Qum",
+      "autoConfigureEnabledHint": "Qu'' paq qaSmoH Ansible Qum tetlh choHbogh chum. veH motlh Hutlhchugh, Hoch tetlh ''oH.",
+      "autoConfigureEnabledHintLimited": "{limit}-vaD Qu'' paq qaSmoH Ansible Qum tetlh choHbogh chum.",
+      "configureAfterApply": "lo''lu''DI'' Qum",
+      "configureAfterApplyHint": "Sar rapDaq naDev Hoch lo'' tlha'' Qum, vaj Qu'' paq chel lI'' CLI lo'' je. not Qum Qaw''."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "Segh chum",
       "awaitingDecision": "wuq loS",
       "typeSavedPlan": "nab polta'",
-      "typeSavedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'."
+      "typeSavedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'.",
+      "queueConfigure": "Qum",
+      "queueConfigureTitle": "DaH tetlh-vaD Qu'' paq yIqaSmoH. nungbe'' nab.",
+      "queueConfigureConfirmAll": "Hoch tetlh-vaD, Hoch hostmey-vaD, Qu'' paq DaqaSmoH''a''? hostmey teH luchoHlu'', ''ej choHlaHbe''lu''.",
+      "queueConfigureConfirmLimited": "{limit}-vaD Qu'' paq DaqaSmoH''a''? hostmey teH luchoHlu'', ''ej choHlaHbe''lu''.",
+      "configurePlaybook": "Qu'' paq",
+      "configurePlaybookPlaceholder": "Qumwo'' motlh",
+      "configureLimit": "veH",
+      "configureLimitPlaceholder": "Hoch tetlh",
+      "configureLimitHint": "DaSIchnISbogh hostmey, ghommey ghap permey. chImchugh, tetlhDaq Hoch host ''oH.",
+      "typeConfigure": "Qum",
+      "typeConfigureHint": "tetlh-vaD Qu'' paq qaSmoH. nab ''ej lo'' Hutlh.",
+      "typeConfigureAfterApplyHint": "Sar rapvamDaq lo'' tlha'' Qum."
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "tetlh",
-        "body": "Qumwo''vam hostmey ghommey je, ''ej ansible chay'' wIv. naDev Hoch ''ay'' DachoHlaH; ''ach DaH paq vanglaHbe''lu''."
+        "body": "Qumwo''vam hostmey ghommey je, ''ej ansible chay'' wIv. naDev Hoch ''ay'' DachoHlaH."
       },
       "nav": {
         "label": "tetlh ''ay''mey",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "UIvo' ghop tlhotlh toblu'",
       "queued": "UIvo' tlhamDaq",
       "queuedSpeculative": "UIvo' tlhamDaq (Hech)",
-      "destroyQueued": "UIvo' Qaw' tlhamDaq"
+      "destroyQueued": "UIvo' Qaw' tlhamDaq",
+      "queuedConfigure": "UIvo'' Qum tlhamDaq"
     },
     "errors": {
       "loadWorkspace": "Qumwo' ghelmeH lujpu'",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Dotlh teywI' lI'meH lujpu'",
       "updateSecurityScan": "Hujqu'ghach Sup choqlaHbe'",
       "updateDebugMode": "Qagh Sam mIw choHmeH lujpu'",
-      "updateForkPlans": "fork PR nabmey choHmeH lujpu'"
+      "updateForkPlans": "fork PR nabmey choHmeH lujpu'",
+      "queueConfigure": "Qum tlhammeH lujpu''",
+      "queueConfigureStatus": "Qum tlhammeH lujpu'' ({status})"
     },
     "subtabs": {
       "state": "Sep",

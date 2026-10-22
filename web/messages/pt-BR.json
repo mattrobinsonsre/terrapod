@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Um dos ambientes de execução próprios desta instalação, por rótulo. Substitui a versão do Ansible, então um workspace com rótulo definido ignora sua linha. Deixe vazio para usar a imagem integrada da linha.",
       "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Nenhum configurado nesta instalação",
-      "ansibleVersionUnconfirmed": "Não foi possível confirmar as versões disponíveis — digite uma"
+      "ansibleVersionUnconfirmed": "Não foi possível confirmar as versões disponíveis — digite uma",
+      "autoConfigureEnabled": "Configurar a cada push",
+      "autoConfigureEnabledHint": "Um push que altera o diretório de configuração do Ansible executa o playbook. Sem nenhum limite padrão definido, isso abrange todo o inventário.",
+      "autoConfigureEnabledHintLimited": "Um push que altera o diretório de configuração do Ansible executa o playbook contra {limit}.",
+      "configureAfterApply": "Configurar após o apply",
+      "configureAfterApplyHint": "Cada apply aqui é seguido por uma configuração na mesma execução, portanto um apply pela CLI também transmite a saída do playbook. Um destroy nunca configura."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publicação de módulo",
       "awaitingDecision": "aguardando decisão",
       "typeSavedPlan": "plano salvo",
-      "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia o workspace até que o plano salvo seja aplicado."
+      "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia o workspace até que o plano salvo seja aplicado.",
+      "queueConfigure": "Configurar",
+      "queueConfigureTitle": "Executar o playbook contra o inventário agora. Nenhum plan o precede.",
+      "queueConfigureConfirmAll": "Executar o playbook contra TODO O INVENTÁRIO? Isso altera hosts reais e não pode ser desfeito.",
+      "queueConfigureConfirmLimited": "Executar o playbook contra {limit}? Isso altera hosts reais e não pode ser desfeito.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "o padrão do workspace",
+      "configureLimit": "Limite",
+      "configureLimitPlaceholder": "todo o inventário",
+      "configureLimitHint": "Quais hosts, grupos ou padrões alcançar. Vazio significa todos os hosts do inventário.",
+      "typeConfigure": "configuração",
+      "typeConfigureHint": "Executa o playbook contra o inventário. Sem plan e sem apply.",
+      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução."
     },
     "state": {
       "deleteConfirm": "Excluir a versão de estado #{serial}? Isso não pode ser desfeito.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventário",
-        "body": "Os hosts e os grupos que este workspace mantém, e no que o ansible os resolve. Cada linha pode ser editada aqui; executar um playbook contra eles ainda não está disponível."
+        "body": "Os hosts e os grupos que este workspace mantém, e no que o ansible os resolve. Cada linha pode ser editada aqui."
       },
       "nav": {
         "label": "Seções do inventário",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Verificação manual de drift pela UI",
       "queued": "Enfileirado pela UI",
       "queuedSpeculative": "Enfileirado pela UI (especulativo)",
-      "destroyQueued": "Destroy enfileirado pela UI"
+      "destroyQueued": "Destroy enfileirado pela UI",
+      "queuedConfigure": "Configuração enfileirada pela UI"
     },
     "errors": {
       "loadWorkspace": "Falha ao carregar o workspace",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Falha ao enviar o arquivo de estado",
       "updateSecurityScan": "Falha ao atualizar a verificação de segurança",
       "updateDebugMode": "Falha ao atualizar o modo de depuração",
-      "updateForkPlans": "Falha ao atualizar os planos de pull requests de forks"
+      "updateForkPlans": "Falha ao atualizar os planos de pull requests de forks",
+      "queueConfigure": "Falha ao enfileirar a configuração",
+      "queueConfigureStatus": "Falha ao enfileirar a configuração ({status})"
     },
     "subtabs": {
       "state": "Estado",

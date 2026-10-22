@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "0n3 0f 7h15 d3pl0ym3n7'5 0wn 3x3cu710n 3nv1r0nm3n75, by l4b3l. 17 0v3rr1d35 7h3 4n51bl3 v3r510n, 50 4 w0rk5p4c3 w17h 4 l4b3l 537 1gn0r35 175 l1n3. L34v3 3mp7y 70 u53 7h3 bu1l7-1n 1m4g3 f0r 7h3 l1n3.",
       "ansibleExecutionEnvironmentPlaceholder": "3.g. rh3l8-h4rd3n3d",
       "ansibleExecutionEnvironmentNone": "N0n3 c0nf1gur3d 0n 7h15 d3pl0ym3n7",
-      "ansibleVersionUnconfirmed": "4v41l4bl3 v3r510n5 c0uld n07 b3 c0nf1rm3d — 7yp3 0n3"
+      "ansibleVersionUnconfirmed": "4v41l4bl3 v3r510n5 c0uld n07 b3 c0nf1rm3d — 7yp3 0n3",
+      "autoConfigureEnabled": "C0nf1gur3 0n pu5h",
+      "autoConfigureEnabledHint": "4 pu5h 7h47 ch4ng35 7h3 4n51bl3 c0nf1g r007 run5 7h3 pl4yb00k. W17h n0 d3f4ul7 l1m17 537, 7h47 15 7h3 wh0l3 1nv3n70ry.",
+      "autoConfigureEnabledHintLimited": "4 pu5h 7h47 ch4ng35 7h3 4n51bl3 c0nf1g r007 run5 7h3 pl4yb00k 4g41n57 {limit}.",
+      "configureAfterApply": "C0nf1gur3 4f73r 4pply",
+      "configureAfterApplyHint": "3v3ry 4pply h3r3 15 f0ll0w3d by 4 c0nf1gur3 0n 7h3 54m3 run, 50 4 CL1 4pply 57r34m5 7h3 pl4yb00k'5 0u7pu7 700. 4 d357r0y n3v3r c0nf1gur35."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "m0dul3 publ15h",
       "awaitingDecision": "4w4171ng d3c1510n",
       "typeSavedPlan": "54v3d pl4n",
-      "typeSavedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d."
+      "typeSavedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d.",
+      "queueConfigure": "C0nf1gur3",
+      "queueConfigureTitle": "Run 7h3 pl4yb00k 4g41n57 7h3 1nv3n70ry n0w. N0 pl4n pr3c3d35 17.",
+      "queueConfigureConfirmAll": "Run 7h3 pl4yb00k 4g41n57 7h3 WH0L3 1nv3n70ry? 7h15 ch4ng35 r34l h0575 4nd c4nn07 b3 und0n3.",
+      "queueConfigureConfirmLimited": "Run 7h3 pl4yb00k 4g41n57 {limit}? 7h15 ch4ng35 r34l h0575 4nd c4nn07 b3 und0n3.",
+      "configurePlaybook": "Pl4yb00k",
+      "configurePlaybookPlaceholder": "7h3 w0rk5p4c3 d3f4ul7",
+      "configureLimit": "L1m17",
+      "configureLimitPlaceholder": "7h3 wh0l3 1nv3n70ry",
+      "configureLimitHint": "Wh1ch h0575, gr0up5 0r p4773rn5 70 r34ch. 3mp7y m34n5 3v3ry h057 1n 7h3 1nv3n70ry.",
+      "typeConfigure": "c0nf1gur3",
+      "typeConfigureHint": "Run5 7h3 pl4yb00k 4g41n57 7h3 1nv3n70ry. N0 pl4n 4nd n0 4pply.",
+      "typeConfigureAfterApplyHint": "7h3 4pply 15 f0ll0w3d by 4 c0nf1gur3 0n 7h15 54m3 run."
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "1nv3n70ry",
-        "body": "7h3 h0575 4nd gr0up5 7h15 w0rk5p4c3 h0ld5, 4nd wh47 4n51bl3 r350lv35 7h3m 70. 34ch r0w 15 3d174bl3 h3r3; runn1ng 4 pl4yb00k 4g41n57 7h3m 15 n07 4v41l4bl3 y37."
+        "body": "7h3 h0575 4nd gr0up5 7h15 w0rk5p4c3 h0ld5, 4nd wh47 4n51bl3 r350lv35 7h3m 70. 34ch r0w 15 3d174bl3 h3r3."
       },
       "nav": {
         "label": "1nv3n70ry 53c710n5",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "M4nu4l dr1f7 ch3ck fr0m U1",
       "queued": "Qu3u3d fr0m U1",
       "queuedSpeculative": "Qu3u3d fr0m U1 (5p3cul471v3)",
-      "destroyQueued": "D357r0y qu3u3d fr0m U1"
+      "destroyQueued": "D357r0y qu3u3d fr0m U1",
+      "queuedConfigure": "C0nf1gur3 qu3u3d fr0m U1"
     },
     "errors": {
       "loadWorkspace": "F41l3d 70 l04d w0rk5p4c3",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3",
       "updateSecurityScan": "F41l3d 70 upd473 53cur17y 5c4nn1ng",
       "updateDebugMode": "F41l3d 70 upd473 d3bug m0d3",
-      "updateForkPlans": "F41l3d 70 upd473 f0rk pull r3qu357 pl4n5"
+      "updateForkPlans": "F41l3d 70 upd473 f0rk pull r3qu357 pl4n5",
+      "queueConfigure": "F41l3d 70 qu3u3 7h3 c0nf1gur3",
+      "queueConfigureStatus": "F41l3d 70 qu3u3 7h3 c0nf1gur3 ({status})"
     },
     "subtabs": {
       "state": "57473",

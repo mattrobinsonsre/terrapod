@@ -57,6 +57,9 @@ interface AutodiscoveryRule {
     // written before #1966 goes on producing plan/apply workspaces.
     'plan-apply-enabled'?: boolean
     'configure-enabled'?: boolean
+    // And how a configure starts on them (#1974), both default false.
+    'auto-configure-enabled'?: boolean
+    'configure-after-apply'?: boolean
     // An ordinary templated path, '' meaning the configuration version's root.
     // No null state: the declaration is `configure-enabled` above (#1966).
     'config-directory'?: string
@@ -169,6 +172,8 @@ export default function AutodiscoveryPage() {
   // every rule produced before #1966: plan/apply on, configure off.
   const [planApplyEnabled, setPlanApplyEnabled] = useState(true)
   const [configureEnabled, setConfigureEnabled] = useState(false)
+  const [autoConfigureEnabled, setAutoConfigureEnabled] = useState(false)
+  const [configureAfterApply, setConfigureAfterApply] = useState(false)
   // Where the configure operation runs in each materialised workspace
   // (#1929) — a plain text box, because the path is just a path and '' is the
   // configuration version's root. #1929 had a mode select here because NULL
@@ -388,6 +393,8 @@ export default function AutodiscoveryPage() {
     // to turn it back on (#1966).
     setPlanApplyEnabled(a['plan-apply-enabled'] ?? true)
     setConfigureEnabled(a['configure-enabled'] ?? false)
+    setAutoConfigureEnabled(a['auto-configure-enabled'] ?? false)
+    setConfigureAfterApply(a['configure-after-apply'] ?? false)
     // `?? ''` and nothing to decide: a stored '' is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -467,6 +474,8 @@ export default function AutodiscoveryPage() {
       // concrete value for each, so there is no "leave alone" to express.
       'plan-apply-enabled': planApplyEnabled,
       'configure-enabled': configureEnabled,
+      'auto-configure-enabled': autoConfigureEnabled,
+      'configure-after-apply': configureAfterApply,
       // Where the configure operation runs (#1929). Sent verbatim and never
       // null — an explicit null is a 422 naming the field (#1966) — with ''
       // meaning the configuration version's root.
@@ -1096,6 +1105,40 @@ export default function AutodiscoveryPage() {
                     </select>
                     <p className="text-xs text-slate-500 mt-1">
                       {tWs('fields.configureEnabledHint')}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-auto-configure-enabled" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.autoConfigureEnabled')}
+                    </label>
+                    <select
+                      id="ad-auto-configure-enabled"
+                      value={autoConfigureEnabled ? 'true' : 'false'}
+                      onChange={e => setAutoConfigureEnabled(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.autoConfigureEnabledHint')}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-configure-after-apply" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.configureAfterApply')}
+                    </label>
+                    <select
+                      id="ad-configure-after-apply"
+                      value={configureAfterApply ? 'true' : 'false'}
+                      onChange={e => setConfigureAfterApply(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.configureAfterApplyHint')}
                     </p>
                   </div>
                 </div>

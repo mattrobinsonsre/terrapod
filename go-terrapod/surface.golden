@@ -301,9 +301,12 @@ field CreateRunRequest.AllowEmptyApply bool
 field CreateRunRequest.AutoApply *bool
 field CreateRunRequest.ConfigurationVersionID string
 field CreateRunRequest.EngineVersion string
+field CreateRunRequest.IsConfigure bool
 field CreateRunRequest.IsDestroy bool
+field CreateRunRequest.Limit string
 field CreateRunRequest.Message string
 field CreateRunRequest.PlanOnly bool
+field CreateRunRequest.Playbook string
 field CreateRunRequest.Refresh *bool
 field CreateRunRequest.RefreshOnly bool
 field CreateRunRequest.ReplaceAddrs []string
@@ -373,9 +376,11 @@ field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-e
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
+field CreateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field CreateWorkspaceRequest.ConfigDirectory string `json:"config-directory,omitempty"`
+field CreateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
 field CreateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
@@ -950,6 +955,7 @@ field Run.AutoApplyDeclinedReason string `json:"auto-apply-declined-reason"`
 field Run.AutoApplyMode string `json:"auto-apply-mode"`
 field Run.BlockedBy string `json:"blocked-by,omitempty"`
 field Run.CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
+field Run.ConfigureAfterApply bool `json:"configure-after-apply"`
 field Run.CostCurrency string `json:"cost-currency,omitempty"`
 field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`
 field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`
@@ -967,13 +973,16 @@ field Run.HasChanges *bool `json:"has-changes,omitempty"`
 field Run.HasCostEstimate bool `json:"has-cost-estimate"`
 field Run.HasJSONOutput bool `json:"has-json-output"`
 field Run.ID string `json:"id"`
+field Run.IsConfigure bool `json:"is-configure"`
 field Run.IsDestroy bool `json:"is-destroy"`
 field Run.IsDriftDetection bool `json:"is-drift-detection"`
+field Run.Limit string `json:"limit,omitempty"`
 field Run.Message string `json:"message,omitempty"`
 field Run.Parallelism int64 `json:"parallelism,omitempty"`
 field Run.PeakCPUUsec *int64 `json:"peak-cpu-usec,omitempty"`
 field Run.PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
 field Run.PlanOnly bool `json:"plan-only"`
+field Run.Playbook string `json:"playbook,omitempty"`
 field Run.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field Run.PulumiStack string `json:"pulumi-stack,omitempty"`
 field Run.Refresh bool `json:"refresh"`
@@ -1217,9 +1226,11 @@ field UpdateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-e
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
+field UpdateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field UpdateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
+field UpdateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
 field UpdateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
@@ -1427,9 +1438,11 @@ field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-envi
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
+field Workspace.AutoConfigureEnabled bool `json:"auto-configure-enabled"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field Workspace.ConfigDirectory string `json:"config-directory,omitempty"`
+field Workspace.ConfigureAfterApply bool `json:"configure-after-apply"`
 field Workspace.ConfigureEnabled bool `json:"configure-enabled"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`

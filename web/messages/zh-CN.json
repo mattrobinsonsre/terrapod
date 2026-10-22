@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "通过标签指定本部署自有的执行环境。它会覆盖 Ansible 版本，因此设置了标签的工作区将忽略其版本线。留空则使用该版本线的内置镜像。",
       "ansibleExecutionEnvironmentPlaceholder": "例如 rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "本部署未配置任何项",
-      "ansibleVersionUnconfirmed": "无法确认可用版本 — 请手动输入"
+      "ansibleVersionUnconfirmed": "无法确认可用版本 — 请手动输入",
+      "autoConfigureEnabled": "推送时配置",
+      "autoConfigureEnabledHint": "改动 Ansible 配置目录的推送会执行该 playbook。未设置默认 limit 时，目标就是整个清单。",
+      "autoConfigureEnabledHintLimited": "改动 Ansible 配置目录的推送会针对 {limit} 执行该 playbook。",
+      "configureAfterApply": "应用后配置",
+      "configureAfterApplyHint": "此处的每一次应用之后，都会在同一次运行中紧接一次配置，因此从 CLI 发起的应用也会流式输出 playbook 的日志。销毁运行从不执行配置。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "模块发布",
       "awaitingDecision": "等待决定",
       "typeSavedPlan": "已保存的计划",
-      "typeSavedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。"
+      "typeSavedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。",
+      "queueConfigure": "配置",
+      "queueConfigureTitle": "立即针对清单执行该 playbook。它之前没有计划阶段。",
+      "queueConfigureConfirmAll": "要针对整个清单（清单中的每一台主机）执行该 playbook 吗？这会改动真实主机，且此操作无法撤销。",
+      "queueConfigureConfirmLimited": "要针对 {limit} 执行该 playbook 吗？这会改动真实主机，且此操作无法撤销。",
+      "configurePlaybook": "playbook",
+      "configurePlaybookPlaceholder": "工作区默认值",
+      "configureLimit": "limit",
+      "configureLimitPlaceholder": "整个清单",
+      "configureLimitHint": "要触及哪些主机、主机组或模式。留空表示清单中的每一台主机。",
+      "typeConfigure": "配置",
+      "typeConfigureHint": "针对清单执行该 playbook。既没有计划，也没有应用。",
+      "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "清单",
-        "body": "此工作区持有的主机和主机组，以及 ansible 对它们的解析结果。每一行都可以在此编辑；但还无法针对它们运行 Playbook。"
+        "body": "此工作区持有的主机和主机组，以及 ansible 对它们的解析结果。每一行都可以在此编辑。"
       },
       "nav": {
         "label": "清单分区",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "从 UI 手动进行漂移检查",
       "queued": "从 UI 排队",
       "queuedSpeculative": "从 UI 排队（推测性）",
-      "destroyQueued": "从 UI 排队销毁"
+      "destroyQueued": "从 UI 排队销毁",
+      "queuedConfigure": "从 UI 排队配置运行"
     },
     "errors": {
       "loadWorkspace": "加载工作区失败",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "上传状态文件失败",
       "updateSecurityScan": "更新安全扫描失败",
       "updateDebugMode": "更新调试模式失败",
-      "updateForkPlans": "更新 fork 拉取请求计划失败"
+      "updateForkPlans": "更新 fork 拉取请求计划失败",
+      "queueConfigure": "排队配置运行失败",
+      "queueConfigureStatus": "排队配置运行失败（{status}）"
     },
     "subtabs": {
       "state": "状态",

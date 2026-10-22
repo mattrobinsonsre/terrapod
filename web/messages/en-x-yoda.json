@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Of this deployment's own execution environments, one it is, by label. The Ansible version, it overrides — so its line, a workspace with a label set ignores. Empty leave it, and the built-in image for the line, use it will.",
       "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened, hmm",
       "ansibleExecutionEnvironmentNone": "Configured on this deployment, none are",
-      "ansibleVersionUnconfirmed": "Confirmed, the available versions could not be — type one, you must"
+      "ansibleVersionUnconfirmed": "Confirmed, the available versions could not be — type one, you must",
+      "autoConfigureEnabled": "push, Configure on",
+      "autoConfigureEnabledHint": "The playbook, a push that changes the Ansible config root runs. The whole inventory that is, with no default limit set.",
+      "autoConfigureEnabledHintLimited": "Against {limit}, a push that changes the Ansible config root runs the playbook.",
+      "configureAfterApply": "apply, Configure after",
+      "configureAfterApplyHint": "By a configure on the same run, every apply here is followed. The playbook''s output too, a CLI apply streams. Configure, a destroy never does."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "module publish",
       "awaitingDecision": "a decision, awaiting",
       "typeSavedPlan": "saved, the plan is",
-      "typeSavedPlanHint": "Deferred, the apply is. Hold the workspace, this run does not, until applied the saved plan is."
+      "typeSavedPlanHint": "Deferred, the apply is. Hold the workspace, this run does not, until applied the saved plan is.",
+      "queueConfigure": "Configure",
+      "queueConfigureTitle": "Against the inventory, run the playbook now. Precede it, no plan does.",
+      "queueConfigureConfirmAll": "Against the WHOLE inventory, run the playbook? Real hosts this changes, and undone it cannot be.",
+      "queueConfigureConfirmLimited": "Against {limit}, run the playbook? Real hosts this changes, and undone it cannot be.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "default, the workspace",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "inventory, the whole",
+      "configureLimitHint": "To reach, which hosts, groups or patterns. Every host in the inventory, empty means.",
+      "typeConfigure": "configure",
+      "typeConfigureHint": "Against the inventory, runs the playbook. No plan and no apply, there is.",
+      "typeConfigureAfterApplyHint": "By a configure on this same run, the apply is followed."
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventory",
-        "body": "The hosts and groups this workspace holds, these are — and what ansible resolves them to. Editable here, every row is; run a playbook against them, you cannot yet."
+        "body": "The hosts and groups this workspace holds, these are — and what ansible resolves them to. Editable here, every row is."
       },
       "nav": {
         "label": "Sections of the inventory",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "From UI, manual drift check",
       "queued": "From UI, queued",
       "queuedSpeculative": "From UI, queued (speculative)",
-      "destroyQueued": "From UI, destroy queued"
+      "destroyQueued": "From UI, destroy queued",
+      "queuedConfigure": "From UI, configure queued"
     },
     "errors": {
       "loadWorkspace": "Load the workspace, it did not",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Upload the state file, it did not",
       "updateSecurityScan": "Update the security scanning, failed it did",
       "updateDebugMode": "Update debug mode, it did not",
-      "updateForkPlans": "Update fork pull request plans, it did not"
+      "updateForkPlans": "Update fork pull request plans, it did not",
+      "queueConfigure": "Queue the configure, it did not",
+      "queueConfigureStatus": "Queue the configure, it did not ({status})"
     },
     "subtabs": {
       "state": "State",

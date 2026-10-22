@@ -259,15 +259,21 @@ class TerraformStrategy:
 
         * onboarding discovery settles the run and the session, skipping the plan
           machinery entirely — there is no plan to complete;
-        * a succeeded Job completes the plan or the apply, chosen by which state
-          the run is in;
+        * a succeeded Job completes the plan, the apply or the configure, chosen
+          by which state the run is in;
         * a failed or deleted Job errors the run.
 
         A second engine answers this differently and that is the point: a
         non-zero exit means something else for a playbook with `ignore_errors`,
         and Ansible has no artifact binding approval to application at all.
+
+        **The configure is here rather than on an engine of its own** because
+        it is not an engine: a configure runs beside whichever engine the
+        workspace uses, on the same Run, and both strategies answer for it
+        identically. `configure` is its own word in both vocabularies, since
+        neither Terraform nor Pulumi has a phase to borrow a name from.
         """
-        phase = "plan" if run_status == "planning" else "apply"
+        phase = {"planning": "plan", "configuring": "configure"}.get(run_status, "apply")
 
         if job_status == "succeeded":
             if run_source == ONBOARDING_DISCOVERY_SOURCE:
@@ -276,6 +282,8 @@ class TerraformStrategy:
                 return TerminalOutcome(action="complete_plan", phase=phase)
             if run_status == "applying":
                 return TerminalOutcome(action="complete_apply", phase=phase)
+            if run_status == "configuring":
+                return TerminalOutcome(action="complete_configure", phase=phase)
             # Neither planning nor applying: the runner's own POST already drove
             # the transition. The helpers are idempotent, but there is nothing
             # left to complete, so say so rather than calling one anyway.
@@ -371,8 +379,19 @@ class TerminalOutcome:
     is what lets the rules be pinned exhaustively rather than sampled.
     """
 
-    #: What the caller should do: complete_plan | complete_apply | error |
-    #: discovery_succeeded | discovery_failed | none.
+    #: What the caller should do: complete_plan | complete_apply |
+    #: complete_configure | error | discovery_succeeded | discovery_failed |
+    #: none.
     action: str
-    #: Which phase's live log to persist before acting — the engine's vocabulary.
+    #: The phase this outcome concerns, in THE ENGINE'S OWN WORDS -- `preview`
+    #: and `update` for Pulumi (#1521), because a run is `planning` whatever
+    #: engine it belongs to and what the user is shown differs.
+    #:
+    #: **It is for display, and must not be used to build a key.** This said
+    #: "which phase's live log to persist", and the reconciler did exactly
+    #: that: for every Pulumi run it looked for a Redis live-log key named
+    #: `...:update`, which nothing writes, so the promote-if-the-runner-did-
+    #: not-upload safety net silently did nothing. A storage or Redis key is
+    #: built from the RUN-STATE phase (`plan`/`apply`/`configure`), which is
+    #: what the runner writes under -- `run_reconciler._phase_of`.
     phase: str

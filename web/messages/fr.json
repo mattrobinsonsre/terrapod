@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Un des environnements d'exécution propres à ce déploiement, par étiquette. Il remplace la version d'Ansible, donc un espace de travail avec une étiquette ignore sa ligne. Laissez vide pour utiliser l'image intégrée de la ligne.",
       "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Aucun configuré sur ce déploiement",
-      "ansibleVersionUnconfirmed": "Impossible de confirmer les versions disponibles — saisissez-en une"
+      "ansibleVersionUnconfirmed": "Impossible de confirmer les versions disponibles — saisissez-en une",
+      "autoConfigureEnabled": "Configurer à chaque push",
+      "autoConfigureEnabledHint": "Un push qui modifie le répertoire de configuration Ansible exécute le playbook. Sans limite par défaut définie, cela vise l''inventaire entier.",
+      "autoConfigureEnabledHintLimited": "Un push qui modifie le répertoire de configuration Ansible exécute le playbook sur {limit}.",
+      "configureAfterApply": "Configurer après application",
+      "configureAfterApplyHint": "Chaque application ici est suivie d''une configuration dans la même exécution, de sorte qu''une application depuis la CLI diffuse aussi la sortie du playbook. Une destruction ne configure jamais."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publication de module",
       "awaitingDecision": "en attente de décision",
       "typeSavedPlan": "plan enregistré",
-      "typeSavedPlanHint": "Application différée : cette exécution ne réserve pas l'espace de travail tant que le plan enregistré n'est pas appliqué."
+      "typeSavedPlanHint": "Application différée : cette exécution ne réserve pas l'espace de travail tant que le plan enregistré n'est pas appliqué.",
+      "queueConfigure": "Configurer",
+      "queueConfigureTitle": "Exécuter maintenant le playbook sur l''inventaire. Aucun plan ne le précède.",
+      "queueConfigureConfirmAll": "Exécuter le playbook sur L''INVENTAIRE ENTIER ? Cela modifie des hôtes réels et cette action est irréversible.",
+      "queueConfigureConfirmLimited": "Exécuter le playbook sur {limit} ? Cela modifie des hôtes réels et cette action est irréversible.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "la valeur par défaut de l''espace de travail",
+      "configureLimit": "Limite",
+      "configureLimitPlaceholder": "l''inventaire entier",
+      "configureLimitHint": "Quels hôtes, groupes ou motifs atteindre. Vide signifie chaque hôte de l''inventaire.",
+      "typeConfigure": "configuration",
+      "typeConfigureHint": "Exécute le playbook sur l''inventaire. Aucun plan et aucune application.",
+      "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution."
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventaire",
-        "body": "Les hôtes et les groupes que cet espace de travail contient, et ce à quoi ansible les résout. Chaque ligne est modifiable ici ; exécuter un playbook sur eux n’est pas encore disponible."
+        "body": "Les hôtes et les groupes que cet espace de travail contient, et ce à quoi ansible les résout. Chaque ligne est modifiable ici."
       },
       "nav": {
         "label": "Sections de l’inventaire",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Vérification manuelle de dérive depuis l'interface",
       "queued": "Mis en file d'attente depuis l'interface",
       "queuedSpeculative": "Mis en file d'attente depuis l'interface (spéculatif)",
-      "destroyQueued": "Destruction mise en file d'attente depuis l'interface"
+      "destroyQueued": "Destruction mise en file d'attente depuis l'interface",
+      "queuedConfigure": "Configuration mise en file d''attente depuis l''interface"
     },
     "errors": {
       "loadWorkspace": "Échec du chargement de l'espace de travail",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Échec du téléversement du fichier d'état",
       "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité",
       "updateDebugMode": "Échec de la mise à jour du mode débogage",
-      "updateForkPlans": "Échec de la mise à jour des plans sur les pull requests depuis un fork"
+      "updateForkPlans": "Échec de la mise à jour des plans sur les pull requests depuis un fork",
+      "queueConfigure": "Échec de la mise en file d''attente de la configuration",
+      "queueConfigureStatus": "Échec de la mise en file d''attente de la configuration ({status})"
     },
     "subtabs": {
       "state": "État",

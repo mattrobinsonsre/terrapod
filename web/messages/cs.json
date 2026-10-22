@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Jedno z vlastních běhových prostředí této instalace, podle označení. Přepisuje verzi Ansible, takže pracovní prostor s nastaveným označením ignoruje svou linii. Ponechte prázdné pro použití vestavěného obrazu linie.",
       "ansibleExecutionEnvironmentPlaceholder": "např. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "V této instalaci není nic nastaveno",
-      "ansibleVersionUnconfirmed": "Dostupné verze nelze potvrdit — zadejte ji"
+      "ansibleVersionUnconfirmed": "Dostupné verze nelze potvrdit — zadejte ji",
+      "autoConfigureEnabled": "Konfigurace při pushnutí",
+      "autoConfigureEnabledHint": "Push do repozitáře, který mění konfigurační adresář Ansible, spustí playbook. Pokud není nastaven výchozí limit, je to celý inventář.",
+      "autoConfigureEnabledHintLimited": "Push do repozitáře, který mění konfigurační adresář Ansible, spustí playbook s limitem {limit}.",
+      "configureAfterApply": "Konfigurace po použití",
+      "configureAfterApplyHint": "Po každém použití zde následuje konfigurace ve stejném běhu, takže použití z CLI streamuje i výstup playbooku. Zničení nikdy nekonfiguruje."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publikace modulu",
       "awaitingDecision": "čeká na rozhodnutí",
       "typeSavedPlan": "uložený plán",
-      "typeSavedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován."
+      "typeSavedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován.",
+      "queueConfigure": "Konfigurovat",
+      "queueConfigureTitle": "Spustit playbook proti inventáři nyní. Nepředchází mu žádný plán.",
+      "queueConfigureConfirmAll": "Spustit playbook proti CELÉMU inventáři? Tím se změní skuteční hostitelé a toto nelze vrátit zpět.",
+      "queueConfigureConfirmLimited": "Spustit playbook s limitem {limit}? Tím se změní skuteční hostitelé a toto nelze vrátit zpět.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "výchozí hodnota pracovního prostoru",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "celý inventář",
+      "configureLimitHint": "Které hostitele, skupiny nebo vzory zasáhnout. Prázdné znamená každého hostitele v inventáři.",
+      "typeConfigure": "konfigurace",
+      "typeConfigureHint": "Spustí playbook proti inventáři. Bez plánu a bez použití.",
+      "typeConfigureAfterApplyHint": "Po použití následuje konfigurace ve stejném běhu."
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventář",
-        "body": "Hostitelé a skupiny, které tento pracovní prostor obsahuje, a to, na co je ansible vyhodnotí. Každý řádek lze zde upravit; spuštění playbooku proti nim ještě není dostupné."
+        "body": "Hostitelé a skupiny, které tento pracovní prostor obsahuje, a to, na co je ansible vyhodnotí. Každý řádek lze zde upravit."
       },
       "nav": {
         "label": "Sekce inventáře",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Ruční kontrola odchýlení z UI",
       "queued": "Zařazeno z UI",
       "queuedSpeculative": "Zařazeno z UI (spekulativní)",
-      "destroyQueued": "Zničení zařazeno z UI"
+      "destroyQueued": "Zničení zařazeno z UI",
+      "queuedConfigure": "Konfigurace zařazena z UI"
     },
     "errors": {
       "loadWorkspace": "Nepodařilo se načíst pracovní prostor",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Nepodařilo se nahrát soubor stavu",
       "updateSecurityScan": "Nepodařilo se aktualizovat bezpečnostní kontrolu",
       "updateDebugMode": "Režim ladění se nepodařilo aktualizovat",
-      "updateForkPlans": "Plány pro pull requesty z forků se nepodařilo aktualizovat"
+      "updateForkPlans": "Plány pro pull requesty z forků se nepodařilo aktualizovat",
+      "queueConfigure": "Nepodařilo se zařadit konfiguraci",
+      "queueConfigureStatus": "Nepodařilo se zařadit konfiguraci ({status})"
     },
     "subtabs": {
       "state": "Stav",

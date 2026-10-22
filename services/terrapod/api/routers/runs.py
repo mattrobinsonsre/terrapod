@@ -79,6 +79,7 @@ from terrapod.services import (
     pool_set,
     run_service,
     variable_service,
+    workspace_settings,
 )
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
@@ -102,12 +103,13 @@ router = APIRouter(tags=["runs"])
 extensions_router = APIRouter(tags=["run-extensions"])
 logger = get_logger(__name__)
 
-# States where cancellation is a sensible action — the run is actively
-# moving through the pipeline. `planned` (awaiting user confirm/discard)
-# is deliberately excluded: the right actions there are confirm/discard,
-# not cancel. Terminal states (applied/errored/discarded/canceled) aren't
-# here because there's nothing left running.
-_CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
+#: The service's own set, not a copy of it. This WAS a copy, and the two
+#: disagreed the moment one moved: `configuring` was added to the service's set
+#: so a configure in flight could be cancelled (#1974), and the copy here --
+#: which is what `is-cancelable` and `can-cancel` are served from -- went on
+#: telling every client a configure could not be. The API would have accepted
+#: the cancel it had just advertised as impossible.
+_CANCELABLE_STATES = run_service.CANCELABLE_STATES
 
 #: The run states an apply-phase Job is launched from. A plan-only run never
 #: reaches either, which is what makes this a usable check on the phase a
@@ -149,6 +151,19 @@ _LISTENER_REPORTABLE: frozenset[tuple[str, str]] = frozenset(
         ("canceling", "canceled"),
         ("canceling", "applied"),
         ("canceling", "errored"),
+        # A configure whose Job the listener could not create (#1974).
+        # `_report_launch_failed` PATCHes `errored` from whatever status the run
+        # is in, and a configure is in `configuring` -- so without this pair the
+        # report is refused and the failure is only noticed minutes later, by
+        # the reconciler's launch timeout, where a plan and an apply both have
+        # it recorded at once.
+        #
+        # `("configuring", "applied")` is deliberately NOT here. A listener
+        # never observes a configure succeeding -- the reconciler drives that
+        # from the Job's own outcome -- and granting it would let whoever holds
+        # a listener certificate declare a playbook complete, which is the same
+        # widening this set's own docstring exists to prevent.
+        ("configuring", "errored"),
     }
 )
 
@@ -354,6 +369,16 @@ def _run_json(
                 "error-message": run.error_message,
                 "target-addrs": run.target_addrs or [],
                 "replace-addrs": run.replace_addrs or [],
+                # The Ansible configure half of the run (#1974). `is-configure`
+                # is "this run carries a configure", `configure-after-apply`
+                # distinguishes a composite from a standalone one, and the two
+                # option attributes are what THIS run was asked to configure --
+                # empty meaning the workspace's defaults, which is what a
+                # git-driven configure runs.
+                "is-configure": run.is_configure,
+                "configure-after-apply": run.configure_after_apply,
+                "playbook": run.playbook or "",
+                "limit": run.ansible_limit or "",
                 "refresh-only": run.refresh_only,
                 "refresh": run.refresh,
                 "allow-empty-apply": run.allow_empty_apply,
@@ -770,14 +795,48 @@ async def create_run(
             )
         plan_only = True
 
+    # What kind of run this is, resolved by the service's own producer so the
+    # capability check and the refusals below cannot disagree with what
+    # `create_run` will actually build (#1974). Pure, so calling it here and
+    # again inside `create_run` gives the same answer.
+    #
+    # After every branch that can force `plan_only`, deliberately: a run forced
+    # plan-only is not a configure, and asking before the forcing would gate it
+    # as one.
+    is_configure, _configure_after_apply = run_service.resolve_configure_shape(
+        ws,
+        requested_configure=bool(attrs.get("is-configure", False)),
+        plan_only=bool(plan_only),
+        is_destroy=bool(attrs.get("is-destroy", False)),
+    )
+    # A configure option on a run that is not a configure is refused rather than
+    # ignored (#2116's class). A workspace with no configure operation is the
+    # likeliest way to get here, and silently dropping the playbook would run
+    # the wrong thing -- or, on a plan, nothing at all -- with the attribute the
+    # caller sent nowhere to be seen.
+    if not is_configure:
+        for name in ("playbook", "limit"):
+            if attrs.get(name):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"'{name}' applies only to a configure run. Set 'is-configure' "
+                        "to run the playbook now, or 'configure-after-apply' on the "
+                        "workspace to run it after every apply -- and note that the "
+                        "workspace must declare a configure operation "
+                        "(configure-enabled)."
+                    ),
+                )
+
     # Check capability: plan-only needs run:plan; apply needs run:apply, or
-    # run:apply-destroy when the run is a destroy (is-destroy=true).
-    if plan_only:
-        required_cap = cap.RUN_PLAN
-    elif attrs.get("is-destroy", False):
-        required_cap = cap.RUN_APPLY_DESTROY
-    else:
-        required_cap = cap.RUN_APPLY
+    # run:apply-destroy when the run is a destroy (is-destroy=true). A
+    # configure is apply-equivalent and needs run:apply -- see
+    # `create_run_capability` for why it is not an axis of its own.
+    required_cap = cap.create_run_capability(
+        plan_only=bool(plan_only),
+        is_destroy=bool(attrs.get("is-destroy", False)),
+        is_configure=is_configure,
+    )
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, required_cap):
         raise HTTPException(
@@ -845,9 +904,22 @@ async def create_run(
             refresh=attrs.get("refresh", True),
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             save_plan=save_plan,
+            is_configure=bool(attrs.get("is-configure", False)),
+            playbook=attrs.get("playbook", "") or "",
+            ansible_limit=attrs.get("limit", "") or "",
         )
-    except run_service.PlanApplyNotEnabled as exc:
-        # A plan or apply asked for on a workspace that declares neither.
+    except (
+        run_service.PlanApplyNotEnabled,
+        workspace_settings.ConfigureNotEnabled,
+        run_service.PlanOnlyConfigureConflict,
+        run_service.ConfigureOptionConflict,
+        run_service.SpeculativeConfigureRefused,
+    ) as exc:
+        # Everything the chokepoint refuses about a run somebody ASKED for:
+        # an operation the workspace does not declare (#2116, #1974), and the
+        # three incoherent configure requests. Translated rather than restated,
+        # so the message an operator reads is the one the rule itself wrote --
+        # a router that rephrased it would be a second copy to drift.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
@@ -1171,13 +1243,17 @@ def _retry_capability(run: Run) -> str:
     A retry is a new run, so it must not let anyone queue what they could not
     queue directly. It used to check `run:cancel`, which a plan-level role
     holds, so such a role could retry an apply-capable run and, on a workspace
-    that auto-applies, apply it (#1599). This mirrors `create_run`'s gate.
+    that auto-applies, apply it (#1599).
+
+    It does not mirror `create_run`'s gate -- it IS that gate, through the same
+    producer, which is what stops the two drifting when a third kind of run
+    arrives (#1976).
     """
-    if run.plan_only:
-        return cap.RUN_PLAN
-    if run.is_destroy:
-        return cap.RUN_APPLY_DESTROY
-    return cap.RUN_APPLY
+    return cap.create_run_capability(
+        plan_only=bool(run.plan_only),
+        is_destroy=bool(run.is_destroy),
+        is_configure=bool(run.is_configure),
+    )
 
 
 @extensions_router.post("/runs/{run_id}/actions/retry")
@@ -1251,6 +1327,15 @@ async def retry_run(
             # Without this a retried destroy came back as an ordinary apply of the
             # same configuration — the opposite of what was asked for.
             is_destroy=run.is_destroy,
+            # And the same class for a configure (#1974): a retried configure
+            # that dropped these came back as an ordinary apply, which on a
+            # configure-only workspace is refused and on a workspace with both
+            # is an apply nobody asked for. Only the STANDALONE request is
+            # copied -- a composite is resolved from the workspace, so passing
+            # its flag would pin it to a setting that may since have changed.
+            is_configure=bool(run.is_configure) and not bool(run.configure_after_apply),
+            playbook=run.playbook or "",
+            ansible_limit=run.ansible_limit or "",
             configuration_version_id=cv_id_for_retry,
             created_by=user.email,
             target_addrs=run.target_addrs,
@@ -1265,7 +1350,16 @@ async def retry_run(
         new_run.vcs_branch = run.vcs_branch
         new_run.vcs_pull_request_number = run.vcs_pull_request_number
         new_run.module_overrides = run.module_overrides
-    except run_service.PlanApplyNotEnabled as exc:
+    except (
+        run_service.PlanApplyNotEnabled,
+        workspace_settings.ConfigureNotEnabled,
+        run_service.PlanOnlyConfigureConflict,
+        run_service.ConfigureOptionConflict,
+        run_service.SpeculativeConfigureRefused,
+    ) as exc:
+        # The same set the create route translates: a retry is a new run, so a
+        # workspace whose declaration has changed since the original can refuse
+        # it, and the refusal is as useful here as there.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
@@ -2925,11 +3019,20 @@ async def next_run(
     if phase == "configure" and ws is not None and ws.config_directory is not None:
         attributes = run_data["data"]["attributes"]
         attributes["config-directory"] = ws.config_directory
-        # The run's own choice would win here; #1974 owns that attribute, so
-        # today this is the workspace's default and the precedence is expressed
-        # in one place (`options_from_attrs`) rather than twice.
+        # The workspace's defaults and, when this run named one, its own
+        # choice (#1974). Both are sent and the precedence is expressed in ONE
+        # place -- `options_from_attrs`, which reads
+        # `playbook or default-playbook` -- rather than being resolved here as
+        # well. Sending only the resolved value would lose the distinction the
+        # run page needs to show ("the workspace's default" against "this run
+        # asked for X"), and resolving it in both places is how two copies of a
+        # precedence rule come to disagree.
         attributes["default-playbook"] = ws.default_playbook or ""
         attributes["default-limit"] = ws.default_limit or ""
+        if run.playbook:
+            attributes["playbook"] = run.playbook
+        if run.ansible_limit:
+            attributes["ansible-limit"] = run.ansible_limit
     run_data["data"]["attributes"]["phase"] = phase
     # Which stack a Pulumi run operates on (#1523). The engine reads this into
     # `--stack`; without it the CLI has nothing selected and every run fails with

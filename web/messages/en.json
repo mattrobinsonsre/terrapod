@@ -2641,7 +2641,12 @@
       "ansibleExecutionEnvironmentTitle": "One of this deployment's own execution environments, by label. It overrides the Ansible version, so a workspace with a label set ignores its line. Leave empty to use the built-in image for the line.",
       "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "None configured on this deployment",
-      "ansibleVersionUnconfirmed": "Available versions could not be confirmed — type one"
+      "ansibleVersionUnconfirmed": "Available versions could not be confirmed — type one",
+      "autoConfigureEnabled": "Configure on push",
+      "autoConfigureEnabledHint": "A push that changes the Ansible config root runs the playbook. With no default limit set, that is the whole inventory.",
+      "autoConfigureEnabledHintLimited": "A push that changes the Ansible config root runs the playbook against {limit}.",
+      "configureAfterApply": "Configure after apply",
+      "configureAfterApplyHint": "Every apply here is followed by a configure on the same run, so a CLI apply streams the playbook's output too. A destroy never configures."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",
@@ -2824,7 +2829,19 @@
       "sourceModulePublish": "module publish",
       "awaitingDecision": "awaiting decision",
       "typeSavedPlan": "saved plan",
-      "typeSavedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied."
+      "typeSavedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied.",
+      "queueConfigure": "Configure",
+      "queueConfigureTitle": "Run the playbook against the inventory now. No plan precedes it.",
+      "queueConfigureConfirmAll": "Run the playbook against the WHOLE inventory? This changes real hosts and cannot be undone.",
+      "queueConfigureConfirmLimited": "Run the playbook against {limit}? This changes real hosts and cannot be undone.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "the workspace default",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "the whole inventory",
+      "configureLimitHint": "Which hosts, groups or patterns to reach. Empty means every host in the inventory.",
+      "typeConfigure": "configure",
+      "typeConfigureHint": "Runs the playbook against the inventory. No plan and no apply.",
+      "typeConfigureAfterApplyHint": "The apply is followed by a configure on this same run."
     },
     "state": {
       "deleteConfirm": "Delete state version #{serial}? This cannot be undone.",
@@ -2925,7 +2942,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventory",
-        "body": "The hosts and groups this workspace holds, and what ansible resolves them to. Each row is editable here; running a playbook against them is not available yet."
+        "body": "The hosts and groups this workspace holds, and what ansible resolves them to. Each row is editable here."
       },
       "nav": {
         "label": "Inventory sections",
@@ -3081,7 +3098,8 @@
       "manualDriftCheck": "Manual drift check from UI",
       "queued": "Queued from UI",
       "queuedSpeculative": "Queued from UI (speculative)",
-      "destroyQueued": "Destroy queued from UI"
+      "destroyQueued": "Destroy queued from UI",
+      "queuedConfigure": "Configure queued from UI"
     },
     "errors": {
       "loadWorkspace": "Failed to load workspace",
@@ -3149,7 +3167,9 @@
       "uploadStateFile": "Failed to upload state file",
       "updateSecurityScan": "Failed to update security scanning",
       "updateDebugMode": "Failed to update debug mode",
-      "updateForkPlans": "Failed to update fork pull request plans"
+      "updateForkPlans": "Failed to update fork pull request plans",
+      "queueConfigure": "Failed to queue the configure",
+      "queueConfigureStatus": "Failed to queue the configure ({status})"
     },
     "applicableVarsets": {
       "title": "Variable sets",

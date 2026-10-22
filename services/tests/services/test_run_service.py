@@ -133,6 +133,15 @@ def _mock_run(**kwargs):
     # with -- which is a MagicMock, and therefore always "somebody else is
     # applying".
     run.save_plan = kwargs.get("save_plan", False)
+    # The configure half (#1974), explicit for the same reason as the
+    # attributes above: an unset MagicMock attribute is truthy, so every run
+    # would read as a COMPOSITE -- `complete_apply` would hand it over to a
+    # configure instead of completing it, and the shipped default is that a run
+    # carries no configure at all.
+    run.is_configure = kwargs.get("is_configure", False)
+    run.configure_after_apply = kwargs.get("configure_after_apply", False)
+    run.configure_started_at = kwargs.get("configure_started_at", None)
+    run.configure_finished_at = kwargs.get("configure_finished_at", None)
     run.listener_id = kwargs.get("listener_id", None)
     run.locked = kwargs.get("locked", False)
     run.source = kwargs.get("source", "tfe-api")
@@ -446,6 +455,15 @@ def _mock_workspace(**kwargs):
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
     ws.ee_resource_cpu = ""
     ws.ee_resource_memory = ""
+    # Mirrors the column defaults (#1974). Left as MagicMock attributes these
+    # are TRUTHY, so every run built here would resolve as a composite
+    # configure -- `create_run` would then write an inventory artifact against
+    # a mocked session, which is the opposite of the shipped default and
+    # nothing to do with what these tests are about.
+    ws.configure_after_apply = kwargs.get("configure_after_apply", False)
+    ws.auto_configure_enabled = kwargs.get("auto_configure_enabled", False)
+    ws.configure_enabled = kwargs.get("configure_enabled", False)
+    ws.plan_apply_enabled = kwargs.get("plan_apply_enabled", True)
     # Pool set is a relationship (#1087); a MagicMock here would not read back
     # as links, so it is always a real list.
     ws.agent_pool_links = kwargs.get("agent_pool_links", [])
@@ -1613,3 +1631,89 @@ class TestATerminalTransitionRevokesTheRunsRunnerTokens:
             result = await transition_run(db, run, "applied")
 
         assert result.status == "applied"
+
+
+class TestAStandaloneConfigureIsNotAStateChange:
+    """`applied` is a configure's terminal too, and three side effects on that
+    transition are about tofu/terraform state having moved (#1974).
+
+    All three are wrong for a playbook run, and two of them are wrong in the
+    dangerous direction: they would record a reconciliation that did not happen,
+    hiding a real divergence behind a configure. A COMPOSITE is deliberately
+    held to the opposite rule -- its apply genuinely moved state -- which is why
+    the predicate cannot be `is_configure` alone.
+    """
+
+    def _ws(self):
+        ws = MagicMock()
+        ws.state_diverged = True
+        ws.drift_detection_enabled = True
+        ws.drift_status = "drifted"
+        ws.drift_last_checked_at = None
+        ws.drift_latest_run_id = uuid.uuid4()
+        ws.locked = False
+        ws.lock_id = None
+        return ws
+
+    async def _apply(self, run, ws):
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch(
+                "terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock
+            ) as fire,
+            patch("terrapod.services.run_service._enqueue_notification", new_callable=AsyncMock),
+            patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock),
+            patch(
+                "terrapod.services.run_service._enqueue_pulumi_run_ended", new_callable=AsyncMock
+            ),
+            patch("terrapod.auth.runner_token_state.revoke_run_tokens", new_callable=AsyncMock),
+        ):
+            await transition_run(db, run, "applied")
+        return fire
+
+    async def test_a_standalone_configure_fires_no_run_triggers(self):
+        """A run trigger means "this workspace's state changed, re-plan what
+        depends on it". A playbook changed no state."""
+        run = _mock_run(status="configuring", is_configure=True, configure_after_apply=False)
+        fire = await self._apply(run, self._ws())
+        fire.assert_not_awaited()
+
+    async def test_a_standalone_configure_does_not_clear_state_divergence(self):
+        run = _mock_run(status="configuring", is_configure=True, configure_after_apply=False)
+        ws = self._ws()
+        await self._apply(run, ws)
+        assert ws.state_diverged is True, "a playbook run cleared a real state divergence"
+
+    async def test_a_standalone_configure_does_not_reset_the_drift_status(self):
+        """Resetting it would suppress the next real drift check on the strength
+        of work that never looked at state."""
+        run = _mock_run(status="configuring", is_configure=True, configure_after_apply=False)
+        ws = self._ws()
+        await self._apply(run, ws)
+        assert ws.drift_status == "drifted"
+        assert ws.drift_last_checked_at is None
+
+    async def test_a_composite_still_gets_all_three(self):
+        """The contrast, and the reason this is a relationship rather than a
+        per-run property: a composite's apply did move state, so suppressing
+        these for it would be the opposite defect."""
+        run = _mock_run(
+            status="configuring",
+            is_configure=True,
+            configure_after_apply=True,
+            apply_started_at=datetime.now(UTC),
+        )
+        ws = self._ws()
+        fire = await self._apply(run, ws)
+        fire.assert_awaited_once()
+        assert ws.state_diverged is False
+        assert ws.drift_status == "no_drift"
+
+    async def test_an_ordinary_apply_is_unchanged(self):
+        run = _mock_run(status="applying", apply_started_at=datetime.now(UTC))
+        ws = self._ws()
+        fire = await self._apply(run, ws)
+        fire.assert_awaited_once()
+        assert ws.state_diverged is False
+        assert ws.drift_status == "no_drift"

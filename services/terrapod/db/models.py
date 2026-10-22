@@ -443,6 +443,54 @@ class Workspace(Base):
     #: attribute contract.
     plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: How a configure STARTS on this workspace (#1974). Both opt-in, both
+    #: default off, and neither means anything without `configure_enabled`.
+    #:
+    #: `auto_configure_enabled`: a push that changes the workspace's Ansible
+    #: config root queues a configure, the same shape as a Terraform workspace
+    #: auto-planning on a push to its directory. It fires the workspace's
+    #: `default_playbook` against its `default_limit`, because a push carries
+    #: no run options -- which is also what BOUNDS it: a workspace whose
+    #: `default_limit` names a canary group cannot be made to fire wider by a
+    #: git push. Deliberately broad where the limit is empty: at scale the
+    #: hazard is hosts left unconfigured, not hosts configured, so the controls
+    #: are visibility (`?limit=` answers what it would target) and
+    #: reversibility (a configure in flight can be cancelled).
+    #:
+    #: `configure_after_apply`: an apply on this workspace is followed by a
+    #: configure ON THE SAME RUN -- the composite.
+    #:
+    #: **A workspace setting rather than a run attribute, and the reason is the
+    #: CLI** (user, 2026-10-22): a remote execution driven from
+    #: `tofu`/`terraform` streams the configure's logs, which only works while
+    #: the configure belongs to the run the CLI is attached to -- and the CLI
+    #: has no way to ask for one, so the workspace is the only place the answer
+    #: can live. `_serve_log` closes a phase stream when the RUN is terminal
+    #: rather than when the apply ends, so the stream stays open through the
+    #: configure with no change to that rule (#1988).
+    #:
+    #: It is NOT apply-derived targeting, which was declined three times: the
+    #: host set comes from the inventory and the limit from `default_limit`,
+    #: exactly as for a standalone configure. What the apply decides is only
+    #: WHEN, and that ordering is forced by the data flow rather than chosen --
+    #: an apply may write inventory rows, so a configure before it would target
+    #: a stale host set. A DESTROY apply never chains one: the hosts are what
+    #: it just removed.
+    #:
+    #: `Run.configure_after_apply` carries the same name deliberately. It is
+    #: the run's snapshot of this setting, which is `auto_apply`'s own shape --
+    #: the workspace holds the operator's intent and the run records what it
+    #: was created under, so the answer survives the setting being changed.
+    #:
+    #: There is deliberately **no scheduled configure** (user, 2026-10-22).
+    #: An operator who wants one drives the run API from their own scheduler;
+    #: nothing here is waiting on a timer that does not exist.
+    auto_configure_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    configure_after_apply: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
 
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
@@ -1850,6 +1898,16 @@ class AutodiscoveryRule(Base):
     #: now. `config_directory` is an ordinary templated path alongside it.
     plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: How a configure starts on the workspaces this rule materialises (#1974),
+    #: templated for the same reason every other Ansible setting here is: a
+    #: rule that can declare a configure operation and not say how it starts
+    #: would leave an operator editing every materialised workspace by hand.
+    auto_configure_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    configure_after_apply: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
     config_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -2846,12 +2904,59 @@ class Run(Base):
     #: of, and ansible's dry run is `--check`, which is its own run option in
     #: the shape of `refresh_only` (#1407 point 14).
     #:
-    #: Nothing sets it yet, deliberately -- #1974 owns triggering and #1972
-    #: owns executing, and the API exposes no `is-configure` attribute until
-    #: they do. A column an operator could set while nothing executed it is the
-    #: "declaration without its reader" defect #2116 was the fourth instance of.
+    #: Set by the triggers (#1974): the `is-configure` run attribute, and a
+    #: push that touches the workspace's Ansible config root on a workspace
+    #: with `auto_configure_enabled`.
     is_configure: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false", default=False
+    )
+    #: Whether this configure FOLLOWS an apply on the same run (#1974) -- the
+    #: composite -- rather than being the whole of what the run does.
+    #:
+    #: Written from the workspace's setting of the same name at creation --
+    #: `auto_apply`'s shape, where the workspace holds the intent and the run
+    #: records what it was created under. There is deliberately no per-run
+    #: override: a standalone configure is already reachable per invocation
+    #: (`is-configure`), so an override here would be a second way to say the
+    #: same thing with no caller asking for it.
+    #:
+    #: It is a second boolean rather than a third value on `is_configure` for
+    #: the reason the workspace's own pair is two booleans (#1966): a value that
+    #: has to be parsed and kept in step across the API, the provider, MCP and
+    #: the UI gets mistyped into a third meaning eventually, and a pair of
+    #: booleans cannot be. The three legal rows are `(False, False)` for an
+    #: ordinary run, `(True, False)` for a standalone configure and
+    #: `(True, True)` for a composite; `(False, True)` is refused at the one
+    #: `Run` constructor.
+    #:
+    #: **It is what tells the claim loop whether this run needs a plan.** A
+    #: standalone configure has no plan/apply half, so it is claimed straight
+    #: from `queued` into `configuring`; a composite is claimed as a plan, then
+    #: an apply, then a configure. Without the distinction the plan tuple's
+    #: `is_configure IS false` clause means a composite can never plan at all.
+    configure_after_apply: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    #: The playbook THIS run executes, relative to the workspace's
+    #: `config_directory`. Empty means the workspace's `default_playbook`.
+    #:
+    #: On the run rather than read from the workspace at dispatch, for the
+    #: reason `target_addrs` is on the run: it is what this run was asked to
+    #: do, and it has to stay answerable after the workspace default moves.
+    #: The relationship is `vcs_branch`'s -- the workspace holds the default
+    #: and an invocation may name something else (#1407 point 14).
+    playbook: Mapped[str] = mapped_column(
+        String(500), nullable=False, server_default="", default=""
+    )
+    #: `--limit` for this run, narrowing it the way `target_addrs` narrows a
+    #: plan. Empty means the workspace's `default_limit`, which may itself be
+    #: empty, meaning the whole resolved inventory.
+    #:
+    #: A git-driven or otherwise platform-decided configure leaves both of
+    #: these empty: a push carries no run options, so it runs the workspace's
+    #: declared defaults, and that is what bounds its blast radius (#1974).
+    ansible_limit: Mapped[str] = mapped_column(
+        String(500), nullable=False, server_default="", default=""
     )
 
     # Drift detection

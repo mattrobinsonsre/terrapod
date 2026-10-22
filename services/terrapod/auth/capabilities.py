@@ -91,6 +91,40 @@ def confirm_capability(is_destroy: bool) -> str:
     return RUN_APPLY_DESTROY if is_destroy else RUN_APPLY
 
 
+def create_run_capability(*, plan_only: bool, is_destroy: bool, is_configure: bool) -> str:
+    """The capability required to CREATE a run of a given kind (#1976).
+
+    One function for the reason `confirm_capability` above is one: the rule was
+    inlined at the create route and at the retry route, and a third kind of run
+    is exactly how two inlined copies come to disagree.
+
+    **A configure is apply-equivalent and sits at the WRITE tier.** Running a
+    playbook against real hosts can restart services, rotate credentials and
+    reboot machines, so `run:plan` is insufficient -- a permission model that
+    treated it as a read-tier convenience would be the most serious hole the
+    feature could ship with. It is `run:apply` rather than a capability of its
+    own, deliberately: there is no `run:configure` axis, because the control
+    over what a given person can configure is WHICH WORKSPACES they hold write
+    on, and a second axis would only describe the same authority twice. Where
+    different people should be allowed to run different playbooks, those are
+    different workspaces with different label RBAC -- exactly as two Terraform
+    workspaces over one repository already are.
+
+    **And there is no destroy analogue.** `--limit` narrows a configure the way
+    `-target` narrows a plan, and anyone with write may already pass `-target`;
+    a configure has no destructive variant to split off. So the split stops at
+    `is_destroy`, which only a plan/apply run can be.
+
+    `plan_only` is checked first because it is the weakest kind, and a configure
+    can never be plan-only -- the combination is refused at run creation.
+    """
+    if is_configure:
+        return RUN_APPLY
+    if plan_only:
+        return RUN_PLAN
+    return confirm_capability(is_destroy)
+
+
 VAR_WRITE = "var:write"  # create / update / delete variables
 INVENTORY_WRITE = "inventory:write"  # declare / change / remove inventory hosts (#1968)
 STATE_WRITE = "state:write"  # create state version, manual upload, rollback

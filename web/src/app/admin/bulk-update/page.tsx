@@ -129,6 +129,12 @@ export default function BulkUpdatePage() {
   // one workspace at a time is what this page exists to avoid.
   const [uPlanApplyEnabled, setUPlanApplyEnabled] = useState('')
   const [uConfigureEnabled, setUConfigureEnabled] = useState('')
+  // How a configure starts (#1974). Both opt-in, both meaningless without
+  // `configure-enabled` above, and both bulk-settable because adopting Ansible
+  // across a fleet means turning the trigger on for the workspaces that should
+  // have it.
+  const [uAutoConfigureEnabled, setUAutoConfigureEnabled] = useState('')
+  const [uConfigureAfterApply, setUConfigureAfterApply] = useState('')
   // BOTH explicitly false is the only combination that can never succeed for
   // any matched workspace, so it is the only one blocked here. Turning just
   // plan/apply off is legitimate for a set that has configure on, and the
@@ -280,6 +286,8 @@ export default function BulkUpdatePage() {
     // being empty is refused.
     if (uPlanApplyEnabled) u['plan-apply-enabled'] = uPlanApplyEnabled === 'true'
     if (uConfigureEnabled) u['configure-enabled'] = uConfigureEnabled === 'true'
+    if (uAutoConfigureEnabled) u['auto-configure-enabled'] = uAutoConfigureEnabled === 'true'
+    if (uConfigureAfterApply) u['configure-after-apply'] = uConfigureAfterApply === 'true'
     // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
     // value here (the configuration version's root), so the checkbox is what
     // says whether to write this at all. Never `null`: an explicit null on
@@ -1063,6 +1071,42 @@ export default function BulkUpdatePage() {
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
                   {tWs('fields.configureEnabledHint')}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-auto-configure-enabled">
+                  {tWs('fields.autoConfigureEnabled')}
+                </label>
+                <select
+                  id="bu-auto-configure-enabled"
+                  value={uAutoConfigureEnabled}
+                  onChange={(e) => setUAutoConfigureEnabled(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.autoConfigureEnabledHint')}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-configure-after-apply">
+                  {tWs('fields.configureAfterApply')}
+                </label>
+                <select
+                  id="bu-configure-after-apply"
+                  value={uConfigureAfterApply}
+                  onChange={(e) => setUConfigureAfterApply(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.configureAfterApplyHint')}
                 </p>
               </div>
             </div>

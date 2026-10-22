@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "이 배포의 자체 실행 환경을 레이블로 지정합니다. Ansible 버전보다 우선하므로 레이블이 설정된 워크스페이스는 해당 라인을 무시합니다. 비워 두면 해당 라인의 기본 이미지를 사용합니다.",
       "ansibleExecutionEnvironmentPlaceholder": "예: rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "이 배포에 구성된 항목이 없습니다",
-      "ansibleVersionUnconfirmed": "사용 가능한 버전을 확인할 수 없습니다 — 직접 입력하세요"
+      "ansibleVersionUnconfirmed": "사용 가능한 버전을 확인할 수 없습니다 — 직접 입력하세요",
+      "autoConfigureEnabled": "푸시 시 구성",
+      "autoConfigureEnabledHint": "Ansible 구성 디렉터리를 변경하는 푸시가 플레이북을 실행합니다. 기본 limit이 설정되어 있지 않으면 대상은 전체 인벤토리입니다.",
+      "autoConfigureEnabledHintLimited": "Ansible 구성 디렉터리를 변경하는 푸시가 {limit}을(를) 대상으로 플레이북을 실행합니다.",
+      "configureAfterApply": "적용 후 구성",
+      "configureAfterApplyHint": "여기서의 모든 적용은 같은 실행에서 구성으로 이어지므로, CLI 적용에서도 플레이북의 출력이 스트리밍됩니다. 삭제 실행은 구성하지 않습니다."
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "모듈 게시",
       "awaitingDecision": "결정 대기 중",
       "typeSavedPlan": "저장된 플랜",
-      "typeSavedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다."
+      "typeSavedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다.",
+      "queueConfigure": "구성",
+      "queueConfigureTitle": "지금 인벤토리를 대상으로 플레이북을 실행합니다. 선행하는 플랜은 없습니다.",
+      "queueConfigureConfirmAll": "전체 인벤토리(인벤토리의 모든 호스트)를 대상으로 플레이북을 실행하시겠습니까? 실제 호스트가 변경되며 이 작업은 취소할 수 없습니다.",
+      "queueConfigureConfirmLimited": "{limit}을(를) 대상으로 플레이북을 실행하시겠습니까? 실제 호스트가 변경되며 이 작업은 취소할 수 없습니다.",
+      "configurePlaybook": "플레이북",
+      "configurePlaybookPlaceholder": "워크스페이스 기본값",
+      "configureLimit": "limit",
+      "configureLimitPlaceholder": "전체 인벤토리",
+      "configureLimitHint": "대상으로 삼을 호스트, 그룹 또는 패턴입니다. 비워 두면 인벤토리의 모든 호스트가 대상이 됩니다.",
+      "typeConfigure": "구성",
+      "typeConfigureHint": "인벤토리를 대상으로 플레이북을 실행합니다. 플랜도 적용도 없습니다.",
+      "typeConfigureAfterApplyHint": "이 같은 실행에서 적용 다음에 구성이 이어집니다."
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "인벤토리",
-        "body": "이 워크스페이스가 보유한 호스트와 그룹, 그리고 ansible이 그것들을 해석한 결과입니다. 각 행은 여기서 편집할 수 있지만, 아직 이들을 대상으로 플레이북을 실행할 수는 없습니다."
+        "body": "이 워크스페이스가 보유한 호스트와 그룹, 그리고 ansible이 그것들을 해석한 결과입니다. 각 행은 여기서 편집할 수 있습니다."
       },
       "nav": {
         "label": "인벤토리 섹션",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "UI에서 수동 드리프트 검사",
       "queued": "UI에서 대기됨",
       "queuedSpeculative": "UI에서 대기됨 (예상)",
-      "destroyQueued": "UI에서 삭제 대기됨"
+      "destroyQueued": "UI에서 삭제 대기됨",
+      "queuedConfigure": "UI에서 구성 대기됨"
     },
     "errors": {
       "loadWorkspace": "워크스페이스를 불러오지 못했습니다",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "상태 파일을 업로드하지 못했습니다",
       "updateSecurityScan": "보안 검사 업데이트에 실패했습니다",
       "updateDebugMode": "디버그 모드를 업데이트하지 못했습니다",
-      "updateForkPlans": "포크 풀 리퀘스트 계획을 업데이트하지 못했습니다"
+      "updateForkPlans": "포크 풀 리퀘스트 계획을 업데이트하지 못했습니다",
+      "queueConfigure": "구성을 대기하지 못했습니다",
+      "queueConfigureStatus": "구성을 대기하지 못했습니다 ({status})"
     },
     "subtabs": {
       "state": "상태",

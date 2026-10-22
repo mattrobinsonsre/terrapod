@@ -222,6 +222,21 @@ class TestTheAllowlistIsDerivedFromTheStateMachine:
         froms = {c for c, t in router._LISTENER_REPORTABLE if t == "confirmed"}
         assert froms == {"applying"}
 
+    def test_a_configure_launch_failure_is_reportable(self):
+        """`_report_launch_failed` PATCHes `errored` from whatever status the
+        run is in, and a configure is in `configuring` (#1974). Without the pair
+        the report is refused and a Job the listener could not create is only
+        noticed minutes later by the reconciler's launch timeout -- where a plan
+        and an apply both have it recorded immediately."""
+        assert ("configuring", "errored") in router._LISTENER_REPORTABLE
+
+    def test_a_configure_SUCCESS_is_not_reportable(self):
+        """The asymmetry, stated so nobody "completes the pair". A listener
+        never observes a configure succeeding -- the reconciler drives that from
+        the Job's outcome -- and granting it would let whoever holds a listener
+        certificate declare a playbook complete."""
+        assert ("configuring", "applied") not in router._LISTENER_REPORTABLE
+
     def test_no_user_act_is_reportable(self):
         """`discarded` is a human discarding a held run; a listener never
         observes it."""

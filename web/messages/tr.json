@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Bu kurulumun kendi yürütme ortamlarından biri, etiketle. Ansible sürümünü geçersiz kılar, bu nedenle etiketi ayarlanmış bir çalışma alanı kendi hattını yok sayar. Hattın yerleşik görüntüsünü kullanmak için boş bırakın.",
       "ansibleExecutionEnvironmentPlaceholder": "örn. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Bu kurulumda yapılandırılmış yok",
-      "ansibleVersionUnconfirmed": "Kullanılabilir sürümler doğrulanamadı — birini yazın"
+      "ansibleVersionUnconfirmed": "Kullanılabilir sürümler doğrulanamadı — birini yazın",
+      "autoConfigureEnabled": "Gönderimde yapılandırma",
+      "autoConfigureEnabledHint": "Ansible yapılandırma dizinini değiştiren bir depo gönderimi playbook'u çalıştırır. Varsayılan bir limit ayarlanmamışsa bu, tüm envanterdir.",
+      "autoConfigureEnabledHintLimited": "Ansible yapılandırma dizinini değiştiren bir depo gönderimi playbook'u {limit} üzerinde çalıştırır.",
+      "configureAfterApply": "Uygulamadan sonra yapılandırma",
+      "configureAfterApplyHint": "Buradaki her uygulamanın ardından aynı çalıştırmada bir yapılandırma gelir; bu yüzden CLI üzerinden yapılan bir uygulama playbook'un çıktısını da akıtır. Yok etme asla yapılandırma yapmaz."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "modül yayımlama",
       "awaitingDecision": "karar bekleniyor",
       "typeSavedPlan": "kaydedilmiş plan",
-      "typeSavedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz."
+      "typeSavedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz.",
+      "queueConfigure": "Yapılandır",
+      "queueConfigureTitle": "Playbook'u envantere karşı şimdi çalıştır. Öncesinde plan yoktur.",
+      "queueConfigureConfirmAll": "Playbook, TÜM envantere karşı çalıştırılsın mı? Bu, gerçek ana makineleri değiştirir ve geri alınamaz.",
+      "queueConfigureConfirmLimited": "Playbook, {limit} üzerinde çalıştırılsın mı? Bu, gerçek ana makineleri değiştirir ve geri alınamaz.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "çalışma alanı varsayılanı",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "tüm envanter",
+      "configureLimitHint": "Hangi ana makinelere, gruplara veya desenlere ulaşılacağı. Boş bırakmak envanterdeki her ana makine anlamına gelir.",
+      "typeConfigure": "yapılandırma",
+      "typeConfigureHint": "Playbook'u envantere karşı çalıştırır. Plan yok, uygulama yok.",
+      "typeConfigureAfterApplyHint": "Uygulamanın ardından bu aynı çalıştırmada bir yapılandırma gelir."
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Envanter",
-        "body": "Bu çalışma alanının tuttuğu ana makineler ve gruplar ile ansible’ın bunları neye çözümlediği. Her satır burada düzenlenebilir; üzerlerinde playbook çalıştırmak henüz mevcut değil."
+        "body": "Bu çalışma alanının tuttuğu ana makineler ve gruplar ile ansible’ın bunları neye çözümlediği. Her satır burada düzenlenebilir."
       },
       "nav": {
         "label": "Envanter bölümleri",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Arayüzden elle sürüklenme denetimi",
       "queued": "Arayüzden sıraya alındı",
       "queuedSpeculative": "Arayüzden sıraya alındı (spekülatif)",
-      "destroyQueued": "Arayüzden yok etme sıraya alındı"
+      "destroyQueued": "Arayüzden yok etme sıraya alındı",
+      "queuedConfigure": "Arayüzden yapılandırma sıraya alındı"
     },
     "errors": {
       "loadWorkspace": "Çalışma alanı yüklenemedi",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Durum dosyası yüklenemedi",
       "updateSecurityScan": "Güvenlik taraması güncellenemedi",
       "updateDebugMode": "Hata ayıklama modu güncellenemedi",
-      "updateForkPlans": "Fork pull request planları güncellenemedi"
+      "updateForkPlans": "Fork pull request planları güncellenemedi",
+      "queueConfigure": "Yapılandırma sıraya alınamadı",
+      "queueConfigureStatus": "Yapılandırma sıraya alınamadı ({status})"
     },
     "subtabs": {
       "state": "Durum",

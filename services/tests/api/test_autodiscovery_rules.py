@@ -57,6 +57,9 @@ def _mock_rule(
     # #1929's six, which `_rule_json` serialises.
     r.plan_apply_enabled = True
     r.configure_enabled = False
+    # #1974's pair, serialised beside them.
+    r.auto_configure_enabled = False
+    r.configure_after_apply = False
     r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""

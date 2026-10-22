@@ -754,9 +754,17 @@
             "boolean"
           ]
         },
+        "is_configure": {
+          "description": "run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet",
+          "type": "boolean"
+        },
         "is_destroy": {
           "description": "plan a destroy (tear-down) run",
           "type": "boolean"
+        },
+        "limit": {
+          "description": "ansible --limit for this configure: which hosts, groups or patterns it reaches. Omit to use the workspace's default_limit, which may itself be empty meaning THE WHOLE INVENTORY. Read the resolved inventory with the limit first (terrapod_inventory_resolved) to see what it would target. Only valid with is_configure",
+          "type": "string"
         },
         "message": {
           "description": "an optional human message describing why",
@@ -768,6 +776,10 @@
             "null",
             "boolean"
           ]
+        },
+        "playbook": {
+          "description": "the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure",
+          "type": "string"
         },
         "refresh": {
           "description": "refresh state before planning (default true)",
@@ -1242,9 +1254,23 @@
             "string"
           ]
         },
+        "auto_configure_enabled": {
+          "description": "whether a PUSH that changes this workspace's ansible config root queues a configure. DEFAULTS TO FALSE. It runs the workspace's default_playbook against its default_limit, because a push carries no run options -- which is also what BOUNDS it: a workspace whose default_limit names a canary group cannot be made to fire wider by a git push. Needs configure_enabled; without it this is inert",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "config_directory": {
           "description": "the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": "string"
+        },
+        "configure_after_apply": {
+          "description": "whether an APPLY on this workspace is followed by a configure ON THE SAME RUN. DEFAULTS TO FALSE. It is a workspace setting rather than a per-run option because the terraform/tofu CLI cannot pass one, and keeping the configure attached to the run means a remote execution keeps streaming its logs. The host set still comes from the inventory and the limit from default_limit -- the apply decides only WHEN. A DESTROY apply never chains one. Needs configure_enabled",
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "configure_enabled": {
           "description": "whether this workspace has an ansible CONFIGURE operation. DEFAULTS TO FALSE, so the operation is opt-in and this is what turns it on -- setting config_directory alone does NOT (#1966), and a workspace with configure_enabled false has no configure operation and no ansible inventory however its roots are set. With it true, config_directory says WHERE the operation runs and inventory_paths says what it targets. Independent of plan_apply_enabled, so a workspace may have both; both off is refused (422)",
@@ -1516,11 +1542,25 @@
             "string"
           ]
         },
+        "auto_configure_enabled": {
+          "description": "turn the GIT trigger for this workspace's configure on or off: a push that changes its ansible config root queues one, running default_playbook against default_limit. Omitting the field leaves the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "config_directory": {
           "description": "the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": [
             "null",
             "string"
+          ]
+        },
+        "configure_after_apply": {
+          "description": "turn CONFIGURE-AFTER-APPLY on or off: an apply on this workspace is followed by a configure on the same run, which is what lets a terraform/tofu CLI apply stream the configure's logs. A destroy apply never chains one. Omitting the field leaves the stored value alone",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "configure_enabled": {

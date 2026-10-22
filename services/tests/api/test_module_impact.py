@@ -135,6 +135,14 @@ def _mock_run(
     run.listener_id = None
     run.target_addrs = None
     run.replace_addrs = None
+    # The configure half of a run (#1974). Serialised, so an unset MagicMock
+    # attribute is not merely wrong -- `_run_json` hands it to `json.dumps` and
+    # the request 500s with "Object of type MagicMock is not JSON
+    # serializable", naming the attribute and nothing about the cause.
+    run.is_configure = False
+    run.configure_after_apply = False
+    run.playbook = ""
+    run.ansible_limit = ""
     run.refresh_only = False
     run.refresh = True
     run.allow_empty_apply = False

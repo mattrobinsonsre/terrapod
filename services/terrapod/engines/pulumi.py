@@ -335,14 +335,22 @@ class PulumiStrategy:
         A failed or deleted Job errors the run, as for Terraform. Pulumi has no
         equivalent of Ansible's `ignore_errors`, so a non-zero exit means the
         same thing here as there.
+
+        **A configure answers `configure` in both engines' vocabularies**, and
+        that is not an oversight in Pulumi's words: a configure is not a Pulumi
+        phase at all. It runs beside the engine, on the same Run, against the
+        workspace's inventory -- so there is no Pulumi term for it to borrow,
+        and inventing one would name something Pulumi does not do.
         """
-        phase = "preview" if run_status == "planning" else "update"
+        phase = {"planning": "preview", "configuring": "configure"}.get(run_status, "update")
 
         if job_status == "succeeded":
             if run_status == "planning":
                 return TerminalOutcome(action="complete_plan", phase=phase)
             if run_status == "applying":
                 return TerminalOutcome(action="complete_apply", phase=phase)
+            if run_status == "configuring":
+                return TerminalOutcome(action="complete_configure", phase=phase)
             # Neither planning nor applying: the runner's own POST already drove
             # the transition. The completion helpers are idempotent, but there is
             # nothing left to complete, so say so rather than calling one anyway.

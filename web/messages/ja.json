@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "このデプロイメント独自の実行環境をラベルで指定します。Ansible バージョンより優先されるため、ラベルが設定されたワークスペースはそのラインを無視します。空のままにすると、そのラインの組み込みイメージを使用します。",
       "ansibleExecutionEnvironmentPlaceholder": "例: rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "このデプロイメントには未設定です",
-      "ansibleVersionUnconfirmed": "利用可能なバージョンを確認できませんでした — 入力してください"
+      "ansibleVersionUnconfirmed": "利用可能なバージョンを確認できませんでした — 入力してください",
+      "autoConfigureEnabled": "プッシュ時に構成",
+      "autoConfigureEnabledHint": "Ansible 設定ディレクトリを変更するプッシュがプレイブックを実行します。既定の limit が設定されていない場合、対象はインベントリ全体です。",
+      "autoConfigureEnabledHintLimited": "Ansible 設定ディレクトリを変更するプッシュが、{limit} に対してプレイブックを実行します。",
+      "configureAfterApply": "適用後に構成",
+      "configureAfterApplyHint": "ここでの適用はすべて、同じ実行内で構成に続きます。そのため CLI からの適用でもプレイブックの出力がストリーミングされます。破棄では構成は行われません。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "モジュール公開",
       "awaitingDecision": "判断待ち",
       "typeSavedPlan": "保存済みプラン",
-      "typeSavedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。"
+      "typeSavedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。",
+      "queueConfigure": "構成",
+      "queueConfigureTitle": "インベントリに対して今すぐプレイブックを実行します。先行するプランはありません。",
+      "queueConfigureConfirmAll": "インベントリ全体（インベントリ内のすべてのホスト）に対してプレイブックを実行しますか？実際のホストが変更され、この操作は元に戻せません。",
+      "queueConfigureConfirmLimited": "{limit} に対してプレイブックを実行しますか？実際のホストが変更され、この操作は元に戻せません。",
+      "configurePlaybook": "プレイブック",
+      "configurePlaybookPlaceholder": "ワークスペースの既定値",
+      "configureLimit": "limit",
+      "configureLimitPlaceholder": "インベントリ全体",
+      "configureLimitHint": "対象とするホスト、グループ、またはパターンを指定します。空欄の場合はインベントリ内のすべてのホストが対象になります。",
+      "typeConfigure": "構成",
+      "typeConfigureHint": "インベントリに対してプレイブックを実行します。プランも適用もありません。",
+      "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "インベントリ",
-        "body": "このワークスペースが保持しているホストとグループ、そして ansible がそれらを解決した結果です。各行はここで編集できますが、これらに対してプレイブックを実行する機能はまだありません。"
+        "body": "このワークスペースが保持しているホストとグループ、そして ansible がそれらを解決した結果です。各行はここで編集できます。"
       },
       "nav": {
         "label": "インベントリのセクション",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "UIからの手動ドリフトチェック",
       "queued": "UIからキューに追加",
       "queuedSpeculative": "UIからキューに追加（投機的）",
-      "destroyQueued": "UIから破棄をキューに追加"
+      "destroyQueued": "UIから破棄をキューに追加",
+      "queuedConfigure": "UIから構成をキューに追加"
     },
     "errors": {
       "loadWorkspace": "ワークスペースの読み込みに失敗しました",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "状態ファイルのアップロードに失敗しました",
       "updateSecurityScan": "セキュリティスキャンの更新に失敗しました",
       "updateDebugMode": "デバッグモードを更新できませんでした",
-      "updateForkPlans": "フォークのプルリクエストのプランを更新できませんでした"
+      "updateForkPlans": "フォークのプルリクエストのプランを更新できませんでした",
+      "queueConfigure": "構成のキュー追加に失敗しました",
+      "queueConfigureStatus": "構成のキュー追加に失敗しました（{status}）"
     },
     "subtabs": {
       "state": "状態",

@@ -29,6 +29,14 @@ def _run(**over):
         # attribute is a bug worth raising on.
         "oidc_audiences": {},
         "oidc_minted_targets": [],
+        # #1974, and present for the same reason as the pair above: the
+        # production row always has both, and `_is_supersedeable_kind` reads
+        # them to exclude a standalone configure -- which is not a statement of
+        # the workspace's desired state and so neither supersedes nor is
+        # superseded. A SimpleNamespace that omitted them would raise
+        # AttributeError rather than exercising the rule.
+        "is_configure": False,
+        "configure_after_apply": False,
     }
     base.update(over)
     return SimpleNamespace(**base)

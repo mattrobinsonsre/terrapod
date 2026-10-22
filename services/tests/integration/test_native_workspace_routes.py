@@ -110,6 +110,15 @@ class TestTheNativeSurfaceServesEveryEngine:
             "alone and already uses `operations` for TFE's own execution-mode "
             "boolean (#1966)"
         ),
+        # How a configure starts (#1974). Native-only for both reasons above:
+        # they are Ansible triggers, and no `terraform`/`tofu`/`tfci`
+        # invocation reads them.
+        "auto-configure-enabled": (
+            "an Ansible trigger; the TFE surface serves Terraform alone (#1974)"
+        ),
+        "configure-after-apply": (
+            "an Ansible trigger; the TFE surface serves Terraform alone (#1974)"
+        ),
         "config-directory": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",

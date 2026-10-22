@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Een van de eigen uitvoeringsomgevingen van deze installatie, op label. Dit overschrijft de Ansible-versie, dus een workspace met een label negeert zijn lijn. Laat leeg om de ingebouwde image van de lijn te gebruiken.",
       "ansibleExecutionEnvironmentPlaceholder": "bijv. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Geen geconfigureerd in deze installatie",
-      "ansibleVersionUnconfirmed": "Beschikbare versies konden niet worden bevestigd — typ er een"
+      "ansibleVersionUnconfirmed": "Beschikbare versies konden niet worden bevestigd — typ er een",
+      "autoConfigureEnabled": "Configureren bij push",
+      "autoConfigureEnabledHint": "Een push die de Ansible-configuratiemap wijzigt, voert het playbook uit. Zonder ingestelde standaardlimiet is dat de hele inventaris.",
+      "autoConfigureEnabledHintLimited": "Een push die de Ansible-configuratiemap wijzigt, voert het playbook uit tegen {limit}.",
+      "configureAfterApply": "Configureren na de apply",
+      "configureAfterApplyHint": "Op elke apply hier volgt het configureren in dezelfde run, dus ook een apply via de CLI streamt de uitvoer van het playbook. Een destroy configureert nooit."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "modulepublicatie",
       "awaitingDecision": "wacht op beslissing",
       "typeSavedPlan": "opgeslagen plan",
-      "typeSavedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast."
+      "typeSavedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast.",
+      "queueConfigure": "Configureren",
+      "queueConfigureTitle": "Voer het playbook nu uit tegen de inventaris. Er gaat geen plan aan vooraf.",
+      "queueConfigureConfirmAll": "Het playbook uitvoeren tegen de HELE inventaris? Dit wijzigt echte hosts en kan niet ongedaan worden gemaakt.",
+      "queueConfigureConfirmLimited": "Het playbook uitvoeren tegen {limit}? Dit wijzigt echte hosts en kan niet ongedaan worden gemaakt.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "de standaard van de workspace",
+      "configureLimit": "Limiet",
+      "configureLimitPlaceholder": "de hele inventaris",
+      "configureLimitHint": "Welke hosts, groepen of patronen bereikt moeten worden. Leeg betekent elke host in de inventaris.",
+      "typeConfigure": "configureren",
+      "typeConfigureHint": "Voert het playbook uit tegen de inventaris. Geen plan en geen apply.",
+      "typeConfigureAfterApplyHint": "Na de apply volgt het configureren in dezelfde run."
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventaris",
-        "body": "De hosts en groepen die deze workspace bevat, en waartoe ansible ze oplost. Elke regel is hier te bewerken; een playbook erop uitvoeren is nog niet beschikbaar."
+        "body": "De hosts en groepen die deze workspace bevat, en waartoe ansible ze oplost. Elke regel is hier te bewerken."
       },
       "nav": {
         "label": "Inventarisonderdelen",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Handmatige driftcontrole vanuit UI",
       "queued": "In wachtrij gezet vanuit UI",
       "queuedSpeculative": "In wachtrij gezet vanuit UI (speculatief)",
-      "destroyQueued": "Destroy in wachtrij gezet vanuit UI"
+      "destroyQueued": "Destroy in wachtrij gezet vanuit UI",
+      "queuedConfigure": "Configureren in wachtrij gezet vanuit UI"
     },
     "errors": {
       "loadWorkspace": "Kan workspace niet laden",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Kan state-bestand niet uploaden",
       "updateSecurityScan": "Bijwerken van de beveiligingsscan is mislukt",
       "updateDebugMode": "Bijwerken van de foutopsporingsmodus mislukt",
-      "updateForkPlans": "Bijwerken van plannen voor pull requests uit forks mislukt"
+      "updateForkPlans": "Bijwerken van plannen voor pull requests uit forks mislukt",
+      "queueConfigure": "Kan configureren niet in wachtrij zetten",
+      "queueConfigureStatus": "Kan configureren niet in wachtrij zetten ({status})"
     },
     "subtabs": {
       "state": "State",

@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Unus ex ambitibus exsecutionis huius institutionis, per titulum. Versionem Ansible supervertit, itaque locus operis cum titulo lineam suam neglegit. Vacuum relinque ut imagine insita lineae utaris.",
       "ansibleExecutionEnvironmentPlaceholder": "ex. gr. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Nullum in hac institutione constitutum",
-      "ansibleVersionUnconfirmed": "Versiones praesto confirmari non potuerunt — scribe unam"
+      "ansibleVersionUnconfirmed": "Versiones praesto confirmari non potuerunt — scribe unam",
+      "autoConfigureEnabled": "Configurare ad quemque impulsum",
+      "autoConfigureEnabledHint": "Impulsus qui directorium configurationis Ansible mutat libellum ludendi exsequitur. Nullo limite praedefinito posito, id totum inventarium petit.",
+      "autoConfigureEnabledHintLimited": "Impulsus qui directorium configurationis Ansible mutat libellum ludendi adversus {limit} exsequitur.",
+      "configureAfterApply": "Configurare post applicationem",
+      "configureAfterApplyHint": "Quamque applicationem hic configuratio in eodem cursu sequitur, ideo applicatio ex CLI etiam egressum libelli ludendi transmittit. Destructio numquam configurat."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "editio moduli",
       "awaitingDecision": "decretum exspectat",
       "typeSavedPlan": "consilium servatum",
-      "typeSavedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur."
+      "typeSavedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur.",
+      "queueConfigure": "Configurare",
+      "queueConfigureTitle": "Libellum ludendi adversus inventarium nunc exsequi. Nullum consilium id praecedit.",
+      "queueConfigureConfirmAll": "Libellum ludendi adversus TOTUM INVENTARIUM exsequi? Hoc veros hospites mutat et revocari non potest.",
+      "queueConfigureConfirmLimited": "Libellum ludendi adversus {limit} exsequi? Hoc veros hospites mutat et revocari non potest.",
+      "configurePlaybook": "Libellus ludendi",
+      "configurePlaybookPlaceholder": "praedefinitus loci operis",
+      "configureLimit": "Limes",
+      "configureLimitPlaceholder": "totum inventarium",
+      "configureLimitHint": "Qui hospites, greges aut exemplaria petenda sint. Vacuum omnem hospitem inventarii significat.",
+      "typeConfigure": "configuratio",
+      "typeConfigureHint": "Libellum ludendi adversus inventarium exsequitur. Nullum consilium et nulla applicatio.",
+      "typeConfigureAfterApplyHint": "Applicationem configuratio in hoc eodem cursu sequitur."
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventarium",
-        "body": "Hospites et greges quos hoc locus operis tenet, et in quae eos ansible resolvit. Quaeque linea hic redigi potest; playbook in eos exsequi nondum praesto est."
+        "body": "Hospites et greges quos hoc locus operis tenet, et in quae eos ansible resolvit. Quaeque linea hic redigi potest."
       },
       "nav": {
         "label": "Partes inventarii",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Inspectio aberrationis manualis ex UI",
       "queued": "In ordinem positum ex UI",
       "queuedSpeculative": "In ordinem positum ex UI (speculativum)",
-      "destroyQueued": "Destructio in ordinem posita ex UI"
+      "destroyQueued": "Destructio in ordinem posita ex UI",
+      "queuedConfigure": "Configuratio in ordinem posita ex UI"
     },
     "errors": {
       "loadWorkspace": "Locus operis onerari non potuit",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Tabula status subdi non potuit",
       "updateSecurityScan": "Scrutinium securitatis renovari non potuit",
       "updateDebugMode": "Modus purgandi renovari non potuit",
-      "updateForkPlans": "Consilia rogationum tractionis e furca renovari non potuerunt"
+      "updateForkPlans": "Consilia rogationum tractionis e furca renovari non potuerunt",
+      "queueConfigure": "Configuratio in ordinem poni non potuit",
+      "queueConfigureStatus": "Configuratio in ordinem poni non potuit ({status})"
     },
     "subtabs": {
       "state": "Status",

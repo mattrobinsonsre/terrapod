@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Um dos ambientes de execução próprios desta instalação, por etiqueta. Substitui a versão do Ansible, pelo que um workspace com etiqueta definida ignora a sua linha. Deixe vazio para usar a imagem integrada da linha.",
       "ansibleExecutionEnvironmentPlaceholder": "ex. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Nenhum configurado nesta instalação",
-      "ansibleVersionUnconfirmed": "Não foi possível confirmar as versões disponíveis — escreva uma"
+      "ansibleVersionUnconfirmed": "Não foi possível confirmar as versões disponíveis — escreva uma",
+      "autoConfigureEnabled": "Configurar em cada push",
+      "autoConfigureEnabledHint": "Um push que altere o diretório de configuração do Ansible executa o playbook. Sem um limite predefinido, isso abrange todo o inventário.",
+      "autoConfigureEnabledHintLimited": "Um push que altere o diretório de configuração do Ansible executa o playbook contra {limit}.",
+      "configureAfterApply": "Configurar após o apply",
+      "configureAfterApplyHint": "Cada apply aqui é seguido por uma configuração na mesma execução, pelo que um apply a partir da CLI também transmite a saída do playbook. Um destroy nunca configura."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publicação de módulo",
       "awaitingDecision": "a aguardar decisão",
       "typeSavedPlan": "plano guardado",
-      "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia a área de trabalho até que o plano guardado seja aplicado."
+      "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia a área de trabalho até que o plano guardado seja aplicado.",
+      "queueConfigure": "Configurar",
+      "queueConfigureTitle": "Executar agora o playbook contra o inventário. Nenhum plano o precede.",
+      "queueConfigureConfirmAll": "Executar o playbook contra TODO O INVENTÁRIO? Isto altera hosts reais e não pode ser anulado.",
+      "queueConfigureConfirmLimited": "Executar o playbook contra {limit}? Isto altera hosts reais e não pode ser anulado.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "a predefinição da área de trabalho",
+      "configureLimit": "Limite",
+      "configureLimitPlaceholder": "todo o inventário",
+      "configureLimitHint": "Quais hosts, grupos ou padrões alcançar. Vazio significa todos os hosts do inventário.",
+      "typeConfigure": "configuração",
+      "typeConfigureHint": "Executa o playbook contra o inventário. Sem plano e sem apply.",
+      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução."
     },
     "state": {
       "deleteConfirm": "Eliminar a versão de estado #{serial}? Isto não pode ser anulado.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventário",
-        "body": "Os hosts e os grupos que esta área de trabalho guarda, e aquilo em que o ansible os resolve. Cada linha é editável aqui; executar um playbook sobre eles ainda não está disponível."
+        "body": "Os hosts e os grupos que esta área de trabalho guarda, e aquilo em que o ansible os resolve. Cada linha é editável aqui."
       },
       "nav": {
         "label": "Secções do inventário",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Verificação manual de drift a partir da UI",
       "queued": "Colocado na fila a partir da UI",
       "queuedSpeculative": "Colocado na fila a partir da UI (especulativo)",
-      "destroyQueued": "Destroy colocado na fila a partir da UI"
+      "destroyQueued": "Destroy colocado na fila a partir da UI",
+      "queuedConfigure": "Configuração colocada na fila a partir da UI"
     },
     "errors": {
       "loadWorkspace": "Falha ao carregar o workspace",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Falha ao carregar o ficheiro de estado",
       "updateSecurityScan": "Falha ao atualizar a verificação de segurança",
       "updateDebugMode": "Não foi possível atualizar o modo de depuração",
-      "updateForkPlans": "Não foi possível atualizar os planos de pull requests de forks"
+      "updateForkPlans": "Não foi possível atualizar os planos de pull requests de forks",
+      "queueConfigure": "Falha ao colocar a configuração na fila",
+      "queueConfigureStatus": "Falha ao colocar a configuração na fila ({status})"
     },
     "subtabs": {
       "state": "Estado",

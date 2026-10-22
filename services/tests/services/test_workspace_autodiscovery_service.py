@@ -529,6 +529,12 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         # afterwards is what the rule exists to avoid.
         "plan_apply_enabled",
         "configure_enabled",
+        # And how a configure starts on them (#1974). A rule that could declare
+        # the operation but not its trigger would materialise workspaces an
+        # operator then has to switch on one at a time, which is the gap this
+        # gate exists for.
+        "auto_configure_enabled",
+        "configure_after_apply",
         # The Ansible roots and run defaults (#1929). A rule carries them so a
         # fleet of configure-capable workspaces can be materialised rather than
         # edited one at a time afterwards -- the user's call when the parity

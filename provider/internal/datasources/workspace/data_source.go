@@ -42,6 +42,8 @@ type workspaceDataSourceModel struct {
 	AnsibleExecutionEnvironment   types.String `tfsdk:"ansible_execution_environment"`
 	PlanApplyEnabled              types.Bool   `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled              types.Bool   `tfsdk:"configure_enabled"`
+	AutoConfigureEnabled          types.Bool   `tfsdk:"auto_configure_enabled"`
+	ConfigureAfterApply           types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
@@ -132,6 +134,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"ansible_execution_environment": computedString("The operator-supplied execution environment this workspace runs its configure operations in, by label. Overrides ansible_version. Null when it names none and runs the built-in image for its line."),
 			"plan_apply_enabled":            computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
 			"configure_enabled":             computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
+			"auto_configure_enabled":        computedBool("Whether a push that changes the workspace's ansible config root queues a configure. Defaults to false. The run uses `default_playbook` and `default_limit`, because a push carries no run options."),
+			"configure_after_apply":         computedBool("Whether an apply on this workspace is followed by a configure on the same run — which is what lets a `terraform`/`tofu` CLI apply stream the configure's logs. Defaults to false. A destroy apply never chains one."),
 			"config_directory":              computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
 			"inventory_paths":               computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
 			"ansible_collections": schema.ListNestedAttribute{
@@ -322,6 +326,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.ConfigureEnabled = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "configure-enabled"); v != nil {
 		m.ConfigureEnabled = types.BoolValue(*v)
+	}
+	m.AutoConfigureEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "auto-configure-enabled"); v != nil {
+		m.AutoConfigureEnabled = types.BoolValue(*v)
+	}
+	m.ConfigureAfterApply = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "configure-after-apply"); v != nil {
+		m.ConfigureAfterApply = types.BoolValue(*v)
 	}
 	// #1929's six. `config-directory` is an ordinary non-nullable path now
 	// (#1966), so it reads as a plain string and NOT through

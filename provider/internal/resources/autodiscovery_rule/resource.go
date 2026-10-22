@@ -123,6 +123,8 @@ type autodiscoveryRuleModel struct {
 	// workspaces rooted at the configuration version's root.
 	PlanApplyEnabled         types.Bool   `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled         types.Bool   `tfsdk:"configure_enabled"`
+	AutoConfigureEnabled     types.Bool   `tfsdk:"auto_configure_enabled"`
+	ConfigureAfterApply      types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigDirectory          types.String `tfsdk:"config_directory"`
 	InventoryPaths           types.List   `tfsdk:"inventory_paths"`
 	DefaultPlaybook          types.String `tfsdk:"default_playbook"`
@@ -430,6 +432,28 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					"rule that materialises configure-only workspaces. **A materialised " +
 					"workspace with both booleans false is refused (422)** — it could " +
 					"never produce a run — so do not set both false here.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_configure_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether workspaces this rule creates queue a " +
+					"configure when a push changes their ansible config root. " +
+					"**Defaults to false.** Templated here so a fleet of " +
+					"configure-capable workspaces can be materialised with their " +
+					"trigger already on, rather than switched on one at a time.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"configure_after_apply": schema.BoolAttribute{
+				MarkdownDescription: "Whether an apply on a workspace this rule " +
+					"creates is followed by a configure on the same run. **Defaults to " +
+					"false.** A destroy apply never chains one.",
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.Bool{
@@ -1246,6 +1270,8 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		// defaults are TRUE.
 		{"plan-apply-enabled", m.PlanApplyEnabled},
 		{"configure-enabled", m.ConfigureEnabled},
+		{"auto-configure-enabled", m.AutoConfigureEnabled},
+		{"configure-after-apply", m.ConfigureAfterApply},
 		{"inventory-include-platform", m.InventoryIncludePlatform},
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
@@ -1525,6 +1551,14 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ConfigureEnabled = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "configure-enabled"); v != nil {
 		m.ConfigureEnabled = types.BoolValue(*v)
+	}
+	m.AutoConfigureEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "auto-configure-enabled"); v != nil {
+		m.AutoConfigureEnabled = types.BoolValue(*v)
+	}
+	m.ConfigureAfterApply = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "configure-after-apply"); v != nil {
+		m.ConfigureAfterApply = types.BoolValue(*v)
 	}
 	// The ansible roots and run defaults (#1929), read side. All three
 	// strings are non-nullable columns whose empty value is meaningful, so

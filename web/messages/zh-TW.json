@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "透過標籤指定本部署自有的執行環境。它會覆蓋 Ansible 版本，因此設定了標籤的工作區將忽略其版本線。留空則使用該版本線的內建映像。",
       "ansibleExecutionEnvironmentPlaceholder": "例如 rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "本部署未設定任何項目",
-      "ansibleVersionUnconfirmed": "無法確認可用版本 — 請手動輸入"
+      "ansibleVersionUnconfirmed": "無法確認可用版本 — 請手動輸入",
+      "autoConfigureEnabled": "推送時設定",
+      "autoConfigureEnabledHint": "變動 Ansible 設定目錄的推送會執行該 playbook。未指定預設 limit 時，目標就是整份清冊。",
+      "autoConfigureEnabledHintLimited": "變動 Ansible 設定目錄的推送會針對 {limit} 執行該 playbook。",
+      "configureAfterApply": "套用後執行設定",
+      "configureAfterApplyHint": "此處的每一次套用之後，都會在同一次執行中緊接一次設定，因此從 CLI 發起的套用也會串流輸出 playbook 的紀錄。銷毀執行從不進行設定。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "模組釋出",
       "awaitingDecision": "等待決定",
       "typeSavedPlan": "已儲存的計畫",
-      "typeSavedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。"
+      "typeSavedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。",
+      "queueConfigure": "設定",
+      "queueConfigureTitle": "立即針對清冊執行該 playbook。它之前沒有計畫階段。",
+      "queueConfigureConfirmAll": "要針對整份清冊（清冊中的每一台主機）執行該 playbook 嗎？這會變動真實主機，且此操作無法撤銷。",
+      "queueConfigureConfirmLimited": "要針對 {limit} 執行該 playbook 嗎？這會變動真實主機，且此操作無法撤銷。",
+      "configurePlaybook": "playbook",
+      "configurePlaybookPlaceholder": "工作區預設值",
+      "configureLimit": "limit",
+      "configureLimitPlaceholder": "整份清冊",
+      "configureLimitHint": "要觸及哪些主機、主機組或模式。留空表示清冊中的每一台主機。",
+      "typeConfigure": "設定",
+      "typeConfigureHint": "針對清冊執行該 playbook。既沒有計畫，也沒有套用。",
+      "typeConfigureAfterApplyHint": "在這同一次執行中，套用之後緊接一次設定。"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "清單",
-        "body": "此工作區持有的主機和主機組，以及 ansible 對它們的解析結果。每一行都可以在此編輯；但還無法針對它們執行 Playbook。"
+        "body": "此工作區持有的主機和主機組，以及 ansible 對它們的解析結果。每一行都可以在此編輯。"
       },
       "nav": {
         "label": "清單區段",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "從 UI 手動進行漂移檢查",
       "queued": "從 UI 排隊",
       "queuedSpeculative": "從 UI 排隊（推測性）",
-      "destroyQueued": "從 UI 排隊銷毀"
+      "destroyQueued": "從 UI 排隊銷毀",
+      "queuedConfigure": "從 UI 排隊設定執行"
     },
     "errors": {
       "loadWorkspace": "載入工作區失敗",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "上傳狀態檔案失敗",
       "updateSecurityScan": "更新安全掃描失敗",
       "updateDebugMode": "更新偵錯模式失敗",
-      "updateForkPlans": "更新 fork 拉取請求計畫失敗"
+      "updateForkPlans": "更新 fork 拉取請求計畫失敗",
+      "queueConfigure": "排隊設定執行失敗",
+      "queueConfigureStatus": "排隊設定執行失敗（{status}）"
     },
     "subtabs": {
       "state": "狀態",

@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Jedno z własnych środowisk wykonawczych tej instalacji, według etykiety. Nadpisuje wersję Ansible, więc obszar roboczy z ustawioną etykietą ignoruje swoją linię. Pozostaw puste, aby użyć wbudowanego obrazu linii.",
       "ansibleExecutionEnvironmentPlaceholder": "np. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Brak skonfigurowanych w tej instalacji",
-      "ansibleVersionUnconfirmed": "Nie udało się potwierdzić dostępnych wersji — wpisz ją"
+      "ansibleVersionUnconfirmed": "Nie udało się potwierdzić dostępnych wersji — wpisz ją",
+      "autoConfigureEnabled": "Konfiguracja po wypchnięciu",
+      "autoConfigureEnabledHint": "Wypchnięcie do repozytorium, które zmienia katalog konfiguracji Ansible, uruchamia playbook. Gdy nie ustawiono domyślnego limitu, jest to cały inwentarz.",
+      "autoConfigureEnabledHintLimited": "Wypchnięcie do repozytorium, które zmienia katalog konfiguracji Ansible, uruchamia playbook z limitem {limit}.",
+      "configureAfterApply": "Konfiguracja po zastosowaniu",
+      "configureAfterApplyHint": "Po każdym zastosowaniu tutaj następuje konfiguracja w tym samym uruchomieniu, więc zastosowanie z CLI przesyła strumieniowo także wyjście playbooka. Niszczenie nigdy nie konfiguruje."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "publikacja modułu",
       "awaitingDecision": "oczekuje na decyzję",
       "typeSavedPlan": "zapisany plan",
-      "typeSavedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany."
+      "typeSavedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany.",
+      "queueConfigure": "Konfiguruj",
+      "queueConfigureTitle": "Uruchom playbook na inwentarzu teraz. Nie poprzedza go żaden plan.",
+      "queueConfigureConfirmAll": "Uruchomić playbook na CAŁYM inwentarzu? To zmieni prawdziwe hosty i tej operacji nie można cofnąć.",
+      "queueConfigureConfirmLimited": "Uruchomić playbook z limitem {limit}? To zmieni prawdziwe hosty i tej operacji nie można cofnąć.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "domyślna wartość obszaru roboczego",
+      "configureLimit": "Limit",
+      "configureLimitPlaceholder": "cały inwentarz",
+      "configureLimitHint": "Które hosty, grupy lub wzorce objąć. Puste oznacza każdy host w inwentarzu.",
+      "typeConfigure": "konfiguracja",
+      "typeConfigureHint": "Uruchamia playbook na inwentarzu. Bez planu i bez zastosowania.",
+      "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu."
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inwentarz",
-        "body": "Hosty i grupy, które przechowuje ten obszar roboczy, oraz to, do czego je rozwiązuje ansible. Każdy wiersz można tu edytować; uruchamianie playbooka na nich nie jest jeszcze dostępne."
+        "body": "Hosty i grupy, które przechowuje ten obszar roboczy, oraz to, do czego je rozwiązuje ansible. Każdy wiersz można tu edytować."
       },
       "nav": {
         "label": "Sekcje inwentarza",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Ręczne sprawdzenie dryfu z UI",
       "queued": "W kolejce z UI",
       "queuedSpeculative": "W kolejce z UI (spekulatywny)",
-      "destroyQueued": "Niszczenie w kolejce z UI"
+      "destroyQueued": "Niszczenie w kolejce z UI",
+      "queuedConfigure": "Konfiguracja w kolejce z UI"
     },
     "errors": {
       "loadWorkspace": "Nie udało się wczytać obszaru roboczego",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Nie udało się przesłać pliku stanu",
       "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa",
       "updateDebugMode": "Nie udało się zaktualizować trybu debugowania",
-      "updateForkPlans": "Nie udało się zaktualizować planów dla pull requestów z forków"
+      "updateForkPlans": "Nie udało się zaktualizować planów dla pull requestów z forków",
+      "queueConfigure": "Nie udało się umieścić konfiguracji w kolejce",
+      "queueConfigureStatus": "Nie udało się umieścić konfiguracji w kolejce ({status})"
     },
     "subtabs": {
       "state": "Stan",

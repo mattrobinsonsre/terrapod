@@ -26,6 +26,16 @@ def _mock_workspace(**overrides):
     # Mirrors the column default. A MagicMock attribute would be truthy, which
     # is the opposite of the shipped behaviour and would hide the gate.
     ws.allow_fork_pr_plans = overrides.get("allow_fork_pr_plans", False)
+    # The operation declarations and the trigger opt-ins (#1974), explicit for
+    # the reason above: truthy MagicMock attributes would make every push on
+    # every one of these fixtures fire a configure as well as a plan.
+    ws.plan_apply_enabled = overrides.get("plan_apply_enabled", True)
+    ws.configure_enabled = overrides.get("configure_enabled", False)
+    ws.auto_configure_enabled = overrides.get("auto_configure_enabled", False)
+    ws.configure_after_apply = overrides.get("configure_after_apply", False)
+    ws.config_directory = overrides.get("config_directory", "")
+    ws.default_playbook = overrides.get("default_playbook", "")
+    ws.default_limit = overrides.get("default_limit", "")
     ws.locked = False
     ws.auto_apply = False
     ws.execution_mode = "agent"

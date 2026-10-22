@@ -81,6 +81,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// means the configuration version's root, so on CREATE "" and omitted
 		// mean the same thing and there is no third state left to express
 		// (#1966). The declaration lives in ConfigureEnabled above.
+		AutoConfigureEnabled     *bool    `json:"auto_configure_enabled,omitempty" jsonschema:"whether a PUSH that changes this workspace's ansible config root queues a configure. DEFAULTS TO FALSE. It runs the workspace's default_playbook against its default_limit, because a push carries no run options -- which is also what BOUNDS it: a workspace whose default_limit names a canary group cannot be made to fire wider by a git push. Needs configure_enabled; without it this is inert"`
+		ConfigureAfterApply      *bool    `json:"configure_after_apply,omitempty" jsonschema:"whether an APPLY on this workspace is followed by a configure ON THE SAME RUN. DEFAULTS TO FALSE. It is a workspace setting rather than a per-run option because the terraform/tofu CLI cannot pass one, and keeping the configure attached to the run means a remote execution keeps streaming its logs. The host set still comes from the inventory and the limit from default_limit -- the apply decides only WHEN. A DESTROY apply never chains one. Needs configure_enabled"`
 		ConfigDirectory          string   `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
 		InventoryPaths           []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
 		DefaultPlaybook          string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
@@ -142,8 +144,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// FALSE for configure -- rather than asserting a value. Both
 			// false is refused by the server against the resulting row; not
 			// re-checked here, for the reason PulumiBindPlan gives above.
-			PlanApplyEnabled: in.PlanApplyEnabled,
-			ConfigureEnabled: in.ConfigureEnabled,
+			PlanApplyEnabled:     in.PlanApplyEnabled,
+			ConfigureEnabled:     in.ConfigureEnabled,
+			AutoConfigureEnabled: in.AutoConfigureEnabled,
+			ConfigureAfterApply:  in.ConfigureAfterApply,
 			// #1929's six. ConfigDirectory is an ordinary path now, so "" and
 			// omitted mean the same thing on create and a plain string is the
 			// honest type; the SDK drops an empty one, which costs nothing
@@ -186,8 +190,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// off is `configure_enabled: false`, and it deliberately leaves
 		// config_directory where it is so re-enabling later resumes in the
 		// same directory.
-		PlanApplyEnabled *bool `json:"plan_apply_enabled,omitempty" jsonschema:"turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled"`
-		ConfigureEnabled *bool `json:"configure_enabled,omitempty" jsonschema:"turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled"`
+		PlanApplyEnabled     *bool `json:"plan_apply_enabled,omitempty" jsonschema:"turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled"`
+		AutoConfigureEnabled *bool `json:"auto_configure_enabled,omitempty" jsonschema:"turn the GIT trigger for this workspace's configure on or off: a push that changes its ansible config root queues one, running default_playbook against default_limit. Omitting the field leaves the stored value alone"`
+		ConfigureAfterApply  *bool `json:"configure_after_apply,omitempty" jsonschema:"turn CONFIGURE-AFTER-APPLY on or off: an apply on this workspace is followed by a configure on the same run, which is what lets a terraform/tofu CLI apply stream the configure's logs. A destroy apply never chains one. Omitting the field leaves the stored value alone"`
+		ConfigureEnabled     *bool `json:"configure_enabled,omitempty" jsonschema:"turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled"`
 		// The ansible configure operation's roots and run defaults (#1929).
 		// ConfigDirectory stays a POINTER here for a different reason from
 		// the booleans above and from the create tool's plain string: a PATCH
@@ -303,8 +309,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// declaration. The both-false refusal is the server's, checked
 			// against the merged row -- a copy here could only see the
 			// payload, which is the half that cannot answer the question.
-			PlanApplyEnabled: in.PlanApplyEnabled,
-			ConfigureEnabled: in.ConfigureEnabled,
+			PlanApplyEnabled:     in.PlanApplyEnabled,
+			ConfigureEnabled:     in.ConfigureEnabled,
+			AutoConfigureEnabled: in.AutoConfigureEnabled,
+			ConfigureAfterApply:  in.ConfigureAfterApply,
 			// #1929's six. ConfigDirectory keeps its pointer so "leave the
 			// stored root alone" stays distinguishable from "move it to the
 			// configuration version's root"; a nil sends nothing, which is

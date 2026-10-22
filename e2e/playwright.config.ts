@@ -136,6 +136,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #1974: how a configure STARTS. Its own project because the first test
+      // asserts the two trigger controls are ABSENT on a workspace with no
+      // configure operation, which every other test here has to enable first.
+      name: 'configure-trigger',
+      testMatch: 'configure-trigger.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'runs',
       testMatch: 'runs.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

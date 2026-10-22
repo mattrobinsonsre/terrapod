@@ -80,6 +80,12 @@ _FIELD_MAP: dict[str, str] = {
     # is what bulk update exists to avoid.
     "plan-apply-enabled": "plan_apply_enabled",
     "configure-enabled": "configure_enabled",
+    # How a configure STARTS (#1974). Bulk-settable for the same reason the
+    # pair above is: adopting Ansible across a fleet means turning the trigger
+    # on for the workspaces that should have it, and doing that one at a time
+    # is what this surface exists to avoid.
+    "auto-configure-enabled": "auto_configure_enabled",
+    "configure-after-apply": "configure_after_apply",
     # The Ansible roots and run defaults (#1929). `config-directory` is an
     # ordinary path, `""` meaning the configuration version's root.
     "config-directory": "config_directory",
@@ -411,6 +417,10 @@ _SETTING_RULES: dict[str, Any] = {
     # the two surfaces come to disagree about what is valid (#1763).
     "plan-apply-enabled": lambda v: workspace_settings.validate_bool(v, "plan-apply-enabled"),
     "configure-enabled": lambda v: workspace_settings.validate_bool(v, "configure-enabled"),
+    "auto-configure-enabled": lambda v: workspace_settings.validate_bool(
+        v, "auto-configure-enabled"
+    ),
+    "configure-after-apply": lambda v: workspace_settings.validate_bool(v, "configure-after-apply"),
     "config-directory": workspace_settings.validate_config_directory,
     "inventory-paths": workspace_settings.validate_inventory_paths,
     "inventory-ignore-paths": workspace_settings.validate_inventory_ignore_paths,

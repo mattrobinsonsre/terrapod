@@ -707,6 +707,35 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"auto_configure_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether a push that changes this workspace's " +
+					"ansible config root queues a configure. **Defaults to false.** " +
+					"The run uses `default_playbook` and `default_limit`, because a " +
+					"push carries no run options — which is also what bounds it: a " +
+					"workspace whose `default_limit` names a canary group cannot be " +
+					"made to fire wider by a git push. Needs `configure_enabled`; " +
+					"without it the setting is inert.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"configure_after_apply": schema.BoolAttribute{
+				MarkdownDescription: "Whether an apply on this workspace is followed " +
+					"by a configure **on the same run**. **Defaults to false.** It is " +
+					"a workspace setting rather than a per-run option because the " +
+					"`terraform`/`tofu` CLI cannot pass one, and keeping the configure " +
+					"attached to the run is what lets a remote execution keep " +
+					"streaming through it. The hosts still come from the inventory and " +
+					"the limit from `default_limit` — the apply decides only *when*. " +
+					"A **destroy** apply never chains a configure.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"config_directory": schema.StringAttribute{
 				MarkdownDescription: "Repository-root-relative directory the ansible " +
 					"configure operation runs in: its fetch scope and the working " +
@@ -1479,6 +1508,14 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureEnabled.ValueBool()
 		req.ConfigureEnabled = &v
 	}
+	if !m.AutoConfigureEnabled.IsNull() && !m.AutoConfigureEnabled.IsUnknown() {
+		v := m.AutoConfigureEnabled.ValueBool()
+		req.AutoConfigureEnabled = &v
+	}
+	if !m.ConfigureAfterApply.IsNull() && !m.ConfigureAfterApply.IsUnknown() {
+		v := m.ConfigureAfterApply.ValueBool()
+		req.ConfigureAfterApply = &v
+	}
 	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
@@ -1703,6 +1740,14 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ConfigureEnabled.IsNull() && !m.ConfigureEnabled.IsUnknown() {
 		v := m.ConfigureEnabled.ValueBool()
 		req.ConfigureEnabled = &v
+	}
+	if !m.AutoConfigureEnabled.IsNull() && !m.AutoConfigureEnabled.IsUnknown() {
+		v := m.AutoConfigureEnabled.ValueBool()
+		req.AutoConfigureEnabled = &v
+	}
+	if !m.ConfigureAfterApply.IsNull() && !m.ConfigureAfterApply.IsUnknown() {
+		v := m.ConfigureAfterApply.ValueBool()
+		req.ConfigureAfterApply = &v
 	}
 	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
@@ -1940,6 +1985,8 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// so a false survives the round trip rather than vanishing as absent.
 	m.PlanApplyEnabled = types.BoolValue(ws.PlanApplyEnabled)
 	m.ConfigureEnabled = types.BoolValue(ws.ConfigureEnabled)
+	m.AutoConfigureEnabled = types.BoolValue(ws.AutoConfigureEnabled)
+	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
 
 	// #1929's six, read side.
 	//

@@ -426,6 +426,11 @@ def _stack_ws(*, execution_mode: str = "local", vcs_connection_id=None) -> Magic
     ws.labels = {}
     ws.execution_mode = execution_mode
     ws.vcs_connection_id = vcs_connection_id
+    # False, not a truthy MagicMock (#1974): `create_run` reads it to decide
+    # whether an apply is followed by a configure, so the default fixture would
+    # turn every Pulumi update into a composite and then resolve an inventory
+    # against a mocked session.
+    ws.configure_after_apply = False
     return ws
 
 

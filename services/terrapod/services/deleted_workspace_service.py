@@ -121,6 +121,13 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # declared inventory still attached and nothing to run it.
         "plan_apply_enabled": ws.plan_apply_enabled,
         "configure_enabled": ws.configure_enabled,
+        # How a configure STARTS (#1974). Snapshotted for the same reason as
+        # the declaration above: a restored workspace that came back with its
+        # triggers off would stop configuring on push with nothing to say why,
+        # and an operator would look at the playbook rather than at the
+        # restore.
+        "auto_configure_enabled": ws.auto_configure_enabled,
+        "configure_after_apply": ws.configure_after_apply,
         # The Ansible roots and run defaults (#1929). An ordinary path now, so
         # it snapshots and restores like `working_directory` beside it.
         "config_directory": ws.config_directory,
@@ -630,6 +637,13 @@ async def restore_workspace(
         # rather than being read as opted in.
         plan_apply_enabled=_restored_plan_apply(settings),
         configure_enabled=_restored_configure(settings),
+        # `is True` for both, like `configure_enabled`: an absent key means a
+        # marker written before these columns, and a trigger is opt-in, so the
+        # safe reading of "the marker does not say" is OFF. Restoring a
+        # workspace that then starts configuring on every push because of a
+        # truthiness fallback is the failure to avoid.
+        auto_configure_enabled=settings.get("auto_configure_enabled") is True,
+        configure_after_apply=settings.get("configure_after_apply") is True,
         # An ordinary path (#1966): `or ""` is right now that "" and absent both
         # mean the configuration version's root. It used to be `.get()` with no
         # fallback because NULL meant "no configure operation" -- that question

@@ -100,6 +100,10 @@ interface WorkspaceAttrs {
   // on, configure off.
   'plan-apply-enabled'?: boolean
   'configure-enabled'?: boolean
+  // How a configure starts (#1974). Both opt-in, both default false, and
+  // neither does anything without `configure-enabled`.
+  'auto-configure-enabled'?: boolean
+  'configure-after-apply'?: boolean
   // An ordinary repo-relative path, `''` meaning the configuration version's
   // root -- `working-directory`'s shape exactly. It has NO null state: whether
   // there is a configure operation is `configure-enabled` above (#1966), not
@@ -215,6 +219,12 @@ interface RunItem {
     // `planned` at once -- an ordinary planned run holds the workspace.
     'save-plan': boolean
     'is-destroy': boolean
+    // The Ansible configure half (#1974). `is-configure` means the run carries
+    // one; `configure-after-apply` tells a COMPOSITE (an apply then a configure
+    // on one run) from a STANDALONE configure, which matters because the first
+    // also plans and applies.
+    'is-configure': boolean
+    'configure-after-apply': boolean
     'created-at': string
     'created-by': string
     'plan-started-at': string | null
@@ -478,6 +488,8 @@ function WorkspaceDetailContent() {
   // workspace that predates these attributes reads back as.
   const [editPlanApplyEnabled, setEditPlanApplyEnabled] = useState(true)
   const [editConfigureEnabled, setEditConfigureEnabled] = useState(false)
+  const [editAutoConfigureEnabled, setEditAutoConfigureEnabled] = useState(false)
+  const [editConfigureAfterApply, setEditConfigureAfterApply] = useState(false)
   // Where the configure operation runs (#1929) -- a plain text box now, because
   // the path is just a path: `''` is the configuration version's root, the way
   // it is for `working-directory` beside it, and there is no third state to
@@ -645,6 +657,13 @@ function WorkspaceDetailContent() {
   const [planRefresh, setPlanRefresh] = useState(true)
   const [planAllowEmpty, setPlanAllowEmpty] = useState(false)
   const [queueingDestroy, setQueueingDestroy] = useState(false)
+  // The configure trigger's own state (#1974). The two option fields are
+  // per-press overrides of the workspace's `default-playbook` / `default-limit`
+  // -- empty means "use the workspace's", which is also what a git-driven
+  // configure runs, because a push carries no run options.
+  const [queueingConfigure, setQueueingConfigure] = useState(false)
+  const [configurePlaybook, setConfigurePlaybook] = useState('')
+  const [configureLimit, setConfigureLimit] = useState('')
   const [showDestroyConfirm, setShowDestroyConfirm] = useState(false)
 
   // VCS ref picker
@@ -776,7 +795,11 @@ function WorkspaceDetailContent() {
       switch (key) {
         case 'id': return item.id
         case 'status': return item.attributes.status
-        case 'type': return (item.attributes['is-destroy'] ? 'destroy' : item.attributes['plan-only'] ? 'plan only' : 'plan + apply') + (item.attributes['save-plan'] ? ' (saved)' : '')
+        // A configure comes FIRST, before the plan-only test: a configure run
+        // is never plan-only (the server refuses the pair), so it would
+        // otherwise sort and filter as a plan + apply -- which is what it is
+        // not (#1974). A COMPOSITE reads as both, because it is.
+        case 'type': return (item.attributes['is-destroy'] ? 'destroy' : item.attributes['is-configure'] ? (item.attributes['configure-after-apply'] ? 'plan + apply + configure' : 'configure') : item.attributes['plan-only'] ? 'plan only' : 'plan + apply') + (item.attributes['save-plan'] ? ' (saved)' : '')
         case 'source': return item.attributes.source
         case 'created-by': return item.attributes['created-by'] || ''
         case 'created-at': return item.attributes['created-at']
@@ -1340,6 +1363,8 @@ function WorkspaceDetailContent() {
     // turn back on exactly the operation the operator turned off (#1966).
     setEditPlanApplyEnabled(workspace.attributes['plan-apply-enabled'] ?? true)
     setEditConfigureEnabled(workspace.attributes['configure-enabled'] ?? false)
+    setEditAutoConfigureEnabled(workspace.attributes['auto-configure-enabled'] ?? false)
+    setEditConfigureAfterApply(workspace.attributes['configure-after-apply'] ?? false)
     // `?? ''` and nothing else to decide: the stored `''` is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -1417,6 +1442,8 @@ function WorkspaceDetailContent() {
               // express, and the server checks the pair it ends up with.
               'plan-apply-enabled': editPlanApplyEnabled,
               'configure-enabled': editConfigureEnabled,
+              'auto-configure-enabled': editAutoConfigureEnabled,
+              'configure-after-apply': editConfigureAfterApply,
               // Where the configure operation runs (#1929). Sent verbatim, and
               // never `null` -- an explicit null is a 422 naming the field
               // (#1966), and `''` is the value that means the configuration
@@ -1920,6 +1947,67 @@ function WorkspaceDetailContent() {
       await loadVariables()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteVariable'))
+    }
+  }
+
+  // Queue a STANDALONE configure (#1974): the workspace's playbook against its
+  // inventory, with no plan and no apply.
+  //
+  // `confirm()` in BOTH pointer modes, not touch only. The two-tier rule puts
+  // an irreversible action in both, and this is one: a playbook can restart
+  // services, rotate credentials and reboot machines, and unlike an apply there
+  // is no plan to review first. The message names what it will reach, because
+  // an empty limit means the whole inventory.
+  async function handleQueueConfigure() {
+    const reach = (configureLimit || attrs['default-limit'] || '').trim()
+    const msg = reach
+      ? t('runs.queueConfigureConfirmLimited', { limit: reach })
+      : t('runs.queueConfigureConfirmAll')
+    if (!window.confirm(msg)) return
+    setQueueingConfigure(true)
+    setError('')
+    try {
+      const runAttrs: Record<string, unknown> = {
+        'is-configure': true,
+        'plan-only': false,
+        message: t('runMessages.queuedConfigure'),
+      }
+      // Sent only when the operator typed one: empty means "the workspace's
+      // default", and sending "" would be indistinguishable from naming it.
+      if (configurePlaybook.trim()) runAttrs['playbook'] = configurePlaybook.trim()
+      if (configureLimit.trim()) runAttrs['limit'] = configureLimit.trim()
+
+      const res = await apiFetch(`/api/v1/runs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'runs',
+            attributes: runAttrs,
+            relationships: {
+              workspace: { data: { type: 'workspaces', id: workspaceId } },
+            },
+          },
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || t('errors.queueConfigureStatus', { status: res.status }))
+      }
+      const runData = await res.json().catch(() => null)
+      const newRunId = runData?.data?.id as string | undefined
+      if (newRunId) {
+        setLastQueuedRunId(newRunId)
+        setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
+      }
+      setShowPlanOptions(false)
+      setConfigurePlaybook('')
+      setConfigureLimit('')
+      await loadRuns()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.queueConfigure'))
+    } finally {
+      setQueueingConfigure(false)
     }
   }
 
@@ -2825,6 +2913,95 @@ function WorkspaceDetailContent() {
                           {t('fields.configureEnabledHint')}
                         </p>
                       </div>
+                      {/* How a configure STARTS (#1974). Shown only once the
+                          operation is declared -- offering a trigger for an
+                          operation the workspace does not have would be two
+                          controls that do nothing, and the declaration is the
+                          one an operator sets first. Read from the edit state
+                          while editing so turning configure on reveals them
+                          immediately rather than after a save. */}
+                      {(editing && perms['can-update'] ? editConfigureEnabled : attrs['configure-enabled']) && (
+                        <>
+                          <div className="min-w-0">
+                            <label
+                              htmlFor="ws-auto-configure-enabled"
+                              className="block text-xs text-slate-500"
+                            >
+                              {t('fields.autoConfigureEnabled')}
+                            </label>
+                            {editing && perms['can-update'] ? (
+                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                                <input
+                                  id="ws-auto-configure-enabled"
+                                  type="checkbox"
+                                  checked={editAutoConfigureEnabled}
+                                  onChange={(e) => setEditAutoConfigureEnabled(e.target.checked)}
+                                  aria-label={t('fields.autoConfigureEnabled')}
+                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                                />
+                                <span className="text-sm text-slate-200">
+                                  {editAutoConfigureEnabled ? t('common.enabled') : t('common.disabled')}
+                                </span>
+                              </label>
+                            ) : (
+                              <p
+                                className="mt-1 text-sm text-slate-200"
+                                data-testid="ws-auto-configure-enabled"
+                              >
+                                {(attrs['auto-configure-enabled'] ?? false)
+                                  ? t('common.enabled')
+                                  : t('common.disabled')}
+                              </p>
+                            )}
+                            <p className="mt-1 text-xs text-slate-400">
+                              {/* What it WILL target, not just that it is on: an
+                                  empty default limit means the whole inventory,
+                                  and that is the fact worth putting in front of
+                                  somebody turning this on. */}
+                              {(attrs['default-limit'] || '').trim()
+                                ? t('fields.autoConfigureEnabledHintLimited', {
+                                    limit: (attrs['default-limit'] || '').trim(),
+                                  })
+                                : t('fields.autoConfigureEnabledHint')}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <label
+                              htmlFor="ws-configure-after-apply"
+                              className="block text-xs text-slate-500"
+                            >
+                              {t('fields.configureAfterApply')}
+                            </label>
+                            {editing && perms['can-update'] ? (
+                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                                <input
+                                  id="ws-configure-after-apply"
+                                  type="checkbox"
+                                  checked={editConfigureAfterApply}
+                                  onChange={(e) => setEditConfigureAfterApply(e.target.checked)}
+                                  aria-label={t('fields.configureAfterApply')}
+                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                                />
+                                <span className="text-sm text-slate-200">
+                                  {editConfigureAfterApply ? t('common.enabled') : t('common.disabled')}
+                                </span>
+                              </label>
+                            ) : (
+                              <p
+                                className="mt-1 text-sm text-slate-200"
+                                data-testid="ws-configure-after-apply"
+                              >
+                                {(attrs['configure-after-apply'] ?? false)
+                                  ? t('common.enabled')
+                                  : t('common.disabled')}
+                              </p>
+                            )}
+                            <p className="mt-1 text-xs text-slate-400">
+                              {t('fields.configureAfterApplyHint')}
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </div>
                     {editing && perms['can-update'] && editHasNoOperations && (
                       // The server refuses this pair (#1966); Save is disabled
@@ -4575,6 +4752,23 @@ function WorkspaceDetailContent() {
                       {queueingPlan ? t('actions.queuing') : phaseWord('queueRun')}
                     </button>
                   )}
+                  {/* The configure trigger (#1974), data-gated: a workspace that
+                      declares no configure operation shows no button, so a
+                      terraform/tofu-only deployment pays nothing and there is no
+                      flag to set. Gated on `can-queue-apply` because a configure
+                      is apply-equivalent -- it needs `run:apply`, so offering it
+                      to a plan-level role would show a button the API refuses
+                      (#1634's lesson, applied to the third run kind). */}
+                  {attrs['configure-enabled'] && perms['can-queue-apply'] && (
+                    <button
+                      onClick={handleQueueConfigure}
+                      disabled={queueingConfigure || attrs.locked}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 disabled:bg-violet-900/40 disabled:text-violet-500/70 text-white transition-colors"
+                      title={attrs.locked ? t('common.workspaceLocked') : t('runs.queueConfigureTitle')}
+                    >
+                      {queueingConfigure ? t('actions.queuing') : t('runs.queueConfigure')}
+                    </button>
+                  )}
                 </div>
                 {showPlanOptions && (
                   <div className="mt-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -4601,6 +4795,44 @@ function WorkspaceDetailContent() {
                         />
                       </div>
                     </div>
+                    {/* The configure run's own two options (#1974), shown only
+                        on a workspace that has the operation. They are
+                        OVERRIDES: empty means the workspace's declared default,
+                        which is what a git-driven configure uses because a push
+                        carries no run options. The limit is the safety surface,
+                        so the hint says what empty means rather than leaving an
+                        operator to find out. */}
+                    {attrs['configure-enabled'] && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-700/50">
+                        <div>
+                          <label htmlFor="cfg-playbook" className="block text-xs text-slate-400 mb-1">
+                            {t('runs.configurePlaybook')}
+                          </label>
+                          <input
+                            id="cfg-playbook"
+                            type="text"
+                            value={configurePlaybook}
+                            onChange={e => setConfigurePlaybook(e.target.value)}
+                            placeholder={attrs['default-playbook'] || t('runs.configurePlaybookPlaceholder')}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="cfg-limit" className="block text-xs text-slate-400 mb-1">
+                            {t('runs.configureLimit')}
+                          </label>
+                          <input
+                            id="cfg-limit"
+                            type="text"
+                            value={configureLimit}
+                            onChange={e => setConfigureLimit(e.target.value)}
+                            placeholder={attrs['default-limit'] || t('runs.configureLimitPlaceholder')}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                          />
+                          <p className="mt-1 text-xs text-slate-500">{t('runs.configureLimitHint')}</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-4 mt-3">
                       {/* The plan-only checkbox that used to live here is now
                           the Plan / Plan + apply button pair above (#1340). */}
@@ -4751,6 +4983,20 @@ function WorkspaceDetailContent() {
                             ) : (
                               <span className="text-xs text-slate-500">{phaseWord('typePlanApply')}</span>
                             )}
+                            {/* Additive like the saved-plan badge beside it, and
+                                for the same reason: a COMPOSITE is a plan+apply
+                                AND a configure, so one badge replacing the other
+                                would hide half of what the run does (#1974). */}
+                            {run.attributes['is-configure'] && (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300"
+                                title={run.attributes['configure-after-apply']
+                                  ? t('runs.typeConfigureAfterApplyHint')
+                                  : t('runs.typeConfigureHint')}
+                              >
+                                {t('runs.typeConfigure')}
+                              </span>
+                            )}
                             {/* Additive, not another branch: a saved plan can also
                                 be a destroy, and "deferred" is the fact that
                                 explains the run list, so it must not be the one
@@ -4839,6 +5085,11 @@ function WorkspaceDetailContent() {
                                 </span>
                               ) : (
                                 <span className="text-slate-400">{phaseWord('typePlanApply')}</span>
+                              )}
+                              {run.attributes['is-configure'] && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">
+                                  {t('runs.typeConfigure')}
+                                </span>
                               )}
                               {run.attributes['save-plan'] && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">

@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Uno degli ambienti di esecuzione propri di questa installazione, per etichetta. Sostituisce la versione di Ansible, quindi un workspace con un'etichetta ignora la sua linea. Lascia vuoto per usare l'immagine integrata della linea.",
       "ansibleExecutionEnvironmentPlaceholder": "es. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Nessuno configurato in questa installazione",
-      "ansibleVersionUnconfirmed": "Impossibile confermare le versioni disponibili — digitane una"
+      "ansibleVersionUnconfirmed": "Impossibile confermare le versioni disponibili — digitane una",
+      "autoConfigureEnabled": "Configurare a ogni push",
+      "autoConfigureEnabledHint": "Un push che modifica la directory di configurazione Ansible esegue il playbook. Se non è impostato alcun limite predefinito, questo copre l''intero inventario.",
+      "autoConfigureEnabledHintLimited": "Un push che modifica la directory di configurazione Ansible esegue il playbook su {limit}.",
+      "configureAfterApply": "Configurare dopo l''apply",
+      "configureAfterApplyHint": "Ogni apply qui è seguito da una configurazione nella stessa esecuzione, quindi anche un apply da CLI trasmette l''output del playbook. Una distruzione non configura mai."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "pubblicazione del modulo",
       "awaitingDecision": "in attesa di decisione",
       "typeSavedPlan": "piano salvato",
-      "typeSavedPlanHint": "Applicazione differita: questa esecuzione non occupa il workspace finché il piano salvato non viene applicato."
+      "typeSavedPlanHint": "Applicazione differita: questa esecuzione non occupa il workspace finché il piano salvato non viene applicato.",
+      "queueConfigure": "Configura",
+      "queueConfigureTitle": "Esegui ora il playbook sull''inventario. Nessun plan lo precede.",
+      "queueConfigureConfirmAll": "Eseguire il playbook sull''INTERO INVENTARIO? Questo modifica host reali e non può essere annullato.",
+      "queueConfigureConfirmLimited": "Eseguire il playbook su {limit}? Questo modifica host reali e non può essere annullato.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "il valore predefinito del workspace",
+      "configureLimit": "Limite",
+      "configureLimitPlaceholder": "l''intero inventario",
+      "configureLimitHint": "Quali host, gruppi o pattern raggiungere. Vuoto significa ogni host dell''inventario.",
+      "typeConfigure": "configurazione",
+      "typeConfigureHint": "Esegue il playbook sull''inventario. Nessun plan e nessun apply.",
+      "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione."
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventario",
-        "body": "Gli host e i gruppi che questo workspace contiene, e in che cosa ansible li risolve. Ogni riga è modificabile qui; eseguire un playbook su di essi non è ancora disponibile."
+        "body": "Gli host e i gruppi che questo workspace contiene, e in che cosa ansible li risolve. Ogni riga è modificabile qui."
       },
       "nav": {
         "label": "Sezioni dell’inventario",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Controllo manuale della deriva dall''UI",
       "queued": "Accodato dall''UI",
       "queuedSpeculative": "Accodato dall''UI (speculativo)",
-      "destroyQueued": "Distruzione accodata dall''UI"
+      "destroyQueued": "Distruzione accodata dall''UI",
+      "queuedConfigure": "Configurazione accodata dall''UI"
     },
     "errors": {
       "loadWorkspace": "Impossibile caricare il workspace",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Impossibile caricare il file di stato",
       "updateSecurityScan": "Impossibile aggiornare l'analisi di sicurezza",
       "updateDebugMode": "Impossibile aggiornare la modalità debug",
-      "updateForkPlans": "Impossibile aggiornare i plan sulle pull request da fork"
+      "updateForkPlans": "Impossibile aggiornare i plan sulle pull request da fork",
+      "queueConfigure": "Impossibile accodare la configurazione",
+      "queueConfigureStatus": "Impossibile accodare la configurazione ({status})"
     },
     "subtabs": {
       "state": "Stato",

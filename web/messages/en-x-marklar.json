@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "One of this marklar's own marklar marklar, by marklar. It overrides the Ansible marklar, so a marklar with a marklar set ignores its marklar. Leave empty to use the built-in marklar for the marklar.",
       "ansibleExecutionEnvironmentPlaceholder": "e.g. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "None configured on this marklar",
-      "ansibleVersionUnconfirmed": "Available marklars could not be confirmed — type one"
+      "ansibleVersionUnconfirmed": "Available marklars could not be confirmed — type one",
+      "autoConfigureEnabled": "Configure on marklar",
+      "autoConfigureEnabledHint": "A marklar that changes the Ansible marklar marklar runs the marklar. With no default marklar set, that is the whole marklar.",
+      "autoConfigureEnabledHintLimited": "A marklar that changes the Ansible marklar marklar runs the marklar against {limit}.",
+      "configureAfterApply": "Configure after marklar",
+      "configureAfterApplyHint": "Every marklar here is followed by a marklar on the same marklar, so a marklar marklar streams the marklar''s marklar too. A marklar never configures."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "marklar marklar",
       "awaitingDecision": "awaiting marklar",
       "typeSavedPlan": "saved marklar",
-      "typeSavedPlanHint": "Marklar deferred: this marklar does not hold the marklar until the saved marklar is applied."
+      "typeSavedPlanHint": "Marklar deferred: this marklar does not hold the marklar until the saved marklar is applied.",
+      "queueConfigure": "Configure",
+      "queueConfigureTitle": "Run the marklar against the marklar now. No marklar precedes it.",
+      "queueConfigureConfirmAll": "Run the marklar against the WHOLE marklar? This changes real marklars and cannot be undone.",
+      "queueConfigureConfirmLimited": "Run the marklar against {limit}? This changes real marklars and cannot be undone.",
+      "configurePlaybook": "Marklar",
+      "configurePlaybookPlaceholder": "the marklar default",
+      "configureLimit": "Marklar",
+      "configureLimitPlaceholder": "the whole marklar",
+      "configureLimitHint": "Which marklars, marklars or marklars to reach. Empty means every marklar in the marklar.",
+      "typeConfigure": "configure",
+      "typeConfigureHint": "Runs the marklar against the marklar. No marklar and no marklar.",
+      "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar."
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Marklar",
-        "body": "The marklars and marklars this marklar holds, and what marklar resolves them to. Each marklar is editable here; running a marklar against them is not available yet."
+        "body": "The marklars and marklars this marklar holds, and what marklar resolves them to. Each marklar is editable here."
       },
       "nav": {
         "label": "Marklar marklars",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manual marklar marklar from marklar",
       "queued": "Queued from marklar",
       "queuedSpeculative": "Queued from marklar (speculative)",
-      "destroyQueued": "Marklar queued from marklar"
+      "destroyQueued": "Marklar queued from marklar",
+      "queuedConfigure": "Marklar queued from marklar"
     },
     "errors": {
       "loadWorkspace": "Failed to load marklar",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Failed to upload marklar marklar",
       "updateSecurityScan": "Failed to update marklar marklar",
       "updateDebugMode": "Failed to update marklar marklar",
-      "updateForkPlans": "Failed to update marklar marklar marklar marklars"
+      "updateForkPlans": "Failed to update marklar marklar marklar marklars",
+      "queueConfigure": "Failed to queue the marklar",
+      "queueConfigureStatus": "Failed to queue the marklar ({status})"
     },
     "subtabs": {
       "state": "Marklar",

@@ -43,6 +43,14 @@ def _run(**kwargs):
     run.job_name = "tprun-abc-apply"
     run.plan_started_at = None
     run.apply_started_at = datetime.now(UTC)
+    # None, because this run is APPLYING rather than between an apply and a
+    # configure (#1974). `_phase_start_of` measures a composite's wait for its
+    # configure claim from `apply_finished_at`, so a truthy MagicMock here would
+    # hand the stale check a Mock where it expects a datetime -- and the failure
+    # is a TypeError comparing it to a timedelta, which says nothing about the
+    # cause.
+    run.apply_finished_at = None
+    run.configure_started_at = None
     run.ee_image = "ghcr.io/example/terrapod-ee:2.16"
     for k, v in kwargs.items():
         setattr(run, k, v)

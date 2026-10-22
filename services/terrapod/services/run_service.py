@@ -220,6 +220,15 @@ class PlanOnlyConfigureConflict(ValueError):
     """
 
 
+class SpeculativeConfigureRefused(ValueError):
+    """A configure was asked for against a speculative configuration version.
+
+    A `ValueError` subclass for the reason its siblings are: a bare
+    `except ValueError` still catches it, and the explicit type lets a router
+    answer 422 while a platform-decided trigger skips.
+    """
+
+
 def refuse_plan_only_configure(*, plan_only: bool, is_configure: bool) -> None:
     """Refuse `plan_only` together with `is_configure`.
 
@@ -248,6 +257,128 @@ def refuse_plan_only_configure(*, plan_only: bool, is_configure: bool) -> None:
             "plan-only has no meaning on a configure run: a configure has no "
             "plan/apply split, and its dry run is the check option"
         )
+
+
+class ConfigureOptionConflict(ValueError):
+    """A run option that cannot mean anything on a standalone configure.
+
+    `ValueError`, like its siblings, so a bare `except ValueError` still
+    catches it and a router can answer 422.
+    """
+
+
+#: The run options that belong to a plan/apply and have no meaning on a
+#: STANDALONE configure, each with the wire name an operator sent and why.
+#:
+#: Refused rather than ignored, which is the #2116 class: a caller's flag
+#: silently doing nothing is the defect, and `-target` on a playbook run is
+#: exactly the kind of thing somebody would reasonably expect to narrow it.
+#: (`--limit` is what narrows a configure, and it has its own attribute.)
+#:
+#: A COMPOSITE is deliberately not held to this: it has a real plan/apply half,
+#: so every one of these means what it always meant for that half.
+_STANDALONE_CONFIGURE_CONFLICTS: dict[str, str] = {
+    "is_destroy": "is-destroy",
+    "refresh_only": "refresh-only",
+    "save_plan": "save-plan",
+    "allow_empty_apply": "allow-empty-apply",
+    "target_addrs": "target-addrs",
+    "replace_addrs": "replace-addrs",
+}
+
+
+def refuse_standalone_configure_conflicts(**options: object) -> None:
+    """Refuse plan/apply run options asked for on a standalone configure.
+
+    Takes the options by their PYTHON names and reports the WIRE names, so the
+    message names what the caller actually sent. Called from `create_run` and
+    nowhere else -- the one `Run` constructor, so no caller can route around it
+    and none has to restate the rule.
+    """
+    offenders = sorted(
+        wire for attr, wire in _STANDALONE_CONFIGURE_CONFLICTS.items() if options.get(attr)
+    )
+    if not offenders:
+        return
+    raise ConfigureOptionConflict(
+        f"{', '.join(offenders)} cannot be used on a configure run: "
+        "these narrow or alter a plan/apply, and a configure has neither. "
+        "Use the limit attribute to narrow which hosts a configure reaches"
+    )
+
+
+def resolve_configure_shape(
+    workspace,
+    *,
+    requested_configure: bool,
+    plan_only: bool,
+    is_destroy: bool,
+) -> tuple[bool, bool]:
+    """The run's `(is_configure, configure_after_apply)` pair (#1974).
+
+    One producer, called from `create_run` alone, so every one of the fifteen
+    run creators gets the same answer without knowing the rule. Three outcomes:
+
+    * **an explicit request** -- somebody passed `is-configure` -- is a
+      STANDALONE configure, `(True, False)`, whatever the workspace's
+      `configure_after_apply` says. Asking to configure now is not asking for
+      an apply first, and reading the workspace setting here would turn
+      "configure these hosts" into "apply this configuration, then configure",
+      which is a different and much larger act than the caller requested;
+    * **an apply on a workspace that declares `configure_after_apply`** becomes
+      a COMPOSITE, `(True, True)`. No caller opts in and none can forget to:
+      the CLI cannot send a flag, and a remote execution streaming the
+      configure's logs is the whole reason the setting exists;
+    * **anything else** is an ordinary run, `(False, False)`.
+
+    Two exclusions, and both are about there being no apply to follow:
+
+    * `plan_only` -- a speculative plan, a CLI `plan`, a drift check. Nothing
+      is applied, so nothing can follow it. This is also why the resolution
+      runs AFTER the speculative-CV forcing rather than before: a run pointed
+      at a speculative configuration version is made plan-only there, and
+      resolving first would hand it a configure half it must not have;
+    * `is_destroy` -- the hosts a configure would target are what the destroy
+      just removed, so chaining one means a playbook against an inventory
+      describing machines that no longer exist. It is excluded structurally
+      rather than left to fail at ansible's own unreachable-host handling.
+    """
+    if requested_configure:
+        return True, False
+    if plan_only or is_destroy:
+        return False, False
+    return (
+        (True, True) if bool(getattr(workspace, "configure_after_apply", False)) else (False, False)
+    )
+
+
+def is_standalone_configure(run) -> bool:
+    """Whether this run is a configure and NOTHING else (#1974).
+
+    The predicate the apply-only side effects key on, because a standalone
+    configure reaches `applied` -- that is the status a configure ends in -- and
+    reaching it does **not** mean tofu/terraform state moved. Three things on
+    that transition are about state having moved and are wrong for one:
+    firing cross-workspace run triggers, clearing `state_diverged`, and
+    resetting `drift_status` to `no_drift`. The last two are wrong in the
+    dangerous direction: both would report a reconciliation that did not
+    happen, hiding a real divergence behind a playbook run.
+
+    A COMPOSITE is deliberately not standalone: its apply genuinely moved
+    state, so every one of those side effects is correct for it. That is also
+    why this cannot be `run.is_configure` alone.
+    """
+    return bool(run.is_configure) and not bool(run.configure_after_apply)
+
+
+def is_standalone_configure_sql(model) -> object:
+    """`is_standalone_configure` as a SQL predicate over `model` (Run or alias).
+
+    A pair for the same reason `pr_closure_cancels` has one: the rule is read
+    both per-row and inside queries, and two hand-written copies of a predicate
+    is how the four `vcs_repo_url` sites came to disagree (#2199).
+    """
+    return and_(model.is_configure.is_(True), model.configure_after_apply.is_(False))
 
 
 #: The run states in which a runner token for each phase, and a cloud-identity
@@ -855,9 +986,24 @@ def _is_supersedeable_kind(run: Run) -> bool:
         concurrently, so they are neither superseded nor superseders);
       - drift-detection runs (detection-only);
       - speculative PR/MR runs (plan-only anyway; the VCS poller already cancels
-        stale ones per-PR on a new commit).
+        stale ones per-PR on a new commit);
+      - STANDALONE configures (#1974). A configure is not a statement about the
+        workspace's desired state: it neither supersedes a queued apply nor is
+        superseded by one, and treating it as one would mean asking for a
+        configure silently discarded a pending apply. A COMPOSITE is a
+        desired-state apply and stays eligible, which is why this cannot test
+        `is_configure` alone.
+
+    Both callers are asking the same question -- contention for the workspace's
+    one apply slot, and staleness against the state serial -- and a configure
+    reads no state, so the exclusion is right for both (#1903).
     """
-    return not run.plan_only and not run.is_drift_detection and run.vcs_pull_request_number is None
+    return (
+        not run.plan_only
+        and not run.is_drift_detection
+        and run.vcs_pull_request_number is None
+        and not is_standalone_configure(run)
+    )
 
 
 async def _has_newer_live_run(db: AsyncSession, run: Run) -> bool:
@@ -874,6 +1020,10 @@ async def _has_newer_live_run(db: AsyncSession, run: Run) -> bool:
             # A saved plan nobody has confirmed is not the desired state yet,
             # so it cannot be what supersedes an older run (#1903).
             _not_deferred_saved_plan(Run),
+            # The SQL half of `_is_supersedeable_kind`'s configure exclusion
+            # (#1974) -- one producer, because three hand-written copies of a
+            # predicate is how four sites came to disagree (#2199).
+            not_(is_standalone_configure_sql(Run)),
             Run.created_at > run.created_at,
             Run.status.notin_(list(TERMINAL_STATES)),
         )
@@ -911,6 +1061,18 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
             # invalidate it is the state moving, and `_staleness_reason`
             # refuses it at confirm for that reason instead.
             Run.save_plan.is_(False),
+            # A queued standalone configure is not an older statement of the
+            # desired state, so a new apply does not discard it (#1974) -- the
+            # other half of `_is_supersedeable_kind`'s exclusion, which decides
+            # whether `newer` supersedes at all.
+            #
+            # The two other queries over this same triple
+            # (`discard_stale_plans_for_state_change` and
+            # `expire_stale_plans_cycle`) deliberately do NOT carry it: both
+            # are scoped to `status == "planned"`, and a configure never
+            # reaches that status -- it goes `queued -> configuring` -- so
+            # there is nothing for the clause to exclude.
+            not_(is_standalone_configure_sql(Run)),
             Run.created_at < newer.created_at,
         )
     )
@@ -1143,12 +1305,17 @@ async def create_run(
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
     is_drift_detection: bool = False,
-    # This run carries an Ansible configure operation (#1988). Nothing passes
-    # it yet: #1974 owns triggering and #1972 owns executing, and the API
-    # exposes no `is-configure` attribute until they do. It is here so the
-    # refusal above has something to refuse and the column has a writer when
-    # they arrive, rather than the parameter being added in a third PR.
+    # An explicit request for a STANDALONE configure (#1974). A composite is
+    # not asked for here -- it is resolved from the workspace's own
+    # `configure_after_apply` by `resolve_configure_shape` below, because the
+    # CLI has no way to pass a flag and the composite exists so a remote
+    # execution can stream the configure's logs.
     is_configure: bool = False,
+    # What THIS run was asked to configure. Empty means the workspace's
+    # `default_playbook` / `default_limit`, which is what a platform-decided
+    # configure runs: a push carries no run options.
+    playbook: str = "",
+    ansible_limit: str = "",
     target_addrs: list[str] | None = None,
     replace_addrs: list[str] | None = None,
     refresh_only: bool = False,
@@ -1167,21 +1334,9 @@ async def create_run(
 
     await ha_role.ensure_leader("create runs")
 
-    # The ONLY enforcement of the workspace's plan/apply declaration (#2116),
-    # here because this is the only `Run` constructor on the live path and so
-    # the only place fifteen callers cannot route around. Raises
-    # `PlanApplyNotEnabled`, a `ValueError`; see that function for why a caller
-    # either translates it to a 4xx or skips on it, and never re-states the
-    # rule itself.
-    #
-    # Before every other check on purpose: the work below -- resolving a
-    # version, splitting the pool set, reading settings -- is wasted on a run
-    # that cannot exist.
-    workspace_settings.require_plan_apply_operation(workspace)
-
-    # The second refusal at this chokepoint, for the same reason the first one
-    # is here: `create_run` is the only `Run` constructor on the live path, so
-    # one check cannot be routed around (#1988).
+    # Refused first, and against the CALLER'S OWN values rather than the
+    # resolved ones, so the message is about what they asked for (#1988). The
+    # resolution below cannot produce this pair, which is asserted after it.
     refuse_plan_only_configure(plan_only=bool(plan_only), is_configure=bool(is_configure))
 
     # A run against a SPECULATIVE configuration version is always plan-only.
@@ -1201,6 +1356,23 @@ async def create_run(
     if configuration_version_id is not None and not plan_only:
         spec_cv = await db.get(ConfigurationVersion, configuration_version_id)
         if spec_cv is not None and spec_cv.speculative:
+            # A configure is refused outright rather than forced plan-only,
+            # because for a configure there is no such thing (#1974). The
+            # forcing below exists to make an apply-capable run harmless; a
+            # configure made "plan-only" would be the contradiction
+            # `refuse_plan_only_configure` rejects, reached by a different door
+            # and silently -- that refusal runs above this, on the caller's own
+            # arguments, so it cannot see a value forced here.
+            #
+            # And it is the right answer on its own merits: a speculative CV is
+            # an unmerged branch, and running its playbook against real hosts is
+            # the fork-PR blast radius with no plan to review first.
+            if is_configure:
+                raise SpeculativeConfigureRefused(
+                    "a configure cannot run against a speculative configuration "
+                    "version: that code is unmerged, and a playbook has no "
+                    "plan-only form -- its dry run is the check option"
+                )
             logger.warning(
                 "Forcing plan-only: run points at a speculative configuration version",
                 workspace=workspace.name,
@@ -1208,6 +1380,46 @@ async def create_run(
                 source=source,
             )
             plan_only = True
+
+    # The run's configure shape, resolved ONCE here (#1974). After the
+    # speculative forcing above, deliberately: that forcing is what makes a run
+    # plan-only, and a plan-only run has no apply for a configure to follow.
+    is_configure, configure_after_apply = resolve_configure_shape(
+        workspace,
+        requested_configure=bool(is_configure),
+        plan_only=bool(plan_only),
+        is_destroy=bool(is_destroy),
+    )
+    # No second `refuse_plan_only_configure` here, deliberately. The resolution
+    # above cannot produce the refused pair -- it returns no configure at all
+    # when `plan_only` -- and a second call would be a runtime assertion that
+    # can never fire while making the chokepoint gate
+    # (`test_the_chokepoint_calls_it`) count two refusals where its whole
+    # purpose is that there is exactly one. The invariant is pinned where it
+    # belongs instead, on the resolver itself.
+    if is_configure and not configure_after_apply:
+        refuse_standalone_configure_conflicts(
+            is_destroy=is_destroy,
+            refresh_only=refresh_only,
+            save_plan=save_plan,
+            allow_empty_apply=allow_empty_apply,
+            target_addrs=target_addrs,
+            replace_addrs=replace_addrs,
+        )
+
+    # The ONLY enforcement of the workspace's operation declaration (#2116,
+    # #1974), here because this is the only `Run` constructor on the live path
+    # and so the only place fifteen callers cannot route around. It dispatches
+    # on the kind resolved above: a standalone configure needs
+    # `configure_enabled` and nothing else, a composite needs both. Raises
+    # `PlanApplyNotEnabled` or `ConfigureNotEnabled`, both `ValueError`s; see
+    # `require_run_operations` for why a caller either translates to a 4xx or
+    # skips, and never re-states the rule itself.
+    workspace_settings.require_run_operations(
+        workspace,
+        is_configure=is_configure,
+        configure_after_apply=configure_after_apply,
+    )
 
     # An explicit `auto_apply` argument (the CLI/API asking for a specific
     # behaviour on this one run) still means exactly what it says, so it maps
@@ -1261,6 +1473,9 @@ async def create_run(
         message=message,
         is_destroy=is_destroy,
         is_configure=is_configure,
+        configure_after_apply=configure_after_apply,
+        playbook=playbook,
+        ansible_limit=ansible_limit,
         auto_apply=auto_apply,
         auto_apply_mode=auto_apply_mode,
         plan_only=plan_only,
@@ -1520,8 +1735,13 @@ async def transition_run(
     if target_status == "queued":
         await supersede_stale_runs(db, run)
 
-    # Fire run triggers when a non-speculative run completes apply
-    if target_status == "applied" and not run.plan_only:
+    # Fire run triggers when a non-speculative run completes apply.
+    #
+    # Not for a STANDALONE configure (#1974), which also ends in `applied`: a
+    # run trigger means "this workspace's state changed, re-plan what depends
+    # on it", and a playbook changed no state. A composite's apply did, so it
+    # fires here as any apply does.
+    if target_status == "applied" and not run.plan_only and not is_standalone_configure(run):
         await fire_run_triggers(db, run.workspace_id)
 
     # A successful (non-speculative) apply brings tofu/terraform state into
@@ -1535,7 +1755,10 @@ async def transition_run(
     # sticks forever even though every subsequent apply succeeds. db.get is
     # identity-mapped, so this shares the session-cached Workspace with the
     # drift-status block below (no extra round trip).
-    if target_status == "applied" and not run.plan_only:
+    # Excluded for a standalone configure for the same reason, and here the
+    # direction matters: clearing the flag would report a reconciliation that
+    # never happened, hiding a real divergence behind a playbook run (#1974).
+    if target_status == "applied" and not run.plan_only and not is_standalone_configure(run):
         ws = await db.get(Workspace, run.workspace_id)
         if ws is not None and ws.state_diverged:
             ws.state_diverged = False
@@ -1551,7 +1774,16 @@ async def transition_run(
     # drift_detection_service.handle_drift_run_completed) and is
     # gated on drift_detection_enabled so the write is cheap on
     # workspaces that don't use the feature.
-    if target_status == "applied" and not run.plan_only and run.source != "drift-detection":
+    # Standalone configures are excluded with the two blocks above: a playbook
+    # run says nothing about whether state matches the configuration, so
+    # recording `no_drift` and advancing the clock would suppress the next real
+    # drift check on the strength of work that did not look at state (#1974).
+    if (
+        target_status == "applied"
+        and not run.plan_only
+        and run.source != "drift-detection"
+        and not is_standalone_configure(run)
+    ):
         ws = await db.get(Workspace, run.workspace_id)
         if ws is not None and ws.drift_detection_enabled:
             ws.drift_status = "no_drift"
@@ -1999,44 +2231,138 @@ async def _complete_plan(
     return run
 
 
+async def _after_apply_landed(db: AsyncSession, run: Run) -> None:
+    """The follow-ups an apply earns once it has landed.
+
+    Extracted because a COMPOSITE run earns them at the END of the run rather
+    than at the end of its apply (#1974). Auto-merge is the one that matters:
+    merging the pull request the moment the apply lands would merge it while
+    the configure that apply exists to feed is still running, and a configure
+    that then fails would have merged on the strength of half a run. `applied`
+    means applied AND configured (#1988), so these fire there, which is also
+    where run triggers, notifications and drift already fire.
+    """
+    if run.vcs_pull_request_number is None:
+        return
+    # A STANDALONE configure never earns them, because no apply landed. It can
+    # carry a pull-request number: a push run is attributed to the PR whose
+    # merge produced the commit (#1878), and a git-driven configure is a push
+    # run. Without this guard such a configure would invalidate sibling PR
+    # plans and arm auto-merge on the strength of a playbook run.
+    if is_standalone_configure(run):
+        return
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        return
+    # Apply-then-merge follow-ups: invalidate stale sibling-PR plans on
+    # the same workspace, then trigger cross-workspace gate evaluation
+    # for the PR this run was associated with. Enqueueing here keeps
+    # the transition synchronous and the gate evaluation async.
+    await _invalidate_sibling_pr_plans(db, ws.id, run.id, run.vcs_pull_request_number)
+    from terrapod.services.scheduler import enqueue_trigger
+
+    await enqueue_trigger(
+        "vcs_apply_completed",
+        {
+            "run_id": str(run.id),
+            "workspace_id": str(ws.id),
+            "pr_number": run.vcs_pull_request_number,
+        },
+        dedup_key=f"vcs_apply_completed:{run.id}",
+    )
+
+
 async def complete_apply(db: AsyncSession, run: Run) -> Run:
-    """Drive an `applying` run to `applied`.
+    """Drive an `applying` run to `applied` -- or to its configure (#1974).
 
     Idempotent counterpart to :func:`complete_plan`. Same dual-path rationale
     — either the runner's `/apply-result` POST or the reconciler's listener
     round-trip can win; whichever lands first does the transition.
 
-    On successful apply for a PR-associated run, schedules cross-workspace
-    gate evaluation (#282 phase 8): invalidate stale sibling-PR plans on
-    the same workspace, refresh the status comment, and fire auto-merge
-    if every PR-affected workspace has met its required state.
+    **A COMPOSITE does not go terminal here.** Its apply has finished and its
+    configure has not started, and the run has to stay live through both or the
+    whole point is lost: `_serve_log` closes a phase stream when the RUN is
+    terminal, so a run that reached `applied` here would disconnect the CLI
+    before the configure it is attached to had run (#1988).
+
+    It stays in `applying` rather than moving to `configuring`, deliberately:
+    the status change is what the claim must perform, because a listener
+    claiming work it has not been handed is the double-claim race. Marking the
+    run `configuring` here would leave the claim with no state to change and
+    two listeners could each launch a configure Job. So the hand-over is
+    expressed exactly as the apply phase's own is -- the apply's Job state is
+    cleared and `apply_finished_at` is stamped, which is what the claim loop
+    matches on and what the stale clock then measures the wait from.
     """
     if run.status != "applying":
         return run
 
-    run = await transition_run(db, run, "applied")
+    if run.configure_after_apply:
+        if run.apply_finished_at is not None:
+            # Already handed over. Both the runner's POST and the reconciler
+            # reach here, and the reconciler keeps reaching it until a listener
+            # claims the configure, so this is the idempotency the docstring
+            # above promises -- without it each pass would re-stamp the clock
+            # the stale check is measuring and the wait could never time out.
+            return run
+        run.apply_finished_at = now_utc()
+        # Exactly what entering `applying` does to the plan's Job state, and
+        # for the same reason: the reconciler must stop driving this run on the
+        # finished apply Job's status, and must not read that Job's cached
+        # "succeeded" as the configure's.
+        run.job_name = None
+        run.job_namespace = None
+        try:
+            from terrapod.redis.client import delete_job_status
 
-    ws = await db.get(Workspace, run.workspace_id)
+            await delete_job_status(str(run.id), "apply")
+        except Exception:
+            pass  # Best-effort cleanup
+        await db.flush()
+        logger.info(
+            "Apply succeeded; awaiting configure claim",
+            run_id=str(run.id),
+            workspace_id=str(run.workspace_id),
+        )
+        return run
+
+    run = await transition_run(db, run, "applied")
 
     logger.info("Apply succeeded", run_id=str(run.id))
 
-    # Apply-then-merge follow-ups: invalidate stale sibling-PR plans on
-    # the same workspace, then trigger cross-workspace gate evaluation
-    # for the PR this run was associated with. Enqueueing here keeps
-    # the transition synchronous and the gate evaluation async.
-    if run.vcs_pull_request_number is not None and ws is not None:
-        await _invalidate_sibling_pr_plans(db, ws.id, run.id, run.vcs_pull_request_number)
-        from terrapod.services.scheduler import enqueue_trigger
+    await _after_apply_landed(db, run)
+    return run
 
-        await enqueue_trigger(
-            "vcs_apply_completed",
-            {
-                "run_id": str(run.id),
-                "workspace_id": str(ws.id),
-                "pr_number": run.vcs_pull_request_number,
-            },
-            dedup_key=f"vcs_apply_completed:{run.id}",
-        )
+
+async def complete_configure(db: AsyncSession, run: Run) -> Run:
+    """Drive a `configuring` run to `applied` (#1974).
+
+    `complete_plan`/`complete_apply`'s third sibling, and the thing whose
+    absence meant a SUCCESSFUL configure drove nothing at all: both engines'
+    `resolve_terminal` derived a phase of `apply`, matched neither `planning`
+    nor `applying`, and returned "nothing to do" -- so the run sat in
+    `configuring` until the stale check errored it, reporting a timeout for a
+    playbook that had finished cleanly.
+
+    `applied` is the terminal for both shapes, which is what makes it mean
+    applied AND configured (#1988). A composite's apply follow-ups are claimed
+    here rather than when its apply finished, for the reason
+    `_after_apply_landed` gives.
+
+    Idempotent, like its siblings: the reconciler and a runner POST can race.
+    """
+    if run.status != "configuring":
+        return run
+
+    run = await transition_run(db, run, "applied")
+
+    logger.info(
+        "Configure succeeded",
+        run_id=str(run.id),
+        standalone=is_standalone_configure(run),
+    )
+
+    await _after_apply_landed(db, run)
     return run
 
 
@@ -2466,11 +2792,19 @@ async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) 
 # Internal callers (vcs_poller, module_impact) legitimately cancel stale
 # `planned` speculative runs when a newer commit supersedes them; they
 # pass `force=True` below to bypass the user-action gate.
-CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
+CANCELABLE_STATES = frozenset(
+    {"pending", "queued", "planning", "confirmed", "applying", "configuring"}
+)
 #: `planned` is deliberately absent: a run that has finished planning has no work
 #: in flight to cancel. The PR-closure sweeps do NOT use this set -- they must
 #: still cancel an apply-capable `planned` run, or it holds the workspace for
 #: ever. See `pr_closure_cancels`.
+#:
+#: `configuring` is here because stopping a configure in flight is one of the
+#: two controls the trigger design rests on (#1974): auto-configure is
+#: deliberately broad, so visibility and reversibility are what make it
+#: tolerable, and a configure that could not be stopped would leave an operator
+#: watching a playbook walk through a fleet with nothing to do about it.
 
 
 def pr_closure_cancels(run: Run) -> bool:
@@ -2555,10 +2889,12 @@ async def cancel_run(
     if reason:
         run.discard_reason = reason
 
-    # Choose the target status. `applying` is the only state where a
-    # Job may already be mutating real infrastructure; everything else
-    # is safe to mark terminal-canceled immediately.
-    if run.status == "applying":
+    # Choose the target status. `applying` and `configuring` are the states
+    # where a Job may already be mutating something real -- infrastructure for
+    # one, the hosts themselves for the other -- so the terminal has to come
+    # from the observed Job outcome rather than from the request. Everything
+    # else is safe to mark terminal-canceled immediately.
+    if run.status in ("applying", "configuring"):
         target = "canceling"
     else:
         target = "canceled"
@@ -2603,6 +2939,50 @@ async def resolve_canceling_run(db: AsyncSession, run: Run, *, job_status: str) 
     """
     if run.status != "canceling":
         return run
+
+    # A cancel that landed during the CONFIGURE is resolved from the Job alone
+    # (#1974). The state-version test below answers "did the apply land?", and
+    # for a configure that question is either meaningless or actively
+    # misleading:
+    #
+    #   * a STANDALONE configure uploads no state version, so the test would
+    #     fall through to the `deleted`/else arms -- and those set the
+    #     workspace's `state_diverged` flag, reporting that real
+    #     infrastructure may have moved without a state record. A playbook
+    #     cannot move tofu/terraform state, so that is a false drift signal on
+    #     a workspace whose state is provably untouched;
+    #   * a COMPOSITE has one, uploaded by the apply that already succeeded, so
+    #     the test would resolve the run to `applied` -- which on a run
+    #     carrying both phases means applied AND configured (#1988), claiming a
+    #     configure completed that was killed mid-fleet.
+    #
+    # `configure_started_at` is the discriminator, as it is in `_apply_status`:
+    # it is stamped on entering `configuring`, and the state machine has no
+    # edge from a failed apply to a configure, so its presence means the apply
+    # half (if any) succeeded and the configure had begun.
+    if run.configure_started_at and not run.configure_finished_at:
+        # A COMPOSITE is never reported `canceled`, and that follows the rule
+        # the state-version test below exists to serve: do not claim a run was
+        # canceled when real work landed and we recorded it. Its apply applied,
+        # so `canceled` would read as "nothing happened" on a run that changed
+        # infrastructure -- while `applied` would claim the configure finished.
+        # `errored` is the honest remainder, and `_apply_status` already maps
+        # `errored` plus `configure_started_at` to an apply that FINISHED, so
+        # the CLI is told the infrastructure change landed and the configure
+        # did not. A standalone configure has no such half, so there `canceled`
+        # is exactly true.
+        if job_status == "deleted" and is_standalone_configure(run):
+            return await transition_run(db, run, "canceled")
+        landed = "" if is_standalone_configure(run) else "The apply had already succeeded. "
+        return await transition_run(
+            db,
+            run,
+            "errored",
+            error_message=(
+                f"Configure canceled; Job ended with status {job_status!r}. {landed}"
+                "Hosts the playbook had already reached keep the changes it made."
+            ),
+        )
 
     from terrapod.db.models import StateVersion
 
@@ -2880,11 +3260,14 @@ async def claim_next_run(
 
     # Try queued runs first (plan phase), then confirmed runs (apply phase), then
     # a standalone configure -- which is ALSO `queued`, because #1974 settled the
-    # shape as one Run carrying a flag rather than a second object type.
+    # shape as one Run carrying a flag rather than a second object type -- and
+    # finally a COMPOSITE's configure, which is claimed out of `applying` once
+    # its apply has finished (#1974). Four claims, three phases.
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),
         ("confirmed", "apply", "applying"),
         ("queued", "configure", "configuring"),
+        ("applying", "configure", "configuring"),
     ]:
         conditions = [
             Run.status == target_status,
@@ -2894,16 +3277,24 @@ async def claim_next_run(
             ),
         ]
 
-        # `is_configure` separates the two tuples that share `queued`, and
-        # WITHOUT it a configure run is claimed as a plan -- the first matching
-        # tuple wins -- so a listener launches a Job that runs `tofu plan`
-        # against a directory of playbooks.
+        # What separates the two tuples that share `queued` is whether the run
+        # is a configure AND NOTHING ELSE. Without the discriminator a configure
+        # is claimed as a plan -- the first matching tuple wins -- so a listener
+        # launches a Job that runs `tofu plan` against a directory of
+        # playbooks. And it has to be the standalone predicate rather than
+        # `is_configure`: a COMPOSITE is `is_configure=True` and DOES need a
+        # plan, so `is_configure IS false` on the plan tuple would mean a
+        # composite could never plan at all (#1974).
         #
-        # The apply tuple is deliberately NOT constrained. A COMPOSITE run (an
-        # apply followed by a configure, #1407 point 1a) carries
-        # `is_configure=True` and must still be claimable as an apply from
-        # `confirmed`; constraining it to False would strand every composite at
-        # its apply.
+        # The apply tuple is deliberately NOT constrained, for the same reason:
+        # a composite must still be claimable as an apply from `confirmed`.
+        #
+        # The composite's configure is claimed out of `applying` and keyed on
+        # `apply_finished_at`, which `complete_apply` stamps when it hands over.
+        # Claiming on the status alone would hand a listener a run whose apply
+        # Job is still running; and the transition to `configuring` is what
+        # makes the claim atomic, since two listeners cannot both move a row
+        # out of `applying`.
         #
         # Per-workspace serialization + manual-lock gate, applied to everything
         # STARTING from `queued` -- a plan (queued → planning) and now a
@@ -2923,8 +3314,16 @@ async def claim_next_run(
         # cost that `plan_only` is dishonest in both directions here. Serialising
         # too much is a throughput question; serialising too little is a
         # correctness one, so this errs that way until #1975 decides.
+        if target_status == "applying":
+            conditions.append(Run.is_configure.is_(True))
+            conditions.append(Run.configure_after_apply.is_(True))
+            conditions.append(Run.apply_finished_at.is_not(None))
+
         if target_status == "queued":
-            conditions.append(Run.is_configure.is_(phase == "configure"))
+            if phase == "configure":
+                conditions.append(is_standalone_configure_sql(Run))
+            else:
+                conditions.append(not_(is_standalone_configure_sql(Run)))
             other = aliased(Run)
             in_flight = (
                 select(other.id)

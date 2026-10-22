@@ -53,6 +53,15 @@ def _mock_run(**kwargs):
     run.vcs_pull_request_number = kwargs.get("vcs_pull_request_number", None)
     run.vcs_commit_sha = kwargs.get("vcs_commit_sha", None)
     run.is_drift_detection = kwargs.get("is_drift_detection", False)
+    # The configure half (#1974), explicit for the same reason as the
+    # attributes above: an unset MagicMock attribute is truthy, so every run
+    # would read as a COMPOSITE -- `complete_apply` would hand it over to a
+    # configure instead of completing it, and the shipped default is that a run
+    # carries no configure at all.
+    run.is_configure = kwargs.get("is_configure", False)
+    run.configure_after_apply = kwargs.get("configure_after_apply", False)
+    run.configure_started_at = kwargs.get("configure_started_at", None)
+    run.configure_finished_at = kwargs.get("configure_finished_at", None)
     # Default `has_changes=True` so existing tests keep matching the
     # "real plan with changes" path — only the no-op short-circuit cares.
     run.has_changes = kwargs.get("has_changes", True)

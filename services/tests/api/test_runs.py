@@ -84,6 +84,14 @@ def _mock_run(
     run.listener_id = None
     run.target_addrs = None
     run.replace_addrs = None
+    # The configure half of a run (#1974). Serialised, so an unset MagicMock
+    # attribute is not merely wrong -- `_run_json` hands it to `json.dumps` and
+    # the request 500s with "Object of type MagicMock is not JSON
+    # serializable", naming the attribute and nothing about the cause.
+    run.is_configure = False
+    run.configure_after_apply = False
+    run.playbook = ""
+    run.ansible_limit = ""
     run.refresh_only = False
     run.refresh = True
     run.allow_empty_apply = False
@@ -148,6 +156,15 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     # #2116: explicit rather than relying on a truthy MagicMock, so that a test
     # setting it False is making a visible choice and not fighting the fixture.
     ws.plan_apply_enabled = True
+    # #1974, and for the same reason plus a sharper one: truthy
+    # `configure_after_apply` would make every run on this fixture a COMPOSITE,
+    # so the route would gate it as a configure and `create_run` would resolve
+    # an inventory -- a behaviour change invisible in any individual test.
+    ws.configure_enabled = False
+    ws.configure_after_apply = False
+    ws.auto_configure_enabled = False
+    ws.default_playbook = ""
+    ws.default_limit = ""
     return ws
 
 

@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Et av denne installasjonens egne kjøremiljøer, via etikett. Det overstyrer Ansible-versjonen, så et arbeidsområde med en etikett ignorerer sin linje. La feltet stå tomt for å bruke linjens innebygde image.",
       "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Ingen konfigurert i denne installasjonen",
-      "ansibleVersionUnconfirmed": "Tilgjengelige versjoner kunne ikke bekreftes — skriv en"
+      "ansibleVersionUnconfirmed": "Tilgjengelige versjoner kunne ikke bekreftes — skriv en",
+      "autoConfigureEnabled": "Konfigurer ved push",
+      "autoConfigureEnabledHint": "En push som endrer Ansible-konfigurasjonsmappen kjører playbooken. Uten en angitt standardgrense er det hele inventaret.",
+      "autoConfigureEnabledHintLimited": "En push som endrer Ansible-konfigurasjonsmappen kjører playbooken mot {limit}.",
+      "configureAfterApply": "Konfigurer etter anvendelse",
+      "configureAfterApplyHint": "Hver anvendelse her følges av en konfigurering i samme kjøring, så også en anvendelse fra CLI strømmer playbookens utdata. En nedriving konfigurerer aldri."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "modulpublisering",
       "awaitingDecision": "venter på beslutning",
       "typeSavedPlan": "lagret plan",
-      "typeSavedPlanHint": "Bruk utsatt: denne kjøringen holder ikke arbeidsområdet før den lagrede planen brukes."
+      "typeSavedPlanHint": "Bruk utsatt: denne kjøringen holder ikke arbeidsområdet før den lagrede planen brukes.",
+      "queueConfigure": "Konfigurer",
+      "queueConfigureTitle": "Kjør playbooken mot inventaret nå. Ingen plan går forut.",
+      "queueConfigureConfirmAll": "Kjøre playbooken mot HELE inventaret? Dette endrer virkelige verter og kan ikke angres.",
+      "queueConfigureConfirmLimited": "Kjøre playbooken mot {limit}? Dette endrer virkelige verter og kan ikke angres.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "arbeidsområdets standard",
+      "configureLimit": "Grense",
+      "configureLimitPlaceholder": "hele inventaret",
+      "configureLimitHint": "Hvilke verter, grupper eller mønstre som skal nås. Tomt betyr hver vert i inventaret.",
+      "typeConfigure": "konfigurer",
+      "typeConfigureHint": "Kjører playbooken mot inventaret. Ingen plan og ingen anvendelse.",
+      "typeConfigureAfterApplyHint": "Etter anvendelsen følger en konfigurering i samme kjøring."
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "Vertene og gruppene dette arbeidsområdet inneholder, og hva ansible løser dem opp til. Hver rad kan redigeres her; å kjøre en playbook mot dem er ikke tilgjengelig ennå."
+        "body": "Vertene og gruppene dette arbeidsområdet inneholder, og hva ansible løser dem opp til. Hver rad kan redigeres her."
       },
       "nav": {
         "label": "Inventarseksjoner",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manuell avdriftskontroll fra grensesnittet",
       "queued": "Lagt i kø fra grensesnittet",
       "queuedSpeculative": "Lagt i kø fra grensesnittet (spekulativ)",
-      "destroyQueued": "Nedriving lagt i kø fra grensesnittet"
+      "destroyQueued": "Nedriving lagt i kø fra grensesnittet",
+      "queuedConfigure": "Konfigurering lagt i kø fra grensesnittet"
     },
     "errors": {
       "loadWorkspace": "Kunne ikke laste arbeidsområde",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Kunne ikke laste opp tilstandsfil",
       "updateSecurityScan": "Kunne ikke oppdatere sikkerhetsskanningen",
       "updateDebugMode": "Kunne ikke oppdatere feilsøkingsmodus",
-      "updateForkPlans": "Kunne ikke oppdatere planer for pull requests fra forker"
+      "updateForkPlans": "Kunne ikke oppdatere planer for pull requests fra forker",
+      "queueConfigure": "Kunne ikke legge konfigureringen i kø",
+      "queueConfigureStatus": "Kunne ikke legge konfigureringen i kø ({status})"
     },
     "subtabs": {
       "state": "Tilstand",

@@ -1,0 +1,169 @@
+# Running a Configure
+
+A [configure operation](runners.md#what-a-configure-actually-runs) runs the
+workspace's playbook against the hosts in its
+[inventory](ansible-inventory.md). This page is about how one **starts**.
+
+A configure is an ordinary **run** carrying a flag, not a second kind of
+object — so it has a run id, a log, a status, notifications, an audit trail and
+a cancel button, exactly as a plan or an apply does. `applied` means applied
+**and** configured.
+
+Two routes start one, and both are off until you turn them on:
+
+| Route | What triggers it | What it runs |
+|---|---|---|
+| **Manual** | the Configure button on the workspace's Runs tab, `POST /api/v1/runs` with `is-configure: true`, or the `terrapod_run_create` MCP tool | the workspace's `default-playbook` against its `default-limit`, or whatever the invocation overrides |
+| **On push** (`auto-configure-enabled`) | a commit that changes a file under the workspace's `config-directory` | the declared defaults — a push carries no run options |
+| **After an apply** (`configure-after-apply`) | every apply on this workspace, on the **same run** | the declared defaults |
+
+There is deliberately **no scheduled configure**. An operator who wants a
+periodic one drives `POST /api/v1/runs` from their own scheduler — anything
+that can make an HTTP request on a timer — rather than Terrapod growing a
+second scheduling vocabulary beside drift detection's.
+
+## Turning it on
+
+```hcl
+resource "terrapod_workspace" "fleet" {
+  name              = "fleet"
+  configure_enabled = true          # the workspace HAS a configure operation
+  config_directory  = "ansible"     # where its ansible.cfg and playbooks live
+  default_playbook  = "site.yml"
+  default_limit     = "canary"      # ← the blast radius, and see below
+
+  auto_configure_enabled = true     # a push to ansible/ configures
+  configure_after_apply  = false    # an apply does not
+}
+```
+
+`configure_enabled` is the declaration; the other two are triggers and mean
+nothing without it. All three default to **false** for an existing workspace,
+so upgrading changes nothing about what runs.
+
+## `default-limit` is the blast radius, and empty means everything
+
+Ansible's `--limit` is what narrows a configure, the way `-target` narrows a
+plan. A triggered configure has no invocation to carry one, so it uses the
+workspace's `default-limit` — and **an empty `default-limit` means every host
+in the inventory**.
+
+That is deliberate rather than an oversight: at scale the hazard is hosts left
+*unconfigured* because somebody has to remember to run a playbook, not hosts
+getting configured. So the controls are **visibility** and **reversibility**
+rather than prevention:
+
+- **See what it would target before it runs.** `GET
+  /workspaces/{id}/inventory/resolved?limit=<pattern>` is ansible's own
+  expansion of the pattern, nesting and `~regex` included — not Terrapod's
+  guess at it. The Inventory tab's Resolved view is the same answer.
+- **Stop one in flight.** A configure can be cancelled from `configuring` like
+  an apply from `applying`: the Job is deleted and the run's terminal status
+  comes from what the Job actually did, because a playbook that was part-way
+  through a fleet has already changed the hosts it reached.
+
+A workspace whose `default-limit` names a canary group **cannot be made to fire
+wider by a git push**, because a push carries no run options. If you want an
+estate-wide auto-configure, leave the limit empty on purpose.
+
+## A destroy never configures
+
+An apply that is tearing infrastructure down is never followed by a configure,
+whatever `configure-after-apply` says: the hosts a configure would reach are
+the ones the destroy has just removed.
+
+## Why "after an apply" is a workspace setting and not a run option
+
+Because the `terraform`/`tofu` CLI has no way to ask for one. An operator
+running `tofu apply` against Terrapod as their backend gets the configure's log
+**streamed on the same connection**, which only works while the configure
+belongs to the run the CLI is attached to — so the workspace is the only place
+that answer can live.
+
+This is not apply-*derived* targeting. The host set still comes from the
+inventory and the limit from `default-limit`; what the apply decides is only
+*when*. And that ordering is forced by the data flow rather than chosen: an
+apply may create the very inventory rows a configure reads, so a configure
+before it would target a stale host set.
+
+A composite run moves `pending → queued → planning → planned → confirmed →
+applying → configuring → applied`. It does **not** go terminal between the two
+halves — that is the whole mechanism, because a terminal run closes the log
+stream the CLI is reading.
+
+## Which pushes imply which operation
+
+Three roots, two operations, and they are independent:
+
+| A commit touching… | creates |
+|---|---|
+| `working-directory` (or a `trigger-prefixes` entry) | a plan/apply run |
+| `config-directory` | a configure run, if `auto-configure-enabled` |
+| both, in one push | both — the plan/apply first, and the configure queues behind it |
+| neither | nothing |
+
+`inventory-paths` needs no entry of its own: its entries are relative to
+`config-directory` and may not escape it, so they are inside that scope
+already.
+
+Where `configure-after-apply` is on and the push implies a plan/apply, that run
+*is* the configure — you get one composite run rather than two, because
+otherwise the playbook would run twice for one commit, once before the apply had
+written the inventory it reads.
+
+A workspace that declares no plan/apply operation creates no plan run, and one
+whose trigger you have not turned on does no work at all on a push: the decision
+is made before the repository is fetched.
+
+## Who may
+
+A configure runs a playbook against real hosts — it can restart services,
+rotate credentials and reboot machines — so it is **apply-equivalent**:
+
+| Capability | May start a configure |
+|---|---|
+| `run:plan` (plan tier) | no |
+| `run:apply` (write tier) | **yes** |
+
+There is no separate `run:configure` axis. The control over what a given person
+can configure is **which workspaces they hold write on** — and where different
+people should be allowed to run different playbooks, those are different
+workspaces with different label RBAC, exactly as two Terraform workspaces over
+one repository already are. A **runner token** cannot start one at all.
+
+A triggered configure has no human principal, and none is resolved: turning the
+trigger on requires write on the workspace, and that write **is** the
+authorisation — the same arrangement `auto-apply` has always had.
+
+## Per-run overrides
+
+A manual invocation may name a different playbook or a different limit for that
+run only:
+
+```sh
+curl -X POST "$TERRAPOD/api/v1/runs" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -d '{"data":{"attributes":{"is-configure":true,"playbook":"patch.yml","limit":"web"},
+       "relationships":{"workspace":{"data":{"type":"workspaces","id":"ws-…"}}}}}'
+```
+
+Both are recorded on the run, so "what did this configure actually target" is
+answerable afterwards even once the workspace's defaults have moved. Empty
+means the workspace's default.
+
+The plan/apply run options are **refused** on a standalone configure rather
+than ignored — `target-addrs`, `replace-addrs`, `refresh-only`, `save-plan`,
+`allow-empty-apply` and `is-destroy` all narrow or alter a plan, and a
+configure has neither. `plan-only` is refused too: ansible's dry run is
+`--check`, which is its own option, not this one.
+
+## Troubleshooting
+
+| What you see | Why |
+|---|---|
+| 422 naming `configure-enabled` | the workspace declares no configure operation |
+| 422 about a speculative configuration version | a configure cannot run an unmerged branch's playbook against real hosts |
+| 403 naming `run:apply` | plan tier is not enough for a configure |
+| A push to the playbook does nothing | `auto-configure-enabled` is off, or the changed file is outside `config-directory` |
+| A configure ran against more hosts than expected | `default-limit` is empty, which means the whole inventory — check the Resolved view with the limit you intended |
+| An apply did not configure | `configure-after-apply` is off, or the apply was a destroy |

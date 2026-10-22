@@ -68,6 +68,18 @@ def _phase_start_of(run: Run) -> datetime | None:
     handles -- a run with no recorded start is treated as not yet stale rather
     than as infinitely stale.
     """
+    # A COMPOSITE between its two phases is in `applying` with its apply
+    # already finished, waiting for a listener to claim the configure (#1974).
+    # Measuring that wait from `apply_started_at` would judge it against the
+    # apply's own age -- which is long past, so the launch-timeout cohort would
+    # error it almost at once, reporting a stalled apply for an apply that
+    # succeeded. The wait began when the apply ended.
+    #
+    # Reachable for a composite only: `transition_run` stamps
+    # `apply_finished_at` on the way to `applied`/`errored`, so an ordinary run
+    # in `applying` always has it NULL.
+    if run.status == "applying" and run.apply_finished_at is not None:
+        return run.apply_finished_at
     return {
         "planning": run.plan_started_at,
         "applying": run.apply_started_at,
@@ -82,13 +94,20 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
     """
     from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
     from terrapod.storage import get_storage
-    from terrapod.storage.keys import apply_log_key, plan_log_key
+    from terrapod.storage.keys import apply_log_key, configure_log_key, plan_log_key
     from terrapod.storage.protocol import ObjectNotFoundError
 
     storage = get_storage()
     ws_id = str(run.workspace_id)
     run_id = str(run.id)
-    log_key = plan_log_key(ws_id, run_id) if phase == "plan" else apply_log_key(ws_id, run_id)
+    # Keyed on the run-state phase vocabulary -- `plan`, `apply`, `configure`
+    # -- which is also what the runner writes its Redis live-log key under. A
+    # two-way choice sent a configure's promoted log to the APPLY key, and on a
+    # composite that would have overwritten the apply's own log with it.
+    log_key = {
+        "plan": plan_log_key,
+        "configure": configure_log_key,
+    }.get(phase, apply_log_key)(ws_id, run_id)
 
     # Check if runner already uploaded the final log
     try:
@@ -425,7 +444,22 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
     outcome = strategy_for(engine).resolve_terminal(
         run_status=run.status, run_source=run.source, job_status=status
     )
-    if outcome.action in ("complete_plan", "complete_apply", "discovery_succeeded"):
+    logger.info(
+        "Job terminal outcome resolved",
+        run_id=str(run.id),
+        action=outcome.action,
+        # The engine's own word for the phase -- `preview`/`update` for Pulumi
+        # (#1521) -- which is why it is here, where a human reads it, and not
+        # used to build a storage key.
+        engine_phase=outcome.phase,
+        job_status=status,
+    )
+    if outcome.action in (
+        "complete_plan",
+        "complete_apply",
+        "complete_configure",
+        "discovery_succeeded",
+    ):
         await _handle_succeeded(db, run, outcome)
     elif outcome.action == "error":
         # Typed OOM message when the listener captured the K8s
@@ -489,15 +523,26 @@ def _human_bytes(n: int) -> str:
 async def _handle_succeeded(db: AsyncSession, run: Run, outcome: TerminalOutcome) -> None:
     """Carry out the engine's decision for a succeeded Job.
 
-    The *choice* between completing a plan, completing an apply, and settling an
-    onboarding-discovery run is the engine's (`resolve_terminal`); this performs
-    it. `run_service.complete_plan` / `complete_apply` are idempotent, so if the
-    runner's direct POST (`/plan-result` / `/apply-result`) already drove the
-    transition, this is a no-op.
+    The *choice* between completing a plan, an apply or a configure, and
+    settling an onboarding-discovery run, is the engine's
+    (`resolve_terminal`); this performs it. `run_service.complete_plan` /
+    `complete_apply` / `complete_configure` are idempotent, so if the runner's
+    direct POST (`/plan-result` / `/apply-result`) already drove the
+    transition, this is a no-op. A configure has no such POST, so for one this
+    is the only driver -- which is why its absence from the dispatch above
+    meant a successful configure drove nothing and was eventually errored by
+    the stale check.
     """
     from terrapod.services import run_service
 
-    await _persist_live_log_if_missing(run, outcome.phase)
+    # `_phase_of(run.status)`, not `outcome.phase`, and `_handle_failed` has
+    # always done it this way. `outcome.phase` is the ENGINE'S display
+    # vocabulary -- Pulumi answers `preview`/`update` -- while both the Redis
+    # live-log key and the storage key are written in the run-state vocabulary.
+    # So for every Pulumi run this read a Redis key that is never written, found
+    # nothing, and silently did nothing: the promote-if-the-runner-did-not-upload
+    # safety net has never worked for Pulumi.
+    await _persist_live_log_if_missing(run, _phase_of(run.status))
 
     # Onboarding discovery (#824 P2): the discovery Job uploaded its artifacts
     # directly to the session; there is no plan to complete. Settle the run
@@ -515,6 +560,8 @@ async def _handle_succeeded(db: AsyncSession, run: Run, outcome: TerminalOutcome
         await run_service.complete_plan(db, run)
     elif outcome.action == "complete_apply":
         await run_service.complete_apply(db, run)
+    elif outcome.action == "complete_configure":
+        await run_service.complete_configure(db, run)
 
 
 async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None:

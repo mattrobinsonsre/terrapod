@@ -540,6 +540,18 @@ A workspace declares which operations it has with two independent booleans.
 | `plan-apply-enabled` | bool | `true` | The workspace has a plan/apply operation — the ordinary OpenTofu, Terraform or Pulumi run |
 | `configure-enabled` | bool | `false` | The workspace has a configure operation — an Ansible run against the workspace's inventory |
 
+And two more say **how** a configure starts. Both are opt-in, both default off,
+and neither means anything without `configure-enabled` — see
+[Running a Configure](ansible-configure.md).
+
+| Attribute | Type | Default | Meaning |
+|---|---|---|---|
+| `auto-configure-enabled` | bool | `false` | A push that changes a file under `config-directory` queues a configure. It runs `default-playbook` against `default-limit`, because a push carries no run options — which is also what bounds it |
+| `configure-after-apply` | bool | `false` | Every apply on this workspace is followed by a configure **on the same run**, so a `tofu apply` against the remote backend streams the playbook's output too. A **destroy** apply never chains one |
+
+There is deliberately **no scheduled configure**. An operator who wants one
+drives `POST /api/v1/runs` from their own scheduler.
+
 **The defaults are the compatibility story.** Plan/apply on and configure off
 means every workspace that predates these attributes behaves exactly as it did,
 with no data step, and a configure operation is something an operator opts into.
@@ -1245,6 +1257,25 @@ The CLI plan/apply flow always supplies a CV (it uploads one first), so it's una
 | `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`). **Terraform/OpenTofu only** — `pulumi up` carries out whatever the preview produced, empty or not, so setting it `true` on a Pulumi workspace is refused with 422 rather than stored and ignored. The other run options are not engine-specific: Pulumi reads `target-addrs`/`replace-addrs` as `--target`/`--replace` URNs and `refresh-only`/`refresh` as `pulumi refresh` / `--refresh=false`. |
 | `vcs-ref` | string | `""` | Branch, tag, or SHA to fetch code from instead of the workspace's tracked branch. Only valid on VCS-connected workspaces. **Runs with a non-default ref are always plan-only** — the server enforces this regardless of the `plan-only` attribute value |
 | `save-plan` | boolean | `false` | A saved-plan run — `terraform plan -out=FILE`. See below |
+| `is-configure` | boolean | `false` | Run the workspace's Ansible playbook against its inventory instead of a plan or an apply. Requires `configure-enabled` on the workspace (422 otherwise) and the `run:apply` capability — a configure is apply-equivalent. See [Running a Configure](ansible-configure.md) |
+| `playbook` | string | `""` | The playbook this configure runs, relative to `config-directory`. Empty means the workspace's `default-playbook`. Refused on a run that is not a configure |
+| `limit` | string | `""` | `--limit` for this configure: which hosts, groups or patterns it reaches. Empty means the workspace's `default-limit`, **which may itself be empty, meaning every host in the inventory**. Refused on a run that is not a configure |
+
+A configure run reads back two more attributes it does not accept:
+`configure-after-apply` distinguishes a composite (an apply followed by a
+configure on one run, driven by the workspace setting) from a standalone
+configure, and the `playbook`/`limit` the run was created with stay on it, so
+"what did this configure target" survives the workspace defaults moving.
+
+The combinations a configure refuses, each with 422 rather than being accepted
+and ignored:
+
+| Combination | Why |
+|---|---|
+| `is-configure` + `plan-only` | A configure has no plan/apply split to be the plan half of. Ansible's dry run is `--check`, which is its own run option |
+| `is-configure` + a speculative configuration version | That code is unmerged, and a playbook against real hosts has no plan to review first |
+| `is-configure` + `is-destroy` / `target-addrs` / `replace-addrs` / `refresh-only` / `save-plan` / `allow-empty-apply` | These narrow or alter a plan, and a standalone configure has neither. `limit` is what narrows a configure |
+| `playbook` or `limit` on a run that is not a configure | The attribute would do nothing, which is the defect rather than the courtesy |
 
 ### Saved-plan runs (`terraform plan -out=FILE`)
 

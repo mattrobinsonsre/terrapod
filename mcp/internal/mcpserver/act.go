@@ -92,11 +92,17 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		Message   string `json:"message,omitempty" jsonschema:"an optional human message describing why"`
 		AutoApply *bool  `json:"auto_apply,omitempty" jsonschema:"auto-apply on success. Omit to use the workspace setting. Passing true does NOT mean 'use the workspace setting' — on a workspace configured with a conditional mode (create / create_update) an explicit true maps the run to 'always', applying it past a guardrail the operator set, including a plan containing destroys. Only pass it when you intend that for this one run."`
 		Refresh   *bool  `json:"refresh,omitempty" jsonschema:"refresh state before planning (default true)"`
+		// A configure has no plan-only form, so plan_only MUST be false with
+		// it -- the server refuses the pair rather than ignoring one.
+		IsConfigure bool   `json:"is_configure,omitempty" jsonschema:"run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet"`
+		Playbook    string `json:"playbook,omitempty" jsonschema:"the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure"`
+		Limit       string `json:"limit,omitempty" jsonschema:"ansible --limit for this configure: which hosts, groups or patterns it reaches. Omit to use the workspace's default_limit, which may itself be empty meaning THE WHOLE INVENTORY. Read the resolved inventory with the limit first (terrapod_inventory_resolved) to see what it would target. Only valid with is_configure"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_create",
 		Description: "Queue a run against a workspace. Defaults to PLAN-ONLY (a safe speculative plan) — inspect the result with terrapod_run_get / terrapod_run_plan_json before applying. " +
-			"Set plan_only=false only when the user explicitly wants to apply; the server still enforces gating (VCS workspaces block CLI applies; policy + auto-apply rules apply). Returns the created run.",
+			"Set plan_only=false only when the user explicitly wants to apply; the server still enforces gating (VCS workspaces block CLI applies; policy + auto-apply rules apply). " +
+			"Set is_configure=true for an ANSIBLE configure instead: it runs a playbook against real hosts with no plan to review, so it needs the same explicit approval an apply does. Returns the created run.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runCreateIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.WorkspaceID == "" {
@@ -113,6 +119,9 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			Message:     in.Message,
 			AutoApply:   in.AutoApply,
 			Refresh:     in.Refresh,
+			IsConfigure: in.IsConfigure,
+			Playbook:    in.Playbook,
+			Limit:       in.Limit,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

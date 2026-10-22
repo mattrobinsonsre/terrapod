@@ -77,6 +77,9 @@ class TestAutodiscoveryRule:
             ansible_collections=[],
             plan_apply_enabled=True,
             configure_enabled=False,
+            # #1974's pair, serialised beside them.
+            auto_configure_enabled=False,
+            configure_after_apply=False,
             config_directory="",
             inventory_paths=[],
             default_playbook="",

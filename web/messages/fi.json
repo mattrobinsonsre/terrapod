@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Yksi tämän asennuksen omista suoritusympäristöistä, nimiöllä. Se ohittaa Ansible-version, joten nimiöllä varustettu työtila ohittaa oman linjansa. Jätä tyhjäksi käyttääksesi linjan sisäänrakennettua vedosta.",
       "ansibleExecutionEnvironmentPlaceholder": "esim. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Tähän asennukseen ei ole määritetty yhtään",
-      "ansibleVersionUnconfirmed": "Saatavilla olevia versioita ei voitu vahvistaa — kirjoita versio"
+      "ansibleVersionUnconfirmed": "Saatavilla olevia versioita ei voitu vahvistaa — kirjoita versio",
+      "autoConfigureEnabled": "Määritys työnnön yhteydessä",
+      "autoConfigureEnabledHint": "Työntö, joka muuttaa Ansible-asetushakemistoa, ajaa playbookin. Jos oletusrajausta ei ole asetettu, se on koko inventaario.",
+      "autoConfigureEnabledHintLimited": "Työntö, joka muuttaa Ansible-asetushakemistoa, ajaa playbookin rajauksella {limit}.",
+      "configureAfterApply": "Määritys käyttöönoton jälkeen",
+      "configureAfterApplyHint": "Jokaista käyttöönottoa täällä seuraa määritys samalla ajolla, joten myös CLI:n käyttöönotto suoratoistaa playbookin tulosteen. Tuhoaminen ei määritä koskaan."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "moduulijulkaisu",
       "awaitingDecision": "odottaa päätöstä",
       "typeSavedPlan": "tallennettu suunnitelma",
-      "typeSavedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön."
+      "typeSavedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön.",
+      "queueConfigure": "Määritä",
+      "queueConfigureTitle": "Aja playbook inventaariota vasten heti. Sitä ei edellä mikään suunnitelma.",
+      "queueConfigureConfirmAll": "Ajetaanko playbook KOKO inventaariota vasten, jokaista isäntää myöten? Tämä muuttaa todellisia isäntiä, eikä sitä voi kumota.",
+      "queueConfigureConfirmLimited": "Ajetaanko playbook rajauksella {limit}? Tämä muuttaa todellisia isäntiä, eikä sitä voi kumota.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "työtilan oletus",
+      "configureLimit": "Rajaus",
+      "configureLimitPlaceholder": "koko inventaario",
+      "configureLimitHint": "Mitkä isännät, ryhmät tai mallit tavoitetaan. Tyhjä tarkoittaa jokaista isäntää inventaariossa.",
+      "typeConfigure": "määritys",
+      "typeConfigureHint": "Ajaa playbookin inventaariota vasten. Ei suunnitelmaa eikä käyttöönottoa.",
+      "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla."
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventaario",
-        "body": "Isännät ja ryhmät, jotka tämä työtila pitää hallussaan, ja se, mihin ansible ne ratkaisee. Jokaista riviä voi muokata täällä; playbookin ajaminen niitä vasten ei ole vielä käytettävissä."
+        "body": "Isännät ja ryhmät, jotka tämä työtila pitää hallussaan, ja se, mihin ansible ne ratkaisee. Jokaista riviä voi muokata täällä."
       },
       "nav": {
         "label": "Inventaarion osiot",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manuaalinen ajautumatarkistus käyttöliittymästä",
       "queued": "Asetettu jonoon käyttöliittymästä",
       "queuedSpeculative": "Asetettu jonoon käyttöliittymästä (spekulatiivinen)",
-      "destroyQueued": "Tuhoaminen asetettu jonoon käyttöliittymästä"
+      "destroyQueued": "Tuhoaminen asetettu jonoon käyttöliittymästä",
+      "queuedConfigure": "Määritys asetettu jonoon käyttöliittymästä"
     },
     "errors": {
       "loadWorkspace": "Työtilan lataaminen epäonnistui",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Tilatiedoston lataaminen epäonnistui",
       "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui",
       "updateDebugMode": "Virheenkorjaustilan päivitys epäonnistui",
-      "updateForkPlans": "Forkien pull requestien suunnitelmien päivitys epäonnistui"
+      "updateForkPlans": "Forkien pull requestien suunnitelmien päivitys epäonnistui",
+      "queueConfigure": "Määrityksen asettaminen jonoon epäonnistui",
+      "queueConfigureStatus": "Määrityksen asettaminen jonoon epäonnistui ({status})"
     },
     "subtabs": {
       "state": "Tila",

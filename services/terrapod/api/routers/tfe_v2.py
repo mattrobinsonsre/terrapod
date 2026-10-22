@@ -780,6 +780,11 @@ def _workspace_json(
                 # whether the workspace uses remote operations.
                 "plan-apply-enabled": ws.plan_apply_enabled,
                 "configure-enabled": ws.configure_enabled,
+                # How a configure starts (#1974). Both default false, so a
+                # workspace that predates them reads as having no trigger --
+                # which is exactly what it has.
+                "auto-configure-enabled": ws.auto_configure_enabled,
+                "configure-after-apply": ws.configure_after_apply,
                 # An ordinary path, `""` meaning the configuration version's
                 # root -- `working-directory`'s shape exactly. It has no null
                 # state any more: whether there is a configure operation is
@@ -1005,6 +1010,8 @@ def _workspace_json(
         for _native_only in (
             "plan-apply-enabled",
             "configure-enabled",
+            "auto-configure-enabled",
+            "configure-after-apply",
             "config-directory",
             "inventory-paths",
             "default-playbook",
@@ -1631,6 +1638,27 @@ async def _create_workspace_impl(
         configure_enabled=(
             _422(workspace_settings.validate_bool, attrs["configure-enabled"], "configure-enabled")
             if "configure-enabled" in attrs
+            else False
+        ),
+        # How a configure starts (#1974), membership-tested for the same reason
+        # and defaulting off: a new workspace runs a playbook only when
+        # somebody asks it to.
+        auto_configure_enabled=(
+            _422(
+                workspace_settings.validate_bool,
+                attrs["auto-configure-enabled"],
+                "auto-configure-enabled",
+            )
+            if "auto-configure-enabled" in attrs
+            else False
+        ),
+        configure_after_apply=(
+            _422(
+                workspace_settings.validate_bool,
+                attrs["configure-after-apply"],
+                "configure-after-apply",
+            )
+            if "configure-after-apply" in attrs
             else False
         ),
         # The Ansible roots and run defaults (#1929). `config-directory` is an
@@ -2393,6 +2421,23 @@ async def update_workspace(
     if "configure-enabled" in attrs:
         ws.configure_enabled = _422(
             workspace_settings.validate_bool, attrs["configure-enabled"], "configure-enabled"
+        )
+    # How a configure starts (#1974). No cross-field invariant of their own: a
+    # trigger set on a workspace with no configure operation is inert rather
+    # than incoherent, and `create_run` refuses the run it would imply -- so
+    # refusing the combination here would stop an operator declaring the
+    # trigger and the operation in either order.
+    if "auto-configure-enabled" in attrs:
+        ws.auto_configure_enabled = _422(
+            workspace_settings.validate_bool,
+            attrs["auto-configure-enabled"],
+            "auto-configure-enabled",
+        )
+    if "configure-after-apply" in attrs:
+        ws.configure_after_apply = _422(
+            workspace_settings.validate_bool,
+            attrs["configure-after-apply"],
+            "configure-after-apply",
         )
     # On the MERGED row, which is why it sits here rather than inside either
     # branch above: turning plan/apply off is legitimate on a workspace that

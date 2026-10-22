@@ -60,7 +60,17 @@ type Run struct {
 	// ordinary way, and a "queued" one has no plan to discard.
 	BlockedBy string `json:"blocked-by,omitempty"`
 	IsDestroy bool   `json:"is-destroy"`
-	AutoApply bool   `json:"auto-apply"`
+	// The Ansible configure half of the run (#1974). IsConfigure says the run
+	// carries one; ConfigureAfterApply distinguishes a COMPOSITE (an apply
+	// followed by a configure on the same run, driven by the workspace's own
+	// setting) from a STANDALONE configure. Playbook and Limit are what this
+	// run was asked to configure -- empty meaning the workspace's defaults,
+	// which is what a git-driven configure runs.
+	IsConfigure         bool   `json:"is-configure"`
+	ConfigureAfterApply bool   `json:"configure-after-apply"`
+	Playbook            string `json:"playbook,omitempty"`
+	Limit               string `json:"limit,omitempty"`
+	AutoApply           bool   `json:"auto-apply"`
 	// AutoApplyMode is the mode snapshotted at run creation (#1274), and
 	// AutoApplyDeclinedReason says why a conditional mode refused to apply
 	// this plan — empty unless the run is parked for a human.
@@ -196,6 +206,21 @@ type CreateRunRequest struct {
 	// VCSRef plans against an arbitrary branch/tag/SHA. The server forces such a
 	// run plan-only regardless of PlanOnly.
 	VCSRef string
+	// IsConfigure asks for a STANDALONE Ansible configure: the workspace's
+	// playbook against its inventory, with no plan and no apply. The workspace
+	// must declare a configure operation (configure-enabled) or the server
+	// answers 422.
+	//
+	// There is no field for a composite. An apply followed by a configure on
+	// one run is the workspace's own configure-after-apply setting, because the
+	// terraform/tofu CLI has no way to pass a flag and the composite exists so
+	// that a remote execution keeps streaming through the configure.
+	IsConfigure bool
+	// Playbook and Limit override the workspace's default-playbook and
+	// default-limit for this run only. Both are refused on a run that is not a
+	// configure rather than ignored.
+	Playbook string
+	Limit    string
 }
 
 // CreateRun queues a run. See CreateRunRequest for the intent signals. Returns
@@ -242,6 +267,15 @@ func (c *Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, err
 	}
 	if req.VCSRef != "" {
 		attrs["vcs-ref"] = req.VCSRef
+	}
+	if req.IsConfigure {
+		attrs["is-configure"] = true
+	}
+	if req.Playbook != "" {
+		attrs["playbook"] = req.Playbook
+	}
+	if req.Limit != "" {
+		attrs["limit"] = req.Limit
 	}
 	rels := map[string]any{
 		"workspace": map[string]any{
@@ -414,6 +448,10 @@ func runFromResource(res *Resource) *Run {
 		DiscardReason:           GetStringAttr(res, "discard-reason"),
 		BlockedBy:               GetStringAttr(res, "blocked-by"),
 		IsDestroy:               GetBoolAttr(res, "is-destroy"),
+		IsConfigure:             GetBoolAttr(res, "is-configure"),
+		ConfigureAfterApply:     GetBoolAttr(res, "configure-after-apply"),
+		Playbook:                GetStringAttr(res, "playbook"),
+		Limit:                   GetStringAttr(res, "limit"),
 		AutoApply:               GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:           GetStringAttr(res, "auto-apply-mode"),
 		AutoApplyDeclinedReason: GetStringAttr(res, "auto-apply-declined-reason"),

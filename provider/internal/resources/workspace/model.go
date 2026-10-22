@@ -103,6 +103,13 @@ type workspaceModel struct {
 	// permit and nobody wants: both false, which can never produce a run.
 	PlanApplyEnabled types.Bool `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled types.Bool `tfsdk:"configure_enabled"`
+	// How a configure STARTS (#1974). Both default false on the server, both
+	// need ConfigureEnabled to mean anything, and neither has a cross-field
+	// invariant of its own -- a trigger declared on a workspace whose configure
+	// operation is not (yet) on is inert rather than incoherent, which is what
+	// lets a configuration declare them in any order.
+	AutoConfigureEnabled types.Bool `tfsdk:"auto_configure_enabled"`
+	ConfigureAfterApply  types.Bool `tfsdk:"configure_after_apply"`
 	// The ansible configure operation's roots and run defaults (#1929).
 	//
 	// ConfigDirectory is Optional+Computed with UseStateForUnknown, exactly

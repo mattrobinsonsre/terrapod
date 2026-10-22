@@ -293,6 +293,30 @@ A PR can touch multiple workspaces. `terrapod apply` (no `-W`) operates on all a
 
 If you want to merge despite incomplete applies, merge the pull request on the provider. There is no Terrapod command for it: a comment-driven force-merge would mean anyone able to type a comment could land a change whose applies had not finished, bypassing the gate above — so the decision stays with whoever the repository already trusts to press Merge. Unapplied workspaces get a banner on their detail page indicating known drift between code and infrastructure.
 
+## A push may imply a configure as well as a plan
+
+A workspace can have an Ansible [configure operation](ansible-configure.md)
+beside its plan/apply one, and the two have different roots — so one push
+decides **which operations it implies**, not just whether to run:
+
+| A commit touching… | creates |
+|---|---|
+| `working-directory`, or a `trigger-prefixes` entry | a plan/apply run, as always |
+| `config-directory`, with `auto-configure-enabled` on | a configure run |
+| both roots in one push | both; the plan/apply first, with the configure queueing behind it on the workspace's own serialisation |
+| neither | nothing |
+
+The ordering is not cosmetic: an apply may write the very inventory rows a
+configure reads, so a configure that ran first would target a stale host set.
+Where the workspace has `configure-after-apply` on, the plan/apply run **is**
+the configure — one composite run rather than two.
+
+A configure fired by a push carries no run options, because a push cannot
+express one: it runs the workspace's `default-playbook` against its
+`default-limit`, and **an empty default limit means every host in the
+inventory**. That is what bounds the trigger, and
+[Running a Configure](ansible-configure.md) is where the trade is set out.
+
 ## Webhook + polling
 
 Hook-and-poll: webhooks accelerate, polling is the source of truth. Every behaviour described here works without webhooks configured — Terrapod's poll cycle (default 60s) handles new commits, new comments, new reviews, and PR-closed events.

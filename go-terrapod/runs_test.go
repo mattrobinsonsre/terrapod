@@ -365,3 +365,54 @@ func TestRunLogRejectsAnEmptyID(t *testing.T) {
 		t.Fatal("expected an error for an id that is only a prefix")
 	}
 }
+
+// A standalone configure is asked for with one attribute, and the plan/apply
+// options are NOT sent with it (#1974): the server refuses them on a configure,
+// so an SDK that sent a zero-valued `is-destroy: false` alongside would be
+// relying on the server reading false as absent.
+func TestCreateRunAsksForAConfigure(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"run-cfg","type":"runs","attributes":{
+			"status":"queued","is-configure":true,"configure-after-apply":false,
+			"playbook":"patch.yml","limit":"canary"}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := c.CreateRun(t.Context(), CreateRunRequest{
+		WorkspaceID: "ws-app",
+		IsConfigure: true,
+		Playbook:    "patch.yml",
+		Limit:       "canary",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs, _ := body["data"].(map[string]any)["attributes"].(map[string]any)
+	if attrs["is-configure"] != true {
+		t.Errorf("is-configure not sent: %v", attrs)
+	}
+	if attrs["playbook"] != "patch.yml" || attrs["limit"] != "canary" {
+		t.Errorf("playbook/limit not sent: %v", attrs)
+	}
+	for _, unwanted := range []string{"is-destroy", "refresh-only", "save-plan", "allow-empty-apply"} {
+		if _, present := attrs[unwanted]; present {
+			t.Errorf("%s was sent on a configure request: %v", unwanted, attrs)
+		}
+	}
+	// And the read-back carries the shape, so a caller can tell a standalone
+	// configure from a composite without asking the workspace.
+	if !run.IsConfigure || run.ConfigureAfterApply {
+		t.Errorf("shape: is-configure=%v after-apply=%v", run.IsConfigure, run.ConfigureAfterApply)
+	}
+	if run.Playbook != "patch.yml" || run.Limit != "canary" {
+		t.Errorf("options: %q %q", run.Playbook, run.Limit)
+	}
+}

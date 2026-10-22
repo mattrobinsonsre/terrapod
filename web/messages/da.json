@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "Et af denne installations egne eksekveringsmiljøer, via etiket. Det tilsidesætter Ansible-versionen, så et arbejdsområde med en etiket ignorerer sin linje. Lad feltet være tomt for at bruge linjens indbyggede image.",
       "ansibleExecutionEnvironmentPlaceholder": "f.eks. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Ingen konfigureret i denne installation",
-      "ansibleVersionUnconfirmed": "Tilgængelige versioner kunne ikke bekræftes — skriv en"
+      "ansibleVersionUnconfirmed": "Tilgængelige versioner kunne ikke bekræftes — skriv en",
+      "autoConfigureEnabled": "Konfigurer ved push",
+      "autoConfigureEnabledHint": "Et push, der ændrer Ansible-konfigurationsmappen, kører playbooken. Uden en angivet standardgrænse er det hele inventaret.",
+      "autoConfigureEnabledHintLimited": "Et push, der ændrer Ansible-konfigurationsmappen, kører playbooken mod {limit}.",
+      "configureAfterApply": "Konfigurer efter anvendelse",
+      "configureAfterApplyHint": "Hver anvendelse her følges af en konfigurering i samme kørsel, så også en anvendelse fra CLI streamer playbookens output. En nedrivning konfigurerer aldrig."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "modulpublicering",
       "awaitingDecision": "afventer beslutning",
       "typeSavedPlan": "gemt plan",
-      "typeSavedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes."
+      "typeSavedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes.",
+      "queueConfigure": "Konfigurer",
+      "queueConfigureTitle": "Kør playbooken mod inventaret nu. Ingen plan går forud.",
+      "queueConfigureConfirmAll": "Kør playbooken mod HELE inventaret? Dette ændrer virkelige værter og kan ikke fortrydes.",
+      "queueConfigureConfirmLimited": "Kør playbooken mod {limit}? Dette ændrer virkelige værter og kan ikke fortrydes.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "arbejdsområdets standard",
+      "configureLimit": "Grænse",
+      "configureLimitPlaceholder": "hele inventaret",
+      "configureLimitHint": "Hvilke værter, grupper eller mønstre der skal nås. Tomt betyder hver vært i inventaret.",
+      "typeConfigure": "konfigurer",
+      "typeConfigureHint": "Kører playbooken mod inventaret. Ingen plan og ingen anvendelse.",
+      "typeConfigureAfterApplyHint": "Efter anvendelsen følger en konfigurering i samme kørsel."
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "De værter og grupper, dette arbejdsområde indeholder, og hvad ansible opløser dem til. Hver række kan redigeres her; at køre en playbook mod dem er endnu ikke muligt."
+        "body": "De værter og grupper, dette arbejdsområde indeholder, og hvad ansible opløser dem til. Hver række kan redigeres her."
       },
       "nav": {
         "label": "Inventarafsnit",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manuelt afdriftstjek fra brugergrænsefladen",
       "queued": "Sat i kø fra brugergrænsefladen",
       "queuedSpeculative": "Sat i kø fra brugergrænsefladen (spekulativ)",
-      "destroyQueued": "Nedrivning sat i kø fra brugergrænsefladen"
+      "destroyQueued": "Nedrivning sat i kø fra brugergrænsefladen",
+      "queuedConfigure": "Konfigurering sat i kø fra brugergrænsefladen"
     },
     "errors": {
       "loadWorkspace": "Kunne ikke indlæse arbejdsområde",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Kunne ikke uploade tilstandsfil",
       "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres",
       "updateDebugMode": "Fejlfindingstilstanden kunne ikke opdateres",
-      "updateForkPlans": "Planer for pull requests fra forks kunne ikke opdateres"
+      "updateForkPlans": "Planer for pull requests fra forks kunne ikke opdateres",
+      "queueConfigure": "Kunne ikke sætte konfigureringen i kø",
+      "queueConfigureStatus": "Kunne ikke sætte konfigureringen i kø ({status})"
     },
     "subtabs": {
       "state": "Tilstand",

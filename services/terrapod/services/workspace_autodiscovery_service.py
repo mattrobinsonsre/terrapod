@@ -403,6 +403,8 @@ async def find_or_autocreate_workspace(
         # plan/apply workspaces.
         plan_apply_enabled=rule.plan_apply_enabled,
         configure_enabled=rule.configure_enabled,
+        auto_configure_enabled=rule.auto_configure_enabled,
+        configure_after_apply=rule.configure_after_apply,
         config_directory=rule.config_directory,
         inventory_paths=list(rule.inventory_paths or []),
         default_playbook=rule.default_playbook,

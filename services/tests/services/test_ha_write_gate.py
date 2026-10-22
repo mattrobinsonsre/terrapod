@@ -67,6 +67,24 @@ class TestEveryGatedEntryPointRefuses:
             await run_service.create_run(AsyncMock(), MagicMock())
 
     @patch("terrapod.services.ha_role.settings")
+    async def test_create_run_is_refused_before_anything_is_read(self, mock_settings):
+        """The gate is the FIRST thing `create_run` does, which is what makes a
+        bare `MagicMock()` workspace a sufficient fixture above (#1974).
+
+        Pinned because the ordering is load-bearing and invisible: a check
+        moved below the workspace reads would still refuse a follower, but it
+        would resolve a version, split the pool set and decide the run's
+        configure shape first -- work on a run that cannot exist, against a
+        workspace nobody validated.
+        """
+        import inspect
+
+        src = inspect.getsource(run_service.create_run)
+        body = src.split('"""', 2)[-1]
+        assert 'ensure_leader("create runs")' in body
+        assert body.index('ensure_leader("create runs")') < body.index("resolve_configure_shape")
+
+    @patch("terrapod.services.ha_role.settings")
     async def test_queue_run(self, mock_settings):
         mock_settings.ha = _static("follower")
         with pytest.raises(NotLeaderError):
@@ -116,7 +134,12 @@ class TestLeaderStillWorks:
         mock_settings.ha = _static("leader")
         db = AsyncMock()
 
-        await run_service.create_run(db, MagicMock())
+        # `configure_after_apply=False` because this one runs `create_run` to
+        # completion rather than expecting the gate to refuse it (#1974): a
+        # truthy MagicMock would make the run a composite and send it to
+        # resolve an inventory against this AsyncMock db, which fails for a
+        # reason that has nothing to do with the HA gate under test.
+        await run_service.create_run(db, MagicMock(configure_after_apply=False))
 
         # Reached the body and persisted — proof the gate let it through.
         db.add.assert_called()

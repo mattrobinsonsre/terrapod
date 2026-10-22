@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "En av den här installationens egna exekveringsmiljöer, via etikett. Den åsidosätter Ansible-versionen, så en arbetsyta med en etikett ignorerar sin linje. Lämna tomt för att använda linjens inbyggda avbildning.",
       "ansibleExecutionEnvironmentPlaceholder": "t.ex. rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "Inga konfigurerade i den här installationen",
-      "ansibleVersionUnconfirmed": "Tillgängliga versioner kunde inte bekräftas — skriv en"
+      "ansibleVersionUnconfirmed": "Tillgängliga versioner kunde inte bekräftas — skriv en",
+      "autoConfigureEnabled": "Konfigurera vid push",
+      "autoConfigureEnabledHint": "En push som ändrar Ansible-konfigurationskatalogen kör playbooken. Utan angiven standardgräns är det hela inventariet.",
+      "autoConfigureEnabledHintLimited": "En push som ändrar Ansible-konfigurationskatalogen kör playbooken mot {limit}.",
+      "configureAfterApply": "Konfigurera efter tillämpning",
+      "configureAfterApplyHint": "Varje tillämpning här följs av en konfigurering i samma körning, så även en tillämpning från CLI strömmar playbookens utdata. En förstörelse konfigurerar aldrig."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "modulpublicering",
       "awaitingDecision": "väntar på beslut",
       "typeSavedPlan": "sparad plan",
-      "typeSavedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas."
+      "typeSavedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas.",
+      "queueConfigure": "Konfigurera",
+      "queueConfigureTitle": "Kör playbooken mot inventariet nu. Ingen plan föregår den.",
+      "queueConfigureConfirmAll": "Köra playbooken mot HELA inventariet? Detta ändrar verkliga värdar och kan inte ångras.",
+      "queueConfigureConfirmLimited": "Köra playbooken mot {limit}? Detta ändrar verkliga värdar och kan inte ångras.",
+      "configurePlaybook": "Playbook",
+      "configurePlaybookPlaceholder": "arbetsytans standard",
+      "configureLimit": "Gräns",
+      "configureLimitPlaceholder": "hela inventariet",
+      "configureLimitHint": "Vilka värdar, grupper eller mönster som ska nås. Tomt betyder varje värd i inventariet.",
+      "typeConfigure": "konfigurera",
+      "typeConfigureHint": "Kör playbooken mot inventariet. Ingen plan och ingen tillämpning.",
+      "typeConfigureAfterApplyHint": "Efter tillämpningen följer en konfigurering i samma körning."
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "Inventarium",
-        "body": "Värdarna och grupperna som den här arbetsytan håller, och vad ansible löser upp dem till. Varje rad kan redigeras här; att köra en playbook mot dem är inte tillgängligt än."
+        "body": "Värdarna och grupperna som den här arbetsytan håller, och vad ansible löser upp dem till. Varje rad kan redigeras här."
       },
       "nav": {
         "label": "Inventarieavsnitt",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "Manuell driftkontroll från gränssnittet",
       "queued": "Köad från gränssnittet",
       "queuedSpeculative": "Köad från gränssnittet (spekulativ)",
-      "destroyQueued": "Förstörelse köad från gränssnittet"
+      "destroyQueued": "Förstörelse köad från gränssnittet",
+      "queuedConfigure": "Konfigurering köad från gränssnittet"
     },
     "errors": {
       "loadWorkspace": "Det gick inte att läsa in arbetsytan",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen",
       "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen",
       "updateDebugMode": "Det gick inte att uppdatera felsökningsläget",
-      "updateForkPlans": "Det gick inte att uppdatera planer för pull requests från forkar"
+      "updateForkPlans": "Det gick inte att uppdatera planer för pull requests från forkar",
+      "queueConfigure": "Det gick inte att köa konfigureringen",
+      "queueConfigureStatus": "Det gick inte att köa konfigureringen ({status})"
     },
     "subtabs": {
       "state": "Tillstånd",

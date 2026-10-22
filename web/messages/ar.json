@@ -2633,7 +2633,12 @@
       "ansibleExecutionEnvironmentTitle": "إحدى بيئات التنفيذ الخاصة بهذا النشر، بواسطة التسمية. تتجاوز إصدار Ansible، لذا تتجاهل مساحة العمل التي تحمل تسمية خطها. اتركه فارغًا لاستخدام الصورة المدمجة للخط.",
       "ansibleExecutionEnvironmentPlaceholder": "مثال rhel8-hardened",
       "ansibleExecutionEnvironmentNone": "لا يوجد أي منها مُهيأ في هذا النشر",
-      "ansibleVersionUnconfirmed": "لم يتعذر تأكيد الإصدارات المتاحة — اكتب أحدها"
+      "ansibleVersionUnconfirmed": "لم يتعذر تأكيد الإصدارات المتاحة — اكتب أحدها",
+      "autoConfigureEnabled": "التهيئة عند الدفع",
+      "autoConfigureEnabledHint": "أي دفع يغيّر دليل تهيئة Ansible يشغّل دفتر التشغيل. وبدون تعيين حد افتراضي، يكون ذلك على المخزون بأكمله.",
+      "autoConfigureEnabledHintLimited": "أي دفع يغيّر دليل تهيئة Ansible يشغّل دفتر التشغيل على {limit}.",
+      "configureAfterApply": "التهيئة بعد التطبيق",
+      "configureAfterApplyHint": "يتبع كل تطبيق هنا تهيئةٌ في عملية التشغيل نفسها، فيبثّ التطبيق من واجهة سطر الأوامر ناتج دفتر التشغيل أيضًا. أمّا الحذف فلا يهيّئ أبدًا."
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",
@@ -2816,7 +2821,19 @@
       "sourceModulePublish": "نشر الوحدة",
       "awaitingDecision": "بانتظار قرار",
       "typeSavedPlan": "خطة محفوظة",
-      "typeSavedPlanHint": "التطبيق مؤجَّل: لا يحجز هذا التشغيل مساحة العمل حتى يتم تطبيق الخطة المحفوظة."
+      "typeSavedPlanHint": "التطبيق مؤجَّل: لا يحجز هذا التشغيل مساحة العمل حتى يتم تطبيق الخطة المحفوظة.",
+      "queueConfigure": "تهيئة",
+      "queueConfigureTitle": "شغّل دفتر التشغيل على المخزون الآن. لا تسبقه خطة.",
+      "queueConfigureConfirmAll": "هل تريد تشغيل دفتر التشغيل على المخزون بأكمله، أي على كل مضيف فيه؟ هذا يغيّر مضيفات حقيقية ولا يمكن التراجع عنه.",
+      "queueConfigureConfirmLimited": "هل تريد تشغيل دفتر التشغيل على {limit}؟ هذا يغيّر مضيفات حقيقية ولا يمكن التراجع عنه.",
+      "configurePlaybook": "دفتر التشغيل",
+      "configurePlaybookPlaceholder": "الافتراضي لمساحة العمل",
+      "configureLimit": "الحد",
+      "configureLimitPlaceholder": "المخزون بأكمله",
+      "configureLimitHint": "المضيفات أو المجموعات أو الأنماط التي سيتم الوصول إليها. الفراغ يعني كل مضيف في المخزون.",
+      "typeConfigure": "تهيئة",
+      "typeConfigureHint": "يشغّل دفتر التشغيل على المخزون. لا خطة ولا تطبيق.",
+      "typeConfigureAfterApplyHint": "يتبع التطبيقَ تهيئةٌ في عملية التشغيل نفسها."
     },
     "state": {
       "deleteConfirm": "هل تريد حذف نسخة الحالة رقم #{serial}؟ لا يمكن التراجع عن هذا.",
@@ -2917,7 +2934,7 @@
     "inventory": {
       "scope": {
         "heading": "المخزون",
-        "body": "المضيفات والمجموعات التي تحتفظ بها مساحة العمل هذه، وما يَحُلّها ansible إليه. كل صفّ قابل للتعديل هنا؛ أمّا تشغيل playbook عليها فغير متاح بعد."
+        "body": "المضيفات والمجموعات التي تحتفظ بها مساحة العمل هذه، وما يَحُلّها ansible إليه. كل صفّ قابل للتعديل هنا."
       },
       "nav": {
         "label": "أقسام المخزون",
@@ -3073,7 +3090,8 @@
       "manualDriftCheck": "فحص انحراف يدوي من الواجهة",
       "queued": "أُضيف إلى قائمة الانتظار من الواجهة",
       "queuedSpeculative": "أُضيف إلى قائمة الانتظار من الواجهة (تخميني)",
-      "destroyQueued": "أُضيف الحذف إلى قائمة الانتظار من الواجهة"
+      "destroyQueued": "أُضيف الحذف إلى قائمة الانتظار من الواجهة",
+      "queuedConfigure": "أُضيفت التهيئة إلى قائمة الانتظار من الواجهة"
     },
     "errors": {
       "loadWorkspace": "فشل تحميل مساحة العمل",
@@ -3141,7 +3159,9 @@
       "uploadStateFile": "فشل رفع ملف الحالة",
       "updateSecurityScan": "تعذّر تحديث فحص الأمان",
       "updateDebugMode": "تعذّر تحديث وضع تصحيح الأخطاء",
-      "updateForkPlans": "تعذّر تحديث خطط طلبات السحب من التفريعات"
+      "updateForkPlans": "تعذّر تحديث خطط طلبات السحب من التفريعات",
+      "queueConfigure": "فشل إضافة التهيئة إلى قائمة الانتظار",
+      "queueConfigureStatus": "فشل إضافة التهيئة إلى قائمة الانتظار ({status})"
     },
     "subtabs": {
       "state": "الحالة",

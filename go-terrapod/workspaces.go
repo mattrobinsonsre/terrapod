@@ -118,6 +118,27 @@ type Workspace struct {
 	// boolean for whether the workspace uses remote operations.
 	PlanApplyEnabled bool `json:"plan-apply-enabled"`
 	ConfigureEnabled bool `json:"configure-enabled"`
+	// AutoConfigureEnabled and ConfigureAfterApply are HOW a configure starts
+	// (#1974). Both opt-in, both default false, and neither means anything
+	// without ConfigureEnabled.
+	//
+	// AutoConfigureEnabled: a push that changes the workspace's Ansible config
+	// root queues a configure, running the declared default playbook against
+	// the declared default limit -- a push carries no run options, which is
+	// also what bounds it.
+	//
+	// ConfigureAfterApply: an apply on this workspace is followed by a
+	// configure ON THE SAME RUN. A workspace setting rather than a run
+	// attribute because the terraform/tofu CLI has no way to ask for one, and
+	// a remote execution streaming the configure's logs is the whole reason it
+	// exists. A destroy apply never chains one.
+	//
+	// No `omitempty`, as on the pair above and for the same reason.
+	//
+	// There is deliberately no scheduled configure. An operator who wants one
+	// drives CreateRun from their own scheduler.
+	AutoConfigureEnabled bool `json:"auto-configure-enabled"`
+	ConfigureAfterApply  bool `json:"configure-after-apply"`
 	// ConfigDirectory is the directory the ansible configure operation runs in
 	// (#1929), relative to the configuration version's root: its fetch scope
 	// and the resolver's and executor's working directory.
@@ -354,6 +375,13 @@ type CreateWorkspaceRequest struct {
 	// The server refuses both false with a 422.
 	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+	// AutoConfigureEnabled and ConfigureAfterApply say how a configure starts
+	// on the new workspace (#1974). POINTERS for the same reason as the pair
+	// above, though the direction is gentler here: both server-side defaults
+	// are FALSE, so a caller that leaves them alone gets no triggers rather
+	// than a surprise.
+	AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
+	ConfigureAfterApply  *bool `json:"configure-after-apply,omitempty"`
 	// ConfigDirectory says where the ansible configure operation is rooted
 	// (#1929), relative to the configuration version's root. It does NOT turn
 	// the operation on -- ConfigureEnabled does (#1966).
@@ -516,6 +544,10 @@ type UpdateWorkspaceRequest struct {
 	// not is a 422 rather than an inert workspace.
 	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+	// AutoConfigureEnabled and ConfigureAfterApply turn a configure trigger on
+	// or off (#1974). POINTERS so that nil leaves the stored value alone.
+	AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
+	ConfigureAfterApply  *bool `json:"configure-after-apply,omitempty"`
 	// ConfigDirectory moves where the ansible configure operation is rooted
 	// (#1929). Still a POINTER here, and for a different reason from the two
 	// fields above: a PATCH needs to distinguish "leave it alone" from "set it
@@ -882,6 +914,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureEnabled != nil {
 		attrs["configure-enabled"] = *req.ConfigureEnabled
 	}
+	if req.AutoConfigureEnabled != nil {
+		attrs["auto-configure-enabled"] = *req.AutoConfigureEnabled
+	}
+	if req.ConfigureAfterApply != nil {
+		attrs["configure-after-apply"] = *req.ConfigureAfterApply
+	}
 	if req.ConfigDirectory != "" {
 		attrs["config-directory"] = req.ConfigDirectory
 	}
@@ -1058,6 +1096,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureEnabled != nil {
 		attrs["configure-enabled"] = *req.ConfigureEnabled
+	}
+	if req.AutoConfigureEnabled != nil {
+		attrs["auto-configure-enabled"] = *req.AutoConfigureEnabled
+	}
+	if req.ConfigureAfterApply != nil {
+		attrs["configure-after-apply"] = *req.ConfigureAfterApply
 	}
 	// A pointer so that `&""` can root the operation at the configuration
 	// version's root while nil leaves the stored value alone. There is no null
@@ -1262,6 +1306,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		// configure operation at the top of every repository.
 		PlanApplyEnabled:              GetBoolAttr(res, "plan-apply-enabled"),
 		ConfigureEnabled:              GetBoolAttr(res, "configure-enabled"),
+		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
+		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),

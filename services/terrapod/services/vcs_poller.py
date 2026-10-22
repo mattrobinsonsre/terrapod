@@ -23,7 +23,7 @@ import time as time_mod
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import not_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import (
@@ -49,6 +49,7 @@ from terrapod.services import (
     gitlab_service,
     run_service,
     vcs_rate_limit,
+    workspace_settings,
 )
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
@@ -255,6 +256,113 @@ def _changes_affect_prefixes(changed_files: list[str], prefixes: list[str]) -> b
     return any(f.startswith(n) for f in changed_files for n in normalized)
 
 
+def plan_apply_trigger_scope(ws: Workspace) -> list[str]:
+    """The repo paths whose change triggers a plan/apply on this workspace.
+
+    An EMPTY list means the whole repository, which is the long-standing
+    behaviour for a workspace that narrows nothing -- see
+    `_changes_affect_scope`.
+    """
+    if ws.trigger_prefixes:
+        return list(ws.trigger_prefixes)
+    return [ws.working_directory] if ws.working_directory else []
+
+
+def configure_trigger_scope(ws: Workspace) -> list[str]:
+    """The repo paths whose change triggers a configure on this workspace.
+
+    The Ansible config root, and only it. #1974's own note said "both Ansible
+    roots", `config_directory` and `inventory_paths` -- which was true when
+    written and is not now: an `inventory_paths` entry resolves against the
+    config root (`inventory_resolve._inventory_sources` builds `root / entry`)
+    and `..` is refused by `validate_inventory_paths`, so every entry is inside
+    `config_directory` by construction and a second term could only ever
+    narrow the scope, never widen it.
+
+    `config_directory == ""` means the Ansible root IS the top of the tree, so
+    the scope is the whole repository -- the same asymmetry
+    `git_fetch.workspace_fetch_paths` documents for the fetch, and for the same
+    reason.
+    """
+    return [ws.config_directory] if ws.config_directory else []
+
+
+def _changes_affect_scope(changed_files: list[str] | None, prefixes: list[str]) -> bool:
+    """Whether a change set affects a trigger scope.
+
+    Two sentinels, both long-standing and both meaning "everything":
+
+    * `changed_files is None` -- the provider truncated the comparison, so we
+      cannot tell and must not skip;
+    * an EMPTY scope -- the workspace narrows nothing, so every path is in it.
+
+    `_changes_affect_prefixes` answers False for an empty prefix list, which is
+    the opposite of what an empty SCOPE means, and that is why this wrapper
+    exists rather than the matcher being called directly.
+    """
+    if changed_files is None or not prefixes:
+        return True
+    return _changes_affect_prefixes(changed_files, prefixes)
+
+
+def needs_change_list(ws: Workspace) -> bool:
+    """Whether deciding this push needs the provider's changed-file list.
+
+    An extra provider call per push per workspace is not free -- VCS rate
+    limits are a real constraint here -- and a workspace whose every trigger
+    scope is the whole repository cannot be narrowed by the answer: both
+    operations fire or neither does, whatever changed. So the call is made only
+    when some scope could actually exclude something.
+
+    This is the long-standing behaviour for the plan/apply scope ("no
+    `working_directory` and no `trigger_prefixes` means never ask"), extended
+    to take the configure scope into account rather than replaced by it: a
+    workspace narrowed only by its Ansible root still needs the list, because
+    that root is what decides whether the configure fires.
+    """
+    if bool(ws.plan_apply_enabled) and plan_apply_trigger_scope(ws):
+        return True
+    return (
+        bool(ws.configure_enabled)
+        and bool(ws.auto_configure_enabled)
+        and bool(configure_trigger_scope(ws))
+    )
+
+
+def operations_implied_by_push(ws: Workspace, changed_files: list[str] | None) -> tuple[bool, bool]:
+    """What a push to this workspace's branch should create (#1974).
+
+    Returns `(plan_apply, standalone_configure)`. Three roots, two operations,
+    and both can fire from one push -- a change under `working_directory` is a
+    plan/apply and one under `config_directory` is a configure, independently.
+
+    The second element is a STANDALONE configure deliberately, and it is False
+    when the plan/apply run will already carry one: on a workspace with
+    `configure_after_apply` that run is a composite, so firing a separate
+    configure as well would run the playbook twice for one push -- once before
+    the apply had written the inventory it reads.
+
+    A workspace that declares no configure operation, or has not opted into the
+    git trigger, never gets one. Both are checked here rather than left to
+    `create_run`'s refusal, because this is a decision about whether to do the
+    work at all: the alternative is fetching an archive and writing a
+    configuration version on every push in order to throw the run away, which
+    is what a configure-only workspace did before this (#1974's own note on
+    #2116).
+    """
+    plan_apply = bool(ws.plan_apply_enabled) and _changes_affect_scope(
+        changed_files, plan_apply_trigger_scope(ws)
+    )
+    wants_configure = (
+        bool(ws.configure_enabled)
+        and bool(ws.auto_configure_enabled)
+        and _changes_affect_scope(changed_files, configure_trigger_scope(ws))
+    )
+    if plan_apply and bool(ws.configure_after_apply):
+        return True, False
+    return plan_apply, wants_configure
+
+
 async def _list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
     """List branches via the appropriate provider."""
     if conn.provider == "gitlab":
@@ -449,6 +557,8 @@ async def _create_vcs_run(
     meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
     replaces_canceled: bool = False,
+    is_configure: bool = False,
+    reuse_cv_id: uuid.UUID | None = None,
 ) -> Run | None:
     """Download archive (via cache + streaming), create ConfigurationVersion and Run.
 
@@ -461,6 +571,12 @@ async def _create_vcs_run(
     pr_number), return None rather than creating a duplicate. This catches
     races from any path that might create VCS-sourced runs — including the
     vcs_poll ↔ vcs_immediate_poll race fixed by the CAS in _poll_workspace_branch.
+
+    `is_configure` asks for a STANDALONE configure instead of a plan/apply
+    (#1974). `reuse_cv_id` names a configuration version already built for this
+    commit, for the one push that creates both: the two runs must execute the
+    same code, and building a second configuration version would upload the same
+    tarball twice to say so.
 
     `replaces_canceled` drops CANCELED runs from that dedup, for the one caller
     that has just cancelled a run and means to replace it (`terrapod plan`,
@@ -477,6 +593,14 @@ async def _create_vcs_run(
         Run.workspace_id == ws.id,
         Run.vcs_commit_sha == sha,
         Run.vcs_branch == branch,
+        # One push can create a plan/apply AND a standalone configure (#1974),
+        # and they are different runs for the same commit -- so without this
+        # clause whichever was created first would make the other look like a
+        # duplicate and it would never exist. Keyed on standalone-ness rather
+        # than on `is_configure`, because a COMPOSITE is the plan/apply run.
+        run_service.is_standalone_configure_sql(Run)
+        if is_configure
+        else not_(run_service.is_standalone_configure_sql(Run)),
     )
     if pr_number is None:
         dedup_q = dedup_q.where(Run.vcs_pull_request_number.is_(None))
@@ -507,42 +631,59 @@ async def _create_vcs_run(
         )
         return None
 
+    cv_id_for_run = reuse_cv_id
+
     if cache is None:
         cache = VCSArchiveCache()
 
-    try:
-        cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths)
-    except Exception as e:
-        logger.error(
-            "Failed to fetch repo archive into cache",
-            workspace=ws.name,
-            ref=sha[:8],
-            error=str(e),
+    # Skipped entirely when a configuration version was already built for this
+    # commit: the archive is in it, and fetching again to upload identical
+    # bytes is the only thing a second fetch would achieve.
+    #
+    # Written as a statement inside the `try` rather than as a conditional
+    # expression, because the refusal-containment gate
+    # (`test_the_poller_wraps_both_fetch_call_sites`) reads this call's POSITION
+    # -- it must be the first statement in a `try` so a repository refused by
+    # the allowlist costs one workspace rather than the whole cycle -- and a
+    # conditional expression made the call invisible to it. The gate said so
+    # ("the matcher has rotted") rather than passing on nothing.
+    cache_storage_key: str | None = None
+    if cv_id_for_run is None:
+        try:
+            cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths)
+        except Exception as e:
+            logger.error(
+                "Failed to fetch repo archive into cache",
+                workspace=ws.name,
+                ref=sha[:8],
+                error=str(e),
+            )
+            return None
+
+    if cv_id_for_run is None:
+        cv = await run_service.create_configuration_version(
+            db,
+            workspace_id=ws.id,
+            source="vcs",
+            auto_queue_runs=False,
+            speculative=speculative,
         )
-        return None
+        await db.flush()
 
-    cv = await run_service.create_configuration_version(
-        db,
-        workspace_id=ws.id,
-        source="vcs",
-        auto_queue_runs=False,
-        speculative=speculative,
-    )
-    await db.flush()
+        try:
+            await _stream_cv_upload_from_cache(cache_storage_key, ws.id, cv.id)
+        except Exception as e:
+            logger.error(
+                "Failed to materialise cached archive into config version",
+                workspace=ws.name,
+                ref=sha[:8],
+                cache_key=cache_storage_key,
+                error=str(e),
+            )
+            return None
 
-    try:
-        await _stream_cv_upload_from_cache(cache_storage_key, ws.id, cv.id)
-    except Exception as e:
-        logger.error(
-            "Failed to materialise cached archive into config version",
-            workspace=ws.name,
-            ref=sha[:8],
-            cache_key=cache_storage_key,
-            error=str(e),
-        )
-        return None
-
-    cv = await run_service.mark_configuration_uploaded(db, cv)
+        cv = await run_service.mark_configuration_uploaded(db, cv)
+        cv_id_for_run = cv.id
 
     try:
         run = await run_service.create_run(
@@ -551,16 +692,32 @@ async def _create_vcs_run(
             message=message,
             source="vcs",
             plan_only=speculative,
-            configuration_version_id=cv.id,
+            configuration_version_id=cv_id_for_run,
             created_by="vcs-poller",
+            # A git-driven configure carries no run options: a push cannot
+            # express one, so it runs the workspace's declared default playbook
+            # against its declared default limit -- which is what BOUNDS it
+            # (#1974). A workspace whose `default_limit` names a canary group
+            # cannot be made to fire wider by a push.
+            is_configure=is_configure,
         )
 
         run.vcs_commit_sha = sha
         run.vcs_branch = branch
-    except run_service.PlanApplyNotEnabled as exc:
+    except (
+        run_service.PlanApplyNotEnabled,
+        workspace_settings.ConfigureNotEnabled,
+    ) as exc:
+        # The platform decided on this run, so there is nobody to tell: skip
+        # quietly rather than logging an error once per poll cycle about a
+        # workspace behaving exactly as declared. Both refusals are reachable --
+        # `operations_implied_by_push` already checks both declarations, so
+        # arriving here means one was turned off between that decision and this
+        # call, which a long cycle makes perfectly possible.
         logger.info(
-            "VCS run skipped: workspace declares no plan/apply operation",
+            "VCS run skipped: workspace declares no such operation",
             workspace=ws.name,
+            is_configure=is_configure,
             reason=str(exc),
         )
         return None
@@ -660,25 +817,14 @@ async def _poll_workspace_branch(
         new_sha=sha[:8],
     )
 
-    # VCS subdirectory filtering: skip runs when changes don't affect the workspace
-    effective_prefixes = (
-        ws.trigger_prefixes
-        if ws.trigger_prefixes
-        else ([ws.working_directory] if ws.working_directory else [])
-    )
-    if effective_prefixes and old_sha:
+    # Which operations this push implies. `None` means we could not tell what
+    # changed -- the provider truncated the comparison, or the first poll of a
+    # workspace has no previous commit to compare against -- and both are
+    # treated as "everything changed", which is the long-standing behaviour.
+    changed: list[str] | None = None
+    if old_sha and needs_change_list(ws):
         try:
             changed = await _get_changed_files(conn, owner, repo, old_sha, sha)
-            # None means truncated — create run unconditionally
-            if changed is not None and not _changes_affect_prefixes(changed, effective_prefixes):
-                logger.info(
-                    "Skipping run — no changes match trigger prefixes",
-                    workspace=ws.name,
-                    trigger_prefixes=effective_prefixes,
-                    changed_files=changed[:20],
-                    changed_files_count=len(changed),
-                )
-                return
         except Exception as e:
             logger.warning(
                 "Failed to get changed files, creating run anyway",
@@ -686,28 +832,74 @@ async def _poll_workspace_branch(
                 error=repr(e),
             )
 
-    try:
-        run = await _create_vcs_run(
-            db,
-            ws,
-            conn,
-            owner,
-            repo,
-            sha,
-            branch,
-            message=f"Triggered by commit {sha[:8]} on {branch}",
-            cache=cache,
-            meta=meta,
-            fetch_paths=fetch_paths,
+    wants_plan_apply, wants_configure = operations_implied_by_push(ws, changed)
+    if not wants_plan_apply and not wants_configure:
+        logger.info(
+            "Skipping run — no changes match this workspace's trigger scopes",
+            workspace=ws.name,
+            plan_apply_scope=plan_apply_trigger_scope(ws),
+            configure_scope=configure_trigger_scope(ws) if ws.auto_configure_enabled else None,
+            changed_files=(changed or [])[:20],
+            changed_files_count=len(changed or []),
         )
+        return
+
+    created: list[tuple[Run, bool]] = []
+    try:
+        # Plan/apply first when both are wanted, and that ordering is not
+        # cosmetic: an apply may write the inventory rows a configure reads, so
+        # a configure that ran first would target a stale host set (#1974). The
+        # claim loop's per-workspace serialisation then holds the configure in
+        # `queued` until the apply-capable run ahead of it is done, because a
+        # standalone configure is not plan-only and so meets that gate.
+        if wants_plan_apply:
+            run = await _create_vcs_run(
+                db,
+                ws,
+                conn,
+                owner,
+                repo,
+                sha,
+                branch,
+                message=f"Triggered by commit {sha[:8]} on {branch}",
+                cache=cache,
+                meta=meta,
+                fetch_paths=fetch_paths,
+            )
+            if run:
+                created.append((run, False))
+        if wants_configure:
+            # The same configuration version where one was just built: both runs
+            # must execute the same commit's code, and a second one would upload
+            # the identical tarball to say so.
+            reuse = created[0][0].configuration_version_id if created else None
+            configure_run = await _create_vcs_run(
+                db,
+                ws,
+                conn,
+                owner,
+                repo,
+                sha,
+                branch,
+                message=f"Configure triggered by commit {sha[:8]} on {branch}",
+                cache=cache,
+                meta=meta,
+                fetch_paths=fetch_paths,
+                is_configure=True,
+                reuse_cv_id=reuse,
+            )
+            if configure_run:
+                created.append((configure_run, True))
     except Exception:
         # The claim above is already committed, so a rollback cannot undo it.
         # Release it explicitly or this commit is skipped forever (#1099).
         await _release_commit_claim(ws.id, sha, old_sha)
         raise
 
-    if run:
-        VCS_RUNS_CREATED.labels(provider=conn.provider, type="push").inc()
+    for run, is_configure in created:
+        VCS_RUNS_CREATED.labels(
+            provider=conn.provider, type="configure" if is_configure else "push"
+        ).inc()
 
         logger.info(
             "VCS run created",
@@ -715,10 +907,15 @@ async def _poll_workspace_branch(
             run_id=str(run.id),
             commit_sha=sha[:8],
             branch=branch,
+            is_configure=is_configure,
         )
-        # Tie this run back to the PR whose merge produced the commit (#1878).
-        # Best-effort: the run is already made, and failing to attribute it must
-        # not fail the poll cycle that made it.
+    # Tie this commit's runs back to the PR whose merge produced it (#1878).
+    # Once for the commit rather than once per run: it is a property of the
+    # commit, and it writes to whichever runs it finds for it.
+    #
+    # Best-effort: the runs are already made, and failing to attribute them must
+    # not fail the poll cycle that made them.
+    if created:
         try:
             await _attribute_merge_commit(db, conn, owner, repo, sha, meta=meta)
         except Exception as e:  # noqa: BLE001 — attribution is not worth a cycle
