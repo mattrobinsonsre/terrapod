@@ -357,3 +357,33 @@ def oci_upload_chunk_key(session_id: str, sequence: int) -> str:
 def oci_upload_prefix(session_id: str) -> str:
     """Prefix holding one upload session's chunks, for cleanup."""
     return f"oci/uploads/{session_id}/"
+
+
+def inventory_baseline_key(workspace_id: str) -> str:
+    """The resolved inventory the workspace's last SUCCESSFUL configure targeted.
+
+    The baseline a derived configure narrows against (#2229): diffing the current
+    resolution against this gives the hosts whose effective configuration has
+    moved since anything was actually applied to them.
+
+    **One object per workspace, overwritten** -- not a version history. The
+    inventory re-cut removed `inventory_versions` deliberately, because every
+    source is static so a read resolves live and there is nothing to keep. What
+    narrowing needs is far smaller: one retained dump. The user's framing: *if we
+    have a repeatable inventory dump process, which we do, we don't have to keep
+    the old database records, just at least one old dump.*
+
+    **Keyed on the workspace, NOT on a run, and that is load-bearing.** The run's
+    own `resolved_inventory_key` is in `RUN_ARTIFACT_KEYS`, and a successful
+    configure is `applied`, which `REAPABLE_RUN` admits -- so that artifact is
+    deleted after `run_artifacts_retention_days` (90 by default) and a workspace
+    configuring less often than that would lose its baseline between runs. The
+    failure would be quiet rather than wrong (no baseline means "configure
+    everything"), which is exactly why it would go unnoticed. One object per
+    workspace is bounded by construction and never reaped.
+
+    Written on SUCCESS, so "the last successful configure" is literally true: a
+    failed configure leaves the previous baseline standing, which is correct
+    because its hosts may be unconfigured and the next run should go wide anyway.
+    """
+    return f"inventory/{workspace_id}/baseline.json"
