@@ -127,6 +127,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # and an operator would look at the playbook rather than at the
         # restore.
         "auto_configure_enabled": ws.auto_configure_enabled,
+        "configure_all_hosts": ws.configure_all_hosts,
         "configure_after_apply": ws.configure_after_apply,
         # The Ansible roots and run defaults (#1929). An ordinary path now, so
         # it snapshots and restores like `working_directory` beside it.
@@ -643,6 +644,7 @@ async def restore_workspace(
         # workspace that then starts configuring on every push because of a
         # truthiness fallback is the failure to avoid.
         auto_configure_enabled=settings.get("auto_configure_enabled") is True,
+        configure_all_hosts=settings.get("configure_all_hosts") is True,
         configure_after_apply=settings.get("configure_after_apply") is True,
         # An ordinary path (#1966): `or ""` is right now that "" and absent both
         # mean the configuration version's root. It used to be `.get()` with no

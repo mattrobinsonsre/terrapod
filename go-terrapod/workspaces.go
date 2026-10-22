@@ -139,6 +139,19 @@ type Workspace struct {
 	// drives CreateRun from their own scheduler.
 	AutoConfigureEnabled bool `json:"auto-configure-enabled"`
 	ConfigureAfterApply  bool `json:"configure-after-apply"`
+	// ConfigureAllHosts forces a DERIVED configure -- one an inventory change
+	// or an apply produced, rather than one somebody asked for with a limit --
+	// to target every host instead of only the ones that changed (#2229).
+	//
+	// Narrowing is the default, and it is conditioned on what justifies
+	// breadth: new playbook or role code has to reach every host, while a
+	// changed HOST is no reason to touch the others. So a derived configure
+	// narrows when the Ansible code under ConfigDirectory is unchanged since
+	// the last successful configure, and goes wide when it moved.
+	//
+	// This flag is the override and it WIDENS. That direction is deliberate:
+	// a flag someone forgets leaves them configuring more, not less.
+	ConfigureAllHosts bool `json:"configure-all-hosts"`
 	// ConfigDirectory is the directory the ansible configure operation runs in
 	// (#1929), relative to the configuration version's root: its fetch scope
 	// and the resolver's and executor's working directory.
@@ -382,6 +395,11 @@ type CreateWorkspaceRequest struct {
 	// than a surprise.
 	AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 	ConfigureAfterApply  *bool `json:"configure-after-apply,omitempty"`
+	// ConfigureAllHosts makes every derived configure on the new workspace
+	// sweep the whole inventory rather than narrowing to the hosts an
+	// inventory change affected (#2229). A POINTER for the reason the pair
+	// above gives; the server-side default is FALSE, which narrows.
+	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 	// ConfigDirectory says where the ansible configure operation is rooted
 	// (#1929), relative to the configuration version's root. It does NOT turn
 	// the operation on -- ConfigureEnabled does (#1966).
@@ -548,6 +566,9 @@ type UpdateWorkspaceRequest struct {
 	// or off (#1974). POINTERS so that nil leaves the stored value alone.
 	AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 	ConfigureAfterApply  *bool `json:"configure-after-apply,omitempty"`
+	// ConfigureAllHosts turns the narrowing off or back on (#2229). A POINTER
+	// so nil leaves the stored value alone.
+	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 	// ConfigDirectory moves where the ansible configure operation is rooted
 	// (#1929). Still a POINTER here, and for a different reason from the two
 	// fields above: a PATCH needs to distinguish "leave it alone" from "set it
@@ -920,6 +941,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureAfterApply != nil {
 		attrs["configure-after-apply"] = *req.ConfigureAfterApply
 	}
+	if req.ConfigureAllHosts != nil {
+		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
+	}
 	if req.ConfigDirectory != "" {
 		attrs["config-directory"] = req.ConfigDirectory
 	}
@@ -1102,6 +1126,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureAfterApply != nil {
 		attrs["configure-after-apply"] = *req.ConfigureAfterApply
+	}
+	if req.ConfigureAllHosts != nil {
+		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
 	}
 	// A pointer so that `&""` can root the operation at the configuration
 	// version's root while nil leaves the stored value alone. There is no null
@@ -1308,6 +1335,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ConfigureEnabled:              GetBoolAttr(res, "configure-enabled"),
 		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
 		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
+		ConfigureAllHosts:             GetBoolAttr(res, "configure-all-hosts"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),

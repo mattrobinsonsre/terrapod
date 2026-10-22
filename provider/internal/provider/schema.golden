@@ -96,6 +96,7 @@ data terrapod_workspace.auto_apply_mode required=false optional=false computed=t
 data terrapod_workspace.auto_configure_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.config_directory required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.configure_after_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+data terrapod_workspace.configure_all_hosts required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.configure_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.debug_mode required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -202,6 +203,7 @@ resource terrapod_autodiscovery_rule.auto_merge_strategy required=false optional
 resource terrapod_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.config_directory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.configure_after_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.configure_all_hosts required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.debug_mode required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -565,6 +567,7 @@ resource terrapod_workspace.auto_merge required=false optional=true computed=tru
 resource terrapod_workspace.auto_merge_strategy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.config_directory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.configure_after_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.configure_all_hosts required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.debug_mode required=false optional=true computed=true sensitive=false type=basetypes.BoolType

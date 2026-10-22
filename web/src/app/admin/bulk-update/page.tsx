@@ -135,6 +135,7 @@ export default function BulkUpdatePage() {
   // have it.
   const [uAutoConfigureEnabled, setUAutoConfigureEnabled] = useState('')
   const [uConfigureAfterApply, setUConfigureAfterApply] = useState('')
+  const [uConfigureAllHosts, setUConfigureAllHosts] = useState('')
   // BOTH explicitly false is the only combination that can never succeed for
   // any matched workspace, so it is the only one blocked here. Turning just
   // plan/apply off is legitimate for a set that has configure on, and the
@@ -288,6 +289,7 @@ export default function BulkUpdatePage() {
     if (uConfigureEnabled) u['configure-enabled'] = uConfigureEnabled === 'true'
     if (uAutoConfigureEnabled) u['auto-configure-enabled'] = uAutoConfigureEnabled === 'true'
     if (uConfigureAfterApply) u['configure-after-apply'] = uConfigureAfterApply === 'true'
+    if (uConfigureAllHosts) u['configure-all-hosts'] = uConfigureAllHosts === 'true'
     // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
     // value here (the configuration version's root), so the checkbox is what
     // says whether to write this at all. Never `null`: an explicit null on
@@ -1107,6 +1109,24 @@ export default function BulkUpdatePage() {
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
                   {tWs('fields.configureAfterApplyHint')}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-configure-all-hosts">
+                  {tWs('fields.configureAllHosts')}
+                </label>
+                <select
+                  id="bu-configure-all-hosts"
+                  value={uConfigureAllHosts}
+                  onChange={(e) => setUConfigureAllHosts(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.configureAllHostsHint')}
                 </p>
               </div>
             </div>

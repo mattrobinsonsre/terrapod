@@ -110,6 +110,7 @@ type workspaceModel struct {
 	// lets a configuration declare them in any order.
 	AutoConfigureEnabled types.Bool `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply  types.Bool `tfsdk:"configure_after_apply"`
+	ConfigureAllHosts    types.Bool `tfsdk:"configure_all_hosts"`
 	// The ansible configure operation's roots and run defaults (#1929).
 	//
 	// ConfigDirectory is Optional+Computed with UseStateForUnknown, exactly

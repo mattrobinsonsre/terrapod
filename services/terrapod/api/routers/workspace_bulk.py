@@ -85,6 +85,7 @@ _FIELD_MAP: dict[str, str] = {
     # on for the workspaces that should have it, and doing that one at a time
     # is what this surface exists to avoid.
     "auto-configure-enabled": "auto_configure_enabled",
+    "configure-all-hosts": "configure_all_hosts",
     "configure-after-apply": "configure_after_apply",
     # The Ansible roots and run defaults (#1929). `config-directory` is an
     # ordinary path, `""` meaning the configuration version's root.
@@ -417,6 +418,7 @@ _SETTING_RULES: dict[str, Any] = {
     # the two surfaces come to disagree about what is valid (#1763).
     "plan-apply-enabled": lambda v: workspace_settings.validate_bool(v, "plan-apply-enabled"),
     "configure-enabled": lambda v: workspace_settings.validate_bool(v, "configure-enabled"),
+    "configure-all-hosts": lambda v: workspace_settings.validate_bool(v, "configure-all-hosts"),
     "auto-configure-enabled": lambda v: workspace_settings.validate_bool(
         v, "auto-configure-enabled"
     ),

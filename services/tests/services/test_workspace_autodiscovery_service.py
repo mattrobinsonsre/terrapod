@@ -535,6 +535,10 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         # gate exists for.
         "auto_configure_enabled",
         "configure_after_apply",
+        # And whether those configures narrow to the hosts that changed
+        # (#2229). A fleet that wants every configure to sweep all hosts is
+        # declaring a policy, not fixing up a workspace, so the rule carries it.
+        "configure_all_hosts",
         # The Ansible roots and run defaults (#1929). A rule carries them so a
         # fleet of configure-capable workspaces can be materialised rather than
         # edited one at a time afterwards -- the user's call when the parity

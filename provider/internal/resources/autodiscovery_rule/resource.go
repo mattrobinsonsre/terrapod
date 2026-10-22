@@ -125,6 +125,7 @@ type autodiscoveryRuleModel struct {
 	ConfigureEnabled         types.Bool   `tfsdk:"configure_enabled"`
 	AutoConfigureEnabled     types.Bool   `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply      types.Bool   `tfsdk:"configure_after_apply"`
+	ConfigureAllHosts        types.Bool   `tfsdk:"configure_all_hosts"`
 	ConfigDirectory          types.String `tfsdk:"config_directory"`
 	InventoryPaths           types.List   `tfsdk:"inventory_paths"`
 	DefaultPlaybook          types.String `tfsdk:"default_playbook"`
@@ -456,6 +457,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					"false.** A destroy apply never chains one.",
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"configure_all_hosts": schema.BoolAttribute{
+				MarkdownDescription: "Whether derived configures on the workspaces this rule creates target **every** host rather than only the hosts an inventory change affected. **Defaults to false**, which narrows.",
+				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
@@ -1272,6 +1281,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		{"configure-enabled", m.ConfigureEnabled},
 		{"auto-configure-enabled", m.AutoConfigureEnabled},
 		{"configure-after-apply", m.ConfigureAfterApply},
+		{"configure-all-hosts", m.ConfigureAllHosts},
 		{"inventory-include-platform", m.InventoryIncludePlatform},
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
@@ -1559,6 +1569,10 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ConfigureAfterApply = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "configure-after-apply"); v != nil {
 		m.ConfigureAfterApply = types.BoolValue(*v)
+	}
+	m.ConfigureAllHosts = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "configure-all-hosts"); v != nil {
+		m.ConfigureAllHosts = types.BoolValue(*v)
 	}
 	// The ansible roots and run defaults (#1929), read side. All three
 	// strings are non-nullable columns whose empty value is meaningful, so

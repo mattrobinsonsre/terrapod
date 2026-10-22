@@ -105,6 +105,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "configure-enabled": rule.configure_enabled,
             # And how a configure starts on them (#1974), both default false.
             "auto-configure-enabled": rule.auto_configure_enabled,
+            "configure-all-hosts": rule.configure_all_hosts,
             "configure-after-apply": rule.configure_after_apply,
             "config-directory": rule.config_directory,
             "inventory-paths": list(rule.inventory_paths or []),
@@ -340,6 +341,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         # incoherent, and refusing the combination would stop an operator
         # declaring the two in either order.
         ("auto-configure-enabled", "auto_configure_enabled"),
+        ("configure-all-hosts", "configure_all_hosts"),
         ("configure-after-apply", "configure_after_apply"),
     ):
         if _key in attrs:
@@ -868,6 +870,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         plan_apply_enabled=fields.get("plan_apply_enabled", True),
         configure_enabled=fields.get("configure_enabled", False),
         auto_configure_enabled=fields.get("auto_configure_enabled", False),
+        configure_all_hosts=fields.get("configure_all_hosts", False),
         configure_after_apply=fields.get("configure_after_apply", False),
         config_directory=fields.get("config_directory", ""),
         inventory_paths=fields.get("inventory_paths", []),

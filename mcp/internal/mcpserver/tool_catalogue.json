@@ -1272,6 +1272,13 @@
             "boolean"
           ]
         },
+        "configure_all_hosts": {
+          "description": "whether a DERIVED configure -- one an inventory change or an apply produced, rather than one somebody asked for with a limit -- targets EVERY host rather than only the hosts that changed. DEFAULTS TO FALSE, which narrows. Narrowing is conditioned on what justifies breadth: new playbook or role code has to reach every host, while a changed HOST is no reason to touch the others, so a derived configure narrows when the ansible code under config_directory is unchanged since the last successful configure and goes wide when it moved. This flag is the override and it WIDENS -- a flag someone forgets leaves you configuring more, not less. It does not affect a configure you create with an explicit limit, which targets what you asked for",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "configure_enabled": {
           "description": "whether this workspace has an ansible CONFIGURE operation. DEFAULTS TO FALSE, so the operation is opt-in and this is what turns it on -- setting config_directory alone does NOT (#1966), and a workspace with configure_enabled false has no configure operation and no ansible inventory however its roots are set. With it true, config_directory says WHERE the operation runs and inventory_paths says what it targets. Independent of plan_apply_enabled, so a workspace may have both; both off is refused (422)",
           "type": [
@@ -1558,6 +1565,13 @@
         },
         "configure_after_apply": {
           "description": "turn CONFIGURE-AFTER-APPLY on or off: an apply on this workspace is followed by a configure on the same run, which is what lets a terraform/tofu CLI apply stream the configure's logs. A destroy apply never chains one. Omitting the field leaves the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "configure_all_hosts": {
+          "description": "turn the host narrowing off or back on: true makes every derived configure on this workspace sweep the whole inventory, false lets one an inventory change produced target only the hosts that changed. Omitting the field leaves the stored value alone",
           "type": [
             "null",
             "boolean"

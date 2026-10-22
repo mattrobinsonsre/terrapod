@@ -381,6 +381,7 @@ field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field CreateWorkspaceRequest.ConfigDirectory string `json:"config-directory,omitempty"`
 field CreateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
+field CreateWorkspaceRequest.ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 field CreateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
@@ -1231,6 +1232,7 @@ field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field UpdateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omitempty"`
 field UpdateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
+field UpdateWorkspaceRequest.ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 field UpdateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
@@ -1443,6 +1445,7 @@ field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field Workspace.ConfigDirectory string `json:"config-directory,omitempty"`
 field Workspace.ConfigureAfterApply bool `json:"configure-after-apply"`
+field Workspace.ConfigureAllHosts bool `json:"configure-all-hosts"`
 field Workspace.ConfigureEnabled bool `json:"configure-enabled"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`

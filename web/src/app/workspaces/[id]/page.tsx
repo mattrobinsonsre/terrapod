@@ -104,6 +104,7 @@ interface WorkspaceAttrs {
   // neither does anything without `configure-enabled`.
   'auto-configure-enabled'?: boolean
   'configure-after-apply'?: boolean
+  'configure-all-hosts'?: boolean
   // An ordinary repo-relative path, `''` meaning the configuration version's
   // root -- `working-directory`'s shape exactly. It has NO null state: whether
   // there is a configure operation is `configure-enabled` above (#1966), not
@@ -490,6 +491,7 @@ function WorkspaceDetailContent() {
   const [editConfigureEnabled, setEditConfigureEnabled] = useState(false)
   const [editAutoConfigureEnabled, setEditAutoConfigureEnabled] = useState(false)
   const [editConfigureAfterApply, setEditConfigureAfterApply] = useState(false)
+  const [editConfigureAllHosts, setEditConfigureAllHosts] = useState(false)
   // Where the configure operation runs (#1929) -- a plain text box now, because
   // the path is just a path: `''` is the configuration version's root, the way
   // it is for `working-directory` beside it, and there is no third state to
@@ -1365,6 +1367,7 @@ function WorkspaceDetailContent() {
     setEditConfigureEnabled(workspace.attributes['configure-enabled'] ?? false)
     setEditAutoConfigureEnabled(workspace.attributes['auto-configure-enabled'] ?? false)
     setEditConfigureAfterApply(workspace.attributes['configure-after-apply'] ?? false)
+    setEditConfigureAllHosts(workspace.attributes['configure-all-hosts'] ?? false)
     // `?? ''` and nothing else to decide: the stored `''` is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -1444,6 +1447,7 @@ function WorkspaceDetailContent() {
               'configure-enabled': editConfigureEnabled,
               'auto-configure-enabled': editAutoConfigureEnabled,
               'configure-after-apply': editConfigureAfterApply,
+              'configure-all-hosts': editConfigureAllHosts,
               // Where the configure operation runs (#1929). Sent verbatim, and
               // never `null` -- an explicit null is a 422 naming the field
               // (#1966), and `''` is the value that means the configuration
@@ -2998,6 +3002,41 @@ function WorkspaceDetailContent() {
                             )}
                             <p className="mt-1 text-xs text-slate-400">
                               {t('fields.configureAfterApplyHint')}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <label
+                              htmlFor="ws-configure-all-hosts"
+                              className="block text-xs text-slate-500"
+                            >
+                              {t('fields.configureAllHosts')}
+                            </label>
+                            {editing && perms['can-update'] ? (
+                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                                <input
+                                  id="ws-configure-all-hosts"
+                                  type="checkbox"
+                                  checked={editConfigureAllHosts}
+                                  onChange={(e) => setEditConfigureAllHosts(e.target.checked)}
+                                  aria-label={t('fields.configureAllHosts')}
+                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                                />
+                                <span className="text-sm text-slate-200">
+                                  {editConfigureAllHosts ? t('common.enabled') : t('common.disabled')}
+                                </span>
+                              </label>
+                            ) : (
+                              <p
+                                className="mt-1 text-sm text-slate-200"
+                                data-testid="ws-configure-all-hosts"
+                              >
+                                {(attrs['configure-all-hosts'] ?? false)
+                                  ? t('common.enabled')
+                                  : t('common.disabled')}
+                              </p>
+                            )}
+                            <p className="mt-1 text-xs text-slate-400">
+                              {t('fields.configureAllHostsHint')}
                             </p>
                           </div>
                         </>

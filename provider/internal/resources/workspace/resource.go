@@ -736,6 +736,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"configure_all_hosts": schema.BoolAttribute{
+				MarkdownDescription: "Whether a **derived** configure — one an inventory change or an apply produced, rather than one somebody asked for with a limit — targets **every** host rather than only the hosts that changed. **Defaults to false**, which narrows.\n\nNarrowing is conditioned on what justifies breadth: new playbook or role code has to reach every host, while a changed *host* is no reason to touch the others. So a derived configure narrows when the ansible code under `config_directory` is unchanged since the last successful configure, and goes wide when it moved. This flag is the override and it **widens** — a flag someone forgets leaves them configuring more, not less.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"config_directory": schema.StringAttribute{
 				MarkdownDescription: "Repository-root-relative directory the ansible " +
 					"configure operation runs in: its fetch scope and the working " +
@@ -1516,6 +1524,10 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAfterApply.ValueBool()
 		req.ConfigureAfterApply = &v
 	}
+	if !m.ConfigureAllHosts.IsNull() && !m.ConfigureAllHosts.IsUnknown() {
+		v := m.ConfigureAllHosts.ValueBool()
+		req.ConfigureAllHosts = &v
+	}
 	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
@@ -1748,6 +1760,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ConfigureAfterApply.IsNull() && !m.ConfigureAfterApply.IsUnknown() {
 		v := m.ConfigureAfterApply.ValueBool()
 		req.ConfigureAfterApply = &v
+	}
+	if !m.ConfigureAllHosts.IsNull() && !m.ConfigureAllHosts.IsUnknown() {
+		v := m.ConfigureAllHosts.ValueBool()
+		req.ConfigureAllHosts = &v
 	}
 	// #1929's six.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
@@ -1987,6 +2003,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.ConfigureEnabled = types.BoolValue(ws.ConfigureEnabled)
 	m.AutoConfigureEnabled = types.BoolValue(ws.AutoConfigureEnabled)
 	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
+	m.ConfigureAllHosts = types.BoolValue(ws.ConfigureAllHosts)
 
 	// #1929's six, read side.
 	//

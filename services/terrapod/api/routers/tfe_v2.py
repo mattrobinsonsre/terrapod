@@ -784,6 +784,7 @@ def _workspace_json(
                 # workspace that predates them reads as having no trigger --
                 # which is exactly what it has.
                 "auto-configure-enabled": ws.auto_configure_enabled,
+                "configure-all-hosts": ws.configure_all_hosts,
                 "configure-after-apply": ws.configure_after_apply,
                 # An ordinary path, `""` meaning the configuration version's
                 # root -- `working-directory`'s shape exactly. It has no null
@@ -1011,6 +1012,7 @@ def _workspace_json(
             "plan-apply-enabled",
             "configure-enabled",
             "auto-configure-enabled",
+            "configure-all-hosts",
             "configure-after-apply",
             "config-directory",
             "inventory-paths",
@@ -1643,6 +1645,16 @@ async def _create_workspace_impl(
         # How a configure starts (#1974), membership-tested for the same reason
         # and defaulting off: a new workspace runs a playbook only when
         # somebody asks it to.
+        configure_all_hosts=(
+            _422(
+                lambda: workspace_settings.validate_bool(
+                    attrs["configure-all-hosts"],
+                    "configure-all-hosts",
+                )
+            )
+            if "configure-all-hosts" in attrs
+            else False
+        ),
         auto_configure_enabled=(
             _422(
                 workspace_settings.validate_bool,
@@ -2427,6 +2439,13 @@ async def update_workspace(
     # than incoherent, and `create_run` refuses the run it would imply -- so
     # refusing the combination here would stop an operator declaring the
     # trigger and the operation in either order.
+    if "configure-all-hosts" in attrs:
+        ws.configure_all_hosts = _422(
+            lambda: workspace_settings.validate_bool(
+                attrs["configure-all-hosts"],
+                "configure-all-hosts",
+            )
+        )
     if "auto-configure-enabled" in attrs:
         ws.auto_configure_enabled = _422(
             workspace_settings.validate_bool,
