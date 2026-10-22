@@ -2331,6 +2331,64 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
             # above promises -- without it each pass would re-stamp the clock
             # the stale check is measuring and the wait could never time out.
             return run
+
+        # RE-RESOLVE the inventory this configure will target, BEFORE the
+        # hand-over becomes visible (#2230).
+        #
+        # The artifact was written at run creation -- before the plan, let alone
+        # this apply -- and the runner FETCHES it rather than re-deriving it, on
+        # purpose (`configure.py`: "the artifact is the answer; re-deriving it is
+        # how the runner and the API come to disagree about what a configure
+        # targeted"). So without this, a composite configures the inventory as it
+        # stood before its own apply, and an apply that CREATES hosts never
+        # configures them -- which is the provision-then-declare pattern the
+        # Ansible story is built on.
+        #
+        # #2021 froze the resolution at creation to keep the playbook and the
+        # hosts on ONE COMMIT, so a push landing mid-run cannot split them. That
+        # argument is about the VCS source and still holds: this re-resolution
+        # reads the same configuration version. What it picks up is the DECLARED
+        # ROWS, which are not versioned with the code and which this run's own
+        # apply deliberately changed.
+        #
+        # It runs BEFORE `apply_finished_at` is stamped because that stamp is
+        # exactly what the claim loop matches on -- so resolving first is what
+        # makes the fresh bytes unmissable, with no new column and no second
+        # state for a listener to race against. Synchronous for the same reason
+        # `create_run` resolves synchronously: it is the same operation in the
+        # same kind of place, and deferring it would reintroduce the window.
+        from terrapod.services import inventory_resolve
+
+        try:
+            await inventory_resolve.write_run_artifact(db, run)
+        except Exception as exc:  # noqa: BLE001
+            # The apply SUCCEEDED and the configure cannot run. Never fall back
+            # to the stale artifact: configuring a host set known to be wrong is
+            # worse than refusing, and the refusal is the thing an operator can
+            # act on.
+            #
+            # `configure_started_at` is stamped here by hand, which is the one
+            # place outside `transition_run` that does so. It has to be: that
+            # stamp is the ONLY thing `_apply_status` can use to tell "the apply
+            # failed" from "the apply succeeded and the configure failed" (both
+            # are `errored` with both apply timestamps set), and `transition_run`
+            # sets it only on entering `configuring` -- which this run never
+            # does, because the claim owns that transition. Without it the CLI is
+            # told the apply failed when it landed, which is the exact lie #1988
+            # exists to prevent.
+            run.configure_started_at = now_utc()
+            run.error_message = (
+                "the apply succeeded, but the inventory for its configure could "
+                f"not be resolved: {exc}"
+            )
+            logger.warning(
+                "Apply succeeded; configure refused because its inventory could not be resolved",
+                run_id=str(run.id),
+                workspace_id=str(run.workspace_id),
+                err=str(exc),
+            )
+            return await transition_run(db, run, "errored")
+
         run.apply_finished_at = now_utc()
         # Exactly what entering `applying` does to the plan's Job state, and
         # for the same reason: the reconciler must stop driving this run on the

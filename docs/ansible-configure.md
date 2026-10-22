@@ -86,18 +86,20 @@ If a workspace has **both** triggers and an apply writes inventory rows — a
 chained to that apply, and another when the next cycle notices the inventory
 moved.
 
-**Today the second one is doing real work, not repeating the first.** A
-composite run resolves its inventory when the run is created, which is before
-its own plan, so the configure chained to an apply does not see the hosts that
-apply just created — that is #2230. The cycle's run resolves afresh, so it is
-what actually configures them. Turning this trigger off on such a workspace
-would leave newly provisioned hosts unconfigured until something else fired.
+**The second run is now redundant rather than load-bearing.** It used not to be:
+a composite resolved its inventory when the run was created, before its own
+plan, so the configure chained to an apply could not see the hosts that apply
+had just created, and the cycle's run was what actually configured them. A
+composite now re-resolves at the hand-over from its apply to its configure, so
+the chained configure targets its own apply's hosts and the second run repeats
+work rather than completing it.
 
-Once #2230 lands, the chained configure will see its own apply's hosts and the
-second run becomes redundant rather than load-bearing. Suppressing it then wants
-`changed_hosts_only` (#2229), which can tell whether the configure that just ran
+Suppressing it wants #2229, which can tell whether the configure that just ran
 already covered the hosts that moved — something this trigger cannot know,
-because its signal says *something* changed and never *what*.
+because its signal says *something* changed and never *what*. Until then, a
+workspace with both triggers configures twice for one apply; ansible is
+idempotent, so the cost is time rather than correctness, and picking one trigger
+avoids it.
 
 ## `default-limit` is the blast radius, and empty means everything
 
