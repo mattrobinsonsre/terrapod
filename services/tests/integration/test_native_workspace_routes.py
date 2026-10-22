@@ -119,6 +119,12 @@ class TestTheNativeSurfaceServesEveryEngine:
         "configure-after-apply": (
             "an Ansible trigger; the TFE surface serves Terraform alone (#1974)"
         ),
+        # How wide a DERIVED configure runs (#2229). Native-only for the same
+        # two reasons: it governs an Ansible run's `--limit`, and no
+        # `terraform`/`tofu`/`tfci` invocation reads it.
+        "configure-all-hosts": (
+            "an Ansible targeting policy; the TFE surface serves Terraform alone (#2229)"
+        ),
         "config-directory": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
