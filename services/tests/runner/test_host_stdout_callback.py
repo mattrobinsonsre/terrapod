@@ -148,6 +148,21 @@ def _run(root: pathlib.Path, *, inventory: str, play: str, tagged: bool, free: b
     return completed.stdout.decode() + completed.stderr.decode()
 
 
+def _canon(text: str, *roots: pathlib.Path) -> str:
+    """Replace each run's own directory with a placeholder.
+
+    Core 2.21 prints the playbook's ABSOLUTE path in its `[ERROR]` block
+    (`Origin: <dir>/site.yml:11:7`, with a source excerpt and a column
+    pointer), and 2.18 did not. The two runs below deliberately use separate
+    directories so neither can see the other's artifacts, so that one value
+    legitimately differs between them. Canonicalising it -- and nothing else --
+    keeps the comparison byte-exact about everything ansible actually said.
+    """
+    for root in roots:
+        text = text.replace(str(root), "<run>")
+    return text
+
+
 def _strip(text: str) -> str:
     """Remove the header and one prefix per line, as the traditional view does."""
     out: list[str] = []
@@ -204,10 +219,13 @@ class TestWhatAnsiblePrintsThroughIt:
         byte of ansible's own words is added, lost or altered, not the order
         three hosts happened to finish in.
         """
-        plain = _run(tmp_path / "a", inventory=_INVENTORY, play=_PLAY, tagged=False)
-        tagged = _run(tmp_path / "b", inventory=_INVENTORY, play=_PLAY, tagged=True)
+        a, b = tmp_path / "a", tmp_path / "b"
+        plain = _run(a, inventory=_INVENTORY, play=_PLAY, tagged=False)
+        tagged = _run(b, inventory=_INVENTORY, play=_PLAY, tagged=True)
         assert HEADER in tagged
-        assert sorted(_strip(tagged).split("\n")) == sorted(plain.split("\n"))
+        assert sorted(_canon(_strip(tagged), a, b).split("\n")) == sorted(
+            _canon(plain, a, b).split("\n")
+        )
 
     def test_a_multi_line_result_carries_its_host_on_every_line(self, tmp_path):
         """The continuation lines are the reason this is a callback.

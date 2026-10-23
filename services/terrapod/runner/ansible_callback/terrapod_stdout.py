@@ -179,9 +179,19 @@ class CallbackModule(DefaultCallback):
         host = escape_host(self._tp_host) if self._tp_host else HOSTLESS
         prefix = host.ljust(_PAD) + DELIMITER
         # `splitlines` would drop the information that a message ended with a
-        # newline; split on "\n" so a trailing empty field round-trips as the
-        # blank line ansible intended.
-        return "\n".join(prefix + line for line in msg.split("\n"))
+        # newline, so split on "\n" -- but a message that ENDS with one yields a
+        # final empty field, and prefixing that invents a line ansible never
+        # printed. Measured on core 2.21.5, whose `[ERROR]` block ends with a
+        # newline: the traditional view gained one blank line per such call,
+        # which is exactly the byte-identity the subclass exists to preserve.
+        # (The comment here previously claimed the empty field "round-trips as
+        # the blank line ansible intended". It does not -- it adds one.)
+        lines = msg.split("\n")
+        trailing = len(lines) > 1 and lines[-1] == ""
+        if trailing:
+            lines = lines[:-1]
+        tagged = "\n".join(prefix + line for line in lines)
+        return tagged + "\n" if trailing else tagged
 
     def _tp_emit_header(self) -> None:
         if self._tp_header_done:
