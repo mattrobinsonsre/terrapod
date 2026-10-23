@@ -2477,7 +2477,11 @@
       "statusFailed": "Methodd",
       "statusIgnoredFailure": "Methodd, anwybyddwyd",
       "statusUnreachable": "Anghyraeddadwy",
-      "statusNotReached": "Heb ei gyrraedd"
+      "statusNotReached": "Heb ei gyrraedd",
+      "detailReaped": "Mae'r manylion fesul tasg ar gyfer y rhediad hwn wedi'u tynnu yn ôl y polisi cadw arteffactau. Mae'r crynodeb fesul gwesteiwr isod yn cael ei gadw yn y gronfa ddata ac nid yw hyn yn effeithio arno.",
+      "detailUnknown": "Nid oedd modd gwirio'r manylion fesul tasg am na wnaeth y system storio ymateb. Efallai eu bod ar gael o hyd.",
+      "detailDownload": "Lawrlwytho manylion llawn y tasgau",
+      "detailDownloadNote": "Un gwrthrych JSON fesul llinell, yn y drefn yr adroddodd Ansible hwy. Mae angen caniatâd i ddarllen y cyflwr."
     }
   },
   "workspaceDetail": {

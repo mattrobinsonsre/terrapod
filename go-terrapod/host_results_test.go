@@ -176,3 +176,87 @@ func TestHostResultsSurfaceServerErrors(t *testing.T) {
 		t.Error("a 403 must be returned as an error, not an empty list")
 	}
 }
+
+// ── the two artifact readers, and the 410 that is the point of them ──
+
+func TestGetRunHostEventStreamReturnsTheJSONLVerbatim(t *testing.T) {
+	// JSONL is not JSON:API, so the bytes come back untouched rather than
+	// parsed -- a caller streams or scans them line by line.
+	jsonl := `{"kind":"task_start","seq":1}` + "\n" + `{"kind":"ok","host":"web1","seq":2}` + "\n"
+	c, seen := newHostResultsFixture(t, http.StatusOK, jsonl)
+
+	got, err := c.GetRunHostEventStream(context.Background(), "run-abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(got) != jsonl {
+		t.Errorf("stream altered:\n got %q\nwant %q", got, jsonl)
+	}
+	if len(*seen) != 1 || (*seen)[0] != "/api/v1/runs/run-abc/host-events/stream" {
+		t.Errorf("wrong path: %v", *seen)
+	}
+}
+
+func TestGetRunHostEventPayloadsUsesItsOwnPath(t *testing.T) {
+	c, seen := newHostResultsFixture(t, http.StatusOK, `{"ref":1,"payload":{"stdout":"x"}}`)
+
+	if _, err := c.GetRunHostEventPayloads(context.Background(), "run-abc"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(*seen) != 1 || (*seen)[0] != "/api/v1/runs/run-abc/host-events/payloads" {
+		t.Errorf("wrong path: %v", *seen)
+	}
+}
+
+func TestIsDetailReapedSeparates410From404(t *testing.T) {
+	// The property worth a test: both statuses mean "no bytes for you", and a
+	// caller that cannot tell them apart renders a reaped stream as "nothing
+	// happened" while the run's own summary says tasks ran. So this asserts
+	// the pair, not just the 410 -- IsNotFound must stay false for the 410 and
+	// IsDetailReaped false for the 404, or a caller branching on the wrong one
+	// still gets it backwards.
+	for _, tc := range []struct {
+		name         string
+		status       int
+		wantReaped   bool
+		wantNotFound bool
+	}{
+		{"reaped by retention", http.StatusGone, true, false},
+		{"never written", http.StatusNotFound, false, true},
+		{"forbidden at run tier", http.StatusForbidden, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := newHostResultsFixture(t, tc.status, "")
+			_, err := c.GetRunHostEventStream(context.Background(), "run-abc")
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if got := IsDetailReaped(err); got != tc.wantReaped {
+				t.Errorf("IsDetailReaped = %v, want %v (err %v)", got, tc.wantReaped, err)
+			}
+			if got := IsNotFound(err); got != tc.wantNotFound {
+				t.Errorf("IsNotFound = %v, want %v (err %v)", got, tc.wantNotFound, err)
+			}
+		})
+	}
+}
+
+func TestTheArtifactReadersRejectAnEmptyRunID(t *testing.T) {
+	// Shares runPath with the two list readers, so an empty id is refused
+	// before a request is made rather than fetching /api/v1/runs//host-events.
+	c, seen := newHostResultsFixture(t, http.StatusOK, "")
+	for _, call := range []struct {
+		name string
+		fn   func() ([]byte, error)
+	}{
+		{"stream", func() ([]byte, error) { return c.GetRunHostEventStream(context.Background(), "") }},
+		{"payloads", func() ([]byte, error) { return c.GetRunHostEventPayloads(context.Background(), "") }},
+	} {
+		if _, err := call.fn(); err == nil {
+			t.Errorf("%s: expected an error for an empty run id", call.name)
+		}
+	}
+	if len(*seen) != 0 {
+		t.Errorf("no request should have been made, got %v", *seen)
+	}
+}

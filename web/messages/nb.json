@@ -2477,7 +2477,11 @@
       "statusFailed": "Feilet",
       "statusIgnoredFailure": "Feilet, ignorert",
       "statusUnreachable": "Utilgjengelig",
-      "statusNotReached": "Ikke nådd"
+      "statusNotReached": "Ikke nådd",
+      "detailReaped": "Detaljene per oppgave for denne kjøringen er fjernet i henhold til oppbevaringsreglene for artefakter. Sammendraget per vert nedenfor er lagret i databasen og er ikke berørt.",
+      "detailUnknown": "Detaljene per oppgave kunne ikke sjekkes fordi lagringen ikke svarte. De er kanskje fortsatt tilgjengelige.",
+      "detailDownload": "Last ned fullstendige oppgavedetaljer",
+      "detailDownloadNote": "Ett JSON-objekt per linje, i den rekkefølgen Ansible rapporterte dem. Krever tillatelse til å lese tilstanden."
     }
   },
   "workspaceDetail": {

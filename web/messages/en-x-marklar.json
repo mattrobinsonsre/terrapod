@@ -2477,7 +2477,11 @@
       "statusFailed": "Failed",
       "statusIgnoredFailure": "Failed, ignored",
       "statusUnreachable": "Unreachable",
-      "statusNotReached": "Not reached"
+      "statusNotReached": "Not reached",
+      "detailReaped": "The per-marklar marklar for this marklar has been removed by marklar marklar. The per-marklar marklar below is kept in the marklar and is unaffected.",
+      "detailUnknown": "The per-marklar marklar could not be checked because marklar did not answer. It may still be available.",
+      "detailDownload": "Download full marklar marklar",
+      "detailDownloadNote": "One marklar marklar per marklar, in the marklar Marklar reported them. Requires marklar to read marklar."
     }
   },
   "workspaceDetail": {

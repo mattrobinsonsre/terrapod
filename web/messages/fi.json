@@ -2477,7 +2477,11 @@
       "statusFailed": "Epäonnistui",
       "statusIgnoredFailure": "Epäonnistui, jätetty huomiotta",
       "statusUnreachable": "Ei tavoitettavissa",
-      "statusNotReached": "Ei käsitelty"
+      "statusNotReached": "Ei käsitelty",
+      "detailReaped": "Tämän ajon tehtäväkohtaiset tiedot on poistettu artefaktien säilytyskäytännön mukaisesti. Alla oleva isäntäkohtainen yhteenveto säilyy tietokannassa, eikä tämä vaikuta siihen.",
+      "detailUnknown": "Tehtäväkohtaisia tietoja ei voitu tarkistaa, koska tallennuspalvelu ei vastannut. Ne voivat olla vielä saatavilla.",
+      "detailDownload": "Lataa tehtävien täydet tiedot",
+      "detailDownloadNote": "Yksi JSON-objekti riviä kohden, siinä järjestyksessä kuin Ansible ne raportoi. Vaatii oikeuden lukea tilaa."
     }
   },
   "workspaceDetail": {

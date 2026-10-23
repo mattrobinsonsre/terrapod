@@ -968,6 +968,10 @@
     "task-name",
     "task-uuid"
   ],
+  "runs.list_run_host_results:meta": [
+    "detail",
+    "detail.state"
+  ],
   "runs.post_cost_summary_message": [
     "content",
     "translated"

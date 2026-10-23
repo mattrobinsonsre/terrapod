@@ -2477,7 +2477,11 @@
       "statusFailed": "Selhalo",
       "statusIgnoredFailure": "Selhalo, ignorováno",
       "statusUnreachable": "Nedostupný",
-      "statusNotReached": "Nezpracovaný"
+      "statusNotReached": "Nezpracovaný",
+      "detailReaped": "Podrobnosti po úlohách pro tento běh byly odstraněny politikou uchovávání artefaktů. Souhrn po hostitelích níže je uchován v databázi a není tím dotčen.",
+      "detailUnknown": "Podrobnosti po úlohách se nepodařilo zkontrolovat, protože úložiště neodpovědělo. Mohou být stále dostupné.",
+      "detailDownload": "Stáhnout úplné podrobnosti úloh",
+      "detailDownloadNote": "Jeden objekt JSON na řádek, v pořadí, v jakém je ohlásil Ansible. Vyžaduje oprávnění ke čtení stavu."
     }
   },
   "workspaceDetail": {

@@ -2477,7 +2477,11 @@
       "statusFailed": "Mislukt",
       "statusIgnoredFailure": "Mislukt, genegeerd",
       "statusUnreachable": "Onbereikbaar",
-      "statusNotReached": "Niet bereikt"
+      "statusNotReached": "Niet bereikt",
+      "detailReaped": "De details per taak voor deze uitvoering zijn verwijderd volgens het bewaarbeleid voor artefacten. De samenvatting per host hieronder staat in de database en is hier niet door geraakt.",
+      "detailUnknown": "De details per taak konden niet worden gecontroleerd omdat de opslag niet antwoordde. Mogelijk zijn ze nog beschikbaar.",
+      "detailDownload": "Volledige taakdetails downloaden",
+      "detailDownloadNote": "Eén JSON-object per regel, in de volgorde waarin Ansible ze heeft gerapporteerd. Vereist het recht om de state te lezen."
     }
   },
   "workspaceDetail": {

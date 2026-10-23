@@ -2477,7 +2477,11 @@
       "statusFailed": "Foundered",
       "statusIgnoredFailure": "Foundered, but pardoned",
       "statusUnreachable": "Beyond hail",
-      "statusNotReached": "Never hailed"
+      "statusNotReached": "Never hailed",
+      "detailReaped": "Th'' per-task tale fer this voyage were cast overboard by artifact retention. Th'' per-hand reckonin'' below be stowed safe in th'' database an'' untouched.",
+      "detailUnknown": "Th'' per-task tale could not be checked, fer th'' hold gave no answer. It may yet be aboard.",
+      "detailDownload": "Haul down th'' whole task tale",
+      "detailDownloadNote": "One JSON chest per line, in th'' order Ansible called them out. Ye be needin'' leave to read th'' state."
     }
   },
   "workspaceDetail": {

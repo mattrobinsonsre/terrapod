@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 )
@@ -190,4 +191,66 @@ func (c *Client) ListRunHostEvents(ctx context.Context, runID, host string) ([]*
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+// GetRunHostEventStream returns the run's complete per-task event stream as
+// JSONL -- one JSON object per line, in the order ansible reported them.
+//
+// # This is state-grade, and the server gates it accordingly
+//
+// The stream carries each module's whole return value for every event, `ok`
+// ones included: a command's full stdout, a uri task's response body, whatever
+// a lookup resolved. So the server requires `state:read` here, where
+// ListRunHostResults and ListRunHostEvents need only `run:read` -- those serve
+// the counters and ansible's own failure text truncated, which is the configure
+// equivalent of a plan log. A caller holding run-tier access gets 403 from this
+// one and should fall back to those two.
+//
+// # A 410 is not a 404, and the difference is the whole reason to check
+//
+// The stream lives in object storage under artifact retention, so it is deleted
+// while the per-host summary rows remain in the database. The server answers
+// 410 for that and 404 when the run reported no hosts at all. Use
+// IsDetailReaped to tell them apart: presenting a reaped stream as "nothing
+// happened" is the specific failure the status exists to prevent, because the
+// run's own summary is still sitting beside it saying tasks ran.
+func (c *Client) GetRunHostEventStream(ctx context.Context, runID string) ([]byte, error) {
+	base, err := runPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	return c.Get(ctx, base+"/host-events/stream")
+}
+
+// GetRunHostEventPayloads returns the sidecar holding payloads too large to
+// inline in the stream, as JSONL of {"ref": N, "payload": {...}}.
+//
+// An event in the main stream carries `payload_ref` instead of `payload` when
+// its payload exceeded the inline bound; that integer is the `ref` here. One
+// sidecar per run rather than an object per payload, so retention deletes a
+// fixed key rather than enumerating a prefix.
+//
+// Same `state:read` gate as GetRunHostEventStream, more so: a payload reaches
+// this file precisely by being the largest output the run produced. 404 means
+// nothing spilled, which is the ordinary case and not a retention event --
+// IsDetailReaped separates that from a sidecar that has been reaped.
+func (c *Client) GetRunHostEventPayloads(ctx context.Context, runID string) ([]byte, error) {
+	base, err := runPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	return c.Get(ctx, base+"/host-events/payloads")
+}
+
+// IsDetailReaped returns true if err is the server saying an artifact existed
+// and has been removed by retention (HTTP 410), rather than never having
+// existed (404, IsNotFound).
+//
+// Kept beside the two readers above rather than in errors.go with IsNotFound
+// and friends, because 410 is not a general shape in this API: these are the
+// only endpoints that distinguish deleted from absent, and they do it because
+// their siblings keep serving the summary after the detail is gone.
+func IsDetailReaped(err error) bool {
+	var ae *APIError
+	return errors.As(err, &ae) && ae.StatusCode == http.StatusGone
 }

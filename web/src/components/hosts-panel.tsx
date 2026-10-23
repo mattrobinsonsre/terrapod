@@ -65,6 +65,10 @@ export function HostsPanel({ runId }: { runId: string }) {
   const [events, setEvents] = useState<HostEventAttrs[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // What `meta.detail.state` said. The panel must not render a complete-looking
+  // summary over detail that retention has deleted (#1928), and it cannot tell
+  // from the rows -- they outlive the artifact.
+  const [detail, setDetail] = useState("");
 
   // The fetch lives INSIDE the effect, with a cancellation flag, rather than in
   // a `useCallback` the effect calls. Two reasons: `react-hooks/
@@ -86,6 +90,7 @@ export function HostsPanel({ runId }: { runId: string }) {
         }
         const results = await resultsRes.json();
         if (cancelled) return;
+        setDetail(results.meta?.detail?.state ?? "");
         setHosts(
           (results.data || []).map(
             (d: { attributes: HostResultAttrs }) => d.attributes,
@@ -125,6 +130,37 @@ export function HostsPanel({ runId }: { runId: string }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-400">{t("reachabilityNote")}</p>
+
+      {/* The per-task detail, and whether it is still there. `reaped` is the
+          case the acceptance names: without this the panel looks complete over
+          a stream retention has deleted. `unknown` is NOT folded into it --
+          "we could not check" and "it is gone" are different claims. */}
+      {detail === "reaped" && (
+        <p className="rounded-lg bg-amber-900/30 px-3 py-2 text-xs text-amber-200">
+          {t("detailReaped")}
+        </p>
+      )}
+      {detail === "unknown" && (
+        <p className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-300">
+          {t("detailUnknown")}
+        </p>
+      )}
+      {detail === "available" && (
+        <p className="text-xs text-slate-400">
+          {/* A plain download rather than a fetch-and-render: the stream is
+              unbounded (one event per task per host, payloads inline) and
+              "sluggish is acceptable; absent is not". An anchor also follows
+              the 302 to storage as a navigation, which a cross-origin `fetch`
+              could not do without CORS on the bucket. */}
+          <a
+            className="rounded-lg bg-slate-700 px-3 py-1.5 font-medium text-slate-100 hover:bg-slate-600"
+            href={`/api/v1/runs/${runId}/host-events/stream`}
+          >
+            {t("detailDownload")}
+          </a>{" "}
+          <span className="ml-1">{t("detailDownloadNote")}</span>
+        </p>
+      )}
 
       {/* Desktop table. Both renders are in the DOM at every width, so an e2e
           locator needs `.filter({ visible: true })`. */}

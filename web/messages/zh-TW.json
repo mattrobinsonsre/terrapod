@@ -2477,7 +2477,11 @@
       "statusFailed": "失敗",
       "statusIgnoredFailure": "失敗，已忽略",
       "statusUnreachable": "無法連線",
-      "statusNotReached": "未觸及"
+      "statusNotReached": "未觸及",
+      "detailReaped": "此次執行的各任務詳細資訊已被工件保留策略刪除。下方的各主機彙總保存在資料庫中，不受影響。",
+      "detailUnknown": "由於儲存未回應，無法檢查各任務詳細資訊。它可能仍然可用。",
+      "detailDownload": "下載完整任務詳細資訊",
+      "detailDownloadNote": "每行一個 JSON 物件，按 Ansible 回報它們的順序排列。需要讀取狀態的權限。"
     }
   },
   "workspaceDetail": {

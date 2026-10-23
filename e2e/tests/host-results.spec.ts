@@ -124,7 +124,7 @@ const HOST_EVENTS = {
 
 async function stubRun(
   page: import('@playwright/test').Page,
-  { hosts }: { hosts: boolean },
+  { hosts, detail = 'available' }: { hosts: boolean; detail?: string },
 ) {
   await page.route(`**/api/*/runs/${RUN_ID}`, async (route) => {
     await route.fulfill({
@@ -160,7 +160,10 @@ async function stubRun(
       contentType: 'application/vnd.api+json',
       body: JSON.stringify(
         hosts
-          ? HOST_RESULTS
+          ? {
+              ...HOST_RESULTS,
+              meta: { ...HOST_RESULTS.meta, detail: { state: detail } },
+            }
           : {
               data: [],
               meta: {
@@ -232,6 +235,50 @@ test.describe('per-host results', () => {
     await expect(
       page.getByText('non-zero return code').filter({ visible: true }).first(),
     ).toBeVisible()
+  })
+
+  test('detail removed by retention says so rather than looking complete', async ({
+    page,
+  }) => {
+    // #1928's acceptance: "where retention has expired the detail, the UI SAYS
+    // SO rather than rendering an empty panel". The summary rows outlive the
+    // JSONL artifact, so without this the panel reads as the whole story.
+    await stubRun(page, { hosts: true, detail: 'reaped' })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=hosts`)
+
+    await expect(
+      page.getByText(/removed by artifact retention/i).filter({ visible: true }),
+    ).toBeVisible()
+    // and the summary is still there -- the message explains the detail, it
+    // does not replace the panel
+    await expect(
+      page.getByText('web1', { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible()
+    // no download offered for bytes that are gone
+    await expect(
+      page.getByRole('link', { name: /download full task detail/i }),
+    ).toHaveCount(0)
+  })
+
+  test('detail still present is reachable, not merely summarised', async ({
+    page,
+  }) => {
+    // The other half of the same clause: "Everything is reachable from the UI.
+    // Sluggish is acceptable; absent is not."
+    await stubRun(page, { hosts: true, detail: 'available' })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=hosts`)
+
+    const link = page
+      .getByRole('link', { name: /download full task detail/i })
+      .filter({ visible: true })
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute(
+      'href',
+      `/api/v1/runs/${RUN_ID}/host-events/stream`,
+    )
+    await expect(
+      page.getByText(/removed by artifact retention/i),
+    ).toHaveCount(0)
   })
 
   test('a run with no hosts has no Hosts tab at all', async ({ page }) => {

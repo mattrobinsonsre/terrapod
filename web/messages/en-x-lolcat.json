@@ -2477,7 +2477,11 @@
       "statusFailed": "Faild",
       "statusIgnoredFailure": "Faild, but ignord",
       "statusUnreachable": "No can reech",
-      "statusNotReached": "Nevr reachd"
+      "statusNotReached": "Nevr reachd",
+      "detailReaped": "Teh per-task detailz fer dis run got yeeted by artifakt retenshun. Teh per-host summry down ther stil livez in teh databaze an iz totes fien.",
+      "detailUnknown": "Culd not check teh per-task detailz coz teh storaj no ansur. Mebbe it stil ther tho.",
+      "detailDownload": "Downlode all teh task detailz",
+      "detailDownloadNote": "Wun JSON thingy per lien, in teh ordr Ansibul sed dem. U needz permishun 2 reed state, srsly."
     }
   },
   "workspaceDetail": {

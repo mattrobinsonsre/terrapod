@@ -2477,7 +2477,11 @@
       "statusFailed": "Başarısız",
       "statusIgnoredFailure": "Başarısız, yoksayıldı",
       "statusUnreachable": "Erişilemiyor",
-      "statusNotReached": "İşlenmedi"
+      "statusNotReached": "İşlenmedi",
+      "detailReaped": "Bu çalıştırmanın görev başına ayrıntıları, yapıt saklama politikası tarafından kaldırıldı. Aşağıdaki ana makine başına özet veritabanında tutulur ve bundan etkilenmez.",
+      "detailUnknown": "Görev başına ayrıntılar denetlenemedi, çünkü depolama yanıt vermedi. Hâlâ mevcut olabilir.",
+      "detailDownload": "Tüm görev ayrıntılarını indir",
+      "detailDownloadNote": "Her satırda bir JSON nesnesi, Ansible''ın bildirdiği sırayla. Durum okuma izni gerektirir."
     }
   },
   "workspaceDetail": {

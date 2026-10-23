@@ -2477,7 +2477,11 @@
       "statusFailed": "失败",
       "statusIgnoredFailure": "失败，已忽略",
       "statusUnreachable": "不可访问",
-      "statusNotReached": "未触及"
+      "statusNotReached": "未触及",
+      "detailReaped": "此次运行的各任务详细信息已被工件保留策略删除。下方的按主机汇总保存在数据库中，不受影响。",
+      "detailUnknown": "由于存储未响应，无法检查各任务详细信息。它可能仍然可用。",
+      "detailDownload": "下载完整任务详细信息",
+      "detailDownloadNote": "每行一个 JSON 对象，按 Ansible 报告它们的顺序排列。需要读取状态的权限。"
     }
   },
   "workspaceDetail": {

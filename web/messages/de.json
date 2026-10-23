@@ -2477,7 +2477,11 @@
       "statusFailed": "Fehlgeschlagen",
       "statusIgnoredFailure": "Fehlgeschlagen, ignoriert",
       "statusUnreachable": "Nicht erreichbar",
-      "statusNotReached": "Nicht erreicht"
+      "statusNotReached": "Nicht erreicht",
+      "detailReaped": "Die Detailansicht pro Task wurde für diesen Lauf durch die Artefakt-Aufbewahrung entfernt. Die Zusammenfassung pro Host unten bleibt in der Datenbank und ist davon nicht betroffen.",
+      "detailUnknown": "Die Detailansicht pro Task konnte nicht geprüft werden, da der Speicher nicht geantwortet hat. Sie ist möglicherweise noch verfügbar.",
+      "detailDownload": "Vollständige Task-Details herunterladen",
+      "detailDownloadNote": "Ein JSON-Objekt pro Zeile, in der Reihenfolge, in der Ansible sie gemeldet hat. Erfordert die Berechtigung zum Lesen des Zustands."
     }
   },
   "workspaceDetail": {

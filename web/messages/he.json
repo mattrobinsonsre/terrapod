@@ -2477,7 +2477,11 @@
       "statusFailed": "נכשל",
       "statusIgnoredFailure": "נכשל, התעלמו",
       "statusUnreachable": "בלתי נגיש",
-      "statusNotReached": "לא הגיעו אליו"
+      "statusNotReached": "לא הגיעו אליו",
+      "detailReaped": "הפירוט לכל משימה עבור הרצה זו הוסר על ידי מדיניות שמירת הארטיפקטים. הסיכום לכל מארח שלמטה נשמר במסד הנתונים ואינו מושפע.",
+      "detailUnknown": "לא ניתן היה לבדוק את הפירוט לכל משימה מכיוון שהאחסון לא השיב. ייתכן שהוא עדיין זמין.",
+      "detailDownload": "הורד את פירוט המשימות המלא",
+      "detailDownloadNote": "אובייקט JSON אחד בכל שורה, בסדר שבו Ansible דיווחה עליהן. נדרשת הרשאה לקרוא מצב."
     }
   },
   "workspaceDetail": {

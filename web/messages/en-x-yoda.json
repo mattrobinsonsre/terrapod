@@ -2477,7 +2477,11 @@
       "statusFailed": "Failed, it has",
       "statusIgnoredFailure": "Failed, but ignored it was",
       "statusUnreachable": "Reachable, it is not",
-      "statusNotReached": "Reached, it was not"
+      "statusNotReached": "Reached, it was not",
+      "detailReaped": "Removed by artifact retention, the per-task detail for this run has been. Kept in the database, the per-host summary below is — unaffected, it remains.",
+      "detailUnknown": "Checked, the per-task detail could not be — answer, storage did not. Available still, it may be.",
+      "detailDownload": "Full task detail, download",
+      "detailDownloadNote": "Per line, one JSON object — in the order Ansible reported them, they come. Permission to read state, it requires."
     }
   },
   "workspaceDetail": {

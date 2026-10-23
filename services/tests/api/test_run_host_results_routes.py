@@ -227,6 +227,267 @@ class TestTheHostEventsRead:
 @patch("terrapod.api.app.init_redis")
 @patch("terrapod.api.app.init_db")
 @pytest.mark.asyncio
+class TestTheEventStreamSeparatesReapedFromNeverWritten:
+    """#1928: "where retention has expired the detail, the UI SAYS SO".
+
+    Three cases, and the middle one is the whole point. Both absent cases
+    present identically at the storage layer -- a missing object -- so a test
+    that instantiates only one of them passes whichever status the route
+    happens to return, which is the recorded trap: when the property is a
+    RELATIONSHIP between two states, the test must instantiate both.
+    """
+
+    @staticmethod
+    def _storage(*, present: bool):
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=present)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/y"))
+        return storage
+
+    @pytest.mark.parametrize("suffix", ["stream", "payloads"])
+    async def test_present_redirects(self, _db, _redis, _storage_p, suffix):
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.api.routers.runs._require_run_ws_capability",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.api.routers.runs.get_storage",
+                return_value=self._storage(present=True),
+            ),
+        ):
+            resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/{suffix}")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "https://x/y"
+
+    async def test_reaped_is_410_and_says_retention_removed_it(self, _db, _redis, _storage_p):
+        """The acceptance clause. A 404 here reads as "nothing happened"."""
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.api.routers.runs._require_run_ws_capability",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.api.routers.runs.get_storage",
+                return_value=self._storage(present=False),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_results",
+                AsyncMock(return_value=[_result("web1")]),
+            ),
+        ):
+            resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/stream")
+        assert resp.status_code == 410
+        assert "retention" in resp.json()["detail"]
+
+    async def test_never_written_is_404_not_410(self, _db, _redis, _storage_p):
+        """No recap rows means no stream was ever stored, so nothing was lost."""
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.api.routers.runs._require_run_ws_capability",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.api.routers.runs.get_storage",
+                return_value=self._storage(present=False),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_results",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/stream")
+        assert resp.status_code == 404
+        assert "retention" not in resp.json()["detail"]
+
+    async def test_the_payloads_sidecar_derives_from_a_payload_ref(self, _db, _redis, _storage_p):
+        """A run that reported hosts but spilled nothing LOST nothing.
+
+        The sidecar and the stream are reaped together and written
+        independently, so reading the sidecar's existence off the stream's
+        would report a retention event for a run that never spilled.
+        """
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.api.routers.runs._require_run_ws_capability",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.api.routers.runs.get_storage",
+                return_value=self._storage(present=False),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_results",
+                AsyncMock(return_value=[_result("web1")]),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_events",
+                AsyncMock(return_value=[RunHostEvent(host="web1", payload_ref=None)]),
+            ),
+        ):
+            resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/payloads")
+        assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+class TestTheSummaryReadReportsWhetherTheDetailSurvives:
+    """`meta.detail.state`, which is what lets the UI "say so" (#1928).
+
+    Driven at `_detail_state` rather than through the route, because the four
+    states are a property of that function and the route only forwards it --
+    and one of the four (`unknown`) cannot be produced through the route
+    without making a storage backend raise.
+    """
+
+    @staticmethod
+    async def _state(*, reported: bool, exists=None, raises=False):
+        from terrapod.api.routers import runs as mod
+
+        run = _run(uuid.uuid4())
+        storage = MagicMock()
+        storage.exists = AsyncMock(
+            side_effect=RuntimeError("backend down") if raises else None,
+            return_value=exists,
+        )
+        with patch.object(mod, "get_storage", return_value=storage):
+            return await mod._detail_state(run, reported)
+
+    async def test_no_host_reported_is_none_without_touching_storage(self):
+        from terrapod.api.routers import runs as mod
+
+        run = _run(uuid.uuid4())
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        with patch.object(mod, "get_storage", return_value=storage):
+            assert await mod._detail_state(run, False) == "none"
+        storage.exists.assert_not_awaited()
+
+    async def test_object_present_is_available(self):
+        assert await self._state(reported=True, exists=True) == "available"
+
+    async def test_object_absent_with_rows_is_reaped(self):
+        """The acceptance case: the summary outlives the artifact."""
+        assert await self._state(reported=True, exists=False) == "reaped"
+
+    async def test_a_broken_backend_is_unknown_never_none(self):
+        """`none` is a claim; `unknown` is the honest answer.
+
+        Mutation target: collapsing this to `none` makes the panel tell an
+        operator the run has no per-task detail when the truth is that nobody
+        could ask. That is the recorded failure of reporting an absent signal
+        as a passing one, in a message a human reads.
+        """
+        assert await self._state(reported=True, raises=True) == "unknown"
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+@pytest.mark.asyncio
+class TestTheStreamIsStateGradeNotRunGrade:
+    """The tier is the security property, and it is not visible behaviourally.
+
+    The callback writes `result._result` verbatim for every event including
+    `ok`, so the object carries each module's whole return value. Serving that
+    at `run:read` is GHSA-gwwq-5v7q-h3f4 exactly -- a full resolved document one
+    tier below raw state. Both routes are asserted, because the sidecar holds
+    the LARGEST payloads the run produced.
+    """
+
+    @pytest.mark.parametrize("suffix", ["stream", "payloads"])
+    async def test_the_artifact_routes_demand_state_read(self, _db, _redis, _storage_p, suffix):
+        from terrapod.auth import capabilities as cap
+
+        seen = []
+
+        async def _record(run, capability, user, db, request=None):
+            seen.append(capability)
+
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=False)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch("terrapod.api.routers.runs._require_run_ws_capability", _record),
+            patch("terrapod.api.routers.runs.get_storage", return_value=storage),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_results",
+                AsyncMock(return_value=[]),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_events",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            await _get(app, f"/api/v1/runs/run-{run.id}/host-events/{suffix}")
+
+        assert seen == [cap.STATE_READ], (
+            f"the {suffix} artifact must be gated on state:read, not {seen}"
+        )
+
+    @pytest.mark.parametrize("suffix", ["host-results", "host-events"])
+    async def test_the_summary_routes_stay_at_run_read(self, _db, _redis, _storage_p, suffix):
+        """The other direction, so the fix for the above cannot over-correct.
+
+        Raising these to `state:read` would withhold a configure's outcome from
+        the read tier that is meant to see it -- the counters, and a failure
+        message that is ansible's own text truncated, which is the configure
+        equivalent of a plan log.
+        """
+        from terrapod.auth import capabilities as cap
+
+        seen = []
+
+        async def _record(run, capability, user, db, request=None):
+            seen.append(capability)
+
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch("terrapod.api.routers.runs._require_run_ws_capability", _record),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_results",
+                AsyncMock(return_value=[]),
+            ),
+            patch(
+                "terrapod.api.routers.runs.host_results_service.list_events",
+                AsyncMock(return_value=[]),
+            ),
+            patch("terrapod.api.routers.runs.get_storage", return_value=MagicMock()),
+            patch(
+                "terrapod.api.routers.runs._targeted_hosts",
+                AsyncMock(return_value=set()),
+            ),
+        ):
+            await _get(app, f"/api/v1/runs/run-{run.id}/{suffix}")
+
+        assert seen == [cap.RUN_READ], f"{suffix} must stay at run:read, not {seen}"
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+@pytest.mark.asyncio
 class TestBothReadsRequireReadOnTheWorkspace:
     @pytest.mark.parametrize("suffix", ["host-results", "host-events"])
     async def test_the_capability_is_checked(self, _db, _redis, _storage, suffix):

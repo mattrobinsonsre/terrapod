@@ -1604,6 +1604,7 @@ func GetStringListMapAttr(r *Resource, key string) map[string][]string
 func GetStringPtrAttr(r *Resource, key string) *string
 func IsAuth(err error) bool
 func IsConflict(err error) bool
+func IsDetailReaped(err error) bool
 func IsNotFound(err error) bool
 func IsValidation(err error) bool
 func MarshalResource(resourceType string, attributes map[string]any, relationships map[string]any) ([]byte, error)
@@ -1756,6 +1757,8 @@ method (*Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPol
 method (*Client) GetRunComplianceReport(ctx context.Context, runID string) (*RunComplianceReport, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
+method (*Client) GetRunHostEventPayloads(ctx context.Context, runID string) ([]byte, error)
+method (*Client) GetRunHostEventStream(ctx context.Context, runID string) ([]byte, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
 method (*Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error)
 method (*Client) GetRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)

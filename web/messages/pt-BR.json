@@ -2477,7 +2477,11 @@
       "statusFailed": "Falhou",
       "statusIgnoredFailure": "Falha tolerada",
       "statusUnreachable": "Inacessível",
-      "statusNotReached": "Não alcançado"
+      "statusNotReached": "Não alcançado",
+      "detailReaped": "O detalhe por tarefa desta execução foi removido pela retenção de artefatos. O resumo por host abaixo é mantido no banco de dados e não é afetado.",
+      "detailUnknown": "Não foi possível verificar o detalhe por tarefa porque o armazenamento não respondeu. Ele ainda pode estar disponível.",
+      "detailDownload": "Baixar o detalhe completo das tarefas",
+      "detailDownloadNote": "Um objeto JSON por linha, na ordem em que o Ansible as relatou. Requer permissão para ler o estado."
     }
   },
   "workspaceDetail": {

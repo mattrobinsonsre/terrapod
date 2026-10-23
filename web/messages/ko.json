@@ -2477,7 +2477,11 @@
       "statusFailed": "실패",
       "statusIgnoredFailure": "실패, 무시됨",
       "statusUnreachable": "연결 불가",
-      "statusNotReached": "도달하지 않음"
+      "statusNotReached": "도달하지 않음",
+      "detailReaped": "이 실행의 작업별 상세 내역은 아티팩트 보관 기간에 따라 삭제되었습니다. 아래의 호스트별 요약은 데이터베이스에 보관되어 있으며 영향을 받지 않습니다.",
+      "detailUnknown": "스토리지가 응답하지 않아 작업별 상세 내역을 확인할 수 없었습니다. 아직 이용할 수 있을 수도 있습니다.",
+      "detailDownload": "전체 작업 상세 내역 다운로드",
+      "detailDownloadNote": "한 줄에 JSON 객체 하나씩, Ansible이 보고한 순서대로 들어 있습니다. 상태를 읽을 권한이 필요합니다."
     }
   },
   "workspaceDetail": {

@@ -797,7 +797,12 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			"that needs no connection, such as a controller-side debug — so do not present a host's status as a " +
 			"health check. Only failures and unreachables are returned as events; everything else Ansible reported " +
 			"is in the run's event-stream artifact, so an empty failure_events means nothing failed rather than " +
-			"nothing happened.",
+			"nothing happened. That artifact is NOT returned here: it carries every module's whole return value " +
+			"and is gated a tier higher (state:read), so read it over HTTP at " +
+			"GET /api/v1/runs/{id}/host-events/stream if you hold that permission. It also lives under artifact " +
+			"retention, so for an older run it may be gone while these summary rows remain — a 410 there means " +
+			"retention deleted it, NOT that the run did nothing, and the two must not be conflated when you " +
+			"report what a run did.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runHostResultsIn) (*mcp.CallToolResult, *runHostResultsOut, error) {
 		if in.RunID == "" {

@@ -2477,7 +2477,11 @@
       "statusFailed": "失敗",
       "statusIgnoredFailure": "失敗（無視）",
       "statusUnreachable": "到達不能",
-      "statusNotReached": "未到達"
+      "statusNotReached": "未到達",
+      "detailReaped": "この実行のタスク別の詳細は、アーティファクトの保持期間により削除されました。以下のホスト別の集計はデータベースに保持されており、影響を受けません。",
+      "detailUnknown": "ストレージが応答しなかったため、タスク別の詳細を確認できませんでした。まだ利用できる可能性があります。",
+      "detailDownload": "タスクの詳細全体をダウンロード",
+      "detailDownloadNote": "1 行に 1 つの JSON オブジェクトで、Ansible が報告した順に並んでいます。状態の読み取り権限が必要です。"
     }
   },
   "workspaceDetail": {

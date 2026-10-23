@@ -2477,7 +2477,11 @@
       "statusFailed": "Échec",
       "statusIgnoredFailure": "Échec toléré",
       "statusUnreachable": "Injoignable",
-      "statusNotReached": "Non atteint"
+      "statusNotReached": "Non atteint",
+      "detailReaped": "Le détail par tâche de cette exécution a été supprimé par la rétention des artefacts. Le résumé par hôte ci-dessous est conservé dans la base de données et n'est pas affecté.",
+      "detailUnknown": "Le détail par tâche n'a pas pu être vérifié car le stockage n'a pas répondu. Il est peut-être encore disponible.",
+      "detailDownload": "Télécharger le détail complet des tâches",
+      "detailDownloadNote": "Un objet JSON par ligne, dans l'ordre où Ansible les a signalées. Nécessite l'autorisation de lire l'état."
     }
   },
   "workspaceDetail": {

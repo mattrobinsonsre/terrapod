@@ -2477,7 +2477,11 @@
       "statusFailed": "F41l3d",
       "statusIgnoredFailure": "F41l3d, 1gn0r3d",
       "statusUnreachable": "Unr34ch4bl3",
-      "statusNotReached": "N07 r34ch3d"
+      "statusNotReached": "N07 r34ch3d",
+      "detailReaped": "7h3 p3r-745k d3741l f0r 7h15 run h45 b33n r3m0v3d by 4r71f4c7 r373n710n. 7h3 p3r-h057 5umm4ry b3l0w 15 k3p7 1n 7h3 d474b453 4nd 15 un4ff3c73d.",
+      "detailUnknown": "7h3 p3r-745k d3741l c0uld n07 b3 ch3ck3d b3c4u53 570r4g3 d1d n07 4n5w3r. 17 m4y 571ll b3 4v41l4bl3.",
+      "detailDownload": "D0wnl04d full 745k d3741l",
+      "detailDownloadNote": "0n3 J50N 0bj3c7 p3r l1n3, 1n 7h3 0rd3r 4n51bl3 r3p0r73d 7h3m. R3qu1r35 p3rm15510n 70 r34d 57473."
     }
   },
   "workspaceDetail": {
