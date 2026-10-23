@@ -146,19 +146,43 @@ class TestTheSidecarShape:
         """
         assert "shareProcessNamespace" not in _pod(ee_image=EE)
 
-    def test_the_ee_pins_no_uid(self):
-        """The contract is "a uid able to read the shared volume", which fsGroup
-        satisfies for ANY uid -- so pinning 1000 would buy nothing and would
-        break an operator image whose files belong to another user.
+    def test_the_ee_pins_the_shared_uid(self):
+        """Pinned as of #1928, and this test is the inverse of what it was.
 
-        `runAsNonRoot` stays, because that much we do require: an image whose
-        USER is root fails to start with kubelet saying so, which is a legible
-        refusal rather than a silent privilege.
+        It asserted that NO `runAsUser` was set, on the contract "a uid able to
+        read the shared volume", which `fsGroup` satisfied for any uid. The cost
+        was that every file the two containers exchange had to be
+        GROUP-READABLE, because the uids could differ -- the credential files
+        among them, holding SSH private keys and vault passphrases.
+
+        Pinning makes those `0600`. It NARROWS the contract, which is a breaking
+        change for an operator EE that cannot run as 1000, and is recorded as one
+        in `docs/upgrading-to-2.0.md`; the agent refuses such an image at the
+        startup probe rather than letting it meet an unreadable file mid-play.
+
+        Inverted rather than deleted: the decision is the thing worth pinning,
+        and whichever way it goes a test should fail if it changes silently.
+        `runAsNonRoot` stays -- redundant now, kept as the independent statement
+        it always was.
         """
         sec = _init(_pod(ee_image=EE), "ee")["securityContext"]
-        assert "runAsUser" not in sec and "runAsGroup" not in sec
+        assert sec["runAsUser"] == 1000
+        assert sec["runAsGroup"] == 1000
         assert sec["runAsNonRoot"] is True
         assert sec["readOnlyRootFilesystem"] is True
+
+    def test_the_pinned_uid_is_the_fsgroup(self):
+        """One number, not two that happen to agree.
+
+        The uid has to be the volume's group owner or the pinning buys nothing:
+        a sidecar pinned to a uid outside the `fsGroup` could not read the shared
+        volume at all, which is a worse failure than the group-readable files the
+        pinning removes.
+        """
+        pod = _pod(ee_image=EE)
+        assert (
+            _init(pod, "ee")["securityContext"]["runAsUser"] == (pod["securityContext"]["fsGroup"])
+        )
 
 
 class TestTheVolumeContract:

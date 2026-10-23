@@ -226,11 +226,37 @@ func TestContractNamesEveryBinaryItRequires(t *testing.T) {
 	// An empty PATH, so everything is missing and the message must list it all —
 	// an operator fixing a custom EE needs the whole set, not the first failure.
 	t.Setenv("PATH", t.TempDir())
-	reason := checkContract()
+	reason := checkContractAs(requiredUID)
 	for _, bin := range contractBinaries {
 		if !strings.Contains(reason, bin) {
 			t.Errorf("the contract failure does not mention %q: %s", bin, reason)
 		}
+	}
+}
+
+func TestContractRefusesAWrongUID(t *testing.T) {
+	// The narrowing #1928 introduced. An operator image that cannot run as this
+	// uid must fail at the PROBE, naming the uid -- not part way through a
+	// playbook on a file it cannot read.
+	reason := checkContractAs(requiredUID + 1)
+	if reason == "" {
+		t.Fatal("a wrong uid must be refused")
+	}
+	for _, want := range []string{"uid", "shared volume"} {
+		if !strings.Contains(reason, want) {
+			t.Errorf("the refusal should mention %q, got: %s", want, reason)
+		}
+	}
+}
+
+func TestContractChecksTheUIDBeforeAnythingElse(t *testing.T) {
+	// Deliberately: the binaries are unknowable from the wrong uid anyway, and a
+	// refusal naming four missing binaries when the real problem is the user
+	// sends the operator looking in the wrong place.
+	t.Setenv("PATH", t.TempDir())
+	reason := checkContractAs(requiredUID + 1)
+	if strings.Contains(reason, "ansible-playbook") {
+		t.Errorf("the uid should be reported, not the binaries it implies: %s", reason)
 	}
 }
 
@@ -242,7 +268,7 @@ func TestContractPassesWhenEverythingIsPresent(t *testing.T) {
 		}
 	}
 	t.Setenv("PATH", dir)
-	if reason := checkContract(); reason != "" {
+	if reason := checkContractAs(requiredUID); reason != "" {
 		t.Fatalf("a conforming environment was reported as broken: %s", reason)
 	}
 }
@@ -258,7 +284,7 @@ func TestContractCatchesAnsibleThatWillNotRun(t *testing.T) {
 	_ = os.WriteFile(dir+"/ansible",
 		[]byte("#!/bin/sh\necho 'Invalid settings supplied for DEFAULT_LOCAL_TMP' >&2\nexit 1\n"), 0o755)
 	t.Setenv("PATH", dir)
-	reason := checkContract()
+	reason := checkContractAs(requiredUID)
 	if reason == "" {
 		t.Fatal("an EE where ansible cannot run was reported as conforming")
 	}

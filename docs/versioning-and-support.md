@@ -149,10 +149,16 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   and an EE never needs rebuilding for a Terrapod release. What an EE must satisfy
   is not a protocol but a short fixed contract: `ansible-playbook`,
   `ansible-galaxy`, `ansible`, `ssh` and `git` on `PATH`, `ansible` runnable as the
-  uid the image runs as, and a uid that can read the shared volume. It is asserted
+  uid the image runs as, and **the ability to run as uid 1000**. It is asserted
   at the EE's startup probe, for operator-supplied images as much as for Terrapod's
   own, so a non-conforming image fails at startup naming what is absent rather
   than part way through a playbook.
+
+  **The uid requirement is new in 2.0 and narrower than what 1.x asked** (1.x
+  required only "a uid that can read the shared volume", which `fsGroup`
+  satisfied for any uid). It exists so the orchestrator and the EE can exchange
+  files on the shared volume at `0600` rather than group-readable. See
+  [upgrading-to-2.0.md](upgrading-to-2.0.md).
 
   **Widening that contract is a breaking change for operator-supplied images**, and
   is treated as one: an image built against today's contract must keep working, so

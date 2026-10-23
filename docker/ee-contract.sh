@@ -34,10 +34,17 @@ done
 #    how an sdist-only ansible-core installed without `wheel` presents.
 ansible --version >/dev/null 2>&1 || fail "ansible is on PATH but will not run"
 
-# 3. Non-root, and numeric, so the Job's fsGroup can be reasoned about without
-#    resolving a name inside the image.
+# 3. Exactly uid 1000, which the Job pins with `runAsUser` (#1928). Our own
+#    images must satisfy whatever the agent REQUIRES, or one of them passes its
+#    build and then fails its own startup probe -- and the agent refuses any
+#    other uid, because the orchestrator and the EE exchange files on the shared
+#    volume at 0600 and that only works while the two uids agree.
+#
+#    It was "non-root, and numeric" while the uid was unpinned and `fsGroup`
+#    carried the access through the group. Narrowed with the contract.
 uid="$(id -u)"
-[ "$uid" != "0" ] || fail "the image runs as root; it must run as a non-root uid"
+[ "$uid" != "0" ] || fail "the image runs as root; it must run as uid 1000"
+[ "$uid" = "1000" ] || fail "the image runs as uid $uid; an EE must run as uid 1000"
 
 # 4. A real playbook with a REAL module. `ansible.builtin.debug` is a
 #    controller-side action plugin that opens no connection and would pass while

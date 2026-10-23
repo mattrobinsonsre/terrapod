@@ -915,6 +915,46 @@ SDKs and a collection's own Python dependencies. What was removed is the
 ansible-specific layer on top of it: the API no longer fetches an ansible at run
 time, so an inventory read can no longer fail because an index was unreachable.
 
+### An execution environment must run as uid 1000
+
+**Who this affects: deployments that set `api.config.ansible.execution_environments`** — the
+label→URI map naming your own EE images. Terrapod's own published EE images already run as
+uid 1000 and need nothing.
+
+1.x asked an EE for "a uid able to read the shared volume", and satisfied it with an
+`fsGroup`: the sidecar's `runAsUser` was deliberately left unset so an image running as any
+non-root user worked. 2.0 pins `runAsUser`/`runAsGroup` to **1000** on the EE container.
+
+The reason is the per-host capture (#1928). The orchestrator and the EE now exchange two
+files on the shared volume — the callback plugin one way, its event stream the other — and
+with the uids guaranteed equal those are `0600` rather than group-readable. The shared
+volume is a pod-scoped `emptyDir`, so group-readable was never reachable from outside the
+pod; this narrows the grant to what the work needs rather than closing an exposure.
+
+**What to check.** An image whose `USER` is a different uid is still *started* as 1000
+(Kubernetes applies `runAsUser` regardless of the image's own `USER`), so the question is
+whether it can *function* as 1000:
+
+```sh
+# As the uid Kubernetes will use, against your own image:
+docker run --rm --user 1000:1000 <your-ee-image> sh -c '
+  id -u && ansible --version >/dev/null && echo CONFORMS'
+```
+
+Two ways it can fail, both measured while building the EE images:
+
+- **no passwd entry for 1000** — a task dies `KeyError: getpwuid(): uid not found`;
+- **a HOME that uid cannot write** — `DEFAULT_LOCAL_TMP` resolves under `/` and ansible dies
+  inside `import ansible.constants`.
+
+Fix either by building the image with `USER 1000` and a passwd entry for it (what Terrapod's
+own EE images do), or by adding one to the image you have.
+
+**You will not meet this mid-run.** The EE agent asserts the uid at the sidecar's startup
+probe, ahead of the binary checks, so a non-conforming image fails at pod start naming the
+uid — rather than part way through a playbook on a file it cannot read, which is where the
+older, looser contract would have sent you.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

@@ -189,26 +189,28 @@ class TestTheVaultPassword:
         labels = [part.split("@", 1)[0] for part in env["ANSIBLE_VAULT_IDENTITY_LIST"].split(",")]
         assert labels == ["dev", "prod"]
 
-    def test_the_password_is_group_readable_and_nothing_wider(self, tmp_path):
-        """`0640`, and the group bit is load-bearing rather than lax.
+    def test_the_password_is_owner_only_and_nothing_wider(self, tmp_path):
+        """`0600`, and the group bit is no longer load-bearing.
 
-        `job_template._ee_security_context` sets NO `runAsUser` on the EE
-        sidecar -- deliberately, so an operator-supplied image may run as its
-        own uid -- and `fsGroup` is what grants that uid access to the shared
-        volume. `fsGroup` works through the GROUP, which `0600` excludes. So
-        `0600` would have worked only for an EE running as uid 1000, ours, and
-        an operator's image on any other uid would have failed to read its own
-        credentials after the configure had started.
+        It was `0640` and the reasoning was sound at the time:
+        `_ee_security_context` set NO `runAsUser` on the sidecar so an
+        operator-supplied image could run as its own uid, `fsGroup` granted that
+        uid the shared volume, and `fsGroup` works through the GROUP -- which
+        `0600` excludes. **#1928 pins `runAsUser` to 1000**, so there is no
+        longer a reader that does not share our uid, and these are the files it
+        would be worst to leave open: SSH private keys, connection passwords and
+        vault passphrases.
 
-        "Other" must still get nothing: the group is the pod's, so group-read
-        means this Job's containers and nothing else.
+        The narrowing is a breaking change for an operator EE that cannot run as
+        1000, recorded in `docs/upgrading-to-2.0.md` and refused at the sidecar's
+        startup probe rather than met here as an unreadable file mid-playbook.
         """
         env, _ = ansible_auth.run(
             path=_auth_file(tmp_path, [_vault("prod", "pw-long-enough-to-register")])
         )
         path = Path(env["ANSIBLE_VAULT_IDENTITY_LIST"].split("@", 1)[1])
         mode = path.stat().st_mode & 0o777
-        assert mode == 0o640, f"expected 0o640, got {oct(mode)}"
+        assert mode == 0o600, f"expected 0o600, got {oct(mode)}"
 
     def test_the_private_key_has_the_same_mode(self, tmp_path):
         """ssh refuses a key it considers too permissive, so this is the mode
@@ -217,7 +219,7 @@ class TestTheVaultPassword:
             path=_auth_file(tmp_path, [_machine("all", private_key="-----BEGIN-----\nk")])
         )
         path = Path(resolved["all.private_key"])
-        assert path.stat().st_mode & 0o777 == 0o640
+        assert path.stat().st_mode & 0o777 == 0o600
 
     def test_no_credential_file_is_readable_by_other(self, tmp_path):
         """Derived over everything the phase wrote, so a future credential kind

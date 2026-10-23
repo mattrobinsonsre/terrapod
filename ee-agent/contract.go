@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -30,7 +31,42 @@ var contractBinaries = []string{"ansible-playbook", "ansible-galaxy", "ssh", "gi
 // dies inside `import ansible.constants`; with a writable HOME but no passwd
 // entry for the uid, a task dies `KeyError: getpwuid(): uid not found`. Both were
 // measured, and both are invisible to a `command -v` check.
+// requiredUID is the uid an execution environment must run as (#1928).
+//
+// The orchestrator and the EE exchange files on the shared volume -- the
+// callback plugin one way, its event stream the other -- and pinning both to one
+// uid is what lets those be `0600` rather than group-readable. The Job spec
+// sets `runAsUser` on the sidecar, so a CONFORMING image is started as this uid
+// whatever its own `USER` says; what fails is an image that cannot function as
+// it, which is the case this catches at the probe rather than mid-playbook on an
+// unreadable file.
+//
+// A narrowing of the contract, and therefore a breaking change for an
+// operator-supplied image built against the older one -- recorded in
+// docs/upgrading-to-2.0.md.
+const requiredUID = 1000
+
+// checkContract reads this process's own uid. The uid is a PARAMETER of
+// checkContractAs rather than read inside it, so the tests can drive both
+// branches: read in place, a wrong uid short-circuits every binary assertion
+// and the rest of the contract becomes untestable anywhere but on a uid-1000
+// machine -- the environment dependence this file exists to turn into a legible
+// refusal, reintroduced into its own tests.
 func checkContract() string {
+	return checkContractAs(os.Getuid())
+}
+
+func checkContractAs(uid int) string {
+	if uid != requiredUID {
+		return fmt.Sprintf(
+			"this execution environment is running as uid %d; an EE must run as uid %d "+
+				"so that it and the orchestrator can exchange files on the shared volume "+
+				"without granting them to a group (the Job sets runAsUser, so an image "+
+				"that cannot run as this uid is the case that reaches here)",
+			uid, requiredUID,
+		)
+	}
+
 	var missing []string
 	for _, bin := range contractBinaries {
 		if _, err := exec.LookPath(bin); err != nil {

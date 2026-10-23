@@ -23,9 +23,9 @@ container:
 
 * **The files go on the shared volume, not the orchestrator's `/tmp`.** The EE
   mounts only `/tp` and `/workspace`, so the PVC-tempfile rule's usual
-  destination is invisible to the only process that must read these. Which is
-  also why their mode is `0640` rather than `0600` -- see
-  `CREDENTIAL_FILE_MODE`, because the reader may not share our uid.
+  destination is invisible to the only process that must read these. Their mode
+  is `0600` -- see `CREDENTIAL_FILE_MODE`. It was `0640` while the EE's uid was
+  unpinned and the reader might not have shared ours; #1928 pinned it.
 
 * **The environment is RETURNED, never exported.** `configure._forced_env`
   strips every inherited `ANSIBLE_*` before setting its own -- which is what

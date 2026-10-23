@@ -122,9 +122,10 @@ def deliver() -> pathlib.Path | None:
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / _PLUGIN_FILENAME
         shutil.copyfile(asset, target)
-        # Group-readable: `_ee_security_context` pins no uid, so an operator's EE
-        # may run as any user and reaches the shared volume through `fsGroup`.
-        target.chmod(0o640)
+        # Owner-only: the EE runs as the SAME pinned uid as this process
+        # (`_ee_security_context`, #1928), so it reads this as the owner and the
+        # group bit would grant more than the contract needs.
+        target.chmod(0o600)
     except OSError as exc:
         log.warning(
             "could not place the host-event callback plugin — a configure will run "

@@ -93,11 +93,14 @@ _DEFAULT_PATH = "/tp/callback/events.jsonl"
 #: that is meant to hold the exceptions.
 _SPILL_BYTES = 64 * 1024
 
-#: Group-readable because the EE's uid is not pinned. `_ee_security_context` sets
-#: no `runAsUser` deliberately -- an operator's image may run as any uid, and
-#: `fsGroup` is what grants it the shared volume -- so a file this writes with a
-#: private mode would be unreadable by the orchestrator when the two differ.
-_MODE = 0o640
+#: Owner-only. The orchestrator reads what this writes, and both containers run
+#: as the SAME pinned uid (`_ee_security_context`, #1928) -- so the group bit
+#: would carry none of the contract and granting it is a wider permission than
+#: the work needs. It was 0640 while the EE's uid was unpinned.
+#:
+#: Set explicitly rather than left to the umask, which is the EE image's to
+#: choose: a default 022 would create this 0644, i.e. world-readable.
+_MODE = 0o600
 
 
 class CallbackModule(CallbackBase):

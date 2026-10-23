@@ -261,13 +261,15 @@ class TestItCapturesWhatAnsibleReports:
         # The whole point of the spill: the file a host filter scans stays small.
         assert events.stat().st_size < sidecar.stat().st_size
 
-    def test_both_files_are_group_readable(self, tmp_path):
-        """The EE's uid is not pinned, so a private mode is unreadable by us.
+    def test_both_files_are_owner_only(self, tmp_path):
+        """Owner-only, because the EE runs as the orchestrator's own uid.
 
-        `_ee_security_context` deliberately sets no `runAsUser` -- an operator's
-        image may run as any uid and reaches the shared volume through `fsGroup`
-        -- so a file this writes 0600 would be unreadable by the orchestrator
-        whenever the two differ.
+        `_ee_security_context` pins `runAsUser` to 1000 (#1928), so the reader of
+        this file shares our uid and the group bit would grant more than the
+        contract needs. It was 0640 while that uid was unpinned.
+
+        Set explicitly rather than left to the umask, which belongs to the EE
+        image: a default 022 would create this 0644 -- world-readable.
         """
         plugins = tmp_path / "cb"
         plugins.mkdir()
@@ -288,7 +290,7 @@ class TestItCapturesWhatAnsibleReports:
         )
         events = tmp_path / "events.jsonl"
         _run(root, events, [str(plugins)])
-        assert events.stat().st_mode & 0o777 == 0o640
+        assert events.stat().st_mode & 0o777 == 0o600
 
 
 @needs_ansible

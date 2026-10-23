@@ -283,23 +283,38 @@ def _add_vault_file_mounts(
 
 
 def _ee_security_context() -> dict:
-    """The EE sidecar's securityContext -- and what it deliberately omits.
+    """The EE sidecar's securityContext.
 
-    No `runAsUser` and no `runAsGroup`. The contract an EE must meet is "a uid
-    able to read the shared volume", and `fsGroup` is what satisfies it for any
-    uid, so pinning 1000 here would buy nothing and would break an operator's
-    image whose files belong to a different user. `runAsNonRoot` stays, because
-    we do require that much: an image whose USER is root fails to start with
-    kubelet saying so, which is a legible refusal rather than a silent
-    privilege.
+    **`runAsUser` and `runAsGroup` are PINNED to the shared uid (#1928).** This
+    used to omit them deliberately, on the grounds that the contract was "a uid
+    able to read the shared volume" and `fsGroup` satisfied that for any uid.
+    The cost of that generality was that every file either container writes for
+    the other had to be GROUP-READABLE, because the two uids could differ -- and
+    group-readable is a wider grant than the work needs when the two are in fact
+    always the same.
 
-    `readOnlyRootFilesystem` stays too. Everything ansible writes is redirected
-    under the shared volume by `_ee_env`, so an EE needs no writable path of its
-    own -- which is the property that keeps the contract to four binaries on
+    Pinning instead lets the orchestrator and the EE exchange files at `0600`:
+    owner-only, with the group bit no longer carrying any of the contract. The
+    volume is a pod-scoped `emptyDir`, so group-readable was never reachable
+    from outside this pod either way; this is a narrowing rather than a fix for
+    an exposure.
+
+    **It narrows the contract, which is a breaking change for an
+    operator-supplied EE whose image runs as another uid**, and is recorded as
+    one in `docs/upgrading-to-2.0.md`. The agent asserts it at the startup probe,
+    so such an image fails at pod start naming the uid rather than part way
+    through a playbook on an unreadable file.
+
+    `runAsNonRoot` stays, redundant now but kept as the independent statement it
+    always was. `readOnlyRootFilesystem` stays too: everything ansible writes is
+    redirected under the shared volume by `_ee_env`, so an EE needs no writable
+    path of its own -- the property that keeps the contract to five binaries on
     PATH.
     """
     return {
         "runAsNonRoot": True,
+        "runAsUser": _EE_FS_GROUP,
+        "runAsGroup": _EE_FS_GROUP,
         "readOnlyRootFilesystem": True,
         "allowPrivilegeEscalation": False,
         "capabilities": {"drop": ["ALL"]},

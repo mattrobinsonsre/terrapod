@@ -59,12 +59,12 @@ class TestDeliveringThePlugin:
         assert placed.is_file()
         assert placed.read_text() == _PLUGIN_SRC.read_text()
 
-    def test_it_is_group_readable_because_the_ee_uid_is_not_pinned(self, _callback_dir):
+    def test_it_is_owner_only_because_the_ee_shares_our_uid(self, _callback_dir):
         host_events.deliver()
         mode = (_callback_dir / "terrapod_events.py").stat().st_mode & 0o777
-        assert mode == 0o640, (
-            "an operator's EE may run as any uid and reaches the shared volume "
-            "through fsGroup, so a 0600 plugin is one it cannot read"
+        assert mode == 0o600, (
+            "the EE runs as the same pinned uid (#1928), so it reads this as the "
+            "owner and the group bit would grant more than the contract needs"
         )
 
     def test_a_missing_asset_degrades_rather_than_refusing(self):
