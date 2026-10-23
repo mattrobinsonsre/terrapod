@@ -2154,7 +2154,9 @@
       "costFull": "Kostenraming",
       "details": "Details",
       "security": "Beveiliging",
-      "securityFull": "Beveiligingsscan"
+      "securityFull": "Beveiligingsscan",
+      "hosts": "Hosts",
+      "hostsFull": "Resultaten per host"
     },
     "banner": {
       "destroy": "Dit is een <strong>destroy</strong>-uitvoering — alle beheerde resources worden vernietigd bij toepassing.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "In wachtrij gezet vanuit een afwijkingscontrole",
       "remediateFailed": "Kon de herstelrun niet in de wachtrij zetten"
+    },
+    "hosts": {
+      "loading": "Resultaten per host worden geladen…",
+      "loadFailed": "Kan de resultaten per host voor deze uitvoering niet laden.",
+      "empty": "Deze uitvoering heeft geen hosts gerapporteerd.",
+      "reachabilityNote": "De status van een host beschrijft wat de uitgevoerde taken hebben gerapporteerd, niet of de host naar behoren werkt — een taak die geen verbinding nodig heeft, slaagt ook op een host die uitgevallen is.",
+      "showFailures": "{count, plural, one {# fout} other {# fouten}}",
+      "failuresFor": "Fouten op {host}",
+      "wasIgnored": "genegeerd door het playbook",
+      "payloadSpilled": "De volledige uitvoer was te groot om inline te bewaren en staat in de gebeurtenisstroom van deze uitvoering.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Gewijzigd",
+      "columnFailures": "Mislukt",
+      "columnSkipped": "Overgeslagen",
+      "statusOk": "OK",
+      "statusChanged": "Gewijzigd",
+      "statusFailed": "Mislukt",
+      "statusIgnoredFailure": "Mislukt, genegeerd",
+      "statusUnreachable": "Onbereikbaar",
+      "statusNotReached": "Niet bereikt"
     }
   },
   "workspaceDetail": {

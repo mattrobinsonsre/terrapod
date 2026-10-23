@@ -2154,7 +2154,9 @@
       "costFull": "コスト見積もり",
       "details": "詳細",
       "security": "セキュリティ",
-      "securityFull": "セキュリティスキャン"
+      "securityFull": "セキュリティスキャン",
+      "hosts": "ホスト",
+      "hostsFull": "ホスト別の結果"
     },
     "banner": {
       "destroy": "これは<strong>破棄</strong>実行です — 適用するとすべての管理対象リソースが破棄されます。",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "差分チェックからキューに追加",
       "remediateFailed": "修正の実行をキューに追加できませんでした"
+    },
+    "hosts": {
+      "loading": "ホスト別の結果を読み込み中…",
+      "loadFailed": "この実行のホスト別の結果を読み込めませんでした。",
+      "empty": "この実行ではホストは報告されませんでした。",
+      "reachabilityNote": "ホストのステータスは、実行されたタスクが報告した内容を示すものであり、そのホストが正常であることを示すものではありません。接続を必要としないタスクは、停止しているホストに対しても成功します。",
+      "showFailures": "{count, plural, other {# 件の失敗}}",
+      "failuresFor": "{host} での失敗",
+      "wasIgnored": "プレイブックにより無視",
+      "payloadSpilled": "出力全体はインラインで保持するには大きすぎるため、この実行のイベントストリームに格納されています。",
+      "columnHost": "ホスト",
+      "columnStatus": "ステータス",
+      "columnOk": "OK",
+      "columnChanged": "変更",
+      "columnFailures": "失敗",
+      "columnSkipped": "スキップ",
+      "statusOk": "OK",
+      "statusChanged": "変更あり",
+      "statusFailed": "失敗",
+      "statusIgnoredFailure": "失敗（無視）",
+      "statusUnreachable": "到達不能",
+      "statusNotReached": "未到達"
     }
   },
   "workspaceDetail": {

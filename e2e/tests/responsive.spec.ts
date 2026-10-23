@@ -2016,3 +2016,106 @@ test.describe('Apply-only variables (#2189)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 })
+
+test.describe('Per-host results (#1928)', () => {
+  test('a four-host configure table does not push the page sideways', async ({ page }) => {
+    // Stubbed rather than seeded: the rows are written by the configure phase's
+    // callback plugin running in an execution environment, which this stack has
+    // no runner for. The LAYOUT is what is under test, and the shape of the
+    // payload is pinned by the API contract and by host-results.spec.ts.
+    //
+    // Two things make this a real phone-width risk rather than a formality: the
+    // desktop render is a SIX-COLUMN numeric table, and a `not-reached` row
+    // carries em-dashes where every other row carries digits — so the card list
+    // has to be what renders here, and a long host name has to wrap.
+    const runId = '55555555-5555-4555-8555-555555555555';
+    const wsId = '66666666-6666-4666-8666-666666666666';
+    const host = (name: string, status: string, reached: boolean) => ({
+      id: `rhr-${name}`,
+      type: 'run-host-results',
+      attributes: {
+        host: name,
+        status,
+        ok: reached ? 4 : null,
+        changed: reached ? 1 : null,
+        failures: reached && status === 'failed' ? 1 : reached ? 0 : null,
+        unreachable: reached ? 0 : null,
+        skipped: reached ? 2 : null,
+        rescued: reached ? 0 : null,
+        ignored: reached ? 0 : null,
+        'saw-unreachable': status === 'unreachable',
+        reached,
+      },
+    });
+
+    await page.route(`**/api/*/runs/${runId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({
+          data: {
+            id: runId,
+            type: 'runs',
+            attributes: {
+              status: 'applied',
+              message: 'responsive host results',
+              'created-at': '2026-10-23T10:00:00Z',
+              'status-timestamps': { 'applied-at': '2026-10-23T10:01:00Z' },
+              actions: {
+                'is-confirmable': false,
+                'is-discardable': false,
+                'is-cancelable': false,
+                'is-retryable': false,
+              },
+            },
+            relationships: { workspace: { data: { id: wsId, type: 'workspaces' } } },
+          },
+        }),
+      }),
+    );
+    await page.route(`**/api/*/runs/${runId}/host-results`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({
+          data: [
+            // A host name long enough to need wrapping rather than widening.
+            host('web-eu-west-1a-application-server-0001.internal', 'ok', true),
+            host('web2', 'failed', true),
+            host('hdead', 'unreachable', true),
+            host('db1', 'not-reached', false),
+          ],
+          meta: {
+            pagination: {
+              'current-page': 1,
+              'page-size': 4,
+              'total-count': 4,
+              'total-pages': 1,
+            },
+          },
+        }),
+      }),
+    );
+    await page.route(`**/api/*/runs/${runId}/host-events*`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({ data: [], meta: {} }),
+      }),
+    );
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=hosts`);
+
+    // The card list is `md:hidden` and the table `hidden md:block`, and BOTH are
+    // in the DOM at every width — so an unscoped locator can pass against the
+    // hidden table and prove nothing about this viewport.
+    const notReached = page.getByText('Not reached', { exact: true }).filter({ visible: true });
+    await expect(notReached).toHaveCount(1, { timeout: 10_000 });
+    await expect(notReached).toBeVisible();
+    await expect(
+      page.getByText('hdead', { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
+
+    await expectNoHorizontalPageScroll(page);
+  });
+});

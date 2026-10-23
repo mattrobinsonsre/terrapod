@@ -2154,6 +2154,8 @@
       "impactFull": "Impact graph",
       "cost": "Cost",
       "costFull": "Cost estimate",
+      "hosts": "Hosts",
+      "hostsFull": "Per-host results",
       "details": "Details"
     },
     "banner": {
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Queued from a drift check",
       "remediateFailed": "Could not queue the remediation run"
+    },
+    "hosts": {
+      "loading": "Loading per-host results…",
+      "loadFailed": "Could not load the per-host results for this run.",
+      "empty": "This run reported no hosts.",
+      "reachabilityNote": "A host's status describes what the tasks that ran reported, not whether the host is healthy — a task that needs no connection succeeds against a host that is down.",
+      "showFailures": "{count, plural, one {# failure} other {# failures}}",
+      "failuresFor": "Failures on {host}",
+      "wasIgnored": "ignored by the playbook",
+      "payloadSpilled": "The full output was too large to keep inline and is in this run's event stream.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Changed",
+      "columnFailures": "Failed",
+      "columnSkipped": "Skipped",
+      "statusOk": "OK",
+      "statusChanged": "Changed",
+      "statusFailed": "Failed",
+      "statusIgnoredFailure": "Failed, ignored",
+      "statusUnreachable": "Unreachable",
+      "statusNotReached": "Not reached"
     }
   },
   "workspaceDetail": {

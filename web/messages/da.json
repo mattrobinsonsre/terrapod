@@ -2154,7 +2154,9 @@
       "costFull": "Omkostningsestimat",
       "details": "Detaljer",
       "security": "Sikkerhed",
-      "securityFull": "Sikkerhedsscanning"
+      "securityFull": "Sikkerhedsscanning",
+      "hosts": "Værter",
+      "hostsFull": "Resultater pr. vært"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivnings</strong>kørsel — alle styrede ressourcer nedrives, når den anvendes.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Sat i kø fra et afvigelsestjek",
       "remediateFailed": "Kunne ikke sætte rettelseskørslen i kø"
+    },
+    "hosts": {
+      "loading": "Indlæser resultater pr. vært…",
+      "loadFailed": "Kunne ikke indlæse resultaterne pr. vært for denne kørsel.",
+      "empty": "Denne kørsel rapporterede ingen værter.",
+      "reachabilityNote": "En værts status beskriver, hvad de opgaver, der kørte, rapporterede, ikke om værten fungerer, som den skal — en opgave, der ikke kræver en forbindelse, lykkes også mod en vært, der er nede.",
+      "showFailures": "{count, plural, one {# fejl} other {# fejl}}",
+      "failuresFor": "Fejl på {host}",
+      "wasIgnored": "ignoreret af playbooken",
+      "payloadSpilled": "Hele outputtet var for stort til at beholde inline og ligger i denne kørsels hændelsesstrøm.",
+      "columnHost": "Vært",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Ændrede",
+      "columnFailures": "Fejlede",
+      "columnSkipped": "Sprunget over",
+      "statusOk": "OK",
+      "statusChanged": "Ændret",
+      "statusFailed": "Fejlet",
+      "statusIgnoredFailure": "Fejlet, ignoreret",
+      "statusUnreachable": "Utilgængelig",
+      "statusNotReached": "Ikke nået"
     }
   },
   "workspaceDetail": {

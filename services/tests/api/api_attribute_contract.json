@@ -821,6 +821,36 @@
     "translated",
     "updated-at"
   ],
+  "runs._host_result_json": [
+    "changed",
+    "created-at",
+    "failures",
+    "host",
+    "ignored",
+    "ok",
+    "reached",
+    "rescued",
+    "saw-unreachable",
+    "skipped",
+    "status",
+    "unreachable",
+    "updated-at"
+  ],
+  "runs._not_reached_json": [
+    "changed",
+    "created-at",
+    "failures",
+    "host",
+    "ignored",
+    "ok",
+    "reached",
+    "rescued",
+    "saw-unreachable",
+    "skipped",
+    "status",
+    "unreachable",
+    "updated-at"
+  ],
   "runs._plan_json": [
     "ai-summary-url",
     "has-changes",
@@ -924,6 +954,19 @@
   "runs.list_run_events": [
     "action",
     "created-at"
+  ],
+  "runs.list_run_host_events": [
+    "created-at",
+    "host",
+    "ignored",
+    "kind",
+    "message",
+    "payload-ref",
+    "play-name",
+    "sequence",
+    "task-action",
+    "task-name",
+    "task-uuid"
   ],
   "runs.post_cost_summary_message": [
     "content",

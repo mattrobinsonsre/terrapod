@@ -2154,7 +2154,9 @@
       "costFull": "Estimativa de custo",
       "details": "Detalhes",
       "security": "Segurança",
-      "securityFull": "Verificação de segurança"
+      "securityFull": "Verificação de segurança",
+      "hosts": "Hosts",
+      "hostsFull": "Resultados por host"
     },
     "banner": {
       "destroy": "Esta é uma execução de <strong>destroy</strong> — todos os recursos gerenciados serão destruídos quando aplicada.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Enfileirado a partir de uma verificação de desvio",
       "remediateFailed": "Não foi possível enfileirar a execução de correção"
+    },
+    "hosts": {
+      "loading": "Carregando os resultados por host…",
+      "loadFailed": "Não foi possível carregar os resultados por host desta execução.",
+      "empty": "Esta execução não relatou nenhum host.",
+      "reachabilityNote": "O status de um host descreve o que as tarefas executadas relataram, não se o host está saudável — uma tarefa que não precisa de nenhuma conexão tem sucesso até contra um host fora do ar.",
+      "showFailures": "{count, plural, one {# falha} other {# falhas}}",
+      "failuresFor": "Falhas em {host}",
+      "wasIgnored": "tolerada pelo playbook",
+      "payloadSpilled": "A saída completa era grande demais para ser mantida aqui e está no fluxo de eventos desta execução.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Alteradas",
+      "columnFailures": "Falhas",
+      "columnSkipped": "Ignoradas",
+      "statusOk": "OK",
+      "statusChanged": "Alterado",
+      "statusFailed": "Falhou",
+      "statusIgnoredFailure": "Falha tolerada",
+      "statusUnreachable": "Inacessível",
+      "statusNotReached": "Não alcançado"
     }
   },
   "workspaceDetail": {

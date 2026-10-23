@@ -2154,7 +2154,9 @@
       "costFull": "Оцінка вартості",
       "details": "Деталі",
       "security": "Безпека",
-      "securityFull": "Сканування безпеки"
+      "securityFull": "Сканування безпеки",
+      "hosts": "Хости",
+      "hostsFull": "Результати за хостами"
     },
     "banner": {
       "destroy": "Це запуск <strong>знищення</strong> — усі керовані ресурси будуть знищені при застосуванні.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Поставлено в чергу за перевіркою розходжень",
       "remediateFailed": "Не вдалося поставити в чергу запуск виправлення"
+    },
+    "hosts": {
+      "loading": "Завантаження результатів за хостами…",
+      "loadFailed": "Не вдалося завантажити результати за хостами для цього запуску.",
+      "empty": "Цей запуск не повідомив про жоден хост.",
+      "reachabilityNote": "Статус хоста описує те, про що повідомили виконані завдання, а не те, що хост працездатний, — завдання, якому не потрібне підключення, успішно виконується й на вимкненому хості.",
+      "showFailures": "{count, plural, one {# збій} few {# збої} many {# збоїв} other {# збою}}",
+      "failuresFor": "Збої на {host}",
+      "wasIgnored": "проігноровано в playbook",
+      "payloadSpilled": "Повний вивід завеликий, щоб зберігати його тут, тому він лежить у потоці подій цього запуску.",
+      "columnHost": "Хост",
+      "columnStatus": "Статус",
+      "columnOk": "OK",
+      "columnChanged": "Змінено",
+      "columnFailures": "Збої",
+      "columnSkipped": "Пропущено",
+      "statusOk": "OK",
+      "statusChanged": "Змінений",
+      "statusFailed": "Збій",
+      "statusIgnoredFailure": "Збій, проігноровано",
+      "statusUnreachable": "Недоступний",
+      "statusNotReached": "Не оброблений"
     }
   },
   "workspaceDetail": {

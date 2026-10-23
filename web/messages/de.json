@@ -2154,7 +2154,9 @@
       "costFull": "Kostenschätzung",
       "details": "Details",
       "security": "Sicherheit",
-      "securityFull": "Sicherheits-Scan"
+      "securityFull": "Sicherheits-Scan",
+      "hosts": "Hosts",
+      "hostsFull": "Ergebnisse pro Host"
     },
     "banner": {
       "destroy": "Dies ist eine <strong>Zerstörungsausführung</strong> — beim Anwenden werden alle verwalteten Ressourcen zerstört.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Aus einer Abweichungsprüfung eingereiht",
       "remediateFailed": "Der Behebungslauf konnte nicht eingereiht werden"
+    },
+    "hosts": {
+      "loading": "Ergebnisse pro Host werden geladen…",
+      "loadFailed": "Die Ergebnisse pro Host für diesen Lauf konnten nicht geladen werden.",
+      "empty": "Dieser Lauf hat keine Hosts gemeldet.",
+      "reachabilityNote": "Der Status eines Hosts beschreibt, was die ausgeführten Tasks gemeldet haben, nicht ob der Host einwandfrei funktioniert — ein Task, der keine Verbindung benötigt, ist auch bei einem ausgefallenen Host erfolgreich.",
+      "showFailures": "{count, plural, one {# Fehler} other {# Fehler}}",
+      "failuresFor": "Fehler auf {host}",
+      "wasIgnored": "vom Playbook ignoriert",
+      "payloadSpilled": "Die vollständige Ausgabe war zu groß, um sie inline zu behalten, und liegt im Ereignisstrom dieses Laufs.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Geändert",
+      "columnFailures": "Fehlgeschlagen",
+      "columnSkipped": "Übersprungen",
+      "statusOk": "OK",
+      "statusChanged": "Geändert",
+      "statusFailed": "Fehlgeschlagen",
+      "statusIgnoredFailure": "Fehlgeschlagen, ignoriert",
+      "statusUnreachable": "Nicht erreichbar",
+      "statusNotReached": "Nicht erreicht"
     }
   },
   "workspaceDetail": {

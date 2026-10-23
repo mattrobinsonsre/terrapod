@@ -109,6 +109,39 @@ def resolved_inventory_key(workspace_id: str, run_id: str) -> str:
     return f"runs/{workspace_id}/{run_id}.inventory.json"
 
 
+def host_events_key(workspace_id: str, run_id: str) -> str:
+    """Key for a configure's per-host, per-task event stream (#1928).
+
+    Under `runs/` rather than `logs/`: this is a machine-read artifact of the run
+    like the resolved inventory beside it, not the human log, and the prefix is
+    already covered by the `run_vars` blob class so no new class is needed.
+
+    One object per run, filtered server-side when a reader asks for one host. The
+    alternative in the issue body -- an object per host at completion -- was
+    dropped deliberately: the retention sweep deletes a FIXED key list per run
+    and has no prefix enumeration, so N objects per run would leak for ever,
+    while the measured volume (79 KB for a four-host play, a few MB for fifty
+    tasks over two hundred hosts) makes filtering one object the cheaper half.
+    """
+    return f"runs/{workspace_id}/{run_id}.host-events.jsonl"
+
+
+def host_events_large_key(workspace_id: str, run_id: str) -> str:
+    """Key for the oversized payloads `host_events_key` references by id.
+
+    A single `gather_facts` result is 16.5 KB per host (measured on ansible-core
+    2.18.3; a Linux host with more mounts and NICs is larger), so the spill
+    threshold sits above it deliberately -- facts are the normal case. What lands
+    here is the exception: on one probe, three 140 KB command results moved
+    422 KB out of a stream that a host filter would otherwise have to scan,
+    leaving the main object at 62 KB.
+
+    ONE sidecar per run, not one per payload, for the retention reason in
+    `host_events_key`.
+    """
+    return f"runs/{workspace_id}/{run_id}.host-events-large.jsonl"
+
+
 def cost_estimate_key(workspace_id: str, run_id: str) -> str:
     """Key for a run's cost estimate (`cost_estimate.json`, #871).
 

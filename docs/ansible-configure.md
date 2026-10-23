@@ -70,10 +70,12 @@ first change *after* that. So switching the flag on for a fleet that already has
 hosts is safe — it is not a licence for an immediate estate-wide run.
 
 **It runs the declared defaults, like every other automatic route** — the
-workspace's `default-playbook` against its `default-limit`. Narrowing a derived
-configure to just the hosts a change actually affected is a separate question,
-tracked in #2229: this trigger knows that *something* changed, never *what*, so
-narrowing needs a comparison of two resolved inventories rather than a token.
+workspace's `default-playbook`. The *limit*, though, is narrowed: a configure
+the platform produced for you targets only the hosts whose resolved
+configuration actually moved, unless the Ansible code changed since the last
+one. `default-limit` stays the outer bound, so this can only ever reach less of
+it. Set `configure-all-hosts` to sweep the whole inventory regardless — see
+[`default-limit` is the blast radius](#default-limit-is-the-blast-radius-and-empty-means-everything).
 
 A **locked** workspace is skipped, and a configure is never
 queued behind one that is already on its way — the change is simply picked up by
@@ -94,12 +96,12 @@ composite now re-resolves at the hand-over from its apply to its configure, so
 the chained configure targets its own apply's hosts and the second run repeats
 work rather than completing it.
 
-Suppressing it wants #2229, which can tell whether the configure that just ran
-already covered the hosts that moved — something this trigger cannot know,
-because its signal says *something* changed and never *what*. Until then, a
-workspace with both triggers configures twice for one apply; ansible is
-idempotent, so the cost is time rather than correctness, and picking one trigger
-avoids it.
+Suppressing it needs this trigger to know *what* changed rather than merely
+that something did, which its signal — a count and a timestamp per table —
+cannot say. So a workspace with both triggers still configures twice for one
+apply. The narrowing does limit the second run to the hosts that moved, and
+ansible is idempotent either way, so the cost is time rather than correctness;
+picking one trigger avoids it.
 
 ## `default-limit` is the blast radius, and empty means everything
 
@@ -270,6 +272,73 @@ than ignored — `target-addrs`, `replace-addrs`, `refresh-only`, `save-plan`,
 `allow-empty-apply` and `is-destroy` all narrow or alter a plan, and a
 configure has neither. `plan-only` is refused too: ansible's dry run is
 `--check`, which is its own option, not this one.
+
+## What a configure reports: one row per host
+
+Ansible's unit of outcome is the **host**, not the resource, so a configure's
+result is a table rather than a single status. The run page grows a **Hosts** tab
+whenever a run has host results — there is no setting to turn on, and a
+Terraform, OpenTofu or Pulumi run has no hosts, so the tab simply is not there.
+
+Each row carries the host's `ok` / `changed` / `failed` / `skipped` counts, a
+derived status, and a drill-down to that host's failures. Two things about the
+table are easy to misread, and both are deliberate.
+
+### A host shown as "not reached" is not a host that passed
+
+Ansible reports only the hosts it got to. Under `serial:` with
+`any_errors_fatal:`, a failure in the first batch ends the play — and the hosts
+in the later batches appear in no event and in no `PLAY RECAP` at all. Measured
+on a four-host inventory failing in the first batch of one: the recap named
+**one** host.
+
+So the table is the union of what ansible reported and what the run's own
+resolved inventory named. A host in the second set and not the first is shown as
+**not reached**, with empty counters rather than zeros — zero is a measurement,
+and this is the absence of one. Without that, a run that aborted after one host
+of fifty would read as a clean one-host success.
+
+### A host's status is not a health check
+
+A host that is genuinely down still reports `ok` for any task that does not need
+the connection — a `debug`, or anything else that runs on the controller. So
+reachability is a property of *the first task that touched the host*, not of the
+host, and the table says so above it.
+
+Where it matters, the **Unreachable** status is taken from ansible's unreachable
+event rather than from the recap's counter, because the two disagree: with
+`ignore_unreachable: true` the summary reads `unreachable=0 ignored=1` while the
+host was in fact unreachable.
+
+### Where the detail lives
+
+Postgres holds the per-host summary and the **failed and unreachable events
+only** — normally none — which is what makes "has this task ever failed, on any
+host, in this workspace" a query. Everything else ansible reported is a JSONL
+object in storage alongside the run's other artifacts, under
+`run_artifacts_retention_days` like the plan log.
+
+That split is sized rather than guessed. Measured on a four-host play with one
+25-iteration loop: **107 events, 79 KB**, of which 75 were loop items, and a
+single `gather_facts` result is **16.5 KB per host**. A row per event at that
+rate is the scaling problem large AWX installations are known for.
+
+Nothing is discarded at capture. A single result above 64 KiB is moved to a
+sidecar object and referenced by id, so the file a host filter has to read stays
+small — on one probe that kept the main stream at 62 KB instead of 483 KB —
+while the full output is still retrievable.
+
+Both reads are available through the API, the Go SDK and the
+`terrapod_run_host_results` MCP tool:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/v1/runs/run-.../host-results"
+curl -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/v1/runs/run-.../host-events?host=web1"
+```
+
+Read on the workspace is what it takes — the same as the run's log.
 
 ## A play that targets the execution environment itself needs `ansible_remote_tmp`
 

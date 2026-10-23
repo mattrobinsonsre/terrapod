@@ -2154,7 +2154,9 @@
       "costFull": "Amcangyfrif cost",
       "details": "Manylion",
       "security": "Diogelwch",
-      "securityFull": "Sgan diogelwch"
+      "securityFull": "Sgan diogelwch",
+      "hosts": "Gwesteiwyr",
+      "hostsFull": "Canlyniadau fesul gwesteiwr"
     },
     "banner": {
       "destroy": "Mae hwn yn rhediad <strong>dinistrio</strong> — dinistrir pob adnodd a reolir wrth ei weithredu.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Wedii giwio o wiriad drifft",
       "remediateFailed": "Methwyd â chiwio''r rhediad cywiro"
+    },
+    "hosts": {
+      "loading": "Yn llwytho'r canlyniadau fesul gwesteiwr…",
+      "loadFailed": "Methwyd llwytho'r canlyniadau fesul gwesteiwr ar gyfer y rhediad hwn.",
+      "empty": "Ni adroddodd y rhediad hwn am unrhyw westeiwyr.",
+      "reachabilityNote": "Mae statws gwesteiwr yn disgrifio'r hyn a adroddodd y tasgau a redodd, nid a yw'r gwesteiwr yn iach — mae tasg nad oes angen cysylltiad arni yn llwyddo hyd yn oed yn erbyn gwesteiwr nad yw'n rhedeg.",
+      "showFailures": "{count, plural, zero {# methiant} one {# methiant} two {# methiant} few {# methiant} many {# methiant} other {# methiant}}",
+      "failuresFor": "Methiannau ar {host}",
+      "wasIgnored": "anwybyddwyd gan y llyfr chwarae",
+      "payloadSpilled": "Roedd yr allbwn llawn yn rhy fawr i'w gadw'n fewnlin, ac mae i'w gael yn ffrwd digwyddiadau'r rhediad hwn.",
+      "columnHost": "Gwesteiwr",
+      "columnStatus": "Statws",
+      "columnOk": "Iawn",
+      "columnChanged": "Newidiwyd",
+      "columnFailures": "Methiannau",
+      "columnSkipped": "Hepgorwyd",
+      "statusOk": "Iawn",
+      "statusChanged": "Newidiwyd",
+      "statusFailed": "Methodd",
+      "statusIgnoredFailure": "Methodd, anwybyddwyd",
+      "statusUnreachable": "Anghyraeddadwy",
+      "statusNotReached": "Heb ei gyrraedd"
     }
   },
   "workspaceDetail": {

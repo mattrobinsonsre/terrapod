@@ -2154,7 +2154,9 @@
       "costFull": "Estimación de coste",
       "details": "Detalles",
       "security": "Seguridad",
-      "securityFull": "Análisis de seguridad"
+      "securityFull": "Análisis de seguridad",
+      "hosts": "Hosts",
+      "hostsFull": "Resultados por host"
     },
     "banner": {
       "destroy": "Esta es una ejecución de <strong>destrucción</strong> — todos los recursos gestionados se destruirán al aplicar.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Puesto en cola desde una comprobación de desviación",
       "remediateFailed": "No se pudo poner en cola la ejecución de corrección"
+    },
+    "hosts": {
+      "loading": "Cargando los resultados por host…",
+      "loadFailed": "No se pudieron cargar los resultados por host de esta ejecución.",
+      "empty": "Esta ejecución no reportó ningún host.",
+      "reachabilityNote": "El estado de un host describe lo que reportaron las tareas que se ejecutaron, no si el host está sano — una tarea que no necesita ninguna conexión tiene éxito incluso contra un host caído.",
+      "showFailures": "{count, plural, one {# fallo} other {# fallos}}",
+      "failuresFor": "Fallos en {host}",
+      "wasIgnored": "tolerado por el playbook",
+      "payloadSpilled": "La salida completa era demasiado grande para conservarla aquí y está en el flujo de eventos de esta ejecución.",
+      "columnHost": "Host",
+      "columnStatus": "Estado",
+      "columnOk": "OK",
+      "columnChanged": "Cambiadas",
+      "columnFailures": "Fallidas",
+      "columnSkipped": "Omitidas",
+      "statusOk": "OK",
+      "statusChanged": "Cambiado",
+      "statusFailed": "Fallido",
+      "statusIgnoredFailure": "Fallo tolerado",
+      "statusUnreachable": "Inaccesible",
+      "statusNotReached": "No alcanzado"
     }
   },
   "workspaceDetail": {

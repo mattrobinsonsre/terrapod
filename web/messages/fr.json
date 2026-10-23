@@ -2154,7 +2154,9 @@
       "costFull": "Estimation du coût",
       "details": "Détails",
       "security": "Sécurité",
-      "securityFull": "Analyse de sécurité"
+      "securityFull": "Analyse de sécurité",
+      "hosts": "Hôtes",
+      "hostsFull": "Résultats par hôte"
     },
     "banner": {
       "destroy": "Ceci est une exécution de <strong>destruction</strong> — toutes les ressources gérées seront détruites lors de l'application.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Mis en file depuis un contrôle de dérive",
       "remediateFailed": "Impossible de mettre en file le run de correction"
+    },
+    "hosts": {
+      "loading": "Chargement des résultats par hôte…",
+      "loadFailed": "Impossible de charger les résultats par hôte de cette exécution.",
+      "empty": "Cette exécution n'a signalé aucun hôte.",
+      "reachabilityNote": "Le statut d'un hôte décrit ce qu'ont signalé les tâches qui se sont exécutées, et non si l'hôte est en bonne santé — une tâche qui n'a besoin d'aucune connexion réussit même face à un hôte hors service.",
+      "showFailures": "{count, plural, one {# échec} other {# échecs}}",
+      "failuresFor": "Échecs sur {host}",
+      "wasIgnored": "toléré par le playbook",
+      "payloadSpilled": "La sortie complète était trop volumineuse pour être conservée ici ; elle se trouve dans le flux d'événements de cette exécution.",
+      "columnHost": "Hôte",
+      "columnStatus": "Statut",
+      "columnOk": "OK",
+      "columnChanged": "Modifiées",
+      "columnFailures": "Échecs",
+      "columnSkipped": "Ignorées",
+      "statusOk": "OK",
+      "statusChanged": "Modifié",
+      "statusFailed": "Échec",
+      "statusIgnoredFailure": "Échec toléré",
+      "statusUnreachable": "Injoignable",
+      "statusNotReached": "Non atteint"
     }
   },
   "workspaceDetail": {

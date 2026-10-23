@@ -2154,7 +2154,9 @@
       "costFull": "Odhad nákladů",
       "details": "Podrobnosti",
       "security": "Zabezpečení",
-      "securityFull": "Bezpečnostní kontrola"
+      "securityFull": "Bezpečnostní kontrola",
+      "hosts": "Hostitelé",
+      "hostsFull": "Výsledky po hostitelích"
     },
     "banner": {
       "destroy": "Toto je <strong>destroy</strong> běh — všechny spravované prostředky budou při aplikaci zničeny.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Zařazeno z kontroly odchylek",
       "remediateFailed": "Nápravný běh se nepodařilo zařadit"
+    },
+    "hosts": {
+      "loading": "Načítání výsledků po hostitelích…",
+      "loadFailed": "Výsledky po hostitelích pro tento běh se nepodařilo načíst.",
+      "empty": "Tento běh neohlásil žádné hostitele.",
+      "reachabilityNote": "Stav hostitele vypovídá o tom, co ohlásily úlohy, které proběhly, nikoli o tom, zda je hostitel v pořádku — úloha, která nepotřebuje žádné připojení, uspěje i proti hostiteli, který je vypnutý.",
+      "showFailures": "{count, plural, one {# selhání} few {# selhání} many {# selhání} other {# selhání}}",
+      "failuresFor": "Selhání na {host}",
+      "wasIgnored": "ignorováno playbookem",
+      "payloadSpilled": "Celý výstup byl příliš velký, než aby se dal uchovat zde, a je v proudu událostí tohoto běhu.",
+      "columnHost": "Hostitel",
+      "columnStatus": "Stav",
+      "columnOk": "OK",
+      "columnChanged": "Změněno",
+      "columnFailures": "Selhání",
+      "columnSkipped": "Přeskočeno",
+      "statusOk": "OK",
+      "statusChanged": "Změněn",
+      "statusFailed": "Selhalo",
+      "statusIgnoredFailure": "Selhalo, ignorováno",
+      "statusUnreachable": "Nedostupný",
+      "statusNotReached": "Nezpracovaný"
     }
   },
   "workspaceDetail": {

@@ -2154,7 +2154,9 @@
       "costFull": "Cost estimate",
       "details": "Detailz",
       "security": "Sekurity",
-      "securityFull": "Sekurity scan"
+      "securityFull": "Sekurity scan",
+      "hosts": "Hostz",
+      "hostsFull": "Per-host rezultz"
     },
     "banner": {
       "destroy": "Dis iz a <strong>destroy</strong> run — all managd resourcez wil be destroyd when applyd.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Queued from a driftz chek",
       "remediateFailed": "Culd not queue teh fixin runz"
+    },
+    "hosts": {
+      "loading": "Loadin teh per-host rezultz…",
+      "loadFailed": "Culd not lode teh per-host rezultz fer dis run. :(",
+      "empty": "Dis run reportd no hostz.",
+      "reachabilityNote": "A host''s statuz tellz u wot teh taskz dat ran reportd, not whevver teh host iz healfy — a task wot needz no connekshun still succeedz gainst a host dat iz ded. srsly.",
+      "showFailures": "{count, plural, one {# failyur} other {# failyurz}}",
+      "failuresFor": "Failyurz on {host}",
+      "wasIgnored": "ignord by teh playbuk",
+      "payloadSpilled": "Teh ful output wuz 2 big 2 keep inlien, so it livez in dis run''s event stream insted.",
+      "columnHost": "Host",
+      "columnStatus": "Statuz",
+      "columnOk": "OK",
+      "columnChanged": "Changd",
+      "columnFailures": "Faild",
+      "columnSkipped": "Skippd",
+      "statusOk": "OK",
+      "statusChanged": "Changd",
+      "statusFailed": "Faild",
+      "statusIgnoredFailure": "Faild, but ignord",
+      "statusUnreachable": "No can reech",
+      "statusNotReached": "Nevr reachd"
     }
   },
   "workspaceDetail": {

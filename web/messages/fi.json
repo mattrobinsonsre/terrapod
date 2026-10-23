@@ -2154,7 +2154,9 @@
       "costFull": "Kustannusarvio",
       "details": "Tiedot",
       "security": "Turvallisuus",
-      "securityFull": "Turvatarkistus"
+      "securityFull": "Turvatarkistus",
+      "hosts": "Isännät",
+      "hostsFull": "Isäntäkohtaiset tulokset"
     },
     "banner": {
       "destroy": "Tämä on <strong>tuhoajo</strong> — kaikki hallitut resurssit tuhotaan käyttöönotettaessa.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Lisätty jonoon poikkeamatarkistuksesta",
       "remediateFailed": "Korjausajoa ei voitu lisätä jonoon"
+    },
+    "hosts": {
+      "loading": "Ladataan isäntäkohtaisia tuloksia…",
+      "loadFailed": "Tämän ajon isäntäkohtaisia tuloksia ei voitu ladata.",
+      "empty": "Tämä ajo ei raportoinut yhtään isäntää.",
+      "reachabilityNote": "Isännän tila kertoo, mitä ajetut tehtävät raportoivat, ei sitä, onko isäntä kunnossa — tehtävä, joka ei tarvitse yhteyttä, onnistuu myös sellaista isäntää vasten, joka ei ole käynnissä.",
+      "showFailures": "{count, plural, one {# epäonnistuminen} other {# epäonnistumista}}",
+      "failuresFor": "Epäonnistumiset isännällä {host}",
+      "wasIgnored": "playbook jätti tämän huomiotta",
+      "payloadSpilled": "Koko tuloste oli liian suuri säilytettäväksi tässä, ja se on tämän ajon tapahtumavirrassa.",
+      "columnHost": "Isäntä",
+      "columnStatus": "Tila",
+      "columnOk": "OK",
+      "columnChanged": "Muuttui",
+      "columnFailures": "Epäonnistui",
+      "columnSkipped": "Ohitettu",
+      "statusOk": "OK",
+      "statusChanged": "Muuttui",
+      "statusFailed": "Epäonnistui",
+      "statusIgnoredFailure": "Epäonnistui, jätetty huomiotta",
+      "statusUnreachable": "Ei tavoitettavissa",
+      "statusNotReached": "Ei käsitelty"
     }
   },
   "workspaceDetail": {

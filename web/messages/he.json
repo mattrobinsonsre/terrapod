@@ -2154,7 +2154,9 @@
       "costFull": "אומדן עלות",
       "details": "פרטים",
       "security": "אבטחה",
-      "securityFull": "סריקת אבטחה"
+      "securityFull": "סריקת אבטחה",
+      "hosts": "מארחים",
+      "hostsFull": "תוצאות לכל מארח"
     },
     "banner": {
       "destroy": "זוהי הרצת <strong>השמדה</strong> — כל המשאבים המנוהלים יושמדו בעת ההחלה.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "נוסף לתור מבדיקת סטייה",
       "remediateFailed": "לא ניתן היה להוסיף את הרצת התיקון לתור"
+    },
+    "hosts": {
+      "loading": "טוען תוצאות לכל מארח…",
+      "loadFailed": "לא ניתן לטעון את התוצאות לכל מארח עבור הרצה זו.",
+      "empty": "הרצה זו לא דיווחה על אף מארח.",
+      "reachabilityNote": "הסטטוס של מארח מתאר את מה שדיווחו המשימות שרצו, ולא אם המארח תקין — משימה שאינה זקוקה לחיבור מצליחה גם מול מארח שאינו פעיל.",
+      "showFailures": "{count, plural, one {# כשל} two {# כשלים} other {# כשלים}}",
+      "failuresFor": "כשלים במארח {host}",
+      "wasIgnored": "ספר ההרצה התעלם ממנו",
+      "payloadSpilled": "הפלט המלא היה גדול מכדי להישמר בתוך ההודעה, והוא נמצא בזרם האירועים של הרצה זו.",
+      "columnHost": "מארח",
+      "columnStatus": "סטטוס",
+      "columnOk": "תקין",
+      "columnChanged": "שונו",
+      "columnFailures": "כשלים",
+      "columnSkipped": "דולגו",
+      "statusOk": "תקין",
+      "statusChanged": "שונה",
+      "statusFailed": "נכשל",
+      "statusIgnoredFailure": "נכשל, התעלמו",
+      "statusUnreachable": "בלתי נגיש",
+      "statusNotReached": "לא הגיעו אליו"
     }
   },
   "workspaceDetail": {

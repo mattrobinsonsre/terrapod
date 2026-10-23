@@ -2154,7 +2154,9 @@
       "costFull": "成本估算",
       "details": "詳情",
       "security": "安全",
-      "securityFull": "安全掃描"
+      "securityFull": "安全掃描",
+      "hosts": "主機",
+      "hostsFull": "各主機的結果"
     },
     "banner": {
       "destroy": "這是一次<strong>銷毀</strong>執行 — 應用時所有受管理的資源都將被銷毀。",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "由偏移檢查加入佇列",
       "remediateFailed": "無法將修復執行加入佇列"
+    },
+    "hosts": {
+      "loading": "正在載入各主機的結果…",
+      "loadFailed": "無法載入此次執行的各主機結果。",
+      "empty": "此次執行未回報任何主機。",
+      "reachabilityNote": "主機的狀態說明的是已執行的任務回報了什麼，而不是這台主機是否健全 — 一個不需要連線的任務，即使面對一台已停機的主機也會成功。",
+      "showFailures": "{count, plural, other {# 項失敗}}",
+      "failuresFor": "{host} 上的失敗",
+      "wasIgnored": "已由 playbook 忽略",
+      "payloadSpilled": "完整輸出太大，無法隨事件內嵌保存，它位於此次執行的事件串流中。",
+      "columnHost": "主機",
+      "columnStatus": "狀態",
+      "columnOk": "OK",
+      "columnChanged": "已更改",
+      "columnFailures": "失敗",
+      "columnSkipped": "已略過",
+      "statusOk": "OK",
+      "statusChanged": "有更改",
+      "statusFailed": "失敗",
+      "statusIgnoredFailure": "失敗，已忽略",
+      "statusUnreachable": "無法連線",
+      "statusNotReached": "未觸及"
     }
   },
   "workspaceDetail": {

@@ -2154,7 +2154,9 @@
       "costFull": "تقدير التكلفة",
       "details": "التفاصيل",
       "security": "الأمان",
-      "securityFull": "فحص الأمان"
+      "securityFull": "فحص الأمان",
+      "hosts": "المضيفات",
+      "hostsFull": "النتائج لكل مضيف"
     },
     "banner": {
       "destroy": "هذا تشغيل <strong>تدمير</strong> — سيتم تدمير جميع الموارد المُدارة عند التطبيق.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "أُضيف إلى قائمة الانتظار من فحص الانحراف",
       "remediateFailed": "تعذّرت إضافة تشغيل الإصلاح إلى قائمة الانتظار"
+    },
+    "hosts": {
+      "loading": "جارٍ تحميل النتائج لكل مضيف…",
+      "loadFailed": "تعذّر تحميل النتائج لكل مضيف لهذا التشغيل.",
+      "empty": "لم يُبلّغ هذا التشغيل عن أي مضيفات.",
+      "reachabilityNote": "تصف حالة المضيف ما أبلغت عنه المهام التي نُفِّذت، لا ما إذا كان المضيف سليمًا — فالمهمة التي لا تحتاج إلى اتصال تنجح حتى مع مضيف متوقف.",
+      "showFailures": "{count, plural, zero {# إخفاقات} one {# إخفاق} two {# إخفاقان} few {# إخفاقات} many {# إخفاقًا} other {# إخفاق}}",
+      "failuresFor": "الإخفاقات على {host}",
+      "wasIgnored": "تجاهله دفتر التشغيل",
+      "payloadSpilled": "كان الناتج الكامل أكبر من أن يُحفَظ مضمَّنًا، وهو في تدفّق أحداث هذا التشغيل.",
+      "columnHost": "المضيف",
+      "columnStatus": "الحالة",
+      "columnOk": "ناجحة",
+      "columnChanged": "مُغيَّرة",
+      "columnFailures": "إخفاقات",
+      "columnSkipped": "مُتخطّاة",
+      "statusOk": "ناجح",
+      "statusChanged": "تم التغيير",
+      "statusFailed": "فشل",
+      "statusIgnoredFailure": "فشل، وتم تجاهله",
+      "statusUnreachable": "غير قابل للوصول",
+      "statusNotReached": "لم يُصل إليه"
     }
   },
   "workspaceDetail": {

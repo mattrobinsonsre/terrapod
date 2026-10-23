@@ -2154,7 +2154,9 @@
       "costFull": "Szacunkowy koszt",
       "details": "Szczegóły",
       "security": "Bezpieczeństwo",
-      "securityFull": "Skan bezpieczeństwa"
+      "securityFull": "Skan bezpieczeństwa",
+      "hosts": "Hosty",
+      "hostsFull": "Wyniki poszczególnych hostów"
     },
     "banner": {
       "destroy": "To jest przebieg <strong>niszczący</strong> — wszystkie zarządzane zasoby zostaną zniszczone po zastosowaniu.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Dodane do kolejki z kontroli rozbieżności",
       "remediateFailed": "Nie udało się dodać uruchomienia naprawczego do kolejki"
+    },
+    "hosts": {
+      "loading": "Ładowanie wyników poszczególnych hostów…",
+      "loadFailed": "Nie udało się wczytać wyników poszczególnych hostów dla tego uruchomienia.",
+      "empty": "To uruchomienie nie zgłosiło żadnych hostów.",
+      "reachabilityNote": "Status hosta opisuje to, co zgłosiły wykonane zadania, a nie to, czy host jest sprawny — zadanie, które nie potrzebuje połączenia, kończy się powodzeniem także na hoście, który jest wyłączony.",
+      "showFailures": "{count, plural, one {# niepowodzenie} few {# niepowodzenia} many {# niepowodzeń} other {# niepowodzenia}}",
+      "failuresFor": "Niepowodzenia na {host}",
+      "wasIgnored": "zignorowane przez playbook",
+      "payloadSpilled": "Pełne wyjście było zbyt duże, aby zachować je w tym miejscu, i znajduje się w strumieniu zdarzeń tego uruchomienia.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Zmienione",
+      "columnFailures": "Niepowodzenia",
+      "columnSkipped": "Pominięte",
+      "statusOk": "OK",
+      "statusChanged": "Zmieniony",
+      "statusFailed": "Niepowodzenie",
+      "statusIgnoredFailure": "Niepowodzenie, zignorowane",
+      "statusUnreachable": "Nieosiągalny",
+      "statusNotReached": "Nieprzetworzony"
     }
   },
   "workspaceDetail": {

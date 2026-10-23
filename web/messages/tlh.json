@@ -2154,7 +2154,9 @@
       "costFull": "Cost estimate",
       "details": "De'De'",
       "security": "Hurgh QaD",
-      "securityFull": "Hurgh QaD wanI''"
+      "securityFull": "Hurgh QaD wanI''",
+      "hosts": "hostmey",
+      "hostsFull": "host Hoch wanI'mey"
     },
     "banner": {
       "destroy": "<strong>Qaw''</strong> Sar vam — lo''lu''DI'' vu''lu''bogh Sepmey Hoch Qaw''lu''.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Deq wIv lo''egh lI'lu'",
       "remediateFailed": "tI'wI' lI'laHbe'"
+    },
+    "hosts": {
+      "loading": "host Hoch wanI'mey gheltaH…",
+      "loadFailed": "Sar vam host Hoch wanI'mey ghelmeH lujpu'.",
+      "empty": "Sar vam pagh host ja'pu'.",
+      "reachabilityNote": "host Dotlh maq Qu'mey vangpu'bogh ja'pu'bogh neH; host pIv 'e' maqbe' — rar poQbe'bogh Qu' Qapbej, Qapbe'bogh hostDaq je.",
+      "showFailures": "{count, plural, one {# luj} other {# luj}}",
+      "failuresFor": "{host} lujmey",
+      "wasIgnored": "Qu' paq buSHa'pu'",
+      "payloadSpilled": "chel naQ tInqu'mo' naDev polbe'lu'; Sar vam wanI' bIQtIqDaq ngaSlu'.",
+      "columnHost": "host",
+      "columnStatus": "Dotlh",
+      "columnOk": "lugh",
+      "columnChanged": "choHlu'pu'",
+      "columnFailures": "lujpu'",
+      "columnSkipped": "jumlu'pu'",
+      "statusOk": "lugh",
+      "statusChanged": "choHlu'pu'",
+      "statusFailed": "lujpu'",
+      "statusIgnoredFailure": "lujpu', buSHa'lu'pu'",
+      "statusUnreachable": "SuchlaHbe'lu'",
+      "statusNotReached": "SIchbe'lu'"
     }
   },
   "workspaceDetail": {

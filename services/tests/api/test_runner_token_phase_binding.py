@@ -12,6 +12,7 @@ gate that is only ever exercised with a session user is how a gate added here ha
 broken every agent run before.
 """
 
+import pathlib
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -20,6 +21,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.routers import run_artifacts
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -77,6 +79,13 @@ PHASED_ROUTES = [
     ("PUT", "artifacts/onboarding-config", "plan"),
     ("PUT", "artifacts/onboarding-imports", "plan"),
     ("POST", "artifacts/onboarding-query-results", "plan"),
+    # The configure phase. All four were missing until the derivation below was
+    # written: `configure-log` and `resolved-inventory` have been phase-bound
+    # since the configure spine and #2021 respectively, and nothing drove either.
+    ("GET", "artifacts/resolved-inventory", "configure"),
+    ("PUT", "artifacts/configure-log", "configure"),
+    ("PUT", "artifacts/host-events", "configure"),
+    ("PUT", "artifacts/host-events-large", "configure"),
 ]
 
 #: Endpoints both phases genuinely use, so they are deliberately NOT phase-bound.
@@ -349,3 +358,73 @@ class TestTheRunStillHasToBeLive:
                 )
 
         assert resp.status_code == 401
+
+
+# ── The list above is hand-kept, so this derives it ──────────────────────
+
+
+def _phase_bound_routes_in_source() -> set[tuple[str, str, str]]:
+    """Every `(method, suffix, phase)` the router actually binds.
+
+    Walked out of `run_artifacts.py` rather than listed, because the list above
+    was hand-kept and HAD drifted: `artifacts/configure-log` has been
+    phase-bound to `configure` since the configure spine shipped and was never
+    added, so the one route whose phase is neither plan nor apply was the one
+    nothing drove. A hand-kept list of what a gate covers is the same shape as
+    every other exemption ledger in this codebase.
+    """
+    import ast
+
+    source = pathlib.Path(run_artifacts.__file__).read_text()
+    found: set[tuple[str, str, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        route: tuple[str, str] | None = None
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            func = decorator.func
+            if not isinstance(func, ast.Attribute) or getattr(func.value, "id", "") != "router":
+                continue
+            if not decorator.args or not isinstance(decorator.args[0], ast.Constant):
+                continue
+            path = str(decorator.args[0].value)
+            marker = "/runs/{run_id}/"
+            if marker in path:
+                route = (func.attr.upper(), path.split(marker, 1)[1])
+        if route is None:
+            continue
+        for call in ast.walk(node):
+            if not isinstance(call, ast.Call):
+                continue
+            if getattr(call.func, "id", "") != "require_runner_for_run":
+                continue
+            for keyword in call.keywords:
+                if keyword.arg == "phase" and isinstance(keyword.value, ast.Constant):
+                    found.add((route[0], route[1], str(keyword.value.value)))
+    return found
+
+
+def test_every_phase_bound_route_is_driven_by_this_file() -> None:
+    derived = _phase_bound_routes_in_source()
+    assert len(derived) >= 12, (
+        f"only found {len(derived)} phase-bound routes in run_artifacts.py — the "
+        "walker stopped matching rather than the routes going away"
+    )
+    missing = derived - set(PHASED_ROUTES)
+    assert not missing, (
+        "these routes pass a `phase=` the parametrised tests above never drive, so "
+        f"nothing proves the other phase is refused on them: {sorted(missing)}"
+    )
+
+
+def test_the_listed_phases_match_the_source() -> None:
+    """A wrong phase in the list would test the wrong refusal and still pass."""
+    derived = {(m, s): p for m, s, p in _phase_bound_routes_in_source()}
+    wrong = [
+        (m, s, listed, derived[(m, s)])
+        for m, s, listed in PHASED_ROUTES
+        if (m, s) in derived and derived[(m, s)] != listed
+    ]
+    assert not wrong, f"(method, suffix, listed, actual): {wrong}"

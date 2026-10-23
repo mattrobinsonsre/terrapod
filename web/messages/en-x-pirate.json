@@ -2154,7 +2154,9 @@
       "costFull": "Cost estimate",
       "details": "Details",
       "security": "Security",
-      "securityFull": "Security scan"
+      "securityFull": "Security scan",
+      "hosts": "Hands",
+      "hostsFull": "Results fer each hand"
     },
     "banner": {
       "destroy": "This be a <strong>send t'' Davy Jones</strong> run — all managed resources will be sent t'' th'' depths when applied.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Logged from a drift watch",
       "remediateFailed": "Could not queue the mendin'' voyage"
+    },
+    "hosts": {
+      "loading": "Haulin'' up th'' results fer each hand…",
+      "loadFailed": "Couldn''t haul up th'' per-hand results fer this voyage, matey.",
+      "empty": "This voyage reported nary a hand.",
+      "reachabilityNote": "A hand''s standin'' tells ye what th'' tasks that ran reported, not whether th'' hand be hale — a task needin'' no connection sails through even against a hand that be dead in th'' water.",
+      "showFailures": "{count, plural, one {# wreck} other {# wrecks}}",
+      "failuresFor": "Wrecks aboard {host}",
+      "wasIgnored": "paid no heed by th'' playbook",
+      "payloadSpilled": "Th'' whole o'' th'' output were too great a cargo to stow here, so it lies in this voyage''s event stream.",
+      "columnHost": "Hand",
+      "columnStatus": "Standin''",
+      "columnOk": "Aye",
+      "columnChanged": "Shifted",
+      "columnFailures": "Foundered",
+      "columnSkipped": "Passed by",
+      "statusOk": "Shipshape",
+      "statusChanged": "Shifted",
+      "statusFailed": "Foundered",
+      "statusIgnoredFailure": "Foundered, but pardoned",
+      "statusUnreachable": "Beyond hail",
+      "statusNotReached": "Never hailed"
     }
   },
   "workspaceDetail": {

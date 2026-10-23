@@ -46,6 +46,7 @@ from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import host_results_service
 from terrapod.services.plan_summary import summarize_plan_json
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
@@ -53,6 +54,8 @@ from terrapod.storage.keys import (
     config_version_key,
     configure_log_key,
     cost_estimate_key,
+    host_events_key,
+    host_events_large_key,
     lock_file_key,
     plan_artifacts_key,
     plan_json_output_key,
@@ -385,6 +388,74 @@ async def upload_configure_log(
     # inventory produces a lot of output, and buffering it is rule 14's hazard.
     await storage.put_stream(key, request.stream())
     await _publish_log_updated(str(run.workspace_id), str(run.id), "configure")
+    return Response(status_code=204)
+
+
+@router.put("/runs/{run_id}/artifacts/host-events")
+async def upload_host_events(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload a configure's per-host event stream and ingest its rows (#1928).
+
+    Phase-bound to `configure` for the same reason as the configure log: the
+    phase is part of what the token authorises rather than a value the caller
+    picks. A plan-phase token cannot write here.
+
+    Streamed to storage first and parsed afterwards, never buffered: the body is
+    megabytes at fleet scale (rule 14), and the ingest reads it back one line at
+    a time rather than loading a document (rule 13).
+
+    **An ingest failure does not fail the upload.** The object is already stored
+    by then, so the events are not lost and a later re-upload or a read of the
+    object still has them; answering non-2xx would make the runner retry a PUT
+    that already succeeded. The failure is logged.
+    """
+    require_runner_for_run(user, run_id, phase="configure")
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = host_events_key(str(run.workspace_id), str(run.id))
+    await storage.put_stream(key, request.stream())
+
+    try:
+        hosts, events = await host_results_service.ingest(db, run)
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        await db.rollback()
+        logger.warning(
+            "stored the host-event stream but could not ingest it",
+            run_id=str(run.id),
+            error=str(exc),
+        )
+        return Response(status_code=204)
+    await db.commit()
+    await _publish_run_updated(str(run.workspace_id), str(run.id), "host-results")
+    logger.info("host events ingested", run_id=str(run.id), hosts=hosts, events=events)
+    return Response(status_code=204)
+
+
+@router.put("/runs/{run_id}/artifacts/host-events-large")
+async def upload_host_events_large(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the oversized payloads the event stream references by id (#1928).
+
+    Its own route rather than a second body on the one above, because it is a
+    second object with its own retention key -- and because it is frequently
+    absent: a run with no payload over the spill threshold writes nothing here,
+    which is the normal case.
+    """
+    require_runner_for_run(user, run_id, phase="configure")
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = host_events_large_key(str(run.workspace_id), str(run.id))
+    await storage.put_stream(key, request.stream())
     return Response(status_code=204)
 
 

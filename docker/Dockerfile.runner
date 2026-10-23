@@ -141,6 +141,13 @@ COPY services/terrapod/runner/lock_extender.py ./terrapod/runner/lock_extender.p
 COPY services/terrapod/runner/plan_artifacts.py ./terrapod/runner/plan_artifacts.py
 COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
 COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
+# The host-event callback plugin (#1928). DATA, not a module of ours: it runs
+# inside the execution environment under the EE's interpreter and imports
+# `ansible`, which this image does not have. The destination is outside
+# `terrapod/` so the runner-image import gates treat it as an asset -- the same
+# treatment `saas_known_hosts` gets, and for the same reason. Nothing in
+# Terrapod imports it; the configure phase copies it onto the shared volume.
+COPY services/terrapod/runner/ansible_callback/ /opt/terrapod/ansible-callback/
 # Native cost engine (#871) — imported by phases/cost.py to price the plan JSON.
 # Pure stdlib (csv/json/dataclasses) + a vendored usage_defaults.json data file,
 # so it fits the minimal runner image with no new deps. terrapod.services is a

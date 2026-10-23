@@ -55,6 +55,10 @@ TOKEN_ENV = "TP_EE_TOKEN"
 #: `read=None` is the deliberate half -- see the module docstring.
 _TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 
+#: How much a `capture=True` call will hold. `ansible-config dump` is a few KB;
+#: this is two orders of magnitude of headroom and still a bound.
+_CAPTURE_LIMIT = 1024 * 1024
+
 
 class ExecutionEnvironmentUnavailable(RuntimeError):
     """The EE agent could not be reached, or answered in a way we cannot use.
@@ -78,6 +82,11 @@ class EEResult:
     bin: str
     rc: int
     error: str = ""
+    #: The combined output, present only when `run(capture=True)`. Bounded by
+    #: `_CAPTURE_LIMIT`: a captured call is for a small, machine-read answer
+    #: (`ansible-config dump`), and an unbounded buffer here would be a way for
+    #: a long-running child to exhaust the orchestrator's memory.
+    output: bytes = b""
 
 
 def configured() -> bool:
@@ -157,6 +166,7 @@ def run(
     env: dict[str, str] | None = None,
     log_file: str | None = None,
     tee_to_stdout: bool = True,
+    capture: bool = False,
 ) -> EEResult:
     """Run an allowlisted ansible entry point in the EE and stream its output.
 
@@ -174,6 +184,12 @@ def run(
             own token before handing it over, so a playbook cannot replay it.
         log_file: appended with the combined output, for upload as the run log.
         tee_to_stdout: also write to our stdout, so the kubelet stream sees it.
+        capture: return the output on the result instead of streaming it, for a
+            call whose ANSWER is the point rather than its progress
+            (`ansible-config dump`). Implies no tee and no log file: a
+            configuration dump is ours to read, not the operator's run log, and
+            teeing it would put their whole effective config in the log of a
+            configure that never asked for it.
 
     Raises:
         ExecutionEnvironmentUnavailable: the agent was unreachable, or answered
@@ -188,6 +204,11 @@ def run(
         "dir": cwd,
     }
 
+    if capture:
+        # A captured call answers us; nothing about it belongs in the run log.
+        log_file, tee_to_stdout = None, False
+    collected = bytearray()
+
     redactor = StreamRedactor()
     # Append rather than truncate: a configure may be the second thing writing
     # this log -- it is concatenated onto the apply's stream from the CLI's point
@@ -196,6 +217,8 @@ def run(
     handle = open(log_file, "ab") if log_file else None  # noqa: SIM115 - closed in finally
 
     def emit(chunk: bytes) -> None:
+        if capture and len(collected) < _CAPTURE_LIMIT:
+            collected.extend(chunk[: _CAPTURE_LIMIT - len(collected)])
         if handle is not None:
             handle.write(chunk)
             handle.flush()
@@ -255,6 +278,7 @@ def run(
             bin=str(body.get("bin", binary)),
             rc=int(body["rc"]),
             error=str(body.get("error", "")),
+            output=bytes(collected),
         )
     except (ValueError, KeyError, TypeError) as exc:
         raise ExecutionEnvironmentUnavailable(

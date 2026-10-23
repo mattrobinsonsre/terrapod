@@ -68,6 +68,8 @@ ID_PREFIXES: dict[str, str] = {
     "policy-sets": "polset-",
     "registry-module-versions": "modver-",
     "remote-state-consumers": "rsc-",
+    "run-host-events": "rhe-",
+    "run-host-results": "rhr-",
     "run-tasks": "task-",
     "run-triggers": "rt-",
     "runs": "run-",

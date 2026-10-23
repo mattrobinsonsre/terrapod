@@ -2154,7 +2154,9 @@
       "costFull": "Cost estimate",
       "details": "Details",
       "security": "Security",
-      "securityFull": "Security scan"
+      "securityFull": "Security scan",
+      "hosts": "Hosts",
+      "hostsFull": "results, per-host"
     },
     "banner": {
       "destroy": "A <strong>destroy</strong> run, this is — when applied, destroyed all managed resources will be.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "From a drift check, queued it was",
       "remediateFailed": "Queued, the remediation run could not be"
+    },
+    "hosts": {
+      "loading": "Per-host results, loading they are…",
+      "loadFailed": "The per-host results for this run, load them I could not.",
+      "empty": "No hosts, this run reported.",
+      "reachabilityNote": "What the tasks that ran reported, a host's status describes — not whether healthy the host is. No connection a task needs, against a host that is down succeed it still does.",
+      "showFailures": "{count, plural, one {# failure, there is} other {# failures, there are}}",
+      "failuresFor": "On {host}, failures",
+      "wasIgnored": "by the playbook, ignored",
+      "payloadSpilled": "Too large to keep inline, the full output was — in this run's event stream, it is.",
+      "columnHost": "Host",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Changed",
+      "columnFailures": "Failed",
+      "columnSkipped": "Skipped",
+      "statusOk": "OK, it is",
+      "statusChanged": "Changed, it was",
+      "statusFailed": "Failed, it has",
+      "statusIgnoredFailure": "Failed, but ignored it was",
+      "statusUnreachable": "Reachable, it is not",
+      "statusNotReached": "Reached, it was not"
     }
   },
   "workspaceDetail": {

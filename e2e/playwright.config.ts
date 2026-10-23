@@ -144,6 +144,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #1928: per-host results for a configure. Its own project because one
+      // test asserts the Hosts tab is ABSENT when a run has no hosts, which is
+      // the "terraform users pay nothing" property and the reason there is no
+      // flag -- every other test here stubs hosts in first.
+      name: 'host-results',
+      testMatch: 'host-results.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'runs',
       testMatch: 'runs.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

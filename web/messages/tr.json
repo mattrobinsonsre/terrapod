@@ -2154,7 +2154,9 @@
       "costFull": "Maliyet tahmini",
       "details": "Ayrıntılar",
       "security": "Güvenlik",
-      "securityFull": "Güvenlik taraması"
+      "securityFull": "Güvenlik taraması",
+      "hosts": "Ana makineler",
+      "hostsFull": "Ana makine başına sonuçlar"
     },
     "banner": {
       "destroy": "Bu bir <strong>yok etme</strong> çalıştırmasıdır — uygulandığında yönetilen tüm kaynaklar yok edilecek.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Sapma kontrolünden kuyruğa alındı",
       "remediateFailed": "Düzeltme çalıştırması kuyruğa alınamadı"
+    },
+    "hosts": {
+      "loading": "Ana makine başına sonuçlar yükleniyor…",
+      "loadFailed": "Bu çalıştırma için ana makine başına sonuçlar yüklenemedi.",
+      "empty": "Bu çalıştırma hiçbir ana makine bildirmedi.",
+      "reachabilityNote": "Bir ana makinenin durumu, çalışan görevlerin ne bildirdiğini anlatır, ana makinenin sağlıklı olduğunu değil — bağlantı gerektirmeyen bir görev, kapalı bir ana makinede de başarılı olur.",
+      "showFailures": "{count, plural, one {# başarısızlık} other {# başarısızlık}}",
+      "failuresFor": "{host} üzerindeki başarısızlıklar",
+      "wasIgnored": "playbook tarafından yoksayıldı",
+      "payloadSpilled": "Tam çıktı, satır içinde tutulamayacak kadar büyüktü ve bu çalıştırmanın olay akışında bulunuyor.",
+      "columnHost": "Ana makine",
+      "columnStatus": "Durum",
+      "columnOk": "Tamam",
+      "columnChanged": "Değişti",
+      "columnFailures": "Başarısız",
+      "columnSkipped": "Atlandı",
+      "statusOk": "Tamam",
+      "statusChanged": "Değişti",
+      "statusFailed": "Başarısız",
+      "statusIgnoredFailure": "Başarısız, yoksayıldı",
+      "statusUnreachable": "Erişilemiyor",
+      "statusNotReached": "İşlenmedi"
     }
   },
   "workspaceDetail": {

@@ -2154,7 +2154,9 @@
       "costFull": "成本估算",
       "details": "详情",
       "security": "安全",
-      "securityFull": "安全扫描"
+      "securityFull": "安全扫描",
+      "hosts": "主机",
+      "hostsFull": "按主机的结果"
     },
     "banner": {
       "destroy": "这是一次<strong>销毁</strong>运行 — 应用时所有受管理的资源都将被销毁。",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "由漂移检查加入队列",
       "remediateFailed": "无法将修复运行加入队列"
+    },
+    "hosts": {
+      "loading": "正在加载按主机的结果…",
+      "loadFailed": "无法加载此次运行的按主机结果。",
+      "empty": "此次运行未报告任何主机。",
+      "reachabilityNote": "主机的状态说明的是已运行的任务报告了什么，而不是这台主机是否健康 — 一个无需连接的任务，即使面对一台已停机的主机也会成功。",
+      "showFailures": "{count, plural, other {# 项失败}}",
+      "failuresFor": "{host} 上的失败",
+      "wasIgnored": "已被 playbook 忽略",
+      "payloadSpilled": "完整输出太大，无法随事件内联保存，它位于此次运行的事件流中。",
+      "columnHost": "主机",
+      "columnStatus": "状态",
+      "columnOk": "OK",
+      "columnChanged": "已更改",
+      "columnFailures": "失败",
+      "columnSkipped": "已跳过",
+      "statusOk": "OK",
+      "statusChanged": "有更改",
+      "statusFailed": "失败",
+      "statusIgnoredFailure": "失败，已忽略",
+      "statusUnreachable": "不可访问",
+      "statusNotReached": "未触及"
     }
   },
   "workspaceDetail": {

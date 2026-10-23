@@ -14,6 +14,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { PlanAiSummary } from '@/components/plan-ai-summary'
 import { ResourceUsage, parseMemoryToBytes, humanBytes } from '@/components/resource-usage'
 import { SecurityPanel } from '@/components/security-panel'
+import { HostsPanel } from '@/components/hosts-panel'
 import { AIPolicyPanel } from '@/components/ai-policy-panel'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
@@ -140,7 +141,17 @@ interface PlanApply {
 // more to show has its own tab — AI analysis and OPA policy only appear when
 // the run actually has them. Details holds the metadata / timeline / run
 // options / resource usage.
-type RunView = 'overview' | 'ai' | 'opa' | 'security' | 'impact' | 'cost' | 'plan' | 'apply' | 'details'
+type RunView =
+  | 'overview'
+  | 'ai'
+  | 'opa'
+  | 'security'
+  | 'impact'
+  | 'cost'
+  | 'hosts'
+  | 'plan'
+  | 'apply'
+  | 'details'
 
 // Run statuses in which the plan phase is over — the server's
 // `_POST_PLAN_STATES` for the plan log endpoint. The plan log is then only
@@ -1023,6 +1034,7 @@ function RunDetailPageInner() {
   >(null)
   // Security-scan rollup (#1036) — drives the Overview card + Security tab
   // visibility. `present:false` means the run has no scan (scanning off).
+  const [hostCount, setHostCount] = useState(0)
   const [securityInfo, setSecurityInfo] = useState<
     { present: boolean; status?: string; blocking?: number; engine?: string } | null
   >(null)
@@ -1049,7 +1061,18 @@ function RunDetailPageInner() {
   // onto the matching tab, so old links from the runs list and the
   // confirm-redirect keep working.
   const viewParam = searchParams.get('view')
-  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'security', 'impact', 'cost', 'plan', 'apply', 'details']
+  const KNOWN_VIEWS: RunView[] = [
+    'overview',
+    'ai',
+    'opa',
+    'security',
+    'impact',
+    'cost',
+    'hosts',
+    'plan',
+    'apply',
+    'details',
+  ]
   const initialView: RunView = KNOWN_VIEWS.includes(viewParam as RunView)
     ? (viewParam as RunView)
     : viewParam === 'logs' || tabParam === 'plan'
@@ -1114,6 +1137,23 @@ function RunDetailPageInner() {
     }
   }, [runId])
 
+  // Per-host results (#1928). Only the COUNT is needed here -- the panel
+  // fetches the rows -- because the tab is gated on there being any, which is
+  // what keeps a terraform or pulumi run from showing it at all.
+  const loadHostCount = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/v1/runs/${runId}/host-results`)
+      if (!res.ok) {
+        setHostCount(0)
+        return
+      }
+      const d = await res.json()
+      setHostCount(d.meta?.pagination?.['total-count'] ?? (d.data || []).length)
+    } catch {
+      /* the tab is chrome: an unreachable read hides it rather than erroring */
+    }
+  }, [runId])
+
   const loadSecurityInfo = useCallback(async () => {
     // Checkov and Trivy read Terraform plan JSON, so an engine that produces
     // none is never scanned and the API refuses to enable scanning on its
@@ -1168,6 +1208,9 @@ function RunDetailPageInner() {
   useEffect(() => { loadAiInfo() }, [loadAiInfo, aiSummaryRefresh])
   useEffect(() => { loadPolicyInfo() }, [loadPolicyInfo, run?.attributes.status])
   useEffect(() => { loadSecurityInfo() }, [loadSecurityInfo, run?.attributes.status])
+  // Re-read on a status change: a configure's rows land when it finishes, so a
+  // page opened while it was still running would otherwise never show the tab.
+  useEffect(() => { loadHostCount() }, [loadHostCount, run?.attributes.status])
 
   // Real-time updates via SSE — reload the run on a status change OR on `run_updated`
   // (a column written outside a transition), and refresh logs on `log_updated`.
@@ -1475,6 +1518,13 @@ function RunDetailPageInner() {
     ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
     ...((attrs['has-json-output']
       ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
+    // Per-host results (#1928). Data-gated, not flagged: a terraform or pulumi
+    // run has no hosts, so the tab simply is not there and such a deployment
+    // pays nothing for Ansible -- the same rule the Cost/Security/OPA tabs
+    // follow (#1986).
+    ...((hostCount > 0
+      ? [['hosts', t('tabs.hosts'), t('tabs.hostsFull')]]
       : []) as [RunView, React.ReactNode, string][]),
     // Also present when the AI policy gate (#1766) holds this run. A run held
     // waiting for a verdict has no summary yet, so gating the tab on the
@@ -2058,6 +2108,11 @@ function RunDetailPageInner() {
             }}
           />
         )}
+
+        {/* Per-host results (#1928) — a configure reports per HOST, so this is
+            the table of them, including the hosts the run targeted and never
+            reached. */}
+        {view === 'hosts' && <HostsPanel runId={runId} />}
 
         {/* Impact graph tab (#761) — interactive plan dependency + blast-radius
             view; the tab only appears when the run produced a JSON plan. */}

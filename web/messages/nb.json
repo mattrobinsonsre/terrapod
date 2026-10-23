@@ -2154,7 +2154,9 @@
       "costFull": "Kostnadsestimat",
       "details": "Detaljer",
       "security": "Sikkerhet",
-      "securityFull": "Sikkerhetsskanning"
+      "securityFull": "Sikkerhetsskanning",
+      "hosts": "Verter",
+      "hostsFull": "Resultater per vert"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivings</strong>kjøring – alle administrerte ressurser vil bli revet ned når den anvendes.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Lagt i kø fra en avvikskontroll",
       "remediateFailed": "Kunne ikke legge rettekjøringen i kø"
+    },
+    "hosts": {
+      "loading": "Laster resultater per vert …",
+      "loadFailed": "Kunne ikke laste resultatene per vert for denne kjøringen.",
+      "empty": "Denne kjøringen rapporterte ingen verter.",
+      "reachabilityNote": "Statusen til en vert beskriver hva oppgavene som kjørte rapporterte, ikke om verten fungerer som den skal — en oppgave som ikke trenger noen forbindelse, lykkes også mot en vert som er nede.",
+      "showFailures": "{count, plural, one {# feil} other {# feil}}",
+      "failuresFor": "Feil på {host}",
+      "wasIgnored": "ignorert av playbooken",
+      "payloadSpilled": "Hele utdataen var for stor til å beholdes inline og ligger i hendelsesstrømmen til denne kjøringen.",
+      "columnHost": "Vert",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Endrede",
+      "columnFailures": "Feilede",
+      "columnSkipped": "Hoppet over",
+      "statusOk": "OK",
+      "statusChanged": "Endret",
+      "statusFailed": "Feilet",
+      "statusIgnoredFailure": "Feilet, ignorert",
+      "statusUnreachable": "Utilgjengelig",
+      "statusNotReached": "Ikke nådd"
     }
   },
   "workspaceDetail": {

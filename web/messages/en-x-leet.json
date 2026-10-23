@@ -2154,7 +2154,9 @@
       "costFull": "C057 3571m473",
       "details": "D3741l5",
       "security": "53cur17y",
-      "securityFull": "53cur17y 5c4n"
+      "securityFull": "53cur17y 5c4n",
+      "hosts": "H0575",
+      "hostsFull": "P3r-h057 r35ul75"
     },
     "banner": {
       "destroy": "7h15 15 4 <strong>d357r0y</strong> run — 4ll m4n4g3d r350urc35 w1ll b3 d357r0y3d wh3n 4ppl13d.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Qu3u3d fr0m 4 dr1f7 ch3ck",
       "remediateFailed": "C0uld n07 qu3u3 7h3 r3m3d14710n run"
+    },
+    "hosts": {
+      "loading": "L04d1ng p3r-h057 r35ul75…",
+      "loadFailed": "C0uld n07 l04d 7h3 p3r-h057 r35ul75 f0r 7h15 run.",
+      "empty": "7h15 run r3p0r73d n0 h0575.",
+      "reachabilityNote": "4 h057'5 5747u5 d35cr1b35 wh47 7h3 745k5 7h47 r4n r3p0r73d, n07 wh37h3r 7h3 h057 15 h34l7hy — 4 745k 7h47 n33d5 n0 c0nn3c710n 5ucc33d5 4g41n57 4 h057 7h47 15 d0wn.",
+      "showFailures": "{count, plural, one {# f41lur3} other {# f41lur35}}",
+      "failuresFor": "F41lur35 0n {host}",
+      "wasIgnored": "1gn0r3d by 7h3 pl4yb00k",
+      "payloadSpilled": "7h3 full 0u7pu7 w45 700 l4rg3 70 k33p 1nl1n3 4nd 15 1n 7h15 run'5 3v3n7 57r34m.",
+      "columnHost": "H057",
+      "columnStatus": "5747u5",
+      "columnOk": "0K",
+      "columnChanged": "Ch4ng3d",
+      "columnFailures": "F41l3d",
+      "columnSkipped": "5k1pp3d",
+      "statusOk": "0K",
+      "statusChanged": "Ch4ng3d",
+      "statusFailed": "F41l3d",
+      "statusIgnoredFailure": "F41l3d, 1gn0r3d",
+      "statusUnreachable": "Unr34ch4bl3",
+      "statusNotReached": "N07 r34ch3d"
     }
   },
   "workspaceDetail": {

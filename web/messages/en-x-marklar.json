@@ -2154,7 +2154,9 @@
       "costFull": "Cost estimate",
       "details": "Marklars",
       "security": "Marklar",
-      "securityFull": "Marklar scan"
+      "securityFull": "Marklar scan",
+      "hosts": "Marklars",
+      "hostsFull": "Per-marklar marklars"
     },
     "banner": {
       "destroy": "This is a <strong>destroy</strong> marklar — all managed marklars will be destroyed when applied.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Queued from a marklar marklar",
       "remediateFailed": "Could not queue the marklar marklar"
+    },
+    "hosts": {
+      "loading": "Loading per-marklar marklars…",
+      "loadFailed": "Could not load the per-marklar marklars for this marklar.",
+      "empty": "This marklar reported no marklars.",
+      "reachabilityNote": "A marklar's marklar describes what the marklars that ran reported, not whether the marklar is healthy — a marklar that needs no marklar succeeds against a marklar that is down.",
+      "showFailures": "{count, plural, one {# marklar} other {# marklars}}",
+      "failuresFor": "Marklars on {host}",
+      "wasIgnored": "ignored by the marklar",
+      "payloadSpilled": "The full marklar was too large to keep inline and is in this marklar's marklar marklar.",
+      "columnHost": "Marklar",
+      "columnStatus": "Marklar",
+      "columnOk": "OK",
+      "columnChanged": "Changed",
+      "columnFailures": "Failed",
+      "columnSkipped": "Skipped",
+      "statusOk": "OK",
+      "statusChanged": "Changed",
+      "statusFailed": "Failed",
+      "statusIgnoredFailure": "Failed, ignored",
+      "statusUnreachable": "Unreachable",
+      "statusNotReached": "Not reached"
     }
   },
   "workspaceDetail": {

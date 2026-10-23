@@ -1025,6 +1025,32 @@ field RunComplianceReport.RunStatus string `json:"run-status"`
 field RunComplianceReport.SecurityScan *SecurityScanSummary `json:"security-scan,omitempty"`
 field RunComplianceReport.Verdict string `json:"verdict"`
 field RunComplianceReport.WorkspaceID string `json:"workspace-id"`
+field RunHostEvent.CreatedAt string `json:"created-at,omitempty"`
+field RunHostEvent.Host string `json:"host"`
+field RunHostEvent.ID string `json:"id"`
+field RunHostEvent.Ignored bool `json:"ignored"`
+field RunHostEvent.Kind string `json:"kind"`
+field RunHostEvent.Message string `json:"message"`
+field RunHostEvent.PayloadRef *int `json:"payload-ref"`
+field RunHostEvent.PlayName string `json:"play-name"`
+field RunHostEvent.Sequence int `json:"sequence"`
+field RunHostEvent.TaskAction string `json:"task-action"`
+field RunHostEvent.TaskName string `json:"task-name"`
+field RunHostEvent.TaskUUID string `json:"task-uuid"`
+field RunHostResult.Changed *int `json:"changed"`
+field RunHostResult.CreatedAt string `json:"created-at,omitempty"`
+field RunHostResult.Failures *int `json:"failures"`
+field RunHostResult.Host string `json:"host"`
+field RunHostResult.ID string `json:"id"`
+field RunHostResult.Ignored *int `json:"ignored"`
+field RunHostResult.OK *int `json:"ok"`
+field RunHostResult.Reached bool `json:"reached"`
+field RunHostResult.Rescued *int `json:"rescued"`
+field RunHostResult.SawUnreachable bool `json:"saw-unreachable"`
+field RunHostResult.Skipped *int `json:"skipped"`
+field RunHostResult.Status string `json:"status"`
+field RunHostResult.Unreachable *int `json:"unreachable"`
+field RunHostResult.UpdatedAt string `json:"updated-at,omitempty"`
 field RunStatusTimestamps.AppliedAt string `json:"applied-at,omitempty"`
 field RunStatusTimestamps.ApplyingAt string `json:"applying-at,omitempty"`
 field RunStatusTimestamps.PlanQueuedAt string `json:"plan-queued-at,omitempty"`
@@ -1804,6 +1830,8 @@ method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, err
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
 method (*Client) ListRoles(ctx context.Context) ([]Role, error)
 method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error)
+method (*Client) ListRunHostEvents(ctx context.Context, runID, host string) ([]*RunHostEvent, error)
+method (*Client) ListRunHostResults(ctx context.Context, runID string) ([]*RunHostResult, error)
 method (*Client) ListRunPolicyChecks(ctx context.Context, runID string) ([]PolicyCheck, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
@@ -2044,6 +2072,8 @@ type RoleReachWorkspace struct
 type Run struct
 type RunActions struct
 type RunComplianceReport struct
+type RunHostEvent struct
+type RunHostResult struct
 type RunStatusTimestamps struct
 type RunTask struct
 type RunTrigger struct

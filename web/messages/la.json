@@ -2154,7 +2154,9 @@
       "costFull": "Aestimatio impensae",
       "details": "Particularia",
       "security": "Securitas",
-      "securityFull": "Perscrutatio securitatis"
+      "securityFull": "Perscrutatio securitatis",
+      "hosts": "Hospites",
+      "hostsFull": "Exitus singulorum hospitum"
     },
     "banner": {
       "destroy": "Haec est exsecutio <strong>destructionis</strong> — omnes facultates administratae destruentur cum applicatur.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Ex inspectione discrepantiae in ordinem missum",
       "remediateFailed": "Cursus correctionis in ordinem mitti non potuit"
+    },
+    "hosts": {
+      "loading": "Exitus singulorum hospitum onerantur…",
+      "loadFailed": "Exitus singulorum hospitum huius exsecutionis onerari non potuerunt.",
+      "empty": "Haec exsecutio nullos hospites rettulit.",
+      "reachabilityNote": "Status hospitis describit quid munera quae cucurrerunt rettulerint, non utrum hospes sanus sit — munus quod nulla conexione eget etiam adversus hospitem exstinctum prospere peragitur.",
+      "showFailures": "{count, plural, one {# defectus} other {# defectus}}",
+      "failuresFor": "Defectus in {host}",
+      "wasIgnored": "a libello ludendi toleratus",
+      "payloadSpilled": "Egressus plenus nimis magnus erat quam ut hic servaretur, ideoque in flumine eventuum huius exsecutionis invenitur.",
+      "columnHost": "Hospes",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Mutata",
+      "columnFailures": "Defecta",
+      "columnSkipped": "Omissa",
+      "statusOk": "OK",
+      "statusChanged": "Mutatus",
+      "statusFailed": "Defectus",
+      "statusIgnoredFailure": "Defectus toleratus",
+      "statusUnreachable": "Inattingibilis",
+      "statusNotReached": "Non attactus"
     }
   },
   "workspaceDetail": {

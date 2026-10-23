@@ -3449,6 +3449,151 @@ class TaskStageResult(Base):
     __table_args__ = (Index("ix_task_stage_results_task_stage_id", "task_stage_id"),)
 
 
+class RunHostResult(Base):
+    """One row per `(run, host)`: the summary ansible reported for that host.
+
+    Ansible's unit of outcome is the HOST, not the resource, so a configure's
+    result is a set of these rather than a single status (#1928). Written from
+    the `v2_playbook_on_stats` event the callback plugin emits.
+
+    **This is the recap and it cannot tell you a host was unreachable.**
+    Measured on ansible-core 2.18.3: with `ignore_unreachable: true`,
+    `v2_runner_on_unreachable` fires while the summary reads `unreachable=0
+    ignored=1`. So `saw_unreachable` is taken from the EVENT and not derived from
+    these counters, and the per-host failure rows in `run_host_events` are
+    load-bearing rather than an optimisation.
+
+    **It is also not the denominator.** `stats.processed` holds only the hosts
+    ansible heard about: with `serial: 1` and `any_errors_fatal: true` over four
+    hosts failing in the first batch, the PLAY RECAP, the callback stream and
+    this table all hold ONE host while three were in scope. Who was in scope
+    comes from the run's resolved-inventory artifact (#2021) and nowhere else,
+    which is why a reader shows "not reached" from that artifact rather than
+    treating an absent row as success.
+
+    **Not replicated, and that is structural.** `runs` is deliberately not
+    replicated -- a run row is live execution state, not history -- and this FKs
+    to it, so a follower would have no run to attach these to. The event stream
+    itself is a blob under `runs/`, which the existing `run_vars` blob class
+    already covers.
+    """
+
+    __tablename__ = "run_host_results"
+    __table_args__ = (
+        UniqueConstraint("run_id", "host", name="uq_run_host_results_run_host"),
+        Index("ix_run_host_results_run", "run_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: Denormalised from the run so a reader can scope by workspace without a
+    #: join, matching how every other per-run table here is queried.
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: Ansible's `inventory_hostname`. Not validated against
+    #: `validate_host_name`: a host arriving from a git inventory source never
+    #: passes through it, so this records what ansible reported rather than what
+    #: Terrapod would have accepted.
+    host: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    ok: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    changed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unreachable: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rescued: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ignored: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    #: True when an unreachable EVENT was seen for this host, whatever the
+    #: counters say. See the class docstring: the two disagree by design once
+    #: `ignore_unreachable` is in play, and the event is the truthful one.
+    saw_unreachable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class RunHostEvent(Base):
+    """A failed or unreachable task event. Those two kinds and no others (#1928).
+
+    Everything ansible reports goes to the event stream in object storage; only
+    these come into Postgres, and they buy two things a blob cannot: a run's
+    failures are readable without fetching an object, and "has this task ever
+    failed, anywhere" is a query.
+
+    **That cross-run query keys on the task NAME, not the uuid.** Measured:
+    `task._uuid` differs between runs of the same playbook (`...-049a-9886-...`
+    against `...-c605-e824-...`), so it correlates events within one run and
+    nothing across runs. Both are stored; the index is on the name.
+
+    `payload_ref` points into the run's oversized-payload sidecar rather than
+    holding the body: a single `gather_facts` result is 16.5 KB and one measured
+    command result was 140 KB, which is not something to put in a row.
+    """
+
+    __tablename__ = "run_host_events"
+    __table_args__ = (
+        Index("ix_run_host_events_run_host", "run_id", "host"),
+        #: The cross-run "has this task ever failed" query, scoped to a
+        #: workspace because that is the boundary a reader has access to.
+        Index("ix_run_host_events_task", "workspace_id", "task_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    host: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: `failed` or `unreachable`. A string rather than an enum for the reason
+    #: every other status column here is one: a new kind is a migration either
+    #: way, and an enum adds a type to drop and recreate.
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    task_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    task_action: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    #: Within-run correlation only -- see the class docstring.
+    task_uuid: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    play_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: `ignore_errors: true` was set, so the run carried on. Recorded because an
+    #: ignored failure is still a failure somebody may want to see, and the
+    #: recap counts it under `ignored` rather than `failures`.
+    ignored: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    msg: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    #: The id of this event's payload in the run's oversized-payload sidecar,
+    #: or NULL when the payload was small enough to stay in the stream.
+    payload_ref: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The plugin's own sequence number, so a reader can order events exactly as
+    #: ansible produced them rather than by timestamp, which ties under forks.
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+
 class PolicySet(Base):
     """A named collection of OPA/Rego policies evaluated during a run (#343).
 

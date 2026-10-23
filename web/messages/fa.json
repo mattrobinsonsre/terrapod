@@ -2154,7 +2154,9 @@
       "costFull": "برآورد هزینه",
       "details": "جزئیات",
       "security": "امنیت",
-      "securityFull": "اسکن امنیتی"
+      "securityFull": "اسکن امنیتی",
+      "hosts": "میزبان‌ها",
+      "hostsFull": "نتایج به‌تفکیک میزبان"
     },
     "banner": {
       "destroy": "این یک اجرای <strong>تخریب</strong> است — با اعمال آن، تمام منابع مدیریت‌شده تخریب خواهند شد.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "از بررسی انحراف به صف افزوده شد",
       "remediateFailed": "افزودن اجرای اصلاح به صف ممکن نشد"
+    },
+    "hosts": {
+      "loading": "در حال بارگذاری نتایج به‌تفکیک میزبان…",
+      "loadFailed": "بارگذاری نتایج به‌تفکیک میزبان برای این اجرا ناموفق بود.",
+      "empty": "این اجرا هیچ میزبانی را گزارش نکرد.",
+      "reachabilityNote": "وضعیت یک میزبان توصیف می‌کند که وظایف اجراشده چه گزارش کردند، نه اینکه میزبان سالم است — وظیفه‌ای که به هیچ اتصالی نیاز ندارد، حتی روی میزبانی که از کار افتاده هم موفق می‌شود.",
+      "showFailures": "{count, plural, one {# شکست} other {# شکست}}",
+      "failuresFor": "شکست‌ها در میزبان {host}",
+      "wasIgnored": "پلی‌بوک آن را نادیده گرفت",
+      "payloadSpilled": "خروجی کامل برای نگه‌داری درون‌خطی بسیار بزرگ بود و در جریان رویدادهای این اجرا قرار دارد.",
+      "columnHost": "میزبان",
+      "columnStatus": "وضعیت",
+      "columnOk": "موفق",
+      "columnChanged": "تغییریافته",
+      "columnFailures": "شکست‌ها",
+      "columnSkipped": "ردشده",
+      "statusOk": "موفق",
+      "statusChanged": "تغییر یافت",
+      "statusFailed": "ناموفق",
+      "statusIgnoredFailure": "ناموفق، نادیده گرفته شد",
+      "statusUnreachable": "دسترس‌ناپذیر",
+      "statusNotReached": "به آن نرسید"
     }
   },
   "workspaceDetail": {

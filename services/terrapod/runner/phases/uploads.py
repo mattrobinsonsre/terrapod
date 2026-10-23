@@ -282,6 +282,51 @@ def upload_plan_json(
     return ok
 
 
+def upload_host_events(
+    cfg: RunnerConfig,
+    *,
+    client: httpx.Client | None = None,
+) -> bool:
+    """Configure phase. Best-effort. The per-host event stream (#1928).
+
+    Two objects rather than one: the main stream is what a host filter scans, and
+    oversized payloads live in a sidecar so that scan stays cheap. One sidecar
+    per RUN rather than one per payload, because the retention sweep deletes a
+    fixed key list per run and has no prefix enumeration.
+
+    Best-effort by the same reasoning as the plan JSON: these are evidence about
+    a configure, and failing the run because the evidence could not be filed
+    would be the reporting path breaking the thing it reports on. `_put_file`
+    already skips a missing or empty file, so a configure that produced no events
+    -- one that could not start, or an older EE -- uploads nothing and says so at
+    info rather than warning.
+    """
+    from terrapod.runner.phases import host_events
+
+    base = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts"
+    ok, status = _put_file(
+        cfg,
+        f"{base}/host-events",
+        host_events.events_path(),
+        content_type="application/x-ndjson",
+        client=client,
+    )
+    if not ok:
+        logger.warning("host-events upload failed (non-fatal)", status=status)
+    large = host_events.large_path()
+    if large.exists() and large.stat().st_size > 0:
+        ok_large, status_large = _put_file(
+            cfg,
+            f"{base}/host-events-large",
+            large,
+            content_type="application/x-ndjson",
+            client=client,
+        )
+        if not ok_large:
+            logger.warning("host-events-large upload failed (non-fatal)", status=status_large)
+    return ok
+
+
 def upload_cost_estimate(
     cfg: RunnerConfig,
     json_path: Path,

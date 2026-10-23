@@ -118,6 +118,12 @@ _EE_INVENTORY_DIR = f"{_EE_SHARED_DIR}/inventory"
 #: `/tmp` -- where the PVC-tempfile rule otherwise sends runner tempfiles -- is
 #: materialised correctly and invisible to the one process that must read it.
 _EE_CREDENTIALS_DIR = f"{_EE_SHARED_DIR}/credentials"
+
+#: Where the host-event callback plugin is placed and where it writes (#1928).
+#: On the shared volume for the same reason as the inventory: the plugin runs
+#: inside the EE, which mounts only this volume and the workspace, and the
+#: orchestrator has to read back what it wrote.
+_EE_CALLBACK_DIR = f"{_EE_SHARED_DIR}/callback"
 #: The group both containers reach the shared volumes through. The orchestrator
 #: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
@@ -424,6 +430,7 @@ def _add_execution_environment(
             {"name": "TP_EE_ROLES_DIR", "value": _EE_ROLES_DIR},
             {"name": "TP_EE_INVENTORY_DIR", "value": _EE_INVENTORY_DIR},
             {"name": "TP_EE_CREDENTIALS_DIR", "value": _EE_CREDENTIALS_DIR},
+            {"name": "TP_EE_CALLBACK_DIR", "value": _EE_CALLBACK_DIR},
             {
                 "name": _EE_TOKEN_ENV,
                 "valueFrom": {
@@ -447,7 +454,7 @@ def _add_execution_environment(
                 "/bin/sh",
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
-                f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} "
+                f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} {_EE_CALLBACK_DIR} "
                 f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
             ],
             "securityContext": {

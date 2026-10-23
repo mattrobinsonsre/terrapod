@@ -55,6 +55,7 @@ from terrapod.runner.phases import (
     execution_hooks,
     failure_reason,
     git_auth,
+    host_events,
     init_phase,
     log_capture,
     mirror_config,
@@ -973,13 +974,28 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
     credential_env, credential_refs = ansible_auth.run()
     inventory = configure_inventory.materialise(cfg, resolved=credential_refs)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
-    return configure.run(
-        cfg,
-        work_dir=work_dir,
-        inventory=inventory,
-        log_file=str(_CONFIGURE_LOG),
-        extra_env=credential_env,
+    # Capture is best-effort and says so: `deliver` returns None when the plugin
+    # asset is missing from this image, which is our packaging defect rather
+    # than the operator's problem, so the configure still runs.
+    plugin_dir = host_events.deliver()
+    capture_env = (
+        host_events.callback_env(cfg, cwd=str(cwd), plugin_dir=plugin_dir) if plugin_dir else {}
     )
+    try:
+        return configure.run(
+            cfg,
+            work_dir=work_dir,
+            inventory=inventory,
+            log_file=str(_CONFIGURE_LOG),
+            extra_env={**credential_env, **capture_env},
+        )
+    finally:
+        # In a `finally` deliberately: the per-host results of a configure that
+        # FAILED are the ones somebody needs, and a playbook that failed half way
+        # through a fleet has already changed the hosts it reached. Uploading only
+        # on success would discard exactly the evidence the feature exists for.
+        if plugin_dir:
+            uploads.upload_host_events(cfg)
 
 
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]

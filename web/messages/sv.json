@@ -2154,7 +2154,9 @@
       "costFull": "Kostnadsuppskattning",
       "details": "Detaljer",
       "security": "Säkerhet",
-      "securityFull": "Säkerhetsskanning"
+      "securityFull": "Säkerhetsskanning",
+      "hosts": "Värdar",
+      "hostsFull": "Resultat per värd"
     },
     "banner": {
       "destroy": "Detta är en <strong>förstörelsekörning</strong> — alla hanterade resurser förstörs vid applicering.",
@@ -2454,6 +2456,28 @@
     "drift": {
       "remediateMessage": "Köad från en avvikelsekontroll",
       "remediateFailed": "Kunde inte köa rättningskörningen"
+    },
+    "hosts": {
+      "loading": "Läser in resultat per värd…",
+      "loadFailed": "Det gick inte att läsa in resultaten per värd för den här körningen.",
+      "empty": "Den här körningen rapporterade inga värdar.",
+      "reachabilityNote": "En värds status beskriver vad de uppgifter som kördes rapporterade, inte om värden fungerar som den ska — en uppgift som inte behöver någon anslutning lyckas även mot en värd som ligger nere.",
+      "showFailures": "{count, plural, one {# fel} other {# fel}}",
+      "failuresFor": "Fel på {host}",
+      "wasIgnored": "ignorerat av playbooken",
+      "payloadSpilled": "Hela utdatan var för stor för att behållas inline och finns i den här körningens händelseström.",
+      "columnHost": "Värd",
+      "columnStatus": "Status",
+      "columnOk": "OK",
+      "columnChanged": "Ändrade",
+      "columnFailures": "Misslyckade",
+      "columnSkipped": "Överhoppade",
+      "statusOk": "OK",
+      "statusChanged": "Ändrad",
+      "statusFailed": "Misslyckad",
+      "statusIgnoredFailure": "Misslyckad, ignorerad",
+      "statusUnreachable": "Onåbar",
+      "statusNotReached": "Inte nådd"
     }
   },
   "workspaceDetail": {

@@ -265,15 +265,25 @@ class TestTheConfigureFlowIsWired:
     def test_the_vault_environment_is_PASSED_to_the_configure(self):
         """Inspecting the keyword's VALUE, not merely that a keyword named
         `extra_env` exists: `extra_env={}` would satisfy the weaker check and
-        restore the defect in full."""
+        restore the defect in full.
+
+        **The assertion is that the credential phase's name REACHES the
+        expression, not that it IS the expression.** It used to require a bare
+        `ast.Name`, which pinned the FORM rather than the property -- and the
+        form stopped being the only correct one as soon as a second concern
+        contributed to the same environment (#1928's callback settings, merged
+        as `{**credential_env, **capture_env}`). A gate written for one instance
+        of a class is blind to the rest; the property here is that the
+        credentials travel as an ARGUMENT rather than through `os.environ`,
+        because `configure._forced_env` strips every inherited `ANSIBLE_*` and
+        an exported vault identity list would be stripped on the way out.
+        """
         fn = self._function()
         call = self._call(fn, module="configure", func_attr="run")
         passed = {k.arg: k.value for k in call.keywords}
         assert "extra_env" in passed, "configure.run is called without extra_env"
-        assert isinstance(passed["extra_env"], ast.Name), (
-            "extra_env must be the name the credential phase returned, not a literal"
-        )
-        # ...and that name must be what `ansible_auth.run()` was unpacked into.
+
+        # The name(s) `ansible_auth.run()` was unpacked into.
         assigned = {
             t.id
             for node in ast.walk(fn)
@@ -281,9 +291,16 @@ class TestTheConfigureFlowIsWired:
             for t in ast.walk(node.targets[0])
             if isinstance(t, ast.Name)
         }
-        assert passed["extra_env"].id in assigned, (
-            f"extra_env is {passed['extra_env'].id!r}, which is not assigned from "
-            f"ansible_auth.run() (that assigns {sorted(assigned)})"
+        assert assigned, "nothing is assigned from ansible_auth.run()"
+
+        # One of them must appear in whatever is passed, at any depth: a bare
+        # name, a merge, a call around it. What is refused is an expression that
+        # does not mention it at all -- `{}`, or a dict of someone else's env.
+        mentioned = {n.id for n in ast.walk(passed["extra_env"]) if isinstance(n, ast.Name)}
+        assert mentioned & assigned, (
+            f"extra_env mentions {sorted(mentioned)}, none of which is assigned from "
+            f"ansible_auth.run() (that assigns {sorted(assigned)}) -- so the vault "
+            "identity list never reaches the configure"
         )
 
     def test_the_credential_REFERENCES_are_PASSED_to_the_inventory(self):

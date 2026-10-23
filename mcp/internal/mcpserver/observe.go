@@ -774,6 +774,46 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, out, nil
 	})
 
+	// ── terrapod_run_host_results ────────────────────────────────────
+	type runHostResultsIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose per-host results to fetch"`
+	}
+	type runHostResultsOut struct {
+		Hosts  []*terrapod.RunHostResult `json:"hosts"`
+		Events []*terrapod.RunHostEvent  `json:"failure_events"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_host_results",
+		Description: "Get a CONFIGURE run's outcome per host, which is how an Ansible run reports: one row per host with " +
+			"ok/changed/failures/skipped/rescued/ignored counts and a derived status, plus every failed or unreachable " +
+			"task event. A plan or apply run has no hosts and returns empty. " +
+			"Two things here are not what they look like, and both matter for what you conclude. " +
+			"A host with status not-reached has null counts: the run targeted it and Ansible never reported on it, " +
+			"which happens under `serial:` with `any_errors_fatal:` because only the batch that ran is reported — " +
+			"so it is NOT a success and the nulls distinguish it from a genuine zero. " +
+			"And saw_unreachable is the honest reachability signal rather than the unreachable count: with " +
+			"`ignore_unreachable: true` Ansible reports unreachable=0 and ignored=1 while the host was in fact " +
+			"unreachable. Reachability is also not liveness — a host that is genuinely dead reports ok for any task " +
+			"that needs no connection, such as a controller-side debug — so do not present a host's status as a " +
+			"health check. Only failures and unreachables are returned as events; everything else Ansible reported " +
+			"is in the run's event-stream artifact, so an empty failure_events means nothing failed rather than " +
+			"nothing happened.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runHostResultsIn) (*mcp.CallToolResult, *runHostResultsOut, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		hosts, err := c.ListRunHostResults(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		events, err := c.ListRunHostEvents(ctx, in.RunID, "")
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, &runHostResultsOut{Hosts: hosts, Events: events}, nil
+	})
+
 	// ── terrapod_run_compliance_report ──────────────────────────────
 	type runComplianceReportIn struct {
 		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose compliance report to fetch"`
