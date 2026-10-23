@@ -254,3 +254,156 @@ class TestItIsIdempotentByReplacement:
             await host_results_service.ingest(db, run)
         deleted = [c.args[0] for c in db.delete.call_args_list]
         assert stale_result in deleted and stale_event in deleted
+
+
+def _capturing_stream(records):
+    """Like `_stream`, but also records every `put` so partitions are visible."""
+    storage = _stream(records)
+    puts: dict[str, bytes] = {}
+
+    async def put(key, body, content_type="application/octet-stream", **_):
+        puts[key] = body
+        return MagicMock()
+
+    storage.put = put
+    return storage, puts
+
+
+async def _ingest_capturing(records):
+    db, run = _db(), _run()
+    storage, puts = _capturing_stream(records)
+    with patch.object(host_results_service, "get_storage", return_value=storage):
+        await host_results_service.ingest(db, run)
+    return db, run, puts
+
+
+def _partition(puts, run, host):
+    from terrapod.storage.keys import host_events_host_key
+
+    return puts[host_events_host_key(str(run.workspace_id), str(run.id), host)]
+
+
+@pytest.mark.asyncio
+class TestThePerHostPartition:
+    """#1928: "events are ALSO written partitioned per host".
+
+    The point is that a drill-down is one object fetch rather than a scan of the
+    whole run's stream, so what matters is that each object holds EVERYTHING
+    that happened to its host -- not the failures, which are already rows.
+    """
+
+    RECORDS = [
+        {"kind": "playbook_start", "seq": 1},
+        {"kind": "task_start", "task_name": "ping", "seq": 2},
+        {"kind": "ok", "host": "web1", "task_name": "ping", "seq": 3},
+        {"kind": "ok", "host": "web2", "task_name": "ping", "seq": 4},
+        {"kind": "failed", "host": "web2", "task_name": "deploy", "msg": "boom", "seq": 5},
+        {"kind": "stats", "recap": {"web1": {"ok": 1}, "web2": {"ok": 1, "failures": 1}}},
+    ]
+
+    async def test_one_object_per_host_naming_only_that_host(self):
+        _, run, puts = await _ingest_capturing(self.RECORDS)
+        assert len(puts) == 2, f"expected one object per host, got {list(puts)}"
+        web1 = _partition(puts, run, "web1").decode()
+        web2 = _partition(puts, run, "web2").decode()
+        assert '"web1"' in web1 and '"web2"' not in web1
+        assert '"web2"' in web2 and '"web1"' not in web2
+
+    async def test_the_partition_is_NOT_only_the_failures(self):
+        """The trap. Rows hold `failed`/`unreachable`; the partition holds all.
+
+        Putting the capture after the kind filter would make each partition a
+        copy of what Postgres already has, which is the one shape that reads as
+        working and delivers nothing.
+        """
+        _, run, puts = await _ingest_capturing(self.RECORDS)
+        web2 = _partition(puts, run, "web2").decode()
+        assert '"ok"' in web2, "the ok event is missing — captured after the kind filter?"
+        assert '"failed"' in web2
+
+    async def test_a_line_naming_no_host_lands_in_no_partition(self):
+        """`playbook_start`, `task_start` and `stats` belong to the run."""
+        _, run, puts = await _ingest_capturing(self.RECORDS)
+        for body in puts.values():
+            text = body.decode()
+            assert "playbook_start" not in text
+            assert "task_start" not in text
+            assert '"stats"' not in text
+
+    async def test_each_line_is_byte_exact_and_newline_terminated(self):
+        """A partition is a subsequence of the stream, not a re-serialisation.
+
+        Re-encoding the parsed record would normalise key order and spacing, so
+        the whole-run object and the partition would disagree byte for byte and
+        a reader diffing them would see changes that are not there.
+
+        **The body here is hand-written with NON-CANONICAL spacing on purpose.**
+        A fixture built with `json.dumps` cannot test this at all: the
+        re-serialisation of its own parsed record is identical to the line it
+        came from, so the assertion holds either way. Measured -- the mutation
+        that swaps `raw` for `json.dumps(record)` SURVIVED the first version of
+        this test, which is the whole reason the fixture is a string.
+        """
+        body = (
+            '{"kind":"playbook_start","seq":1}\n'
+            '{ "kind" : "ok" ,  "host" : "web1" ,  "seq" : 3 }\n'
+            '{"kind":"stats","recap":{"web1":{"ok":1}}}\n'
+        )
+        _, run, puts = await _ingest_capturing(body)
+        web1 = _partition(puts, run, "web1")
+        assert web1 == b'{ "kind" : "ok" ,  "host" : "web1" ,  "seq" : 3 }\n', (
+            "the partition was re-serialised rather than copied verbatim"
+        )
+
+    async def test_an_upload_failure_does_not_lose_the_rows(self):
+        """A partition is a read-side convenience, so it must not be fatal.
+
+        The whole-run stream and every row are already stored; failing the
+        ingest over a partition would lose those too.
+        """
+        db, run = _db(), _run()
+        storage = _stream(self.RECORDS)
+
+        async def boom(*_a, **_k):
+            raise RuntimeError("bucket on fire")
+
+        storage.put = boom
+        with patch.object(host_results_service, "get_storage", return_value=storage):
+            hosts, events = await host_results_service.ingest(db, run)
+        assert hosts == 2
+        assert len(_added(db, RunHostResult)) == 2
+
+    async def test_the_temp_directory_is_removed_even_when_the_upload_fails(self):
+        """Else a failed ingest leaves a copy of the whole stream on the PVC.
+
+        Which is the failure the disk buffering exists to avoid, so the cleanup
+        is in a `finally` and this is what pins it there.
+        """
+        import tempfile
+
+        made: list[str] = []
+        real = tempfile.mkdtemp
+
+        def record(*a, **k):
+            d = real(*a, **k)
+            made.append(d)
+            return d
+
+        db, run = _db(), _run()
+        storage = _stream(self.RECORDS)
+
+        async def boom(*_a, **_k):
+            raise RuntimeError("nope")
+
+        storage.put = boom
+        with (
+            patch.object(host_results_service, "get_storage", return_value=storage),
+            patch.object(tempfile, "mkdtemp", record),
+        ):
+            await host_results_service.ingest(db, run)
+
+        assert made, "the partitioner did not create a temp directory"
+        import os
+
+        for d in made:
+            assert not os.path.isdir(d), f"{d} was left behind"

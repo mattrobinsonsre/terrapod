@@ -279,6 +279,24 @@ export function HostsPanel({ runId }: { runId: string }) {
           <h4 className="text-sm font-medium">
             {t("failuresFor", { host: expanded })}
           </h4>
+          {/* The drill-down #1928 asks for: this host's OWN object, not a
+              filter of the run's, so it is one fetch rather than a scan of a
+              stream that is tens of MB at fleet scale. Shown only when the
+              detail still exists; `reaped` and `unknown` are announced at the
+              top of the panel and a link here would offer bytes that are gone.
+
+              The existing `detailDownload` label is reused deliberately rather
+              than adding a per-host string: it reads correctly under a heading
+              that already names the host, and a near-duplicate key would be 31
+              more values to keep true for no gain a reader can see. */}
+          {detail === "available" && (
+            <a
+              className="inline-block rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-600"
+              href={`/api/v1/runs/${runId}/host-events/stream?host=${encodeURIComponent(expanded)}`}
+            >
+              {t("detailDownload")}
+            </a>
+          )}
           {eventsFor(expanded).map((e) => (
             <div key={`${e.sequence}-${e.kind}`} className="text-xs space-y-1">
               <div className="flex flex-wrap items-center gap-2">

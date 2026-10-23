@@ -29,15 +29,19 @@ somebody needs when a configure was killed.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.config import settings
 from terrapod.db.models import Run, RunHostEvent, RunHostResult
 from terrapod.logging_config import get_logger
 from terrapod.storage import get_storage
-from terrapod.storage.keys import host_events_key
+from terrapod.storage.keys import host_events_host_key, host_events_key
 
 logger = get_logger(__name__)
 
@@ -110,6 +114,87 @@ async def _lines(key: str):
         yield buffer
 
 
+def _resolve_tmpdir() -> str | None:
+    """The configured ephemeral PVC dir if it exists, else None.
+
+    None falls back to the system tempdir, which is right for tests and local
+    dev without a PVC mount. The partition buffers a whole run's stream split
+    across hosts, which is exactly the >10 MB case the PVC rule exists for --
+    the API pod's `/tmp` is RAM-backed.
+    """
+    configured = settings.vcs.tmpdir
+    if configured and os.path.isdir(configured):
+        return configured
+    return None
+
+
+class _Partitioner:
+    """Buffers each host's events to its own file, then uploads one object each.
+
+    Written during `ingest`'s single pass rather than by re-reading the stream
+    per host: N passes over a multi-MB object to produce N objects is the cost
+    the partition exists to remove, paid at write time instead of read time.
+
+    Buffered to DISK and not to memory. A fleet's stream is the one artifact
+    here that is unbounded by design, and holding it split across a dict of
+    lists would make the API pod's memory scale with the size of the operator's
+    estate.
+
+    Lines go in VERBATIM -- the bytes as the callback wrote them -- so a host's
+    partition is a byte-exact subsequence of the whole stream and a reader
+    parses both the same way. Re-serialising the parsed record would silently
+    normalise key order and number formatting between the two.
+    """
+
+    def __init__(self, workspace_id: str, run_id: str) -> None:
+        self._workspace_id = workspace_id
+        self._run_id = run_id
+        self._dir = tempfile.mkdtemp(prefix="tp-hostevents-", dir=_resolve_tmpdir())
+        self._handles: dict[str, Any] = {}
+
+    def add(self, host: str, raw: bytes) -> None:
+        handle = self._handles.get(host)
+        if handle is None:
+            # One file per host, named by ordinal rather than by hostname: a
+            # host name is not a safe filename, and the mapping is held in the
+            # dict rather than recovered from the directory.
+            path = os.path.join(self._dir, f"{len(self._handles)}.jsonl")
+            handle = open(path, "wb")  # noqa: SIM115 -- closed in `flush`
+            self._handles[host] = handle
+        handle.write(raw)
+        if not raw.endswith(b"\n"):
+            handle.write(b"\n")
+
+    async def flush(self) -> int:
+        """Upload one object per host. Returns how many were written."""
+        storage = get_storage()
+        written = 0
+        for host, handle in self._handles.items():
+            handle.close()
+            key = host_events_host_key(self._workspace_id, self._run_id, host)
+            try:
+                with open(handle.name, "rb") as fh:
+                    await storage.put(key, fh.read(), content_type="application/x-ndjson")
+                written += 1
+            except Exception:
+                # A partition is a read-side convenience: the whole-run stream
+                # and every row are already stored, so losing one must not fail
+                # the ingest and lose those too. The drill-down degrades to the
+                # whole stream, which is what it was before the partition.
+                logger.warning(
+                    "failed to write a host's event partition",
+                    run_id=self._run_id,
+                    exc_info=True,
+                )
+        return written
+
+    def cleanup(self) -> None:
+        for handle in self._handles.values():
+            if not handle.closed:
+                handle.close()
+        shutil.rmtree(self._dir, ignore_errors=True)
+
+
 async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     """Read the run's uploaded event stream into rows. Returns (hosts, events).
 
@@ -132,6 +217,7 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     events: list[RunHostEvent] = []
     malformed = 0
     truncated = False
+    partitions = _Partitioner(str(run.workspace_id), str(run.id))
 
     async for raw in _lines(key):
         if not raw.strip():
@@ -144,6 +230,13 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
         if not isinstance(record, dict):
             malformed += 1
             continue
+        # Before the kind filters below: they keep only `failed`/`unreachable`
+        # as ROWS, while a host's partition is everything that happened to it.
+        # Putting this after them would partition the failures alone, which is
+        # what the rows already are.
+        host_of_record = record.get("host")
+        if isinstance(host_of_record, str) and host_of_record:
+            partitions.add(host_of_record, raw)
         kind = record.get("kind")
         if kind == "stats":
             reported = record.get("recap")
@@ -176,6 +269,16 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
         db.add(event)
     await db.flush()
 
+    # "At completion", per #1928: after the pass, so a partition exists only for
+    # a stream that was read all the way through. `cleanup` is in a `finally`
+    # because the temp directory holds a copy of the whole stream split by host
+    # -- leaving it behind on an error would fill the PVC one failed ingest at a
+    # time, which is the failure mode the buffering was supposed to avoid.
+    try:
+        partitioned = await partitions.flush()
+    finally:
+        partitions.cleanup()
+
     if malformed or truncated:
         logger.warning(
             "host-event stream was partly unreadable",
@@ -189,6 +292,7 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
         run_id=str(run.id),
         hosts=len(recap),
         event_rows=len(events),
+        partitions=partitioned,
     )
     return len(recap), len(events)
 

@@ -185,7 +185,7 @@ func TestGetRunHostEventStreamReturnsTheJSONLVerbatim(t *testing.T) {
 	jsonl := `{"kind":"task_start","seq":1}` + "\n" + `{"kind":"ok","host":"web1","seq":2}` + "\n"
 	c, seen := newHostResultsFixture(t, http.StatusOK, jsonl)
 
-	got, err := c.GetRunHostEventStream(context.Background(), "run-abc")
+	got, err := c.GetRunHostEventStream(context.Background(), "run-abc", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestIsDetailReapedSeparates410From404(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := newHostResultsFixture(t, tc.status, "")
-			_, err := c.GetRunHostEventStream(context.Background(), "run-abc")
+			_, err := c.GetRunHostEventStream(context.Background(), "run-abc", "")
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -249,7 +249,7 @@ func TestTheArtifactReadersRejectAnEmptyRunID(t *testing.T) {
 		name string
 		fn   func() ([]byte, error)
 	}{
-		{"stream", func() ([]byte, error) { return c.GetRunHostEventStream(context.Background(), "") }},
+		{"stream", func() ([]byte, error) { return c.GetRunHostEventStream(context.Background(), "", "") }},
 		{"payloads", func() ([]byte, error) { return c.GetRunHostEventPayloads(context.Background(), "") }},
 	} {
 		if _, err := call.fn(); err == nil {
@@ -258,5 +258,35 @@ func TestTheArtifactReadersRejectAnEmptyRunID(t *testing.T) {
 	}
 	if len(*seen) != 0 {
 		t.Errorf("no request should have been made, got %v", *seen)
+	}
+}
+
+func TestGetRunHostEventStreamWithAHostFetchesThatPartition(t *testing.T) {
+	// The query parameter is what makes the drill-down one object fetch, so the
+	// path is the property worth asserting -- a method that silently dropped
+	// the host would still return bytes and still parse.
+	c, seen := newHostResultsFixture(t, http.StatusOK, `{"kind":"ok","host":"web 1"}`+"\n")
+
+	if _, err := c.GetRunHostEventStream(context.Background(), "run-abc", "web 1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Escaped, because a host name is operator data: a space or an ampersand
+	// must not split the query or inject another parameter.
+	want := "/api/v1/runs/run-abc/host-events/stream?host=web+1"
+	if len(*seen) != 1 || (*seen)[0] != want {
+		t.Errorf("wrong path:\n got %v\nwant %q", *seen, want)
+	}
+}
+
+func TestGetRunHostEventStreamWithNoHostAsksForTheWholeRun(t *testing.T) {
+	// The other direction: an empty host must add no parameter at all, or the
+	// server would narrow to a host literally named "".
+	c, seen := newHostResultsFixture(t, http.StatusOK, "")
+
+	if _, err := c.GetRunHostEventStream(context.Background(), "run-abc", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(*seen) != 1 || (*seen)[0] != "/api/v1/runs/run-abc/host-events/stream" {
+		t.Errorf("wrong path: %v", *seen)
 	}
 }

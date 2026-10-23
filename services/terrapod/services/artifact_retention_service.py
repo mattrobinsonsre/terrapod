@@ -31,6 +31,7 @@ from terrapod.db.models import (
     CachedProviderPackage,
     ConfigurationVersion,
     Run,
+    RunHostResult,
     StateVersion,
     Workspace,
 )
@@ -42,6 +43,7 @@ from terrapod.storage.keys import (
     config_version_key,
     configure_log_key,
     cost_estimate_key,
+    host_events_host_key,
     host_events_key,
     host_events_large_key,
     lock_file_key,
@@ -313,6 +315,33 @@ async def _cleanup_run_artifacts(
                     "Failed to delete run artifact from storage",
                     run_id=run_id,
                     key_fn=key_fn.__name__,
+                    exc_info=True,
+                )
+
+        # The per-host event partitions (#1928), which cannot be entries in
+        # `RUN_ARTIFACT_KEYS` because that tuple's functions take only
+        # `(workspace_id, run_id)` and these need the host.
+        #
+        # **This is the only artifact here whose key set is DERIVED rather than
+        # fixed, and the derivation is what makes it safe to write N of them.**
+        # The host set comes from this run's own `run_host_results` rows:
+        # nothing in the tree deletes those, and this sweep touches storage
+        # only, so they are still here however long after the run this fires.
+        # Deriving from a prefix listing instead would need an enumeration the
+        # storage protocol does not offer -- which is exactly why the
+        # oversized-payload sidecar is one object per run and not one per
+        # payload, a payload reference existing only inside the stream.
+        host_rows = await db.execute(
+            select(RunHostResult.host).where(RunHostResult.run_id == run.id)
+        )
+        for host in host_rows.scalars().all():
+            try:
+                await storage.delete(host_events_host_key(ws_id, run_id, host))
+                artifact_count += 1
+            except Exception:
+                logger.warning(
+                    "Failed to delete a host's event partition from storage",
+                    run_id=run_id,
                     exc_info=True,
                 )
 

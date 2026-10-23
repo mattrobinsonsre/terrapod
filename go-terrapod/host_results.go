@@ -214,12 +214,32 @@ func (c *Client) ListRunHostEvents(ctx context.Context, runID, host string) ([]*
 // IsDetailReaped to tell them apart: presenting a reaped stream as "nothing
 // happened" is the specific failure the status exists to prevent, because the
 // run's own summary is still sitting beside it saying tasks ran.
-func (c *Client) GetRunHostEventStream(ctx context.Context, runID string) ([]byte, error) {
+//
+// # host selects one host's own object rather than filtering
+//
+// Empty means the whole run. A host name fetches that host's partition, which
+// the server writes at ingest alongside the whole stream -- so a drill-down is
+// one object fetch rather than a download of a stream that is tens of MB at
+// fleet scale. A partition is a byte-exact subsequence, so parse either the
+// same way, and it holds everything that happened to the host rather than only
+// its failures, which ListRunHostEvents already returns as rows.
+//
+// With a host named, the 410/404 split narrows to it: a reaped partition for a
+// host the run reported on is 410, and a host it never reported on is 404,
+// because nothing was lost there.
+//
+// The parameter rather than a second method, matching ListRunHostEvents, whose
+// host argument means exactly this.
+func (c *Client) GetRunHostEventStream(ctx context.Context, runID, host string) ([]byte, error) {
 	base, err := runPath(runID)
 	if err != nil {
 		return nil, err
 	}
-	return c.Get(ctx, base+"/host-events/stream")
+	path := base + "/host-events/stream"
+	if host != "" {
+		path += "?host=" + url.QueryEscape(host)
+	}
+	return c.Get(ctx, path)
 }
 
 // GetRunHostEventPayloads returns the sidecar holding payloads too large to

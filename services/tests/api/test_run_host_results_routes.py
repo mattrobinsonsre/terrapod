@@ -312,6 +312,69 @@ class TestTheEventStreamSeparatesReapedFromNeverWritten:
         assert resp.status_code == 404
         assert "retention" not in resp.json()["detail"]
 
+    async def test_a_host_is_served_its_OWN_object_not_a_filter_of_the_stream(
+        self, _db, _redis, _storage_p
+    ):
+        """The partition is the point of #1928's "one object fetch".
+
+        Mutation target: serving `host_events_key` here regardless of `?host=`
+        passes every status assertion while making the drill-down a scan of a
+        stream that is tens of MB at fleet scale -- the exact cost the partition
+        exists to remove, and invisible to any test that checks only the code.
+        """
+        from terrapod.storage.keys import host_events_host_key
+
+        run = _run(uuid.uuid4())
+        db = AsyncMock()
+        app = _app(db)
+        storage = self._storage(present=True)
+        with (
+            patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+            patch(
+                "terrapod.api.routers.runs._require_run_ws_capability",
+                AsyncMock(return_value=None),
+            ),
+            patch("terrapod.api.routers.runs.get_storage", return_value=storage),
+        ):
+            resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/stream?host=web1")
+        assert resp.status_code == 302
+        asked = storage.exists.await_args.args[0]
+        assert asked == host_events_host_key(str(run.workspace_id), str(run.id), "web1"), (
+            f"served the wrong object: {asked}"
+        )
+
+    async def test_an_unknown_host_is_404_while_a_reaped_one_is_410(self, _db, _redis, _storage_p):
+        """Narrowed to the host, not the run.
+
+        A run that reported ten hosts and is asked about an eleventh lost
+        nothing, so it must not claim retention took something. Both cases are
+        driven, because each alone passes whichever status the route returns.
+        """
+        run = _run(uuid.uuid4())
+        for host, rows, expect in (
+            ("web1", [_result("web1")], 410),
+            ("nope", [_result("web1")], 404),
+        ):
+            db = AsyncMock()
+            app = _app(db)
+            with (
+                patch("terrapod.api.routers.runs._get_run", AsyncMock(return_value=run)),
+                patch(
+                    "terrapod.api.routers.runs._require_run_ws_capability",
+                    AsyncMock(return_value=None),
+                ),
+                patch(
+                    "terrapod.api.routers.runs.get_storage",
+                    return_value=self._storage(present=False),
+                ),
+                patch(
+                    "terrapod.api.routers.runs.host_results_service.list_results",
+                    AsyncMock(return_value=rows),
+                ),
+            ):
+                resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-events/stream?host={host}")
+            assert resp.status_code == expect, f"host={host} gave {resp.status_code}"
+
     async def test_the_payloads_sidecar_derives_from_a_payload_ref(self, _db, _redis, _storage_p):
         """A run that reported hosts but spilled nothing LOST nothing.
 

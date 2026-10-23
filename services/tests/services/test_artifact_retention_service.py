@@ -234,6 +234,61 @@ class TestCleanupRunArtifacts:
                 assert key_fn(str(ws_id), str(run.id)) in asked, key_fn.__name__
 
     @pytest.mark.asyncio
+    async def test_the_per_host_event_partitions_are_deleted_too(self):
+        """#1928's partitions, whose keys are DERIVED rather than fixed.
+
+        They cannot be entries in `RUN_ARTIFACT_KEYS` -- its functions take only
+        `(workspace_id, run_id)` and these need the host -- so nothing else in
+        this sweep would reach them and they would be the one artifact that
+        outlives its run for ever.
+
+        The host set comes from the run's own `run_host_results` rows, which is
+        what makes writing N objects per run safe: nothing in the tree deletes
+        those rows and this sweep touches storage only, so they are still there
+        however long afterwards this fires.
+        """
+        from terrapod.storage.keys import host_events_host_key
+
+        ws_id = _make_uuid()
+        run = _make_run(ws_id, status="applied")
+        hosts = ["web1", "web2", "db1"]
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        # Scripted in call order: the run sweep, then this run's host rows.
+        db.execute.side_effect = [_FakeResult([run]), _FakeResult(hosts)]
+
+        deleted = await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        asked = {call.args[0] for call in storage.delete.await_args_list}
+        for host in hosts:
+            key = host_events_host_key(str(ws_id), str(run.id), host)
+            assert key in asked, f"partition for {host} was not deleted"
+        # And the count includes them, so a partition deleted without being
+        # counted cannot read as nothing having happened.
+        assert deleted == len(RUN_ARTIFACT_KEYS) + len(hosts)
+
+    @pytest.mark.asyncio
+    async def test_a_run_that_reported_no_hosts_asks_for_no_partitions(self):
+        """No rows, no derived keys -- so a plan or apply costs nothing extra.
+
+        The sweep runs over every terminal run in the deployment, the
+        overwhelming majority of which are plans and applies with no host
+        results at all, so this is the common path rather than an edge.
+        """
+        ws_id = _make_uuid()
+        run = _make_run(ws_id, status="applied")
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        db.execute.side_effect = [_FakeResult([run]), _FakeResult([])]
+
+        deleted = await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        assert deleted == len(RUN_ARTIFACT_KEYS)
+        assert storage.delete.await_count == len(RUN_ARTIFACT_KEYS)
+
+    @pytest.mark.asyncio
     async def test_resets_has_json_output_flag_when_artifact_deleted(self):
         """After retention deletes a run's `.json-output`, the row must stop
         advertising the URL via `_plan_json` — i.e. `has_json_output` must

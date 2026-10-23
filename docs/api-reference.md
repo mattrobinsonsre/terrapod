@@ -1631,6 +1631,7 @@ An Ansible configure reports per **host**, not per resource, so a configure run 
 GET /api/v1/runs/{run_id}/host-results                       # every host (workspace read)
 GET /api/v1/runs/{run_id}/host-events[?host=<name>]          # failures only (workspace read)
 GET /api/v1/runs/{run_id}/host-events/stream                 # every event, JSONL (STATE read)
+GET /api/v1/runs/{run_id}/host-events/stream?host=<name>     # that host's own object (STATE read)
 GET /api/v1/runs/{run_id}/host-events/payloads               # oversized-payload sidecar (STATE read)
 ```
 
@@ -1650,6 +1651,12 @@ Two of those need explaining, because taking them at face value gets the wrong a
 Order by `sequence` rather than `created-at`: under `forks` several hosts finish inside the same millisecond and the timestamps tie. `task-uuid` correlates events **within one run only** — ansible generates a fresh one per run of the same playbook — so the cross-run key is `task-name`, which is what the index is on. `payload-ref` is non-null when the result was too large to store inline and identifies it in the run's oversized-payload sidecar.
 
 **GET host-events/stream** returns the complete per-task event stream as JSONL — one JSON object per line, in the order ansible reported them — and **GET host-events/payloads** returns the sidecar a `payload-ref` points into, as JSONL of `{"ref": N, "payload": {…}}`.
+
+**`?host=<name>` serves that host's own object rather than filtering the run's.** The events are partitioned per host at ingest as well as kept whole, so a drill-down is one object fetch instead of a scan of a stream that is tens of MB at fleet scale. A partition is a byte-exact subsequence of the whole stream — the same lines, copied verbatim rather than re-serialised — so a reader parses either identically. It holds **everything** that happened to that host, not just its failures; those are the rows above.
+
+With `?host=`, the three-way below narrows to that host: a recap row for it and no object is a `410`, and no row at all is a `404`, because a run asked about a host it never reported on lost nothing.
+
+Partitions are deleted by artifact retention like every other run artifact, from the host list in `run_host_results` — the only artifact here whose key set is derived rather than fixed, which is safe precisely because nothing deletes those rows and the sweep touches storage only. (The oversized-payload sidecar is one object per run for the opposite reason: a payload *reference* exists only inside the stream, so nothing outside it could enumerate what was written.)
 
 Both are gated on **`state:read`, not `run:read`**, and the difference is the content rather than the shape. The two reads above serve counters and ansible's own failure text truncated at 2000 characters, which is the configure equivalent of a plan log and is served at the same tier for the same reason. These two carry `result._result` verbatim for every event including `ok` — each module's whole return value, so a `command`'s full stdout, a `uri` task's response body, whatever a lookup resolved. That is state-grade, and serving a full resolved document a tier below raw state is [GHSA-gwwq-5v7q-h3f4](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gwwq-5v7q-h3f4). Ansible already censors a `no_log` task's result at source, which is the playbook author's own control over this.
 

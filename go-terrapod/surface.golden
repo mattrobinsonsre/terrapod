@@ -1758,7 +1758,7 @@ method (*Client) GetRunComplianceReport(ctx context.Context, runID string) (*Run
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunHostEventPayloads(ctx context.Context, runID string) ([]byte, error)
-method (*Client) GetRunHostEventStream(ctx context.Context, runID string) ([]byte, error)
+method (*Client) GetRunHostEventStream(ctx context.Context, runID, host string) ([]byte, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
 method (*Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error)
 method (*Client) GetRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)

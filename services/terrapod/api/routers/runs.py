@@ -93,6 +93,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     cost_estimate_key,
+    host_events_host_key,
     host_events_key,
     host_events_large_key,
     plan_json_output_key,
@@ -1862,6 +1863,7 @@ async def _host_event_artifact(
 async def download_run_host_event_stream(
     request: Request,
     run_id: str = Path(...),
+    host: str = Query("", description="Only this host's slice of the stream."),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
@@ -1884,16 +1886,38 @@ async def download_run_host_event_stream(
     redacted second artifact is another thing to keep correct for ever. Ansible
     already censors a `no_log` task's result at source, which is the operator's
     own control over this and the one a playbook author expects to work.
+
+    **`?host=` serves that host's own object rather than filtering this one**,
+    which is the point of the partition #1928 asks for: a drill-down is one
+    object fetch instead of a scan of a stream that is tens of MB at fleet
+    scale. The partition is a byte-exact subsequence, so a reader parses either
+    the same way.
+
+    One route rather than a second, because the three-way below is the whole
+    subtlety and is identical for both: duplicating it is how the two come to
+    disagree about what a 410 means.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.STATE_READ, user, db, request=request)
 
     # A recap row per host is written when the stream is ingested, so rows
     # present means a stream was stored -- which is what separates "reaped" from
-    # "this run reported no hosts".
+    # "this run reported no hosts". With `?host=`, the question narrows to that
+    # one host: a row for it means it HAD a partition, so a missing object is a
+    # retention event, while no row means the run never reported on it and
+    # nothing was lost.
     async def _reported() -> bool:
-        return bool(await host_results_service.list_results(db, run))
+        rows = await host_results_service.list_results(db, run)
+        if not host:
+            return bool(rows)
+        return any(row.host == host for row in rows)
 
+    if host:
+        return await _host_event_artifact(
+            host_events_host_key(str(run.workspace_id), str(run.id), host),
+            ever_existed=_reported,
+            absent=f"This run reported nothing for host {host!r}.",
+        )
     return await _host_event_artifact(
         host_events_key(str(run.workspace_id), str(run.id)),
         ever_existed=_reported,
