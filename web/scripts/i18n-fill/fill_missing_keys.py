@@ -43,6 +43,7 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import os
 import pathlib
 import re
 import sys
@@ -53,23 +54,56 @@ _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)")
 
 
 def missing_keys(locale: str, namespace: str) -> tuple[str, ...]:
-    """The dotted `group.leaf` keys `en` has under `namespace` and `locale` has not.
+    """The dotted paths `en` has under `namespace` and `locale` has not.
 
-    Two levels deep, which is the shape of every namespace this fills. A key
-    whose value is itself an object is skipped rather than guessed at: a nested
-    group needs its own fill, and silently flattening one would write a string
-    where the catalogue expects a map.
+    **Any depth.** This walked exactly TWO levels, which made a nested group
+    unfillable rather than merely unsupported: it surfaced the GROUP as the
+    missing key, whose English value is an object, then refused it as "not a
+    non-empty string" -- and because a partial fill is also refused, there was
+    no subset of such a change the script would accept. Three separate fills of
+    `runDetail.log.hosts.*` hit that and each wrote its own driver, which is the
+    #1915 failure the one-writer rule exists to prevent.
+
+    The old docstring said a nested group "is skipped rather than guessed at".
+    The intent was right and the skip was implemented at the group level rather
+    than the leaf, so it hard-failed instead of skipping. Recursing to the leaf
+    is what the intent actually required -- `runDetail.log.index` had been a
+    nested group all along, so the shape was never exotic.
     """
     src = _load("en")[namespace]
     dst = _load(locale).get(namespace, {})
     out: list[str] = []
-    for group, items in src.items():
-        if not isinstance(items, dict):
-            continue
-        have = dst.get(group, {})
-        have = have if isinstance(have, dict) else {}
-        out.extend(f"{group}.{leaf}" for leaf in items if leaf not in have)
+
+    def walk(want, have, prefix: str) -> None:
+        for name, value in want.items():
+            here = have.get(name) if isinstance(have, dict) else None
+            path = f"{prefix}{name}"
+            if isinstance(value, dict):
+                walk(value, here if isinstance(here, dict) else {}, f"{path}.")
+            elif here is None:
+                out.append(path)
+
+    walk(src, dst, "")
     return tuple(out)
+
+
+def _reach(doc, path: str):
+    """The English value at a dotted path, for the parity and identity checks."""
+    for part in path.split("."):
+        doc = doc[part]
+    return doc
+
+
+def _plant(doc, path: str, value: str) -> None:
+    """Write `value` at a dotted path, creating the groups it passes through."""
+    *groups, leaf = path.split(".")
+    for group in groups:
+        nxt = doc.get(group)
+        if not isinstance(nxt, collections.OrderedDict):
+            nxt = collections.OrderedDict(nxt) if isinstance(nxt, dict) else collections.OrderedDict()
+            doc[group] = nxt
+        doc = nxt
+    doc[leaf] = value
 
 
 def _load(locale: str) -> collections.OrderedDict:
@@ -113,8 +147,14 @@ def main() -> int:
         if not isinstance(value, str) or not value.strip():
             problems.append(f"{key}: not a non-empty string")
             continue
-        grp, leaf = key.split(".")
-        src = english[grp][leaf]
+        try:
+            src = _reach(english, key)
+        except (KeyError, TypeError):
+            problems.append(f"{key}: not a key `en` has under this namespace")
+            continue
+        if not isinstance(src, str):
+            problems.append(f"{key}: names a GROUP in `en`, not a value — fill its leaves")
+            continue
         want = sorted(set(_PLACEHOLDER.findall(src)))
         got = sorted(set(_PLACEHOLDER.findall(value)))
         if want != got:
@@ -128,9 +168,13 @@ def main() -> int:
     doc = _load(args.locale)
     wd = doc.setdefault(args.namespace, collections.OrderedDict())
     for key, value in values.items():
-        grp, leaf = key.split(".")
-        wd.setdefault(grp, collections.OrderedDict())[leaf] = value
-    path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
+        _plant(wd, key, value)
+    # Atomically, so a concurrent reader -- several locales are often filled in
+    # parallel -- can only ever see the whole old file or the whole new one.
+    rendered = json.dumps(doc, ensure_ascii=False, indent=2) + "\n"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(rendered)
+    os.replace(tmp, path)
     print(f"{args.locale}: wrote {len(values)} keys")
     return 0
 
