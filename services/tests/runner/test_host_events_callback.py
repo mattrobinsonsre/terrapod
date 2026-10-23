@@ -77,7 +77,17 @@ def _fixture(root: pathlib.Path, *, play: str, cfg: str | None = None) -> None:
                 dead:
                   hosts:
                     hdead:
-                      ansible_host: 203.0.113.9
+                      # Loopback with a port nothing can be listening on.
+                      # ECONNREFUSED is immediate and STRUCTURAL -- no network,
+                      # no DNS, no timeout -- so it means the same thing in a
+                      # container with no egress. A reserved TEST-NET address
+                      # over SSH does not: it fired the unreachable hook locally
+                      # and fired NOTHING in CI, where this test then failed on
+                      # an empty event list rather than on the property it
+                      # exists to pin. Measured at 0.35s against a multi-second
+                      # connect timeout.
+                      ansible_host: 127.0.0.1
+                      ansible_port: 1
                       ansible_connection: ssh
                       ansible_user: nobody
             """

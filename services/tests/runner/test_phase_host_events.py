@@ -17,7 +17,6 @@ import pytest
 from terrapod.runner import ee_client
 from terrapod.runner.phases import host_events
 
-_MODULE = pathlib.Path(host_events.__file__)
 _PLUGIN_SRC = (
     pathlib.Path(host_events.__file__).resolve().parents[1]
     / "ansible_callback"

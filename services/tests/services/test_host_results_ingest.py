@@ -213,7 +213,7 @@ class TestItToleratesAStreamItCannotFullyRead:
             + "\n"
             + '{"kind": "failed", "host": "we'
         )
-        db, _run_, (hosts, events) = await _ingest(body)
+        _db, _run_, (hosts, events) = await _ingest(body)
         assert (hosts, events) == (1, 1)
 
     async def test_a_non_object_line_is_skipped(self):
@@ -222,7 +222,7 @@ class TestItToleratesAStreamItCannotFullyRead:
             + json.dumps({"kind": "failed", "host": "web2", "task": "t", "seq": 1})
             + "\n"
         )
-        db, _run_, (_hosts, events) = await _ingest(body)
+        _db, _run_, (_hosts, events) = await _ingest(body)
         assert events == 1
 
     async def test_an_empty_stream_yields_nothing_rather_than_failing(self):
@@ -233,7 +233,7 @@ class TestItToleratesAStreamItCannotFullyRead:
     async def test_the_event_rows_are_capped_while_the_stream_keeps_everything(self):
         over = host_results_service.MAX_EVENT_ROWS + 25
         records = [{"kind": "failed", "host": f"h{i}", "task": "t", "seq": i} for i in range(over)]
-        db, _run_, (_hosts, events) = await _ingest(records)
+        _db, _run_, (_hosts, events) = await _ingest(records)
         assert events == host_results_service.MAX_EVENT_ROWS
 
 
