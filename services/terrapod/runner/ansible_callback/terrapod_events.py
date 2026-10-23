@@ -11,9 +11,13 @@ Terrapod imports it.
 
 It is a **notification** callback, not a stdout one. Ansible permits exactly one
 `stdout_callback` and many notification callbacks, which is what lets this
-coexist with ansible's own renderer -- measured on 2.18.3: 107 events captured
-while `default` produced byte-normal output. The human log's format belongs to
-#2144's stdout callback; this one never writes to stdout.
+coexist with whatever holds that single slot -- measured on 2.18.3: 107 events
+captured while the stdout callback produced byte-normal output. Since #2144 that
+slot is OURS (`terrapod_stdout`, a `default` subclass that prefixes every line
+with its host), so the two plugins sit in the same directory and
+`ANSIBLE_CALLBACK_PLUGINS` loads both: it is a search path, not one file. This
+one still never writes to stdout, and the human log's format belongs to the
+stdout callback rather than here.
 
 `CALLBACK_NEEDS_ENABLED = False` is load-bearing and not a convenience. Measured
 against an `ansible.cfg` that sets both `callback_plugins` and
