@@ -1715,6 +1715,7 @@ method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogI
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
 method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error)
 method (*Client) GetCatalogItemInterface(ctx context.Context, id string) (*CatalogItemInterface, error)
+method (*Client) GetConfigureLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
 method (*Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error)
 method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)

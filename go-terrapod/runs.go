@@ -604,21 +604,40 @@ func (o *LogOptions) query() string {
 // "run-<uuid>", or "plan-<uuid>"). Returns the log bytes as-is; a run that has
 // not planned yet simply has a short or empty log rather than an error.
 func (c *Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error) {
-	return c.runLog(ctx, "plans", runID, opts)
+	return c.runLog(ctx, "/api/v2/", "plans", runID, opts)
 }
 
 // GetApplyLog returns the apply-phase log for a run. Accepts a run id in any
 // form, as GetPlanLog does.
 func (c *Client) GetApplyLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error) {
-	return c.runLog(ctx, "applies", runID, opts)
+	return c.runLog(ctx, "/api/v2/", "applies", runID, opts)
 }
 
-// runLog serves both phases: the endpoints are identical apart from the
-// collection segment, and both key on the run's UUID.
-func (c *Client) runLog(ctx context.Context, collection, runID string, opts *LogOptions) ([]byte, error) {
-	id := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(runID, "plan-"), "apply-"), "run-")
+// GetConfigureLog returns the configure-phase (Ansible) log for a run, which is
+// every configure's log whether it followed an apply or stood alone (#2144).
+// Accepts a run id in any form, as the two above do.
+//
+// On the NATIVE prefix, unlike its siblings: a configure is not a concept any
+// CLI consumes, so the route is not on the TFE compatibility surface. There is
+// no legacy fallback because the endpoint exists on no released version, so a
+// fallback would be code that can never succeed.
+//
+// Pass Plain to get ansible's own words. Each line of the raw log is prefixed
+// with the host it belongs to so a viewer can show one host alone, and Plain
+// removes that prefix along with the ANSI codes.
+func (c *Client) GetConfigureLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error) {
+	return c.runLog(ctx, "/api/v1/", "configures", runID, opts)
+}
+
+// runLog serves every phase: the endpoints are identical apart from the prefix
+// and the collection segment, and all three key on the run's UUID.
+func (c *Client) runLog(ctx context.Context, prefix, collection, runID string, opts *LogOptions) ([]byte, error) {
+	id := runID
+	for _, p := range []string{"plan-", "apply-", "configure-", "run-"} {
+		id = strings.TrimPrefix(id, p)
+	}
 	if id == "" {
 		return nil, fmt.Errorf("run id is required")
 	}
-	return c.Get(ctx, "/api/v2/"+collection+"/"+url.PathEscape(id)+"/log"+opts.query())
+	return c.Get(ctx, prefix+collection+"/"+url.PathEscape(id)+"/log"+opts.query())
 }

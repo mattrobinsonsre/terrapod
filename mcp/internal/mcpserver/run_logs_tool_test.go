@@ -106,13 +106,34 @@ func TestRunLogsAsksTheServerForPlainText(t *testing.T) {
 }
 
 func TestRunLogsPhaseSelectsTheCollection(t *testing.T) {
-	for phase, want := range map[string]string{"plan": "/api/v2/plans/", "apply": "/api/v2/applies/"} {
+	// `configure` is on the NATIVE prefix, unlike the other two: no CLI consumes
+	// a configure, so its route is not on the TFE compatibility surface (#2144).
+	// Keeping all three in one table is what makes that asymmetry visible rather
+	// than hiding it in a test of its own.
+	for phase, want := range map[string]string{
+		"plan":      "/api/v2/plans/",
+		"apply":     "/api/v2/applies/",
+		"configure": "/api/v1/configures/",
+	} {
 		var q string
 		sess := logCaller(t, "ok", &q)
 		callLogs(t, sess, map[string]any{"run_id": "run-aaaa", "phase": phase})
 		if !strings.Contains(q, want) {
 			t.Errorf("phase %q hit %q, want %q", phase, q, want)
 		}
+	}
+}
+
+func TestRunLogsAsksForPlainOnAConfigureToo(t *testing.T) {
+	// For a configure, `plain` does more than strip ANSI: it removes the
+	// per-host line prefix the raw log carries (#2144). Without it an agent
+	// would have to parse our framing to read ansible's words, which is exactly
+	// the work the flag exists to save it.
+	var q string
+	sess := logCaller(t, "ok", &q)
+	callLogs(t, sess, map[string]any{"run_id": "run-aaaa", "phase": "configure"})
+	if !strings.Contains(q, "format=plain") {
+		t.Errorf("a configure read must ask for plain, got %q", q)
 	}
 }
 

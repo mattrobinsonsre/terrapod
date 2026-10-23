@@ -365,7 +365,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_run_logs ────────────────────────────────────────────
 	type runLogsIn struct {
 		RunID    string `json:"run_id" jsonschema:"the run id (run-...) whose log to fetch"`
-		Phase    string `json:"phase,omitempty" jsonschema:"which phase to read: plan (default) or apply"`
+		Phase    string `json:"phase,omitempty" jsonschema:"which phase to read: plan (default), apply, or configure for an Ansible run"`
 		Offset   int64  `json:"offset,omitempty" jsonschema:"byte offset to read from; omit to get the END of the log, which is where a failure is"`
 		MaxBytes int64  `json:"max_bytes,omitempty" jsonschema:"cap on returned bytes (default 16384)"`
 	}
@@ -379,9 +379,10 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_logs",
-		Description: "Fetch a run's plan or apply LOG — the engine's own output (OpenTofu/Terraform, or Pulumi), which is where the reason for a failure actually is. terrapod_run_get reports THAT a run errored and its exit code; this reports WHY. " +
+		Description: "Fetch a run's plan, apply or configure LOG — the engine's own output (OpenTofu/Terraform, or Pulumi), or ansible's for a configure, which is where the reason for a failure actually is. terrapod_run_get reports THAT a run errored and its exit code; this reports WHY. " +
 			"Returns the END of the log by default, because that is where an error is reported and a full apply log can be megabytes; `truncated` says whether earlier output was dropped and `offset` says where the returned chunk starts, so pass that offset back to page further in. ANSI colour codes are stripped. " +
-			"An empty log is not an error: a run that has not reached the phase yet simply has nothing to show.",
+			"An empty log is not an error: a run that has not reached the phase yet simply has nothing to show. " +
+			"For `configure`, prefer terrapod_run_host_results first: ansible's output is per host and interleaved, so the per-host table says WHICH hosts failed far faster than reading the log, and this log then says why.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runLogsIn) (*mcp.CallToolResult, runLogsOut, error) {
 		if in.RunID == "" {
@@ -391,14 +392,20 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		if phase == "" {
 			phase = "plan"
 		}
-		if phase != "plan" && phase != "apply" {
-			return errText("phase must be 'plan' or 'apply'"), runLogsOut{}, nil
+		if phase != "plan" && phase != "apply" && phase != "configure" {
+			return errText("phase must be 'plan', 'apply' or 'configure'"), runLogsOut{}, nil
 		}
 
+		// `Plain` on every phase, which for a configure also strips the per-host
+		// line prefix the raw log carries (#2144) -- so an agent reads ansible's
+		// own words rather than our framing, with no parsing of its own.
 		opts := &terrapod.LogOptions{Plain: true, Offset: in.Offset}
 		get := c.GetPlanLog
-		if phase == "apply" {
+		switch phase {
+		case "apply":
 			get = c.GetApplyLog
+		case "configure":
+			get = c.GetConfigureLog
 		}
 		raw, err := get(ctx, in.RunID, opts)
 		if err != nil {

@@ -885,7 +885,7 @@
           "type": "integer"
         },
         "phase": {
-          "description": "which phase to read: plan (default) or apply",
+          "description": "which phase to read: plan (default), apply, or configure for an Ansible run",
           "type": "string"
         },
         "run_id": {

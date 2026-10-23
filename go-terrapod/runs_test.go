@@ -50,11 +50,19 @@ func newRunsFixture(t *testing.T) *Client {
 		switch {
 		// Log endpoints: echo back what was asked for so the tests can assert
 		// the query the client built, not just that a request happened.
-		case r.Method == http.MethodGet && (p == "/api/v2/plans/aaaa/log" || p == "/api/v2/applies/aaaa/log"):
+		case r.Method == http.MethodGet && (p == "/api/v2/plans/aaaa/log" ||
+			p == "/api/v2/applies/aaaa/log" ||
+			// Native, unlike the two above: no CLI consumes a configure, so the
+			// route is not on the TFE compatibility surface (#2144). The prefix
+			// being different is itself part of what the tests assert.
+			p == "/api/v1/configures/aaaa/log"):
 			w.Header().Set("Content-Type", "text/plain")
 			phase := "plan"
 			if strings.HasPrefix(p, "/api/v2/applies/") {
 				phase = "apply"
+			}
+			if strings.HasPrefix(p, "/api/v1/configures/") {
+				phase = "configure"
 			}
 			q := r.URL.Query()
 			_, _ = fmt.Fprintf(w, "phase=%s offset=%s limit=%s format=%s",
@@ -329,6 +337,65 @@ func TestGetApplyLogHitsTheAppliesCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(got), "phase=apply") {
+		t.Errorf("got %s", got)
+	}
+}
+
+func TestGetConfigureLogHitsTheNativeConfiguresCollection(t *testing.T) {
+	c := newRunsFixture(t)
+	// Every id form, including its own prefix: a configure id is the run's UUID
+	// with `configure-` on it, the same shape as the other two phases.
+	for _, id := range []string{"aaaa", "run-aaaa", "configure-aaaa"} {
+		got, err := c.GetConfigureLog(t.Context(), id, nil)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if !strings.Contains(string(got), "phase=configure") {
+			t.Errorf("%s: got %s", id, got)
+		}
+	}
+}
+
+func TestGetConfigureLogIsNotOnTheCompatibilitySurface(t *testing.T) {
+	// The fixture serves the configure log at `/api/v1/` ALONE, so a client
+	// that reached for `/api/v2/` would 404 here rather than silently working.
+	// That is the assertion: mounting a native concept on the surface the CLI
+	// reads is the #1905 mistake in reverse.
+	var seen string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.URL.Path
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetConfigureLog(t.Context(), "run-aaaa", nil); err != nil {
+		t.Fatal(err)
+	}
+	if seen != "/api/v1/configures/aaaa/log" {
+		t.Errorf("configure log went to %q, expected the native prefix", seen)
+	}
+}
+
+func TestGetConfigureLogRequiresARunID(t *testing.T) {
+	c := newRunsFixture(t)
+	if _, err := c.GetConfigureLog(t.Context(), "configure-", nil); err == nil {
+		t.Error("an id that is only a prefix must be refused, not sent as an empty path")
+	}
+}
+
+func TestGetConfigureLogPassesPlainThrough(t *testing.T) {
+	// `Plain` is what strips the per-host prefix as well as the ANSI codes, so a
+	// consumer that wants ansible's own words has one flag rather than a parser.
+	c := newRunsFixture(t)
+	got, err := c.GetConfigureLog(t.Context(), "run-aaaa", &LogOptions{Plain: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "format=plain") {
 		t.Errorf("got %s", got)
 	}
 }
