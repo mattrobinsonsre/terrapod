@@ -723,9 +723,16 @@ function LogPanel({
   // Pin the active scroller to the tail when following and the content changes.
   // Runs in useLayoutEffect (synchronously before paint) so a fresh chunk or
   // the panel's own resize never flashes an intermediate scroll position.
+  //
+  // Keyed on `shownLog`, the text actually rendered, rather than on the `log`
+  // prop: switching the per-host filter changes the content without any new
+  // chunk arriving, and #2144 requires the switch to preserve follow. Keyed on
+  // `log` it did not -- a filtered view opened short of its own tail and stayed
+  // there until the next chunk happened to land, which on a finished run is
+  // never.
   useLayoutEffect(() => {
     if (following) scrollToBottom(false)
-  }, [log, colorMode, following, scrollToBottom])
+  }, [shownLog, colorMode, following, scrollToBottom])
 
   // Track the scroller's position so scrolling up to read disengages follow and
   // scrolling back to the bottom re-engages it. The listener is on the window

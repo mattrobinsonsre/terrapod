@@ -58,6 +58,22 @@ const TAGGED_BODY = [
   tag('~', 'db1   : ok=1  changed=0  unreachable=0  failed=0'),
 ].join('\n')
 
+/**
+ * Long enough that the log pane genuinely overflows.
+ *
+ * Without that, `scrollHeight === clientHeight` and "is it scrolled to the
+ * bottom" is true however the component behaves -- the follow assertion below
+ * would pass vacuously, which is worse than not having it.
+ */
+const LONG_TAGGED_BODY = [
+  HEADER,
+  tag('~', 'PLAY [configure] ***************************************************'),
+  ...Array.from({ length: 120 }, (_, i) =>
+    tag(i % 2 === 0 ? 'web1' : 'web2', `ok: [${i % 2 === 0 ? 'web1' : 'web2'}] line ${i}`),
+  ),
+  tag('~', 'PLAY RECAP *********************************************************'),
+].join('\n')
+
 const UNTAGGED_BODY = [
   'PLAY [configure] ***************************************************',
   '',
@@ -304,5 +320,30 @@ test.describe('the configure log', () => {
     })
     await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}`)
     await expect(page.getByTestId('log-pre-configure')).toHaveCount(0)
+  })
+
+  test('switching the filter keeps follow pinned to the new tail', async ({ page }) => {
+    // #2144 requires the switch to preserve follow. The effect that pins the
+    // tail was keyed on the `log` prop, so a filter change -- which alters the
+    // rendered text with no new chunk arriving -- did not re-pin: the filtered
+    // view opened short of its own tail and stayed there until the next chunk
+    // landed, which on a finished run is never.
+    await stubRun(page, { body: LONG_TAGGED_BODY, status: 'configuring', complete: false })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+
+    const pane = paneText(page)
+    await expect(pane).toContainText('line 119')
+
+    // The fixture must actually overflow, or the assertion below proves nothing.
+    const overflows = await pane.evaluate(el => el.scrollHeight > el.clientHeight + 10)
+    expect(overflows, 'fixture too short to test scrolling').toBe(true)
+
+    const atBottom = () =>
+      pane.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight < 4)
+
+    await expect.poll(atBottom).toBe(true)
+    await page.getByTestId('log-hosts-configure').selectOption('web1')
+    await expect(pane).not.toContainText('[web2]')
+    await expect.poll(atBottom).toBe(true)
   })
 })
