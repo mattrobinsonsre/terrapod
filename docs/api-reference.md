@@ -1536,6 +1536,50 @@ A **Pulumi** run uploads a preview digest to the same place (#1560), built from 
 
 The digest deliberately carries each step's operation, URN and type and nothing else — the engine's events also hold every resource's old and new state, which is where a stack's secrets are. `steps` is capped (`steps_truncated` says when), while `change_summary` is exact however large the preview. Both shapes fill the same `resource-additions` / `resource-changes` / `resource-destructions` / `resource-replacements` / `resource-imports` attributes, so the change badges, conditional auto-apply and the AI summary read one shape whatever produced it. Pulumi's `replace` fills `resource-replacements`; its paired `create-replacement` and `delete-replaced` are not counted again.
 
+### Configure Details
+
+```
+GET /api/v1/runs/{run_id}/configure
+GET /api/v1/configures/{capability}/log[?offset=&limit=&format=raw|plain]
+```
+
+The configure phase's own sub-resource, beside Plan and Apply. Type `configures`,
+attributes `status` and `log-read-url`; the read needs workspace read, like its two
+siblings. **Native only** — no CLI consumes a configure, so unlike Plan and Apply these
+are not served on `/api/tfe/v2`.
+
+`status` tracks the configure and not the apply: `pending` before it starts (including
+during a composite's apply), `running` while `configuring`, `finished` on `applied`, and
+the run's own status otherwise. A run that is not a configure reports `unreachable` — a
+client gates the surface on the run's `is-configure` rather than on a 404.
+
+**Every configure writes one log, composite or standalone**, because one Job runs one
+phase. `log-read-url` carries a signed capability in place of the run id, as the plan and
+apply log URLs do, and the capability is its own kind — one minted for a plan log will not
+read a configure log.
+
+Each line of the raw log is prefixed with the host it belongs to, behind a
+self-identifying header, so a viewer can show one host's output alone:
+
+```
+#terrapod-host-log v1
+web1       | ok: [web1] => {
+web1       |     "msg": "hello from web1"
+web1       | }
+~          | TASK [say hello] ***********************************************
+```
+
+`~` marks a line belonging to no single host — a task banner, the `PLAY RECAP`. A host
+name containing `|`, `~`, `%` or whitespace is percent-escaped in the field, so the first
+`|` is always the separator. The header is **not** necessarily the first line: a
+collection install writes to the same artifact first, and anything before the header is
+untagged output that belongs to every view.
+
+**`format=plain` strips the prefix as well as the ANSI codes**, which is what the Go SDK's
+`Plain` option and the `terrapod_run_logs` MCP tool send — so a non-terminal consumer gets
+ansible's own words and the framing stays with the viewer that parses it. A log with no
+header is from a runner image predating this and is returned unchanged.
+
 ### Plan JSON Output
 
 ```
