@@ -8,17 +8,29 @@
 ARG BASE_IMAGE=python:3.14-slim
 FROM ${BASE_IMAGE}
 
+# `openssh-client` is here for one reason worth stating: a test that proves
+# ansible reports a host UNREACHABLE needs the ssh transport to exist. Without
+# it the connection plugin cannot run at all, so the unreachable hook never
+# fires and the test fails on an empty event list rather than on the property it
+# pins -- which is exactly what happened (#1928), twice, because the first fix
+# addressed the fixture's network dependence and not its missing binary.
+#
+# Same reasoning as the OPA and ansible-core installs below: this image bakes in
+# a real binary so the test exercises the real behaviour rather than skipping.
+# Not a published image, so it carries no CVE surface for operators.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     jq \
+    openssh-client \
     pkg-config \
     gcc \
     libc6-dev \
     xmlsec1 \
     libxmlsec1-dev \
     libxmlsec1-openssl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ssh -V
 
 # OPA — so the policy-engine tests (#343) exercise the real binary rather than
 # skipping. This is the ONE image that still bakes it in: the api and runner

@@ -63,6 +63,27 @@ def _working_ansible() -> str | None:
 ANSIBLE = _working_ansible()
 needs_ansible = pytest.mark.skipif(ANSIBLE is None, reason="no working ansible-playbook")
 
+#: The unreachable test needs the ssh TRANSPORT, not just ansible, and the
+#: failure without it is measured rather than assumed. Driving this exact
+#: fixture with ssh hidden from PATH:
+#:
+#:     with ssh     rc=0  unreachable=['hdead']  failed=[]
+#:     without ssh  rc=2  unreachable=[]         failed=['hdead']
+#:
+#: So ansible reports the host FAILED, not unreachable -- `ignore_unreachable`
+#: therefore does not apply either -- and the test fails on an empty list rather
+#: than on the property it pins. That is how it failed in CI twice: the first fix
+#: addressed the fixture's dependence on the network and not its missing binary.
+#:
+#: Skipping is right on a developer's machine and must NOT be how it behaves in
+#: CI, so `docker/Dockerfile.test` installs `openssh-client` and asserts `ssh -V`
+#: at BUILD time: a missing transport fails the image build, where it belongs,
+#: rather than quietly skipping the one test that needs it.
+needs_ssh = pytest.mark.skipif(
+    shutil.which("ssh") is None,
+    reason="no ssh transport, so ansible cannot report a host unreachable",
+)
+
 
 def _fixture(root: pathlib.Path, *, play: str, cfg: str | None = None) -> None:
     (root / "inventory.yml").write_text(
@@ -188,6 +209,7 @@ class TestItCapturesWhatAnsibleReports:
         failed = [r for r in _events(events) if r["kind"] == "failed"]
         assert [(r["host"], r["ignored"]) for r in failed] == [("web2", True)]
 
+    @needs_ssh
     def test_unreachable_fires_while_the_recap_says_zero(self, tmp_path):
         """The measured disagreement `saw_unreachable` exists for.
 
