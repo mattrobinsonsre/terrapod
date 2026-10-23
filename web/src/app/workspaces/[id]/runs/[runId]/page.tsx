@@ -23,7 +23,8 @@ import { useIsTouch } from '@/lib/use-media-query'
 import { createLogFollower, type LogFollower } from '@/lib/log-follower'
 import { logPaneHeightPx } from '@/lib/log-pane-height'
 import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
-import { filterHostLog, parseHostLog, stripHostTags } from '@/lib/host-log'
+import { filterHostLog, parseHostLog, pickerHostList, stripHostTags } from '@/lib/host-log'
+import { hostStatusKey } from '@/lib/host-status'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 import {
@@ -512,6 +513,9 @@ function LogPanel({
   // touch tablet/foldable page-scrolls too, while a mouse (any width) keeps the
   // inner pane. Mirrors the CSS `fine:` overflow on the <pre> below.
   const t = useTranslations('runDetail')
+  // The per-host status strings are the Hosts tab's (#1928), reused rather
+  // than restated, so the picker and the table cannot disagree about a word.
+  const tHosts = useTranslations('runDetail.hosts')
   const tRoot = useTranslations()
   const summaryLabel = engineWord(tRoot, engine, 'logIndexSummary')
   const isTouch = useIsTouch()
@@ -548,6 +552,54 @@ function LogPanel({
   // view with the switch absent rather than an empty per-host pane.
   const hostLog = useMemo(() => parseHostLog(cleanLog), [cleanLog])
   const [hostFilter, setHostFilter] = useState('')
+
+  // Every host the run TARGETED, not only those that have produced output
+  // yet. An inventory host ansible has not reached is exactly what someone
+  // goes looking for, and the log alone cannot name it -- a host with no
+  // output has no tagged line to be found in. `/host-results` is complete
+  // from run creation: it unions the recap rows with the run's own resolved
+  // inventory, so mid-run it already returns every targeted host.
+  //
+  // Refetched on the streaming edge rather than per log chunk, because the
+  // two halves settle at different times: the host LIST is complete from
+  // creation, while a status comes from the PLAY RECAP and so is not known
+  // for any host until the phase ends. Polling per chunk would be a request
+  // per chunk to learn nothing.
+  const [hostRows, setHostRows] = useState<{ host: string; status: string }[]>([])
+  useEffect(() => {
+    if (!hostLog.tagged) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await apiFetch(`/api/v1/runs/${runId}/host-results`)
+        if (!res.ok || cancelled) return
+        const d = await res.json()
+        if (cancelled) return
+        setHostRows(
+          (d.data || [])
+            .map((r: { attributes?: { host?: string; status?: string } }) => ({
+              host: r.attributes?.host ?? '',
+              status: r.attributes?.status ?? '',
+            }))
+            .filter((r: { host: string }) => r.host),
+        )
+      } catch {
+        /* The picker degrades to the hosts the log names, never to nothing:
+           an unreachable read must not remove a control that works. */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [runId, hostLog.tagged, isStreaming])
+
+  // The union lives in `host-log.ts` so it has a gate of its own: the only
+  // coverage for it here would be an E2E spec, and the property -- that a
+  // targeted host which produced nothing is still offered -- is pure logic.
+  const pickerHosts = useMemo(
+    () => pickerHostList(hostLog.hosts, hostRows),
+    [hostLog.hosts, hostRows],
+  )
 
   // The text actually shown. For a tagged log this is never `cleanLog`: even
   // the combined view has to have the tags removed, because the traditional
@@ -930,11 +982,18 @@ function LogPanel({
                   title={t('log.hosts.title')}
                 >
                   <option value="">{t('log.hosts.all')}</option>
-                  {hostLog.hosts.map(host => (
-                    <option key={host} value={host}>
-                      {host}
-                    </option>
-                  ))}
+                  {pickerHosts.map(({ host, status }) => {
+                    // `hostStatusKey` returns null for a status the server
+                    // has added and the UI does not know, so the option falls
+                    // back to the bare name rather than rendering a raw
+                    // lower-case slug among translated ones (#1334).
+                    const key = status ? hostStatusKey(status) : null
+                    return (
+                      <option key={host} value={host}>
+                        {key ? `${host} \u2014 ${tHosts(key)}` : host}
+                      </option>
+                    )
+                  })}
                 </select>
               </>
             )}

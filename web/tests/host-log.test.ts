@@ -9,6 +9,7 @@ import {
   HOST_LOG_HOSTLESS,
   filterHostLog,
   parseHostLog,
+  pickerHostList,
   stripHostTags,
   unescapeHost,
 } from '../src/lib/host-log.ts'
@@ -204,5 +205,70 @@ describe('the format agrees with the plugin that writes it', () => {
     const line = 'web1'.padEnd(pad) + HOST_LOG_DELIMITER + 'ok: [web1]'
     const parsed = parseHostLog([HOST_LOG_HEADER, line].join('\n'))
     assert.deepEqual(parsed.lines[0], { host: 'web1', text: 'ok: [web1]' })
+  })
+})
+
+describe('pickerHostList', () => {
+  const rows = [
+    { host: 'web1', status: 'ok' },
+    { host: 'web2', status: 'ignored-failure' },
+    { host: 'db2', status: 'not-reached' },
+  ]
+
+  it('offers a targeted host that has produced no output at all', () => {
+    // The requirement, and the reason the picker cannot be built from the log:
+    // `db2` appears in no tagged line, and an inventory host the run has not
+    // reached is exactly what someone goes looking for. A picker built from the
+    // log alone omits the one entry the control exists to provide.
+    const out = pickerHostList(['web1', 'web2'], rows)
+    assert.deepEqual(
+      out.map(h => h.host),
+      ['web1', 'web2', 'db2'],
+    )
+  })
+
+  it('keeps the log’s first-seen order and appends the silent hosts after it', () => {
+    // First-seen is meaningful — it is the order they began working — and
+    // appending keeps it stable as output arrives: a host moves out of the tail
+    // into its first-seen position exactly once, never shuffling the rest.
+    const out = pickerHostList(['web2', 'web1'], rows)
+    assert.deepEqual(
+      out.map(h => h.host),
+      ['web2', 'web1', 'db2'],
+    )
+  })
+
+  it('attaches the server’s status and never invents one', () => {
+    const out = pickerHostList(['web1', 'web9'], rows)
+    assert.deepEqual(out, [
+      { host: 'web1', status: 'ok' },
+      // Named in the log, absent from the recap: no status, not a guess. A dead
+      // host reports `ok` for any task that needs no connection, so status is a
+      // property of the tasks that touched it rather than of the host (#1928).
+      { host: 'web9', status: '' },
+      // Both recap hosts the log has not named are appended, not just one.
+      { host: 'web2', status: 'ignored-failure' },
+      { host: 'db2', status: 'not-reached' },
+    ])
+  })
+
+  it('never lists a host twice when it is in both sources', () => {
+    const out = pickerHostList(['web1', 'web2', 'db2'], rows)
+    assert.equal(out.length, 3)
+    assert.equal(new Set(out.map(h => h.host)).size, 3)
+  })
+
+  it('degrades to the log’s hosts when the targeted read gave nothing', () => {
+    // An unreachable `/host-results` must not remove a control that works.
+    assert.deepEqual(pickerHostList(['web1'], []), [{ host: 'web1', status: '' }])
+  })
+
+  it('offers the targeted hosts even before any output has arrived', () => {
+    // Mid-run, before the first tagged line: the list is already complete,
+    // because `/host-results` is complete from run creation.
+    assert.deepEqual(
+      pickerHostList([], rows).map(h => h.host),
+      ['web1', 'web2', 'db2'],
+    )
   })
 })

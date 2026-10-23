@@ -152,3 +152,41 @@ export function filterHostLog(parsed: HostLog, host: string): string {
     .map(l => l.text)
     .join('\n')
 }
+
+/** A host the run targeted, as `/host-results` reports it. */
+export interface TargetedHost {
+  host: string
+  /** The server's own status slug, or '' when it has not said yet. */
+  status: string
+}
+
+/**
+ * Every host the picker should offer, log-seen first.
+ *
+ * The log cannot answer this on its own. A host the run TARGETED and ansible
+ * has not reported on appears in no tagged line, and that is precisely the host
+ * someone goes looking for — so a picker built from the log alone omits the one
+ * entry the control exists to provide. `/host-results` is complete from run
+ * creation (it unions the recap rows with the run's own resolved inventory), so
+ * the two together are the full set.
+ *
+ * Order is the log's first-seen order, then the targeted hosts that have
+ * produced nothing. First-seen is meaningful — it is the order they began
+ * working — and appending the silent ones keeps it stable as output arrives: a
+ * host moves from the tail into its first-seen position exactly once.
+ *
+ * A status is attached only when the server has given one. It is never derived
+ * here: a dead host reports `ok` for any task needing no connection, so status
+ * is a property of the tasks that touched it, not of the host (#1928).
+ */
+export function pickerHostList(
+  logHosts: readonly string[],
+  targeted: readonly TargetedHost[],
+): TargetedHost[] {
+  const status = new Map(targeted.map(r => [r.host, r.status]))
+  const seen = new Set(logHosts)
+  return [
+    ...logHosts.map(host => ({ host, status: status.get(host) ?? '' })),
+    ...targeted.filter(r => !seen.has(r.host)).map(r => ({ host: r.host, status: r.status })),
+  ]
+}

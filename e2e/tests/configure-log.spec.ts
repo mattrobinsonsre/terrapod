@@ -101,6 +101,26 @@ async function stubRun(
     })
   })
 
+  // `/host-results` is complete from run creation -- it unions the recap rows
+  // with the run's resolved inventory -- so `db2` here is a host the run
+  // TARGETED and ansible has not reported on. It appears in no tagged log
+  // line, which is exactly why the picker cannot be built from the log alone.
+  await page.route(`**/api/*/runs/${RUN_ID}/host-results`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/vnd.api+json',
+      body: JSON.stringify({
+        data: [
+          { id: '1', type: 'host-results', attributes: { host: 'web1', status: 'ok' } },
+          { id: '2', type: 'host-results', attributes: { host: 'web2', status: 'ignored-failure' } },
+          { id: '3', type: 'host-results', attributes: { host: 'db1', status: 'changed' } },
+          { id: '4', type: 'host-results', attributes: { host: 'db2', status: 'not-reached' } },
+        ],
+        meta: { pagination: { 'total-count': 4 } },
+      }),
+    })
+  })
+
   await page.route(`**/api/terrapod/v1/runs/${RUN_ID}/configure`, async route => {
     await route.fulfill({
       status: 200,
@@ -130,17 +150,53 @@ function paneText(page: import('@playwright/test').Page) {
 }
 
 test.describe('the configure log', () => {
-  test('offers a host picker listing every host that produced output', async ({ page }) => {
+  test('lists every TARGETED host, including one that has produced no output', async ({ page }) => {
+    // The requirement: "a host with no output yet is listed, not hidden -- an
+    // inventory host that has not been reached is exactly what someone looks
+    // for". `db2` is in no tagged line, so a picker built from the log alone
+    // cannot offer it, and the host someone is hunting would be the one host
+    // the control omits.
     await stubRun(page, { body: TAGGED_BODY })
     await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
 
     const picker = page.getByTestId('log-hosts-configure')
     await expect(picker).toBeVisible()
-    // First-seen order, and the host-less marker is not among them.
-    const values = await picker.locator('option').evaluateAll(opts =>
-      opts.map(o => (o as HTMLOptionElement).value),
-    )
-    expect(values).toEqual(['', 'web1', 'web2', 'db1'])
+    // Log-seen hosts in first-seen order, then the targeted silent one. The
+    // host-less marker is not among them.
+    await expect
+      .poll(async () =>
+        picker.locator('option').evaluateAll(opts =>
+          opts.map(o => (o as HTMLOptionElement).value),
+        ),
+      )
+      .toEqual(['', 'web1', 'web2', 'db1', 'db2'])
+  })
+
+  test('carries each host’s status in the picker as it becomes known', async ({ page }) => {
+    // Reusing the Hosts tab's own status strings (#1928), so the two surfaces
+    // cannot disagree about a word, and `not-reached` reads as neutral rather
+    // than as a failure -- the run did not get to the host.
+    await stubRun(page, { body: TAGGED_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+
+    const picker = page.getByTestId('log-hosts-configure')
+    await expect(picker.locator('option', { hasText: /^db2/ })).toContainText('Not reached')
+    await expect(picker.locator('option', { hasText: /^web2/ })).toContainText('Failed, ignored')
+  })
+
+  test('a targeted host with no output shows the context, not a blank pane', async ({ page }) => {
+    // Selecting the host someone came looking for must not read as an error.
+    await stubRun(page, { body: TAGGED_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+
+    const picker = page.getByTestId('log-hosts-configure')
+    await expect(picker.locator('option[value="db2"]')).toHaveCount(1)
+    await picker.selectOption('db2')
+
+    const pane = paneText(page)
+    await expect(pane).toContainText('PLAY RECAP')
+    await expect(pane).toContainText('TASK [say hello]')
+    await expect(pane).not.toContainText('hello from web1')
   })
 
   test('shows ansible’s own words with no tag in the combined view', async ({ page }) => {
