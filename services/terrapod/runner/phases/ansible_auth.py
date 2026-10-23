@@ -137,7 +137,7 @@ def _load(path: Path = _AUTH_FILE) -> list[dict]:
 
 
 def _write_secret_file(directory: Path, name: str, content: str) -> Path:
-    """Write `content` to a `0640` file and return its path.
+    """Write `content` to a `CREDENTIAL_FILE_MODE` file and return its path.
 
     The mode is set at CREATION rather than chmod-ed afterwards: a key written
     with default permissions and then narrowed is readable for the window in

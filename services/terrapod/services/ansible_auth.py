@@ -70,14 +70,11 @@ import re
 from typing import Any
 
 #: The mode for ANY file on the EE's shared volume that carries credential
-#: material: owner read/write plus GROUP READ, and nothing for other.
+#: material: owner read/write, and nothing for group or other.
 #:
-#: The group bit is load-bearing rather than lax.
-#: `job_template._ee_security_context` deliberately sets no `runAsUser` on the
-#: EE sidecar -- its docstring says pinning 1000 "would break an operator's
-#: image whose files belong to a different user", and `fsGroup` is what
-#: satisfies the contract "a uid able to read the shared volume" for ANY uid.
-#: Owner-only, because the EE now runs as the SAME uid as the orchestrator.
+#: Owner-only is reachable because the EE runs as the SAME uid as the
+#: orchestrator: `job_template._ee_security_context` pins `runAsUser` to 1000,
+#: so there is exactly one reader and it is us.
 #:
 #: This was `0640` and the group bit was load-bearing: `fsGroup` granted access
 #: through the GROUP, so `0600` would have worked only for an EE running as uid

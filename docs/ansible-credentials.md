@@ -14,8 +14,8 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | a `0640` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
-| `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0640` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
+| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | a `0600` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
+| `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0600` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
 [encryption at rest](encryption-at-rest.md) where the deployment has it enabled,
@@ -57,7 +57,7 @@ a configure that cannot connect.
 
 | Field | Becomes | Notes |
 |---|---|---|
-| `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0640` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
+| `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
 | `password` | `ansible_password` | |
 | `user` | `ansible_user` | |
 | `become` | `ansible_become` | a boolean. `true`/`yes`/`1`/`on` and `false`/`no`/`0`/`off` are accepted; anything else is refused, because a value ansible cannot read as true would read as false and silently drop privilege escalation |
@@ -286,7 +286,7 @@ files have to land somewhere both can see.
    spec, so nothing is readable through `kubectl describe job` or from etcd. The
    Secret carries an `ownerReference` to the Job, so it cascade-deletes with it.
 3. **Materialisation.** A runner phase runs **before** the collection install and
-   before the playbook, and writes each credential to a `0640` file on the volume
+   before the playbook, and writes each credential to a `0600` file on the volume
    **shared with the execution environment** — the directory the Job names in
    `TP_EE_CREDENTIALS_DIR`. The file is opened with that mode rather than
    chmod-ed afterwards, so there is no window in which it is readable.

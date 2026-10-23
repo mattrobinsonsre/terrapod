@@ -1609,11 +1609,14 @@ class AnsibleConfig(BaseModel):
         description="Operator-supplied execution environments as label -> image URI. A "
         "workspace selects one by label in `ansible_execution_environment`, which "
         "overrides its `ansible_version`. The URI is used as given and never rewritten "
-        "through the pull-through. Each image must carry ansible-playbook, "
-        "ansible-galaxy, ssh and git on PATH and run as a uid that can read the shared "
-        "volume; the sidecar's startup probe asserts that, so a non-conforming image "
-        "fails at pod startup naming what is missing rather than mid-run. These images "
-        "are trusted code and are not covered by Terrapod's image scanning.",
+        "through the pull-through. Each image must carry `ansible-playbook`, "
+        "`ansible-galaxy`, `ssh` and `git` on PATH, must have an `ansible` that is "
+        "runnable rather than merely present, and must run as uid 1000 -- the "
+        "orchestrator and the image exchange files on the shared volume and both run as "
+        "that uid, so those files are owner-only rather than group-readable. The "
+        "sidecar's startup probe asserts all of it, so a non-conforming image fails at "
+        "pod startup naming what is wrong rather than mid-run. These images are trusted "
+        "code and are not covered by Terrapod's image scanning.",
     )
     availability_ttl_seconds: int = Field(
         default=300,

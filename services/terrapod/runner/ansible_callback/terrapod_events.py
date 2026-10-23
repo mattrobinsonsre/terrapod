@@ -257,7 +257,7 @@ def _sidecar_path(path: str) -> str:
 
 
 def _open_append(path: str):
-    """Line-buffered append, group-readable, or None if it cannot be opened."""
+    """Line-buffered append, owner-only, or None if it cannot be opened."""
     try:
         parent = os.path.dirname(path)
         if parent:

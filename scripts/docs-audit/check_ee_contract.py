@@ -68,18 +68,32 @@ MIN_AGENT_BINARIES = 4
 #: Every place the contract is stated in PROSE, and the heading or bullet that
 #: states it, so a mention elsewhere on the page cannot satisfy the check.
 #:
-#: Two, not one, and the second is the one that matters most: the policy page
-#: states the contract as the thing that makes an EE insensitive to a Terrapod
-#: release, while `docs/runners.md` is what somebody BUILDING an image reads.
-#: That second statement was ungated and had already drifted -- it still named
-#: the 1.x requirement ("a uid that can read the shared volume") after #1928
-#: narrowed it to uid 1000, so an operator following it would have built an
-#: image the startup probe refuses. Fixing the instance and leaving the gate
-#: blind is how the next one happens.
+#: FIVE, because each is read by a different person at a different moment and
+#: every one of them has drifted at least once:
+#:
+#: * `docs/versioning-and-support.md` states it as the thing that makes an EE
+#:   insensitive to a Terrapod release;
+#: * `docs/runners.md` is what somebody BUILDING an image reads. It was ungated
+#:   and had drifted -- it still named the 1.x requirement ("a uid that can read
+#:   the shared volume") after #1928 narrowed it to uid 1000, so an operator
+#:   following it would have built an image the startup probe refuses;
+#: * `helm/terrapod/values.yaml` is what an operator reads at the moment they
+#:   configure this;
+#: * `services/terrapod/config.py` is the same statement on the config schema,
+#:   which is where it reaches an operator who never opens the chart;
+#: * `llms.txt` is what an AGENT reads, and it is the one that proves the gate
+#:   needed widening rather than the pages needing fixing: it was outside PROSE
+#:   when #1928 pinned the uid, so it went on telling an agent the contract was
+#:   "a uid that can read the shared volume" while the probe demanded 1000 --
+#:   and the sibling credential bullet still gave the WITHDRAWN REASONING for
+#:   group-readable files ("the EE sidecar deliberately pins no `runAsUser`"),
+#:   which by then was the opposite of the truth.
+#:
+#: Fixing the instances and leaving the gate at three is how the next one
+#: happens, so the gate grew with them.
 #: path -> (where the statement starts, where it ends). An explicit end rather
-#: than one inferred from the marker's shape, because the third of these is a
-#: YAML comment block with no heading structure at all -- and it is the one an
-#: operator reads at the moment they configure this.
+#: than one inferred from the marker's shape, because two of these have no
+#: heading structure at all -- a YAML comment block and a Python string.
 PROSE: dict[Path, tuple[str, str]] = {
     Path("docs/versioning-and-support.md"): (
         "- **runner \u2194 execution environment:**",
@@ -89,6 +103,14 @@ PROSE: dict[Path, tuple[str, str]] = {
     Path("helm/terrapod/values.yaml"): (
         "# Each image must carry",
         "execution_environments: {}",
+    ),
+    Path("services/terrapod/config.py"): (
+        "Operator-supplied execution environments as label -> image URI",
+        "availability_ttl_seconds",
+    ),
+    Path("llms.txt"): (
+        "- [Ansible Execution Environments]",
+        "\n- [",
     ),
 }
 
@@ -260,11 +282,27 @@ def main() -> int:
                 # so a substring check passes with the requirement sentence
                 # gutted. Measured: changing "run as uid 1000" to "run as a uid"
                 # survived the substring form.
-                if required_uid and not re.search(
-                    rf"\b(?:run|runs|running|runnable|ability to run)\s+as\s+"
-                    rf"(?:the\s+)?uid\s+{required_uid}\b",
-                    block,
-                ):
+                # The subject has to be the IMAGE. Two different requirements
+                # phrase alike -- "the image must run as uid 1000" and "`ansible`
+                # must be runnable as uid 1000" -- so a plain search is satisfied
+                # by the second while the first is gutted. Measured: it was, and
+                # the mutation that removes the image requirement from `llms.txt`
+                # SURVIVED until this excluded an `ansible` subject.
+                #
+                # `re.IGNORECASE` because `llms.txt` writes the requirement in
+                # CAPS for emphasis throughout. It costs nothing -- what is
+                # required is the whole phrase, not the number.
+                uid_claims = [
+                    m
+                    for m in re.finditer(
+                        rf"\b(?:run|runs|running|runnable|ability to run)\s+as\s+"
+                        rf"(?:the\s+)?uid\s+{required_uid}\b",
+                        block,
+                        re.IGNORECASE,
+                    )
+                    if not re.search(r"`?ansible`?\s*$", block[max(0, m.start() - 20) : m.start()])
+                ]
+                if required_uid and not uid_claims:
                     problems.append(
                         f"{rel} does not state that an EE must RUN AS uid {required_uid} "
                         "(the number appearing somewhere in the section is not the same "
