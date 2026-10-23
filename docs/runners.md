@@ -358,11 +358,72 @@ set. Its **URI is used exactly as given** and is never rewritten through the
 pull-through cache. And it is **not covered by Terrapod's own image scanning** —
 the release re-scan reports on the built-in images only.
 
-The contract an image must meet is short: `ansible-playbook`, `ansible-galaxy`,
-`ssh` and `git` on `PATH`, and a uid that can read the shared volume. The
-sidecar's startup probe asserts exactly that, so a non-conforming image fails at
-pod startup naming what is missing rather than part-way through a run. Writable
-temporary space comes from the Job spec, so the image needs no writable root.
+#### What your image must provide
+
+Five things, and all five are asserted at the sidecar's startup probe — so a
+non-conforming image fails at **pod start, naming what is wrong**, rather than
+part-way through a playbook.
+
+| Requirement | Why |
+|---|---|
+| `ansible-playbook` on `PATH` | runs the configure |
+| `ansible-galaxy` on `PATH` | installs collections and roles. In the EE because the core that installs content must be the core that runs it — `requires_ansible` is not enforced at install time, so installing with one and running with another fails mid-play |
+| `ansible` on `PATH` **and runnable** | the probe runs `ansible --version`, because a console script whose shebang cannot be resolved is present, executable, and fails with "not found" |
+| `ssh` on `PATH` | reaches a managed node |
+| `git` on `PATH` | clones a git-sourced role, which `ansible-galaxy` does itself |
+| **able to run as uid 1000** | the orchestrator and your image exchange files on the shared volume — the callback plugin one way, its event stream the other — and both run as this uid so those files are `0600` rather than readable by a group |
+
+**The uid is not about your image's `USER`.** The Job sets `runAsUser: 1000`, so
+Kubernetes starts your image as that uid whatever its `USER` line says. The
+question is whether it can *function* as it, and there are exactly two ways it
+cannot — both measured while building Terrapod's own images, and both invisible
+to a `command -v` check:
+
+- **no `/etc/passwd` entry for 1000** — a task dies `KeyError: getpwuid(): uid
+  not found`;
+- **a `HOME` that uid cannot write** — `DEFAULT_LOCAL_TMP` resolves under `/` and
+  ansible dies inside `import ansible.constants`. (Terrapod points `HOME` at the
+  shared volume, so this only bites an image that overrides it.)
+
+**Your image needs no writable root filesystem.** Everything ansible writes —
+temporary directories, collections, roles — is redirected onto the shared volume
+by the Job, and the sidecar runs with `readOnlyRootFilesystem: true`.
+
+A minimal conforming image:
+
+```dockerfile
+FROM registry.internal/base/rhel8:2026.10
+
+RUN dnf install -y python3.12 openssh-clients git \
+ && python3.12 -m pip install --no-cache-dir 'ansible-core~=2.21' \
+ && useradd --uid 1000 --create-home --shell /sbin/nologin ansible
+
+# Not what grants the uid — the Job does that — but it keeps the image
+# runnable the same way by hand, which is how you test it.
+USER 1000
+```
+
+**Check it before you add the label**, as the uid Kubernetes will use:
+
+```sh
+docker run --rm --user 1000:1000 registry.internal/platform/ee-rhel8:2026.10 sh -c '
+  id -u                                              &&
+  for b in ansible-playbook ansible-galaxy ansible ssh git; do
+    command -v "$b" >/dev/null || { echo "missing: $b"; exit 1; }
+  done                                               &&
+  ansible --version >/dev/null                       &&
+  echo CONFORMS'
+```
+
+If that prints `1000` and `CONFORMS`, the startup probe will pass.
+
+**A requirement here is only ever added in a major release.** Widening this
+contract breaks images built against the older one, so a new requirement waits
+for a major or arrives as something the probe tolerates the absence of. The uid
+requirement is itself new in 2.0 — 1.x asked only for "a uid that can read the
+shared volume" — and
+[upgrading-to-2.0.md](upgrading-to-2.0.md#an-execution-environment-must-run-as-uid-1000)
+covers that change for an image you already have.
 
 #### Which environments this deployment can run
 

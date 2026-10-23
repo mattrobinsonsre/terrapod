@@ -852,10 +852,18 @@ api:
       #   execution_environments:
       #     rhel8-hardened: registry.internal/platform/ee-rhel8:2026.10
       #
-      # Each image must carry ansible-playbook, ansible-galaxy, ssh and git on
-      # PATH and run as a uid that can read the shared volume; the sidecar's
-      # startup probe asserts exactly that, so a non-conforming image fails at
-      # pod startup naming what is missing rather than mid-run.
+      # Each image must carry `ansible-playbook`, `ansible-galaxy`, `ansible`,
+      # `ssh` and `git` on PATH, and must be able to run as uid 1000 -- the Job
+      # pins runAsUser, so what matters is whether the image can FUNCTION as
+      # that uid (a passwd entry for it, and a writable HOME), not what its own
+      # USER line says. The sidecar's startup probe asserts exactly that, so a
+      # non-conforming image fails at pod startup naming what is wrong rather
+      # than mid-run. The image needs no writable root: temp dirs, collections
+      # and roles are all redirected onto the shared volume.
+      #
+      # docs/runners.md has the full contract, a minimal Dockerfile and a
+      # one-line check to run against your own image before adding it here.
+      # The uid requirement is new in 2.0 -- see docs/upgrading-to-2.0.md.
       #
       # THREE THINGS TO BE CLEAR ABOUT: an environment you supply is trusted
       # code, on the same footing as a custom runner image; its URI is used
