@@ -17,11 +17,14 @@ import pytest
 from terrapod.runner import ee_client
 from terrapod.runner.phases import host_events
 
-_PLUGIN_SRC = (
-    pathlib.Path(host_events.__file__).resolve().parents[1]
-    / "ansible_callback"
-    / "terrapod_events.py"
-)
+_ASSET_DIR = pathlib.Path(host_events.__file__).resolve().parents[1] / "ansible_callback"
+
+#: DERIVED from the phase's own tuple rather than listed, so a plugin added
+#: later is covered by the shippability gates below without anyone remembering
+#: to extend them. Listing them is how `terrapod_stdout.py` would have shipped
+#: ungated (#2144).
+_PLUGIN_SRCS = {name: _ASSET_DIR / name for name in host_events._PLUGIN_FILENAMES}
+_PLUGIN_SRC = _PLUGIN_SRCS["terrapod_events.py"]
 
 
 @pytest.fixture(autouse=True)
@@ -52,12 +55,35 @@ def _dump(path_entries: list[str], *, source: str = "/etc/ansible/ansible.cfg") 
 
 
 class TestDeliveringThePlugin:
-    def test_it_copies_the_asset_onto_the_shared_volume(self, _callback_dir):
+    @pytest.mark.parametrize("name", sorted(_PLUGIN_SRCS))
+    def test_it_copies_every_asset_onto_the_shared_volume(self, _callback_dir, name):
+        """Both plugins, one directory. `ANSIBLE_CALLBACK_PLUGINS` is a search
+        PATH, so a second file needs no addition to it -- which is why #2144's
+        stdout callback costs no change there."""
         target = host_events.deliver()
         assert target == _callback_dir
-        placed = _callback_dir / "terrapod_events.py"
+        placed = _callback_dir / name
         assert placed.is_file()
-        assert placed.read_text() == _PLUGIN_SRC.read_text()
+        assert placed.read_text() == _PLUGIN_SRCS[name].read_text()
+
+    def test_a_missing_stdout_plugin_costs_the_view_and_not_the_results(
+        self, _callback_dir, tmp_path
+    ):
+        """Each plugin degrades on its own.
+
+        The events capture is the per-host RESULTS and the stdout callback is
+        the per-host VIEW. A shipping defect in one must not take the other
+        down, so `deliver` reports success on the events plugin alone -- and
+        `callback_env` then declines to name a stdout callback the EE has no
+        file for, which would make ansible warn on every run.
+        """
+        partial = tmp_path / "partial"
+        partial.mkdir()
+        (partial / "terrapod_events.py").write_text(_PLUGIN_SRC.read_text())
+        with patch.object(host_events, "_ASSET_CANDIDATES", (str(partial),)):
+            assert host_events.deliver() == _callback_dir
+        assert (_callback_dir / "terrapod_events.py").is_file()
+        assert not (_callback_dir / "terrapod_stdout.py").exists()
 
     def test_it_is_owner_only_because_the_ee_shares_our_uid(self, _callback_dir):
         host_events.deliver()
@@ -94,6 +120,41 @@ class TestTheEnvironmentItComposes:
             "the operator's own callback path was dropped — measured, that silently "
             "disables every notification callback they run"
         )
+
+    def test_it_names_our_stdout_callback_once_the_plugin_is_there(self, _callback_dir):
+        """It REPLACES the operator's renderer, and that is the decision (#2144).
+
+        There is exactly one stdout slot, so unlike `ANSIBLE_CALLBACK_PLUGINS`
+        there is no "ours AND theirs" form. The user's reason, 2026-10-23: *"We
+        have to control the output format because it's our responsibility to
+        make it visible to the UI and api."* What is NOT replaced is the
+        operator's `ansible.cfg`, which we still never write.
+
+        The value is a NAME, not a path -- the path comes from
+        `ANSIBLE_CALLBACK_PLUGINS`, and setting a path here silently selects
+        nothing.
+        """
+        host_events.deliver()
+        result = ee_client.EEResult(bin="ansible-config", rc=0, output=_dump(["/theirs"]))
+        with patch.object(ee_client, "run", return_value=result):
+            env = host_events.callback_env(_cfg(), cwd="/w", plugin_dir=_callback_dir)
+        assert env["ANSIBLE_STDOUT_CALLBACK"] == "terrapod_stdout"
+        assert "/" not in env["ANSIBLE_STDOUT_CALLBACK"], "a path selects nothing"
+
+    def test_it_does_not_name_a_stdout_callback_the_ee_cannot_find(self, _callback_dir):
+        """A packaging defect degrades to ansible's own renderer.
+
+        Naming a plugin that is not on the path makes ansible warn on every
+        run and fall back anyway, so the warning is pure noise about a mistake
+        of ours. The viewer already falls back to the traditional view when the
+        log carries no header, so nothing downstream breaks.
+        """
+        _callback_dir.mkdir(parents=True, exist_ok=True)
+        assert not (_callback_dir / "terrapod_stdout.py").exists()
+        result = ee_client.EEResult(bin="ansible-config", rc=0, output=_dump(["/theirs"]))
+        with patch.object(ee_client, "run", return_value=result):
+            env = host_events.callback_env(_cfg(), cwd="/w", plugin_dir=_callback_dir)
+        assert "ANSIBLE_STDOUT_CALLBACK" not in env
 
     def test_it_never_writes_callbacks_enabled(self, _callback_dir):
         """Writing it would REPLACE their list, not extend it.
@@ -199,7 +260,8 @@ class TestTheSidecarIsOnePerRun:
 
 
 class TestThePluginStaysShippableIntoAnyExecutionEnvironment:
-    def test_it_imports_only_the_standard_library_and_ansible(self):
+    @pytest.mark.parametrize("name", sorted(_PLUGIN_SRCS))
+    def test_it_imports_only_the_standard_library_and_ansible(self, name):
         """It runs under the EE's interpreter, which has no Terrapod at all.
 
         Ten published EE lines span Python 3.10 to 3.14 (#2154), and an
@@ -207,7 +269,7 @@ class TestThePluginStaysShippableIntoAnyExecutionEnvironment:
         `ModuleNotFoundError` inside somebody else's container, discovered when
         the configure has already started.
         """
-        tree = ast.parse(_PLUGIN_SRC.read_text())
+        tree = ast.parse(_PLUGIN_SRCS[name].read_text())
         imported: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -231,7 +293,7 @@ class TestThePluginStaysShippableIntoAnyExecutionEnvironment:
         root = pathlib.Path(host_events.__file__).resolve().parents[2]
         offenders = []
         for source in root.rglob("*.py"):
-            if source == _PLUGIN_SRC or "ansible_callback" in source.parts:
+            if source in set(_PLUGIN_SRCS.values()) or "ansible_callback" in source.parts:
                 continue
             text = source.read_text(errors="replace")
             if "ansible_callback" in text and "import" in text:

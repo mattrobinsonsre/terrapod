@@ -227,6 +227,13 @@ local_resource(
         'services/terrapod/runner/job_entrypoint.py',
         'services/terrapod/runner/phases',
         'services/terrapod/runner/saas_known_hosts',
+        # The ansible callback plugins (#1928, #2144). They are DATA the
+        # Dockerfile COPYs to a destination outside `terrapod/`, so the
+        # `phases` entry above does not cover them -- and without this line
+        # editing a plugin triggers no rebuild, so the pod keeps running the
+        # stale one while the source looks fixed. The runner image has no
+        # live_update, so a rebuild is the only loop there is.
+        'services/terrapod/runner/ansible_callback',
         'services/terrapod/services/cost',
         'services/terrapod/services/inventory_render.py',
         'services/terrapod/services/ansible_auth.py',
