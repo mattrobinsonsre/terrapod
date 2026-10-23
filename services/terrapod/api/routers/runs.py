@@ -92,6 +92,7 @@ from terrapod.services.workspace_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
+    configure_log_key,
     cost_estimate_key,
     host_events_host_key,
     host_events_key,
@@ -3073,6 +3074,116 @@ async def show_apply(
     return JSONResponse(content=_apply_json(run, request))
 
 
+# ── Configure Details (#2144) ────────────────────────────────────────────
+
+
+def _configure_status(run: Run) -> str:
+    """The configure phase's own status, in the vocabulary the siblings use.
+
+    A third phase resource rather than folding into the apply, because the two
+    are genuinely separate objects: a composite runs a SEPARATE configure Job
+    whose output lands in `configure_log_key`, which the reconciler relies on --
+    sending it to the apply key "would have overwritten the apply's own log".
+    """
+    s = run.status
+    if not run.is_configure:
+        # Not a configure at all. Honest rather than 404: a client gates the
+        # surface on the run's own `is-configure`, so this says "there is no
+        # such phase here" without making absence the signal.
+        return "unreachable"
+    if s in ("pending", "queued", "planning", "planned", "confirmed", "applying"):
+        return "pending"
+    if s in ("configuring", "canceling"):
+        return "running"
+    if s == "applied":
+        return "finished"
+    return s
+
+
+def _configure_json(run: Run, request: Request | None = None) -> dict:
+    """Build the configure JSON:API response (URL base: see `_plan_json`).
+
+    **Native, so `/api/v1` and never `/api/tfe/v2`.** No CLI consumes a
+    configure -- `go-tfe` has no concept of one -- and putting it on the
+    compatibility surface would be the #1905 mistake in reverse.
+    """
+    from terrapod.api.routers.tfe_v2 import _request_base_url
+
+    base = _request_base_url(request)
+    log_cap = capability_urls.mint(capability_urls.KIND_CONFIGURE_LOG, str(run.id))
+    return {
+        "data": {
+            "id": f"configure-{run.id}",
+            "type": "configures",
+            "attributes": {
+                "status": _configure_status(run),
+                "log-read-url": f"{base}/api/v1/configures/{log_cap}/log",
+            },
+            "links": {
+                "self": f"/api/v1/configures/configure-{run.id}",
+            },
+        }
+    }
+
+
+@extensions_router.get("/runs/{run_id}/configure")
+async def show_configure(
+    request: Request,
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Show configure details including the log URL (#2144)."""
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
+    return JSONResponse(content=_configure_json(run, request))
+
+
+@extensions_router.get("/configures/{configure_id}/log")
+async def configure_log(
+    request: Request,
+    configure_id: str = Path(...),
+    offset: int = Query(0),
+    limit: int = Query(0),
+    format: Literal["raw", "plain"] = Query("raw"),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Stream the configure log (#2144).
+
+    `run:read`, like the plan and apply logs and for the same reason: a
+    configure's output is no more sensitive than theirs. The per-task EVENT
+    stream is the one gated on `state:read`, because it carries every module's
+    complete return value.
+
+    The phase is complete exactly when the RUN is terminal -- a configure is the
+    last thing a run does, whether it followed an apply or stood alone -- so
+    there is no narrower set to pass than `TERMINAL_STATES`.
+    """
+    segment, user = await resolve_capability_or_authenticate(
+        configure_id,
+        expect_kind=capability_urls.KIND_CONFIGURE_LOG,
+        request=request,
+        not_found="Configure not found",
+    )
+    run_uuid = parse_id(segment, "configure-", "run-", detail="Configure not found")
+    run = await run_service.get_run(db, run_uuid)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Configure not found")
+    if user is not None:
+        await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
+
+    return await _serve_log(
+        run=run,
+        log_key=configure_log_key(str(run.workspace_id), str(run.id)),
+        phase_complete_states=frozenset(run_service.TERMINAL_STATES),
+        offset=offset,
+        limit=limit,
+        strip_ansi=format == "plain",
+        untag=format == "plain",
+        phase="configure",
+    )
+
+
 # ── SSE (Server-Sent Events) ─────────────────────────────────────────────
 
 
@@ -4217,6 +4328,49 @@ async def apply_log(
 
 _ANSI_RE = re.compile(rb"\x1b\[[0-9;]*[a-zA-Z]")
 
+#: #2144's framing, RESTATED rather than imported: the plugin that writes it
+#: imports `ansible`, which this process does not have, so it cannot be a shared
+#: constant. Restating a contract is how two sides drift, which is why
+#: `test_host_log_format_agrees_with_the_plugin` reads the plugin's own source
+#: and fails if either literal moves.
+_HOST_LOG_HEADER = b"#terrapod-host-log v1"
+_HOST_LOG_DELIMITER = b" | "
+
+#: A host field is escaped, so it holds no delimiter and no newline -- which is
+#: what lets this match the FIRST delimiter and be certain it is the right one.
+#:
+#: DERIVED from the delimiter above rather than spelling the pipe again. Written
+#: out, the constant was declared and read by nothing but a test -- the
+#: flag-nothing-reads defect this codebase has recorded four times, reintroduced
+#: in the commit that restated the format. Deriving it makes the constant
+#: load-bearing, so the two cannot disagree and a mutation of it is visible.
+_HOST_LOG_PIPE = _HOST_LOG_DELIMITER.strip()
+_HOST_LOG_LINE = re.compile(
+    rb"^[^" + re.escape(_HOST_LOG_PIPE) + rb"\n]*?\s*" + re.escape(_HOST_LOG_PIPE) + rb" ?",
+    re.M,
+)
+
+
+def _untag_host_log(data: bytes) -> bytes:
+    """Strip #2144's per-line host prefix, leaving ansible's own words.
+
+    Only from the header onward. The same artifact legitimately carries
+    untagged bytes BEFORE it -- `ansible_collections.install` writes galaxy
+    output to the file first and the orchestrator's structlog lines are rolled
+    in around it -- and a prefix matcher let loose on those would eat the first
+    pipe out of an ordinary line of text.
+
+    An absent header means an untagged log (an older runner, or a configure that
+    ran without the plugin), and then there is nothing to do.
+    """
+    at = data.find(_HOST_LOG_HEADER)
+    if at < 0:
+        return data
+    head, tail = data[:at], data[at + len(_HOST_LOG_HEADER) :]
+    # Drop the header's own trailing newline so removing it leaves no blank line.
+    tail = tail[1:] if tail[:1] == b"\n" else tail
+    return head + _HOST_LOG_LINE.sub(b"", tail)
+
 
 async def _serve_log(
     run: Run,
@@ -4225,9 +4379,17 @@ async def _serve_log(
     offset: int,
     limit: int,
     strip_ansi: bool = False,
+    untag: bool = False,
     phase: str = "plan",
 ) -> Response:
     """Shared log serving logic with STX/ETX framing.
+
+    `untag` removes #2144's per-line host prefix. It travels with `format=plain`
+    rather than having a flag of its own, because that parameter already means
+    "text for something that is not a terminal" -- it strips ANSI for the same
+    reason -- and the two consumers that pass it, the Go SDK and the MCP log
+    tool, want ansible's own words rather than our framing. The UI asks for
+    `raw` and parses the prefix, which is the whole point of its being there.
 
     Data source priority:
     1. Object storage (authoritative — final log uploaded by Job on completion)
@@ -4277,6 +4439,8 @@ async def _serve_log(
 
     if strip_ansi:
         data = _ANSI_RE.sub(b"", data)
+    if untag:
+        data = _untag_host_log(data)
 
     if limit > 0:
         chunk = data[offset : offset + limit]

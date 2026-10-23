@@ -70,10 +70,21 @@ def configure_log_key(workspace_id: str, run_id: str) -> str:
     """Key for a run's configure (Ansible) log output (#1988).
 
     A third key rather than a generic `{phase}` form, matching the two above.
-    The composite case -- apply then configure -- concatenates the configure's
-    bytes onto the APPLY log, because that is what the CLI reads and what
-    `_serve_log` keeps open until the run is terminal. This key is for the
-    standalone configure, which has no apply for its output to belong to.
+
+    **EVERY configure writes here, composite or standalone.** This docstring
+    used to say a composite's bytes are concatenated onto the APPLY log and that
+    this key was for the standalone case; that was never what the runner did
+    (corrected 2026-10-23, #2144). One Job runs exactly one phase --
+    `job_entrypoint` dispatches on `cfg.phase` and `_run_configure_phase` has a
+    single call site -- so a composite runs its own configure Job, whose
+    `log_artifact_phase` is `configure` and which therefore uploads here.
+    `run_reconciler` depends on that and says so: sending a configure's promoted
+    log to the apply key "would have overwritten the apply's own log with it".
+
+    The claim was wrong in the expensive direction. Reading it, a per-host log
+    view had to be designed for an apply log that is part Terraform output and
+    part tagged ansible output; measuring it, one read route serves every
+    configure.
 
     Before it existed the live-stream endpoint silently relabelled an unknown
     phase as `plan` and wrote over the plan's own Redis key, so a configure's

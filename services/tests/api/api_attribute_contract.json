@@ -807,6 +807,10 @@
     "log-read-url",
     "status"
   ],
+  "runs._configure_json": [
+    "log-read-url",
+    "status"
+  ],
   "runs._cost_summary_json": [
     "advisories",
     "created-at",

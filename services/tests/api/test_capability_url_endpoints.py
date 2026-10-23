@@ -111,6 +111,26 @@ class TestABareIdNoLongerReadsALog:
         resp = await _get(app, f"/api/v2/applies/{cap}/log")
         assert resp.status_code == 404
 
+    async def test_the_same_for_the_configure_log(self):
+        """The third phase, added with the read path it never had (#2144).
+
+        It is native, so it is reached at `/api/v1` rather than on the
+        compatibility surface -- but the property is identical: a run id is not
+        a secret, and this endpoint is polled by a client that sends no
+        credential.
+        """
+        run_id = str(uuid.uuid4())
+        app = _app()
+        resp = await _get(app, f"/api/v1/configures/{run_id}/log")
+        assert resp.status_code == 401
+
+    async def test_a_plan_capability_does_not_read_a_configure_log(self):
+        run_id = str(uuid.uuid4())
+        cap = cu.mint(cu.KIND_PLAN_LOG, run_id)
+        app = _app()
+        resp = await _get(app, f"/api/v1/configures/{cap}/log")
+        assert resp.status_code == 404
+
 
 class TestAValidCapabilityStillServes:
     """The CLI and the web log viewer both poll with no credential."""

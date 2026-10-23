@@ -375,9 +375,12 @@ async def upload_configure_log(
     third route exists rather than a `{phase}` parameter: the phase is part of
     what the token authorises, not a value the caller chooses.
 
-    A STANDALONE configure's log. A composite run's configure output is
-    concatenated onto the apply log instead and uploaded through
-    `apply-log`, because that is the stream the CLI is attached to.
+    **Every configure's log, composite or standalone.** This used to say a
+    composite's output goes to `apply-log` instead; it never did (corrected
+    2026-10-23, #2144). One Job runs one phase, so a composite has its own
+    configure Job and `log_artifact_phase` is `configure` for it too. See
+    `configure_log_key`, and `run_reconciler`, which relies on the two keys
+    being distinct.
     """
     require_runner_for_run(user, run_id, phase="configure")
     run = await _get_run(run_id, db)

@@ -54,6 +54,12 @@ _HKDF_LABEL = b"terrapod/capability-url/v1"
 #: capability would be accepted by the state upload.
 KIND_PLAN_LOG = "plan-log"
 KIND_APPLY_LOG = "apply-log"
+#: A configure's log (#2144). A THIRD kind for the reason the comment above
+#: gives: all three resolve the same run id, so without domain separation a
+#: capability minted for a plan log would read a configure log -- and a
+#: configure's log is ansible's full output over a fleet, which is not the same
+#: material as a plan.
+KIND_CONFIGURE_LOG = "configure-log"
 KIND_CV_UPLOAD = "cv-upload"
 KIND_SV_UPLOAD = "sv-upload"
 
