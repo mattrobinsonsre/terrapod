@@ -2156,7 +2156,9 @@
       "security": "Sicherheit",
       "securityFull": "Sicherheits-Scan",
       "hosts": "Hosts",
-      "hostsFull": "Ergebnisse pro Host"
+      "hostsFull": "Ergebnisse pro Host",
+      "configureLabel": "Konfigurieren<log>Protokoll</log>",
+      "configureFull": "Konfigurations-Protokoll"
     },
     "banner": {
       "destroy": "Dies ist eine <strong>Zerstörungsausführung</strong> — beim Anwenden werden alle verwalteten Ressourcen zerstört.",
@@ -2266,6 +2268,12 @@
           "error": "Fehler",
           "warning": "Warnung"
         }
+      },
+      "configureEmpty": "Noch keine Konfigurations-Ausgabe verfügbar.",
+      "hosts": {
+        "label": "Nach Host filtern",
+        "title": "Nur die Ausgabe eines einzelnen Hosts anzeigen. Task-Überschriften und die Zusammenfassung bleiben sichtbar.",
+        "all": "Alle Hosts"
       }
     },
     "policyPanel": {

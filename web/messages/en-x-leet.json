@@ -2156,7 +2156,9 @@
       "security": "53cur17y",
       "securityFull": "53cur17y 5c4n",
       "hosts": "H0575",
-      "hostsFull": "P3r-h057 r35ul75"
+      "hostsFull": "P3r-h057 r35ul75",
+      "configureLabel": "C0nf1gur3<log>L0g</log>",
+      "configureFull": "C0nf1gur3 l0g"
     },
     "banner": {
       "destroy": "7h15 15 4 <strong>d357r0y</strong> run — 4ll m4n4g3d r350urc35 w1ll b3 d357r0y3d wh3n 4ppl13d.",
@@ -2266,6 +2268,12 @@
           "error": "3rr0r",
           "warning": "w4rn1ng"
         }
+      },
+      "configureEmpty": "N0 c0nf1gur3 0u7pu7 4v41l4bl3 y37.",
+      "hosts": {
+        "label": "F1l73r by h057",
+        "title": "5h0w 0nly 0n3 h057'5 0u7pu7. 745k h34d1ng5 4nd 7h3 r3c4p 574y v151bl3.",
+        "all": "4ll h0575"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Sicurezza",
       "securityFull": "Analisi di sicurezza",
       "hosts": "Host",
-      "hostsFull": "Risultati per host"
+      "hostsFull": "Risultati per host",
+      "configureLabel": "Configurazione<log>Log</log>",
+      "configureFull": "Log della configurazione"
     },
     "banner": {
       "destroy": "Questa è un''esecuzione di <strong>distruzione</strong> — tutte le risorse gestite verranno distrutte quando applicata.",
@@ -2266,6 +2268,12 @@
           "error": "errore",
           "warning": "avviso"
         }
+      },
+      "configureEmpty": "Nessun output della configurazione ancora disponibile.",
+      "hosts": {
+        "label": "Filtra per host",
+        "title": "Mostra l''output di un solo host. Le intestazioni dei task e il riepilogo finale restano visibili.",
+        "all": "Tutti gli host"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Sekurity",
       "securityFull": "Sekurity scan",
       "hosts": "Hostz",
-      "hostsFull": "Per-host rezultz"
+      "hostsFull": "Per-host rezultz",
+      "configureLabel": "Konfigur<log>Log</log>",
+      "configureFull": "Konfigur log"
     },
     "banner": {
       "destroy": "Dis iz a <strong>destroy</strong> run — all managd resourcez wil be destroyd when applyd.",
@@ -2266,6 +2268,12 @@
           "error": "oh noes",
           "warning": "warnin"
         }
+      },
+      "configureEmpty": "No konfigur output availabul yet.",
+      "hosts": {
+        "label": "Filtur by host",
+        "title": "Show only one host''s output. Task headingz an teh rekap stay visibul.",
+        "all": "All hostz"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Marklar",
       "securityFull": "Marklar scan",
       "hosts": "Marklars",
-      "hostsFull": "Per-marklar marklars"
+      "hostsFull": "Per-marklar marklars",
+      "configureLabel": "Marklar<log>Marklar</log>",
+      "configureFull": "Marklar marklar"
     },
     "banner": {
       "destroy": "This is a <strong>destroy</strong> marklar — all managed marklars will be destroyed when applied.",
@@ -2266,6 +2268,12 @@
           "error": "marklar",
           "warning": "marklar"
         }
+      },
+      "configureEmpty": "No marklar marklar available yet.",
+      "hosts": {
+        "label": "Filter by marklar",
+        "title": "Show only one marklar's marklar. Marklar marklars and the marklar stay visible.",
+        "all": "All marklars"
       }
     },
     "policyPanel": {

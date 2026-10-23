@@ -2156,7 +2156,9 @@
       "security": "Hurgh QaD",
       "securityFull": "Hurgh QaD wanI''",
       "hosts": "hostmey",
-      "hostsFull": "host Hoch wanI'mey"
+      "hostsFull": "host Hoch wanI'mey",
+      "configureLabel": "Qum<log>teywI''</log>",
+      "configureFull": "Qum teywI'"
     },
     "banner": {
       "destroy": "<strong>Qaw''</strong> Sar vam — lo''lu''DI'' vu''lu''bogh Sepmey Hoch Qaw''lu''.",
@@ -2266,6 +2268,12 @@
           "error": "Qagh",
           "warning": "ghuHmoHwI''"
         }
+      },
+      "configureEmpty": "Qum chel tu'be'lu' DaH.",
+      "hosts": {
+        "label": "host DarSeH",
+        "title": "wa' host chel neH 'ang. Qu' permey tlhoS je leghlu'taH.",
+        "all": "Hoch hostmey"
       }
     },
     "policyPanel": {

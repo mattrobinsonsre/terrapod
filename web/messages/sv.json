@@ -2156,7 +2156,9 @@
       "security": "Säkerhet",
       "securityFull": "Säkerhetsskanning",
       "hosts": "Värdar",
-      "hostsFull": "Resultat per värd"
+      "hostsFull": "Resultat per värd",
+      "configureLabel": "Konfiguration<log>logg</log>",
+      "configureFull": "Konfigurationslogg"
     },
     "banner": {
       "destroy": "Detta är en <strong>förstörelsekörning</strong> — alla hanterade resurser förstörs vid applicering.",
@@ -2266,6 +2268,12 @@
           "error": "fel",
           "warning": "varning"
         }
+      },
+      "configureEmpty": "Ingen konfigurationsutdata tillgänglig ännu.",
+      "hosts": {
+        "label": "Filtrera efter värd",
+        "title": "Visa endast utdata från en enda värd. Uppgiftsrubriker och sammanfattningen förblir synliga.",
+        "all": "Alla värdar"
       }
     },
     "policyPanel": {

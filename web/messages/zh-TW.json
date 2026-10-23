@@ -2156,7 +2156,9 @@
       "security": "安全",
       "securityFull": "安全掃描",
       "hosts": "主機",
-      "hostsFull": "各主機的結果"
+      "hostsFull": "各主機的結果",
+      "configureLabel": "設定<log>日誌</log>",
+      "configureFull": "設定日誌"
     },
     "banner": {
       "destroy": "這是一次<strong>銷毀</strong>執行 — 應用時所有受管理的資源都將被銷毀。",
@@ -2266,6 +2268,12 @@
           "error": "錯誤",
           "warning": "警告"
         }
+      },
+      "configureEmpty": "暫無可用的設定輸出。",
+      "hosts": {
+        "label": "依主機篩選",
+        "title": "僅顯示一台主機的輸出。任務標題與彙總仍會保持可見。",
+        "all": "所有主機"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Securitas",
       "securityFull": "Perscrutatio securitatis",
       "hosts": "Hospites",
-      "hostsFull": "Exitus singulorum hospitum"
+      "hostsFull": "Exitus singulorum hospitum",
+      "configureLabel": "Configuratio<log>Diarium</log>",
+      "configureFull": "Diarium configurationis"
     },
     "banner": {
       "destroy": "Haec est exsecutio <strong>destructionis</strong> — omnes facultates administratae destruentur cum applicatur.",
@@ -2266,6 +2268,12 @@
           "error": "erratum",
           "warning": "monitum"
         }
+      },
+      "configureEmpty": "Nullus egressus configurationis adhuc praesto.",
+      "hosts": {
+        "label": "Per hospitem cribrare",
+        "title": "Egressum unius tantum hospitis monstrare. Tituli munerum et summarium visibilia manent.",
+        "all": "Omnes hospites"
       }
     },
     "policyPanel": {

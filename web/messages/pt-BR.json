@@ -2156,7 +2156,9 @@
       "security": "Segurança",
       "securityFull": "Verificação de segurança",
       "hosts": "Hosts",
-      "hostsFull": "Resultados por host"
+      "hostsFull": "Resultados por host",
+      "configureLabel": "Configuração<log>Log</log>",
+      "configureFull": "Log da configuração"
     },
     "banner": {
       "destroy": "Esta é uma execução de <strong>destroy</strong> — todos os recursos gerenciados serão destruídos quando aplicada.",
@@ -2266,6 +2268,12 @@
           "error": "erro",
           "warning": "aviso"
         }
+      },
+      "configureEmpty": "Nenhuma saída de configuração disponível ainda.",
+      "hosts": {
+        "label": "Filtrar por host",
+        "title": "Mostrar apenas a saída de um host. Os cabeçalhos de tarefa e o resumo final continuam visíveis.",
+        "all": "Todos os hosts"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Security",
       "securityFull": "Security scan",
       "hosts": "Hands",
-      "hostsFull": "Results fer each hand"
+      "hostsFull": "Results fer each hand",
+      "configureLabel": "Riggin''<log>Ship''s Log</log>",
+      "configureFull": "Riggin'' ship''s log"
     },
     "banner": {
       "destroy": "This be a <strong>send t'' Davy Jones</strong> run — all managed resources will be sent t'' th'' depths when applied.",
@@ -2266,6 +2268,12 @@
           "error": "scuttled",
           "warning": "squall ahead"
         }
+      },
+      "configureEmpty": "Nay riggin'' output available yet.",
+      "hosts": {
+        "label": "Filter by hand",
+        "title": "Show only one hand''s output. Task headin''s an'' th'' recap stay in sight.",
+        "all": "All hands"
       }
     },
     "policyPanel": {

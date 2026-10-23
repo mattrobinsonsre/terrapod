@@ -2156,7 +2156,9 @@
       "security": "Beveiliging",
       "securityFull": "Beveiligingsscan",
       "hosts": "Hosts",
-      "hostsFull": "Resultaten per host"
+      "hostsFull": "Resultaten per host",
+      "configureLabel": "Configureren<log>logboek</log>",
+      "configureFull": "Configuratielogboek"
     },
     "banner": {
       "destroy": "Dit is een <strong>destroy</strong>-uitvoering — alle beheerde resources worden vernietigd bij toepassing.",
@@ -2266,6 +2268,12 @@
           "error": "fout",
           "warning": "waarschuwing"
         }
+      },
+      "configureEmpty": "Nog geen configuratie-uitvoer beschikbaar.",
+      "hosts": {
+        "label": "Filteren op host",
+        "title": "Alleen de uitvoer van één host weergeven. Taakkoppen en de samenvatting blijven zichtbaar.",
+        "all": "Alle hosts"
       }
     },
     "policyPanel": {

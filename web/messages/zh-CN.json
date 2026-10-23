@@ -2156,7 +2156,9 @@
       "security": "安全",
       "securityFull": "安全扫描",
       "hosts": "主机",
-      "hostsFull": "按主机的结果"
+      "hostsFull": "按主机的结果",
+      "configureLabel": "配置<log>日志</log>",
+      "configureFull": "配置日志"
     },
     "banner": {
       "destroy": "这是一次<strong>销毁</strong>运行 — 应用时所有受管理的资源都将被销毁。",
@@ -2266,6 +2268,12 @@
           "error": "错误",
           "warning": "警告"
         }
+      },
+      "configureEmpty": "暂无可用的配置输出。",
+      "hosts": {
+        "label": "按主机筛选",
+        "title": "仅显示一台主机的输出。任务标题与汇总仍会保持可见。",
+        "all": "所有主机"
       }
     },
     "policyPanel": {

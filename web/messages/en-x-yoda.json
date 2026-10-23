@@ -2156,7 +2156,9 @@
       "security": "Security",
       "securityFull": "Security scan",
       "hosts": "Hosts",
-      "hostsFull": "results, per-host"
+      "hostsFull": "results, per-host",
+      "configureLabel": "Configure<log>Log</log>",
+      "configureFull": "log, Configure"
     },
     "banner": {
       "destroy": "A <strong>destroy</strong> run, this is — when applied, destroyed all managed resources will be.",
@@ -2266,6 +2268,12 @@
           "error": "failed, it has",
           "warning": "careful, you must be"
         }
+      },
+      "configureEmpty": "No configure output available yet, there is.",
+      "hosts": {
+        "label": "By host, filter",
+        "title": "Only one host's output, show it does. Visible, task headings and the recap stay.",
+        "all": "All hosts, these are"
       }
     },
     "policyPanel": {

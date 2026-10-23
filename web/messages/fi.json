@@ -2156,7 +2156,9 @@
       "security": "Turvallisuus",
       "securityFull": "Turvatarkistus",
       "hosts": "Isännät",
-      "hostsFull": "Isäntäkohtaiset tulokset"
+      "hostsFull": "Isäntäkohtaiset tulokset",
+      "configureLabel": "Määritys<log>Loki</log>",
+      "configureFull": "Määritysloki"
     },
     "banner": {
       "destroy": "Tämä on <strong>tuhoajo</strong> — kaikki hallitut resurssit tuhotaan käyttöönotettaessa.",
@@ -2266,6 +2268,12 @@
           "error": "virhe",
           "warning": "varoitus"
         }
+      },
+      "configureEmpty": "Määrityksen tulostetta ei ole vielä saatavilla.",
+      "hosts": {
+        "label": "Suodata isännän mukaan",
+        "title": "Näytä vain yhden isännän tuloste. Tehtävien otsikot ja yhteenveto pysyvät näkyvissä.",
+        "all": "Kaikki isännät"
       }
     },
     "policyPanel": {

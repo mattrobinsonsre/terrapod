@@ -2156,7 +2156,9 @@
       "security": "Sikkerhet",
       "securityFull": "Sikkerhetsskanning",
       "hosts": "Verter",
-      "hostsFull": "Resultater per vert"
+      "hostsFull": "Resultater per vert",
+      "configureLabel": "Konfigurasjon<log>Logg</log>",
+      "configureFull": "Konfigurasjonslogg"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivings</strong>kjøring – alle administrerte ressurser vil bli revet ned når den anvendes.",
@@ -2266,6 +2268,12 @@
           "error": "feil",
           "warning": "advarsel"
         }
+      },
+      "configureEmpty": "Ingen konfigurasjonsutdata tilgjengelig ennå.",
+      "hosts": {
+        "label": "Filtrer etter vert",
+        "title": "Vis bare utdata fra én enkelt vert. Oppgaveoverskrifter og sammendraget er fortsatt synlige.",
+        "all": "Alle verter"
       }
     },
     "policyPanel": {

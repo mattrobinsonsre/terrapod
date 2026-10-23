@@ -2156,7 +2156,9 @@
       "security": "보안",
       "securityFull": "보안 스캔",
       "hosts": "호스트",
-      "hostsFull": "호스트별 결과"
+      "hostsFull": "호스트별 결과",
+      "configureLabel": "구성<log>로그</log>",
+      "configureFull": "구성 로그"
     },
     "banner": {
       "destroy": "이것은 <strong>삭제</strong> 실행입니다 — 적용되면 관리 중인 모든 리소스가 삭제됩니다.",
@@ -2266,6 +2268,12 @@
           "error": "오류",
           "warning": "경고"
         }
+      },
+      "configureEmpty": "아직 사용 가능한 구성 출력이 없습니다.",
+      "hosts": {
+        "label": "호스트로 필터링",
+        "title": "호스트 한 대의 출력만 표시합니다. 작업 머리글과 요약은 계속 표시됩니다.",
+        "all": "모든 호스트"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Sécurité",
       "securityFull": "Analyse de sécurité",
       "hosts": "Hôtes",
-      "hostsFull": "Résultats par hôte"
+      "hostsFull": "Résultats par hôte",
+      "configureLabel": "Configuration<log>Journal</log>",
+      "configureFull": "Journal de la configuration"
     },
     "banner": {
       "destroy": "Ceci est une exécution de <strong>destruction</strong> — toutes les ressources gérées seront détruites lors de l'application.",
@@ -2266,6 +2268,12 @@
           "error": "erreur",
           "warning": "avertissement"
         }
+      },
+      "configureEmpty": "Aucune sortie de configuration disponible pour l''instant.",
+      "hosts": {
+        "label": "Filtrer par hôte",
+        "title": "Afficher uniquement la sortie d''un seul hôte. Les en-têtes de tâche et le récapitulatif restent visibles.",
+        "all": "Tous les hôtes"
       }
     },
     "policyPanel": {

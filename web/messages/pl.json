@@ -2156,7 +2156,9 @@
       "security": "Bezpieczeństwo",
       "securityFull": "Skan bezpieczeństwa",
       "hosts": "Hosty",
-      "hostsFull": "Wyniki poszczególnych hostów"
+      "hostsFull": "Wyniki poszczególnych hostów",
+      "configureLabel": "Konfiguracja<log>Dziennik</log>",
+      "configureFull": "Dziennik konfiguracji"
     },
     "banner": {
       "destroy": "To jest przebieg <strong>niszczący</strong> — wszystkie zarządzane zasoby zostaną zniszczone po zastosowaniu.",
@@ -2266,6 +2268,12 @@
           "error": "błąd",
           "warning": "ostrzeżenie"
         }
+      },
+      "configureEmpty": "Brak dostępnego wyjścia konfiguracji.",
+      "hosts": {
+        "label": "Filtruj po hoście",
+        "title": "Pokazuj wyjście tylko jednego hosta. Nagłówki zadań i podsumowanie pozostają widoczne.",
+        "all": "Wszystkie hosty"
       }
     },
     "policyPanel": {

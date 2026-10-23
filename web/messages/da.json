@@ -2156,7 +2156,9 @@
       "security": "Sikkerhed",
       "securityFull": "Sikkerhedsscanning",
       "hosts": "Værter",
-      "hostsFull": "Resultater pr. vært"
+      "hostsFull": "Resultater pr. vært",
+      "configureLabel": "Konfiguration<log>log</log>",
+      "configureFull": "Konfigurationslog"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivnings</strong>kørsel — alle styrede ressourcer nedrives, når den anvendes.",
@@ -2266,6 +2268,12 @@
           "error": "fejl",
           "warning": "advarsel"
         }
+      },
+      "configureEmpty": "Ingen konfigurationsoutput tilgængelig endnu.",
+      "hosts": {
+        "label": "Filtrér efter vært",
+        "title": "Vis kun output fra én enkelt vært. Opgaveoverskrifter og opsummeringen bliver fortsat vist.",
+        "all": "Alle værter"
       }
     },
     "policyPanel": {

@@ -2156,7 +2156,9 @@
       "security": "Güvenlik",
       "securityFull": "Güvenlik taraması",
       "hosts": "Ana makineler",
-      "hostsFull": "Ana makine başına sonuçlar"
+      "hostsFull": "Ana makine başına sonuçlar",
+      "configureLabel": "Yapılandırma<log>Günlüğü</log>",
+      "configureFull": "Yapılandırma günlüğü"
     },
     "banner": {
       "destroy": "Bu bir <strong>yok etme</strong> çalıştırmasıdır — uygulandığında yönetilen tüm kaynaklar yok edilecek.",
@@ -2266,6 +2268,12 @@
           "error": "hata",
           "warning": "uyarı"
         }
+      },
+      "configureEmpty": "Henüz yapılandırma çıktısı mevcut değil.",
+      "hosts": {
+        "label": "Ana makineye göre filtrele",
+        "title": "Yalnızca tek bir ana makinenin çıktısını göster. Görev başlıkları ve özet görünür kalır.",
+        "all": "Tüm ana makineler"
       }
     },
     "policyPanel": {

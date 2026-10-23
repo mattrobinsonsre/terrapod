@@ -2156,7 +2156,9 @@
       "security": "セキュリティ",
       "securityFull": "セキュリティスキャン",
       "hosts": "ホスト",
-      "hostsFull": "ホスト別の結果"
+      "hostsFull": "ホスト別の結果",
+      "configureLabel": "構成<log>ログ</log>",
+      "configureFull": "構成ログ"
     },
     "banner": {
       "destroy": "これは<strong>破棄</strong>実行です — 適用するとすべての管理対象リソースが破棄されます。",
@@ -2266,6 +2268,12 @@
           "error": "エラー",
           "warning": "警告"
         }
+      },
+      "configureEmpty": "まだ構成出力がありません。",
+      "hosts": {
+        "label": "ホストで絞り込み",
+        "title": "1 台のホストの出力のみを表示します。タスクの見出しと集計は表示されたままになります。",
+        "all": "すべてのホスト"
       }
     },
     "policyPanel": {

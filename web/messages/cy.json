@@ -2156,7 +2156,9 @@
       "security": "Diogelwch",
       "securityFull": "Sgan diogelwch",
       "hosts": "Gwesteiwyr",
-      "hostsFull": "Canlyniadau fesul gwesteiwr"
+      "hostsFull": "Canlyniadau fesul gwesteiwr",
+      "configureLabel": "Cyflunio<log>Log</log>",
+      "configureFull": "Log cyflunio"
     },
     "banner": {
       "destroy": "Mae hwn yn rhediad <strong>dinistrio</strong> — dinistrir pob adnodd a reolir wrth ei weithredu.",
@@ -2266,6 +2268,12 @@
           "error": "gwall",
           "warning": "rhybudd"
         }
+      },
+      "configureEmpty": "Dim allbwn cyflunio ar gael eto.",
+      "hosts": {
+        "label": "Hidlo yn ôl gwesteiwr",
+        "title": "Dangos allbwn un gwesteiwr yn unig. Mae penawdau'r tasgau a'r crynodeb terfynol yn aros yn weladwy.",
+        "all": "Pob gwesteiwr"
       }
     },
     "policyPanel": {

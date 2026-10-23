@@ -2156,7 +2156,9 @@
       "security": "Zabezpečení",
       "securityFull": "Bezpečnostní kontrola",
       "hosts": "Hostitelé",
-      "hostsFull": "Výsledky po hostitelích"
+      "hostsFull": "Výsledky po hostitelích",
+      "configureLabel": "Konfigurace<log>Log</log>",
+      "configureFull": "Log konfigurace"
     },
     "banner": {
       "destroy": "Toto je <strong>destroy</strong> běh — všechny spravované prostředky budou při aplikaci zničeny.",
@@ -2266,6 +2268,12 @@
           "error": "chyba",
           "warning": "varování"
         }
+      },
+      "configureEmpty": "Zatím není k dispozici žádný výstup konfigurace.",
+      "hosts": {
+        "label": "Filtrovat podle hostitele",
+        "title": "Zobrazit výstup jen jednoho hostitele. Záhlaví úloh a souhrn zůstávají viditelné.",
+        "all": "Všichni hostitelé"
       }
     },
     "policyPanel": {
