@@ -180,6 +180,17 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #2144: the per-host configure log view. Its own project for the same
+      // reason host-results has one -- one test asserts the Configure tab is
+      // ABSENT on a run with no configure, so it must not be stubbed in by a
+      // neighbour. Note it also serves a log with no end-of-log marker, which
+      // is what proves the switch works mid-run rather than waiting for the
+      // run to finish the way the plan index deliberately does.
+      name: 'configure-log',
+      testMatch: 'configure-log.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'impact-graph',
       testMatch: 'impact-graph.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

@@ -340,6 +340,83 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 Read on the workspace is what it takes — the same as the run's log.
 
+## Reading the log: one host at a time, or all of them
+
+Ansible interleaves its output by construction — one line for this host, one
+for that — and at any real fleet size that is the difference between a log you
+can read and one you scroll past. So the **Configure** tab offers two views
+over the same log, and the switch works mid-run in both directions:
+
+- the **combined stream**, which is ansible's own output exactly as it renders
+  it, and is the default;
+- **one host alone**, chosen from a picker listing every host that has produced
+  output. Task headings and the `PLAY RECAP` stay visible, because they are
+  what tells you which task a line belongs to.
+
+Neither view is more delayed than the other, and neither is more delayed than
+the combined log was before: the switch is a filter over text the page already
+has, so selecting a host costs no request.
+
+### Why the runner tags the log rather than the viewer parsing it
+
+Ansible's combined output cannot be attributed after the fact. Measured over a
+three-host play, only **12 of 41** non-blank lines carry `[host]` at all — six
+of twenty-four under `strategy: free` — and the three classes that carry none
+are the ones you read when something breaks:
+
+- the `[ERROR]:` block, its `Origin:` path and the quoted YAML excerpt are
+  printed **before** the `fatal: [host]` line that names the host;
+- `[WARNING]` lines name the host in prose, in quotes, out of order;
+- `...ignoring`, after an ignored failure, names no host.
+
+So Terrapod sets its own ansible **stdout callback**, which is handed the host
+structurally and prefixes every line it emits — including the continuation
+lines of a multi-line result, which nothing else can attribute. The callback
+subclasses ansible's own `default` renderer, so the combined view is ansible's
+rendering rather than an imitation of it: removing the prefix reproduces its
+output byte for byte.
+
+**This replaces a `stdout_callback` you have configured yourself.** Ansible
+permits exactly one, and Terrapod takes it because the platform is responsible
+for making the output readable in the UI and through the API. Your
+`ansible.cfg` is not replaced — Terrapod never writes that file — and your
+`callbacks_enabled` list is untouched, so every notification callback you run
+still runs.
+
+### The format, if you are reading the log with something else
+
+The stored log carries a header and one prefix per line:
+
+```
+#terrapod-host-log v1
+web1       | ok: [web1] => {
+web1       |     "msg": "hello from web1"
+web1       | }
+~          | TASK [say hello] ***********************************************
+```
+
+`~` marks a line belonging to no single host. A host name containing `|`, `~`,
+`%` or whitespace is percent-escaped in the field, so the first `|` is always
+the separator — an ordinary name is untouched.
+
+**Ask for `format=plain` and you get ansible's words with no prefix**, which is
+what the Go SDK's `Plain` option and the `terrapod_run_logs` MCP tool already
+send. The prefix is there for the viewer:
+
+```sh
+# ansible's own output, no framing
+curl -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/v1/runs/run-.../configure"      # -> log-read-url
+curl "<log-read-url>?format=plain"
+```
+
+The header is deliberately **not** the first line of the stored log: a
+collection install writes its own output to the same artifact first. Anything
+before the header is shown in every view.
+
+A log with no header is one from a runner image that predates this. It renders
+in full, and the per-host picker is simply not offered.
+
 ## A play that targets the execution environment itself needs `ansible_remote_tmp`
 
 Most configures target managed nodes over SSH and need nothing here. But a play

@@ -2156,6 +2156,8 @@
       "costFull": "Cost estimate",
       "hosts": "Hosts",
       "hostsFull": "Per-host results",
+      "configureLabel": "Configure<log>Log</log>",
+      "configureFull": "Configure log",
       "details": "Details"
     },
     "banner": {
@@ -2272,6 +2274,12 @@
           "error": "error",
           "warning": "warning"
         }
+      },
+      "configureEmpty": "No configure output available yet.",
+      "hosts": {
+        "label": "Filter by host",
+        "title": "Show only one host's output. Task headings and the recap stay visible.",
+        "all": "All hosts"
       }
     },
     "policyPanel": {

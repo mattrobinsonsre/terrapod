@@ -762,6 +762,67 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the per-host log filter is usable at phone width (#2144)', async ({ page }) => {
+    // A native <select>, for the same reason the plan index uses one: the
+    // platform renders its own picker, so a fleet's worth of host names never
+    // needs a custom menu that could overflow. Unlike that index this one does
+    // NOT wait for the log to be whole, so the stub omits ETX -- the switch has
+    // to work mid-run, which is the requirement.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('resp-hosts'));
+    const runId = await seedRun(token, wsId);
+    const tag = (host: string, text: string) => `${host.padEnd(10)} | ${text}`;
+    // A deliberately long host name: the one thing that could widen the page.
+    const long = 'web-01.production.eu-west-1.internal.example.com';
+    const body =
+      '\x02#terrapod-host-log v1\n' +
+      [
+        tag('~', 'TASK [say hello] ***'),
+        tag('web1', 'ok: [web1]'),
+        tag(long, `ok: [${long}]`),
+      ].join('\n') + '\n';
+
+    await page.route(`**/api/*/runs/${runId}`, async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.attributes.status = 'configuring';
+      json.data.attributes['is-configure'] = true;
+      await route.fulfill({ response: res, body: JSON.stringify(json) });
+    });
+    await page.route(`**/api/terrapod/v1/runs/${runId}/configure`, (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({
+          data: {
+            id: 'c',
+            type: 'configures',
+            attributes: { status: 'running', 'log-read-url': '/__e2e_cfg_log' },
+          },
+        }),
+      }));
+    await page.route('**/__e2e_cfg_log*', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: new URL(route.request().url()).searchParams.get('offset') === '0' ? body : '',
+      }));
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=configure`);
+
+    const picker = page.getByTestId('log-hosts-configure');
+    await expect(picker).toBeVisible();
+    // A real tap target, not a sliver of text.
+    const box = await picker.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+    // Selecting still works on touch, and the filtered view renders.
+    await picker.selectOption(long);
+    await expect(page.getByTestId('log-pre-configure').filter({ visible: true }).first())
+      .toContainText('TASK [say hello]');
+    // The whole point: a long host name must not widen the page.
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('the run log pane reserves no height on touch (#1547, #722)', async ({ page }) => {
     // #1547 reserves the pane's full height while a phase streams — with a
     // precise pointer only. On touch the page is the scroll container (#722):
