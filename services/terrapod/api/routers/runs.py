@@ -538,10 +538,11 @@ def _run_json(
 
 
 async def _get_run(run_id: str, db: AsyncSession) -> Run:
-    # A plan and an apply are both views of a run, so all three spellings name
-    # the same row. Parsed through the shared helper so a malformed id is a
-    # 404 rather than the 500 an uncaught ValueError used to produce (#1699).
-    run_uuid = parse_id(run_id, "run-", "plan-", "apply-", detail="Run not found")
+    # A plan, an apply and a configure are all views of a run, so every
+    # spelling names the same row. Parsed through the shared helper so a
+    # malformed id is a 404 rather than the 500 an uncaught ValueError used
+    # to produce (#1699).
+    run_uuid = parse_id(run_id, "run-", "plan-", "apply-", "configure-", detail="Run not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")

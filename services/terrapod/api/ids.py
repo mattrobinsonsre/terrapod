@@ -51,6 +51,7 @@ ID_PREFIXES: dict[str, str] = {
     "agent-pools": "apool-",
     "applies": "apply-",
     "configuration-versions": "cv-",
+    "configures": "configure-",
     "execution-hooks": "hook-",
     "inventory-global-vars": "invvar-",
     "inventory-group-children": "invgc-",

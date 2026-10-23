@@ -246,3 +246,45 @@ class TestTheLogRouteIsWiredToTheRightKey:
 
         assert captured["untag"] is True
         assert captured["strip_ansi"] is True
+
+
+class TestAConfigureIdNamesItsRun:
+    """`configure-{uuid}` is the third spelling of a run, beside plan and apply.
+
+    `_configure_json` emits `configure-{run.id}` as the sub-resource's id and
+    `/api/v1/configures/configure-{run.id}` as its `self` link, so a caller
+    legitimately holds that spelling and sends it back -- which is why
+    `ID_PREFIXES` carries it and the run resolver strips it.
+
+    Gated here rather than left to `test_id_prefix_tolerance`, which found the
+    missing table entry and could NOT find this half: removing `configure-`
+    from the resolver leaves all 58 of its tests passing, because it drives a
+    run route with the `run-` spelling. A table entry that nothing strips is
+    the recorded flag-nothing-reads shape, and so is its mirror -- a stripper
+    with no test.
+    """
+
+    async def test_the_run_resolver_accepts_a_configure_id(self):
+        run = _run()
+        with patch.object(runs_router.run_service, "get_run", return_value=run) as get:
+            got = await runs_router._get_run(f"configure-{run.id}", None)
+        assert got is run
+        # The prefix was stripped, not passed through: the resolver must have
+        # asked for the bare uuid.
+        assert get.await_args.args[1] == run.id
+
+    async def test_every_spelling_of_a_run_reaches_the_same_row(self):
+        """Derived from the resolver's own prefix list, so a fourth view cannot
+        be added without being accepted here too."""
+        run = _run()
+        for prefix in ("", "run-", "plan-", "apply-", "configure-"):
+            with patch.object(runs_router.run_service, "get_run", return_value=run) as get:
+                got = await runs_router._get_run(f"{prefix}{run.id}", None)
+            assert got is run, prefix
+            assert get.await_args.args[1] == run.id, prefix
+
+    def test_the_prefix_is_in_the_shared_table(self):
+        """Or no endpoint accepts the spelling `_configure_json` hands out."""
+        from terrapod.api.ids import ID_PREFIXES
+
+        assert ID_PREFIXES.get("configures") == "configure-"
