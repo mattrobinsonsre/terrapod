@@ -349,9 +349,25 @@ over the same log, and the switch works mid-run in both directions:
 
 - the **combined stream**, which is ansible's own output exactly as it renders
   it, and is the default;
-- **one host alone**, chosen from a picker listing every host that has produced
-  output. Task headings and the `PLAY RECAP` stay visible, because they are
-  what tells you which task a line belongs to.
+- **one host alone**, chosen from a picker listing every host the run
+  **targeted** — not merely those that have produced output yet. Task headings
+  and the `PLAY RECAP` stay visible, because they are what tells you which task
+  a line belongs to.
+
+A host that has produced nothing is the one you are most likely hunting, so it
+is listed rather than hidden, and selecting it shows the task headings and the
+recap rather than a blank pane. The log alone cannot name such a host — it has
+no line to be found in — so the picker takes the targeted set from the run's
+own per-host results, which are complete from the moment the run is created.
+Each entry carries that host's status once ansible has reported one; until then
+it carries none, because a status comes from the `PLAY RECAP` and so is not
+known for any host until the phase ends.
+
+**`not reached` is not a health check.** It means the run did not get to the
+host — which happens under `serial:` with `any_errors_fatal:`, where only the
+batch that ran is reported — and it is neither a pass nor a failure. A
+genuinely dead host reports `ok` for any task that needs no connection, so a
+status describes the tasks that touched the host, never the host itself.
 
 Neither view is more delayed than the other, and neither is more delayed than
 the combined log was before: the switch is a filter over text the page already
