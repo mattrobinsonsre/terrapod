@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
 from terrapod.db.models import CachedPackageFile
+from terrapod.http_retry import DEFAULT_RETRIES, retry_delay_seconds
 from terrapod.logging_config import get_logger
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectStore
@@ -141,6 +142,63 @@ async def touch(db: AsyncSession, record: CachedPackageFile) -> None:
     await db.flush()
 
 
+async def _fetch_to_file_with_retry(
+    client: httpx.AsyncClient, artifact: Artifact, path: str
+) -> None:
+    """Stream an upstream artifact to disk, restarting after transient failures.
+
+    The temporary file is opened with ``wb`` for each successful response, so a
+    read timeout after partial progress cannot append a second copy of the file.
+    Nothing is written to object storage until one complete upstream response
+    has arrived.
+    """
+    url = artifact.upstream_url
+    for attempt in range(DEFAULT_RETRIES + 1):
+        retry_status: int | None = None
+        try:
+            async with client.stream("GET", url) as response:
+                if response.status_code == 404:
+                    raise NotFoundUpstream(url)
+                if response.status_code >= 500:
+                    retry_status = response.status_code
+                elif response.status_code >= 400:
+                    raise UpstreamError(f"upstream returned {response.status_code} for {url}")
+                else:
+                    handle = await asyncio.to_thread(open, path, "wb")
+                    try:
+                        async for chunk in response.aiter_bytes(_CHUNK):
+                            await asyncio.to_thread(handle.write, chunk)
+                    finally:
+                        await asyncio.to_thread(handle.close)
+        except httpx.RequestError as exc:
+            if attempt == DEFAULT_RETRIES:
+                raise UpstreamError(f"could not reach {url}: {exc}") from exc
+            logger.warning(
+                "Retrying package cache upstream stream after transport error",
+                ecosystem=artifact.ecosystem,
+                url=url,
+                attempt=attempt + 1,
+                retries=DEFAULT_RETRIES,
+                error=str(exc),
+            )
+            await asyncio.sleep(retry_delay_seconds(attempt))
+            continue
+
+        if retry_status is None:
+            return
+        if attempt == DEFAULT_RETRIES:
+            raise UpstreamError(f"upstream returned {retry_status} for {url}")
+        logger.warning(
+            "Retrying package cache upstream stream after 5xx",
+            ecosystem=artifact.ecosystem,
+            url=url,
+            attempt=attempt + 1,
+            retries=DEFAULT_RETRIES,
+            status=retry_status,
+        )
+        await asyncio.sleep(retry_delay_seconds(attempt))
+
+
 async def fetch_and_cache(
     db: AsyncSession,
     storage: ObjectStore,
@@ -171,19 +229,7 @@ async def fetch_and_cache(
     os.close(tmp_fd)
     try:
         try:
-            async with client.stream("GET", artifact.upstream_url) as response:
-                if response.status_code == 404:
-                    raise NotFoundUpstream(artifact.upstream_url)
-                if response.status_code >= 400:
-                    raise UpstreamError(
-                        f"upstream returned {response.status_code} for {artifact.upstream_url}"
-                    )
-                handle = await asyncio.to_thread(open, tmp_path, "wb")
-                try:
-                    async for chunk in response.aiter_bytes(_CHUNK):
-                        await asyncio.to_thread(handle.write, chunk)
-                finally:
-                    await asyncio.to_thread(handle.close)
+            await _fetch_to_file_with_retry(client, artifact, tmp_path)
         except httpx.HTTPError as exc:
             raise UpstreamError(f"could not reach {artifact.upstream_url}: {exc}") from exc
 

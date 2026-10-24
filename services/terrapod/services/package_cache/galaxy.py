@@ -30,6 +30,7 @@ import re
 import httpx
 
 from terrapod.config import settings
+from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
     NotFoundUpstream,
@@ -96,7 +97,9 @@ async def _get_json(url: str, *, client: httpx.AsyncClient | None = None) -> dic
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:
-        response = await client.get(url, headers={"Accept": "application/json"})
+        response = await arequest_with_retry(
+            client, "GET", url, headers={"Accept": "application/json"}
+        )
     except httpx.HTTPError as exc:
         raise UpstreamError(f"could not reach {url}: {exc}") from exc
     finally:

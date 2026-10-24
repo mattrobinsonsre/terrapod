@@ -28,6 +28,7 @@ import re
 import httpx
 
 from terrapod.config import settings
+from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
     NotFoundUpstream,
@@ -102,7 +103,7 @@ async def fetch_versions(package_id: str, *, client: httpx.AsyncClient | None = 
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:
-        response = await client.get(url)
+        response = await arequest_with_retry(client, "GET", url)
     except httpx.HTTPError as exc:
         raise UpstreamError(f"could not reach {url}: {exc}") from exc
     finally:
