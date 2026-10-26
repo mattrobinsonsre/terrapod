@@ -418,7 +418,33 @@ def _run_json(
                         "planning-at": _rfc3339(run.plan_started_at),
                         "planned-at": _rfc3339(run.plan_finished_at),
                         "applying-at": _rfc3339(run.apply_started_at),
-                        "applied-at": _rfc3339(run.apply_finished_at),
+                        # WHEN THE RUN ENTERED `applied`, which for a composite
+                        # is not when the APPLY finished (#1988). Every key in
+                        # go-tfe's `RunStatusTimestamps` is a per-STATUS time --
+                        # `AppliedAt`, `ApplyingAt`, `PlannedAt` -- so a client
+                        # reads this as the run's completion.
+                        #
+                        # `apply_finished_at` alone is wrong here and wrong
+                        # UNBOUNDEDLY: the composite hand-over sets it when the
+                        # apply yields to the configure, so a measured run
+                        # reported completion 40.5s early and #1977 exists
+                        # because a configure can run for hours. For a
+                        # terraform-only run the two are the same instant --
+                        # `transition_run` sets `apply_finished_at` on the
+                        # transition INTO `applied` -- so nothing changes there.
+                        "applied-at": _rfc3339(run.configure_finished_at or run.apply_finished_at),
+                        # Native only. The frozen surface has no third phase to
+                        # describe and `go-tfe` would ignore these, so they
+                        # follow the `configuring`->`applying` fold: the honest
+                        # detail on `/api/v1`, the compatible shape on TFE.
+                        **(
+                            {}
+                            if tfe
+                            else {
+                                "configuring-at": _rfc3339(run.configure_started_at),
+                                "configured-at": _rfc3339(run.configure_finished_at),
+                            }
+                        ),
                     }.items()
                     if v
                 },
@@ -4396,6 +4422,15 @@ async def apply_log(
         limit=limit,
         strip_ansi=format == "plain",
         phase="apply",
+        # #1988: a run carrying a configure concatenates it onto the apply, so
+        # the CLI -- which has no third phase to show -- sees both. Only when
+        # the run HAS a configure; a terraform-only run passes None and is
+        # byte-identical to before.
+        tail=(
+            (configure_log_key(str(run.workspace_id), str(run.id)), "configure")
+            if run.is_configure
+            else None
+        ),
     )
 
 
@@ -4445,6 +4480,31 @@ def _untag_host_log(data: bytes) -> bytes:
     return head + _HOST_LOG_LINE.sub(b"", tail)
 
 
+async def _phase_bytes(run: Run, log_key: str, phase: str) -> bytes | None:
+    """One phase's log bytes, from storage if it has them and Redis if not.
+
+    Extracted so the APPLY log can carry a composite's configure bytes without
+    restating the source-priority chain. `None` means neither source has
+    anything, which is distinct from `b""`.
+    """
+    storage = get_storage()
+    try:
+        return await storage.get(log_key)
+    except ObjectNotFoundError:
+        pass
+    except Exception:
+        return None
+    try:
+        from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+
+        live = await get_redis_client().get(f"{LOG_STREAM_PREFIX}{run.id}:{phase}")
+    except Exception:
+        return None
+    if live is None:
+        return None
+    return live.encode() if isinstance(live, str) else live
+
+
 async def _serve_log(
     run: Run,
     log_key: str,
@@ -4454,6 +4514,7 @@ async def _serve_log(
     strip_ansi: bool = False,
     untag: bool = False,
     phase: str = "plan",
+    tail: tuple[str, str] | None = None,
 ) -> Response:
     """Shared log serving logic with STX/ETX framing.
 
@@ -4483,6 +4544,18 @@ async def _serve_log(
     phase_done = run.status in phase_complete_states
     from_storage = False
 
+    # `tail` is a (log_key, phase) pair whose bytes are APPENDED to this log --
+    # the composite's configure onto the apply (#1988). The platform has three
+    # phases and the CLI sees two, so the configure's output has to arrive on
+    # the apply's stream or `tofu apply` goes silent for the configure's whole
+    # duration and reports success with no sign one ran.
+    #
+    # Appending is safe for a polling client precisely because the apply's own
+    # bytes are COMPLETE before the configure starts: the hand-over sets
+    # `apply_finished_at` and the apply Job is gone, so the prefix this client
+    # has already consumed can never change length under it. A tail whose
+    # length grows is just more log, which is what the client is polling for.
+
     try:
         data = await storage.get(log_key)
         from_storage = True
@@ -4509,6 +4582,33 @@ async def _serve_log(
             if phase_done:
                 return Response(content=_STX + _ETX, media_type="text/plain")
             return Response(content=b"", media_type="text/plain")
+
+    if tail is not None:
+        extra = await _phase_bytes(run, tail[0], tail[1])
+        if extra:
+            # UNTAGGED unconditionally, not when the caller asks for `plain`.
+            # #2144's `host | ` prefix exists for the configure tab's per-host
+            # picker; the APPLY stream has no picker to serve, and the consumer
+            # here is `tofu apply` on somebody's terminal. Measured before this
+            # line existed: the operator saw `~          | TASK [...]`, our
+            # framing in their output, because the cloud backend never asks for
+            # `format=plain` and so the format-keyed strip never fired.
+            data = data + _untag_host_log(extra)
+        else:
+            # The tail is expected and has not landed, so this log is NOT
+            # finished however complete the primary phase looks -- and that is
+            # true above all once the RUN is terminal, which is exactly when
+            # the ETX below would otherwise fire. A first version guarded only
+            # `not phase_done`, which left the terminal case closing on the
+            # apply's own bytes; the test for it failed and the mutation that
+            # deletes the guard killed nothing, which is how that was caught.
+            #
+            # The runner uploads from its EXIT trap, AFTER the transition to
+            # terminal, so this window is the ordinary case rather than an edge
+            # one. Not closing is the same trade the primary phase already
+            # makes on its Redis path: a client that polls a little longer
+            # beats one that truncates the log it was asked to show.
+            from_storage = False
 
     if strip_ansi:
         data = _ANSI_RE.sub(b"", data)
