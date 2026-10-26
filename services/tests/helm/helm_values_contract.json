@@ -512,6 +512,8 @@
   "runners.applyServiceAccount.create",
   "runners.applyServiceAccount.name",
   "runners.azureWorkloadIdentity",
+  "runners.configureRetries",
+  "runners.configureRetryBackoffSeconds",
   "runners.debugLingerSeconds",
   "runners.defaultExecutionBackend",
   "runners.defaultPulumiVersion",
