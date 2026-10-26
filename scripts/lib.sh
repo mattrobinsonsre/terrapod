@@ -62,7 +62,31 @@ check_container_store_space() {
 
 # Build the Python test image if needed.
 TEST_IMAGE="${TEST_IMAGE:-terrapod-test:local}"
+
+# `TEST_IMAGE_PREBUILT` says the caller has already put $TEST_IMAGE in the image
+# store, so do not build it again. CI sets it: every Python slice used to run
+# this plain `docker build` from scratch, because a fresh runner has no layer
+# store, which measured 64s per job -- a quarter of an hour of runner time per
+# run producing the same image fifteen times.
+#
+# Explicit rather than "skip if the image exists". A local `make test` runs the
+# tests BAKED INTO the image, so skipping on mere presence would silently
+# validate a stale one, and an unchanged test count after adding tests is the
+# only tell. An env var cannot be set by accident.
+#
+# A missing image FAILS here rather than falling back to a build: the fallback
+# would turn a broken CI step into fifteen slow-but-green jobs, which is the
+# shape that hides itself.
 ensure_test_image() {
+  if [[ -n "${TEST_IMAGE_PREBUILT:-}" ]]; then
+    if ! docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
+      error "TEST_IMAGE_PREBUILT is set but $TEST_IMAGE is not in the image store."
+      error "Whatever was meant to build it did not, so there is nothing to test with."
+      return 1
+    fi
+    info "Using the prebuilt Python test image ($TEST_IMAGE)..."
+    return 0
+  fi
   check_container_store_space || return 1
   info "Building Python test image ($TEST_IMAGE)..."
   docker build -f "$REPO_ROOT/docker/Dockerfile.test" -t "$TEST_IMAGE" "$REPO_ROOT"

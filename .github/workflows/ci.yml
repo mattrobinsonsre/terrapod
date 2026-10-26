@@ -691,7 +691,54 @@ jobs:
             pytest_args: "--shard 8/8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        with:
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+
+      # `terrapod-test:local` was being built FROM SCRATCH inside every one of
+      # these jobs, because `scripts/test.sh` runs a plain `docker build` and a
+      # fresh runner has no layer store to hit. Measured at 64s per job on run
+      # 40316874372 -- apt, the ansible-core venv, poetry, and the app's own
+      # dependency install -- which across fifteen slices is a quarter of an
+      # hour of runner time per run spent producing the same image fifteen
+      # times. Under a hard twenty-job concurrency ceiling, duplicated work is
+      # what you can least afford: it does not merely cost minutes, it holds a
+      # slot another queued job is waiting for.
+      #
+      # Built here through buildx with the same `type=gha` layer cache the five
+      # product images already use, and `load`ed so `docker-compose.test.yml`
+      # finds it under its default tag. `TEST_IMAGE_PREBUILT` then tells
+      # `ensure_test_image` not to build it again.
+      #
+      # ONE writer, not fifteen. `cache-to` is on the `unit` slice alone,
+      # because fifteen concurrent `mode=max` exports converge on the same
+      # layers while paying to upload them fifteen times; every slice reads.
+      # So a cold cache costs exactly what today costs and the NEXT run is the
+      # one that benefits, which is the right trade for a file that changes
+      # rarely. `unit` is the writer because it is the cheapest slice and
+      # always runs.
+      - name: Build the test image (shared layer cache)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: docker/Dockerfile.test
+          platforms: linux/amd64
+          load: true
+          tags: terrapod-test:local
+          cache-from: type=gha,scope=test-image
+          cache-to: ${{ matrix.slice.name == 'unit' && 'type=gha,mode=max,scope=test-image' || '' }}
+
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
+        env:
+          TEST_IMAGE_PREBUILT: "1"
 
   # ── pricegen unit tests (#1025) ───────────────────────
   # The pricegen package (self-generated cost pricesheet, #893) is a standalone
