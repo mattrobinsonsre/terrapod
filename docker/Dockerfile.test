@@ -91,12 +91,32 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
 # two things that no longer exist. The API now finds `ansible-inventory` on PATH
 # (`inventory_resolve._BINARY`), which is why the symlink below is what makes
 # this image match production rather than merely resemble it.
+#
+# **`ansible-playbook` and `ansible-vault` are symlinked too, and were not until
+# #1934.** Only `ansible-inventory` was, so every test that DRIVES A PLAYBOOK --
+# the two callback plugins' gates (#1928, #2144), the vault decryption proof, the
+# redaction gates -- probed `shutil.which("ansible-playbook")`, found nothing and
+# skipped, in CI, silently. Those are the tests whose whole argument is that a
+# claim about ansible's rendering or censorship is worth nothing unless ansible
+# made it, so skipping them in the only place that gates a merge left the claim
+# resting on a developer's machine. A `skipif` is right there and must never be
+# how CI behaves.
+#
+# All three are asserted at BUILD time, so a future change that drops one fails
+# the image build rather than quietly restoring the skip. `ansible-galaxy` is
+# deliberately NOT linked: its own tests reach the network to resolve a
+# collection, which is a different decision from running a playbook against
+# `connection: local` or encrypting a file.
 ARG ANSIBLE_CORE_VERSION=2.21.5
 RUN python -m venv /opt/ansible \
     && /opt/ansible/bin/pip install --no-cache-dir --only-binary=:all: \
         "ansible-core==${ANSIBLE_CORE_VERSION}" \
     && ln -s /opt/ansible/bin/ansible-inventory /usr/local/bin/ansible-inventory \
-    && ansible-inventory --version
+    && ln -s /opt/ansible/bin/ansible-playbook /usr/local/bin/ansible-playbook \
+    && ln -s /opt/ansible/bin/ansible-vault /usr/local/bin/ansible-vault \
+    && ansible-inventory --version \
+    && ansible-playbook --version \
+    && ansible-vault --version
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir poetry==1.8.4
