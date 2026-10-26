@@ -188,6 +188,12 @@ class _Partitioner:
                 )
         return written
 
+    def __enter__(self) -> _Partitioner:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.cleanup()
+
     def cleanup(self) -> None:
         for handle in self._handles.values():
             if not handle.closed:
@@ -217,67 +223,74 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     events: list[RunHostEvent] = []
     malformed = 0
     truncated = False
-    partitions = _Partitioner(str(run.workspace_id), str(run.id))
+    # The partitioner owns a temp directory and one open handle per host, so
+    # its lifetime is a `with` rather than a `try` around `flush` alone. That
+    # arrangement was the defect CodeQL's py/file-not-closed pointed at: the
+    # handles are opened in the streaming loop below, and the `finally` began
+    # after it -- so a storage error mid-stream, or a failing `db.flush`, left
+    # every handle open and the directory behind. One descriptor per host and
+    # a full copy of the stream split by host, which is exactly the
+    # PVC-filling failure the cleanup existed to prevent.
+    #
+    # "At completion", per #1928: the upload happens after the pass, so a
+    # partition exists only for a stream that was read all the way through.
+    with _Partitioner(str(run.workspace_id), str(run.id)) as partitions:
+        async for raw in _lines(key):
+            if not raw.strip():
+                continue
+            try:
+                record = json.loads(raw)
+            except (ValueError, UnicodeDecodeError):
+                malformed += 1
+                continue
+            if not isinstance(record, dict):
+                malformed += 1
+                continue
+            # Before the kind filters below: they keep only `failed`/`unreachable`
+            # as ROWS, while a host's partition is everything that happened to it.
+            # Putting this after them would partition the failures alone, which is
+            # what the rows already are.
+            host_of_record = record.get("host")
+            if isinstance(host_of_record, str) and host_of_record:
+                partitions.add(host_of_record, raw)
+            kind = record.get("kind")
+            if kind == "stats":
+                reported = record.get("recap")
+                if isinstance(reported, dict):
+                    recap = {str(h): s for h, s in reported.items() if isinstance(s, dict)}
+                continue
+            if kind not in ROW_KINDS:
+                continue
+            if kind == "unreachable":
+                unreachable_hosts.add(str(record.get("host") or ""))
+            if len(events) >= MAX_EVENT_ROWS:
+                truncated = True
+                continue
+            events.append(_event_row(run, record))
 
-    async for raw in _lines(key):
-        if not raw.strip():
-            continue
-        try:
-            record = json.loads(raw)
-        except (ValueError, UnicodeDecodeError):
-            malformed += 1
-            continue
-        if not isinstance(record, dict):
-            malformed += 1
-            continue
-        # Before the kind filters below: they keep only `failed`/`unreachable`
-        # as ROWS, while a host's partition is everything that happened to it.
-        # Putting this after them would partition the failures alone, which is
-        # what the rows already are.
-        host_of_record = record.get("host")
-        if isinstance(host_of_record, str) and host_of_record:
-            partitions.add(host_of_record, raw)
-        kind = record.get("kind")
-        if kind == "stats":
-            reported = record.get("recap")
-            if isinstance(reported, dict):
-                recap = {str(h): s for h, s in reported.items() if isinstance(s, dict)}
-            continue
-        if kind not in ROW_KINDS:
-            continue
-        if kind == "unreachable":
-            unreachable_hosts.add(str(record.get("host") or ""))
-        if len(events) >= MAX_EVENT_ROWS:
-            truncated = True
-            continue
-        events.append(_event_row(run, record))
+        # Every host that failed or was unreachable gets a row even when the stats
+        # event never arrived -- a Job killed mid-play writes events and no recap,
+        # and a host whose only trace is a failure must not vanish.
+        for event in events:
+            recap.setdefault(event.host, {})
 
-    # Every host that failed or was unreachable gets a row even when the stats
-    # event never arrived -- a Job killed mid-play writes events and no recap,
-    # and a host whose only trace is a failure must not vanish.
-    for event in events:
-        recap.setdefault(event.host, {})
+        for host, summary in recap.items():
+            row = _recap_row(run, host, summary)
+            # From the EVENT, not the counters: with `ignore_unreachable: true`
+            # ansible reports `unreachable=0 ignored=1` while the unreachable hook
+            # fires, so the recap alone cannot answer this. Measured on 2.18.3.
+            row.saw_unreachable = host in unreachable_hosts or row.unreachable > 0
+            db.add(row)
+        for event in events:
+            db.add(event)
+        await db.flush()
 
-    for host, summary in recap.items():
-        row = _recap_row(run, host, summary)
-        # From the EVENT, not the counters: with `ignore_unreachable: true`
-        # ansible reports `unreachable=0 ignored=1` while the unreachable hook
-        # fires, so the recap alone cannot answer this. Measured on 2.18.3.
-        row.saw_unreachable = host in unreachable_hosts or row.unreachable > 0
-        db.add(row)
-    for event in events:
-        db.add(event)
-    await db.flush()
-
-    # "At completion", per #1928: after the pass, so a partition exists only for
-    # a stream that was read all the way through. `cleanup` is in a `finally`
-    # because the temp directory holds a copy of the whole stream split by host
-    # -- leaving it behind on an error would fill the PVC one failed ingest at a
-    # time, which is the failure mode the buffering was supposed to avoid.
-    try:
+        # "At completion", per #1928: after the pass, so a partition exists only for
+        # a stream that was read all the way through. `cleanup` is in a `finally`
+        # because the temp directory holds a copy of the whole stream split by host
+        # -- leaving it behind on an error would fill the PVC one failed ingest at a
+        # time, which is the failure mode the buffering was supposed to avoid.
         partitioned = await partitions.flush()
-    finally:
-        partitions.cleanup()
 
     if malformed or truncated:
         logger.warning(
