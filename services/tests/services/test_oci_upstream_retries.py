@@ -126,6 +126,50 @@ async def test_tag_digest_404_is_final_and_uses_the_cached_value(point_at_upstre
     assert len(calls) == 1
 
 
+async def test_tag_digest_revalidation_is_bounded_tighter_than_the_shared_default(
+    point_at_upstream, monkeypatch
+) -> None:
+    """This call site's latency budget is a constraint, not a preference (#2243).
+
+    Revalidation runs inline on the manifest read path, so the shared default --
+    four attempts with 1/2/4s of backoff -- would make a pull that could have
+    been served from cache wait ~59s against this function's own 3s/10s timeouts,
+    where a single shot is ~13s. One extra attempt is deliberate; four is not.
+
+    Asserted here rather than globally because `fetch_manifest` and `fetch_blob`
+    deliberately keep the default: they have no cached answer to fall back on, so
+    for them a retry is the difference between a served image and a failed pull.
+
+    The delay is checked by RECORDING what the call site passed rather than by
+    timing it, because `point_at_upstream` zeroes the backoff -- so a revert to
+    `base_delay=1.0` would be invisible to any wall-clock assertion.
+    """
+    seen: list[tuple] = []
+
+    def _record(*args: float) -> float:
+        seen.append(args)
+        return 0.0
+
+    monkeypatch.setattr(http_retry, "_backoff_seconds", _record)
+
+    calls: list[httpx.Request] = []
+    async with _client([httpx.Response(503)], calls) as client:
+        actual = await pullthrough_service.current_upstream_digest(
+            HOST, REPOSITORY, "latest", client=client
+        )
+
+    # Gives up and lets the caller serve what it has, rather than raising -- the
+    # documented "returns None on any failure" contract is unchanged.
+    assert actual is None
+    # Two attempts, and strictly fewer than the shared default allows.
+    assert len(calls) == 2
+    assert len(calls) < http_retry.DEFAULT_RETRIES + 1
+    # `_backoff_seconds(attempt, base_delay, max_delay)` -- one sleep, well under
+    # the shared base delay.
+    assert [args[1] for args in seen] == [0.2]
+    assert all(args[1] < http_retry.DEFAULT_BASE_DELAY for args in seen)
+
+
 async def test_tag_listing_retries_a_5xx(point_at_upstream) -> None:
     calls: list[httpx.Request] = []
     async with _client(
