@@ -739,8 +739,18 @@ jobs:
   # write access to the repository, and the tag is a hash of the base's own
   # inputs, so what it publishes is exactly what that hash describes.
   build-test-base:
+    # NO `needs`, deliberately. It reads nothing `prepare` produces -- its
+    # condition is context (`github.event_name`, the PR's head repo), its
+    # registry is a workflow env, and its tag comes from files in the checkout
+    # -- so depending on `prepare` would only delay it, and being EARLY is the
+    # whole point: the slices look for this image when they start, so every
+    # second it is published sooner is a slice that pulls instead of building.
+    #
+    # The cost of not gating on `prepare.outputs.images_exist` is that this also
+    # runs on a re-tag run where the test matrix is skipped. It then finds the
+    # tag present and exits in seconds, which is cheaper than the delay gating
+    # on it would add to every other run.
     name: Publish the test base image
-    needs: prepare
     if: >-
       github.event_name != 'pull_request'
       || github.event.pull_request.head.repo.full_name == github.repository
