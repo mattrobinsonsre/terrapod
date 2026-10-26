@@ -727,13 +727,23 @@ jobs:
   # fast, which for a file that changes a few times a year is the whole of the
   # benefit.
   #
-  # Non-PR only, because a fork PR's token has no `packages: write`. A PR that
-  # changes the lock therefore builds the base in each slice until it merges,
-  # which is today's cost rather than a regression.
+  # Skipped only for a FORK PR, whose token has no `packages: write`. Not for
+  # PRs in general: a same-repo PR's token does have it, and gating on `is_pr`
+  # meant a PR could never publish the base -- so a change to this machinery
+  # could not demonstrate its own effect, and a PR that bumps the lock would
+  # rebuild the base in every slice on every push until it merged. A fork PR
+  # still falls through to building it locally, which is what every run did
+  # before this existed.
+  #
+  # A same-repo PR publishing a base is no new trust boundary: it already has
+  # write access to the repository, and the tag is a hash of the base's own
+  # inputs, so what it publishes is exactly what that hash describes.
   build-test-base:
     name: Publish the test base image
     needs: prepare
-    if: needs.prepare.outputs.is_pr != 'true'
+    if: >-
+      github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       packages: write
