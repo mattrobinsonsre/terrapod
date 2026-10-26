@@ -41,7 +41,16 @@ class _FakeAgent:
     then could not say how it ended.
     """
 
-    def __init__(self, chunks, verdict, *, exec_status=200, trailer_rc=None, chunk_delay=0.0):
+    def __init__(
+        self,
+        chunks,
+        verdict,
+        *,
+        exec_status=200,
+        trailer_rc=None,
+        chunk_delay=0.0,
+        after_first_chunk=None,
+    ):
         self.chunks = chunks
         self.verdict = verdict
         self.exec_status = exec_status
@@ -52,6 +61,18 @@ class _FakeAgent:
         # race in the test rather than in the code, and it passes or fails on
         # machine speed.
         self.chunk_delay = chunk_delay
+        # Called once, after the FIRST chunk has been written and flushed.
+        #
+        # This is what lets a test act during the request without a timer. A
+        # timer races the stream: the signal has to land after the client has
+        # installed its handler and before the stream ends, so the test passes
+        # on headroom rather than on ordering -- and a loaded CI runner starved
+        # the timer thread past the end of a two-second stream, which read as
+        # "a SIGTERM did not reach the execution environment" when the signal
+        # had simply arrived late. A hook here is CAUSED by the stream, so it
+        # cannot precede the handler, and a stream that keeps going until
+        # `cancelled` cannot end before the signal is observed.
+        self.after_first_chunk = after_first_chunk
         self.seen: list[dict] = []
         self.cancelled = False
         agent = self
@@ -92,7 +113,7 @@ class _FakeAgent:
                         self.send_header("Trailer", "X-Terrapod-RC")
                     self.send_header("Transfer-Encoding", "chunked")
                     self.end_headers()
-                    for chunk in agent.chunks:
+                    for index, chunk in enumerate(agent.chunks):
                         # Stop when cancelled, as the real agent does: it SIGINTs
                         # ansible, which exits, and the stream ends. That also
                         # takes most of the timing out of the cancellation tests
@@ -102,6 +123,8 @@ class _FakeAgent:
                             break
                         self.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
                         self.wfile.flush()
+                        if index == 0 and agent.after_first_chunk is not None:
+                            agent.after_first_chunk()
                         if agent.chunk_delay:
                             time.sleep(agent.chunk_delay)
                     # A trailer the client is expected to ignore entirely.
@@ -383,25 +406,33 @@ class TestTerminationReachesTheExecutionEnvironment:
     """
 
     def test_a_sigterm_during_a_run_cancels_in_the_ee(self, agent, absorb_sigterm):
+        """Fired BY the stream rather than by a timer racing it.
+
+        The timer version failed on a loaded CI runner: it fired the signal 50ms
+        in against a two-second stream, and the timer thread was starved past
+        the end of the stream, so the run completed normally and the assertion
+        read as "a SIGTERM did not reach the execution environment" when the
+        signal had simply arrived late. Widening the stream would only buy more
+        headroom for the same race.
+
+        Firing from the fake after its first chunk removes the ordering
+        question instead: the signal cannot precede the handler, because the
+        handler is installed before the request that produces the chunk. Python
+        delivers a process-directed signal to the main thread, which is where
+        the handler is, so this still exercises the real path. The chunk budget
+        is the only deadline left and it bounds a genuine regression rather than
+        this test -- the stream stops as soon as cancellation is observed, so a
+        passing run ends in milliseconds.
+        """
         import os
         import signal as signalmod
-        import threading
 
-        a = agent(chunks=[b"PLAY [x] ***\n"] * 40, chunk_delay=0.05)
-
-        # Fire the signal at ourselves while the request is in flight. Python
-        # delivers it on the main thread, which is where the handler is
-        # installed, so this exercises the real path rather than calling the
-        # handler directly.
-        def fire():
-            os.kill(os.getpid(), signalmod.SIGTERM)
-
-        timer = threading.Timer(0.05, fire)
-        timer.start()
-        try:
-            run("ansible-playbook", [], cwd="/w", tee_to_stdout=False)
-        finally:
-            timer.cancel()
+        a = agent(
+            chunks=[b"PLAY [x] ***\n"] * 2000,
+            chunk_delay=0.005,
+            after_first_chunk=lambda: os.kill(os.getpid(), signalmod.SIGTERM),
+        )
+        run("ansible-playbook", [], cwd="/w", tee_to_stdout=False)
         assert a.cancelled is True, "a SIGTERM did not reach the execution environment"
 
     def test_the_handler_is_restored_afterwards(self, agent, absorb_sigterm):

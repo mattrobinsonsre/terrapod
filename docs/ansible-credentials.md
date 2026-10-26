@@ -369,18 +369,78 @@ than the backstop:
 - **A machine credential's key material reaches ansible as a file too**, named by
   an inventory variable holding its path.
 - Every secret field — a private key, a connection password, a become password,
-  a vault password — is additionally **registered with the run-log redactor
-  before the file exists**, so there is no window in which ansible could print
-  one unredacted. Note this is a backstop rather than the control: a very short
-  value is deliberately *not* registered, because a short string matches ordinary
-  output and would mangle the log.
+  a vault password — is additionally **registered with the redactor before the
+  file exists**, so there is no window in which ansible could print one
+  unredacted.
 
-What the redactor does **not** cover is every way a playbook can surface a secret
-of its own. Raising ansible's verbosity in your committed `ansible.cfg` — which
-Terrapod reads and leaves intact — makes it print task arguments, so a role that
-passes a decrypted value as a module argument prints that value. That is ansible's
-`no_log` to solve, not Terrapod's: the redactor knows the values Terrapod
-delivered, not the ones a play derives from them.
+### Both of a configure's streams are covered
+
+A configure writes two durable things, and the redactor covers both:
+
+| stream | what it is |
+|---|---|
+| the run log | ansible's own output, as you read it on the run page |
+| the per-host event stream | the structured capture behind the **Hosts** tab, and the failure text stored against each host |
+
+The second matters more than it looks. A callback plugin records each module's
+whole return value, so a task that *prints* a credential puts it there — and the
+failure message lifted out of that stream is readable at a lower permission tier
+than the stream itself. Both objects are redacted by the orchestrator before
+they leave the runner, so the value never reaches storage, the database or the
+API.
+
+**The value is matched in the forms a log actually carries it in, not only as you
+typed it.** Inside a JSON document a newline is two characters, so a private key
+appears as `-----BEGIN …-----\nb3Blb…` rather than across three lines, and a
+password containing a quote appears as `p@ss\"word`. A pass that looked only for
+the value as given would find nothing in that file and report success — so the
+encoded forms are matched too, to two levels of nesting. Beyond that (JSON
+inside JSON inside JSON) is a stated limit rather than a covered case.
+
+### The floor, and what it means for a short password
+
+A very short value is deliberately **not** registered, because a short string
+matches ordinary output and a log with half its words blacked out stops being
+read. Where the floor sits depends on what else protects the value:
+
+- A **private key** and a **vault password** reach ansible as `0600` files. The
+  file is the control and the redactor is a backstop, so they keep the higher
+  floor — and neither is ever short.
+- A **connection password** and a **become password** are substituted into the
+  rendered inventory as values, so the redactor is the only thing standing
+  between them and these two streams. Their floor is **8 characters**. A
+  password shorter than that is delivered and used normally, and is not
+  redacted; if that matters to you, lengthen it.
+
+The runner says so in the log when it skips a value, naming the length and the
+floor but never the value.
+
+### What it cannot cover
+
+The redactor knows the values **Terrapod delivered**, not the ones a play derives
+from them. So:
+
+- A secret your playbook reads from somewhere else, or builds out of one we
+  delivered, is yours to protect with `no_log`.
+- Raising ansible's verbosity in your committed `ansible.cfg` — which Terrapod
+  reads and leaves intact — makes it print task arguments, so a role passing a
+  decrypted value as a module argument prints that value.
+- Where ansible provides each task's `invocation` — the arguments a module was
+  called with — the event stream keeps it rather than dropping it as ansible's
+  own renderer does below `-vvv`. It is what answers "what did we actually run
+  on this host", and it is part of why that stream is gated a tier above the
+  summary. Anything a module itself marks `no_log` is already replaced in it.
+  Whether it is there at all depends on the line: measured, ansible-core
+  **2.18.3, 2.19.6 and 2.20.4 provide it and 2.21.5 does not give it to a
+  callback at any verbosity**. So it follows the workspace's `ansible-version`,
+  and Terrapod neither adds nor removes it.
+- A result large enough to spill into the sidecar keeps a 2000-character excerpt
+  in the main stream. A secret straddling that cut leaves a fragment no
+  exact-value match can find; the whole value, in the sidecar, is redacted.
+
+`no_log` is ansible's answer to all of these and Terrapod honours it rather than
+re-deriving it: a `no_log` task's result is censored by ansible before any
+Terrapod code sees it.
 
 A workspace `env` variable cannot change this either way. Those reach the
 orchestrator container, not the execution environment — the environment ansible

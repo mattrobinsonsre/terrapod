@@ -1884,10 +1884,19 @@ async def download_run_host_event_stream(
     this mistake: serving a full resolved document one tier below raw state
     handed a read-tier user what the `state:read` gate exists to withhold.
 
-    Not redacted to serve it lower instead, for the reason recorded there: a
-    redacted second artifact is another thing to keep correct for ever. Ansible
-    already censors a `no_log` task's result at source, which is the operator's
-    own control over this and the one a playbook author expects to work.
+    Not served lower by producing a second, redacted copy, for the reason
+    recorded there: a parallel artifact is another thing to keep correct for
+    ever.
+
+    **What IS redacted is every credential Terrapod itself resolved for this
+    run** (#1934) -- vault passwords, machine credentials, the cloud identity
+    token -- stripped by the orchestrator from the one object before it is
+    uploaded, in the forms a JSON document actually carries them in. That is not
+    the tiering decision above and does not soften it: a module's return value is
+    state-grade whether or not a credential of ours is in it, so the gate is
+    unchanged. Ansible censors a `no_log` task's result at source, which is the
+    operator's own control over the rest and the one a playbook author expects to
+    work; a secret the playbook derived itself is theirs, and the stream says so.
 
     **`?host=` serves that host's own object rather than filtering this one**,
     which is the point of the partition #1928 asks for: a drill-down is one

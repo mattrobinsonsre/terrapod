@@ -247,11 +247,50 @@ class TestTheVaultPassword:
         would match ordinary output and mangle the log -- and an operator picks
         their own vault password. So the FILE is the protection, not the
         redactor, exactly as git auth states for tokens. The credential must
-        still be delivered."""
+        still be delivered.
+
+        That reasoning is why a VAULT password keeps the higher default floor and
+        is unchanged by #1934: it is a file. It does not transfer to a machine
+        credential's `password`, which is substituted into the inventory as a
+        value -- see `TestAMachinePasswordHasNoMechanismBehindIt` below.
+        """
         env, _ = ansible_auth.run(path=_auth_file(tmp_path, [_vault("prod", "short")]))
         path = Path(env["ANSIBLE_VAULT_IDENTITY_LIST"].split("@", 1)[1])
         assert path.read_text() == "short"
         assert b"short" not in exec_subprocess._SECRETS
+
+
+class TestAMachinePasswordHasNoMechanismBehindIt:
+    """So the redactor is its only control, and its floor is lower (#1934).
+
+    Asserted through the PHASE and not through `register_secret`, because the
+    thing that can go wrong is the phase passing the default floor: the function
+    takes a floor and would be perfectly correct while no caller gave it one.
+    """
+
+    def test_a_machine_password_below_the_default_floor_is_still_registered(self, tmp_path):
+        ansible_auth.run(path=_auth_file(tmp_path, [_machine("web", password="hunter22")]))
+        assert b"hunter22" in exec_subprocess._SECRETS, (
+            "it is substituted into the rendered inventory as a value, so nothing "
+            "but the redactor stands between it and the run's two streams"
+        )
+
+    def test_a_become_password_below_the_default_floor_is_registered_too(self, tmp_path):
+        ansible_auth.run(
+            path=_auth_file(tmp_path, [_machine("web", user="deploy", become_password="sudo-pw1")])
+        )
+        assert b"sudo-pw1" in exec_subprocess._SECRETS
+
+    def test_the_lowered_floor_is_still_a_floor(self, tmp_path):
+        """`prod` would match ordinary output, which is what the floor exists for."""
+        ansible_auth.run(path=_auth_file(tmp_path, [_machine("web", password="prod")]))
+        assert b"prod" not in exec_subprocess._SECRETS
+
+    def test_a_non_secret_field_is_never_registered_however_short(self, tmp_path):
+        """`user` is not a secret, and registering it would black out every line
+        of the log that names the account."""
+        ansible_auth.run(path=_auth_file(tmp_path, [_machine("web", user="deploy-service")]))
+        assert b"deploy-service" not in exec_subprocess._SECRETS
 
 
 class TestTheMachineCredential:
