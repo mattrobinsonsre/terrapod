@@ -335,6 +335,16 @@ async def current_upstream_digest(
 
     Deliberately short timeouts. This is an optimisation on the read path, and a
     slow upstream must not make a pull that could be served locally slow too.
+
+    And deliberately a tighter retry policy than the shared default, for the same
+    reason (#2243). Retrying at all is worth something here: a tag is a mutable
+    reference stored beside immutable artifacts (#1425), so a transient failure
+    that skips revalidation serves a stale image. But the default policy is four
+    attempts with 1/2/4s of backoff, which against these timeouts is ~59s on a
+    sick upstream where a single shot is ~13s -- paid inline on a pull that could
+    have been served from cache. One extra attempt with a 0.2s delay catches a
+    genuine blip for ~13s more, and the fallback is unchanged either way: when it
+    finally gives up it returns None and the caller serves what it has.
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{tag}"
     timeout = httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0)
@@ -364,6 +374,13 @@ async def current_upstream_digest(
             auth=auth,
             follow_redirects=True,
             timeout=timeout,
+            # Tighter than the shared default on purpose -- see the docstring.
+            # `fetch_manifest` and `fetch_blob` keep the default policy, because
+            # they have no cached answer to fall back on: for them a retry is the
+            # difference between a served image and a failed pull.
+            retries=1,
+            base_delay=0.2,
+            max_delay=0.2,
         )
     except httpx.HTTPError as exc:
         logger.info(
