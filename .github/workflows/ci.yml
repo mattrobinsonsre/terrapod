@@ -63,7 +63,7 @@ env:
   POSTGRES_IMAGE: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
   REDIS_IMAGE: ghcr.io/mattrobinsonsre/mirror/redis:7-alpine
   # The largest single thing CI pulls: 0.91GB compressed, fetched by each of the
-  # eight E2E shards. Mirrored in #1475 for the same reason as the rest — CI
+  # five E2E shards. Mirrored in #1475 for the same reason as the rest — CI
   # should not depend on a third-party registry being reachable.
   #
   # This tag must stay in step with e2e/package-lock.json, which pins
@@ -3258,10 +3258,24 @@ jobs:
     # Sharded across N GitHub runners using Playwright's built-in --shard=k/N.
     # Each shard boots its own docker-compose stack in PARALLEL, so stack-boot
     # wall-clock is ~constant regardless of shard count — adding shards lowers
-    # the per-shard TEST time without raising boot wall-clock (the cost is
-    # runner-minutes). Grow the `shard:` list as the suite grows so total
-    # wall-clock stays flat. Per-shard blob reports are merged into one HTML
-    # report by the `e2e-report` job.
+    # the per-shard TEST time without raising boot wall-clock. Per-shard blob
+    # reports are merged into one HTML report by the `e2e-report` job.
+    #
+    # The sentence that used to follow -- "the cost is runner-minutes, so grow
+    # the list as the suite grows" -- was true and incomplete, and the missing
+    # half is what drove this back from eight to FIVE on 2026-10-26. The cost is
+    # runner-minutes AND a slot, and against a 20-job ceiling the slot is the
+    # scarce one. Measured per shard on run 40333801771: ~95s of FIXED cost
+    # (2s checkout, 14s artifact download, 43s image load, 25s stack boot, 2s
+    # health, 2s node_modules, 5s teardown, 2s set-up) against 77s of actual
+    # Playwright. The overhead is larger than the work it protects, so at eight
+    # shards 760s of the tier's 1215s was setup and only ~450s was testing.
+    #
+    # Five puts ~90s of test on each shard for the same ~95s of fixed cost --
+    # the longest shard goes 176s -> ~190s, still inside this wave's own tail --
+    # and hands three slots back to the wave. So grow the list when the SUITE
+    # grows past the point where a shard's test time dominates its ~95s floor,
+    # not merely when the suite grows.
     name: E2E Tests (${{ matrix.shard }}/${{ strategy.job-total }})
     # amd64 only — e2e loads the amd64 images and must not wait on the
     # slower arm64 builds (they run in parallel as a build-validation gate).
@@ -3274,7 +3288,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5]
     # Whole-job upper bound. Default is GitHub's 360 min, which lets a
     # wedged step run for six hours before anyone notices. 15 min covers
     # a cold-runner worst-case (image pull + stack boot + test suite)
@@ -3656,9 +3670,11 @@ jobs:
         run: docker compose -f e2e/docker-compose.e2e.yml down -v
 
   # ── E2E Report (merge shard blob reports) ──────────────
-  # Merges the per-shard Playwright blob reports into a single HTML report,
-  # so a failure across 8 shards is triaged from one artifact. Runs even when
-  # shards fail (always()) — that's exactly when the merged report is needed.
+  # Merges the per-shard Playwright blob reports into a single HTML report, so
+  # a failure anywhere in the matrix is triaged from one artifact. Runs even
+  # when shards fail (always()) — that's exactly when the merged report is
+  # needed. The download is `blob-report-*` with `merge-multiple`, so it is
+  # count-agnostic and the shard list can move without touching this job.
   # Merges the shard blob reports into one HTML report for a human to read.
   #
   # Deliberately NOT part of `ci-pass`: it asserts nothing about the product. The
