@@ -242,6 +242,14 @@ jobs:
       - name: (docs-audit) Peer-fairness review list
         run: python3 scripts/docs-audit/check_peer_fairness.py
 
+      # A machine credential's `key` is its NAME, and where it applies is said
+      # in the inventory by a `${terrapod:<name>.<field>}` placeholder. An
+      # earlier design scoped it to `all` or a group; seven prose surfaces kept
+      # that account after the code moved, and `all` is a valid credential name
+      # so following them is accepted and then silently does nothing.
+      - name: (docs-audit) A machine credential's key is described with its mechanism
+        run: python3 scripts/docs-audit/check_credential_key_prose.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
