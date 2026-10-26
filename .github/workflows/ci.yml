@@ -739,12 +739,19 @@ jobs:
   # measured on run 40316874372, for an image whose contents change only when
   # `Dockerfile.test-base` or the lock does.
   #
-  # **Deliberately NOT a dependency of `python-test`.** A run whose base is not
-  # yet published must not wait for one -- it builds locally, exactly as every
-  # run did before this existed -- so this can never put a job on the critical
-  # path, and the worst case is the cost we already pay. It makes the NEXT run
-  # fast, which for a file that changes a few times a year is the whole of the
-  # benefit.
+  # **`python-test` DEPENDS on this, and must.** Without the dependency the
+  # publish and the fifteen slices start together, so on any run whose base is
+  # not already published every slice misses the pull and builds the base
+  # itself -- sixteen builds of one image, worse than the fifteen this set out
+  # to remove, with the publish only ever helping the NEXT run.
+  #
+  # **But it is NOT part of the `CI` verdict.** This is a performance
+  # optimisation with a correct fallback: `ensure_test_image` builds the base
+  # locally when it cannot pull one, so a failed publish costs speed and not a
+  # red build, and gating the required check on it would let an optimisation
+  # fail an otherwise-correct change. The ordering it exists for is unaffected,
+  # because `python-test` still waits for it and `python-test` IS in the
+  # verdict.
   #
   # Skipped only for a FORK PR, whose token has no `packages: write`. Not for
   # PRs in general: a same-repo PR's token does have it, and gating on `is_pr`
@@ -769,7 +776,7 @@ jobs:
     # runs on a re-tag run where the test matrix is skipped. It then finds the
     # tag present and exits in seconds, which is cheaper than the delay gating
     # on it would add to every other run.
-    name: Publish the test base image
+    name: Test Base Image
     if: >-
       github.event_name != 'pull_request'
       || github.event.pull_request.head.repo.full_name == github.repository
@@ -4974,7 +4981,6 @@ jobs:
       - build-ee-agent
       - build-query
       - python-test
-      - build-test-base
       - pricegen-test
       - rescan-test
       - migration-check
@@ -5041,7 +5047,6 @@ jobs:
             "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
-            "${{ needs.build-test-base.result }}"
             "${{ needs.pricegen-test.result }}"
             "${{ needs.rescan-test.result }}"
             "${{ needs.migration-check.result }}"
