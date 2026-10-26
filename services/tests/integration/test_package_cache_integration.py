@@ -19,6 +19,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
+from terrapod import http_retry
 from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db_session
 from terrapod.services.package_cache.substrate import (
@@ -46,6 +47,22 @@ def _fake_upstream(*, calls: list[str], status: int = 200, body: bytes = WHEEL):
         return httpx.Response(status, content=body)
 
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+def _fake_upstream_sequence(*, calls: list[str], statuses: list[int], body: bytes = WHEEL):
+    """Return successive responses while retaining the usual request counter."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        status = statuses[min(len(calls) - 1, len(statuses) - 1)]
+        return httpx.Response(status, content=body)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+@pytest.fixture
+def zero_retry_delay(monkeypatch) -> None:
+    monkeypatch.setattr(http_retry, "_backoff_seconds", lambda *_: 0.0)
 
 
 def _artifact(filename: str = "flask-3.0.0-py3-none-any.whl") -> Artifact:
@@ -146,15 +163,32 @@ class TestFetchAndCache:
         async with get_db_session() as db, _fake_upstream(calls=calls, status=404) as client:
             with pytest.raises(NotFoundUpstream):
                 await fetch_and_cache(db, storage, _artifact(), client=client)
+        assert len(calls) == 1
 
-    async def test_a_500_upstream_is_an_upstream_error(self, app) -> None:
+    async def test_a_5xx_upstream_is_retried_before_the_package_is_cached(
+        self, app, zero_retry_delay
+    ) -> None:
+        calls: list[str] = []
+        storage = get_storage()
+        async with (
+            get_db_session() as db,
+            _fake_upstream_sequence(calls=calls, statuses=[503, 200]) as client,
+        ):
+            record = await fetch_and_cache(db, storage, _artifact(), client=client)
+
+        assert len(calls) == 2
+        assert record.size == len(WHEEL)
+        assert await storage.get(record.storage_key) == WHEEL
+
+    async def test_a_500_upstream_is_an_upstream_error(self, app, zero_retry_delay) -> None:
         calls: list[str] = []
         storage = get_storage()
         async with get_db_session() as db, _fake_upstream(calls=calls, status=503) as client:
             with pytest.raises(UpstreamError):
                 await fetch_and_cache(db, storage, _artifact(), client=client)
+        assert len(calls) == http_retry.DEFAULT_RETRIES + 1
 
-    async def test_a_failed_fetch_leaves_nothing_behind(self, app) -> None:
+    async def test_a_failed_fetch_leaves_nothing_behind(self, app, zero_retry_delay) -> None:
         """Neither a row promising bytes that were never stored, nor a temp file.
 
         A row without an object is the worse of the two: every later request

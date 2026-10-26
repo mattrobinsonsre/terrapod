@@ -87,6 +87,15 @@ def _backoff_seconds(attempt: int, base_delay: float, max_delay: float) -> float
     return min(max_delay, base_delay * (2**attempt))
 
 
+def retry_delay_seconds(
+    attempt: int,
+    base_delay: float = DEFAULT_BASE_DELAY,
+    max_delay: float = DEFAULT_MAX_DELAY,
+) -> float:
+    """The shared bounded delay for retry loops that stream response bodies."""
+    return _backoff_seconds(attempt, base_delay, max_delay)
+
+
 def request_with_retry(
     client: httpx.Client,
     method: str,

@@ -22,6 +22,7 @@ being silently overwritten by upstream content.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 import httpx
@@ -29,6 +30,7 @@ import structlog
 
 from terrapod.config import settings
 from terrapod.db.models import OCIRepository
+from terrapod.http_retry import DEFAULT_RETRIES, arequest_with_retry, retry_delay_seconds
 from terrapod.services.oci.names import Digest
 
 logger = structlog.get_logger("oci.pullthrough")
@@ -56,6 +58,30 @@ class UpstreamUnavailable(Exception):
     502-shaped error rather than a 404 that would look like the image simply
     does not exist.
     """
+
+
+class _RetryableUpstreamStatus(Exception):
+    """A transient status received while a streamed OCI blob was being fetched."""
+
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__(f"upstream returned {status_code}")
+
+
+class _RetryableUpstreamTransport(Exception):
+    """A transport failure from the upstream side of a storage stream."""
+
+
+def _caused_by(error: BaseException, original: BaseException) -> bool:
+    """Whether a storage backend wrapped an error raised by the input stream."""
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        if current is original:
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def resolve_upstream(name: str) -> tuple[str, str] | None:
@@ -118,7 +144,13 @@ def mirroring_allowed() -> bool:
     return bool(settings.registry.oci.upstreams) and not settings.registry.cache_only
 
 
-async def fetch_manifest(host: str, repository: str, reference: str) -> tuple[bytes, str, str]:
+async def fetch_manifest(
+    host: str,
+    repository: str,
+    reference: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> tuple[bytes, str, str]:
     """Fetch a manifest from upstream, returning (body, media type, digest).
 
     The digest is computed from the bytes rather than read from the upstream's
@@ -127,13 +159,23 @@ async def fetch_manifest(host: str, repository: str, reference: str) -> tuple[by
     content-addressed.
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{reference}"
+    owns_client = client is None
+    client = client or httpx.AsyncClient(timeout=30.0, follow_redirects=True, auth=_auth(host))
     try:
-        async with httpx.AsyncClient(
-            timeout=30.0, follow_redirects=True, auth=_auth(host)
-        ) as client:
-            response = await client.get(url, headers={"Accept": MANIFEST_ACCEPT})
+        response = await arequest_with_retry(
+            client,
+            "GET",
+            url,
+            headers={"Accept": MANIFEST_ACCEPT},
+            auth=_auth(host),
+            follow_redirects=True,
+            timeout=30.0,
+        )
     except httpx.HTTPError as exc:
         raise UpstreamUnavailable(f"{host}: {exc}") from exc
+    finally:
+        if owns_client:
+            await client.aclose()
 
     if response.status_code == 404:
         raise UpstreamUnavailable(f"{host} has no manifest {repository}:{reference}")
@@ -145,7 +187,15 @@ async def fetch_manifest(host: str, repository: str, reference: str) -> tuple[by
     return body, media_type, f"sha256:{hashlib.sha256(body).hexdigest()}"
 
 
-async def fetch_blob(host: str, repository: str, digest: Digest, storage, storage_key: str) -> int:
+async def fetch_blob(
+    host: str,
+    repository: str,
+    digest: Digest,
+    storage,
+    storage_key: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> int:
     """Stream a blob from upstream into storage, verifying it as it passes.
 
     Returns its size. Streamed rather than buffered because a layer is hundreds
@@ -154,33 +204,90 @@ async def fetch_blob(host: str, repository: str, digest: Digest, storage, storag
     a container fails to start, with nothing pointing at the cause.
     """
     url = f"{_base_url(host)}/v2/{repository}/blobs/{digest}"
-    hasher = hashlib.new(digest.algorithm)
-    size = 0
-
-    async def _verified():
-        nonlocal size
-        async with httpx.AsyncClient(
-            timeout=300.0, follow_redirects=True, auth=_auth(host)
-        ) as client:
-            async with client.stream("GET", url) as response:
-                if response.status_code >= 400:
-                    raise UpstreamUnavailable(f"{host} returned {response.status_code}")
-                async for chunk in response.aiter_bytes(_STREAM_CHUNK):
-                    hasher.update(chunk)
-                    size += len(chunk)
-                    yield chunk
-
+    owns_client = client is None
+    client = client or httpx.AsyncClient(timeout=300.0, follow_redirects=True, auth=_auth(host))
     try:
-        await storage.put_stream(storage_key, _verified())
-    except httpx.HTTPError as exc:
-        raise UpstreamUnavailable(f"{host}: {exc}") from exc
+        for attempt in range(DEFAULT_RETRIES + 1):
+            hasher = hashlib.new(digest.algorithm)
+            size = 0
+            upstream_failure: Exception | None = None
 
-    if hasher.hexdigest() != digest.encoded:
-        # The stored object is already written; the caller must not record it.
-        # Left for the reaper rather than deleted inline, because a delete that
-        # fails here would mask the far more interesting integrity failure.
-        raise UpstreamUnavailable(f"{host} served {repository}@{digest} with a mismatched digest")
-    return size
+            async def _verified(hasher=hasher):
+                nonlocal size, upstream_failure
+                try:
+                    async with client.stream(
+                        "GET",
+                        url,
+                        auth=_auth(host),
+                        follow_redirects=True,
+                        timeout=300.0,
+                    ) as response:
+                        if response.status_code == 404:
+                            raise UpstreamUnavailable(f"{host} has no blob {repository}@{digest}")
+                        if response.status_code >= 500:
+                            raise _RetryableUpstreamStatus(response.status_code)
+                        if response.status_code >= 400:
+                            raise UpstreamUnavailable(f"{host} returned {response.status_code}")
+                        async for chunk in response.aiter_bytes(_STREAM_CHUNK):
+                            hasher.update(chunk)
+                            size += len(chunk)
+                            yield chunk
+                except (_RetryableUpstreamStatus, UpstreamUnavailable) as exc:
+                    upstream_failure = exc
+                    raise
+                except httpx.RequestError as exc:
+                    failure = _RetryableUpstreamTransport(str(exc))
+                    upstream_failure = failure
+                    raise failure from exc
+
+            try:
+                await storage.put_stream(storage_key, _verified())
+            except Exception as exc:
+                # Some storage drivers wrap exceptions from the source iterator
+                # (Azure, for example). Retry only when the cause chain proves
+                # the failure came from this upstream response, not the store.
+                if upstream_failure is None or not _caused_by(exc, upstream_failure):
+                    raise
+                if isinstance(upstream_failure, UpstreamUnavailable):
+                    if exc is upstream_failure:
+                        raise
+                    raise upstream_failure from exc
+
+                if attempt == DEFAULT_RETRIES:
+                    if isinstance(upstream_failure, _RetryableUpstreamStatus):
+                        detail = f"{host} returned {upstream_failure.status_code}"
+                    else:
+                        detail = f"{host}: {upstream_failure.__cause__ or upstream_failure}"
+                    raise UpstreamUnavailable(detail) from exc
+
+                logger.warning(
+                    "Retrying OCI blob after transient upstream failure",
+                    host=host,
+                    repository=repository,
+                    attempt=attempt + 1,
+                    retries=DEFAULT_RETRIES,
+                    status=(
+                        upstream_failure.status_code
+                        if isinstance(upstream_failure, _RetryableUpstreamStatus)
+                        else None
+                    ),
+                    error=str(upstream_failure),
+                )
+                await asyncio.sleep(retry_delay_seconds(attempt))
+                continue
+
+            if hasher.hexdigest() != digest.encoded:
+                # The stored object is already written; the caller must not record it.
+                # Left for the reaper rather than deleted inline, because a delete that
+                # fails here would mask the far more interesting integrity failure.
+                raise UpstreamUnavailable(
+                    f"{host} served {repository}@{digest} with a mismatched digest"
+                )
+            return size
+        raise AssertionError("retry loop exited without a result")
+    finally:
+        if owns_client:
+            await client.aclose()
 
 
 async def ensure_mirror_repository(db, name: str, host: str) -> OCIRepository:
@@ -197,7 +304,13 @@ async def ensure_mirror_repository(db, name: str, host: str) -> OCIRepository:
     return repository
 
 
-async def current_upstream_digest(host: str, repository: str, tag: str) -> str | None:
+async def current_upstream_digest(
+    host: str,
+    repository: str,
+    tag: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> str | None:
     """What upstream says this tag points at now, or None if it cannot be reached.
 
     A `HEAD` returns `Docker-Content-Digest` without the body, so confirming an
@@ -213,6 +326,13 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
     slow upstream must not make a pull that could be served locally slow too.
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{tag}"
+    timeout = httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0)
+    owns_client = client is None
+    client = client or httpx.AsyncClient(
+        follow_redirects=True,
+        auth=_auth(host),
+        timeout=timeout,
+    )
 
     try:
         # `auth=` rather than an Authorization header: `_auth` returns a
@@ -223,12 +343,15 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
         # failure" contract, and surface as a 500 on an ordinary image pull. It
         # only ever fired for an upstream with credentials, which is why it sat
         # here unmet while every anonymous mirror worked.
-        async with httpx.AsyncClient(
-            follow_redirects=True,
+        response = await arequest_with_retry(
+            client,
+            "HEAD",
+            url,
+            headers={"Accept": MANIFEST_ACCEPT},
             auth=_auth(host),
-            timeout=httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0),
-        ) as client:
-            response = await client.head(url, headers={"Accept": MANIFEST_ACCEPT})
+            follow_redirects=True,
+            timeout=timeout,
+        )
     except httpx.HTTPError as exc:
         logger.info(
             "Could not confirm mirrored tag with upstream; serving the cached image",
@@ -238,6 +361,9 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
             error=str(exc),
         )
         return None
+    finally:
+        if owns_client:
+            await client.aclose()
 
     if response.status_code >= 400:
         # Includes the tag having been deleted upstream (404). Keeping what we
@@ -262,7 +388,12 @@ async def current_upstream_digest(host: str, repository: str, tag: str) -> str |
 _MAX_TAG_PAGES = 20
 
 
-async def upstream_tags(host: str, repository: str) -> list[str] | None:
+async def upstream_tags(
+    host: str,
+    repository: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> list[str] | None:
     """Every tag upstream holds for a repository, or None if it cannot be known.
 
     **None means "cannot tell", and a caller must not read it as "empty".** That
@@ -284,7 +415,9 @@ async def upstream_tags(host: str, repository: str) -> list[str] | None:
     so the timeouts are a little more generous -- but still bounded, because this
     sits behind a read an operator is waiting on in a form.
     """
-    return await list_tags_at(_base_url(host), repository, auth=_auth(host), label=host)
+    return await list_tags_at(
+        _base_url(host), repository, auth=_auth(host), label=host, client=client
+    )
 
 
 async def list_tags_at(
@@ -293,6 +426,7 @@ async def list_tags_at(
     *,
     auth: tuple[str, str] | None = None,
     label: str = "",
+    client: httpx.AsyncClient | None = None,
 ) -> list[str] | None:
     """`upstream_tags` for a registry that is not a configured pull-through upstream.
 
@@ -312,38 +446,48 @@ async def list_tags_at(
     url: str | None = f"{base_url.rstrip('/')}/v2/{repository}/tags/list?n=100"
     collected: list[str] = []
     host = label or base_url
+    timeout = httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=5.0)
+    owns_client = client is None
+    client = client or httpx.AsyncClient(
+        follow_redirects=True,
+        auth=auth,
+        timeout=timeout,
+    )
 
     try:
-        async with httpx.AsyncClient(
-            follow_redirects=True,
-            auth=auth,
-            timeout=httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=5.0),
-        ) as client:
-            for _ in range(_MAX_TAG_PAGES):
-                response = await client.get(url, headers={"Accept": "application/json"})
-                if response.status_code == 404:
-                    # The repository genuinely has no tags upstream. Distinct
-                    # from unreachable: this one IS an answer.
-                    return []
-                if response.status_code >= 400:
-                    logger.info(
-                        "Upstream refused a tag listing",
-                        host=host,
-                        repository=repository,
-                        status=response.status_code,
-                    )
-                    return None
+        for _ in range(_MAX_TAG_PAGES):
+            response = await arequest_with_retry(
+                client,
+                "GET",
+                url,
+                headers={"Accept": "application/json"},
+                auth=auth,
+                follow_redirects=True,
+                timeout=timeout,
+            )
+            if response.status_code == 404:
+                # The repository genuinely has no tags upstream. Distinct
+                # from unreachable: this one IS an answer.
+                return []
+            if response.status_code >= 400:
+                logger.info(
+                    "Upstream refused a tag listing",
+                    host=host,
+                    repository=repository,
+                    status=response.status_code,
+                )
+                return None
 
-                body = response.json()
-                tags = body.get("tags") if isinstance(body, dict) else None
-                # `tags: null` is legal in the spec for an empty repository, and
-                # is not a malformed response to warn about.
-                if isinstance(tags, list):
-                    collected.extend(t for t in tags if isinstance(t, str))
+            body = response.json()
+            tags = body.get("tags") if isinstance(body, dict) else None
+            # `tags: null` is legal in the spec for an empty repository, and
+            # is not a malformed response to warn about.
+            if isinstance(tags, list):
+                collected.extend(t for t in tags if isinstance(t, str))
 
-                url = _next_page(response, base_url.rstrip("/"))
-                if url is None:
-                    return collected
+            url = _next_page(response, base_url.rstrip("/"))
+            if url is None:
+                return collected
     except (httpx.HTTPError, ValueError) as exc:
         # ValueError covers a non-JSON body: a proxy error page is a failure to
         # reach the registry, not a repository with no tags.
@@ -354,6 +498,9 @@ async def list_tags_at(
             error=str(exc),
         )
         return None
+    finally:
+        if owns_client:
+            await client.aclose()
 
     logger.warning(
         "Upstream tag listing exceeded the page cap; treating it as unknown",
