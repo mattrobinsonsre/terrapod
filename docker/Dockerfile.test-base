@@ -1,0 +1,159 @@
+# Terrapod test runner — the DEPENDENCY half (#2248)
+#
+# Split out of `Dockerfile.test` because every Python CI slice was building the
+# whole image from scratch: measured at 64s per job on run 40316874372, of which
+# ~45s is this file's work (apt, OPA, OpenTofu, the ansible-core venv, poetry
+# and `poetry install`) and ~17s is exporting layers. Fifteen slices paid it
+# fifteen times, for an image whose expensive half changes only when the lock or
+# this file does.
+#
+# So this half is built once, published as `terrapod-test-base:<hash of its own
+# inputs>`, and pulled; the leaf then adds only COPY layers, which measured
+# 0.0-0.1s each. `scripts/lib.sh` computes the hash and falls back to building
+# this locally when the tag is not published -- which is what keeps a fork PR,
+# an air-gapped checkout and a dependency bump all working with no special case.
+#
+# **Nothing below may depend on the repository's code or tests.** A layer that
+# does would be baked into a tag that outlives the commit, and every later run
+# would test the wrong tree. The hash covers this file, `services/pyproject.toml`
+# and `services/poetry.lock` -- so if you add an input here, add it to
+# `_test_base_hash` in `scripts/lib.sh` too, or the tag stops describing the
+# image.
+# Terrapod API test runner
+# Includes all dev dependencies (pytest, ruff, mypy)
+
+# Base image, overridable so CI can pull it from our GHCR mirror instead of
+# Docker Hub, whose anonymous pull limit is shared across GitHub runners and
+# turns unrelated PRs red (#1186). The default is the upstream reference, so a
+# local build needs no mirror access and behaves exactly as before.
+ARG BASE_IMAGE=python:3.14-slim
+FROM ${BASE_IMAGE}
+
+# `openssh-client` is here for one reason worth stating: a test that proves
+# ansible reports a host UNREACHABLE needs the ssh transport to exist. Without
+# it the connection plugin cannot run at all, so the unreachable hook never
+# fires and the test fails on an empty event list rather than on the property it
+# pins -- which is exactly what happened (#1928), twice, because the first fix
+# addressed the fixture's network dependence and not its missing binary.
+#
+# Same reasoning as the OPA and ansible-core installs below: this image bakes in
+# a real binary so the test exercises the real behaviour rather than skipping.
+# Not a published image, so it carries no CVE surface for operators.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    jq \
+    openssh-client \
+    pkg-config \
+    gcc \
+    libc6-dev \
+    xmlsec1 \
+    libxmlsec1-dev \
+    libxmlsec1-openssl \
+    && rm -rf /var/lib/apt/lists/* \
+    && ssh -V
+
+# OPA — so the policy-engine tests (#343) exercise the real binary rather than
+# skipping. This is the ONE image that still bakes it in: the api and runner
+# images fetch it at run time now (#1208), but a test image that did the same
+# would need upstream reach on every CI run to test a code path that has nothing
+# to do with fetching. Not a published image, so it carries no CVE surface for
+# operators. Keep the version roughly in step with
+# `registry.platform_tools.opa_version` in values.yaml — the tests exercise
+# `opa check` behaviour, so a large drift would test something operators do not
+# run.
+ARG TARGETARCH
+ARG OPA_VERSION=1.21.0
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
+    && rm /tmp/opa.sha256 \
+    && chmod 0755 /usr/local/bin/opa \
+    && /usr/local/bin/opa version
+
+# OpenTofu — so the runner tfvars tests (terrapod.runner.phases.tfvars) parse
+# the generated terrapod.auto.tfvars with a REAL engine in CI rather than
+# skipping. tofu is MPL-licensed (clean to embed); terraform (BSL) is only run
+# locally. The test parametrizes over whichever engines are present.
+ARG OPENTOFU_VERSION=1.12.2
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.tar.gz "${BASE}/tofu_${OPENTOFU_VERSION}_linux_${ARCH}.tar.gz" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.sums "${BASE}/tofu_${OPENTOFU_VERSION}_SHA256SUMS" \
+    && EXPECTED="$(grep "  tofu_${OPENTOFU_VERSION}_linux_${ARCH}.tar.gz$" /tmp/tofu.sums | cut -d' ' -f1)" \
+    && echo "${EXPECTED}  /tmp/tofu.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/tofu.tar.gz -C /usr/local/bin tofu \
+    && rm /tmp/tofu.tar.gz /tmp/tofu.sums \
+    && chmod 0755 /usr/local/bin/tofu \
+    && /usr/local/bin/tofu version
+
+# ansible-core — so the inventory resolution tests run `ansible-inventory` for
+# REAL in CI rather than skipping. That matters more here than for most tools:
+# Terrapod deliberately implements no merge of its own, so every claim about
+# precedence, the group DAG and `--limit` expansion is a claim about ansible's
+# behaviour, and a test that does not run ansible asserts nothing about it.
+#
+# Two of ansible's output shapes are load-bearing and neither is documented:
+# a host with no variables is absent from `_meta.hostvars`, and a group with no
+# members has no top-level entry at all. Both were found by running it.
+#
+# Its OWN virtualenv, not the image's python: ansible-core shares jinja2, PyYAML
+# and packaging with the application, so installing it alongside would let its
+# ranges move the app's resolved versions and test something operators do not
+# run.
+#
+# Keep the version inside the `ansible-core` range in `services/pyproject.toml`
+# (`~2.21`), which is where the API image's own pin lives. It is NOT a Helm
+# value: `api.config.default_ansible_version` was removed in 2.0 along with the
+# machinery that created a venv on first use and pip-installed into it, so a
+# comment pointing at values.yaml or at `services/api_ansible.py` is pointing at
+# two things that no longer exist. The API now finds `ansible-inventory` on PATH
+# (`inventory_resolve._BINARY`), which is why the symlink below is what makes
+# this image match production rather than merely resemble it.
+#
+# **`ansible-playbook` and `ansible-vault` are symlinked too, and were not until
+# #1934.** Only `ansible-inventory` was, so every test that DRIVES A PLAYBOOK --
+# the two callback plugins' gates (#1928, #2144), the vault decryption proof, the
+# redaction gates -- probed `shutil.which("ansible-playbook")`, found nothing and
+# skipped, in CI, silently. Those are the tests whose whole argument is that a
+# claim about ansible's rendering or censorship is worth nothing unless ansible
+# made it, so skipping them in the only place that gates a merge left the claim
+# resting on a developer's machine. A `skipif` is right there and must never be
+# how CI behaves.
+#
+# All three are asserted at BUILD time, so a future change that drops one fails
+# the image build rather than quietly restoring the skip. `ansible-galaxy` is
+# deliberately NOT linked: its own tests reach the network to resolve a
+# collection, which is a different decision from running a playbook against
+# `connection: local` or encrypting a file.
+ARG ANSIBLE_CORE_VERSION=2.21.5
+RUN python -m venv /opt/ansible \
+    && /opt/ansible/bin/pip install --no-cache-dir --only-binary=:all: \
+        "ansible-core==${ANSIBLE_CORE_VERSION}" \
+    && ln -s /opt/ansible/bin/ansible-inventory /usr/local/bin/ansible-inventory \
+    && ln -s /opt/ansible/bin/ansible-playbook /usr/local/bin/ansible-playbook \
+    && ln -s /opt/ansible/bin/ansible-vault /usr/local/bin/ansible-vault \
+    && ansible-inventory --version \
+    && ansible-playbook --version \
+    && ansible-vault --version
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir poetry==1.8.4
+
+WORKDIR /app
+
+# Install ALL dependencies (main + dev) from the committed lock.
+#
+# The lock is named outright, NOT `poetry.lock*`: while no lock was committed
+# that glob matched nothing and `poetry install` resolved a fresh closure every
+# build, so the suite ran against whatever the index served rather than against
+# the reviewed set (GHSA-rgvw-c74c-h75w). Named, a missing lock fails the COPY.
+#
+# `poetry install` from a lock verifies each file against the hash recorded in
+# it, and refuses outright when the lock no longer matches pyproject.toml — so
+# this needs no separate --require-hashes the way the pip-based images do.
+COPY services/pyproject.toml services/poetry.lock ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --no-root

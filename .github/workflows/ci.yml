@@ -698,47 +698,72 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-        with:
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
-
-      # `terrapod-test:local` was being built FROM SCRATCH inside every one of
-      # these jobs, because `scripts/test.sh` runs a plain `docker build` and a
-      # fresh runner has no layer store to hit. Measured at 64s per job on run
-      # 40316874372 -- apt, the ansible-core venv, poetry, and the app's own
-      # dependency install -- which across fifteen slices is a quarter of an
-      # hour of runner time per run spent producing the same image fifteen
-      # times. Under a hard twenty-job concurrency ceiling, duplicated work is
-      # what you can least afford: it does not merely cost minutes, it holds a
-      # slot another queued job is waiting for.
+      # The expensive half of `terrapod-test:local` is published as
+      # `terrapod-test-base:sha-<input hash>` and PULLED here rather than built
+      # in each of the fifteen slices (#2248). `scripts/lib.sh` resolves it:
+      # local store, then this registry, then a local build -- so a fork PR with
+      # no package access, and a PR that changes the lock, both still work and
+      # simply pay what every job used to pay.
       #
-      # Built here through buildx with the same `type=gha` layer cache the five
-      # product images already use, and `load`ed so `docker-compose.test.yml`
-      # finds it under its default tag. `TEST_IMAGE_PREBUILT` then tells
-      # `ensure_test_image` not to build it again.
-      #
-      # ONE writer, not fifteen. `cache-to` is on the `unit` slice alone,
-      # because fifteen concurrent `mode=max` exports converge on the same
-      # layers while paying to upload them fifteen times; every slice reads.
-      # So a cold cache costs exactly what today costs and the NEXT run is the
-      # one that benefits, which is the right trade for a file that changes
-      # rarely. `unit` is the writer because it is the cheapest slice and
-      # always runs.
-      - name: Build the test image (shared layer cache)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          file: docker/Dockerfile.test
-          platforms: linux/amd64
-          load: true
-          tags: terrapod-test:local
-          cache-from: type=gha,scope=test-image
-          cache-to: ${{ matrix.slice.name == 'unit' && 'type=gha,mode=max,scope=test-image' || '' }}
-
+      # A pull rather than a layer cache, measured: `cache-from: type=gha` with
+      # buildx made it WORSE (91-93s against 64s), because the container driver
+      # has to hand the image back to the daemon and that export cost 23.5s of
+      # layers plus a 23.4s tarball send, warm or cold. A pull writes straight
+      # into the daemon and pays none of it.
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
         env:
-          TEST_IMAGE_PREBUILT: "1"
+          TEST_BASE_REGISTRY: ${{ env.REGISTRY }}
+
+  # ── Test base image (#2248) ────────────────────────────
+  # Publishes the dependency half of the Python test image so the fifteen
+  # python-test slices can PULL it instead of each building it. 64s per job,
+  # measured on run 40316874372, for an image whose contents change only when
+  # `Dockerfile.test-base` or the lock does.
+  #
+  # **Deliberately NOT a dependency of `python-test`.** A run whose base is not
+  # yet published must not wait for one -- it builds locally, exactly as every
+  # run did before this existed -- so this can never put a job on the critical
+  # path, and the worst case is the cost we already pay. It makes the NEXT run
+  # fast, which for a file that changes a few times a year is the whole of the
+  # benefit.
+  #
+  # Non-PR only, because a fork PR's token has no `packages: write`. A PR that
+  # changes the lock therefore builds the base in each slice until it merges,
+  # which is today's cost rather than a regression.
+  build-test-base:
+    name: Publish the test base image
+    needs: prepare
+    if: needs.prepare.outputs.is_pr != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Build and push when the tag is absent
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+        run: |
+          # The tag comes from `lib.sh` rather than being recomputed here: two
+          # implementations of a content hash is two things to get wrong, and a
+          # tag that disagrees with the one the test jobs look for would publish
+          # an image nothing ever pulls -- silently, and looking like a success.
+          source scripts/lib.sh
+          tag="$(test_base_tag)"
+          remote="${REGISTRY}/${tag}"
+          if docker manifest inspect "$remote" >/dev/null 2>&1; then
+            echo "Already published, nothing to do: $remote"
+            exit 0
+          fi
+          echo "Publishing $remote"
+          docker build -f docker/Dockerfile.test-base -t "$remote" .
+          docker push "$remote"
 
   # ── pricegen unit tests (#1025) ───────────────────────
   # The pricegen package (self-generated cost pricesheet, #893) is a standalone
@@ -1190,6 +1215,13 @@ jobs:
       # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
       - name: Every token mint names its identity provider
         run: python3 scripts/docs-audit/check_token_mints.py
+      # Also not a docs gate, and here for the same reason: this job sees the
+      # whole checkout, including the workflows. A package published with
+      # nothing reaping it fails SILENTLY -- no check turns red, the versions
+      # just pile up -- and that has now happened twice. The second time, the
+      # chart package held 408 versions and `mirror/python` 330.
+      - name: Every published GHCR package is reaped
+        run: python3 scripts/docs-audit/check_ghcr_cleanup.py
       # Also not a docs gate, and also here because this job sees the whole
       # checkout. Every `uses:` is SHA-pinned, so the trailing `# vN` comment is
       # the only human-readable statement of what is pinned -- and dependabot
@@ -4090,6 +4122,7 @@ jobs:
             ee-agent-lint=${{ needs.ee-agent-lint.result }}
             ee-agent-test=${{ needs.ee-agent-test.result }}
             python-test=${{ needs.python-test.result }}
+            build-test-base=${{ needs.build-test-base.result }}
             pricegen-test=${{ needs.pricegen-test.result }}
             rescan-test=${{ needs.rescan-test.result }}
             migration-check=${{ needs.migration-check.result }}
@@ -4903,6 +4936,7 @@ jobs:
       - build-ee-agent
       - build-query
       - python-test
+      - build-test-base
       - pricegen-test
       - rescan-test
       - migration-check
@@ -4969,6 +5003,7 @@ jobs:
             "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
+            "${{ needs.build-test-base.result }}"
             "${{ needs.pricegen-test.result }}"
             "${{ needs.rescan-test.result }}"
             "${{ needs.migration-check.result }}"
