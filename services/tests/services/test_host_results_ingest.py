@@ -9,6 +9,7 @@ at that rate is the scaling pain large AWX installs are known for.
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -213,7 +214,7 @@ class TestItToleratesAStreamItCannotFullyRead:
             + "\n"
             + '{"kind": "failed", "host": "we'
         )
-        _db, _run_, (hosts, events) = await _ingest(body)
+        _, _, (hosts, events) = await _ingest(body)
         assert (hosts, events) == (1, 1)
 
     async def test_a_non_object_line_is_skipped(self):
@@ -222,7 +223,7 @@ class TestItToleratesAStreamItCannotFullyRead:
             + json.dumps({"kind": "failed", "host": "web2", "task": "t", "seq": 1})
             + "\n"
         )
-        _db, _run_, (_hosts, events) = await _ingest(body)
+        _, _, (_hosts, events) = await _ingest(body)
         assert events == 1
 
     async def test_an_empty_stream_yields_nothing_rather_than_failing(self):
@@ -233,7 +234,7 @@ class TestItToleratesAStreamItCannotFullyRead:
     async def test_the_event_rows_are_capped_while_the_stream_keeps_everything(self):
         over = host_results_service.MAX_EVENT_ROWS + 25
         records = [{"kind": "failed", "host": f"h{i}", "task": "t", "seq": i} for i in range(over)]
-        _db, _run_, (_hosts, events) = await _ingest(records)
+        _, _, (_hosts, events) = await _ingest(records)
         assert events == host_results_service.MAX_EVENT_ROWS
 
 
@@ -407,3 +408,46 @@ class TestThePerHostPartition:
 
         for d in made:
             assert not os.path.isdir(d), f"{d} was left behind"
+
+
+@pytest.mark.asyncio
+class TestEveryHandleAndTheTempDirectoryAreReleased:
+    """The partitioner's lifetime is a `with`, not a `try` around `flush` alone.
+
+    It opens one handle per host inside the streaming loop, so a cleanup that
+    guarded only `flush` left every handle open and the temp directory behind
+    whenever anything between the two raised -- a storage error mid-stream, or a
+    failing `db.flush`. That is one descriptor per host plus a full copy of the
+    stream split by host: exactly the PVC-filling failure the cleanup exists to
+    prevent, and what CodeQL's py/file-not-closed pointed at.
+    """
+
+    async def test_a_failure_after_the_stream_still_releases_everything(self):
+        created: list = []
+        real = host_results_service._Partitioner
+
+        class _Spy(real):  # type: ignore[misc, valid-type]
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                created.append(self)
+
+        db, run = _db(), _run()
+        db.flush = AsyncMock(side_effect=RuntimeError("the database went away"))
+        records = [
+            {"kind": "failed", "host": "web1", "task": "t", "seq": 1},
+            {"kind": "failed", "host": "web2", "task": "t", "seq": 2},
+        ]
+        with (
+            patch.object(host_results_service, "get_storage", return_value=_stream(records)),
+            patch.object(host_results_service, "_Partitioner", _Spy),
+        ):
+            with pytest.raises(RuntimeError):
+                await host_results_service.ingest(db, run)
+
+        assert created, "the partitioner was never constructed"
+        partitioner = created[0]
+        # Without this the assertions below pass vacuously: nothing needs
+        # releasing if nothing was ever opened.
+        assert len(partitioner._handles) == 2, partitioner._handles
+        assert all(handle.closed for handle in partitioner._handles.values())
+        assert not os.path.exists(partitioner._dir)
