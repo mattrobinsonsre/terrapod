@@ -37,6 +37,7 @@ exit — same formula bash uses.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import signal
 import subprocess
@@ -259,26 +260,157 @@ _MIN_SECRET_LEN = 24
 _REDACTED = b"[redacted]"
 
 
-def register_secret(value: str) -> bool:
-    """Register a value to strip from the child's log stream. Idempotent.
+#: How many times over a value is re-encoded when deriving the forms to match.
+#:
+#: **One level is the form that actually appears, and it is invisible until you
+#: look at the bytes** (#1934). A secret inside a JSON string is escaped per
+#: character, so an SSH private key reaches `host-events` as
+#: `-----BEGIN ...-----\nb3Blb...` with LITERAL backslash-n, and a password
+#: containing a quote as `p@ss\"word`. Measured: the raw value appears nowhere in
+#: that file, so a pass over the raw form alone reports nothing to do and leaves
+#: the secret in the clear -- the worst direction, because it looks like it
+#: worked.
+#:
+#: **Two is for JSON arriving inside JSON**, which is a real shape rather than a
+#: hypothetical: a `uri` task reading a key out of a secrets API gets a JSON body
+#: whose own encoding escaped the newlines once, and the callback encodes that
+#: string again. Beyond two the nesting has to be JSON in JSON in JSON, and the
+#: residual is named in `docs/ansible-credentials.md` rather than paid for here.
+#:
+#: Each level is derived with `json.dumps`, i.e. the same encoder the callback
+#: uses, so the forms are what is in the file rather than an escaping rule of
+#: ours. A value with nothing to escape is its own encoded form -- true of a JWT
+#: and of any ordinary password -- so the set is unchanged for a deployment that
+#: runs only terraform or tofu, which is what makes this cost them nothing.
+_ESCAPE_DEPTH = 2
 
-    Returns whether it was registered. Best-effort by construction: see
-    `_MIN_SECRET_LEN` for why a short value is skipped rather than refused.
+
+def _match_forms(value: str) -> list[bytes]:
+    """Every encoding of `value` a log can carry, outermost last.
+
+    Stops as soon as a level is its own encoding, so the common case yields one
+    form and the set does not grow.
     """
-    if not value or len(value) < _MIN_SECRET_LEN:
+    forms, current = [value], value
+    for _ in range(_ESCAPE_DEPTH):
+        encoded = json.dumps(current)[1:-1]
+        if encoded == current:
+            break
+        forms.append(encoded)
+        current = encoded
+    return [form.encode() for form in forms]
+
+
+def register_secret(value: str, *, min_length: int = _MIN_SECRET_LEN) -> bool:
+    """Register a value to strip from this run's log streams. Idempotent.
+
+    Registers the value AND its JSON-escaped forms, because the structured
+    stream a configure writes is JSON and the human log is too whenever the
+    operator's own `ansible.cfg` sets `result_format = json` -- both measured.
+    One door for both, because two redaction paths over the same secret is the
+    shape that goes silently out of step.
+
+    Args:
+        value: the secret itself, exactly as the runner holds it.
+        min_length: the floor below which it is skipped. The default exists for
+            the cloud identity token and says so (`_MIN_SECRET_LEN`); a caller
+            whose secret has no mechanism protecting it passes its own. A
+            connection password is substituted into the rendered inventory as a
+            VALUE, so unlike a private key or a vault password -- which reach
+            ansible as 0600 files and are protected by that -- the redactor is
+            the only control over it, and the floor chosen for a JWT's shape has
+            nothing to say about one. 8 is the floor `summary_redaction` already
+            uses for matching a literal in free text.
+
+    Returns whether it was registered.
+    """
+    if not value or len(value) < min_length:
         logger.warning(
             "not registering a redaction value below the minimum length; it would "
             "match ordinary output and mangle the log",
             length=len(value or ""),
-            minimum=_MIN_SECRET_LEN,
+            minimum=min_length,
         )
         return False
-    _SECRETS.add(value.encode())
+    _SECRETS.update(_match_forms(value))
     return True
 
 
 def _reset_secrets_for_tests() -> None:
     _SECRETS.clear()
+
+
+def redact_file(path: str | os.PathLike[str]) -> bool:
+    """Redact a whole document in place; return whether it is now safe to send.
+
+    **The return value answers the caller's question, not "did anything
+    change".** True means the file holds no registered secret -- either none was
+    there, which is the overwhelming case, or the rewrite succeeded. False means
+    a secret IS there and could not be removed, which is the one case an
+    uploader must refuse. Reporting "rewritten" instead would make a clean file
+    and a failed rewrite the same answer, and the caller would have to guess
+    which.
+
+    For an artifact the runner uploads rather than streams -- today the per-host
+    event stream and its payload sidecar (#1928), which the callback writes
+    inside the execution environment where no secret of ours exists or should.
+    So the redaction is the ORCHESTRATOR's, on the file, before anything sends
+    it: #1934's first requirement, and the alternative is a secrets file on the
+    volume the operator's own playbook can read.
+
+    **Over the whole document at once**, so there is no boundary for a secret to
+    straddle and no carry to reason about -- the thing `StreamRedactor` exists to
+    handle for a stream, absent by construction here.
+
+    **Byte-wise rather than parse-walk-reserialise**, which looks like the
+    tidier answer and is worse in two ways. A configure killed mid-flush leaves
+    a truncated last line, and that is the line carrying the failure someone is
+    looking for: a parser skips it, and skipping means uploading it unredacted. A
+    byte pass cannot fail on it. And the per-host partitions the API cuts from
+    this file are a byte-exact subsequence of it, which re-serialising would
+    quietly stop being true of.
+
+    In place, not a redacted copy: the unredacted bytes are on a volume the
+    execution environment also mounts, so rewriting them shortens that window
+    too. Atomic via `os.replace`, with the mode set at creation, so a failure
+    leaves the original rather than a half-written file -- and so the temporary
+    file is never briefly wider than 0600.
+    """
+    target = os.fspath(path)
+    try:
+        with open(target, "rb") as handle:
+            data = handle.read()
+    except OSError:
+        # A configure that produced no events, or one that could not start.
+        # Nothing to clean and nothing to refuse: `_put_file` skips a missing
+        # file anyway.
+        return True
+    cleaned = _redact(data)
+    if cleaned == data:
+        return True
+    tmp = f"{target}.redacting"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(cleaned)
+        os.replace(tmp, target)
+    except OSError as exc:
+        # Deliberately not fatal and deliberately loud. Failing the configure
+        # because its evidence could not be cleaned would be the reporting path
+        # breaking the thing it reports on -- but a secret this could not remove
+        # must not be uploaded, which is what the False says.
+        logger.warning(
+            "could not redact a captured artifact; it will not be uploaded",
+            path=target,
+            err=str(exc),
+        )
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return False
+    logger.info("redacted a captured artifact before upload", path=target)
+    return True
 
 
 def _redact(buf: bytes) -> bytes:

@@ -300,14 +300,37 @@ def upload_host_events(
     already skips a missing or empty file, so a configure that produced no events
     -- one that could not start, or an older EE -- uploads nothing and says so at
     info rather than warning.
+
+    **Both objects are redacted first** (#1934), which is why that pass lives in
+    here rather than in the caller -- see the comment below.
     """
+    from terrapod.runner import exec_subprocess
     from terrapod.runner.phases import host_events
 
     base = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts"
+    events = host_events.events_path()
+    # **Redaction happens HERE and not at the call site** (#1934). The callback
+    # writes `result._result` verbatim from inside the execution environment,
+    # where no secret of ours exists or should, so a credential the platform
+    # resolved and a task then printed is in these bytes -- and `msg` from this
+    # stream becomes a database column served at `run:read`, a tier BELOW the
+    # artifact itself. Putting the pass inside the uploader rather than beside it
+    # makes "nothing sends these files unredacted" a property of the only
+    # function that can send them, instead of something a second caller has to
+    # remember.
+    #
+    # A file it could not clean is NOT uploaded. That is the one case worth
+    # refusing: the alternative is sending the secret and logging about it.
+    if not exec_subprocess.redact_file(events):
+        logger.warning(
+            "host-events not uploaded: the capture could not be redacted",
+            run_id=cfg.run_id,
+        )
+        return False
     ok, status = _put_file(
         cfg,
         f"{base}/host-events",
-        host_events.events_path(),
+        events,
         content_type="application/x-ndjson",
         client=client,
     )
@@ -315,6 +338,12 @@ def upload_host_events(
         logger.warning("host-events upload failed (non-fatal)", status=status)
     large = host_events.large_path()
     if large.exists() and large.stat().st_size > 0:
+        if not exec_subprocess.redact_file(large):
+            logger.warning(
+                "host-events-large not uploaded: the capture could not be redacted",
+                run_id=cfg.run_id,
+            )
+            return ok
         ok_large, status_large = _put_file(
             cfg,
             f"{base}/host-events-large",

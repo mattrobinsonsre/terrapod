@@ -80,6 +80,22 @@ _AUTH_FILE = Path("/var/run/terrapod/vars/ansible-auth.json")
 #: Matches `job_template._EE_CREDENTIALS_DIR`, so a runner-tier test needs no Job.
 _DEFAULT_CREDENTIALS_DIR = "/tp/credentials"
 
+#: The redaction floor for a secret field delivered as a VALUE (#1934).
+#:
+#: Eight rather than `exec_subprocess._MIN_SECRET_LEN`, and the split is the
+#: point rather than a loosening: the default floor exists for the cloud identity
+#: token and justifies itself by that token's shape, while a `password` or
+#: `become_password` is substituted into the rendered inventory, so nothing but
+#: the redactor stands between it and the two streams. Eight is the floor
+#: `summary_redaction.MIN_LITERAL_LENGTH` already uses for matching a literal in
+#: free text, so this is the house number rather than a new one -- and below it
+#: the trade genuinely inverts, because a value like `prod` matches ordinary
+#: output and a log with half its words blacked out stops being read.
+#:
+#: `private_key` keeps the default floor on purpose: it arrives as a 0600 file,
+#: which is the control, and it cannot be short.
+_VALUE_SECRET_MIN_LENGTH = 8
+
 #: The env var carrying every labelled vault password at once. One variable for
 #: any number of vault IDs: measured against ansible-core 2.18.3, a labelled
 #: list decrypts every labelled secret and tries an unlabelled `!vault` block
@@ -289,7 +305,16 @@ def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[
             out[f"{key}.{field}"] = "true" if parse_boolean(str(value)) else "false"
             continue
         if field in MACHINE_SECRET_FIELDS:
-            exec_subprocess.register_secret(str(value))
+            # A LOWER floor than the default, because this field has no
+            # mechanism behind it (#1934, user's decision 2026-10-26). A private
+            # key and a vault password reach ansible as 0600 files, so the file
+            # is the control and the redactor is a backstop -- which is what the
+            # default floor's own reasoning rests on, and that reasoning does
+            # not transfer here: a connection or become password is substituted
+            # into the rendered inventory as a VALUE, so redaction is the only
+            # control over it. The default floor was chosen for a JWT's shape
+            # and has nothing to say about a sudo password an operator typed.
+            exec_subprocess.register_secret(str(value), min_length=_VALUE_SECRET_MIN_LENGTH)
         out[f"{key}.{field}"] = str(value)
     if not out:
         raise AnsibleAuthError("it carries no usable field")
