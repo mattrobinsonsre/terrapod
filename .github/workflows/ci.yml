@@ -589,8 +589,27 @@ jobs:
     # On a v0.35.0 main-run reference: combined 310s serial →
     # split slowest-shard ~75s (integration), others sub-60s.
     name: Python Test (${{ matrix.slice.name }})
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    needs: [prepare, build-test-base]
+    # **Depends on the base publish, which is the whole point of it.** Without
+    # the dependency the publish and these fifteen slices start together, so on
+    # any run with a new hash every slice misses the pull and builds the base
+    # itself -- sixteen builds of one image, worse than the fifteen this set out
+    # to remove, with the publish only ever helping the NEXT run.
+    #
+    # It costs little, because `build-test-base` has no `needs` and so starts at
+    # t=0: on a warm run it finds the tag published and exits in seconds, and on
+    # a cold one these slices wait once for a build that otherwise happens
+    # fifteen times. Under a twenty-job concurrency ceiling that trade is not
+    # close -- the ceiling turns saved runner-minutes into wall-clock for
+    # whatever is queued behind them.
+    #
+    # `!cancelled()` rather than the default, and load-bearing twice. A SKIPPED
+    # dependency skips its dependents, so on a fork PR -- where the publish
+    # cannot run -- the default would skip every Python slice and the required
+    # check would pass having tested nothing. And if the publish FAILS these
+    # must still run: `ensure_test_image` falls back to building the base
+    # locally, so a broken publish costs speed rather than coverage.
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
