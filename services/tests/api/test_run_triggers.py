@@ -562,6 +562,10 @@ class TestFireRunTriggers:
         run.plan_finished_at = None
         run.apply_started_at = datetime(2026, 1, 1, tzinfo=UTC)
         run.apply_finished_at = None
+        # #1988 serialises these, so an unset MagicMock reaches json.dumps
+        # and every test in this file fails on a message naming neither.
+        run.configure_started_at = None
+        run.configure_finished_at = None
 
         mock_db = AsyncMock()
 
@@ -581,6 +585,10 @@ class TestFireRunTriggers:
         run.plan_finished_at = None
         run.apply_started_at = datetime(2026, 1, 1, tzinfo=UTC)
         run.apply_finished_at = None
+        # #1988 serialises these, so an unset MagicMock reaches json.dumps
+        # and every test in this file fails on a message naming neither.
+        run.configure_started_at = None
+        run.configure_finished_at = None
 
         mock_db = AsyncMock()
 

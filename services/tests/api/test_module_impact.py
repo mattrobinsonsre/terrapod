@@ -132,6 +132,10 @@ def _mock_run(
     run.plan_finished_at = None
     run.apply_started_at = None
     run.apply_finished_at = None
+    # #1988 serialises these, so an unset MagicMock reaches json.dumps
+    # and every test in this file fails on a message naming neither.
+    run.configure_started_at = None
+    run.configure_finished_at = None
     run.listener_id = None
     run.target_addrs = None
     run.replace_addrs = None

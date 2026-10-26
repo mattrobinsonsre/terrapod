@@ -77,6 +77,10 @@ def _mock_run(
     run.plan_finished_at = None
     run.apply_started_at = None
     run.apply_finished_at = None
+    # #1988 serialises these, so an unset MagicMock reaches json.dumps
+    # and every test in this file fails on a message naming neither.
+    run.configure_started_at = None
+    run.configure_finished_at = None
     # #647/#646: no state snapshot / discard reason by default (no baseline →
     # the staleness guard never fires; None serialises cleanly).
     run.plan_state_serial = None
