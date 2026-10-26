@@ -892,17 +892,28 @@ jobs:
   # no DB/Redis/network — the fetch tests monkeypatch the HTTP layer.
   python-audit:
     name: Python Audit
-    # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
-    # for `python-audit`, 15s for `secret-scan` -- but it cannot be COMBINED
-    # with the other short jobs the way the rest were, because each runs in its
-    # own `container:` and that is job-level: a containerised job can only merge
-    # with one using the identical image, and no other short job uses either.
+    # In the lint/test wave, and the measurement that put it BACK there is worth
+    # keeping, because the reasoning for deferring it was not wrong so much as
+    # aimed at the wrong scarcity. It cannot be combined with the other short
+    # jobs the way the rest were -- each of these two runs in its own
+    # `container:`, which is job-level, so a containerised job can only merge
+    # with one using the identical image and no other short job uses either --
+    # and on 2026-10-26 it was deferred past the image build on the grounds that
+    # the slot it holds in the gating wave is therefore bought for nothing.
     #
-    # So the slot it holds in the wave that gates everything is bought for
-    # nothing. Deferring it past the image build yields that slot to
-    # `build-query` and `build-ee-agent`, which gate every image and therefore
-    # every job after them; measured on run 40326401622, those two sat 51s
-    # waiting for a slot while forty-seven jobs with no successor held them.
+    # Measured, that trade loses. These two are 62s and 24s, so deferring them
+    # yielded the gating wave 86 slot-seconds; in the later wave they joined 19
+    # jobs competing for ~11 free slots, and `python-audit` QUEUED 76s to run
+    # 62s of work (run 40336816248). A job that waits longer than it runs is the
+    # signature of the contended wave, and the later wave is the contended one:
+    # almost everything in it depends on the amd64 images, so a slot denied
+    # there is paid by the whole wave, which is not true of a short job here
+    # that finishes long before this wave's own ~400s tail.
+    #
+    # The lint/test wave's width still matters -- it is what decides how fast
+    # the image builds get their slots (median queue 143s at 28 jobs, 48s at 19)
+    # -- but the lever for that is removing jobs with no successor, not moving
+    # cheap ones downstream onto the critical path.
     #
     # Nothing is delayed by this. `create-manifests` is the only consumer and it
     # already needs `scan-images`, a wave further on, so its own depth is
@@ -911,8 +922,8 @@ jobs:
     # `!cancelled()` keeps the signal independent of the ordering: a bare
     # `needs` edge SKIPS this when an image build fails, which would hide an
     # audit result behind an unrelated failure.
-    needs: [prepare, build-images-amd64]
-    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     # Literal, not ${{ env.* }}: the env context is NOT available in a job's
     # `container:` or in `services:` — using it there makes the whole workflow
@@ -990,17 +1001,28 @@ jobs:
   # ── Dependency Audit (npm) ────────────────────────────
   secret-scan:
     name: Secret Scan
-    # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
-    # for `python-audit`, 15s for `secret-scan` -- but it cannot be COMBINED
-    # with the other short jobs the way the rest were, because each runs in its
-    # own `container:` and that is job-level: a containerised job can only merge
-    # with one using the identical image, and no other short job uses either.
+    # In the lint/test wave, and the measurement that put it BACK there is worth
+    # keeping, because the reasoning for deferring it was not wrong so much as
+    # aimed at the wrong scarcity. It cannot be combined with the other short
+    # jobs the way the rest were -- each of these two runs in its own
+    # `container:`, which is job-level, so a containerised job can only merge
+    # with one using the identical image and no other short job uses either --
+    # and on 2026-10-26 it was deferred past the image build on the grounds that
+    # the slot it holds in the gating wave is therefore bought for nothing.
     #
-    # So the slot it holds in the wave that gates everything is bought for
-    # nothing. Deferring it past the image build yields that slot to
-    # `build-query` and `build-ee-agent`, which gate every image and therefore
-    # every job after them; measured on run 40326401622, those two sat 51s
-    # waiting for a slot while forty-seven jobs with no successor held them.
+    # Measured, that trade loses. These two are 62s and 24s, so deferring them
+    # yielded the gating wave 86 slot-seconds; in the later wave they joined 19
+    # jobs competing for ~11 free slots, and `python-audit` QUEUED 76s to run
+    # 62s of work (run 40336816248). A job that waits longer than it runs is the
+    # signature of the contended wave, and the later wave is the contended one:
+    # almost everything in it depends on the amd64 images, so a slot denied
+    # there is paid by the whole wave, which is not true of a short job here
+    # that finishes long before this wave's own ~400s tail.
+    #
+    # The lint/test wave's width still matters -- it is what decides how fast
+    # the image builds get their slots (median queue 143s at 28 jobs, 48s at 19)
+    # -- but the lever for that is removing jobs with no successor, not moving
+    # cheap ones downstream onto the critical path.
     #
     # Nothing is delayed by this. `create-manifests` is the only consumer and it
     # already needs `scan-images`, a wave further on, so its own depth is
@@ -1009,8 +1031,8 @@ jobs:
     # `!cancelled()` keeps the signal independent of the ordering: a bare
     # `needs` edge SKIPS this when an image build fails, which would hide an
     # audit result behind an unrelated failure.
-    needs: [prepare, build-images-amd64]
-    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     container: zricethezav/gitleaks:latest
     steps:
