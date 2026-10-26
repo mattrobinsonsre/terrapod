@@ -109,10 +109,30 @@ MIN_SITES = 8
 
 
 def _tracked() -> list[str]:
+    """Every tracked prose surface, EXCEPT this gate's own file.
+
+    This file necessarily quotes the withdrawn phrasings in order to ban them,
+    and its docstring is about the rule rather than a statement of the mechanism
+    to an operator or an agent -- so scanning it reports three findings that are
+    the gate working as intended, which is the shape that gets a gate muted.
+
+    **It is excluded in BOTH clauses, and the asymmetry was a real defect.** It
+    was excluded from the ban and not from the paragraph walk, and the gate
+    passed locally anyway -- because `git ls-files` did not yet list it. A
+    derived gate's subject therefore CHANGES AT `git add`, so a new one must be
+    re-run after being committed, not before. Self-exclusion is one file, named
+    structurally rather than by path, and this file's own prose is reviewed as
+    part of reviewing the gate.
+    """
     out = subprocess.run(
         ["git", "ls-files"], capture_output=True, text=True, cwd=ROOT, check=True
     ).stdout.split()
-    return [f for f in out if f.endswith(SUFFIXES) or f == "llms.txt"]
+    mine = pathlib.Path(__file__).resolve()
+    return [
+        f
+        for f in out
+        if (f.endswith(SUFFIXES) or f == "llms.txt") and (ROOT / f).resolve() != mine
+    ]
 
 
 def _mechanism_pattern() -> re.Pattern[str]:
@@ -183,7 +203,7 @@ def main() -> int:
     # thing that drifts, so the absence of one is deliberate.
     for rel in _tracked():
         path = ROOT / rel
-        if not path.is_file() or path.resolve() == pathlib.Path(__file__).resolve():
+        if not path.is_file():
             continue
         try:
             text = path.read_text()
