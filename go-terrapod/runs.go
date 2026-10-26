@@ -381,6 +381,45 @@ func (c *Client) RetryRun(ctx context.Context, runID string) (*Run, error) {
 	return parseRun(data)
 }
 
+// RetryRunOutstandingHosts queues a new configure run covering ONLY the hosts
+// the given configure did not configure, and returns the NEW run (#1973).
+//
+// The remainder is computed server-side by subtracting the hosts that finished
+// from the run's own resolved-inventory artifact, not by collecting the ones
+// that failed: under `serial:` + `any_errors_fatal` the hosts a play never
+// reached appear in no callback event and in no PLAY RECAP, so a retry built
+// from failures fixes the failures, reports success, and silently leaves the
+// rest unconfigured.
+//
+// The new run is always a STANDALONE configure, even when the one being retried
+// was an apply-then-configure composite: that apply already landed, so the hosts
+// are all that is left and re-applying would be an infrastructure change nobody
+// asked for.
+//
+// A separate method rather than an argument on RetryRun, so an existing caller
+// is untouched. Returns *ValidationError (422) when the run is not a
+// configure, and when it has NO outstanding hosts -- which is a refusal rather
+// than a no-op on purpose, because an empty limit means the workspace's own
+// default, i.e. every host. Use RetryRun to re-run the whole limit.
+//
+// A canceled configure is a partial configure, so it can be retried this way
+// too.
+func (c *Client) RetryRunOutstandingHosts(ctx context.Context, runID string) (*Run, error) {
+	id, err := runIDPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Post(
+		ctx,
+		"/api/terrapod/v1/runs/"+id+"/actions/retry",
+		[]byte(`{"only-outstanding-hosts":true}`),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseRun(data)
+}
+
 // GetRunPlanJSON returns the structured JSON plan output for a run (the
 // `tofu show -json` document). Plan ids share the run's UUID, so this accepts a
 // run id in any form (bare, "run-<uuid>", or "plan-<uuid>"). The endpoint 302s

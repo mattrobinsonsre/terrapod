@@ -2,6 +2,8 @@
 
 Terrapod uses a label-based RBAC system instead of Terraform Enterprise's team model. Labels replace teams entirely -- a "team" is just a label. This document covers the permission model, role configuration, and common patterns.
 
+**Enforcement is per capability, and there are 50 of them across 14 resource kinds.** A capability is a `resource:verb` pair -- `run:plan`, `run:apply`, `run:apply-destroy`, `state:read`, `workspace:lock`, `registry:write`, `var:write` and so on -- and every API call checks one. The hierarchical presets below are a convenience over that set, not the unit of enforcement: a role can instead be authored with an **explicit capability set**, which is how you express "may plan but never apply" or "may apply but never destroy". The complete list is in [RBAC capabilities](rbac-capabilities.md).
+
 > Note: Workspaces configured for **[apply-then-merge](vcs-workflows.md)** delegate authorization for PR-comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod unlock`) to the VCS provider's repo permissions and branch protection — Terrapod's label-based RBAC described here does **not** gate those actions. Those commands require the commenter to have **push access** to the repository (GitHub collaborator permission; GitLab Developer or above), so commenting alone is not authorization. RBAC continues to apply to everything else (UI navigation, CLI runs, state access, settings changes).
 
 ---

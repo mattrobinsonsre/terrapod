@@ -2086,6 +2086,23 @@ runners:
   lifecycleDestroyRetries: 2            # retries after the first failure (3 attempts total)
   lifecycleDestroyRetryBackoffSeconds: 45  # wait after an error before retrying
 
+  # Partial-configure recovery (#1973): automatically re-run a failed Ansible
+  # configure against only the hosts it did not configure. The remainder is
+  # subtracted from the run's own resolved-inventory artifact, not read off the
+  # failures -- under `serial:` + `any_errors_fatal` the hosts a play never
+  # reached appear in no callback event and no PLAY RECAP, so a retry built from
+  # failures fixes the failures and leaves the rest unconfigured while looking
+  # finished.
+  #
+  # OFF BY DEFAULT, deliberately unlike lifecycleDestroyRetries above: a destroy
+  # is declarative and incremental so re-running it is safe by construction, and
+  # a playbook is whatever you wrote. Set configureRetries > 0 to let the
+  # platform do it unattended. An operator can always retry to the remainder by
+  # hand -- POST /runs/{id}/actions/retry with {"only-outstanding-hosts": true}
+  # -- which needs no setting and does not count against this cap.
+  configureRetries: 0                   # 0 disables; >0 = automatic attempts
+  configureRetryBackoffSeconds: 45      # wait after an error before retrying
+
   # Execution hooks (#619): kill-switch for operator-defined custom-shell steps
   # run inside runner Jobs at fixed points (pre_init/pre_plan/post_plan/
   # pre_apply/post_apply). Hooks are an admin-managed library associated with

@@ -110,6 +110,56 @@ batteries-included (filesystem storage, in-cluster Postgres/Redis, a local
 admin), and prints the URL and first-login credentials — no external
 dependencies. See [Getting started](getting-started.md).
 
+## How granular is Terrapod's access control?
+
+Enforcement is per **capability**, and there are **50 capabilities across 14
+resource kinds** — workspaces, runs, state, variables, the module and provider registry,
+agent pools, policy sets, inventory, notifications, run tasks, run triggers,
+drift, the catalog, and platform-level administration. A capability is a
+`resource:verb` pair such as `run:plan`, `run:apply`, `state:read`,
+`workspace:lock` or `registry:write`, and every API call checks one.
+
+Roles are the convenient way to hand out sets of those, and they come as
+hierarchical presets (workspace **read → plan → write → admin**; separate
+ladders for pools, registry and catalog). But a preset is only a shorthand: a
+role can be authored with an **explicit capability set** instead, which is how
+you express a permission a ladder cannot — "may queue a plan but never apply" is
+the common one, and it is simply `run:plan` without `run:apply`.
+
+Scoping is by **label** rather than by team. A role grants its capabilities on
+the resources carrying a label, so one role can cover a thousand workspaces and
+a workspace can be reached by many roles; `allow-all` covers the estate without
+labelling anything. Deny rules subtract.
+
+Because that is a lot of surface to reason about by hand, two endpoints answer
+it directly instead of leaving you to work it out:
+
+- **What does this role reach, and why?** `GET /api/v1/roles/{name}/preview`
+  resolves a role across workspaces, pools, registry and catalog, including what
+  a deny rule removed.
+- **Who can reach this resource, and how?** `GET /api/v1/workspaces/{id}/access`
+  (and the same for pools, registry items and catalog items) names every access
+  path, **including the ones that bypass roles entirely** — ownership, platform
+  admin, the `everyone` floor.
+
+Full catalogue of all 50: [RBAC capabilities](rbac-capabilities.md). The model
+itself: [RBAC](rbac.md).
+
+## Can I give someone plan access but not apply?
+
+Yes, and it needs no workaround — it is the `plan` preset, or an explicit role
+holding `run:plan` without `run:apply`. The two are separate capabilities, so
+the distinction is enforced at the API rather than being a UI convention: a
+principal without `run:apply` cannot confirm a plan through the UI, the CLI, the
+provider, the MCP tools, or a direct API call.
+
+The same separation exists for the cases that usually need it next:
+`run:apply-destroy` is distinct from `run:apply`, so you can let someone apply
+without letting them destroy; `state:read` is distinct from `workspace:read`, so
+someone can see a workspace and its runs without downloading raw state; and
+`var:write` is distinct from `workspace:write`, so configuration and credentials
+can be separated.
+
 ## Can teams using different tools and workflows (Terraform, OpenTofu, Terragrunt, CLI, VCS) share one Terrapod?
 
 Yes — being **unopinionated about how each team works** is a deliberate strength.

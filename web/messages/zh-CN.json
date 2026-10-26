@@ -2489,7 +2489,13 @@
       "detailReaped": "此次运行的各任务详细信息已被工件保留策略删除。下方的按主机汇总保存在数据库中，不受影响。",
       "detailUnknown": "由于存储未响应，无法检查各任务详细信息。它可能仍然可用。",
       "detailDownload": "下载完整任务详细信息",
-      "detailDownloadNote": "每行一个 JSON 对象，按 Ansible 报告它们的顺序排列。需要读取状态的权限。"
+      "detailDownloadNote": "每行一个 JSON 对象，按 Ansible 报告它们的顺序排列。需要读取状态的权限。",
+      "outstandingTitle": "{count, plural, one {还有 # 台主机需要配置} other {还有 # 台主机需要配置}}",
+      "outstandingNote": "失败的主机、Ansible 无法访问的主机，以及 play 未触及的主机。play 从未触及的主机不会被任何来源报告，因此这里是根据本次运行所针对的清单推算出来的，而不是根据失败记录。",
+      "retryOutstanding": "重试这些主机",
+      "retryOutstandingBusy": "正在加入队列…",
+      "retryOutstandingConfirm": "要针对 {hosts} 执行该 playbook 吗？这会改动真实主机，且此操作无法撤销。",
+      "retryOutstandingFailed": "无法将重试加入队列"
     }
   },
   "workspaceDetail": {

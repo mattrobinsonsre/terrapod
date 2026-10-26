@@ -2489,7 +2489,13 @@
       "detailReaped": "Detaljene per oppgave for denne kjøringen er fjernet i henhold til oppbevaringsreglene for artefakter. Sammendraget per vert nedenfor er lagret i databasen og er ikke berørt.",
       "detailUnknown": "Detaljene per oppgave kunne ikke sjekkes fordi lagringen ikke svarte. De er kanskje fortsatt tilgjengelige.",
       "detailDownload": "Last ned fullstendige oppgavedetaljer",
-      "detailDownloadNote": "Ett JSON-objekt per linje, i den rekkefølgen Ansible rapporterte dem. Krever tillatelse til å lese tilstanden."
+      "detailDownloadNote": "Ett JSON-objekt per linje, i den rekkefølgen Ansible rapporterte dem. Krever tillatelse til å lese tilstanden.",
+      "outstandingTitle": "{count, plural, one {# vert må fortsatt konfigureres} other {# verter må fortsatt konfigureres}}",
+      "outstandingNote": "Verter som feilet, som Ansible ikke kunne nå, eller som playet aldri kom fram til. En vert som playet aldri nådde, rapporteres ikke av noe som helst, så dette regnes ut fra inventaret denne kjøringen var rettet mot, i stedet for fra feilene.",
+      "retryOutstanding": "Prøv disse vertene på nytt",
+      "retryOutstandingBusy": "Legger i kø…",
+      "retryOutstandingConfirm": "Kjøre playbooken mot {hosts}? Dette endrer virkelige verter og kan ikke angres.",
+      "retryOutstandingFailed": "Kunne ikke legge det nye forsøket i kø"
     }
   },
   "workspaceDetail": {

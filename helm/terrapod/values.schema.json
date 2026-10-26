@@ -441,6 +441,14 @@
           "type": "integer",
           "minimum": 0
         },
+        "configureRetries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "configureRetryBackoffSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
         "hooksEnabled": {
           "type": "boolean"
         },

@@ -2489,7 +2489,13 @@
       "detailReaped": "Th'' per-task tale fer this voyage were cast overboard by artifact retention. Th'' per-hand reckonin'' below be stowed safe in th'' database an'' untouched.",
       "detailUnknown": "Th'' per-task tale could not be checked, fer th'' hold gave no answer. It may yet be aboard.",
       "detailDownload": "Haul down th'' whole task tale",
-      "detailDownloadNote": "One JSON chest per line, in th'' order Ansible called them out. Ye be needin'' leave to read th'' state."
+      "detailDownloadNote": "One JSON chest per line, in th'' order Ansible called them out. Ye be needin'' leave to read th'' state.",
+      "outstandingTitle": "{count, plural, one {# hand still wants riggin'' out} other {# hands still want riggin'' out}}",
+      "outstandingNote": "Hands that foundered, that Ansible could not hail, or that th'' play never reached at all. A hand th'' play never reached be reported by nary a soul, so this be reckoned from th'' manifest this voyage set course by, rather than from th'' wrecks.",
+      "retryOutstanding": "Try these hands again",
+      "retryOutstandingBusy": "In th'' queue…",
+      "retryOutstandingConfirm": "Run th'' playbook against {hosts}? This changes real hands an'' cannot be undone.",
+      "retryOutstandingFailed": "Couldn''t get th'' retry into th'' queue"
     }
   },
   "workspaceDetail": {

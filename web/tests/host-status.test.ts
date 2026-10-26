@@ -29,23 +29,38 @@ import {
 const en = JSON.parse(readFileSync("messages/en.json", "utf8"));
 const HOSTS = en.runDetail.hosts;
 
-/** Every status literal the server's own derivation can return. */
+/** Every status literal the server's own derivation can return.
+ *
+ * Read from `services/configure_recovery.py`, not from the router. The
+ * derivation used to be inline in `_host_result_json`; #1973 moved it, because
+ * deciding which hosts a retry must cover needs the same judgement and a second
+ * copy of the rule is a second answer to "did this host configure". This test
+ * failed loudly when that happened -- its `>= 6` floor refused the three
+ * statuses still visible in the router rather than passing on them -- which is
+ * the floor doing exactly its job.
+ *
+ * `host_status` is matched for its `return "..."` literals, and `not-reached` is
+ * added from the module's own `OUTSTANDING` set, since only the subtraction
+ * produces it and no `return` in that function emits it.
+ */
 function serverStatuses(): string[] {
   const source = readFileSync(
-    "../services/terrapod/api/routers/runs.py",
+    "../services/terrapod/services/configure_recovery.py",
     "utf8",
   );
-  // The derivation and the not-reached row, both inside `# ── Per-host results`.
-  const start = source.indexOf("def _host_result_json");
-  const end = source.indexOf("async def _targeted_hosts");
-  assert.ok(
-    start > 0 && end > start,
-    "could not locate the host-result serialisers",
-  );
-  const block = source.slice(start, end);
+  const start = source.indexOf("def host_status");
+  const end = source.indexOf("async def targeted_hosts");
+  assert.ok(start > 0 && end > start, "could not locate host_status");
   const found = new Set<string>();
-  for (const m of block.matchAll(/status\s*=\s*"([a-z-]+)"/g)) found.add(m[1]);
-  for (const m of block.matchAll(/"status":\s*"([a-z-]+)"/g)) found.add(m[1]);
+  for (const m of source.slice(start, end).matchAll(/return\s+"([a-z-]+)"/g)) {
+    found.add(m[1]);
+  }
+  // The one status no `return` emits: a targeted host with no row at all.
+  const outstanding = source.match(
+    /OUTSTANDING: frozenset\[str\] = frozenset\(\{([^}]*)\}\)/,
+  );
+  assert.ok(outstanding, "could not locate OUTSTANDING");
+  for (const m of outstanding[1].matchAll(/"([a-z-]+)"/g)) found.add(m[1]);
   return [...found].sort();
 }
 
@@ -53,7 +68,8 @@ test("every status the server can emit has a message key", () => {
   const statuses = serverStatuses();
   assert.ok(
     statuses.length >= 6,
-    `only found ${statuses.length} statuses in runs.py (${statuses}) — the matcher ` +
+    `only found ${statuses.length} statuses in configure_recovery.py (${statuses}) — ` +
+      "the matcher " +
       "stopped matching rather than the statuses going away",
   );
   const unmapped = statuses.filter((s) => !hostStatusKey(s));

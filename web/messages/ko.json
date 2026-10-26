@@ -2489,7 +2489,13 @@
       "detailReaped": "이 실행의 작업별 상세 내역은 아티팩트 보관 기간에 따라 삭제되었습니다. 아래의 호스트별 요약은 데이터베이스에 보관되어 있으며 영향을 받지 않습니다.",
       "detailUnknown": "스토리지가 응답하지 않아 작업별 상세 내역을 확인할 수 없었습니다. 아직 이용할 수 있을 수도 있습니다.",
       "detailDownload": "전체 작업 상세 내역 다운로드",
-      "detailDownloadNote": "한 줄에 JSON 객체 하나씩, Ansible이 보고한 순서대로 들어 있습니다. 상태를 읽을 권한이 필요합니다."
+      "detailDownloadNote": "한 줄에 JSON 객체 하나씩, Ansible이 보고한 순서대로 들어 있습니다. 상태를 읽을 권한이 필요합니다.",
+      "outstandingTitle": "{count, plural, one {아직 구성이 필요한 호스트 #대} other {아직 구성이 필요한 호스트 #대}}",
+      "outstandingNote": "실패한 호스트, Ansible이 연결하지 못한 호스트, 그리고 플레이가 미처 처리하지 못한 호스트입니다. 플레이가 도달하지 못한 호스트는 어디에서도 보고되지 않으므로, 이 목록은 실패 기록이 아니라 이 실행이 대상으로 삼은 인벤토리에서 산출합니다.",
+      "retryOutstanding": "이 호스트 재시도",
+      "retryOutstandingBusy": "대기열에 추가 중…",
+      "retryOutstandingConfirm": "{hosts}을(를) 대상으로 플레이북을 실행하시겠습니까? 실제 호스트가 변경되며 이 작업은 취소할 수 없습니다.",
+      "retryOutstandingFailed": "재시도를 대기열에 추가하지 못했습니다"
     }
   },
   "workspaceDetail": {

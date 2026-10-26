@@ -182,18 +182,32 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	})
 
 	// ── terrapod_run_retry ───────────────────────────────────────────
+	// Its own input type rather than the shared runIDIn: adding the field there
+	// would put an Ansible-only flag on terrapod_run_apply and every other run
+	// action, and change their input_schema in the frozen catalogue for nothing.
+	type runRetryIn struct {
+		RunID                string `json:"run_id" jsonschema:"the run id (run-...) to act on"`
+		OnlyOutstandingHosts bool   `json:"only_outstanding_hosts,omitempty" jsonschema:"Ansible configure runs only: retry just the hosts this configure did NOT configure, instead of its whole limit. The remainder is computed server-side by subtracting the hosts that finished from the run resolved-inventory artifact, so it includes hosts the play never reached as well as the ones that failed. Refused with 422 when the run is not a configure, and when nothing is outstanding - an empty limit would mean every host in the inventory, so there is no silent no-op here."`
+	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_retry",
 		Description: "Retry a finished run: queue a NEW run with the same configuration version and options (targets, replace, refresh, destroy) as the original, and return the new run — follow it with terrapod_run_get / terrapod_run_logs using the returned id. " +
 			"Only a terminal run (errored, canceled, discarded, applied) or a plan-only run left at planned can be retried; anything else returns the server's error unchanged. " +
 			"A plan-only or speculative PR plan retries as plan-only. An apply-capable run retries as apply-capable and follows the workspace's own auto-apply setting, so on a workspace that auto-applies the new run WILL apply: treat that like terrapod_run_create with plan_only=false, and only with the user's explicit approval. " +
-			"Needs the same permission as queuing that kind of run: run:plan for a plan-only run, run:apply for an apply-capable one, run:apply-destroy for a destroy.",
+			"Needs the same permission as queuing that kind of run: run:plan for a plan-only run, run:apply for an apply-capable one, run:apply-destroy for a destroy. " +
+			"For an Ansible CONFIGURE run that configured some hosts and not others, pass only_outstanding_hosts=true to retry just the ones left: that is a NARROWER action than a plain retry, not a riskier one, and it is the right call after a partial configure. Without it the whole limit runs again.",
 		Annotations: destructive,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.Run, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runRetryIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
 		}
-		run, err := c.RetryRun(ctx, in.RunID)
+		var run *terrapod.Run
+		var err error
+		if in.OnlyOutstandingHosts {
+			run, err = c.RetryRunOutstandingHosts(ctx, in.RunID)
+		} else {
+			run, err = c.RetryRun(ctx, in.RunID)
+		}
 		if err != nil {
 			return errResult(err), nil, nil
 		}

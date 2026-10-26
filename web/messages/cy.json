@@ -2489,7 +2489,13 @@
       "detailReaped": "Mae'r manylion fesul tasg ar gyfer y rhediad hwn wedi'u tynnu yn ôl y polisi cadw arteffactau. Mae'r crynodeb fesul gwesteiwr isod yn cael ei gadw yn y gronfa ddata ac nid yw hyn yn effeithio arno.",
       "detailUnknown": "Nid oedd modd gwirio'r manylion fesul tasg am na wnaeth y system storio ymateb. Efallai eu bod ar gael o hyd.",
       "detailDownload": "Lawrlwytho manylion llawn y tasgau",
-      "detailDownloadNote": "Un gwrthrych JSON fesul llinell, yn y drefn yr adroddodd Ansible hwy. Mae angen caniatâd i ddarllen y cyflwr."
+      "detailDownloadNote": "Un gwrthrych JSON fesul llinell, yn y drefn yr adroddodd Ansible hwy. Mae angen caniatâd i ddarllen y cyflwr.",
+      "outstandingTitle": "{count, plural, zero {# gwesteiwr heb eu cyflunio o hyd} one {# gwesteiwr heb ei gyflunio o hyd} two {# westeiwr heb eu cyflunio o hyd} few {# gwesteiwr heb eu cyflunio o hyd} many {# gwesteiwr heb eu cyflunio o hyd} other {# gwesteiwr heb eu cyflunio o hyd}}",
+      "outstandingNote": "Gwesteiwyr a fethodd, na allai Ansible eu cyrraedd, neu na chyrhaeddodd y chwarae hwy o gwbl. Nid oes dim o gwbl yn adrodd am westeiwr na chyrhaeddodd y chwarae ef, felly caiff hyn ei gyfrifo o'r rhestr eiddo a dargedwyd gan y rhediad hwn yn hytrach nag o'r methiannau.",
+      "retryOutstanding": "Ailgeisio'r gwesteiwyr hyn",
+      "retryOutstandingBusy": "Yn ciwio…",
+      "retryOutstandingConfirm": "Rhedeg y llyfr chwarae yn erbyn {hosts}? Mae hyn yn newid gwesteiwyr go iawn ac ni ellir ei ddadwneud.",
+      "retryOutstandingFailed": "Methwyd ciwio'r ailgais"
     }
   },
   "workspaceDetail": {

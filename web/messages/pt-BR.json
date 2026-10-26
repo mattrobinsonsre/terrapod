@@ -2489,7 +2489,13 @@
       "detailReaped": "O detalhe por tarefa desta execução foi removido pela retenção de artefatos. O resumo por host abaixo é mantido no banco de dados e não é afetado.",
       "detailUnknown": "Não foi possível verificar o detalhe por tarefa porque o armazenamento não respondeu. Ele ainda pode estar disponível.",
       "detailDownload": "Baixar o detalhe completo das tarefas",
-      "detailDownloadNote": "Um objeto JSON por linha, na ordem em que o Ansible as relatou. Requer permissão para ler o estado."
+      "detailDownloadNote": "Um objeto JSON por linha, na ordem em que o Ansible as relatou. Requer permissão para ler o estado.",
+      "outstandingTitle": "{count, plural, one {# host ainda precisa ser configurado} other {# hosts ainda precisam ser configurados}}",
+      "outstandingNote": "Hosts que falharam, que o Ansible não conseguiu alcançar ou aos quais o play nunca chegou. Um host ao qual o play nunca chegou não é relatado por nada, então isto é deduzido do inventário que esta execução teve como alvo, e não das falhas.",
+      "retryOutstanding": "Repetir estes hosts",
+      "retryOutstandingBusy": "Enfileirando…",
+      "retryOutstandingConfirm": "Executar o playbook contra {hosts}? Isso altera hosts reais e não pode ser desfeito.",
+      "retryOutstandingFailed": "Não foi possível enfileirar a repetição"
     }
   },
   "workspaceDetail": {

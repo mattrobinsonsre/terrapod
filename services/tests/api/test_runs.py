@@ -2583,3 +2583,229 @@ class TestPlanApplyDeclarationIsEnforcedOnTheRoute:
                 headers=_AUTH,
             )
         assert resp.status_code == 201
+
+
+# ── Retry only the outstanding hosts (#1973) ───────────────────────────────
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+@pytest.mark.asyncio
+class TestRetryOnlyOutstandingHosts:
+    """`{"only-outstanding-hosts": true}` on `actions/retry` (#1973).
+
+    An option on the existing action rather than a route of its own: the route,
+    its RBAC (`_retry_capability`, which already routes a configure through the
+    shared producer), its terminal-state check, the SDK method and the MCP tool
+    all already exist and already carry a configure's fields forward. What was
+    missing is only narrowing the limit to the hosts that still need it.
+    """
+
+    def _configure_run(self, **kw):
+        kw.setdefault("status", "errored")
+        run = _mock_run(**kw)
+        run.is_configure = True
+        run.ansible_limit = "web1:web2:web3"
+        run.playbook = "site.yml"
+        return run
+
+    def _app_for(self, run):
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+        # `_mock_run` leaves the CV null, so the route's #439 fallback looks up
+        # the workspace's latest uploaded one. Without an answer here every
+        # retry 422s on "nothing to retry against" -- a refusal about the
+        # fixture rather than about anything this class is testing.
+        cv = MagicMock()
+        cv.scalar_one_or_none.return_value = uuid.uuid4()
+        mock_db.execute = AsyncMock(return_value=cv)
+        return app, mock_db
+
+    async def _retry(self, app, run, body=None):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                f"/api/terrapod/v1/runs/run-{run.id}/actions/retry",
+                headers=_AUTH,
+                json=body,
+            )
+
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.services.configure_recovery.outstanding_hosts")
+    async def test_the_limit_becomes_the_remainder(
+        self, mock_outstanding, mock_resolve, mock_get_run, mock_create, mock_queue, *_
+    ):
+        """The new run carries ONLY the outstanding hosts as its limit."""
+        mock_resolve.return_value = caps_for_level("admin")
+        run = self._configure_run()
+        mock_get_run.return_value = run
+        mock_outstanding.return_value = ["web1", "web3"]
+        app, _db = self._app_for(run)
+        new = _mock_run(status="pending", ws_id=run.workspace_id)
+        mock_create.return_value = new
+        mock_queue.return_value = new
+
+        resp = await self._retry(app, run, {"only-outstanding-hosts": True})
+
+        assert resp.status_code == 201
+        kwargs = mock_create.await_args.kwargs
+        assert kwargs["ansible_limit"] == "web1:web3"
+        assert kwargs["playbook"] == "site.yml"
+        assert "2 outstanding host(s)" in kwargs["message"]
+
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.services.configure_recovery.outstanding_hosts")
+    async def test_an_empty_remainder_is_refused(
+        self, mock_outstanding, mock_resolve, mock_get_run, mock_create, *_
+    ):
+        """**The mutation target of this whole feature.**
+
+        An empty `ansible_limit` means the workspace's own default, so falling
+        through here would silently re-run the WHOLE inventory -- the opposite
+        of what was asked, and the one outcome a remainder retry exists to
+        prevent. It also covers the unreadable-artifact case, where the
+        remainder is empty by design rather than because the work is done.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        run = self._configure_run()
+        mock_get_run.return_value = run
+        mock_outstanding.return_value = []
+        app, _db = self._app_for(run)
+
+        resp = await self._retry(app, run, {"only-outstanding-hosts": True})
+
+        assert resp.status_code == 422
+        assert "no outstanding hosts" in resp.json()["detail"]
+        mock_create.assert_not_called()
+
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_non_configure_run_is_refused(
+        self, mock_resolve, mock_get_run, mock_create, *_
+    ):
+        """There are no hosts to narrow to, so this is a 422 naming the field
+        rather than a retry that quietly ignores the option."""
+        mock_resolve.return_value = caps_for_level("admin")
+        run = _mock_run(status="errored")  # is_configure stays False
+        mock_get_run.return_value = run
+        app, _db = self._app_for(run)
+
+        resp = await self._retry(app, run, {"only-outstanding-hosts": True})
+
+        assert resp.status_code == 422
+        # The DISTINGUISHING clause, not just the field name. Both refusals
+        # mention `only-outstanding-hosts` -- the empty-remainder one says
+        # "retry without it" -- so asserting the name alone passed even with
+        # this refusal deleted, because the request then fell through to the
+        # other one and 422'd for a different reason. A mutation check is what
+        # found that; reading the test did not.
+        assert "configured no hosts" in resp.json()["detail"]
+        mock_create.assert_not_called()
+
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.services.configure_recovery.outstanding_hosts")
+    async def test_a_composite_retries_as_a_standalone_configure(
+        self, mock_outstanding, mock_resolve, mock_get_run, mock_create, mock_queue, *_
+    ):
+        """A composite's apply already landed, so the hosts are all that is left.
+
+        Without this the ordinary retry path would compute
+        `is_configure and not configure_after_apply` -> False and queue an
+        ordinary APPLY of the same configuration -- an infrastructure change
+        nobody asked for, in answer to "configure the hosts you missed".
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        run = self._configure_run()
+        run.configure_after_apply = True
+        mock_get_run.return_value = run
+        mock_outstanding.return_value = ["db1"]
+        app, _db = self._app_for(run)
+        new = _mock_run(status="pending", ws_id=run.workspace_id)
+        mock_create.return_value = new
+        mock_queue.return_value = new
+
+        resp = await self._retry(app, run, {"only-outstanding-hosts": True})
+
+        assert resp.status_code == 201
+        assert mock_create.await_args.kwargs["is_configure"] is True
+        assert mock_create.await_args.kwargs["ansible_limit"] == "db1"
+
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.services.configure_recovery.outstanding_hosts")
+    async def test_a_canceled_configure_retries_to_its_remainder(
+        self, mock_outstanding, mock_resolve, mock_get_run, mock_create, mock_queue, *_
+    ):
+        """A cancelled configure IS a partial configure, so the same
+        subtraction resumes it (the 2026-10-07 decision on #1973). The
+        scheduler deliberately does not -- that would override whoever
+        cancelled it -- but a person asking for it by hand is different."""
+        mock_resolve.return_value = caps_for_level("admin")
+        run = self._configure_run(status="canceled")
+        mock_get_run.return_value = run
+        mock_outstanding.return_value = ["web2"]
+        app, _db = self._app_for(run)
+        new = _mock_run(status="pending", ws_id=run.workspace_id)
+        mock_create.return_value = new
+        mock_queue.return_value = new
+
+        resp = await self._retry(app, run, {"only-outstanding-hosts": True})
+
+        assert resp.status_code == 201
+        assert mock_create.await_args.kwargs["ansible_limit"] == "web2"
+
+    @pytest.mark.parametrize(
+        "body",
+        [None, {}, {"only-outstanding-hosts": False}, {"only-outstanding-hosts": "yes"}, []],
+        ids=["no-body", "empty", "false", "a-string", "not-an-object"],
+    )
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs._get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.services.configure_recovery.outstanding_hosts")
+    async def test_only_a_literal_true_opts_in(
+        self,
+        mock_outstanding,
+        mock_resolve,
+        mock_get_run,
+        mock_create,
+        mock_queue,
+        _db_i,
+        _redis,
+        _storage,
+        body,
+    ):
+        """Anything but `true` keeps the pre-#1973 behaviour: a FULL retry.
+
+        Both directions matter. A caller who sends the key as a string must not
+        silently get a full retry when they asked for a narrow one -- but they
+        must not get a NARROWED one off a truthy string either, because the
+        remainder is computed from an artifact and a wrong reading of intent
+        here changes which hosts a playbook touches.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        run = self._configure_run()
+        mock_get_run.return_value = run
+        app, _db = self._app_for(run)
+        new = _mock_run(status="pending", ws_id=run.workspace_id)
+        mock_create.return_value = new
+        mock_queue.return_value = new
+
+        resp = await self._retry(app, run, body)
+
+        assert resp.status_code == 201
+        assert mock_create.await_args.kwargs["ansible_limit"] == "web1:web2:web3"
+        mock_outstanding.assert_not_called()

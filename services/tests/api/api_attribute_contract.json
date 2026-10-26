@@ -974,7 +974,10 @@
   ],
   "runs.list_run_host_results:meta": [
     "detail",
-    "detail.state"
+    "detail.state",
+    "outstanding",
+    "outstanding.count",
+    "outstanding.hosts"
   ],
   "runs.post_cost_summary_message": [
     "content",

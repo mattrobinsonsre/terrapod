@@ -1464,6 +1464,27 @@ Creates a new run from a terminal run (applied, errored, canceled, discarded) us
 
 **Required permission:** what queuing that run would need — `run:plan` for a plan-only run, `run:apply` for an apply run, `run:apply-destroy` for a destroy run (the workspace permissions block reports these as `can-queue-run`, `can-queue-apply` and `can-queue-destroy`).
 
+#### Retrying only the hosts a configure did not reach
+
+An optional body narrows a **configure** run's retry to the hosts still outstanding:
+
+```json
+{"only-outstanding-hosts": true}
+```
+
+The new run's `ansible-limit` is the remainder, computed by subtracting the hosts that finished from the run's own resolved-inventory artifact — not by collecting the ones that failed. Under `serial:` with `any_errors_fatal:` the hosts a play never reached appear in no event and in no `PLAY RECAP`, so a retry built from failures fixes the failures and leaves the rest unconfigured while reporting success. `meta.outstanding` on **GET host-results** (below) is the same set, computed by the same predicate.
+
+Only the literal `true` opts in; any other value, and an absent or malformed body, means the ordinary full retry. A **canceled** configure is a partial configure and retries this way too.
+
+Two refusals, both `422`, and neither is a no-op:
+
+- the run is not a configure, so it has no hosts to narrow to;
+- **nothing is outstanding.** An empty limit means the workspace's own default, i.e. every host in the inventory, so this cannot be allowed to fall through. Retry without the field to re-run the whole limit.
+
+The new run is always a **standalone configure**, even when the one being retried was an apply-then-configure composite: that apply already landed, so the hosts are all that is left and re-applying would be an infrastructure change nobody asked for.
+
+**Required permission:** unchanged — a configure retry needs what queuing a configure needs.
+
 ### Workspace Events (SSE)
 
 ```
@@ -1680,6 +1701,8 @@ GET /api/v1/runs/{run_id}/host-events/payloads               # oversized-payload
 ```
 
 **GET host-results** returns `{"data": [<resource>], "meta": {"pagination": {...}, "detail": {...}}}`, type `run-host-results`. Attributes: `host`, `status`, `ok`, `changed`, `failures`, `unreachable`, `skipped`, `rescued`, `ignored`, `saw-unreachable`, `reached`, `created-at`, `updated-at`.
+
+`meta.outstanding` is `{"count": <n>, "hosts": [...]}` — the hosts this configure has **not** configured: the ones that failed, the ones ansible could not reach, and the ones it never reported at all. It is what **Retry Run** with `only-outstanding-hosts` would cover, derived by the same predicate so the two cannot disagree. A host whose failure the playbook tolerated with `ignore_errors: true` is **not** in it, and neither is one a `block`/`rescue` recovered: both are outcomes the playbook declared acceptable, and retrying them would re-run to the attempt cap for ever. An unreadable inventory artifact yields an empty list rather than every host, which is the safe direction.
 
 `meta.detail.state` says whether the per-task stream behind this summary still exists, so a client does not have to download it to find out — `available`, `reaped` (retention deleted it; the summary rows outlive the artifact), `none` (the run reported no hosts), or `unknown` (storage could not be asked). **`unknown` is not `none`**: "there is no detail" is a claim, and a backend that cannot answer must not be rendered as making it.
 

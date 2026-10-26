@@ -2489,7 +2489,13 @@
       "detailReaped": "Sar vam Qu' Hoch De' Doch polmeH poH teqlu'pu'. naDev host Hoch tlhoS De' polDaq pollu'taH 'ej choHbe'lu'.",
       "detailUnknown": "Qu' Hoch De' nudlaHbe'lu'pu', polwI' jangbe'mo'. chaq lo'laHtaH.",
       "detailDownload": "Qu' De' naQ pol",
-      "detailDownloadNote": "wa' JSON Doch HuH, Ansible ja'pu'bogh mIwDaq. Dotlh laDmeH chaw' poQlu'."
+      "detailDownloadNote": "wa' JSON Doch HuH, Ansible ja'pu'bogh mIwDaq. Dotlh laDmeH chaw' poQlu'.",
+      "outstandingTitle": "{count, plural, one {# host QumnISlu'taH} other {# hostmey QumnISlu'taH}}",
+      "outstandingNote": "lujpu'bogh hostmey, Ansible SIchlaHbe'bogh hostmey, ghap Qu' paq SIchbe'pu'bogh hostmey. Qu' paq SIchbe'pu'bogh host ja'be'lu', vaj Sar vam ghom tetlh nIDbogh lo'lu', 'ach lujmey lo'be'lu'.",
+      "retryOutstanding": "hostmey vam nID",
+      "retryOutstandingBusy": "lI'taH…",
+      "retryOutstandingConfirm": "{hosts} Qum'a'? Qu' paq lo'lu', hostmey teHbogh choHlu', 'ej choHlaHbe'lu'.",
+      "retryOutstandingFailed": "nID lI'meH lujpu'"
     }
   },
   "workspaceDetail": {

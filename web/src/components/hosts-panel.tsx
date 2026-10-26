@@ -29,6 +29,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { MobileCard, MobileCardList } from "@/components/mobile-card-list";
 import { hostStatusBadge, hostStatusKey } from "@/lib/host-status";
@@ -61,6 +62,8 @@ interface HostEventAttrs {
 
 export function HostsPanel({ runId }: { runId: string }) {
   const t = useTranslations("runDetail.hosts");
+  const router = useRouter();
+  const params = useParams();
   const [hosts, setHosts] = useState<HostResultAttrs[] | null>(null);
   const [events, setEvents] = useState<HostEventAttrs[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -69,6 +72,12 @@ export function HostsPanel({ runId }: { runId: string }) {
   // summary over detail that retention has deleted (#1928), and it cannot tell
   // from the rows -- they outlive the artifact.
   const [detail, setDetail] = useState("");
+  // What `meta.outstanding` said: the hosts this configure has not configured
+  // (#1973). Server-side rather than filtered from the rows here, because the
+  // same predicate decides what a retry covers -- two readers of the counters
+  // is two answers to "did this host configure".
+  const [outstanding, setOutstanding] = useState<string[]>([]);
+  const [retrying, setRetrying] = useState(false);
 
   // The fetch lives INSIDE the effect, with a cancellation flag, rather than in
   // a `useCallback` the effect calls. Two reasons: `react-hooks/
@@ -91,6 +100,7 @@ export function HostsPanel({ runId }: { runId: string }) {
         const results = await resultsRes.json();
         if (cancelled) return;
         setDetail(results.meta?.detail?.state ?? "");
+        setOutstanding(results.meta?.outstanding?.hosts ?? []);
         setHosts(
           (results.data || []).map(
             (d: { attributes: HostResultAttrs }) => d.attributes,
@@ -127,9 +137,64 @@ export function HostsPanel({ runId }: { runId: string }) {
   const count = (n: number | null) => (n === null ? "—" : String(n));
   const eventsFor = (host: string) => events.filter((e) => e.host === host);
 
+  async function retryOutstanding() {
+    // Confirmed in BOTH pointer modes, not touch-only like the plain retry on
+    // the run page. This queues a configure, and queueing a configure already
+    // confirms unconditionally everywhere else (`queueConfigureConfirm*`):
+    // running a playbook changes real hosts and there is no undo. That it is a
+    // NARROWER action than the full retry does not make it reversible.
+    if (!window.confirm(t("retryOutstandingConfirm", { hosts: outstanding.join(", ") })))
+      return;
+    setRetrying(true);
+    try {
+      const res = await apiFetch(`/api/v1/runs/${runId}/actions/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ "only-outstanding-hosts": true }),
+      });
+      if (!res.ok) {
+        setError(t("retryOutstandingFailed"));
+        return;
+      }
+      const payload = await res.json();
+      const newId = payload?.data?.id;
+      if (newId && params?.id) {
+        router.push(`/workspaces/${params.id}/runs/${newId}`);
+      }
+    } catch {
+      setError(t("retryOutstandingFailed"));
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-400">{t("reachabilityNote")}</p>
+
+      {/* The remainder, and the one action that acts on it. Rendered only when
+          there IS one, so a workspace that never configures -- and a configure
+          that finished cleanly -- shows nothing extra: the data-gated pattern
+          #1973 asks for instead of a flag. */}
+      {outstanding.length > 0 && (
+        <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 space-y-2">
+          <p className="text-sm font-medium text-amber-200">
+            {t("outstandingTitle", { count: outstanding.length })}
+          </p>
+          <p className="text-xs text-amber-300/80">{t("outstandingNote")}</p>
+          <p className="break-words font-mono text-xs text-slate-300">
+            {outstanding.join(", ")}
+          </p>
+          <button
+            type="button"
+            onClick={retryOutstanding}
+            disabled={retrying}
+            className="rounded-lg bg-amber-900/50 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-900/70 disabled:opacity-50"
+          >
+            {retrying ? t("retryOutstandingBusy") : t("retryOutstanding")}
+          </button>
+        </div>
+      )}
 
       {/* The per-task detail, and whether it is still there. `reaped` is the
           case the acceptance names: without this the panel looks complete over

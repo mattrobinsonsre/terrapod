@@ -527,6 +527,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Retry failed catalog/autodiscovery lifecycle destroy runs",
     )
 
+    # Partial-configure recovery (#1973): re-run a failed configure against only
+    # the hosts it did not configure. OFF by default -- `configure_retries`
+    # defaults to 0 and the handler returns immediately -- so a deployment that
+    # has not asked for it pays one config read per cycle and nothing else, and a
+    # terraform/tofu-only deployment never has an eligible run either way.
+    from terrapod.services.configure_recovery import configure_retry_cycle
+
+    register_periodic_task(
+        "configure_retry",
+        interval_seconds=30,
+        handler=configure_retry_cycle,
+        description="Re-run a failed configure against its outstanding hosts",
+    )
+
     # Plan expiry sweep (#646): discard apply-capable planned runs that have aged
     # past their workspace's plan_expiry_seconds TTL. No-op when no workspace sets
     # a TTL (the default). Cheap query gated on plan_expiry_seconds > 0.

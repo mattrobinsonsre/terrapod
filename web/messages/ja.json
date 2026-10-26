@@ -2489,7 +2489,13 @@
       "detailReaped": "この実行のタスク別の詳細は、アーティファクトの保持期間により削除されました。以下のホスト別の集計はデータベースに保持されており、影響を受けません。",
       "detailUnknown": "ストレージが応答しなかったため、タスク別の詳細を確認できませんでした。まだ利用できる可能性があります。",
       "detailDownload": "タスクの詳細全体をダウンロード",
-      "detailDownloadNote": "1 行に 1 つの JSON オブジェクトで、Ansible が報告した順に並んでいます。状態の読み取り権限が必要です。"
+      "detailDownloadNote": "1 行に 1 つの JSON オブジェクトで、Ansible が報告した順に並んでいます。状態の読み取り権限が必要です。",
+      "outstandingTitle": "{count, plural, one {まだ構成が必要なホスト # 台} other {まだ構成が必要なホスト # 台}}",
+      "outstandingNote": "失敗したホスト、Ansible が到達できなかったホスト、およびプレイが処理に至らなかったホストです。プレイが到達しなかったホストはどこからも報告されないため、これは失敗の記録からではなく、この実行が対象としたインベントリから算出しています。",
+      "retryOutstanding": "これらのホストを再試行",
+      "retryOutstandingBusy": "キューに追加中…",
+      "retryOutstandingConfirm": "{hosts} に対してプレイブックを実行しますか？実際のホストが変更され、この操作は元に戻せません。",
+      "retryOutstandingFailed": "再試行をキューに追加できませんでした"
     }
   },
   "workspaceDetail": {

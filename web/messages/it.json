@@ -2489,7 +2489,13 @@
       "detailReaped": "Il dettaglio per task di questa esecuzione è stato rimosso dalla conservazione degli artefatti. Il riepilogo per host riportato sotto è conservato nel database e non ne è interessato.",
       "detailUnknown": "Non è stato possibile verificare il dettaglio per task perché lo storage non ha risposto. Potrebbe essere ancora disponibile.",
       "detailDownload": "Scarica il dettaglio completo dei task",
-      "detailDownloadNote": "Un oggetto JSON per riga, nell'ordine in cui Ansible li ha segnalati. Richiede il permesso di leggere lo stato."
+      "detailDownloadNote": "Un oggetto JSON per riga, nell'ordine in cui Ansible li ha segnalati. Richiede il permesso di leggere lo stato.",
+      "outstandingTitle": "{count, plural, one {# host deve ancora essere configurato} other {# host devono ancora essere configurati}}",
+      "outstandingNote": "Host che sono falliti, che Ansible non è riuscito a raggiungere o a cui il play non è mai arrivato. Un host a cui il play non è mai arrivato non viene segnalato da nulla, quindi questo dato è ricavato dall''inventario a cui era rivolta questa esecuzione anziché dai fallimenti.",
+      "retryOutstanding": "Riprova questi host",
+      "retryOutstandingBusy": "In accodamento…",
+      "retryOutstandingConfirm": "Eseguire il playbook su {hosts}? Questa azione modifica host reali e non può essere annullata.",
+      "retryOutstandingFailed": "Impossibile accodare il nuovo tentativo"
     }
   },
   "workspaceDetail": {
