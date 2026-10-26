@@ -50,7 +50,7 @@ class TestNothingIsLostOrDuplicated:
     dropped file never runs and nobody notices, and a duplicated one wastes a
     shard while hiding the imbalance."""
 
-    @pytest.mark.parametrize("shards", [1, 2, 3, 4, 5, 8, 29])
+    @pytest.mark.parametrize("shards", [1, 2, 3, 4, 5, 6, 8, 29])
     def test_every_file_lands_in_exactly_one_shard(self, shards):
         buckets = plan_shards(REAL, shards)
         placed = [f for b in buckets for f in b]

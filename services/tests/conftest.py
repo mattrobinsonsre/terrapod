@@ -9,10 +9,10 @@ CI Python Test matrix (see "Code ↔ Tests Contract" in CLAUDE.md):
   tests/storage/         │  fast, pure / mocked, no DB
   tests/test_logging…   ─┘
 
-  tests/services/       ─┐  shards: services-api-1..3  (pytest-xdist -n auto,
-  tests/api/            ─┘  and `--shard k/3` across runners); AsyncMock-driven
+  tests/services/       ─┐  shards: services-api-1..6  (pytest-xdist -n auto,
+  tests/api/            ─┘  and `--shard k/6` across runners); AsyncMock-driven
 
-  tests/integration/    ──  shards: integration-1..4  (serial — real Postgres)
+  tests/integration/    ──  shards: integration-1..8  (serial — real Postgres)
 
 When adding a test, put it under the directory whose tier it belongs
 to, NOT whichever directory feels closest by file name. The CI matrix

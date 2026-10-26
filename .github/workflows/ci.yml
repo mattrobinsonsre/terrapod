@@ -612,46 +612,83 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_ansible_is_baked.py tests/test_ee_image_resolution.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py tests/crypto tests/test_ha_config.py
             pytest_args: -n auto
-          # services-api is sharded across three runners as well as run under
+          # services-api is sharded across SIX runners as well as run under
           # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
           # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
           # building the FastAPI app ~1000 times. Split by file on collected
           # test count, the same way as integration below.
+          #
+          # Three became six on 2026-10-26, because three was still leaving one
+          # job on the critical path at 8.7 min: measured on run 40316874372,
+          # 94s of setup (64s image build, 28s compose and collection) plus 422s
+          # of pytest for 2714 tests, against a 10.1 min run span. The three
+          # shards were also badly unbalanced at 8.7 / 7.0 / 5.3 min despite
+          # being balanced on collected test count, so per-test cost is NOT
+          # uniform for this tier -- that is why halving the slice is worth more
+          # here than the arithmetic suggests, and why rebalancing alone would
+          # not have been enough.
           - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 1/3
+            pytest_args: -n auto --shard 1/6
           - name: services-api-2
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 2/3
+            pytest_args: -n auto --shard 2/6
           - name: services-api-3
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 3/3
-          # Four runner-level shards, balanced on collected test count by
+            pytest_args: -n auto --shard 3/6
+          - name: services-api-4
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 4/6
+          - name: services-api-5
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 5/6
+          - name: services-api-6
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 6/6
+          # EIGHT runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
           # setup and teardown, which every test pays equally — so a file's
           # duration is its test count times a constant, and counting balances it.
           #
-          # Four (#1555): ~100s of every job is fixed cost (checkout, image,
-          # compose stack, collection), measured at 95s and 112s on real runs, so
-          # each further shard buys less wall-clock for the same ~100s of runner
-          # time. Three became four once the suite grew to ~400 tests; beyond
-          # that the fixed cost dominates.
+          # ~100s of every job is fixed cost (checkout, image, compose stack,
+          # collection), measured at 95s and 112s on real runs, so each further
+          # shard buys less wall-clock for the same ~100s of runner time. Three
+          # became four once the suite grew to ~400 tests, and four became eight
+          # on 2026-10-26 because every shard was still over five minutes
+          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372).
+          #
+          # This tier CANNOT use xdist -- the session-scoped table-creation
+          # fixture races under workers -- so runner-level shards are the only
+          # parallelism it has, which is what makes doubling it the right lever
+          # here even though the fixed cost is paid eight times.
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/4"
+            pytest_args: "--shard 1/8"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/4"
+            pytest_args: "--shard 2/8"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/4"
+            pytest_args: "--shard 3/8"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/4"
+            pytest_args: "--shard 4/8"
+          - name: integration-5
+            paths: tests/integration
+            pytest_args: "--shard 5/8"
+          - name: integration-6
+            paths: tests/integration
+            pytest_args: "--shard 6/8"
+          - name: integration-7
+            paths: tests/integration
+            pytest_args: "--shard 7/8"
+          - name: integration-8
+            paths: tests/integration
+            pytest_args: "--shard 8/8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
