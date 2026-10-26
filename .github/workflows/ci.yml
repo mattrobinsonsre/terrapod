@@ -589,8 +589,27 @@ jobs:
     # On a v0.35.0 main-run reference: combined 310s serial →
     # split slowest-shard ~75s (integration), others sub-60s.
     name: Python Test (${{ matrix.slice.name }})
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    needs: [prepare, build-test-base]
+    # **Depends on the base publish, which is the whole point of it.** Without
+    # the dependency the publish and these fifteen slices start together, so on
+    # any run with a new hash every slice misses the pull and builds the base
+    # itself -- sixteen builds of one image, worse than the fifteen this set out
+    # to remove, with the publish only ever helping the NEXT run.
+    #
+    # It costs little, because `build-test-base` has no `needs` and so starts at
+    # t=0: on a warm run it finds the tag published and exits in seconds, and on
+    # a cold one these slices wait once for a build that otherwise happens
+    # fifteen times. Under a twenty-job concurrency ceiling that trade is not
+    # close -- the ceiling turns saved runner-minutes into wall-clock for
+    # whatever is queued behind them.
+    #
+    # `!cancelled()` rather than the default, and load-bearing twice. A SKIPPED
+    # dependency skips its dependents, so on a fork PR -- where the publish
+    # cannot run -- the default would skip every Python slice and the required
+    # check would pass having tested nothing. And if the publish FAILS these
+    # must still run: `ensure_test_image` falls back to building the base
+    # locally, so a broken publish costs speed rather than coverage.
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -612,49 +631,185 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_ansible_is_baked.py tests/test_ee_image_resolution.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py tests/crypto tests/test_ha_config.py
             pytest_args: -n auto
-          # services-api is sharded across three runners as well as run under
+          # services-api is sharded across SIX runners as well as run under
           # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
           # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
           # building the FastAPI app ~1000 times. Split by file on collected
           # test count, the same way as integration below.
+          #
+          # Three became six on 2026-10-26, because three was still leaving one
+          # job on the critical path at 8.7 min: measured on run 40316874372,
+          # 94s of setup (64s image build, 28s compose and collection) plus 422s
+          # of pytest for 2714 tests, against a 10.1 min run span. The three
+          # shards were also badly unbalanced at 8.7 / 7.0 / 5.3 min despite
+          # being balanced on collected test count, so per-test cost is NOT
+          # uniform for this tier -- that is why halving the slice is worth more
+          # here than the arithmetic suggests, and why rebalancing alone would
+          # not have been enough.
           - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 1/3
+            pytest_args: -n auto --shard 1/6
           - name: services-api-2
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 2/3
+            pytest_args: -n auto --shard 2/6
           - name: services-api-3
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 3/3
-          # Four runner-level shards, balanced on collected test count by
+            pytest_args: -n auto --shard 3/6
+          - name: services-api-4
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 4/6
+          - name: services-api-5
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 5/6
+          - name: services-api-6
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 6/6
+          # EIGHT runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
           # setup and teardown, which every test pays equally — so a file's
           # duration is its test count times a constant, and counting balances it.
           #
-          # Four (#1555): ~100s of every job is fixed cost (checkout, image,
-          # compose stack, collection), measured at 95s and 112s on real runs, so
-          # each further shard buys less wall-clock for the same ~100s of runner
-          # time. Three became four once the suite grew to ~400 tests; beyond
-          # that the fixed cost dominates.
+          # ~100s of every job is fixed cost (checkout, image, compose stack,
+          # collection), measured at 95s and 112s on real runs, so each further
+          # shard buys less wall-clock for the same ~100s of runner time. Three
+          # became four once the suite grew to ~400 tests, and four became eight
+          # on 2026-10-26 because every shard was still over five minutes
+          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372).
+          #
+          # This tier CANNOT use xdist -- the session-scoped table-creation
+          # fixture races under workers -- so runner-level shards are the only
+          # parallelism it has, which is what makes doubling it the right lever
+          # here even though the fixed cost is paid eight times.
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/4"
+            pytest_args: "--shard 1/8"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/4"
+            pytest_args: "--shard 2/8"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/4"
+            pytest_args: "--shard 3/8"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/4"
+            pytest_args: "--shard 4/8"
+          - name: integration-5
+            paths: tests/integration
+            pytest_args: "--shard 5/8"
+          - name: integration-6
+            paths: tests/integration
+            pytest_args: "--shard 6/8"
+          - name: integration-7
+            paths: tests/integration
+            pytest_args: "--shard 7/8"
+          - name: integration-8
+            paths: tests/integration
+            pytest_args: "--shard 8/8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      # The expensive half of `terrapod-test:local` is published as
+      # `terrapod-test-base:sha-<input hash>` and PULLED here rather than built
+      # in each of the fifteen slices (#2248). `scripts/lib.sh` resolves it:
+      # local store, then this registry, then a local build -- so a fork PR with
+      # no package access, and a PR that changes the lock, both still work and
+      # simply pay what every job used to pay.
+      #
+      # A pull rather than a layer cache, measured: `cache-from: type=gha` with
+      # buildx made it WORSE (91-93s against 64s), because the container driver
+      # has to hand the image back to the daemon and that export cost 23.5s of
+      # layers plus a 23.4s tarball send, warm or cold. A pull writes straight
+      # into the daemon and pays none of it.
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
+        env:
+          TEST_BASE_REGISTRY: ${{ env.REGISTRY }}
+
+  # ── Test base image (#2248) ────────────────────────────
+  # Publishes the dependency half of the Python test image so the fifteen
+  # python-test slices can PULL it instead of each building it. 64s per job,
+  # measured on run 40316874372, for an image whose contents change only when
+  # `Dockerfile.test-base` or the lock does.
+  #
+  # **`python-test` DEPENDS on this, and must.** Without the dependency the
+  # publish and the fifteen slices start together, so on any run whose base is
+  # not already published every slice misses the pull and builds the base
+  # itself -- sixteen builds of one image, worse than the fifteen this set out
+  # to remove, with the publish only ever helping the NEXT run.
+  #
+  # **But it is NOT part of the `CI` verdict.** This is a performance
+  # optimisation with a correct fallback: `ensure_test_image` builds the base
+  # locally when it cannot pull one, so a failed publish costs speed and not a
+  # red build, and gating the required check on it would let an optimisation
+  # fail an otherwise-correct change. The ordering it exists for is unaffected,
+  # because `python-test` still waits for it and `python-test` IS in the
+  # verdict.
+  #
+  # Skipped only for a FORK PR, whose token has no `packages: write`. Not for
+  # PRs in general: a same-repo PR's token does have it, and gating on `is_pr`
+  # meant a PR could never publish the base -- so a change to this machinery
+  # could not demonstrate its own effect, and a PR that bumps the lock would
+  # rebuild the base in every slice on every push until it merged. A fork PR
+  # still falls through to building it locally, which is what every run did
+  # before this existed.
+  #
+  # A same-repo PR publishing a base is no new trust boundary: it already has
+  # write access to the repository, and the tag is a hash of the base's own
+  # inputs, so what it publishes is exactly what that hash describes.
+  build-test-base:
+    # NO `needs`, deliberately. It reads nothing `prepare` produces -- its
+    # condition is context (`github.event_name`, the PR's head repo), its
+    # registry is a workflow env, and its tag comes from files in the checkout
+    # -- so depending on `prepare` would only delay it, and being EARLY is the
+    # whole point: the slices look for this image when they start, so every
+    # second it is published sooner is a slice that pulls instead of building.
+    #
+    # The cost of not gating on `prepare.outputs.images_exist` is that this also
+    # runs on a re-tag run where the test matrix is skipped. It then finds the
+    # tag present and exits in seconds, which is cheaper than the delay gating
+    # on it would add to every other run.
+    name: Test Base Image
+    if: >-
+      github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Build and push when the tag is absent
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+        run: |
+          # The tag comes from `lib.sh` rather than being recomputed here: two
+          # implementations of a content hash is two things to get wrong, and a
+          # tag that disagrees with the one the test jobs look for would publish
+          # an image nothing ever pulls -- silently, and looking like a success.
+          source scripts/lib.sh
+          tag="$(test_base_tag)"
+          remote="${REGISTRY}/${tag}"
+          if docker manifest inspect "$remote" >/dev/null 2>&1; then
+            echo "Already published, nothing to do: $remote"
+            exit 0
+          fi
+          echo "Publishing $remote"
+          docker build -f docker/Dockerfile.test-base -t "$remote" .
+          docker push "$remote"
 
   # ── pricegen unit tests (#1025) ───────────────────────
   # The pricegen package (self-generated cost pricesheet, #893) is a standalone
@@ -1106,6 +1261,13 @@ jobs:
       # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
       - name: Every token mint names its identity provider
         run: python3 scripts/docs-audit/check_token_mints.py
+      # Also not a docs gate, and here for the same reason: this job sees the
+      # whole checkout, including the workflows. A package published with
+      # nothing reaping it fails SILENTLY -- no check turns red, the versions
+      # just pile up -- and that has now happened twice. The second time, the
+      # chart package held 408 versions and `mirror/python` 330.
+      - name: Every published GHCR package is reaped
+        run: python3 scripts/docs-audit/check_ghcr_cleanup.py
       # Also not a docs gate, and also here because this job sees the whole
       # checkout. Every `uses:` is SHA-pinned, so the trailing `# vN` comment is
       # the only human-readable statement of what is pinned -- and dependabot

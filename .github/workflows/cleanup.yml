@@ -15,57 +15,129 @@ jobs:
     permissions:
       packages: write
     strategy:
+      # One package's failure must not stop the rest being reaped, and a
+      # package this has never run against is exactly where a surprise lives.
+      fail-fast: false
       matrix:
-        # All five published images. Omitting any (previously listener +
-        # migrations were missing) leaves its sha-tagged versions to
-        # accumulate in GHCR forever, since main pushes all five on every
-        # commit but only the listed ones get reaped.
-        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
+        # EVERY container package this repository publishes. The five product
+        # images were the whole list for a long time and that was already the
+        # second time this went wrong: before them, listener and migrations were
+        # missing and their sha-tagged versions accumulated for ever.
+        #
+        # Measured 2026-10-26, which is why the rest are here now: the chart
+        # package held 408 versions, `mirror/python` 330, `mirror/postgres` 71
+        # and `terrapod-ee` 54, none of them reaped by anything.
+        #
+        # `scripts/docs-audit/check_ghcr_cleanup.py` derives the published set
+        # from the workflows and fails when one is missing from this list, so
+        # the next image cannot be forgotten the way these were.
+        image:
+          # The five product images (ci.yml).
+          - terrapod-api
+          - terrapod-web
+          - terrapod-runner
+          - terrapod-listener
+          - terrapod-migrations
+          # The Helm chart, pushed as an OCI artifact at release. Its versions
+          # are `1.11.1`-shaped with no `v`, which is why the keep-rule below
+          # had to stop looking for one.
+          - terrapod
+          # The Ansible execution environments (ee-build.yml). **Every tag here
+          # is a CHOICE WE OFFER AN OPERATOR and no line is deprecated** -- a
+          # workspace pins one in `ansible_version` -- so deleting `2.12` breaks
+          # every workspace on that line. They are safe to list only because the
+          # rule below keeps every release-tagged version for ever; it is the
+          # untagged leftovers of ten weekly rebuilds that need reaping.
+          - terrapod-ee
+          # The test base image (#2248). Tagged `sha-<input hash>`, so the rule
+          # reaps it by shape rather than by an exemption -- and harmlessly,
+          # because `ensure_test_image` rebuilds and republishes it.
+          - terrapod-test-base
+          # The pull-through mirror (mirror-images.yml), which re-syncs daily by
+          # digest and so leaves an untagged version behind on every change.
+          - mirror/python
+          - mirror/node
+          - mirror/postgres
+          - mirror/redis
+          - mirror/registry
+          - mirror/alpine-helm
+          - mirror/moby-buildkit
+          - mirror/localstack-localstack
+          - mirror/semgrep-semgrep
+          - mirror/mcr.microsoft.com-playwright
     steps:
-      - name: Delete old SHA-tagged versions
+      - name: Delete old sha-only and untagged versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ matrix.image }}
         run: |
-          # Delete untagged and sha-* tagged versions older than 30 days,
-          # keeping all semver-tagged (v*) versions indefinitely.
+          # **Every RELEASED image is kept for ever; only sha-only ones are
+          # reaped** (user's decision, 2026-10-26). A version is reapable when
+          # it is untagged, or when every tag it carries is sha-shaped --
+          # `sha-<short>` for a commit build and `sha256-<digest>` for the
+          # signature and attestation artifacts GHCR stores beside a push.
+          #
+          # This REPLACES a keep-rule that looked for `^v[0-9]`, which was true
+          # of the five product images and of nothing else we publish: the chart
+          # tags `1.11.1`, the EE images `2.21.5` and `2.21`, the mirror
+          # `3.13-slim`. Adding those packages under the old rule would have
+          # deleted released charts and live EE lines, which is why the rule and
+          # the list had to change together.
+          #
+          # For the five images that were already here the behaviour is
+          # unchanged: a `v`-tagged version has a non-sha tag, so it is still
+          # kept, and an untagged or sha-only one is still reaped.
+          #
+          # The age cutoff applies only to versions that are already reapable,
+          # so it bounds how soon a cache artifact goes rather than deciding
+          # what may go at all.
           cutoff=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
           echo "Cutoff: $cutoff"
-          echo "Image: ${{ matrix.image }}"
+          echo "Image:  $IMAGE"
 
-          # List all versions
+          # A mirror package's name contains a slash, which is a path separator
+          # in the API route unless it is encoded. Reading the name from an env
+          # var rather than interpolating it also keeps a package name out of
+          # the shell's parsing entirely.
+          path="${IMAGE//\//%2F}"
+
           versions=$(gh api --paginate \
-            "users/mattrobinsonsre/packages/container/${{ matrix.image }}/versions" \
+            "users/mattrobinsonsre/packages/container/${path}/versions" \
             --jq '.[]') || { echo "No versions found"; exit 0; }
 
+          kept=0; reaped=0; recent=0
           echo "$versions" | jq -c '.' | while read -r version; do
             id=$(echo "$version" | jq -r '.id')
-            tags=$(echo "$version" | jq -r '.metadata.container.tags[]?' 2>/dev/null)
             updated=$(echo "$version" | jq -r '.updated_at')
+            # One tag per line, and an untagged version yields no lines at all.
+            tags=$(echo "$version" | jq -r '.metadata.container.tags[]?')
 
-            # Skip versions with any semver tag (v*)
-            has_semver=false
+            # Reapable unless SOME tag is a release tag. Expressed this way
+            # round deliberately: the failure that matters is deleting
+            # something released, so the default has to be "keep".
+            reapable=true
             while IFS= read -r tag; do
-              if [[ "$tag" =~ ^v[0-9] ]]; then
-                has_semver=true
+              [[ -z "$tag" ]] && continue
+              if [[ ! "$tag" =~ ^sha-[0-9a-f]+$ && ! "$tag" =~ ^sha256-[0-9a-f]+$ ]]; then
+                reapable=false
                 break
               fi
             done <<< "$tags"
 
-            if [[ "$has_semver" == "true" ]]; then
-              echo "KEEP $id (semver tagged: $tags)"
+            if [[ "$reapable" != "true" ]]; then
+              echo "KEEP $id (released: $(echo "$tags" | paste -sd, -))"
               continue
             fi
 
-            # Skip if newer than cutoff
             if [[ "$updated" > "$cutoff" ]]; then
-              echo "KEEP $id (recent: $updated, tags: $tags)"
+              echo "KEEP $id (sha-only but recent: $updated)"
               continue
             fi
 
-            echo "DELETE $id (old: $updated, tags: $tags)"
+            echo "DELETE $id (sha-only, old: $updated)"
             gh api -X DELETE \
-              "users/mattrobinsonsre/packages/container/${{ matrix.image }}/versions/$id" \
-              2>/dev/null || echo "  Failed to delete $id"
+              "users/mattrobinsonsre/packages/container/${path}/versions/$id" \
+              || echo "  Failed to delete $id"
           done
 
-          echo "Cleanup complete for ${{ matrix.image }}"
+          echo "Cleanup complete for $IMAGE"
