@@ -34,19 +34,32 @@ container:
   would be stripped on the way out, silently, and the configure would run with
   no vault password. It has to travel as data.
 
-* **A machine credential becomes inventory variables rather than CLI flags.**
-  `key` is the scope -- `all`, or a group -- so ansible's own group precedence
-  does the scoping and a per-group key costs no logic of ours. Only the file
-  PATH enters the document; the key never does. The document is the runner's
-  local render, so a password delivered this way reaches a file beside ansible
-  and never the stored artifact, the Resolved view, or anything holding
-  inventory read.
+* **A machine credential is referred to BY NAME from the inventory, never
+  injected.** `key` is the credential's name, and nothing on the credential
+  decides which hosts it reaches: the inventory does, by a
+  `${terrapod:<name>.<field>}` placeholder this phase resolves and
+  `configure_inventory` substitutes into the document it renders. Only the file
+  PATH is substituted for a file field; the key never enters the document. That
+  render is local to the Job, so a password delivered this way reaches a file
+  beside ansible and never the stored artifact, the Resolved view, or anything
+  holding inventory read.
 
-**Host variables outrank what this injects, and that is the intended order.**
-The resolved document's host variables are already effective, and host beats
-group in ansible -- so an operator who declared `ansible_user` in their own
-inventory keeps it. Their explicit, visible declaration is the more specific
-statement; a credential supplies what they did not say.
+**Precedence is ansible's own, because a substituted placeholder is an ordinary
+inventory variable.** Host beats group beats `all`, with no Terrapod rule to
+learn, and a value the operator set WITHOUT a placeholder outranks one with it
+at a lower level.
+
+**That bullet described `key` as "the scope -- `all`, or a group" until
+2026-10-26, and the wrong version is recorded here rather than quietly
+replaced.** It was the design before placeholders, and believing it is not
+harmless: its whole premise is that placement is automatic, so a reader writes
+no `${terrapod:...}` placeholder at all. `all` satisfies `CREDENTIAL_NAME`, so
+`key: all` is accepted at the write boundary -- measured -- and then nothing
+refers to the credential, nothing resolves it, and because an ABSENT reference
+is not an unresolved one the run is not refused either. It reports hosts it
+could not reach, naming neither the credential nor the reason. Seven surfaces
+still carried that account after the mechanism became placeholder-based;
+`scripts/docs-audit/check_credential_key_prose.py` is what stops the eighth.
 """
 
 from __future__ import annotations

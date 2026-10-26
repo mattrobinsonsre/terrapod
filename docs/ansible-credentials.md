@@ -55,7 +55,15 @@ rather than ignored — a credential field under a name nothing reads is a
 credential that silently does not apply, and the operator's next signal would be
 a configure that cannot connect.
 
-| Field | Becomes | Notes |
+**Nothing in the middle column happens automatically.** It is the inventory
+variable operators usually point a field's placeholder at — setting `user` does
+not set `ansible_user` for you. A placeholder can fill *any* connection
+variable, including a fragment of one, so the column is a convention rather
+than a mapping; see
+[`key` is the credential's name](#key-is-the-credentials-name-and-the-inventory-says-where-it-is-used)
+below.
+
+| Field | Typical target variable | Notes |
 |---|---|---|
 | `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
 | `password` | `ansible_password` | |

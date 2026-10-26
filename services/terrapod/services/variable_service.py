@@ -92,8 +92,12 @@ GIT_AUTH_CATEGORIES = frozenset({"git_http_auth", "git_ssh_auth"})
 #: has anything to do with it.
 PHASES_SEEING_APPLY_ONLY = frozenset({"apply", "configure"})
 
-#: Ansible's two credential classes (#1933). `key` is the SCOPE in both, exactly
-#: as it is a URL pattern for git auth:
+#: Ansible's two credential classes (#1933). `key` carries the same KIND of thing
+#: as it does for git auth -- what the credential applies to -- but what that IS
+#: differs per category, so the two are stated separately below rather than
+#: generalised into one word. This line generalised it to a single SCOPE for
+#: both categories while the bullet directly beneath it already said NAME: one
+#: comment block, two answers.
 #:
 #: * `ansible_machine_auth` — `key` is the credential's NAME. The INVENTORY
 #:   says where it is used, by a `${terrapod:<name>.<field>}` placeholder the
