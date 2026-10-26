@@ -4161,7 +4161,6 @@ jobs:
             ee-agent-lint=${{ needs.ee-agent-lint.result }}
             ee-agent-test=${{ needs.ee-agent-test.result }}
             python-test=${{ needs.python-test.result }}
-            build-test-base=${{ needs.build-test-base.result }}
             pricegen-test=${{ needs.pricegen-test.result }}
             rescan-test=${{ needs.rescan-test.result }}
             migration-check=${{ needs.migration-check.result }}
