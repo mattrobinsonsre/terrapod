@@ -158,8 +158,8 @@ jobs:
           echo "Images exist: $images_exist"
 
   # ── Python Lint ────────────────────────────────────────
-  python-lint:
-    name: Python Lint
+  python-checks:
+    name: Python checks
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
@@ -168,82 +168,207 @@ jobs:
       - run: scripts/lint.sh python
 
   # ── Frontend Lint ─────────────────────────────────────
-  frontend-lint:
-    name: Frontend Lint
+
+      - name: (docs-audit) Cross-references resolve
+        run: python3 scripts/docs-audit/check_links.py
+
+      - name: (docs-audit) Countable claims match the code
+        run: python3 scripts/docs-audit/check_counts.py
+
+      - name: (docs-audit) Named targets, values and paths exist
+        run: python3 scripts/docs-audit/check_references.py
+      # The provider hard-codes copies of server defaults, and schema.golden
+      # records types rather than defaults -- so a drift is invisible to every
+      # other gate. It happened: the provider sat a minor behind for a release.
+
+      - name: (docs-audit) Provider defaults agree with the server's
+        run: python3 scripts/docs-audit/check_provider_defaults.py
+      # Not a docs gate, but it belongs to a job that sees the whole checkout:
+      # the pytest tiers run in an image that does not ship `scripts/`, and the
+      # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
+
+      - name: (docs-audit) Every token mint names its identity provider
+        run: python3 scripts/docs-audit/check_token_mints.py
+      # Also not a docs gate, and here for the same reason: this job sees the
+      # whole checkout, including the workflows. A package published with
+      # nothing reaping it fails SILENTLY -- no check turns red, the versions
+      # just pile up -- and that has now happened twice. The second time, the
+      # chart package held 408 versions and `mirror/python` 330.
+
+      - name: (docs-audit) Every published GHCR package is reaped
+        run: python3 scripts/docs-audit/check_ghcr_cleanup.py
+      # Also not a docs gate, and also here because this job sees the whole
+      # checkout. Every `uses:` is SHA-pinned, so the trailing `# vN` comment is
+      # the only human-readable statement of what is pinned -- and dependabot
+      # rewrites the comment per OCCURRENCE, so a file whose comment was already
+      # stale keeps it through a bump. Four of twenty pins disagreed with
+      # themselves when #2161 landed; `actions/checkout` was labelled v4, v5.0.0
+      # and v7 at once, and is v7.
+
+      - name: (docs-audit) Pinned actions agree on their version comments
+        run: python3 scripts/docs-audit/check_action_pins.py
+      # A job that downloads an artifact must depend on the job producing it.
+      # Without that the two are only ordered by the scheduler, so the job is
+      # green until the ordering goes the other way -- which is how the runner
+      # image build failed on arm64 and passed on amd64 in the same run.
+      # The only gate here with a dependency. Installed explicitly rather
+      # than assumed: every other job in this file that needs PyYAML installs
+      # it, which is evidence enough that the runner image is not relied on to
+      # carry it.
+      - run: pip install pyyaml
+      # Checks itself along with the rest, which is what makes the set closed
+      # rather than merely one longer.
+
+      - name: (docs-audit) Every docs-audit gate is run by this job
+        run: python3 scripts/docs-audit/check_docs_audit_wiring.py
+
+      - name: (docs-audit) Downloaded artifacts come from a declared dependency
+        run: python3 scripts/docs-audit/check_artifact_deps.py
+      # The EE contract is asserted twice on purpose -- at build time and
+      # against the pushed digest -- and dropping either half leaves the other
+      # green. Stdlib only, so it needs nothing installed above.
+
+      - name: (docs-audit) The EE contract still has both its readers
+        run: python3 scripts/docs-audit/check_ee_contract.py
+      # Wired in here because nothing auto-discovers these scripts, and this
+      # one had been sitting in the directory unrun -- the same shape as a flag
+      # nothing reads, with the gate itself as the thing nobody was reading.
+
+      - name: (docs-audit) No forward-looking issue references
+        run: python3 scripts/docs-audit/check_issue_refs.py
+      # Advisory: prints for human review, never fails. Telling a factual
+      # boundary from a put-down is a judgement call.
+
+      - name: (docs-audit) Peer-fairness review list
+        run: python3 scripts/docs-audit/check_peer_fairness.py
+
+  # ── Platform-tool artifacts (#2066) ───────────────
+  # `platform_tools.py` holds a static table of the platforms each publisher
+  # ships, and the table cannot express the thing that actually varies:
+  # availability is a property of a (version, platform) pair. Checkov stopped
+  # publishing its linux/arm64 asset at 3.3.21 while the table went on claiming
+  # it, so from v1.9.0 every security scan on an arm64 agent pool recorded
+  # `errored` — and on an enforced workspace that blocks every run. Nothing in
+  # CI contradicted the claim, because nothing asked the publisher.
+  #
+  # This asks. Network-bound, so it is its own job rather than a pytest tier,
+  # and it needs the real `download_url()` rather than a copy of its rules —
+  # hence the slim install plus PYTHONPATH rather than a dependency-free script.
+  # It gates a release through `quality-gate`: shipping a version whose artifact
+  # does not exist is the failure this exists to prevent.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: pip install pytest
+
+      - name: (rescan-test) Run the re-scan and register-review script tests
+        run: python -m pytest scripts/tests -v
+
+  # ── Migration smoke (#544) ────────────────────────────
+  # The Python test tiers build the schema with `Base.metadata.create_all`, so
+  # the migration files are never executed by any test. This one-shot job runs
+  # the REAL `alembic upgrade head` against a Postgres, then seeds + queries
+  # representative rows — catching a bad backfill / NOT-NULL-without-default on a
+  # populated table that create_all would never exercise. Always-on (cheap,
+  # ~2 min) rather than path-gated, so a models.py change that needs a migration
+  # can't slip through by touching a file the filter missed.
+      - run: pip install httpx pydantic pydantic-settings pyyaml structlog pgpy standard-imghdr
+
+      - name: (platform-tool-artifacts) Every artifact the platform tables claim exists
+        env:
+          PYTHONPATH: services
+        run: python3 scripts/check-platform-tool-artifacts.py
+
+  # ── Helm Lint ──────────────────────────────────────────
+      - run: pip install pyyaml ijson pytest
+
+      - name: (pricegen-test) Run pricegen unit tests
+        run: python -m pytest pricegen/tests -v
+
+  # ── Release re-scan script tests (#1212) ──────────────
+  # The three `scripts/rescan_*.py` decide what a security channel says, and
+  # their failure mode is silence rather than a crash: a normaliser reading the
+  # wrong field reports zero findings and the run goes green. They are plain
+  # stdlib files invoked by path (deliberately dependency-free, so the scheduled
+  # workflow needs no install step), which also means they are not in the
+  # services test image — so they run here, next to pricegen, for the same
+  # reason. Pinned here: the two bugs that shipped, and the privacy split
+  # (dependency findings may be public, code findings and per-release detail may
+  # not).
+
+  node-checks:
+    name: Node checks
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
-    # `container:` or in `services:` — using it there makes the whole workflow
-    # invalid, which GitHub reports as NO checks rather than a failing one.
+
     container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
+
     defaults:
       run:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install dependencies
+
+      - name: (frontend-lint) Install dependencies
         run: npm ci
-      - name: ESLint
+
+      - name: (frontend-lint) ESLint
         run: npm run lint
-      - name: TypeScript type-check
+
+      - name: (frontend-lint) TypeScript type-check
         run: npm run type-check
-      - name: i18n completeness (every offered locale is 100% or it is not offered — #767)
+
+      - name: (frontend-lint) i18n completeness (every offered locale is 100% or it is not offered — #767)
         run: npm run i18n:check
-      - name: i18n no-hardcoded-strings (no new untranslated JSX literals — #767)
+
+      - name: (frontend-lint) i18n no-hardcoded-strings (no new untranslated JSX literals — #767)
         run: npm run i18n:lint
-      - name: Phase vocabulary (no engine's verb hardcoded in a component — #1521)
+
+      - name: (frontend-lint) Phase vocabulary (no engine's verb hardcoded in a component — #1521)
         run: npm run i18n:phases
-      - name: Unit tests (node:test — no test framework dependency)
+
+      - name: (frontend-lint) Unit tests (node:test — no test framework dependency)
         run: npm run test:unit
 
   # ── Provider Lint ─────────────────────────────────────
-  provider-lint:
-    name: Provider Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: provider/go.mod
-          cache-dependency-path: provider/go.sum
-      - name: Vet
-        run: go vet ./...
-        working-directory: provider
-      - name: Build
-        run: go build ./...
-        working-directory: provider
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
-        with:
-          version: v2.12.2
-          working-directory: provider
-          args: --config=../.golangci.yml
 
-  # ── Provider Test ────────────────────────────────────
-  provider-test:
-    name: Provider Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: provider/go.mod
-          cache-dependency-path: provider/go.sum
-      - name: Test
-        run: go test ./... -v -count=1 -timeout 120s
-        working-directory: provider
+      - name: (npm-audit) Install dependencies
+        run: npm ci
 
-  # ── go-terrapod Lint ──────────────────────────────────
-  # The public Go SDK lives in go-terrapod/ with its own go.mod (no
-  # provider/migrate-specific deps). Both terraform-provider-terrapod
-  # and terrapod-migrate import from here.
-  go-terrapod-lint:
-    name: go-terrapod Lint
+      - name: (npm-audit) Run npm audit
+        # Fail on any high/critical advisory except those allowlisted in
+        # pentest/npm-audit-allow.txt, which carries the reasoning and exit
+        # condition for each (mirrors pip-audit's ignore file and trivy's
+        # .trivyignore). Shared with release-rescan.yml so the two cannot drift.
+        run: |
+          npm audit --audit-level=high --json > audit.json || true
+          node -e '
+            const a = require("./audit.json");
+            const allow = new Set(
+              require("fs").readFileSync("../pentest/npm-audit-allow.txt", "utf8")
+                .split("\n").map((l) => l.split("#")[0].trim()).filter(Boolean),
+            );
+            const bad = [];
+            for (const [name, v] of Object.entries(a.vulnerabilities || {})) {
+              if (!["high", "critical"].includes(v.severity)) continue;
+              const ids = (v.via || [])
+                .filter((x) => x && typeof x === "object" && x.url)
+                .map((x) => x.url.split("/").pop());
+              const unhandled = ids.filter((id) => !allow.has(id));
+              if (unhandled.length) bad.push(`${name} [${v.severity}]: ${unhandled.join(", ")}`);
+            }
+            if (bad.length) {
+              console.error("Non-allowlisted high/critical npm advisories:\n" + bad.join("\n"));
+              process.exit(1);
+            }
+            console.log("npm audit: clean (only allowlisted advisories remain — see step comment).");
+          '
+
+  # ── Go dependency audit (#1542) ───────────────────────
+
+  go-modules-core:
+    name: Go modules (core)
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
@@ -253,13 +378,16 @@ jobs:
         with:
           go-version-file: go-terrapod/go.mod
           cache-dependency-path: go-terrapod/go.sum
-      - name: Vet
+
+      - name: (go-terrapod-lint) Vet
         run: go vet ./...
         working-directory: go-terrapod
-      - name: Build
+
+      - name: (go-terrapod-lint) Build
         run: go build ./...
         working-directory: go-terrapod
-      - name: golangci-lint
+
+      - name: (go-terrapod-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -267,18 +395,8 @@ jobs:
           args: --config=../.golangci.yml
 
   # ── go-terrapod Test ──────────────────────────────────
-  go-terrapod-test:
-    name: go-terrapod Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go-terrapod/go.mod
-          cache-dependency-path: go-terrapod/go.sum
-      - name: Test
+
+      - name: (go-terrapod-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: go-terrapod
 
@@ -286,24 +404,42 @@ jobs:
   # The terrapod-migrate binary lives in migrate/ with its own go.mod
   # (the provider doesn't carry go-tfe or the HCL libs). Mirrors the
   # provider-lint shape so failures look the same to operators.
-  migrate-lint:
-    name: Migrate Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+
+      - name: (provider-lint) Vet
+        run: go vet ./...
+        working-directory: provider
+
+      - name: (provider-lint) Build
+        run: go build ./...
+        working-directory: provider
+
+      - name: (provider-lint) golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          go-version-file: migrate/go.mod
-          cache-dependency-path: migrate/go.sum
-      - name: Vet
+          version: v2.12.2
+          working-directory: provider
+          args: --config=../.golangci.yml
+
+  # ── Provider Test ────────────────────────────────────
+
+      - name: (provider-test) Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: provider
+
+  # ── go-terrapod Lint ──────────────────────────────────
+  # The public Go SDK lives in go-terrapod/ with its own go.mod (no
+  # provider/migrate-specific deps). Both terraform-provider-terrapod
+  # and terrapod-migrate import from here.
+
+      - name: (migrate-lint) Vet
         run: go vet ./...
         working-directory: migrate
-      - name: Build
+
+      - name: (migrate-lint) Build
         run: go build ./...
         working-directory: migrate
-      - name: golangci-lint
+
+      - name: (migrate-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -311,26 +447,17 @@ jobs:
           args: --config=../.golangci.yml
 
   # ── Migrate Test ──────────────────────────────────────
-  migrate-test:
-    name: Migrate Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: migrate/go.mod
-          cache-dependency-path: migrate/go.sum
-      - name: Test
+
+      - name: (migrate-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: migrate
 
   # ── Publish Lint ──────────────────────────────────────
   # terrapod-publish lives in publish/ with its own go.mod (pulls the
   # ProtonMail OpenPGP libs that the SDK doesn't). Mirrors migrate's shape.
-  publish-lint:
-    name: Publish Lint
+
+  go-modules-tools:
+    name: Go modules (tools)
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
@@ -340,13 +467,16 @@ jobs:
         with:
           go-version-file: publish/go.mod
           cache-dependency-path: publish/go.sum
-      - name: Vet
+
+      - name: (publish-lint) Vet
         run: go vet ./...
         working-directory: publish
-      - name: Build
+
+      - name: (publish-lint) Build
         run: go build ./...
         working-directory: publish
-      - name: golangci-lint
+
+      - name: (publish-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -354,41 +484,22 @@ jobs:
           args: --config=../.golangci.yml
 
   # ── Publish Test ──────────────────────────────────────
-  publish-test:
-    name: Publish Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: publish/go.mod
-          cache-dependency-path: publish/go.sum
-      - name: Test
+
+      - name: (publish-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: publish
 
   # ── Query Lint ────────────────────────────────────────
-  query-lint:
-    name: Query Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: query/go.mod
-          # Stdlib-only module — no go.sum, so nothing to cache.
-          cache: false
-      - name: Vet
+
+      - name: (query-lint) Vet
         run: go vet ./...
         working-directory: query
-      - name: Build
+
+      - name: (query-lint) Build
         run: go build ./...
         working-directory: query
-      - name: golangci-lint
+
+      - name: (query-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -396,40 +507,22 @@ jobs:
           args: --config=../.golangci.yml
 
   # ── Query Test ────────────────────────────────────────
-  query-test:
-    name: Query Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: query/go.mod
-          cache: false
-      - name: Test
+
+      - name: (query-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: query
 
   # ── MCP Lint ──────────────────────────────────────────
-  mcp-lint:
-    name: MCP Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: mcp/go.mod
-          cache: false
-      - name: Vet
+
+      - name: (mcp-lint) Vet
         run: go vet ./...
         working-directory: mcp
-      - name: Build
+
+      - name: (mcp-lint) Build
         run: go build ./...
         working-directory: mcp
-      - name: golangci-lint
+
+      - name: (mcp-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -439,18 +532,8 @@ jobs:
   # ── MCP Test ──────────────────────────────────────────
   # Includes the tool-catalogue contract gate (TestToolCatalogue) — a
   # removed/renamed/retyped tool fails here (breaking; #550).
-  mcp-test:
-    name: MCP Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: mcp/go.mod
-          cache: false
-      - name: Test
+
+      - name: (mcp-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: mcp
 
@@ -459,25 +542,16 @@ jobs:
   # (#2154). Its own module, stdlib-only, so it can be injected into an EE
   # without dragging a dependency surface in with it — which is what keeps an EE
   # free of Terrapod code and therefore insensitive to Terrapod releases.
-  ee-agent-lint:
-    name: EE Agent Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: ee-agent/go.mod
-          # Stdlib-only module — no go.sum, so nothing to cache.
-          cache: false
-      - name: Vet
+
+      - name: (ee-agent-lint) Vet
         run: go vet ./...
         working-directory: ee-agent
-      - name: Build
+
+      - name: (ee-agent-lint) Build
         run: go build ./...
         working-directory: ee-agent
-      - name: golangci-lint
+
+      - name: (ee-agent-lint) golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
@@ -485,18 +559,8 @@ jobs:
           args: --config=../.golangci.yml
 
   # ── EE Agent Test ─────────────────────────────────────
-  ee-agent-test:
-    name: EE Agent Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: ee-agent/go.mod
-          cache: false
-      - name: Test
+
+      - name: (ee-agent-test) Test
         # Longer than the other modules': several tests start a real child and
         # wait for it to be signalled, because cancellation is a property you
         # cannot assert without one.
@@ -506,6 +570,7 @@ jobs:
   # ── Build terrapod-ee-agent binary (baked into the runner image) ──────
   # Static and stdlib-only, so the initContainer can copy it onto a shared
   # volume and the EE can run it with no interpreter and no libraries of ours.
+
   build-ee-agent:
     name: Build terrapod-ee-agent (${{ matrix.goarch }})
     needs: prepare
@@ -817,85 +882,6 @@ jobs:
   # tests (adapters, engine, computed path, multi-region fetch/merge) run here.
   # Deps are just pyyaml + ijson (the same the weekly Pricesheet workflow uses);
   # no DB/Redis/network — the fetch tests monkeypatch the HTTP layer.
-  pricegen-test:
-    name: pricegen Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14"
-      - run: pip install pyyaml ijson pytest
-      - name: Run pricegen unit tests
-        run: python -m pytest pricegen/tests -v
-
-  # ── Release re-scan script tests (#1212) ──────────────
-  # The three `scripts/rescan_*.py` decide what a security channel says, and
-  # their failure mode is silence rather than a crash: a normaliser reading the
-  # wrong field reports zero findings and the run goes green. They are plain
-  # stdlib files invoked by path (deliberately dependency-free, so the scheduled
-  # workflow needs no install step), which also means they are not in the
-  # services test image — so they run here, next to pricegen, for the same
-  # reason. Pinned here: the two bugs that shipped, and the privacy split
-  # (dependency findings may be public, code findings and per-release detail may
-  # not).
-  rescan-test:
-    name: Security Scripts Test
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14"
-      - run: pip install pytest
-      - name: Run the re-scan and register-review script tests
-        run: python -m pytest scripts/tests -v
-
-  # ── Migration smoke (#544) ────────────────────────────
-  # The Python test tiers build the schema with `Base.metadata.create_all`, so
-  # the migration files are never executed by any test. This one-shot job runs
-  # the REAL `alembic upgrade head` against a Postgres, then seeds + queries
-  # representative rows — catching a bad backfill / NOT-NULL-without-default on a
-  # populated table that create_all would never exercise. Always-on (cheap,
-  # ~2 min) rather than path-gated, so a models.py change that needs a migration
-  # can't slip through by touching a file the filter missed.
-  migration-check:
-    name: Migration Smoke
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        # Literal for the same reason as `container:` above.
-        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
-        env:
-          POSTGRES_USER: terrapod
-          POSTGRES_PASSWORD: terrapod
-          POSTGRES_DB: terrapod
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U terrapod"
-          --health-interval 3s --health-timeout 3s --health-retries 20
-    env:
-      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Build migrations image
-        run: docker build -f docker/Dockerfile.migrations -t tp-migrations:ci .
-      - name: Run migrations (alembic upgrade head — the real migration files)
-        run: docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" tp-migrations:ci
-      - name: Seed representative rows + query the migrated schema
-        run: |
-          docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" \
-            -v "$PWD/scripts/migration_smoke.py:/app/scripts/migration_smoke.py:ro" \
-            --entrypoint python tp-migrations:ci scripts/migration_smoke.py
-
-  # ── Dependency Audit (Python) ─────────────────────────
   python-audit:
     name: Python Audit
     # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
@@ -994,154 +980,6 @@ jobs:
           fi
 
   # ── Dependency Audit (npm) ────────────────────────────
-  npm-audit:
-    name: npm Audit
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
-    # `container:` or in `services:` — using it there makes the whole workflow
-    # invalid, which GitHub reports as NO checks rather than a failing one.
-    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install dependencies
-        run: npm ci
-      - name: Run npm audit
-        # Fail on any high/critical advisory except those allowlisted in
-        # pentest/npm-audit-allow.txt, which carries the reasoning and exit
-        # condition for each (mirrors pip-audit's ignore file and trivy's
-        # .trivyignore). Shared with release-rescan.yml so the two cannot drift.
-        run: |
-          npm audit --audit-level=high --json > audit.json || true
-          node -e '
-            const a = require("./audit.json");
-            const allow = new Set(
-              require("fs").readFileSync("../pentest/npm-audit-allow.txt", "utf8")
-                .split("\n").map((l) => l.split("#")[0].trim()).filter(Boolean),
-            );
-            const bad = [];
-            for (const [name, v] of Object.entries(a.vulnerabilities || {})) {
-              if (!["high", "critical"].includes(v.severity)) continue;
-              const ids = (v.via || [])
-                .filter((x) => x && typeof x === "object" && x.url)
-                .map((x) => x.url.split("/").pop());
-              const unhandled = ids.filter((id) => !allow.has(id));
-              if (unhandled.length) bad.push(`${name} [${v.severity}]: ${unhandled.join(", ")}`);
-            }
-            if (bad.length) {
-              console.error("Non-allowlisted high/critical npm advisories:\n" + bad.join("\n"));
-              process.exit(1);
-            }
-            console.log("npm audit: clean (only allowlisted advisories remain — see step comment).");
-          '
-
-  # ── Go dependency audit (#1542) ───────────────────────
-  go-audit:
-    name: Go Audit
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Audit every Go module
-        # Six Go modules ship in every release and, until #1542, NOTHING scanned
-        # any of them. Trivy covers the images; `provider` and `migrate` are
-        # release *assets*, not image contents, so the image scan cannot see
-        # them. pip-audit and npm audit cover Python and JavaScript. Go had no
-        # equivalent, and a HIGH in grpc reached a tagged release because of it.
-        #
-        # Version-based, not `govulncheck`. govulncheck does reachability
-        # analysis and reported the grpc advisory as clean, because the
-        # vulnerable function is never called from our binaries — which is
-        # useful for triage and useless as a gate, since an operator scanning
-        # our released artifacts sees the version, not the call graph. This
-        # matches what Dependabot and their scanner will say.
-        #
-        # It also found two modules Dependabot missed entirely (`publish`,
-        # `query`), so it is not merely duplicating the alerts.
-        #
-        # The vulnerability DB is downloaded ONCE, up front, into a shared
-        # cache, and the six scans then run with `--skip-db-update`. Before
-        # this each `docker run` fetched the DB itself — six independent
-        # chances for a transient registry failure, and when one hit (a 404
-        # from mirror.gcr.io on the DB layer, 2026-10-05) the job reported
-        # "High/critical advisories in a Go module" and exited 1. `--exit-code
-        # 1` means findings, but a FATAL init error also exits non-zero, so
-        # `|| fail=1` could not tell "found a CVE" from "never scanned", and
-        # the gate named the wrong cause. Separating the download makes a DB
-        # failure its own attributable failure, before any module is scanned.
-        run: |
-          set -u
-          TRIVY="${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}"
-          CACHE="${RUNNER_TEMP:-/tmp}/trivy-cache"
-          mkdir -p "$CACHE"
-
-          # Bounded retry: a registry hiccup here is infrastructure, not a
-          # finding, and must not be reported as one. Three attempts with
-          # backoff, then fail with a message that says what actually broke.
-          db_ok=0
-          for attempt in 1 2 3; do
-            echo "── vulnerability DB (attempt $attempt/3)"
-            if docker run --rm -v "$CACHE:/cache" "$TRIVY" \
-                 fs --cache-dir /cache --scanners vuln --download-db-only --quiet; then
-              db_ok=1; break
-            fi
-            [ "$attempt" -lt 3 ] && sleep $((attempt * 15))
-          done
-          if [ "$db_ok" != "1" ]; then
-            echo
-            echo "Could not download the Trivy vulnerability database after 3 attempts."
-            echo "NO MODULE WAS SCANNED — this is an infrastructure failure, not a"
-            echo "finding. Re-run the job; if it persists, check Trivy DB registry"
-            echo "availability (ghcr.io / mirror.gcr.io)."
-            exit 1
-          fi
-
-          fail=0
-          # DERIVED, not listed. A hand-kept list is why `loadtest` had never
-          # been audited at all — it is the one module that was also missing a
-          # lint and a test job, and it stayed invisible here for the same
-          # reason. The floor is the same shape CodeQL's module build uses: a
-          # finder that stops matching must fail rather than audit a fraction
-          # of the Go code and report success.
-          mapfile -t mods < <(
-            find . -name go.mod \
-              -not -path './.conformance/*' \
-              -not -path './.claude/*' \
-              -not -path './node_modules/*' \
-              -printf '%h\n' | sed 's|^\./||' | sort
-          )
-          if [ "${#mods[@]}" -lt 7 ]; then
-            echo "Found only ${#mods[@]} Go module(s): ${mods[*]}"
-            echo "Expected at least 7 — failing rather than auditing a fraction."
-            exit 1
-          fi
-          echo "Auditing ${#mods[@]} module(s): ${mods[*]}"
-          for m in "${mods[@]}"; do
-            echo "── $m"
-            docker run --rm -v "$PWD:/src" -v "$CACHE:/cache" -w /src \
-              "$TRIVY" \
-              fs --cache-dir /cache --skip-db-update \
-              --scanners vuln --severity HIGH,CRITICAL \
-              --ignorefile /src/pentest/trivy/.trivyignore \
-              --exit-code 1 --quiet "$m/go.mod" || fail=1
-          done
-          if [ "$fail" != "0" ]; then
-            echo
-            echo "High/critical advisories in a Go module. Bump the dependency:"
-            echo "  cd <module> && go get <pkg>@<fixed> && go mod tidy"
-            echo "Pin the FIXED version, never an older one — pinning a lower"
-            echo "version downgrades the whole module graph and can reintroduce"
-            echo "advisories elsewhere."
-            exit 1
-          fi
-          echo "all Go modules clean"
-
-  # ── Secret Scanning (gitleaks) ────────────────────────
   secret-scan:
     name: Secret Scan
     # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
@@ -1272,127 +1110,38 @@ jobs:
           comment-summary-in-pr: on-failure
 
   # ── Docs Audit ─────────────────────────────────────────
-  docs-audit:
-    name: Docs Audit
+  host-checks:
+    name: Repo and chart checks
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Pure-mechanism doc gates (#1389). No judgement, no network: a link
-      # either resolves or it does not, a count either matches the code or it
-      # does not. The failure mode they exist for is silent — a renamed heading
-      # or a grown registry leaves the docs confidently wrong.
-      - name: Cross-references resolve
-        run: python3 scripts/docs-audit/check_links.py
-      - name: Countable claims match the code
-        run: python3 scripts/docs-audit/check_counts.py
-      - name: Named targets, values and paths exist
-        run: python3 scripts/docs-audit/check_references.py
-      # The provider hard-codes copies of server defaults, and schema.golden
-      # records types rather than defaults -- so a drift is invisible to every
-      # other gate. It happened: the provider sat a minor behind for a release.
-      - name: Provider defaults agree with the server's
-        run: python3 scripts/docs-audit/check_provider_defaults.py
-      # Not a docs gate, but it belongs to a job that sees the whole checkout:
-      # the pytest tiers run in an image that does not ship `scripts/`, and the
-      # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
-      - name: Every token mint names its identity provider
-        run: python3 scripts/docs-audit/check_token_mints.py
-      # Also not a docs gate, and here for the same reason: this job sees the
-      # whole checkout, including the workflows. A package published with
-      # nothing reaping it fails SILENTLY -- no check turns red, the versions
-      # just pile up -- and that has now happened twice. The second time, the
-      # chart package held 408 versions and `mirror/python` 330.
-      - name: Every published GHCR package is reaped
-        run: python3 scripts/docs-audit/check_ghcr_cleanup.py
-      # Also not a docs gate, and also here because this job sees the whole
-      # checkout. Every `uses:` is SHA-pinned, so the trailing `# vN` comment is
-      # the only human-readable statement of what is pinned -- and dependabot
-      # rewrites the comment per OCCURRENCE, so a file whose comment was already
-      # stale keeps it through a bump. Four of twenty pins disagreed with
-      # themselves when #2161 landed; `actions/checkout` was labelled v4, v5.0.0
-      # and v7 at once, and is v7.
-      - name: Pinned actions agree on their version comments
-        run: python3 scripts/docs-audit/check_action_pins.py
-      # A job that downloads an artifact must depend on the job producing it.
-      # Without that the two are only ordered by the scheduler, so the job is
-      # green until the ordering goes the other way -- which is how the runner
-      # image build failed on arm64 and passed on amd64 in the same run.
-      # The only gate here with a dependency. Installed explicitly rather
-      # than assumed: every other job in this file that needs PyYAML installs
-      # it, which is evidence enough that the runner image is not relied on to
-      # carry it.
-      - run: pip install pyyaml
-      # Checks itself along with the rest, which is what makes the set closed
-      # rather than merely one longer.
-      - name: Every docs-audit gate is run by this job
-        run: python3 scripts/docs-audit/check_docs_audit_wiring.py
-      - name: Downloaded artifacts come from a declared dependency
-        run: python3 scripts/docs-audit/check_artifact_deps.py
-      # The EE contract is asserted twice on purpose -- at build time and
-      # against the pushed digest -- and dropping either half leaves the other
-      # green. Stdlib only, so it needs nothing installed above.
-      - name: The EE contract still has both its readers
-        run: python3 scripts/docs-audit/check_ee_contract.py
-      # Wired in here because nothing auto-discovers these scripts, and this
-      # one had been sitting in the directory unrun -- the same shape as a flag
-      # nothing reads, with the gate itself as the thing nobody was reading.
-      - name: No forward-looking issue references
-        run: python3 scripts/docs-audit/check_issue_refs.py
-      # Advisory: prints for human review, never fails. Telling a factual
-      # boundary from a put-down is a judgement call.
-      - name: Peer-fairness review list
-        run: python3 scripts/docs-audit/check_peer_fairness.py
 
-  # ── Platform-tool artifacts (#2066) ───────────────
-  # `platform_tools.py` holds a static table of the platforms each publisher
-  # ships, and the table cannot express the thing that actually varies:
-  # availability is a property of a (version, platform) pair. Checkov stopped
-  # publishing its linux/arm64 asset at 3.3.21 while the table went on claiming
-  # it, so from v1.9.0 every security scan on an arm64 agent pool recorded
-  # `errored` — and on an enforced workspace that blocks every run. Nothing in
-  # CI contradicted the claim, because nothing asked the publisher.
-  #
-  # This asks. Network-bound, so it is its own job rather than a pytest tier,
-  # and it needs the real `download_url()` rather than a copy of its rules —
-  # hence the slim install plus PYTHONPATH rather than a dependency-free script.
-  # It gates a release through `quality-gate`: shipping a version whose artifact
-  # does not exist is the failure this exists to prevent.
-  platform-tool-artifacts:
-    name: Platform Tool Artifacts
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14"
-      # Enough to import `terrapod.services.platform_tools`, which pulls
-      # `terrapod.config` (pydantic) and `artifact_verification` (pgpy, whose
-      # `imghdr` import needs the 3.13+ backport). A ModuleNotFoundError here
-      # means the import chain grew — add the package, do not fork the URL logic.
-      - run: pip install httpx pydantic pydantic-settings pyyaml structlog pgpy standard-imghdr
-      - name: Every artifact the platform tables claim exists
+    services:
+      postgres:
+        # Literal for the same reason as `container:` above.
+        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
         env:
-          PYTHONPATH: services
-        run: python3 scripts/check-platform-tool-artifacts.py
+          POSTGRES_USER: terrapod
+          POSTGRES_PASSWORD: terrapod
+          POSTGRES_DB: terrapod
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U terrapod"
+          --health-interval 3s --health-timeout 3s --health-retries 20
 
-  # ── Helm Lint ──────────────────────────────────────────
-  helm-lint:
-    name: Helm Lint
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Helm lint (default values)
+
+      - name: (helm-lint) Helm lint (default values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
             "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             lint helm/terrapod --values helm/terrapod/values.yaml
-      - name: Helm lint (local dev values)
+
+      - name: (helm-lint) Helm lint (local dev values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
             "${HELM_IMAGE:-alpine/helm:3.17.2}" \
@@ -1403,14 +1152,15 @@ jobs:
   # install that renders no working stack because a component default is off.
   # (Directly targets the web.enabled=false class of bug that shipped a
   # non-working chart: lint passed, but `helm install` produced no web/Ingress.)
-  helm-smoke:
-    name: Helm Smoke
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: No third-party image is pulled straight from Docker Hub
+      - run: scripts/helm-config-contract.sh
+
+  # ── Eval quickstart boot (kind + k3d) ──────────────────
+  # Proves `make eval` actually stands up a complete stack (embedded
+  # Postgres/Redis + migrations + API + web) on a throwaway cluster, on both
+  # supported cluster tools. Uses released images, so it exercises the eval
+  # mechanism + chart, not the PR's app code (that's covered by the test job).
+
+      - name: (helm-smoke) No third-party image is pulled straight from Docker Hub
         run: |
           # The first pass at the mirror MISSED e2e/docker-compose.e2e.yml, which
           # duly failed a docs-only PR an hour later on a postgres pull. Grepping
@@ -1444,7 +1194,8 @@ jobs:
           fi
           echo "all third-party images are overridable, and every mirror ref is listed"
 
-      - name: The chart never mints a token signing key, and yields to a supplied one
+
+      - name: (helm-smoke) The chart never mints a token signing key, and yields to a supplied one
         run: |
           # GHSA-hc47-q72v-4vcm, #1994. The chart used to generate this key, which
           # put a random value in a rendered manifest -- not a pure function of its
@@ -1504,7 +1255,8 @@ jobs:
             && { echo "a default render injects a signing key env var; the API stores its own"; exit 1; }
           echo "signing key: never minted by the chart, referenced when supplied, absent otherwise"
 
-      - name: The strong-secrets switch reaches the pod and stays off by default
+
+      - name: (helm-smoke) The strong-secrets switch reaches the pod and stays off by default
         run: |
           # Config-channel contract for GHSA-hc47-q72v-4vcm. The switch decides
           # whether the API refuses to start on a weak signing key or a
@@ -1529,7 +1281,8 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
 
-      - name: The GitLab git-credential switch renders, on every profile, and stays off
+
+      - name: (helm-smoke) The GitLab git-credential switch renders, on every profile, and stays off
         run: |
           # Config-channel contract for the GitLab half of the VCS-connection
           # git credential. A GitLab connection holds an access token that
@@ -1560,7 +1313,8 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
 
-      - name: An explicit false reaches the pod, and nothing unmodelled is rendered
+
+      - name: (helm-smoke) An explicit false reaches the pod, and nothing unmodelled is rendered
         run: |
           # The config CHANNEL contract, both directions, in the job that has a helm
           # binary. There is an equivalent pytest (tests/helm/
@@ -1604,7 +1358,8 @@ jobs:
               || { echo "rendered config disagrees with Settings on $f"; exit 1; }
           done
 
-      - name: The comment-command push gate reaches the pod and stays on by default
+
+      - name: (helm-smoke) The comment-command push gate reaches the pod and stays on by default
         run: |
           # Config-channel contract for the PR-comment authorization gate. The
           # switch decides whether `terrapod apply` from a pull-request comment
@@ -1631,7 +1386,8 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the comment-command push gate renders, defaults on, and honours false"
 
-      - name: The Vault value source reaches the pod, and its credential never does
+
+      - name: (helm-smoke) The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.
           #
@@ -1708,7 +1464,8 @@ jobs:
           }
           echo "vault config renders; credential is secretKeyRef-only"
 
-      - name: Vault jwt auth projects its token, and a custom CA reaches the pod
+
+      - name: (helm-smoke) Vault jwt auth projects its token, and a custom CA reaches the pod
         run: |
           # #1650. jwt auth reads an audience-scoped projected ServiceAccount
           # token; a per-instance CA is a Secret key mounted as a file. Both are
@@ -1799,7 +1556,8 @@ jobs:
           }
           echo "vault jwt projects its token; the custom CA is mounted at ca_file"
 
-      - name: Every SAML assertion check reaches the pod, in both positions
+
+      - name: (helm-smoke) Every SAML assertion check reaches the pod, in both positions
         run: |
           # The config-channel contract for the SAML hardening switches.
           #
@@ -1894,7 +1652,8 @@ jobs:
           done
           echo "the SAML assertion checks render in both positions, and an unset one does not"
 
-      - name: Every retention key in values.yaml reaches the rendered ConfigMap
+
+      - name: (helm-smoke) Every retention key in values.yaml reaches the rendered ConfigMap
         run: |
           # Leg 3 of the config-channel contract. A key can be in values.yaml
           # and in values.schema.json and still be inert, because the operator
@@ -1919,7 +1678,8 @@ jobs:
           fi
           echo "all retention keys render:" $keys
 
-      - name: The outbound-URL guard's settings reach the pod
+
+      - name: (helm-smoke) The outbound-URL guard's settings reach the pod
         run: |
           # #1541. The guard decides where a user-supplied webhook may point, so
           # a value that never reaches the ConfigMap means an operator who
@@ -1960,7 +1720,8 @@ jobs:
           }
           echo "outbound_requests still renders with notifications null"
 
-      - name: Two installs in one cluster cannot collide on a cluster-scoped name
+
+      - name: (helm-smoke) Two installs in one cluster cannot collide on a cluster-scoped name
         run: |
           # Terrapod is single-organization, so separating business units means
           # running an instance per tenant — two in one cluster is a topology we
@@ -1986,7 +1747,8 @@ jobs:
             exit 1
           fi
 
-      - name: No config value renders in scientific notation (#1426)
+
+      - name: (helm-smoke) No config value renders in scientific notation (#1426)
         run: |
           # A values FILE yields float64, and Go renders a large float64 as
           # `1e+06` — which Pydantic refuses as an integer, so the API will not
@@ -2021,7 +1783,8 @@ jobs:
             exit 1
           fi
           echo "No config value renders in scientific notation OK"
-      - name: Stock install renders a working stack (web + Ingress + bootstrap)
+
+      - name: (helm-smoke) Stock install renders a working stack (web + Ingress + bootstrap)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2067,7 +1830,8 @@ jobs:
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }
           echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
-      - name: Bootstrap seeds several agent pools without exposing a token (#1411)
+
+      - name: (helm-smoke) Bootstrap seeds several agent pools without exposing a token (#1411)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2091,7 +1855,8 @@ jobs:
             echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
           fi
           echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
-      - name: Capability flags render, including false (#1986)
+
+      - name: (helm-smoke) Capability flags render, including false (#1986)
         run: |
           # There is no engine on/off switch any more (#1986) — these per-capability
           # flags are what survived, and they are the half that was load-bearing: the
@@ -2128,7 +1893,8 @@ jobs:
           [ "$got" = "7" ] || { echo "FAIL: $got of 7 capability flags rendered as false — a flag Helm dropped silently means the capability still serves (#1986)"; echo "$off" | sed -n '/^    registry:/,/^      provider_cache:/p'; exit 1; }
           echo "Capability flags render OK, including false"
 
-      - name: OCI garbage collection renders into config.yaml (#1419)
+
+      - name: (helm-smoke) OCI garbage collection renders into config.yaml (#1419)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2145,7 +1911,8 @@ jobs:
             echo "FAIL: a scheduled mirror-expiry key is back. Deleting a cached image on a timer cannot make it fresher and discards the fallback needed when upstream is down (#1419)"; exit 1
           fi
           echo "OCI GC config renders OK"
-      - name: The cached-image staleness threshold is operator-settable (#1425)
+
+      - name: (helm-smoke) The cached-image staleness threshold is operator-settable (#1425)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2165,7 +1932,8 @@ jobs:
               --set api.config.registry.oci.mirror_tag_ttl_hours=0)
           echo "$zero" | grep -q "mirror_tag_ttl_hours: 0" || { echo "FAIL: mirror_tag_ttl_hours=0 did not render — 'never re-check' would silently become the code default (#1425)"; exit 1; }
           echo "Cached-image staleness threshold renders OK, including 0"
-      - name: Local dev values render
+
+      - name: (helm-smoke) Local dev values render
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2327,7 +2095,8 @@ jobs:
           # mentions "api_key" in prose, which is not a leak.
           echo "$out" | grep -qE '^\s*api_key:' && { echo "FAIL: api_key rendered as a config key in the ConfigMap"; exit 1; } || true
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
-      - name: Declining the node read is supported (#1128)
+
+      - name: (helm-smoke) Declining the node read is supported (#1128)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2339,7 +2108,8 @@ jobs:
           # still reported from our own pods, only zone spread goes unknown.
           echo "$out" | grep -q "name: .*-component-status" || { echo "FAIL: declining the node read must not disable component status (#1128)"; exit 1; }
           echo "read_nodes opt-out renders OK"
-      - name: Per-class object-store policy renders, and a typo is refused (#1151)
+
+      - name: (helm-smoke) Per-class object-store policy renders, and a typo is refused (#1151)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2365,7 +2135,8 @@ jobs:
             echo "FAIL: an unknown blob class name must be rejected by values.schema.json (#1151)"; exit 1
           fi
           echo "per-class blob policy renders OK, unknown class refused"
-      - name: Eval values render (embedded Postgres/Redis)
+
+      - name: (helm-smoke) Eval values render (embedded Postgres/Redis)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2381,7 +2152,8 @@ jobs:
           echo "$out" | grep -q "opa_version:" || { echo "FAIL: values-eval renders no opa_version — eval would lose policy evaluation (#1208)"; exit 1; }
           echo "$out" | grep -q "checkov_version:" || { echo "FAIL: values-eval renders no checkov_version — eval would lose security scanning (#1208)"; exit 1; }
           echo "values-eval renders embedded datastores + platform-tool versions OK"
-      - name: Forward proxy + custom CA bundle render (#592)
+
+      - name: (helm-smoke) Forward proxy + custom CA bundle render (#592)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2408,7 +2180,8 @@ jobs:
           echo "$out" | grep -q "ca_bundle_source_path" || { echo "FAIL: runners.yaml CA source path missing"; exit 1; }
           echo "$out" | grep -q "http_proxy: \"http://proxy.example.com:3128\"" || { echo "FAIL: runners.yaml proxy missing"; exit 1; }
           echo "proxy + CA bundle render OK (#592)"
-      - name: Observability bundle render — PrometheusRule + Grafana dashboards (#546)
+
+      - name: (helm-smoke) Observability bundle render — PrometheusRule + Grafana dashboards (#546)
         run: |
           # Every bundled dashboard JSON is valid JSON before it's embedded.
           # (jq is preinstalled on GitHub ubuntu-latest runners.)
@@ -2433,7 +2206,8 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "kind: PrometheusRule" && { echo "FAIL: PrometheusRule rendered by default (should be opt-in)"; exit 1; }
           echo "observability bundle renders OK and is off by default (#546)"
-      - name: Backup + DR-drill CronJobs render and are off by default (#545)
+
+      - name: (helm-smoke) Backup + DR-drill CronJobs render and are off by default (#545)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2455,7 +2229,8 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "component: backup" && { echo "FAIL: backup CronJob rendered by default (should be opt-in)"; exit 1; }
           echo "backup + DR-drill CronJobs render OK and are off by default (#545)"
-      - name: Preflight identity-doctor Jobs render and are off by default (#571)
+
+      - name: (helm-smoke) Preflight identity-doctor Jobs render and are off by default (#571)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2474,7 +2249,8 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "component: preflight" && { echo "FAIL: preflight rendered by default (should be opt-in)"; exit 1; }
           echo "preflight Jobs render OK and are off by default (#571)"
-      - name: Encryption-at-rest config + secret wiring (#553)
+
+      - name: (helm-smoke) Encryption-at-rest config + secret wiring (#553)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2494,7 +2270,8 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -A1 "encryption:" | grep -q "enabled: true" && { echo "FAIL: encryption enabled by default"; exit 1; }
           echo "encryption-at-rest config + secret wiring OK and off by default (#553)"
-      - name: Control-plane PriorityClasses render and are off by default (#751)
+
+      - name: (helm-smoke) Control-plane PriorityClasses render and are off by default (#751)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
@@ -2518,7 +2295,8 @@ jobs:
           echo "$stock" | grep -q "priorityClassName:" && { echo "FAIL: priorityClassName set by default"; exit 1; }
           echo "control-plane PriorityClasses render OK and are off by default (#751)"
 
-      - name: A separate runner namespace renders a working topology
+
+      - name: (helm-smoke) A separate runner namespace renders a working topology
         run: |
           # GHSA-p8xx-7rwg-9f72. Where runner Jobs run is the operator's call, so
           # the DEFAULTS do not move: runnerNamespace stays empty and
@@ -2598,7 +2376,8 @@ jobs:
 
           echo "the separated runner namespace renders a working topology, and the defaults are unmoved"
 
-      - name: No credential supplied in values is rendered into a manifest
+
+      - name: (helm-smoke) No credential supplied in values is rendered into a manifest
         run: |
           # GHSA-93m3-v3h4-4qvw. Four credentials used to be rendered as literal
           # env values: the database URL (the API Deployment plus the migrations,
@@ -2670,7 +2449,8 @@ jobs:
 
           echo "every credential supplied in values reaches its consumer from a Secret, and only from a Secret"
 
-      - name: Bootstrap join tokens are bounded, and an explicit 0 survives
+
+      - name: (helm-smoke) Bootstrap join tokens are bounded, and an explicit 0 survives
         run: |
           # GHSA-93m3-v3h4-4qvw, second half. A bootstrap join token was created
           # with no expiry and no use limit — a permanent, unlimited credential
@@ -2708,7 +2488,8 @@ jobs:
             || { echo "an explicit poolTokenTTLSeconds=0 was swallowed"; exit 1; }
 
           echo "bootstrap join tokens render bounded by default, and an explicit 0 survives"
-      - name: The cloud identity audience catalogue reaches the ConfigMap
+
+      - name: (helm-smoke) The cloud identity audience catalogue reaches the ConfigMap
         run: |
           # Leg 3 of the config-channel contract. A values key with no render
           # line is SILENTLY INERT -- the operator sets it, it never reaches the
@@ -2735,7 +2516,8 @@ jobs:
           done
           echo "cloud identity audience catalogue renders OK and is empty by default (#1901)"
 
-      - name: The apply ServiceAccount renders only when asked for (#2189)
+
+      - name: (helm-smoke) The apply ServiceAccount renders only when asked for (#2189)
         run: |
           # An apply-phase identity exists so a speculative plan -- which runs
           # code from a pull request nobody has reviewed -- cannot reach the
@@ -2779,7 +2561,8 @@ jobs:
           done
           echo "apply ServiceAccount renders OK and is absent by default (#2189)"
 
-      - name: An issuer-only webhook Ingress is a renderable configuration
+
+      - name: (helm-smoke) An issuer-only webhook Ingress is a renderable configuration
         run: |
           # values.yaml advertises "enabling this block with ONLY those two
           # paths, and no webhook path at all" as first-class, for a deployment
@@ -2819,20 +2602,117 @@ jobs:
   # real model field), contract-spine keys present, and no non-sensitive
   # TERRAPOD_* env on any Deployment. See AGENTS.md → "The config-channel
   # contract" and scripts/check_helm_config_contract.py.
-  helm-config-contract:
-    name: Helm Config Contract
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - run: scripts/helm-config-contract.sh
 
-  # ── Eval quickstart boot (kind + k3d) ──────────────────
-  # Proves `make eval` actually stands up a complete stack (embedded
-  # Postgres/Redis + migrations + API + web) on a throwaway cluster, on both
-  # supported cluster tools. Uses released images, so it exercises the eval
-  # mechanism + chart, not the PR's app code (that's covered by the test job).
+      - name: (go-audit) Audit every Go module
+        # Six Go modules ship in every release and, until #1542, NOTHING scanned
+        # any of them. Trivy covers the images; `provider` and `migrate` are
+        # release *assets*, not image contents, so the image scan cannot see
+        # them. pip-audit and npm audit cover Python and JavaScript. Go had no
+        # equivalent, and a HIGH in grpc reached a tagged release because of it.
+        #
+        # Version-based, not `govulncheck`. govulncheck does reachability
+        # analysis and reported the grpc advisory as clean, because the
+        # vulnerable function is never called from our binaries — which is
+        # useful for triage and useless as a gate, since an operator scanning
+        # our released artifacts sees the version, not the call graph. This
+        # matches what Dependabot and their scanner will say.
+        #
+        # It also found two modules Dependabot missed entirely (`publish`,
+        # `query`), so it is not merely duplicating the alerts.
+        #
+        # The vulnerability DB is downloaded ONCE, up front, into a shared
+        # cache, and the six scans then run with `--skip-db-update`. Before
+        # this each `docker run` fetched the DB itself — six independent
+        # chances for a transient registry failure, and when one hit (a 404
+        # from mirror.gcr.io on the DB layer, 2026-10-05) the job reported
+        # "High/critical advisories in a Go module" and exited 1. `--exit-code
+        # 1` means findings, but a FATAL init error also exits non-zero, so
+        # `|| fail=1` could not tell "found a CVE" from "never scanned", and
+        # the gate named the wrong cause. Separating the download makes a DB
+        # failure its own attributable failure, before any module is scanned.
+        run: |
+          set -u
+          TRIVY="${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}"
+          CACHE="${RUNNER_TEMP:-/tmp}/trivy-cache"
+          mkdir -p "$CACHE"
+
+          # Bounded retry: a registry hiccup here is infrastructure, not a
+          # finding, and must not be reported as one. Three attempts with
+          # backoff, then fail with a message that says what actually broke.
+          db_ok=0
+          for attempt in 1 2 3; do
+            echo "── vulnerability DB (attempt $attempt/3)"
+            if docker run --rm -v "$CACHE:/cache" "$TRIVY" \
+                 fs --cache-dir /cache --scanners vuln --download-db-only --quiet; then
+              db_ok=1; break
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 15))
+          done
+          if [ "$db_ok" != "1" ]; then
+            echo
+            echo "Could not download the Trivy vulnerability database after 3 attempts."
+            echo "NO MODULE WAS SCANNED — this is an infrastructure failure, not a"
+            echo "finding. Re-run the job; if it persists, check Trivy DB registry"
+            echo "availability (ghcr.io / mirror.gcr.io)."
+            exit 1
+          fi
+
+          fail=0
+          # DERIVED, not listed. A hand-kept list is why `loadtest` had never
+          # been audited at all — it is the one module that was also missing a
+          # lint and a test job, and it stayed invisible here for the same
+          # reason. The floor is the same shape CodeQL's module build uses: a
+          # finder that stops matching must fail rather than audit a fraction
+          # of the Go code and report success.
+          mapfile -t mods < <(
+            find . -name go.mod \
+              -not -path './.conformance/*' \
+              -not -path './.claude/*' \
+              -not -path './node_modules/*' \
+              -printf '%h\n' | sed 's|^\./||' | sort
+          )
+          if [ "${#mods[@]}" -lt 7 ]; then
+            echo "Found only ${#mods[@]} Go module(s): ${mods[*]}"
+            echo "Expected at least 7 — failing rather than auditing a fraction."
+            exit 1
+          fi
+          echo "Auditing ${#mods[@]} module(s): ${mods[*]}"
+          for m in "${mods[@]}"; do
+            echo "── $m"
+            docker run --rm -v "$PWD:/src" -v "$CACHE:/cache" -w /src \
+              "$TRIVY" \
+              fs --cache-dir /cache --skip-db-update \
+              --scanners vuln --severity HIGH,CRITICAL \
+              --ignorefile /src/pentest/trivy/.trivyignore \
+              --exit-code 1 --quiet "$m/go.mod" || fail=1
+          done
+          if [ "$fail" != "0" ]; then
+            echo
+            echo "High/critical advisories in a Go module. Bump the dependency:"
+            echo "  cd <module> && go get <pkg>@<fixed> && go mod tidy"
+            echo "Pin the FIXED version, never an older one — pinning a lower"
+            echo "version downgrades the whole module graph and can reintroduce"
+            echo "advisories elsewhere."
+            exit 1
+          fi
+          echo "all Go modules clean"
+
+  # ── Secret Scanning (gitleaks) ────────────────────────
+
+      - name: (migration-check) Build migrations image
+        run: docker build -f docker/Dockerfile.migrations -t tp-migrations:ci .
+
+      - name: (migration-check) Run migrations (alembic upgrade head — the real migration files)
+        run: docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" tp-migrations:ci
+
+      - name: (migration-check) Seed representative rows + query the migrated schema
+        run: |
+          docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" \
+            -v "$PWD/scripts/migration_smoke.py:/app/scripts/migration_smoke.py:ro" \
+            --entrypoint python tp-migrations:ci scripts/migration_smoke.py
+
+  # ── Dependency Audit (Python) ─────────────────────────
+
   helm-eval-boot:
     name: Eval Boot (${{ matrix.tool }})
     # Depend on the amd64 build so the eval boots the images BUILT FROM THIS PR
@@ -4015,21 +3895,19 @@ jobs:
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64, python-lint, frontend-lint, python-test, python-audit, npm-audit, go-audit, secret-scan, codeql, helm-lint, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, secret-scan, codeql, sast, scan-images]
     if: |
       always()
       && needs.build-images-amd64.result == 'success'
       && needs.build-images-arm64.result == 'success'
       && needs.prepare.outputs.is_pr != 'true'
-      && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
-      && (needs.frontend-lint.result == 'success' || needs.frontend-lint.result == 'skipped')
+      && (needs.python-checks.result == 'success' || needs.python-checks.result == 'skipped')
+      && (needs.node-checks.result == 'success' || needs.node-checks.result == 'skipped')
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.python-audit.result == 'success' || needs.python-audit.result == 'skipped')
-      && (needs.npm-audit.result == 'success' || needs.npm-audit.result == 'skipped')
-      && (needs.go-audit.result == 'success' || needs.go-audit.result == 'skipped')
+      && (needs.host-checks.result == 'success' || needs.host-checks.result == 'skipped')
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
-      && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
       && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
       && (needs.scan-images.result == 'success' || needs.scan-images.result == 'skipped')
     runs-on: ubuntu-latest
@@ -4152,35 +4030,14 @@ jobs:
     name: Quality Gate
     if: always()
     needs:
-      - python-lint
-      - frontend-lint
-      - provider-lint
-      - provider-test
-      - go-terrapod-lint
-      - go-terrapod-test
-      - migrate-lint
-      - migrate-test
-      - publish-lint
-      - publish-test
-      - query-lint
-      - query-test
-      - mcp-lint
-      - mcp-test
-      - ee-agent-lint
-      - ee-agent-test
+      - python-checks
+      - node-checks
+      - go-modules-core
+      - go-modules-tools
       - python-test
-      - pricegen-test
-      - rescan-test
-      - migration-check
-      - docs-audit
-      - platform-tool-artifacts
       - python-audit
-      - npm-audit
-      - go-audit
       - secret-scan
-      - helm-lint
-      - helm-smoke
-      - helm-config-contract
+      - host-checks
       - sast
     runs-on: ubuntu-latest
     steps:
@@ -4189,35 +4046,14 @@ jobs:
           # Space-separated name=result pairs, so the check below is a plain
           # loop rather than 25 hand-written comparisons that can drift.
           RESULTS: >-
-            python-lint=${{ needs.python-lint.result }}
-            frontend-lint=${{ needs.frontend-lint.result }}
-            provider-lint=${{ needs.provider-lint.result }}
-            provider-test=${{ needs.provider-test.result }}
-            go-terrapod-lint=${{ needs.go-terrapod-lint.result }}
-            go-terrapod-test=${{ needs.go-terrapod-test.result }}
-            migrate-lint=${{ needs.migrate-lint.result }}
-            migrate-test=${{ needs.migrate-test.result }}
-            publish-lint=${{ needs.publish-lint.result }}
-            publish-test=${{ needs.publish-test.result }}
-            query-lint=${{ needs.query-lint.result }}
-            query-test=${{ needs.query-test.result }}
-            mcp-lint=${{ needs.mcp-lint.result }}
-            mcp-test=${{ needs.mcp-test.result }}
-            ee-agent-lint=${{ needs.ee-agent-lint.result }}
-            ee-agent-test=${{ needs.ee-agent-test.result }}
+            python-checks=${{ needs.python-checks.result }}
+            node-checks=${{ needs.node-checks.result }}
+            go-modules-core=${{ needs.go-modules-core.result }}
+            go-modules-tools=${{ needs.go-modules-tools.result }}
             python-test=${{ needs.python-test.result }}
-            pricegen-test=${{ needs.pricegen-test.result }}
-            rescan-test=${{ needs.rescan-test.result }}
-            migration-check=${{ needs.migration-check.result }}
-            docs-audit=${{ needs.docs-audit.result }}
-            platform-tool-artifacts=${{ needs.platform-tool-artifacts.result }}
             python-audit=${{ needs.python-audit.result }}
-            npm-audit=${{ needs.npm-audit.result }}
-            go-audit=${{ needs.go-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
-            helm-lint=${{ needs.helm-lint.result }}
-            helm-smoke=${{ needs.helm-smoke.result }}
-            helm-config-contract=${{ needs.helm-config-contract.result }}
+            host-checks=${{ needs.host-checks.result }}
             sast=${{ needs.sast.result }}
         run: |
           set -eu
@@ -5000,38 +4836,18 @@ jobs:
     if: always()
     needs:
       - prepare
-      - python-lint
-      - frontend-lint
-      - provider-lint
-      - provider-test
-      - go-terrapod-lint
-      - go-terrapod-test
-      - migrate-lint
-      - migrate-test
-      - publish-lint
-      - publish-test
-      - query-lint
-      - query-test
-      - mcp-lint
-      - mcp-test
-      - ee-agent-lint
-      - ee-agent-test
+      - python-checks
+      - node-checks
+      - go-modules-core
+      - go-modules-tools
       - build-ee-agent
       - build-query
       - python-test
-      - pricegen-test
-      - rescan-test
-      - migration-check
-      - platform-tool-artifacts
       - python-audit
-      - npm-audit
-      - go-audit
       - secret-scan
       - codeql
       - dependency-review
-      - helm-lint
-      - helm-smoke
-      - helm-config-contract
+      - host-checks
       - helm-eval-boot
       - sast
       - build-images-amd64
@@ -5066,38 +4882,18 @@ jobs:
         run: |
           results=(
             "${{ needs.prepare.result }}"
-            "${{ needs.python-lint.result }}"
-            "${{ needs.frontend-lint.result }}"
-            "${{ needs.provider-lint.result }}"
-            "${{ needs.provider-test.result }}"
-            "${{ needs.go-terrapod-lint.result }}"
-            "${{ needs.go-terrapod-test.result }}"
-            "${{ needs.migrate-lint.result }}"
-            "${{ needs.migrate-test.result }}"
-            "${{ needs.publish-lint.result }}"
-            "${{ needs.publish-test.result }}"
-            "${{ needs.query-lint.result }}"
-            "${{ needs.query-test.result }}"
-            "${{ needs.mcp-lint.result }}"
-            "${{ needs.mcp-test.result }}"
-            "${{ needs.ee-agent-lint.result }}"
-            "${{ needs.ee-agent-test.result }}"
+            "${{ needs.python-checks.result }}"
+            "${{ needs.node-checks.result }}"
+            "${{ needs.go-modules-core.result }}"
+            "${{ needs.go-modules-tools.result }}"
             "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
-            "${{ needs.pricegen-test.result }}"
-            "${{ needs.rescan-test.result }}"
-            "${{ needs.migration-check.result }}"
-            "${{ needs.platform-tool-artifacts.result }}"
             "${{ needs.python-audit.result }}"
-            "${{ needs.npm-audit.result }}"
-            "${{ needs.go-audit.result }}"
             "${{ needs.secret-scan.result }}"
             "${{ needs.codeql.result }}"
             "${{ needs.dependency-review.result }}"
-            "${{ needs.helm-lint.result }}"
-            "${{ needs.helm-smoke.result }}"
-            "${{ needs.helm-config-contract.result }}"
+            "${{ needs.host-checks.result }}"
             "${{ needs.helm-eval-boot.result }}"
             "${{ needs.sast.result }}"
             "${{ needs.build-images-amd64.result }}"
