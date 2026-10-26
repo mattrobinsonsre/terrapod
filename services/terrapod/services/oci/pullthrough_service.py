@@ -159,15 +159,20 @@ async def fetch_manifest(
     content-addressed.
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{reference}"
+    # Resolved once rather than per use. `_auth` warns for a username with no
+    # password, so evaluating it for the client AND for the request doubled that
+    # line for a misconfigured upstream. The per-request `auth=` is the one that
+    # has to stay: a caller may pass its own client, which carries none.
+    auth = _auth(host)
     owns_client = client is None
-    client = client or httpx.AsyncClient(timeout=30.0, follow_redirects=True, auth=_auth(host))
+    client = client or httpx.AsyncClient(timeout=30.0, follow_redirects=True, auth=auth)
     try:
         response = await arequest_with_retry(
             client,
             "GET",
             url,
             headers={"Accept": MANIFEST_ACCEPT},
-            auth=_auth(host),
+            auth=auth,
             follow_redirects=True,
             timeout=30.0,
         )
@@ -204,8 +209,10 @@ async def fetch_blob(
     a container fails to start, with nothing pointing at the cause.
     """
     url = f"{_base_url(host)}/v2/{repository}/blobs/{digest}"
+    # Once, not per attempt -- see `fetch_manifest`.
+    auth = _auth(host)
     owns_client = client is None
-    client = client or httpx.AsyncClient(timeout=300.0, follow_redirects=True, auth=_auth(host))
+    client = client or httpx.AsyncClient(timeout=300.0, follow_redirects=True, auth=auth)
     try:
         for attempt in range(DEFAULT_RETRIES + 1):
             hasher = hashlib.new(digest.algorithm)
@@ -218,7 +225,7 @@ async def fetch_blob(
                     async with client.stream(
                         "GET",
                         url,
-                        auth=_auth(host),
+                        auth=auth,
                         follow_redirects=True,
                         timeout=300.0,
                     ) as response:
@@ -284,7 +291,11 @@ async def fetch_blob(
                     f"{host} served {repository}@{digest} with a mismatched digest"
                 )
             return size
-        raise AssertionError("retry loop exited without a result")
+        # Defensive: the loop above either returns, raises, or continues, and
+        # the final attempt always raises. An `AssertionError` reads as a broken
+        # invariant in a test rather than as a server fault, which is the wrong
+        # signal for an operator reading a 502.
+        raise RuntimeError(f"blob retry loop for {repository}@{digest} produced no result")
     finally:
         if owns_client:
             await client.aclose()
@@ -327,10 +338,12 @@ async def current_upstream_digest(
     """
     url = f"{_base_url(host)}/v2/{repository}/manifests/{tag}"
     timeout = httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0)
+    # Once, not per use -- see `fetch_manifest`.
+    auth = _auth(host)
     owns_client = client is None
     client = client or httpx.AsyncClient(
         follow_redirects=True,
-        auth=_auth(host),
+        auth=auth,
         timeout=timeout,
     )
 
@@ -348,7 +361,7 @@ async def current_upstream_digest(
             "HEAD",
             url,
             headers={"Accept": MANIFEST_ACCEPT},
-            auth=_auth(host),
+            auth=auth,
             follow_redirects=True,
             timeout=timeout,
         )
