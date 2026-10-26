@@ -367,8 +367,8 @@ jobs:
 
   # ── Go dependency audit (#1542) ───────────────────────
 
-  go-modules-core:
-    name: Go modules (core)
+  go-modules:
+    name: Go modules
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
@@ -376,8 +376,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
+          # Any module's directive will do -- they are kept in step by
+          # `check_go_directives.py` -- but the CACHE key must cover every
+          # module's `go.sum`, or a lockfile change in one leaves the others
+          # restoring a stale module cache. The two jobs this replaced each
+          # keyed on one module's sum and so cached six modules under the
+          # seventh's key.
           go-version-file: go-terrapod/go.mod
-          cache-dependency-path: go-terrapod/go.sum
+          cache-dependency-path: |
+            go-terrapod/go.sum
+            provider/go.sum
+            migrate/go.sum
+            publish/go.sum
+            query/go.sum
+            mcp/go.sum
+            ee-agent/go.sum
+
+  # ── go-terrapod Lint ──────────────────────────────────
+  # The public Go SDK lives in go-terrapod/ with its own go.mod (no
+  # provider/migrate-specific deps). Both terraform-provider-terrapod
+  # and terrapod-migrate import from here.
 
       - name: (go-terrapod-lint) Vet
         run: go vet ./...
@@ -400,10 +418,9 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: go-terrapod
 
-  # ── Migrate Lint ──────────────────────────────────────
-  # The terrapod-migrate binary lives in migrate/ with its own go.mod
-  # (the provider doesn't carry go-tfe or the HCL libs). Mirrors the
-  # provider-lint shape so failures look the same to operators.
+  # ── Provider Lint ─────────────────────────────────────
+  # terraform-provider-terrapod lives in provider/ and is a thin, typed wrapper
+  # over the SDK above -- no JSON:API marshaling of its own.
 
       - name: (provider-lint) Vet
         run: go vet ./...
@@ -426,10 +443,10 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: provider
 
-  # ── go-terrapod Lint ──────────────────────────────────
-  # The public Go SDK lives in go-terrapod/ with its own go.mod (no
-  # provider/migrate-specific deps). Both terraform-provider-terrapod
-  # and terrapod-migrate import from here.
+  # ── Migrate Lint ──────────────────────────────────────
+  # The terrapod-migrate binary lives in migrate/ with its own go.mod
+  # (the provider doesn't carry go-tfe or the HCL libs). Mirrors the
+  # provider-lint shape so failures look the same to operators.
 
       - name: (migrate-lint) Vet
         run: go vet ./...
@@ -455,19 +472,6 @@ jobs:
   # ── Publish Lint ──────────────────────────────────────
   # terrapod-publish lives in publish/ with its own go.mod (pulls the
   # ProtonMail OpenPGP libs that the SDK doesn't). Mirrors migrate's shape.
-
-  go-modules-tools:
-    name: Go modules (tools)
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: publish/go.mod
-          cache-dependency-path: publish/go.sum
-
       - name: (publish-lint) Vet
         run: go vet ./...
         working-directory: publish
@@ -696,7 +700,7 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_ansible_is_baked.py tests/test_ee_image_resolution.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py tests/crypto tests/test_ha_config.py
             pytest_args: -n auto
-          # services-api is sharded across SIX runners as well as run under
+          # services-api is sharded across FIVE runners as well as run under
           # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
           # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
           # building the FastAPI app ~1000 times. Split by file on collected
@@ -708,28 +712,32 @@ jobs:
           # of pytest for 2714 tests, against a 10.1 min run span. The three
           # shards were also badly unbalanced at 8.7 / 7.0 / 5.3 min despite
           # being balanced on collected test count, so per-test cost is NOT
-          # uniform for this tier -- that is why halving the slice is worth more
-          # here than the arithmetic suggests, and why rebalancing alone would
-          # not have been enough.
+          # uniform for this tier -- that is why splitting the slice is worth
+          # more here than the arithmetic suggests, and why rebalancing alone
+          # would not have been enough.
+          #
+          # Six then became FIVE the same day. Six shards came in at 3.0-5.5
+          # min (measured on run 40333801771), so the longest was no longer the
+          # thing deciding the span -- and each further shard pays the ~95s of
+          # fixed setup again for a slot that the 20-job ceiling is short of.
+          # Five is the point where the slice stops being the critical path and
+          # a slot is worth more than a minute of it.
           - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 1/6
+            pytest_args: -n auto --shard 1/5
           - name: services-api-2
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 2/6
+            pytest_args: -n auto --shard 2/5
           - name: services-api-3
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 3/6
+            pytest_args: -n auto --shard 3/5
           - name: services-api-4
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 4/6
+            pytest_args: -n auto --shard 4/5
           - name: services-api-5
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 5/6
-          - name: services-api-6
-            paths: tests/services tests/api
-            pytest_args: -n auto --shard 6/6
-          # EIGHT runner-level shards, balanced on collected test count by
+            pytest_args: -n auto --shard 5/5
+          # SIX runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
           # setup and teardown, which every test pays equally — so a file's
@@ -740,39 +748,37 @@ jobs:
           # shard buys less wall-clock for the same ~100s of runner time. Three
           # became four once the suite grew to ~400 tests, and four became eight
           # on 2026-10-26 because every shard was still over five minutes
-          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372).
+          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372). Eight then
+          # became SIX the same day: at eight the shards ran 3.2-4.2 min
+          # (run 40333801771), so the tier had stopped being the critical path
+          # and the two extra slots were worth more to the jobs queueing behind
+          # it than the ~40s they saved here.
           #
           # This tier CANNOT use xdist -- the session-scoped table-creation
           # fixture races under workers -- so runner-level shards are the only
-          # parallelism it has, which is what makes doubling it the right lever
-          # here even though the fixed cost is paid eight times.
+          # parallelism it has, which is what makes sharding it the right lever
+          # here even though the fixed cost is paid once per shard.
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/8"
+            pytest_args: "--shard 1/6"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/8"
+            pytest_args: "--shard 2/6"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/8"
+            pytest_args: "--shard 3/6"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/8"
+            pytest_args: "--shard 4/6"
           - name: integration-5
             paths: tests/integration
-            pytest_args: "--shard 5/8"
+            pytest_args: "--shard 5/6"
           - name: integration-6
             paths: tests/integration
-            pytest_args: "--shard 6/8"
-          - name: integration-7
-            paths: tests/integration
-            pytest_args: "--shard 7/8"
-          - name: integration-8
-            paths: tests/integration
-            pytest_args: "--shard 8/8"
+            pytest_args: "--shard 6/6"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -1011,10 +1017,28 @@ jobs:
         run: gitleaks detect --source . --no-git --config .gitleaks.toml
 
   # ── CodeQL (GitHub Advanced Security) ──────────────────
+  #
+  # DELIBERATELY after the image build, with `python-audit` and `secret-scan`,
+  # and it is the one deferral that needs justifying -- the others are seconds
+  # long and this holds three slots for 1.5-3.5 min (89/137/194s measured on run
+  # 40333801771) in the wave where the 20-job ceiling actually binds.
+  #
+  # Deferring a job that finds code defects would normally be the wrong trade.
+  # It is not here, because `analyze` does not fail on findings: an alert goes to
+  # code scanning and is dismissed per alert (see codeql-config.yml), and the
+  # only required check is the `CI` aggregate. So this job's own red is never a
+  # security finding -- it is a Go module that will not compile, the module-count
+  # floor below, or an extractor failure. Moving it therefore changes WHEN the
+  # alerts appear, not whether a defect can reach `main`.
+  #
+  # The one thing it uniquely compiles is `loadtest`, the only Go module with no
+  # lint or test job of its own -- which is how it was caught broken in the first
+  # place. A broken `loadtest` is now found after the images build rather than
+  # before, costing those builds and nothing else, because it ships in no image.
   codeql:
     name: CodeQL (${{ matrix.language }})
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    needs: [prepare, build-images-amd64]
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -4032,8 +4056,7 @@ jobs:
     needs:
       - python-checks
       - node-checks
-      - go-modules-core
-      - go-modules-tools
+      - go-modules
       - python-test
       - python-audit
       - secret-scan
@@ -4048,8 +4071,7 @@ jobs:
           RESULTS: >-
             python-checks=${{ needs.python-checks.result }}
             node-checks=${{ needs.node-checks.result }}
-            go-modules-core=${{ needs.go-modules-core.result }}
-            go-modules-tools=${{ needs.go-modules-tools.result }}
+            go-modules=${{ needs.go-modules.result }}
             python-test=${{ needs.python-test.result }}
             python-audit=${{ needs.python-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
@@ -4838,8 +4860,7 @@ jobs:
       - prepare
       - python-checks
       - node-checks
-      - go-modules-core
-      - go-modules-tools
+      - go-modules
       - build-ee-agent
       - build-query
       - python-test
@@ -4884,8 +4905,7 @@ jobs:
             "${{ needs.prepare.result }}"
             "${{ needs.python-checks.result }}"
             "${{ needs.node-checks.result }}"
-            "${{ needs.go-modules-core.result }}"
-            "${{ needs.go-modules-tools.result }}"
+            "${{ needs.go-modules.result }}"
             "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
