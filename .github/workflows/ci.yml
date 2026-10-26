@@ -898,8 +898,27 @@ jobs:
   # ── Dependency Audit (Python) ─────────────────────────
   python-audit:
     name: Python Audit
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
+    # for `python-audit`, 15s for `secret-scan` -- but it cannot be COMBINED
+    # with the other short jobs the way the rest were, because each runs in its
+    # own `container:` and that is job-level: a containerised job can only merge
+    # with one using the identical image, and no other short job uses either.
+    #
+    # So the slot it holds in the wave that gates everything is bought for
+    # nothing. Deferring it past the image build yields that slot to
+    # `build-query` and `build-ee-agent`, which gate every image and therefore
+    # every job after them; measured on run 40326401622, those two sat 51s
+    # waiting for a slot while forty-seven jobs with no successor held them.
+    #
+    # Nothing is delayed by this. `create-manifests` is the only consumer and it
+    # already needs `scan-images`, a wave further on, so its own depth is
+    # unchanged.
+    #
+    # `!cancelled()` keeps the signal independent of the ordering: a bare
+    # `needs` edge SKIPS this when an image build fails, which would hide an
+    # audit result behind an unrelated failure.
+    needs: [prepare, build-images-amd64]
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
     runs-on: ubuntu-latest
     # Literal, not ${{ env.* }}: the env context is NOT available in a job's
     # `container:` or in `services:` — using it there makes the whole workflow
@@ -1125,8 +1144,27 @@ jobs:
   # ── Secret Scanning (gitleaks) ────────────────────────
   secret-scan:
     name: Secret Scan
-    needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    # Deferred out of the lint/test wave (user, 2026-10-26). It is short -- 60s
+    # for `python-audit`, 15s for `secret-scan` -- but it cannot be COMBINED
+    # with the other short jobs the way the rest were, because each runs in its
+    # own `container:` and that is job-level: a containerised job can only merge
+    # with one using the identical image, and no other short job uses either.
+    #
+    # So the slot it holds in the wave that gates everything is bought for
+    # nothing. Deferring it past the image build yields that slot to
+    # `build-query` and `build-ee-agent`, which gate every image and therefore
+    # every job after them; measured on run 40326401622, those two sat 51s
+    # waiting for a slot while forty-seven jobs with no successor held them.
+    #
+    # Nothing is delayed by this. `create-manifests` is the only consumer and it
+    # already needs `scan-images`, a wave further on, so its own depth is
+    # unchanged.
+    #
+    # `!cancelled()` keeps the signal independent of the ordering: a bare
+    # `needs` edge SKIPS this when an image build fails, which would hide an
+    # audit result behind an unrelated failure.
+    needs: [prepare, build-images-amd64]
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
     runs-on: ubuntu-latest
     container: zricethezav/gitleaks:latest
     steps:
