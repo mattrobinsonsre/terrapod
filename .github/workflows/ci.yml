@@ -700,7 +700,7 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_ansible_is_baked.py tests/test_ee_image_resolution.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py tests/crypto tests/test_ha_config.py
             pytest_args: -n auto
-          # services-api is sharded across FIVE runners as well as run under
+          # services-api is sharded across FOUR runners as well as run under
           # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
           # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
           # building the FastAPI app ~1000 times. Split by file on collected
@@ -716,28 +716,29 @@ jobs:
           # more here than the arithmetic suggests, and why rebalancing alone
           # would not have been enough.
           #
-          # Six then became FIVE the same day. Six shards came in at 3.0-5.5
-          # min (measured on run 40333801771), so the longest was no longer the
-          # thing deciding the span -- and each further shard pays the ~95s of
-          # fixed setup again for a slot that the 20-job ceiling is short of.
-          # Five is the point where the slice stops being the critical path and
-          # a slot is worth more than a minute of it.
+          # Six then came back to FOUR the same day, in two steps. At six the
+          # shards ran 3.0-5.5 min (run 40333801771) -- so the longest had
+          # stopped deciding the run span, and from there every extra shard pays
+          # the ~95s of fixed setup again for a slot the 20-job ceiling is short
+          # of. Subtracting the fixed cost leaves ~966s of pytest, so four
+          # shards is ~340s each and, at the 1.3x imbalance measured at six,
+          # ~410s for the worst. That is the deliberate trade: this tier becomes
+          # the longest job in the gating wave again, in exchange for two slots
+          # for the jobs queueing behind it. If the span goes up rather than
+          # down, this is the change to put back first.
           - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 1/5
+            pytest_args: -n auto --shard 1/4
           - name: services-api-2
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 2/5
+            pytest_args: -n auto --shard 2/4
           - name: services-api-3
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 3/5
+            pytest_args: -n auto --shard 3/4
           - name: services-api-4
             paths: tests/services tests/api
-            pytest_args: -n auto --shard 4/5
-          - name: services-api-5
-            paths: tests/services tests/api
-            pytest_args: -n auto --shard 5/5
-          # SIX runner-level shards, balanced on collected test count by
+            pytest_args: -n auto --shard 4/4
+          # FIVE runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
           # setup and teardown, which every test pays equally — so a file's
@@ -748,11 +749,15 @@ jobs:
           # shard buys less wall-clock for the same ~100s of runner time. Three
           # became four once the suite grew to ~400 tests, and four became eight
           # on 2026-10-26 because every shard was still over five minutes
-          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372). Eight then
-          # became SIX the same day: at eight the shards ran 3.2-4.2 min
-          # (run 40333801771), so the tier had stopped being the critical path
-          # and the two extra slots were worth more to the jobs queueing behind
-          # it than the ~40s they saved here.
+          # (measured 7.2 / 5.9 / 7.6 / 7.2 on run 40316874372). Eight then came
+          # back to FIVE the same day, in two steps: at eight the shards ran
+          # 3.2-4.2 min (run 40333801771), so the tier had stopped being the
+          # critical path and the freed slots were worth more to the jobs
+          # queueing behind it. Net of the ~95s fixed cost that is ~981s of
+          # pytest, so five shards is ~200s each and ~320s for the worst at the
+          # 1.15x imbalance measured at eight -- still inside the e2e/scan
+          # wave's own tail, which is what makes this tier the cheaper of the
+          # two to take slots back from.
           #
           # This tier CANNOT use xdist -- the session-scoped table-creation
           # fixture races under workers -- so runner-level shards are the only
@@ -763,22 +768,19 @@ jobs:
           # automatically and cannot be silently missed (#1468).
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/6"
+            pytest_args: "--shard 1/5"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/6"
+            pytest_args: "--shard 2/5"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/6"
+            pytest_args: "--shard 3/5"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/6"
+            pytest_args: "--shard 4/5"
           - name: integration-5
             paths: tests/integration
-            pytest_args: "--shard 5/6"
-          - name: integration-6
-            paths: tests/integration
-            pytest_args: "--shard 6/6"
+            pytest_args: "--shard 5/5"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
