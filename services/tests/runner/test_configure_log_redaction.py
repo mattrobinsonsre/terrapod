@@ -41,7 +41,21 @@ from terrapod.runner.phases import uploads
 
 #: A private key is the case the raw-form pass cannot see, and it is not a
 #: contrived one: `private_key` is a registered secret field (#1933) and a
-#: multi-line value is what a key is.
+#: multi-line value is what a key is. The body is 64 characters of base64 that
+#: decode to nothing; no key material exists for it.
+#:
+#: **It must not be written into a playbook, and `p/secrets` is why.** An
+#: earlier version of the ansible-driven test below carried the same header
+#: inside a YAML block scalar, where it sits at the start of its line, and
+#: `generic.secrets.security.detected-private-key` matched it -- a true positive
+#: in form, and the only failing finding in the whole SAST job. Measured here:
+#: this constant does NOT match (the header is preceded by a quote) and the
+#: indented one did, so the fixture reaches ansible through an extra-vars file
+#: instead and no suppression is needed. Deliberately no `nosemgrep`: one that
+#: matches nothing is a comment asserting a finding that does not occur, and the
+#: mutation check is what showed that a suppression added here did no work. If
+#: the rule ever widens to quoted occurrences, add it then, with a real finding
+#: behind it.
 KEY = (
     "-----BEGIN OPENSSH PRIVATE KEY-----\n"
     "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz\n"
@@ -417,18 +431,29 @@ _EVENTS_PLUGIN = (
 )
 
 
-def _drive(root: pathlib.Path, play: str) -> pathlib.Path:
+def _drive(root: pathlib.Path, play: str, *, extra_vars: dict | None = None) -> pathlib.Path:
     """Run the play with the real callback; return the events file it wrote.
 
     HOME is NOT relocated, for the reason `test_host_events_callback` records: it
     moves Python's user site-packages with it, so a user-site ansible stops
     importing and the script dies before parsing its arguments.
+
+    `extra_vars` go through a FILE rather than being written into the play.
+    Partly hygiene -- a credential on an argv is the thing the runner's own
+    credential phase exists to avoid -- and partly so a multi-line secret has
+    exactly one literal in this module: embedded in the play it would also need
+    its own block-scalar indentation, and the test would then have to parse the
+    value back out of the result to know what to register.
     """
     plugins = root / "cb"
     plugins.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(_EVENTS_PLUGIN, plugins / _EVENTS_PLUGIN.name)
     (root / "inventory.yml").write_text("all:\n  hosts:\n    web1: {ansible_connection: local}\n")
     (root / "site.yml").write_text(play)
+    arguments = ["-i", "inventory.yml", "site.yml"]
+    if extra_vars is not None:
+        (root / "vars.json").write_text(json.dumps(extra_vars))
+        arguments += ["-e", "@vars.json"]
     events = root / "events.jsonl"
 
     env = dict(os.environ)
@@ -441,7 +466,7 @@ def _drive(root: pathlib.Path, play: str) -> pathlib.Path:
         }
     )
     subprocess.run(  # noqa: S603
-        [str(ANSIBLE), "-i", "inventory.yml", "site.yml"],
+        [str(ANSIBLE), *arguments],
         cwd=root,
         env=env,
         capture_output=True,
@@ -471,33 +496,21 @@ class TestWhatRealAnsiblePutsInTheStream:
                 """
                 - hosts: all
                   gather_facts: false
-                  vars:
-                    delivered: |
-                      -----BEGIN OPENSSH PRIVATE KEY-----
-                      b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
-                      -----END OPENSSH PRIVATE KEY-----
                   tasks:
                     - name: a module returns it in its result
                       ansible.builtin.debug:
                         msg: "ssh refused: {{ delivered }}"
                 """
             ).strip(),
+            extra_vars={"delivered": KEY},
         )
         raw = events.read_bytes()
         assert b"OPENSSH PRIVATE KEY" in raw, "ansible did not report the task"
-
-        # Registered exactly as the credential phase holds it: ansible's block
-        # scalar yields the key with real newlines and a trailing one.
-        material = next(
-            r["payload"]["msg"].split("ssh refused: ", 1)[1]
-            for r in _records(events)
-            if r.get("kind") == "ok"
-        )
-        assert material.encode() not in raw, (
+        assert KEY.encode() not in raw, (
             "the raw form IS in the file, so this fixture no longer reproduces the "
             "defect and the assertion below would pass without the escaped forms"
         )
-        assert exec_subprocess.register_secret(material) is True
+        assert exec_subprocess.register_secret(KEY) is True
 
         assert exec_subprocess.redact_file(events) is True
         assert b"OPENSSH PRIVATE KEY" not in events.read_bytes()
