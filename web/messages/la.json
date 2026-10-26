@@ -2489,7 +2489,13 @@
       "detailReaped": "Particularia singulorum munerum huius exsecutionis per retentionem artefactorum remota sunt. Summarium singulorum hospitum infra positum in basi datorum servatur neque afficitur.",
       "detailUnknown": "Particularia singulorum munerum inspici non potuerunt quia apotheca non respondit. Fortasse adhuc praesto sunt.",
       "detailDownload": "Plena particularia munerum depromere",
-      "detailDownloadNote": "Unum obiectum JSON per lineam, eo ordine quo Ansible ea rettulit. Permissionem status legendi requirit."
+      "detailDownloadNote": "Unum obiectum JSON per lineam, eo ordine quo Ansible ea rettulit. Permissionem status legendi requirit.",
+      "outstandingTitle": "{count, plural, one {# hospes adhuc configurandus est} other {# hospites adhuc configurandi sunt}}",
+      "outstandingNote": "Hospites qui defecerunt, quos Ansible attingere non potuit, aut ad quos actus numquam pervenit. Hospes ad quem actus numquam pervenit a nullo omnino refertur, ideo hoc ex inventario quod haec exsecutio petivit colligitur, non ex defectibus.",
+      "retryOutstanding": "Hos hospites retentare",
+      "retryOutstandingBusy": "In ordinem mittitur…",
+      "retryOutstandingConfirm": "Libellum ludendi adversus {hosts} exsequi? Hoc hospites veros mutat neque revocari potest.",
+      "retryOutstandingFailed": "Retentatio in ordinem mitti non potuit"
     }
   },
   "workspaceDetail": {

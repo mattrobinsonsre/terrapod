@@ -2489,7 +2489,13 @@
       "detailReaped": "Bu çalıştırmanın görev başına ayrıntıları, yapıt saklama politikası tarafından kaldırıldı. Aşağıdaki ana makine başına özet veritabanında tutulur ve bundan etkilenmez.",
       "detailUnknown": "Görev başına ayrıntılar denetlenemedi, çünkü depolama yanıt vermedi. Hâlâ mevcut olabilir.",
       "detailDownload": "Tüm görev ayrıntılarını indir",
-      "detailDownloadNote": "Her satırda bir JSON nesnesi, Ansible''ın bildirdiği sırayla. Durum okuma izni gerektirir."
+      "detailDownloadNote": "Her satırda bir JSON nesnesi, Ansible''ın bildirdiği sırayla. Durum okuma izni gerektirir.",
+      "outstandingTitle": "{count, plural, one {# ana makine hâlâ yapılandırılmayı bekliyor} other {# ana makine hâlâ yapılandırılmayı bekliyor}}",
+      "outstandingNote": "Başarısız olan, Ansible''ın erişemediği veya play''in hiç ulaşamadığı ana makineler. Play''in hiç ulaşmadığı bir ana makineyi hiçbir şey bildirmez; bu yüzden bu liste, başarısızlıklardan değil, bu çalıştırmanın hedeflediği envanterden hesaplanır.",
+      "retryOutstanding": "Bu ana makineleri yeniden dene",
+      "retryOutstandingBusy": "Kuyruğa alınıyor…",
+      "retryOutstandingConfirm": "Playbook, {hosts} ana makineleri üzerinde çalıştırılsın mı? Bu, gerçek ana makineleri değiştirir ve geri alınamaz.",
+      "retryOutstandingFailed": "Yeniden deneme kuyruğa alınamadı"
     }
   },
   "workspaceDetail": {

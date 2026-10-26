@@ -2489,7 +2489,13 @@
       "detailReaped": "Szczegóły poszczególnych zadań dla tego uruchomienia zostały usunięte przez retencję artefaktów. Podsumowanie poszczególnych hostów poniżej jest przechowywane w bazie danych i pozostaje nienaruszone.",
       "detailUnknown": "Nie udało się sprawdzić szczegółów poszczególnych zadań, ponieważ magazyn nie odpowiedział. Mogą być nadal dostępne.",
       "detailDownload": "Pobierz pełne szczegóły zadań",
-      "detailDownloadNote": "Jeden obiekt JSON w wierszu, w kolejności, w jakiej zgłosił je Ansible. Wymaga uprawnienia do odczytu stanu."
+      "detailDownloadNote": "Jeden obiekt JSON w wierszu, w kolejności, w jakiej zgłosił je Ansible. Wymaga uprawnienia do odczytu stanu.",
+      "outstandingTitle": "{count, plural, one {# host nadal wymaga konfiguracji} few {# hosty nadal wymagają konfiguracji} many {# hostów nadal wymaga konfiguracji} other {# hosta nadal wymaga konfiguracji}}",
+      "outstandingNote": "Hosty, na których wystąpiło niepowodzenie, które okazały się nieosiągalne dla Ansible, albo do których play w ogóle nie dotarł. Hosta, do którego play nie dotarł, nie zgłasza nic, więc ta lista jest wyliczana z inwentarza objętego tym uruchomieniem, a nie z niepowodzeń.",
+      "retryOutstanding": "Ponów te hosty",
+      "retryOutstandingBusy": "Dodawanie do kolejki…",
+      "retryOutstandingConfirm": "Uruchomić playbook na hostach: {hosts}? To zmieni prawdziwe hosty i tej operacji nie można cofnąć.",
+      "retryOutstandingFailed": "Nie udało się dodać ponowienia do kolejki"
     }
   },
   "workspaceDetail": {

@@ -2489,7 +2489,13 @@
       "detailReaped": "Podrobnosti po úlohách pro tento běh byly odstraněny politikou uchovávání artefaktů. Souhrn po hostitelích níže je uchován v databázi a není tím dotčen.",
       "detailUnknown": "Podrobnosti po úlohách se nepodařilo zkontrolovat, protože úložiště neodpovědělo. Mohou být stále dostupné.",
       "detailDownload": "Stáhnout úplné podrobnosti úloh",
-      "detailDownloadNote": "Jeden objekt JSON na řádek, v pořadí, v jakém je ohlásil Ansible. Vyžaduje oprávnění ke čtení stavu."
+      "detailDownloadNote": "Jeden objekt JSON na řádek, v pořadí, v jakém je ohlásil Ansible. Vyžaduje oprávnění ke čtení stavu.",
+      "outstandingTitle": "{count, plural, one {# hostitel stále potřebuje konfiguraci} few {# hostitelé stále potřebují konfiguraci} many {# hostitele stále potřebuje konfiguraci} other {# hostitelů stále potřebuje konfiguraci}}",
+      "outstandingNote": "Hostitelé, u nichž došlo k selhání, které se Ansible nepodařilo zastihnout, nebo ke kterým se play vůbec nedostal. Hostitele, ke kterému se play nedostal, neohlásí vůbec nic, takže se to odvozuje z inventáře, na který tento běh mířil, nikoli ze selhání.",
+      "retryOutstanding": "Zkusit tyto hostitele znovu",
+      "retryOutstandingBusy": "Zařazuje se…",
+      "retryOutstandingConfirm": "Spustit playbook proti hostitelům: {hosts}? Tím se změní skuteční hostitelé a toto nelze vrátit zpět.",
+      "retryOutstandingFailed": "Opakování se nepodařilo zařadit"
     }
   },
   "workspaceDetail": {

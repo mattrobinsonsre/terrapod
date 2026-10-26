@@ -2489,7 +2489,13 @@
       "detailReaped": "De details per taak voor deze uitvoering zijn verwijderd volgens het bewaarbeleid voor artefacten. De samenvatting per host hieronder staat in de database en is hier niet door geraakt.",
       "detailUnknown": "De details per taak konden niet worden gecontroleerd omdat de opslag niet antwoordde. Mogelijk zijn ze nog beschikbaar.",
       "detailDownload": "Volledige taakdetails downloaden",
-      "detailDownloadNote": "Eén JSON-object per regel, in de volgorde waarin Ansible ze heeft gerapporteerd. Vereist het recht om de state te lezen."
+      "detailDownloadNote": "Eén JSON-object per regel, in de volgorde waarin Ansible ze heeft gerapporteerd. Vereist het recht om de state te lezen.",
+      "outstandingTitle": "{count, plural, one {# host moet nog geconfigureerd worden} other {# hosts moeten nog geconfigureerd worden}}",
+      "outstandingNote": "Hosts die zijn mislukt, die Ansible niet kon bereiken, of waar de play nooit aan toe is gekomen. Een host die de play nooit heeft bereikt, wordt door helemaal niets gerapporteerd; dit wordt daarom afgeleid uit de inventaris waarop deze uitvoering gericht was, en niet uit de fouten.",
+      "retryOutstanding": "Deze hosts opnieuw proberen",
+      "retryOutstandingBusy": "In wachtrij zetten…",
+      "retryOutstandingConfirm": "Het playbook uitvoeren tegen {hosts}? Dit wijzigt echte hosts en kan niet ongedaan worden gemaakt.",
+      "retryOutstandingFailed": "Kon de nieuwe poging niet in de wachtrij zetten"
     }
   },
   "workspaceDetail": {

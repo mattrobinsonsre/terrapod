@@ -31,6 +31,8 @@ data:
     drift_max_duration_seconds: {{ .Values.runners.driftMaxDurationSeconds | default 1800 }}
     lifecycle_destroy_retries: {{ .Values.runners.lifecycleDestroyRetries | default 2 }}
     lifecycle_destroy_retry_backoff_seconds: {{ .Values.runners.lifecycleDestroyRetryBackoffSeconds | default 45 }}
+    configure_retries: {{ .Values.runners.configureRetries | default 0 }}
+    configure_retry_backoff_seconds: {{ .Values.runners.configureRetryBackoffSeconds | default 45 }}
     default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.13" | quote }}
     default_pulumi_version: {{ .Values.runners.defaultPulumiVersion | default "3.208" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}

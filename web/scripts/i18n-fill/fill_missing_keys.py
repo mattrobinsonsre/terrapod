@@ -116,7 +116,15 @@ def _load(locale: str) -> collections.OrderedDict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("locale")
-    ap.add_argument("values", help="JSON object of {dotted.key: translated value}")
+    ap.add_argument(
+        "values",
+        help=(
+            "PATH TO A FILE holding a JSON object of {dotted.key: translated value}. "
+            "A path, not the JSON itself -- this said 'JSON object' and three "
+            "separate fills read it as an inline string before the brief started "
+            "warning about it."
+        ),
+    )
     ap.add_argument("--namespace", default="workspaceDetail")
     ap.add_argument("--allow-identical", default="")
     args = ap.parse_args()

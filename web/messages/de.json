@@ -2489,7 +2489,13 @@
       "detailReaped": "Die Detailansicht pro Task wurde für diesen Lauf durch die Artefakt-Aufbewahrung entfernt. Die Zusammenfassung pro Host unten bleibt in der Datenbank und ist davon nicht betroffen.",
       "detailUnknown": "Die Detailansicht pro Task konnte nicht geprüft werden, da der Speicher nicht geantwortet hat. Sie ist möglicherweise noch verfügbar.",
       "detailDownload": "Vollständige Task-Details herunterladen",
-      "detailDownloadNote": "Ein JSON-Objekt pro Zeile, in der Reihenfolge, in der Ansible sie gemeldet hat. Erfordert die Berechtigung zum Lesen des Zustands."
+      "detailDownloadNote": "Ein JSON-Objekt pro Zeile, in der Reihenfolge, in der Ansible sie gemeldet hat. Erfordert die Berechtigung zum Lesen des Zustands.",
+      "outstandingTitle": "{count, plural, one {# Host muss noch konfiguriert werden} other {# Hosts müssen noch konfiguriert werden}}",
+      "outstandingNote": "Hosts, die fehlgeschlagen sind, die Ansible nicht erreichen konnte oder zu denen das Play nie gekommen ist. Ein Host, den das Play nie erreicht hat, wird von gar nichts gemeldet; dies wird daher aus dem Inventar ermittelt, das dieser Lauf angesprochen hat, und nicht aus den Fehlern.",
+      "retryOutstanding": "Diese Hosts wiederholen",
+      "retryOutstandingBusy": "Wird eingereiht…",
+      "retryOutstandingConfirm": "Das Playbook gegen {hosts} ausführen? Dies verändert echte Hosts und kann nicht rückgängig gemacht werden.",
+      "retryOutstandingFailed": "Der erneute Versuch konnte nicht eingereiht werden"
     }
   },
   "workspaceDetail": {

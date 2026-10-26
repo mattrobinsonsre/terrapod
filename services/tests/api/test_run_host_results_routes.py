@@ -537,8 +537,13 @@ class TestTheStreamIsStateGradeNotRunGrade:
                 AsyncMock(return_value=[]),
             ),
             patch("terrapod.api.routers.runs.get_storage", return_value=MagicMock()),
+            # The denominator now lives in `configure_recovery` -- #1973 needs
+            # the same artifact to decide which hosts a retry must cover, and a
+            # second reader of it is a second answer. Patched at the source
+            # module, not on the router, because the router looks the attribute
+            # up on the module at call time.
             patch(
-                "terrapod.api.routers.runs._targeted_hosts",
+                "terrapod.services.configure_recovery.targeted_hosts",
                 AsyncMock(return_value=set()),
             ),
         ):

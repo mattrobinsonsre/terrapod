@@ -96,6 +96,9 @@ func newRunsFixture(t *testing.T) *Client {
 
 		// Retry is a Terrapod extension: /api/terrapod/v1, not /api/v2, and it
 		// answers with the NEW run.
+		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-nohosts/actions/retry":
+			http.Error(w, `{"errors":[{"status":"422","title":"Unprocessable Entity","detail":"run-nohosts has no outstanding hosts, so there is nothing to retry."}]}`, http.StatusUnprocessableEntity)
+			return
 		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-busy/actions/retry":
 			http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"Cannot retry run in non-terminal state 'planning'"}]}`, http.StatusConflict)
 			return
@@ -286,6 +289,72 @@ func TestRetryRunOnAnUnfinishedRunIsAConflict(t *testing.T) {
 func TestRetryRunNeedsAnID(t *testing.T) {
 	c := newRunsFixture(t)
 	if _, err := c.RetryRun(t.Context(), ""); err == nil {
+		t.Fatal("expected an error for an empty run id")
+	}
+}
+
+func TestRetryRunOutstandingHostsSendsTheFlagAndReturnsTheNewRun(t *testing.T) {
+	// Its own server rather than the shared fixture, because the property under
+	// test is the BODY on the wire. The shared fixture answers this path for
+	// RetryRun too, so a test written against it would pass whether or not the
+	// flag was sent -- and the flag is the whole difference between retrying
+	// two hosts and retrying the entire inventory.
+	var body []byte
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/.well-known/") {
+			_, _ = w.Write([]byte(`{"tfe.v2":"/api/v2/"}`))
+			return
+		}
+		gotPath = r.URL.Path
+		body, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(runPayload("run-bbbb")))
+	}))
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := c.RetryRunOutstandingHosts(t.Context(), "run-aaaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.ID != "run-bbbb" {
+		t.Errorf("got %q, want the new run run-bbbb", run.ID)
+	}
+	if gotPath != "/api/terrapod/v1/runs/run-aaaa/actions/retry" {
+		t.Errorf("posted to %q", gotPath)
+	}
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("body %q is not JSON: %v", body, err)
+	}
+	// A literal true. The server accepts nothing else -- a truthy string there
+	// means a FULL retry, which on a partial configure is every host in the
+	// inventory rather than the handful that are left.
+	if sent["only-outstanding-hosts"] != true {
+		t.Errorf("body was %q; want only-outstanding-hosts set to true", body)
+	}
+}
+
+func TestRetryRunOutstandingHostsWithNothingOutstandingIsAValidationError(t *testing.T) {
+	// A refusal, not a no-op: an empty limit means the workspace's own default,
+	// so a server that fell through here would re-run the whole inventory.
+	c := newRunsFixture(t)
+	_, err := c.RetryRunOutstandingHosts(t.Context(), "run-nohosts")
+	if err == nil {
+		t.Fatal("expected a validation error")
+	}
+	if _, ok := err.(*ValidationError); !ok {
+		t.Errorf("expected *ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestRetryRunOutstandingHostsNeedsAnID(t *testing.T) {
+	c := newRunsFixture(t)
+	if _, err := c.RetryRunOutstandingHosts(t.Context(), ""); err == nil {
 		t.Fatal("expected an error for an empty run id")
 	}
 }

@@ -2489,7 +2489,13 @@
       "detailReaped": "Detaljerna per uppgift för den här körningen har tagits bort enligt bevarandereglerna för artefakter. Sammanfattningen per värd nedan bevaras i databasen och påverkas inte.",
       "detailUnknown": "Detaljerna per uppgift kunde inte kontrolleras eftersom lagringen inte svarade. De kan fortfarande finnas kvar.",
       "detailDownload": "Ladda ner fullständiga uppgiftsdetaljer",
-      "detailDownloadNote": "Ett JSON-objekt per rad, i den ordning Ansible rapporterade dem. Kräver behörighet att läsa tillståndet."
+      "detailDownloadNote": "Ett JSON-objekt per rad, i den ordning Ansible rapporterade dem. Kräver behörighet att läsa tillståndet.",
+      "outstandingTitle": "{count, plural, one {# värd behöver fortfarande konfigureras} other {# värdar behöver fortfarande konfigureras}}",
+      "outstandingNote": "Värdar som misslyckades, som Ansible inte kunde nå, eller som playet aldrig hann fram till. En värd som playet aldrig nådde rapporteras inte av någonting alls, så detta räknas fram ur inventariet som den här körningen riktade sig mot i stället för ur felen.",
+      "retryOutstanding": "Försök igen med dessa värdar",
+      "retryOutstandingBusy": "Köar…",
+      "retryOutstandingConfirm": "Köra playbooken mot {hosts}? Detta ändrar verkliga värdar och kan inte ångras.",
+      "retryOutstandingFailed": "Kunde inte köa omförsöket"
     }
   },
   "workspaceDetail": {

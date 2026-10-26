@@ -2489,7 +2489,13 @@
       "detailReaped": "Detaljerne pr. opgave for denne kørsel er blevet fjernet i henhold til opbevaringsreglerne for artefakter. Oversigten pr. vært nedenfor bevares i databasen og er ikke berørt.",
       "detailUnknown": "Detaljerne pr. opgave kunne ikke kontrolleres, fordi lageret ikke svarede. De er muligvis stadig tilgængelige.",
       "detailDownload": "Download fulde opgavedetaljer",
-      "detailDownloadNote": "Ét JSON-objekt pr. linje, i den rækkefølge Ansible rapporterede dem. Kræver tilladelse til at læse tilstanden."
+      "detailDownloadNote": "Ét JSON-objekt pr. linje, i den rækkefølge Ansible rapporterede dem. Kræver tilladelse til at læse tilstanden.",
+      "outstandingTitle": "{count, plural, one {# vært mangler stadig at blive konfigureret} other {# værter mangler stadig at blive konfigureret}}",
+      "outstandingNote": "Værter, der fejlede, som Ansible ikke kunne nå, eller som playet aldrig nåede frem til. En vært, som playet aldrig nåede, rapporteres slet ikke af noget, så dette udregnes ud fra det inventar, denne kørsel var rettet mod, i stedet for ud fra fejlene.",
+      "retryOutstanding": "Prøv disse værter igen",
+      "retryOutstandingBusy": "Sætter i kø…",
+      "retryOutstandingConfirm": "Kør playbooken mod {hosts}? Dette ændrer virkelige værter og kan ikke fortrydes.",
+      "retryOutstandingFailed": "Kunne ikke sætte det nye forsøg i kø"
     }
   },
   "workspaceDetail": {

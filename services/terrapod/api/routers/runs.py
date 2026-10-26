@@ -78,6 +78,7 @@ from terrapod.services import (
     agent_pool_service,
     ansible_auth,
     ansible_ee_service,
+    configure_recovery,
     host_results_service,
     inventory_resolve,
     plan_graph_service,
@@ -1287,6 +1288,35 @@ def _retry_capability(run: Run) -> str:
     )
 
 
+#: The one body field `actions/retry` accepts. A BOOLEAN rather than a
+#: `scope=outstanding` enum, for the reason recorded on #1966: a value that has
+#: to be spelled correctly across the API, the SDK, MCP and the UI will be
+#: mistyped into a third meaning eventually, and a boolean cannot be.
+_ONLY_OUTSTANDING = "only-outstanding-hosts"
+
+
+async def _wants_only_outstanding(request: Request) -> bool:
+    """Whether this retry was asked to cover only the outstanding hosts.
+
+    Read off the raw `Request` rather than declared as a body model, the same
+    way `api/pagination.py` reads its params: the field is optional on a route
+    that has never taken a body, and declaring one would change the route's
+    signature for every existing caller to add one boolean.
+
+    A missing, empty or unparseable body means False -- the pre-#1973
+    behaviour, which is a full retry. Only the literal `true` opts in, so a
+    caller that sends the key with a string or a number gets the safe answer
+    rather than a surprising one.
+    """
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001 - absent or malformed body is simply "no"
+        return False
+    if not isinstance(body, dict):
+        return False
+    return body.get(_ONLY_OUTSTANDING) is True
+
+
 @extensions_router.post("/runs/{run_id}/actions/retry")
 async def retry_run(
     request: Request,
@@ -1301,6 +1331,22 @@ async def retry_run(
     runs (errored, canceled, discarded, applied, planned plan-only) can be retried.
     Requires what creating that run would: `run:plan` for a plan-only run,
     `run:apply` for an apply-capable one, `run:apply-destroy` for a destroy.
+
+    **With `{"only-outstanding-hosts": true}` on a configure run, the new run
+    covers only the hosts this one did not configure** (#1973) -- the partial
+    recovery this issue exists for. The remainder is subtracted from the run's
+    own resolved-inventory artifact rather than read off the failures, because
+    under `serial:` + `any_errors_fatal` the hosts a play never reached appear
+    in no callback event and no PLAY RECAP, so a retry built from failures fixes
+    the failures and silently leaves the rest unconfigured.
+
+    A **canceled** configure is a partial configure, so it retries this way too:
+    `canceled` is already terminal, and resuming it is the same subtraction.
+
+    The new run is always a STANDALONE configure, whatever the source was. For a
+    composite the hosts are the only thing left to do -- the apply landed, and
+    re-running it to reach them would be an infrastructure change nobody asked
+    for.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, _retry_capability(run), user, db, request=request)
@@ -1317,6 +1363,41 @@ async def retry_run(
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
+
+    only_outstanding = await _wants_only_outstanding(request)
+    retry_limit = run.ansible_limit or ""
+    # A composite's `is_configure` is deliberately NOT carried forward below; a
+    # remainder retry overrides that, because the hosts are the only thing left.
+    retry_is_configure = bool(run.is_configure) and not bool(run.configure_after_apply)
+    outstanding: list[str] = []
+
+    if only_outstanding:
+        if not run.is_configure:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"'{_ONLY_OUTSTANDING}' applies to a configure run; "
+                    f"run-{run.id} configured no hosts."
+                ),
+            )
+        outstanding = await configure_recovery.outstanding_hosts(db, run)
+        if not outstanding:
+            # MUST refuse rather than fall through. An empty `ansible_limit`
+            # means the workspace's own default, so queueing this would silently
+            # retry the WHOLE inventory -- the opposite of what was asked, and
+            # the one outcome a remainder retry exists to prevent. The same
+            # refusal covers the unreadable-artifact case, where the remainder
+            # is empty by design.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"run-{run.id} has no outstanding hosts, so there is nothing "
+                    f"to retry. Retry without '{_ONLY_OUTSTANDING}' to re-run the "
+                    "whole limit."
+                ),
+            )
+        retry_limit = configure_recovery.remainder_limit(outstanding)
+        retry_is_configure = True
 
     # Defensive: if the source run has no CV (e.g. it was queued by an
     # older fire_run_triggers before #439, or by some other path that
@@ -1352,7 +1433,11 @@ async def retry_run(
         new_run = await run_service.create_run(
             db,
             workspace=ws,
-            message=f"Retry of run-{run.id}",
+            message=(
+                f"Retry of run-{run.id} for {len(outstanding)} outstanding host(s)"
+                if only_outstanding
+                else f"Retry of run-{run.id}"
+            ),
             source=run.source,
             plan_only=run.plan_only,
             # Without this a retried destroy came back as an ordinary apply of the
@@ -1364,9 +1449,9 @@ async def retry_run(
             # is an apply nobody asked for. Only the STANDALONE request is
             # copied -- a composite is resolved from the workspace, so passing
             # its flag would pin it to a setting that may since have changed.
-            is_configure=bool(run.is_configure) and not bool(run.configure_after_apply),
+            is_configure=retry_is_configure,
             playbook=run.playbook or "",
-            ansible_limit=run.ansible_limit or "",
+            ansible_limit=retry_limit,
             configuration_version_id=cv_id_for_retry,
             created_by=user.email,
             target_addrs=run.target_addrs,
@@ -1601,21 +1686,14 @@ async def list_run_events(
 def _host_result_json(row: RunHostResult, run: Run) -> dict:
     """One host's summary.
 
-    `status` is derived here rather than stored, so one reader cannot disagree
-    with another about what the counters mean -- and `unreachable` comes off
-    `saw_unreachable`, because the recap counters cannot answer it once
-    `ignore_unreachable` is in play.
+    `status` is DERIVED rather than stored, so one reader cannot disagree with
+    another about what the counters mean. It used to be derived inline here,
+    which made that claim true of this route alone -- #1973 needs the same
+    judgement to decide which hosts a retry must cover, and a second copy of the
+    rule is a second answer to "did this host configure". So the rule lives in
+    `configure_recovery.host_status` and both callers read it from there.
     """
-    if row.saw_unreachable:
-        status = "unreachable"
-    elif row.failures:
-        status = "failed"
-    elif row.ignored:
-        status = "ignored-failure"
-    elif row.changed:
-        status = "changed"
-    else:
-        status = "ok"
+    status = configure_recovery.host_status(row)
     return {
         "id": f"rhr-{row.id}",
         "type": "run-host-results",
@@ -1676,33 +1754,6 @@ def _not_reached_json(host: str, run: Run) -> dict:
     }
 
 
-async def _targeted_hosts(run: Run) -> set[str]:
-    """Every host the run's resolved inventory names, or an empty set.
-
-    The run's own artifact rather than the live inventory: it is pinned at run
-    creation (and re-resolved at a composite's hand-over), so it is what this
-    run actually targeted even after the estate has moved. An absent or
-    unreadable artifact yields nothing, which degrades to "show what ansible
-    reported" rather than failing a read.
-    """
-    from terrapod.storage import get_storage
-    from terrapod.storage.keys import resolved_inventory_key
-
-    key = resolved_inventory_key(str(run.workspace_id), str(run.id))
-    try:
-        raw = await get_storage().get(key)
-    except Exception:  # noqa: BLE001 - any storage error degrades the same way
-        return set()
-    if not raw:
-        return set()
-    try:
-        document = json.loads(raw)
-    except ValueError:
-        return set()
-    hosts = document.get("hosts") if isinstance(document, dict) else None
-    return set(hosts.keys()) if isinstance(hosts, dict) else set()
-
-
 @extensions_router.get("/runs/{run_id}/host-results")
 async def list_run_host_results(
     request: Request,
@@ -1718,6 +1769,12 @@ async def list_run_host_results(
     The host set is the UNION of what ansible reported and what the run's
     resolved-inventory artifact names, because neither alone is the answer --
     see `_not_reached_json`.
+
+    **`meta.outstanding` is what a retry would cover** (#1973): the hosts this
+    configure has not configured, which an operator needs to see rather than
+    infer by filtering the rows themselves. It is `count` plus the sorted
+    `hosts`, and it is empty when the artifact could not be read -- the safe
+    direction, because the alternative reads as "every host needs configuring".
 
     **`meta.detail` tells a reader whether the per-task stream is still there,
     so it does not have to download it to find out.** #1928's acceptance asks
@@ -1741,14 +1798,20 @@ async def list_run_host_results(
 
     rows = await host_results_service.list_results(db, run)
     reported = {row.host for row in rows}
+    targeted = await configure_recovery.targeted_hosts(run)
     entries = [_host_result_json(row, run) for row in rows]
-    entries += [
-        _not_reached_json(host, run) for host in sorted(await _targeted_hosts(run) - reported)
-    ]
+    entries += [_not_reached_json(host, run) for host in sorted(targeted - reported)]
     entries.sort(key=lambda e: e["attributes"]["host"])
+
+    # From the two things already fetched, through the predicate a retry uses
+    # (#1973). Deriving it here from the same inputs rather than re-reading them
+    # is what makes the number an operator reads and the `--limit` a retry
+    # carries one computation rather than two that agree today.
+    outstanding = configure_recovery.outstanding_from(targeted, rows)
 
     meta = build_meta(len(entries), 1, len(entries) or 1)
     meta["detail"] = {"state": await _detail_state(run, bool(rows))}
+    meta["outstanding"] = {"count": len(outstanding), "hosts": outstanding}
     return JSONResponse(content={"data": entries, "meta": meta})
 
 

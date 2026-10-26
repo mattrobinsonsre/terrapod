@@ -2489,7 +2489,13 @@
       "detailReaped": "The per-marklar marklar for this marklar has been removed by marklar marklar. The per-marklar marklar below is kept in the marklar and is unaffected.",
       "detailUnknown": "The per-marklar marklar could not be checked because marklar did not answer. It may still be available.",
       "detailDownload": "Download full marklar marklar",
-      "detailDownloadNote": "One marklar marklar per marklar, in the marklar Marklar reported them. Requires marklar to read marklar."
+      "detailDownloadNote": "One marklar marklar per marklar, in the marklar Marklar reported them. Requires marklar to read marklar.",
+      "outstandingTitle": "{count, plural, one {# marklar still needs configuring} other {# marklars still need configuring}}",
+      "outstandingNote": "Marklars that failed, that Marklar could not reach, or that the marklar never got to. A marklar the marklar never reached is reported by nothing at all, so this is worked out from the marklar this marklar targeted rather than from the marklars.",
+      "retryOutstanding": "Retry these marklars",
+      "retryOutstandingBusy": "Marklaring…",
+      "retryOutstandingConfirm": "Run the marklar against {hosts}? This changes real marklars and cannot be undone.",
+      "retryOutstandingFailed": "Could not queue the marklar"
     }
   },
   "workspaceDetail": {

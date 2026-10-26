@@ -2489,7 +2489,13 @@
       "detailReaped": "Teh per-task detailz fer dis run got yeeted by artifakt retenshun. Teh per-host summry down ther stil livez in teh databaze an iz totes fien.",
       "detailUnknown": "Culd not check teh per-task detailz coz teh storaj no ansur. Mebbe it stil ther tho.",
       "detailDownload": "Downlode all teh task detailz",
-      "detailDownloadNote": "Wun JSON thingy per lien, in teh ordr Ansibul sed dem. U needz permishun 2 reed state, srsly."
+      "detailDownloadNote": "Wun JSON thingy per lien, in teh ordr Ansibul sed dem. U needz permishun 2 reed state, srsly.",
+      "outstandingTitle": "{count, plural, one {# host stil needz konfigurin} other {# hostz stil needz konfigurin}}",
+      "outstandingNote": "Hostz wot faild, wot Ansibul culd not reech, or wot teh play nevr even got 2. A host teh play nevr reachd getz reportd by absolootly nuffin, so dis getz figurd out frum teh inventoree dis run wuz aimin at, not frum teh failyurz.",
+      "retryOutstanding": "Retry dem hostz",
+      "retryOutstandingBusy": "Queuein…",
+      "retryOutstandingConfirm": "Run teh playbuk gainst {hosts}? Dis changez reel hostz an cannot be undun.",
+      "retryOutstandingFailed": "Culd not queue teh retry"
     }
   },
   "workspaceDetail": {

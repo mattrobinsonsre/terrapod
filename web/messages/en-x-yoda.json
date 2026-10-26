@@ -2489,7 +2489,13 @@
       "detailReaped": "Removed by artifact retention, the per-task detail for this run has been. Kept in the database, the per-host summary below is — unaffected, it remains.",
       "detailUnknown": "Checked, the per-task detail could not be — answer, storage did not. Available still, it may be.",
       "detailDownload": "Full task detail, download",
-      "detailDownloadNote": "Per line, one JSON object — in the order Ansible reported them, they come. Permission to read state, it requires."
+      "detailDownloadNote": "Per line, one JSON object — in the order Ansible reported them, they come. Permission to read state, it requires.",
+      "outstandingTitle": "{count, plural, one {# host, configuring it still needs} other {# hosts, configuring they still need}}",
+      "outstandingNote": "Hosts that failed, hosts that Ansible could not reach, or hosts that the play never got to, these are. Reported by nothing at all, a host the play never reached is — so from the inventory this run targeted, worked out this is, rather than from the failures.",
+      "retryOutstanding": "These hosts, retry",
+      "retryOutstandingBusy": "Queued, they are being…",
+      "retryOutstandingConfirm": "Against {hosts}, run the playbook? Real hosts this changes, and undone it cannot be.",
+      "retryOutstandingFailed": "Queue the retry, I could not"
     }
   },
   "workspaceDetail": {

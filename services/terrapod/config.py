@@ -304,6 +304,34 @@ class RunnerConfig(BaseSettings):
             "settle before terraform tries the teardown again."
         ),
     )
+    configure_retries: int = Field(
+        default=0,
+        description=(
+            "How many times to automatically re-run a FAILED configure against "
+            "the hosts it did not configure (#1973), before leaving it errored "
+            "for an operator. The remainder is subtracted from the run's own "
+            "resolved-inventory artifact rather than read off the failures, "
+            "because under `serial:` + `any_errors_fatal` the hosts a play never "
+            "reached appear in no callback event and no PLAY RECAP -- so a retry "
+            "built from failures fixes the failures and silently leaves the rest "
+            "unconfigured. DEFAULTS TO 0, WHICH DISABLES IT, unlike the "
+            "lifecycle-destroy retry it otherwise mirrors: a destroy is "
+            "declarative and incremental, so re-running it is safe by "
+            "construction, while a playbook is whatever you wrote and may not be "
+            "idempotent. A canceled configure is never auto-retried -- that would "
+            "override whoever cancelled it -- though an operator may retry one to "
+            "its remainder by hand, which does not count against this cap."
+        ),
+    )
+    configure_retry_backoff_seconds: int = Field(
+        default=45,
+        description=(
+            "Seconds to wait after a configure errors before queuing the "
+            "remainder retry, giving a transient SSH or DNS failure -- the case "
+            "this exists for -- time to clear before ansible tries those hosts "
+            "again."
+        ),
+    )
     hooks_enabled: bool = Field(
         default=True,
         description=(

@@ -298,6 +298,75 @@ resolved inventory named. A host in the second set and not the first is shown as
 and this is the absence of one. Without that, a run that aborted after one host
 of fifty would read as a clean one-host success.
 
+### Retrying only the hosts that are left
+
+A configure that fails partway has configured some hosts and not others, and the
+run reports which. **Retry these hosts** on the Hosts tab queues a new configure
+whose limit is exactly the ones that still need it. Over the API that is the
+ordinary retry action with one field:
+
+```bash
+curl -X POST "$TERRAPOD/api/v1/runs/run-abc123/actions/retry" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"only-outstanding-hosts": true}'
+```
+
+It is a new configure run like any other — its own id, log, notifications and
+audit trail — so nothing about reading it is special.
+
+**The remainder is worked out by subtraction, not by collecting the failures**,
+and that is the whole reason this is a feature rather than a one-line script.
+Under `serial:` with `any_errors_fatal:` the hosts a play never reached appear
+in no event and in no `PLAY RECAP`, so a retry built from "what failed" fixes
+the failures, reports success, and leaves the rest unconfigured — which is worse
+than failing, because it looks finished. What it subtracts from is the run's own
+resolved inventory, pinned when the run was created, so a retry cannot widen to
+hosts the original never targeted even if the inventory has moved since.
+
+Three things follow, and each is deliberate:
+
+- **A host whose failure the playbook tolerated is not retried.**
+  `ignore_errors: true` is you saying that failure is acceptable, so re-running
+  the play would be re-running something you already accepted — and under the
+  automatic retry below it would re-run to the attempt cap on every single run,
+  for ever. A rescued host is not retried either, because a `block`/`rescue`
+  that recovered is a success and ansible counts it as one.
+- **A run with nothing outstanding is refused, not quietly retried.** An empty
+  limit means the workspace's own default, so falling through would re-run the
+  whole inventory. Retry without the field if that is what you want.
+- **The new run is always a standalone configure**, even when the one you are
+  retrying was an apply-then-configure. That apply landed; the hosts are all
+  that is left, and re-applying to reach them would be an infrastructure change
+  you did not ask for.
+
+A **cancelled** configure is a partial configure, so it retries this way too.
+
+#### Letting the platform do it
+
+`runners.configureRetries` is **0 by default, which disables it**. Set it above
+zero and Terrapod re-runs a failed configure against its outstanding hosts by
+itself, up to that many attempts, waiting `runners.configureRetryBackoffSeconds`
+(45 by default) after each failure so a transient SSH or DNS problem has time to
+clear.
+
+```yaml
+runners:
+  configureRetries: 2                  # 0 disables; 2 = up to two automatic attempts
+  configureRetryBackoffSeconds: 45
+```
+
+Off by default on purpose, and **deliberately unlike
+`runners.lifecycleDestroyRetries`, which defaults to 2**. A destroy is
+declarative and incremental, so re-running one is safe by construction. A
+playbook is whatever you wrote, and it may not be idempotent — so the platform
+will re-run it unattended only when you have said it may.
+
+Two bounds worth knowing. A **cancelled** configure is never retried
+automatically: somebody stopped it, and resuming it would override them. And a
+retry you ask for by hand does not count against the cap, which exists to bound
+what happens without you.
+
 ### A host's status is not a health check
 
 A host that is genuinely down still reports `ok` for any task that does not need

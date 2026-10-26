@@ -2153,6 +2153,12 @@ test.describe('Per-host results (#1928)', () => {
               'total-count': 4,
               'total-pages': 1,
             },
+            // The remainder a retry would cover (#1973). Server-side, so the
+            // panel renders it rather than filtering the rows itself.
+            outstanding: {
+              count: 3,
+              hosts: ['db1', 'hdead', 'web2'],
+            },
           },
         }),
       }),
@@ -2175,6 +2181,22 @@ test.describe('Per-host results (#1928)', () => {
     await expect(notReached).toBeVisible();
     await expect(
       page.getByText('hdead', { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
+
+    // The outstanding-hosts banner and its action (#1973). Scoped to visible
+    // for the same reason as above, and matched on the BUTTON rather than on
+    // the host list, because the three host names also appear in the rows -- an
+    // assertion on those would pass with the banner absent.
+    const retry = page
+      .getByRole('button', { name: 'Retry these hosts' })
+      .filter({ visible: true });
+    await expect(retry).toHaveCount(1);
+    await expect(retry).toBeVisible();
+    // The count comes from `meta.outstanding`, not from counting the rows: four
+    // hosts are shown and three are outstanding, so a panel that counted rows
+    // would say four here.
+    await expect(
+      page.getByText('3 hosts still need configuring').filter({ visible: true }),
     ).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);

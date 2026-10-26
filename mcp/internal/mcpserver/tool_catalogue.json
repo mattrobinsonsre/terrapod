@@ -973,6 +973,10 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "only_outstanding_hosts": {
+          "description": "Ansible configure runs only: retry just the hosts this configure did NOT configure, instead of its whole limit. The remainder is computed server-side by subtracting the hosts that finished from the run resolved-inventory artifact, so it includes hosts the play never reached as well as the ones that failed. Refused with 422 when the run is not a configure, and when nothing is outstanding - an empty limit would mean every host in the inventory, so there is no silent no-op here.",
+          "type": "boolean"
+        },
         "run_id": {
           "description": "the run id (run-...) to act on",
           "type": "string"
