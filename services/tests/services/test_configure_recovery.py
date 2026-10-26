@@ -400,3 +400,54 @@ class TestThereIsOneProducerOfTheDerivation:
         # And no chain of its own alongside the call -- the shape that would let
         # both exist, with the call's result quietly overwritten.
         assert "ignored-failure" not in ast.unparse(fn)
+
+
+class TestARefusedRetryIsSkippedRatherThanRaised:
+    """`create_run` refuses when the workspace no longer declares a configure.
+
+    #2116's rule is that every `create_run` caller decides what the refusal
+    means FOR IT, and `test_plan_apply_enforcement.TestEveryCallSiteDecides`
+    derives the call sites and fails on one that does not — which is how this
+    was caught, as the sixteenth site.
+
+    The answer here is catch-and-skip, because nobody asked for this run. The
+    reason it must not merely propagate is specific: the attempt cap counts
+    retries that were CREATED, so a refusal creates nothing, leaves the count
+    at zero, and this path is re-reached on every cycle — for ever, about a
+    workspace that is behaving exactly as declared.
+    """
+
+    def _errored_configure(self):
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.status = "errored"
+        run.is_configure = True
+        run.playbook = "site.yml"
+        run.configuration_version_id = uuid.uuid4()
+        run.updated_at = datetime.now(UTC) - timedelta(hours=1)
+        return run
+
+    @pytest.mark.parametrize("which", ["plan-apply", "configure"])
+    @pytest.mark.asyncio
+    async def test_both_refusals_skip(self, which):
+        from terrapod.services import run_service, workspace_settings
+
+        exc = (
+            run_service.PlanApplyNotEnabled("no plan/apply")
+            if which == "plan-apply"
+            else workspace_settings.ConfigureNotEnabled("no configure")
+        )
+        run = self._errored_configure()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=MagicMock(id=run.workspace_id))
+        with (
+            patch.object(cr, "_latest_run", AsyncMock(return_value=run)),
+            patch.object(cr, "_consecutive_recovery_attempts", AsyncMock(return_value=0)),
+            patch.object(cr, "outstanding_hosts", AsyncMock(return_value=["web1"])),
+            patch("terrapod.services.run_service.create_run", AsyncMock(side_effect=exc)),
+            patch("terrapod.services.run_service.queue_run", AsyncMock()) as queue,
+        ):
+            # No exception escapes, and nothing is queued.
+            await cr._retry_one(db, run, retries=2)
+        queue.assert_not_called()

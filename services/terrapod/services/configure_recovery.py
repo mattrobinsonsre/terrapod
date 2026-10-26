@@ -62,10 +62,15 @@ logger = structlog.get_logger(__name__)
 #: mentioned it.
 OUTSTANDING: frozenset[str] = frozenset({"failed", "unreachable", "not-reached"})
 
-#: Every status `host_status` can return, plus the one only the subtraction
-#: produces. Derived from the counters and never stored, so there is one answer
-#: rather than one per reader.
-STATUSES: frozenset[str] = OUTSTANDING | frozenset({"ignored-failure", "changed", "ok"})
+# There is deliberately NO `STATUSES` constant enumerating everything
+# `host_status` can return. One was written here and CodeQL flagged it unused
+# (alert 552) -- correctly: nothing read it, and the web's `host-status.test.ts`
+# derives the server's status set from `host_status`'s own `return` literals and
+# from `OUTSTANDING` above, not from a list. A constant read only by a gate that
+# asserts the constant is circular, and this is the shape recorded repeatedly in
+# this codebase as a flag nothing reads. Contrast `_ROUTABLE_VERBS`, which looks
+# unused to CodeQL and must be KEPT, because two gates genuinely read it: there
+# the alert is dismissed, here the code goes.
 
 #: What separates hosts in a `--limit`. The same convention
 #: `inventory_narrowing` emits, for the same measured reason: `--limit` has no
@@ -292,7 +297,7 @@ async def _latest_run(db: AsyncSession, workspace_id) -> Run | None:
 async def _retry_one(db: AsyncSession, run: Run, *, retries: int) -> None:
     """Queue one automatic retry, or decide there is nothing to do."""
     from terrapod.db.models import Workspace
-    from terrapod.services import run_service
+    from terrapod.services import run_service, workspace_settings
 
     # Only if this errored configure is still the workspace's latest run. A
     # newer one -- a retry already queued, a manual retry, an apply -- supersedes
@@ -318,20 +323,40 @@ async def _retry_one(db: AsyncSession, run: Run, *, retries: int) -> None:
     if ws is None:
         return
 
-    retry = await run_service.create_run(
-        db,
-        workspace=ws,
-        message=(
-            f"Configure retry for {len(hosts)} outstanding host(s) "
-            f"(attempt {attempts + 1}/{retries})"
-        ),
-        source=RECOVERY_SOURCE,
-        is_configure=True,
-        playbook=run.playbook or "",
-        ansible_limit=remainder_limit(hosts),
-        configuration_version_id=run.configuration_version_id,
-        created_by="system",
-    )
+    try:
+        retry = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=(
+                f"Configure retry for {len(hosts)} outstanding host(s) "
+                f"(attempt {attempts + 1}/{retries})"
+            ),
+            source=RECOVERY_SOURCE,
+            is_configure=True,
+            playbook=run.playbook or "",
+            ansible_limit=remainder_limit(hosts),
+            configuration_version_id=run.configuration_version_id,
+            created_by="system",
+        )
+    except (run_service.PlanApplyNotEnabled, workspace_settings.ConfigureNotEnabled):
+        # CATCH AND SKIP, because this retry is the platform's own decision and
+        # not something anybody asked for (#2116's rule: a requested run gets a
+        # 4xx naming the column; a platform-decided one skips). The workspace's
+        # declaration can have changed between the configure failing and this
+        # cycle firing, and a workspace behaving exactly as declared must not
+        # produce an error.
+        #
+        # INFO rather than warning, and that is the point rather than taste: the
+        # attempt cap counts retries that were CREATED, so a refusal creates
+        # nothing, leaves the count at zero, and this path is re-reached on
+        # every cycle. At warning level that is a line every 30 seconds for
+        # ever about a workspace that is configured correctly.
+        logger.info(
+            "configure retry skipped: workspace no longer declares a configure operation",
+            workspace_id=str(run.workspace_id),
+            errored_run=str(run.id),
+        )
+        return
     retry = await run_service.queue_run(db, retry)
     await db.commit()
     logger.info(
