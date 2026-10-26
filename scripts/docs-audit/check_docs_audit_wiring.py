@@ -12,6 +12,13 @@ Finding the instance is not the fix. The question is what was meant to catch it,
 and the answer was nothing, so this is that. It checks itself along with the
 rest, which is what makes the set closed rather than merely one longer.
 
+It asks whether SOME job in the workflow runs each gate, rather than naming
+the job, because which job that is is a property of how the waves are carved and
+that moves: these gates lived in a `docs-audit` job of their own until it was
+folded into a combined lint job, at which point a check keyed on the job name
+failed while every gate was still running. The invariant worth holding is "this
+gate runs in CI", and the job it runs in is not part of it.
+
 It deliberately says nothing about the exec bit. Every invocation of these
 scripts names an interpreter (`python3 <path>`, `sh <path>`), so the bit is
 load-bearing nowhere and asserting it would fail CI for a reason with no
@@ -29,7 +36,6 @@ import yaml
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 WORKFLOW = Path(".github/workflows/ci.yml")
-JOB = "docs-audit"
 
 #: A matcher that stops matching must fail rather than pass on nothing.
 MIN_GATES = 8
@@ -42,28 +48,35 @@ def main() -> int:
         return 1
 
     parsed = yaml.safe_load(workflow.read_text())
-    job = (parsed.get("jobs") or {}).get(JOB)
-    if job is None:
-        print(f"FAIL — {WORKFLOW} has no `{JOB}` job; these gates run nowhere")
+    jobs = parsed.get("jobs") or {}
+    if not jobs:
+        print(f"FAIL — {WORKFLOW} declares no jobs; these gates run nowhere")
         return 1
 
-    # The steps' own `run:` text, so a step that merely NAMES a script in its
-    # `name:` does not count as running it. `str()` rather than the value,
-    # because YAML types a bare `run: true` as a boolean and joining that raises
-    # a TypeError -- a gate that dies on an ordinary step reports CI as unwell
-    # rather than reporting its own property, which is the failure it exists to
-    # avoid being mistaken for.
-    commands = " ".join(str(step.get("run") or "") for step in job.get("steps") or [])
+    # Every job's steps' own `run:` text, so a step that merely NAMES a script
+    # in its `name:` does not count as running it. `str()` rather than the
+    # value, because YAML types a bare `run: true` as a boolean and joining that
+    # raises a TypeError -- a gate that dies on an ordinary step reports CI as
+    # unwell rather than reporting its own property, which is the failure it
+    # exists to avoid being mistaken for.
+    runs_in: dict[str, str] = {}
+    for name, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        runs_in[name] = " ".join(
+            str(step.get("run") or "") for step in job.get("steps") or [] if isinstance(step, dict)
+        )
 
     gates = sorted(p for p in HERE.glob("check_*.py"))
     problems: list[str] = []
 
     for gate in gates:
         rel = gate.relative_to(ROOT)
-        if str(rel) not in commands:
+        where = sorted(job for job, commands in runs_in.items() if str(rel) in commands)
+        if not where:
             problems.append(
-                f"{rel} is not run by the `{JOB}` job; add an explicit step, "
-                "because nothing discovers these"
+                f"{rel} is run by no job in {WORKFLOW}; add an explicit step to "
+                "one, because nothing discovers these"
             )
 
     if len(gates) < MIN_GATES:
@@ -78,7 +91,7 @@ def main() -> int:
             print(f"  - {p}")
         return 1
 
-    print(f"PASS — all {len(gates)} docs-audit gate(s) are run by the `{JOB}` job.")
+    print(f"PASS — all {len(gates)} docs-audit gate(s) are run by a job in {WORKFLOW}.")
     return 0
 
 
