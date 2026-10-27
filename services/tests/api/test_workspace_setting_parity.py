@@ -751,3 +751,74 @@ class TestCreateCanSetWhatEditCanSet:
             f"table, so they can diverge again exactly as they did before #2253: "
             f"{problems}"
         )
+
+
+#: Workspace attributes the API refuses outright on an engine whose strategy says
+#: the feature does not apply, mapped to the predicate that decides it.
+#:
+#: A ledger, so the half that can drift is DERIVED: the engine list is computed
+#: from the predicate over `known_engines()` rather than restated here. Adding a
+#: row is cheap; the floor below stops the map emptying and passing on nothing.
+_ENGINE_GATED_ATTRS = {
+    "security-scan-enforcement": "evaluates_security_scans",
+    "drift-ignore-rules": "honours_drift_ignore_rules",
+}
+
+
+def _declared_engines(attr: str) -> set[str] | None:
+    """The `engines:` list the shared field table declares for `attr`, or None.
+
+    Read as text rather than imported, because the assertion is about what the
+    table DECLARES -- the create form filters on exactly this list before building
+    its payload, so a missing restriction is a 422 the operator meets and no test
+    driving the helper would see.
+    """
+    import re
+
+    src = _surface("web/src/lib/workspace-fields.ts").read_text()
+    m = re.search(r"\{\s*attr: '" + re.escape(attr) + r"'.*?\}", src, re.S)
+    assert m, f"no FIELDS entry for {attr!r}; this gate reads the table by shape"
+    entry = m.group(0)
+    if "engines:" not in entry:
+        return None
+    tail = entry.split("engines:", 1)[1]
+    return set(re.findall(r"'([a-z][a-z0-9_-]*)'", tail.split("]", 1)[0]))
+
+
+def test_scan_enforcement_engines_match_the_api():
+    """The create form must not send an attribute the API refuses for that engine.
+
+    `validate_scan_enforcement` raises unless the value is `off` on an engine
+    `evaluates_security_scans` says False for. The create form sends every
+    attribute it rendered, so without the restriction a Pulumi create 422s and
+    creates NOTHING -- which is how it shipped, and which no unit test saw because
+    `toAttributes` emitted a perfectly well-formed payload the API then refused.
+
+    Derived, not restated: the expected list is computed from the predicate over
+    `known_engines()`, so a new engine, or a predicate changing its mind, fails
+    here rather than reaching an operator as a 422.
+    """
+    from terrapod import engines
+
+    assert len(_ENGINE_GATED_ATTRS) >= 2, "the gated-attribute map has emptied"
+    known = set(engines.known_engines())
+    assert len(known) >= 2, "known_engines() collapsed; this gate needs the real set"
+
+    problems = []
+    for attr, pred_name in _ENGINE_GATED_ATTRS.items():
+        pred = getattr(engines, pred_name)
+        expected = {e for e in known if pred(e)}
+        assert expected != known, (
+            f"{pred_name} allows every known engine, so {attr} needs no restriction "
+            "and this row is dead -- remove it rather than asserting a no-op"
+        )
+        declared = _declared_engines(attr)
+        if declared != expected:
+            problems.append(
+                f"{attr}: the field table declares engines={sorted(declared) if declared else None} "
+                f"but {pred_name} allows {sorted(expected)}"
+            )
+    assert not problems, (
+        "the create form would send an attribute the API refuses for that engine:\n  "
+        + "\n  ".join(problems)
+    )

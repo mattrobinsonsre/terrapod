@@ -94,8 +94,11 @@ COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/
 # Without these two files the gate raises rather than passing vacuously; the
 # `_surface()` helper says so in its own error.
 COPY web/src/lib/workspace-fields.ts ./web/src/lib/workspace-fields.ts
-COPY web/src/app/workspaces/page.tsx ./web/src/app/workspaces/page.tsx
-COPY "web/src/app/workspaces/[id]/page.tsx" "./web/src/app/workspaces/[id]/page.tsx"
+# The whole route, deliberately, because COPY globs its source: `[id]` is a
+# character class matching one of `i`/`d`, never the literal directory, and
+# quoting does not help -- the parser strips quotes and still globs. A per-file
+# COPY of the dynamic route silently copies nothing and the gate then raises.
+COPY web/src/app/workspaces ./web/src/app/workspaces
 # Read by tests/auth/test_cli_login_timing.py, which ties this page's
 # POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
 COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx

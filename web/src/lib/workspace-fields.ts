@@ -359,7 +359,14 @@ export const FIELDS: readonly FieldSpec[] = [
 
   // --- security scanning ------------------------------------------------
   { attr: 'security-scan-engine', id: 'ws-scan-engine', group: 'security' },
-  { attr: 'security-scan-enforcement', id: 'ws-scan-enforcement', group: 'security' },
+  // Refused outright on an engine the scanners cannot read: `validate_scan_enforcement`
+  // raises unless the value is `off`, keyed on `engines.evaluates_security_scans`.
+  // So a create form that sends it on a Pulumi workspace 422s the whole request and
+  // creates nothing, which is how it shipped. Derived from that predicate over
+  // `known_engines()` by `test_scan_enforcement_engines_match_the_api`, so a new
+  // engine or a changed predicate fails there rather than 422ing an operator.
+  { attr: 'security-scan-enforcement', id: 'ws-scan-enforcement', group: 'security',
+    engines: ['terraform'] },
   {
     attr: 'security-scan-severity-threshold',
     id: 'ws-scan-threshold',

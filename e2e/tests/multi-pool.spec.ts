@@ -39,7 +39,9 @@ test.describe("Multi-pool workspace routing", () => {
 
     // Both pools are listed. Asserting on BOTH is the point — showing only the
     // first would look correct while hiding half the set.
-    const pools = page.getByText("Agent pools", { exact: true });
+    // By heading: the group heading and the field label inside it carry the same
+    // words (#2253), so a bare text locator matches two elements.
+    const pools = page.getByRole("heading", { name: "Agent pools", exact: true });
     await expect(pools).toBeVisible({ timeout: 10_000 });
     // By NAME, not by a slice of the UUID. This previously asserted the first 8
     // characters of the pool id, which pinned the very defect it now guards
@@ -135,7 +137,7 @@ test.describe("Multi-pool workspace routing", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/workspaces/${wsId}`);
-    await expect(page.getByText("Agent pools", { exact: true })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Agent pools", exact: true })).toBeVisible({
       timeout: 10_000,
     });
     await expectNoHorizontalPageScroll(page);

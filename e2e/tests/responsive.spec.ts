@@ -2240,28 +2240,27 @@ test.describe('Workspace form sections (#2253)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
-  test('a collapsed advanced group says what it holds, and expanding it does not overflow', async ({
+  test('an advanced group on the create form is shut, opens, and does not overflow', async ({
     page,
   }) => {
-    const token = getStoredToken()
-    // Labels are a list-valued advanced setting, so a workspace carrying two of
-    // them exercises the one property worth guarding: a collapsed group must not
-    // CONCEAL a value. The indicator is derived from the value (a count), never
-    // from a defaults table — so two labels must surface as a count on the
-    // summary while the group is still shut.
-    const wsId = await createWorkspace(token, uniqueName('e2e-wsform-advanced'), {
-      labels: { team: 'platform', tier: 'prod' },
-    })
+    // The collapsing mechanism is a property of the CREATE form only. The
+    // Configuration tab deliberately passes `advanced` to no group — two of its
+    // groups are all-advanced and existing specs assert their fields visible —
+    // so an earlier version of this test drove `?tab=configuration` and waited
+    // for a `<details>` that page never renders.
+    //
+    // `diagnostics` is all-advanced (debug mode, Slack channel), so the derived
+    // rule collapses it. What a shut group ANNOUNCES is unit-tested instead, in
+    // web/tests/workspace-field-logic.test.ts, against both the array and the
+    // map shape — which is the stronger test, and the only place the map shape
+    // is covered. A fresh create form has nothing set, so there is no count to
+    // surface here and asserting one would be asserting the fixture.
+    await page.goto('/workspaces')
+    await page.getByRole('button', { name: 'New Workspace' }).click()
 
-    await page.goto(`/workspaces/${wsId}?tab=configuration`)
-
-    const group = page.getByTestId('ws-adv-metadata')
+    const group = page.getByTestId('ws-adv-diagnostics')
     await expect(group).toBeVisible({ timeout: 15_000 })
-
-    // Shut, and already telling the operator it is not empty.
     await expect(group).not.toHaveAttribute('open', /.*/)
-    await expect(page.getByTestId('ws-adv-metadata-held')).toContainText('2')
-
     await expectNoHorizontalPageScroll(page)
 
     // Open it: the fields appear and the page still does not scroll sideways.
