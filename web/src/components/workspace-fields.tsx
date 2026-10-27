@@ -474,3 +474,40 @@ export function WsField({
     </div>
   )
 }
+
+/**
+ * The attribute payload for a create or a save, built from the values.
+ *
+ * ONE producer, because the two rules below are each a 422 waiting to happen
+ * and neither is visible from a field's declaration:
+ *
+ *   - **Never send an alias beside its canonical key.** The API derives
+ *     `auto-apply` from `auto-apply-mode` and refuses a request carrying both.
+ *     `alsoAccepts` records the superseded spellings precisely so nothing
+ *     renders a second control for one, and this function never emits one.
+ *   - **`vcs-connection` is a RELATIONSHIP, not an attribute.** It is returned
+ *     here under its own key so the caller can place it, rather than being
+ *     silently dropped into `attributes` where the API would ignore it.
+ *
+ * `engine` is omitted: it is chosen by which create endpoint is posted to and
+ * is immutable afterwards, which is why its spec carries `notInForms`.
+ */
+export function toAttributes(
+  values: Record<string, unknown>,
+  opts: { include?: (attr: string) => boolean } = {},
+): { attributes: Record<string, unknown>; vcsConnectionId: string } {
+  const attributes: Record<string, unknown> = {}
+  let vcsConnectionId = ''
+  for (const spec of FIELDS) {
+    if (spec.notInForms) continue
+    if (opts.include && !opts.include(spec.attr)) continue
+    const v = values[spec.attr]
+    if (v === undefined) continue
+    if (spec.attr === 'vcs-connection-id') {
+      vcsConnectionId = typeof v === 'string' ? v : ''
+      continue
+    }
+    attributes[spec.attr] = v
+  }
+  return { attributes, vcsConnectionId }
+}
