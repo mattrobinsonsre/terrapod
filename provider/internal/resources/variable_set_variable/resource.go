@@ -133,10 +133,12 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"sensitive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
 			"apply_only": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Withhold this variable from a plan and deliver it only to an " +
-					"apply. An apply-only row shadows its standard twin inside this set's own " +
-					"precedence tier only — a priority set's standard row still beats a " +
-					"workspace apply-only one.",
+				Description: "Withhold this variable from a plan, delivering it to an apply " +
+					"AND to an Ansible configure, which runs the repository's playbooks " +
+					"against real hosts and so receives these rows deliberately. To withhold " +
+					"it from an apply as well, use `configure_only`. An apply-only row " +
+					"shadows its standard twin inside this set's own precedence tier only — " +
+					"a priority set's standard row still beats a workspace apply-only one.",
 			},
 			"configure_only": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),

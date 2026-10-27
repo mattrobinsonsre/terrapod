@@ -112,11 +112,15 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"apply_only": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Withhold this variable from a plan and deliver it only to an " +
-					"apply. A plan executes the configuration's code, so a credential only " +
-					"the apply needs should not be in a plan's environment. For a different " +
-					"value per phase, declare TWO variables with the same `key` — one " +
-					"ordinary and one `apply_only` — and the apply-only one wins on an apply.",
+				Description: "Withhold this variable from a plan, delivering it to an apply " +
+					"AND to an Ansible configure. A plan executes the configuration's code, " +
+					"so a credential a plan does not need should not be in its environment; " +
+					"a configure runs the repository's playbooks against real hosts, so it " +
+					"is a write with apply-equivalent blast radius and receives these rows " +
+					"deliberately. To withhold a variable from an apply as well, use " +
+					"`configure_only`. For a different value per phase, declare TWO " +
+					"variables with the same `key` — one ordinary and one `apply_only` — " +
+					"and the apply-only one wins on an apply.",
 			},
 			"configure_only": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
