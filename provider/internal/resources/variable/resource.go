@@ -118,6 +118,17 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					"value per phase, declare TWO variables with the same `key` — one " +
 					"ordinary and one `apply_only` — and the apply-only one wins on an apply.",
 			},
+			"configure_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan AND from an apply, delivering " +
+					"it only to an Ansible configure. The fleet's own credential — an SSH " +
+					"private key to the estate, a become password — which nothing in a plan " +
+					"or an apply has any business holding. This is a THIRD slot rather than a " +
+					"variant of `apply_only`, because a configure already receives every " +
+					"apply-only row: `apply_only` means \"apply and configure\", so it cannot " +
+					"express \"not in an apply either\". Setting both flags on one variable is " +
+					"refused by the server with a 422 rather than resolved.",
+			},
 			"description": schema.StringAttribute{
 				Optional: true, Description: "Description.",
 			},
@@ -280,13 +291,13 @@ var _ resource.ResourceWithModifyPlan = &variableResource{}
 // then returns different ones, which is "Provider produced inconsistent result
 // after apply". `apply_only` was omitted when it was added (#2189) and
 // `updated_at` carries `onupdate` on the server, so flipping it alone hit
-// exactly that.
+// exactly that; `configure_only` (#2190) is in from the start.
 //
 // TestEveryAttributeIsAccountedForInTheRePlanGate derives the membership from
 // the schema, so a new attribute cannot be left out silently.
 var changeDetecting = []string{
 	"workspace_id", "key", "value", "category", "structured", "hcl",
-	"sensitive", "apply_only", "description", "value_source",
+	"sensitive", "apply_only", "configure_only", "description", "value_source",
 }
 
 // carriedWhenUnchanged are the attributes the server moves on every write, kept
@@ -331,6 +342,9 @@ func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		req.ApplyOnly = m.ApplyOnly.ValueBool()
 	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		req.ConfigureOnly = m.ConfigureOnly.ValueBool()
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
 	}
@@ -367,6 +381,10 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		a := m.ApplyOnly.ValueBool()
 		req.ApplyOnly = &a
+	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		c := m.ConfigureOnly.ValueBool()
+		req.ConfigureOnly = &c
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -409,6 +427,7 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
 	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
+	m.ConfigureOnly = types.BoolValue(v.ConfigureOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

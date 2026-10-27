@@ -72,3 +72,21 @@ func TestEveryAttributeIsAccountedForInTheRePlanGate(t *testing.T) {
 			"was it renamed or removed?", name, accounted[name])
 	}
 }
+
+// The two phase flags decide which run phases receive a variable, so a write
+// can change either one and both belong in the compare list. Spelled out
+// separately from the derived gate above because this is the specific pairing
+// #2190 introduced: `configure_only` is not a variant of `apply_only` but a
+// third slot beside it, and the two must stay wired alike.
+func TestBothPhaseFlagsAreChangeDetecting(t *testing.T) {
+	in := map[string]bool{}
+	for _, name := range changeDetecting {
+		in[name] = true
+	}
+	for _, name := range []string{"apply_only", "configure_only"} {
+		if !in[name] {
+			t.Errorf("%q is not in changeDetecting, so flipping it alone plans a "+
+				"stale updated_at and the apply contradicts the plan", name)
+		}
+	}
+}

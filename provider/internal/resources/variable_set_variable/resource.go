@@ -27,15 +27,16 @@ type variableSetVariableModel struct {
 	ID       types.String `tfsdk:"id"`
 	VarsetID types.String `tfsdk:"varset_id"`
 
-	Key         types.String `tfsdk:"key"`
-	Value       types.String `tfsdk:"value"`
-	Category    types.String `tfsdk:"category"`
-	Structured  types.Bool   `tfsdk:"structured"`
-	HCL         types.Bool   `tfsdk:"hcl"`
-	Sensitive   types.Bool   `tfsdk:"sensitive"`
-	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
-	Description types.String `tfsdk:"description"`
-	ValueSource types.String `tfsdk:"value_source"`
+	Key           types.String `tfsdk:"key"`
+	Value         types.String `tfsdk:"value"`
+	Category      types.String `tfsdk:"category"`
+	Structured    types.Bool   `tfsdk:"structured"`
+	HCL           types.Bool   `tfsdk:"hcl"`
+	Sensitive     types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly     types.Bool   `tfsdk:"apply_only"`
+	ConfigureOnly types.Bool   `tfsdk:"configure_only"`
+	Description   types.String `tfsdk:"description"`
+	ValueSource   types.String `tfsdk:"value_source"`
 
 	VersionID types.String `tfsdk:"version_id"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -54,7 +55,7 @@ var (
 // after apply" rather than a missed optimisation.
 var changeDetecting = []string{
 	"varset_id", "key", "value", "category", "structured", "hcl",
-	"sensitive", "apply_only", "description", "value_source",
+	"sensitive", "apply_only", "configure_only", "description", "value_source",
 }
 
 // carriedWhenUnchanged are the attributes the server moves on every write.
@@ -136,6 +137,16 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"apply. An apply-only row shadows its standard twin inside this set's own " +
 					"precedence tier only — a priority set's standard row still beats a " +
 					"workspace apply-only one.",
+			},
+			"configure_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan AND from an apply, delivering " +
+					"it only to an Ansible configure — the fleet's own credential, such as an " +
+					"SSH private key to the estate, which nothing in a plan or an apply has " +
+					"any business holding. A third slot rather than a variant of `apply_only`, " +
+					"which means \"apply and configure\" and so cannot express \"not in an " +
+					"apply either\". Setting both flags on one variable is refused by the " +
+					"server with a 422 rather than resolved.",
 			},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
 			"value_source": schema.StringAttribute{
@@ -284,6 +295,9 @@ func buildCreateVSVRequest(m *variableSetVariableModel) terrapod.CreateVarsetVar
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		req.ApplyOnly = m.ApplyOnly.ValueBool()
 	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		req.ConfigureOnly = m.ConfigureOnly.ValueBool()
+	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
 	}
@@ -315,6 +329,10 @@ func buildUpdateVSVRequest(m *variableSetVariableModel) terrapod.UpdateVarsetVar
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		a := m.ApplyOnly.ValueBool()
 		req.ApplyOnly = &a
+	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		c := m.ConfigureOnly.ValueBool()
+		req.ConfigureOnly = &c
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -353,6 +371,7 @@ func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
 	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
+	m.ConfigureOnly = types.BoolValue(v.ConfigureOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

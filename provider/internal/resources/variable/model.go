@@ -45,15 +45,16 @@ type variableModel struct {
 	ID          types.String `tfsdk:"id"`
 	WorkspaceID types.String `tfsdk:"workspace_id"`
 
-	Key         types.String `tfsdk:"key"`
-	Value       types.String `tfsdk:"value"`
-	Category    types.String `tfsdk:"category"`
-	Structured  types.Bool   `tfsdk:"structured"`
-	HCL         types.Bool   `tfsdk:"hcl"`
-	Sensitive   types.Bool   `tfsdk:"sensitive"`
-	ApplyOnly   types.Bool   `tfsdk:"apply_only"`
-	Description types.String `tfsdk:"description"`
-	ValueSource types.String `tfsdk:"value_source"`
+	Key           types.String `tfsdk:"key"`
+	Value         types.String `tfsdk:"value"`
+	Category      types.String `tfsdk:"category"`
+	Structured    types.Bool   `tfsdk:"structured"`
+	HCL           types.Bool   `tfsdk:"hcl"`
+	Sensitive     types.Bool   `tfsdk:"sensitive"`
+	ApplyOnly     types.Bool   `tfsdk:"apply_only"`
+	ConfigureOnly types.Bool   `tfsdk:"configure_only"`
+	Description   types.String `tfsdk:"description"`
+	ValueSource   types.String `tfsdk:"value_source"`
 
 	VersionID types.String `tfsdk:"version_id"`
 	CreatedAt types.String `tfsdk:"created_at"`
