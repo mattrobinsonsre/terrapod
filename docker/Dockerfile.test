@@ -86,6 +86,15 @@ COPY mcp/internal/mcpserver/crud.go ./mcp/internal/mcpserver/crud.go
 # out of four because the rule was a convention nothing checked.
 COPY web/src/app/admin/bulk-update/page.tsx ./web/src/app/admin/bulk-update/page.tsx
 COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/page.tsx
+# Read by tests/api/test_workspace_setting_parity.py's create/edit parity gate
+# (#2253), which requires every attribute the workspace create path accepts to
+# be offered by the shared field table -- and requires the create form to
+# actually READ that table, because the forms sharing no field code is how they
+# diverged to 13 controls against ~50 accepted attributes in the first place.
+# Without these two files the gate raises rather than passing vacuously; the
+# `_surface()` helper says so in its own error.
+COPY web/src/components/workspace-fields.tsx ./web/src/components/workspace-fields.tsx
+COPY web/src/app/workspaces/page.tsx ./web/src/app/workspaces/page.tsx
 # Read by tests/auth/test_cli_login_timing.py, which ties this page's
 # POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
 COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx

@@ -114,6 +114,18 @@ export interface FieldSpec {
    */
   notInForms?: string
   /**
+   * Settable at create and immutable afterwards.
+   *
+   * `engine` is the only one: the native create route reads it off the body
+   * (`attrs.get("engine")`, defaulting to Terraform) and nothing on the PATCH
+   * path accepts it, because a workspace holds state produced by its own
+   * engine. So the create form offers a selector, the edit tab shows it
+   * read-only, and `toAttributes` must still emit it on create -- dropping it
+   * would silently make every workspace Terraform and leave Pulumi
+   * uncreatable from the UI, which is exactly the #1535 defect over again.
+   */
+  createOnly?: boolean
+  /**
    * Older payload spellings the API still accepts for this same setting.
    *
    * Not a convenience: the parity gate derives what the create route accepts,
@@ -141,12 +153,12 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'engine',
     id: 'ws-engine',
     group: 'identity',
-    // NOT an `attrs` key. The engine is chosen by WHICH create endpoint is
-    // posted to (`_create_workspace_impl(..., engine=...)`), and it is
-    // immutable afterwards -- a workspace holds state produced by its own
-    // engine, which is why `NEVER_BULK_SETTABLE` calls it identity. So the
-    // create form offers a selector and the edit form shows it read-only.
-    notInForms: 'chosen by the create endpoint, not sent as an attribute',
+    // Read on CREATE by the native route rather than by
+    // `_create_workspace_impl` -- `workspace_extensions` takes it off the body
+    // and passes it down as a parameter -- and accepted on no PATCH path,
+    // because `NEVER_BULK_SETTABLE` rightly calls it identity. So it must be
+    // SENT at create and shown read-only afterwards.
+    createOnly: true,
   },
 
   // --- execution --------------------------------------------------------
@@ -489,17 +501,23 @@ export function WsField({
  *     here under its own key so the caller can place it, rather than being
  *     silently dropped into `attributes` where the API would ignore it.
  *
- * `engine` is omitted: it is chosen by which create endpoint is posted to and
- * is immutable afterwards, which is why its spec carries `notInForms`.
+ * `engine` is emitted on create and withheld on a save, because the native
+ * create route reads it off the body while no PATCH path accepts it. Getting
+ * that backwards is not cosmetic: omitting it at create makes every workspace
+ * Terraform and leaves Pulumi uncreatable from the UI.
  */
 export function toAttributes(
   values: Record<string, unknown>,
-  opts: { include?: (attr: string) => boolean } = {},
+  opts: { include?: (attr: string) => boolean; create?: boolean } = {},
 ): { attributes: Record<string, unknown>; vcsConnectionId: string } {
   const attributes: Record<string, unknown> = {}
   let vcsConnectionId = ''
   for (const spec of FIELDS) {
     if (spec.notInForms) continue
+    // A create-only attribute is emitted on create and never on a save: the
+    // PATCH path does not accept `engine`, so sending it would be noise at
+    // best and a 422 if that ever tightens.
+    if (spec.createOnly && !opts.create) continue
     if (opts.include && !opts.include(spec.attr)) continue
     const v = values[spec.attr]
     if (v === undefined) continue
@@ -510,4 +528,94 @@ export function toAttributes(
     attributes[spec.attr] = v
   }
   return { attributes, vcsConnectionId }
+}
+
+/**
+ * Where each attribute's label lives, as a key under `workspaceDetail`.
+ *
+ * ONE map, because the alternative is each form guessing. It is not a
+ * mechanical kebab-to-camel conversion and that is the whole reason it exists:
+ * measured against `en.json`, only 29 of the 55 attributes convert cleanly.
+ * `vcs-repo-url` is `fields.vcsRepository`, `engine-version` is
+ * `fields.version`, `resource-cpu` is `fields.cpuRequest`, and the settings
+ * the specialised cards own live in those cards' own sections --
+ * `aiSummary.mode`, `securityScan.threshold`, `drift.checkInterval`.
+ *
+ * Keys under `workspaceDetail` rather than a new shared root: those 111 labels
+ * are already translated in all 33 catalogues, so pointing at them means the
+ * create form inherits the translations instead of needing ~50 new strings
+ * translated 33 times. `workspace-field-groups.tsx` records why the namespace
+ * keeps the detail page's name.
+ *
+ * `test_workspace_field_labels` asserts every entry RESOLVES, so a typo here
+ * fails a test rather than rendering a raw key at an operator.
+ */
+export const LABEL_KEY: Record<string, string> = {
+  // identity
+  name: 'fields.name',
+  engine: 'fields.engine',
+  // execution
+  'execution-mode': 'fields.executionMode',
+  'execution-backend': 'fields.executionBackend',
+  'engine-version': 'fields.version',
+  'working-directory': 'fields.workingDirectory',
+  'auto-apply-mode': 'fields.autoApply',
+  'terragrunt-enabled': 'fields.terragruntEnabledAgent',
+  'terragrunt-version': 'fields.terragruntEnabledVersion',
+  'pulumi-bind-plan': 'fields.bindPlan',
+  parallelism: 'fields.parallelism',
+  'resource-cpu': 'fields.cpuRequest',
+  'resource-memory': 'fields.memoryRequest',
+  // operations
+  'plan-apply-enabled': 'fields.planApplyEnabled',
+  'configure-enabled': 'fields.configureEnabled',
+  'auto-configure-enabled': 'fields.autoConfigureEnabled',
+  'configure-after-apply': 'fields.configureAfterApply',
+  'configure-all-hosts': 'fields.configureAllHosts',
+  // ansible
+  'config-directory': 'fields.configDirectory',
+  'default-playbook': 'fields.defaultPlaybook',
+  'default-limit': 'fields.defaultLimit',
+  'inventory-include-platform': 'fields.inventoryIncludePlatform',
+  'inventory-paths': 'fields.inventoryPaths',
+  'inventory-ignore-paths': 'fields.inventoryIgnorePaths',
+  'ansible-version': 'fields.ansibleVersion',
+  'ansible-execution-environment': 'fields.ansibleExecutionEnvironment',
+  'ansible-collections': 'fields.ansibleCollections',
+  'ee-resource-cpu': 'fields.eeCpuRequest',
+  'ee-resource-memory': 'fields.eeMemoryRequest',
+  // pools
+  'agent-pool-ids': 'fields.agentPools',
+  // vcs
+  'vcs-connection-id': 'fields.vcsConnection',
+  'vcs-repo-url': 'fields.vcsRepository',
+  'vcs-branch': 'fields.vcsBranch',
+  'vcs-workflow': 'fields.vcsWorkflow',
+  'auto-merge': 'fields.autoMerge',
+  'auto-merge-strategy': 'fields.autoMergeStrategy',
+  'allow-fork-pr-plans': 'allowForkPrPlans.label',
+  'trigger-prefixes': 'fields.triggerPrefixes',
+  // governance
+  'drift-detection-enabled': 'drift.enabledLabel',
+  'drift-detection-interval-seconds': 'drift.checkInterval',
+  'drift-ignore-rules': 'fields.driftIgnoreRules',
+  'plan-expiry-seconds': 'planExpiry.expireAfter',
+  // ai
+  'ai-summary-mode': 'aiSummary.mode',
+  'ai-summary-context': 'aiSummary.contextLabel',
+  'ai-policy-mode': 'aiSummary.policyMode',
+  // security scanning
+  'security-scan-engine': 'securityScan.engine',
+  'security-scan-enforcement': 'securityScan.enforcement',
+  'security-scan-severity-threshold': 'securityScan.threshold',
+  'security-scan-skip-rules': 'securityScan.skipRules',
+  // metadata
+  'owner-email': 'fields.owner',
+  labels: 'fields.labels',
+  'var-files': 'fields.varFiles',
+  // cloud identity
+  'oidc-audiences': 'fields.oidcAudiences',
+  // diagnostics
+  'debug-mode': 'debugMode.label',
+  'slack-channel': 'slack.channel',
 }
