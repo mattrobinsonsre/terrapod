@@ -340,6 +340,14 @@ failed. Hosts it had not reached are reported as not reached, which is what
 [Retrying only the hosts that are left](#retrying-only-the-hosts-that-are-left)
 acts on.
 
+Both settings are **deployment-wide, and deliberately not per workspace.** Nobody
+can pick a sensible per-workspace number before real configures have run on their
+own estate, and a workspace column would have to be carried through the API, the
+SDK, the provider, the MCP tools and the UI to be worth having. The ceiling is
+therefore sized for your longest legitimate playbook rather than tuned per
+workspace; if you reach a point where one workspace genuinely needs its own
+bound, that is worth asking for rather than working around.
+
 ### Retrying only the hosts that are left
 
 A configure that fails partway has configured some hosts and not others, and the
