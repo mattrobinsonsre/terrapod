@@ -46,6 +46,8 @@ const page = read('src', 'app', 'workspaces', '[id]', 'page.tsx')
 const panel = read('src', 'components', 'inventory-panel.tsx')
 const bulk = read('src', 'app', 'admin', 'bulk-update', 'page.tsx')
 const autodiscovery = read('src', 'app', 'admin', 'autodiscovery', 'page.tsx')
+/** The shared field table both workspace forms render from (#2253). */
+const fields = read('src', 'components', 'workspace-fields.tsx')
 
 /** Every surface that writes a workspace or the rule that materialises one. */
 const WRITERS = [
@@ -146,10 +148,32 @@ test('the read-only render has TWO states, and the empty one says "root"', () =>
 })
 
 test('both operation booleans are offered on the workspace editor', () => {
-  assert.match(page, /id="ws-plan-apply-enabled"/)
-  assert.match(page, /id="ws-configure-enabled"/)
-  assert.match(page, /t\('fields\.planApplyEnabled'\)/)
-  assert.match(page, /t\('fields\.configureEnabled'\)/)
+  // The property is unchanged; where it is written down moved. Since #2253 the
+  // editor renders from the shared field table, so the DOM id and the label key
+  // live in `workspace-fields.tsx` and the page names only the attribute — the
+  // literal `id="ws-plan-apply-enabled"` this used to match is now derived from
+  // `FIELD_BY_ATTR`.
+  //
+  // Asserted in BOTH halves rather than one, which is what keeps it as strict
+  // as the version it replaces: the page could name an attribute the table does
+  // not declare, and the table could declare one no form renders. Neither half
+  // alone can see that.
+  for (const attr of ['plan-apply-enabled', 'configure-enabled']) {
+    assert.match(
+      page,
+      new RegExp(`attr="${attr}"`),
+      `${attr} is not rendered on the workspace editor`,
+    )
+    assert.match(
+      fields,
+      new RegExp(`attr: '${attr}'`),
+      `${attr} is not declared in the shared field table`,
+    )
+  }
+  assert.match(fields, /id: 'ws-plan-apply-enabled'/)
+  assert.match(fields, /id: 'ws-configure-enabled'/)
+  assert.match(fields, /'plan-apply-enabled': 'fields\.planApplyEnabled',/)
+  assert.match(fields, /'configure-enabled': 'fields\.configureEnabled',/)
 })
 
 test('every surface blocks the both-false save the server refuses', () => {

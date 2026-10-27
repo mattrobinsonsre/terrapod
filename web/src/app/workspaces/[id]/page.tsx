@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, Suspense, type ReactNode } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
@@ -11,6 +11,13 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
+import {
+  EDIT_INPUT,
+  FIELD_BY_ATTR,
+  LABEL_KEY,
+  dependencyMet,
+} from '@/components/workspace-fields'
+import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { categoryKey, nativeCategoryKey } from '@/lib/variable-category'
 import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
@@ -2475,6 +2482,426 @@ function WorkspaceDetailContent() {
       })),
   ]
 
+  // ---------------------------------------------------------------------
+  // The Configuration tab's field groups (#2253)
+  //
+  // `workspace-fields.tsx` owns which attribute belongs to which group and
+  // `workspace-field-groups.tsx` owns the markup. What lives here is the only
+  // part this page can answer: what each value currently IS, and what changing
+  // it means. That is exactly why a group takes `(mode, values, onChange)`
+  // rather than owning a save — this tab has THREE save semantics and they
+  // have to stay distinct:
+  //
+  //   the settings card   batched into the `edit*` buffer behind Edit / Save
+  //   the drift card      per-field action buttons, plus `Check now`
+  //   the six others      PATCH immediately on change
+  //
+  // A group that assumed any one of those would be unusable by the other two.
+
+  /** The engine as `FIELDS` names it; an older workspace carries none. */
+  const engineId = attrs.engine || 'terraform'
+
+  /** The stored row, as the groups want it: keyed by attribute name.
+   *
+   *  Cast because the attributes interface has no index signature, and giving
+   *  it one would stop every misspelled key being a type error — which is the
+   *  more valuable of the two properties. */
+  const storedValues = attrs as unknown as Record<string, unknown>
+
+  /** An attribute's label, from the one shared map.
+   *
+   *  The single engine-specific exception is `auto-merge`: a Pulumi workspace
+   *  merges after an UPDATE rather than an apply, so that label comes from the
+   *  phase vocabulary instead of `fields.autoMerge` (#1911). Every other label
+   *  is engine-neutral, which is why this is an exception rather than a second
+   *  lookup table. */
+  const fieldLabel = (attr: string): string =>
+    attr === 'auto-merge' ? phaseWord('fieldsAutoMerge') : t(LABEL_KEY[attr])
+
+  // NO GROUP IN THIS CARD PASSES `advanced`, and that is measured rather than
+  // an oversight. A collapsed `<details>` is HIDDEN to Playwright, and the only
+  // two groups here whose every field is advanced are each asserted visible by
+  // an existing spec: `oidc-audiences` by responsive.spec.ts ("both the
+  // provider keys and every audience stay visible, not hidden behind a
+  // breakpoint") and `Drift Ignore Rules` by pulumi-workspace.spec.ts, which
+  // uses its presence to tell the two engines apart. Collapsing either means
+  // opening the `<details>` in those specs first, which is a change to the
+  // suite rather than to this page.
+  //
+  // `metadata` and `vcs` are mixed — `owner-email` and `vcs-repo-url` are not
+  // advanced — so neither was ever a candidate: folding a group because ONE of
+  // its fields is advanced would put the repository URL out of sight.
+
+  // Every write path in the settings card already guarded on `can-update` as
+  // well as `editing`; the Edit button is itself behind that permission, so
+  // the two agree in practice and one name makes the card uniform.
+  const settingsEditing = editing && !!perms['can-update']
+
+  /** What the settings card shows: the stored row, overlaid with the edit
+   *  buffer while editing.
+   *
+   *  OVERLAID rather than replaced, so a field with no edit state of its own —
+   *  and, far more important, every dependency GATE — still reads a real value
+   *  instead of `undefined`, which `dependencyMet` fails closed on. */
+  const settingsValues: Record<string, unknown> = settingsEditing
+    ? {
+        ...storedValues,
+        name: editName,
+        'execution-mode': editExecMode,
+        'execution-backend': editBackend,
+        'engine-version': editVersion,
+        'working-directory': editWorkingDir,
+        'auto-apply-mode': editAutoApplyMode,
+        'pulumi-bind-plan': editBindPlan,
+        parallelism: editParallelism,
+        'resource-cpu': editCpu,
+        'resource-memory': editMemory,
+        'terragrunt-enabled': editTerragruntEnabled,
+        'terragrunt-version': editTerragruntVersion,
+        'plan-apply-enabled': editPlanApplyEnabled,
+        'configure-enabled': editConfigureEnabled,
+        'auto-configure-enabled': editAutoConfigureEnabled,
+        'configure-after-apply': editConfigureAfterApply,
+        'configure-all-hosts': editConfigureAllHosts,
+        'config-directory': editConfigDir,
+        'default-playbook': editDefaultPlaybook,
+        'default-limit': editDefaultLimit,
+        'inventory-include-platform': editInventoryIncludePlatform,
+        'inventory-paths': editInventoryPaths,
+        'inventory-ignore-paths': editInventoryIgnorePaths,
+        'agent-pool-ids': editPoolIds,
+        'owner-email': editOwner,
+        labels: editLabels,
+        'var-files': editVarFiles,
+        'vcs-connection-id': editVcsConnectionId,
+        'vcs-repo-url': editVcsRepoUrl,
+        'vcs-branch': editVcsBranch,
+        'vcs-workflow': editVcsWorkflow,
+        'auto-merge': editAutoMerge,
+        'auto-merge-strategy': editAutoMergeStrategy,
+        'trigger-prefixes': editTriggerPrefixes,
+        'drift-ignore-rules': editDriftIgnoreRules,
+        'oidc-audiences': editOidcAudiences ?? {},
+      }
+    : storedValues
+
+  /** The hint under a settings field, where the old markup carried one. */
+  const SETTINGS_HINTS: Record<string, string> = {
+    'plan-apply-enabled': 'fields.planApplyEnabledHint',
+    'configure-enabled': 'fields.configureEnabledHint',
+    'configure-after-apply': 'fields.configureAfterApplyHint',
+    'configure-all-hosts': 'fields.configureAllHostsHint',
+    'inventory-include-platform': 'fields.inventoryIncludePlatformHint',
+    'config-directory': 'fields.configDirectoryRootHint',
+    'inventory-paths': 'fields.inventoryPathsHint',
+    'inventory-ignore-paths': 'fields.inventoryIgnorePathsHint',
+    'agent-pool-ids': 'fields.agentPoolsHint',
+    'trigger-prefixes': 'fields.triggerPrefixesHint',
+    'oidc-audiences': 'fields.oidcAudiencesHint',
+  }
+
+  const settingsHint = (attr: string): ReactNode => {
+    // `auto-configure-enabled` says what it WILL target rather than only that
+    // it is on: an empty default limit means the whole inventory, and that is
+    // the fact worth putting in front of somebody turning it on.
+    if (attr === 'auto-configure-enabled') {
+      const limit = String(settingsValues['default-limit'] ?? '').trim()
+      return (
+        <p className="mt-1 text-xs text-slate-400">
+          {limit
+            ? t('fields.autoConfigureEnabledHintLimited', { limit })
+            : t('fields.autoConfigureEnabledHint')}
+        </p>
+      )
+    }
+    const key = SETTINGS_HINTS[attr]
+    // Hints that only make sense beside a control, which is where the old
+    // markup put them too — a read view that repeated them would be noise.
+    const editOnly = attr === 'config-directory' || attr === 'inventory-include-platform'
+    if (!key || (editOnly && !settingsEditing)) return null
+    return <p className="mt-1 text-xs text-slate-400">{t(key)}</p>
+  }
+
+  /** Where each settings field's change goes.
+   *
+   *  One table rather than a prop per field, because a group hands the
+   *  attribute name back and this page is what knows the buffer. An attribute
+   *  absent from here cannot be changed in the settings card, by construction
+   *  rather than by remembering to render it read-only. */
+  const SETTINGS_SETTERS: Record<string, (v: unknown) => void> = {
+    name: (v) => setEditName(String(v)),
+    'execution-mode': (v) => setEditExecMode(String(v)),
+    'execution-backend': (v) => setEditBackend(String(v)),
+    'engine-version': (v) => setEditVersion(String(v)),
+    'working-directory': (v) => setEditWorkingDir(String(v)),
+    'auto-apply-mode': (v) => setEditAutoApplyMode(String(v)),
+    'pulumi-bind-plan': (v) => setEditBindPlan(Boolean(v)),
+    // Kept a STRING, because the input is one: parsing here would turn a
+    // half-typed value into `NaN` under the operator's cursor, and the save
+    // path already coerces it.
+    parallelism: (v) => setEditParallelism(String(v)),
+    'resource-cpu': (v) => setEditCpu(String(v)),
+    'resource-memory': (v) => setEditMemory(String(v)),
+    'terragrunt-enabled': (v) => setEditTerragruntEnabled(Boolean(v)),
+    'terragrunt-version': (v) => setEditTerragruntVersion(String(v)),
+    'plan-apply-enabled': (v) => setEditPlanApplyEnabled(Boolean(v)),
+    'configure-enabled': (v) => setEditConfigureEnabled(Boolean(v)),
+    'auto-configure-enabled': (v) => setEditAutoConfigureEnabled(Boolean(v)),
+    'configure-after-apply': (v) => setEditConfigureAfterApply(Boolean(v)),
+    'configure-all-hosts': (v) => setEditConfigureAllHosts(Boolean(v)),
+    'config-directory': (v) => setEditConfigDir(String(v)),
+    'default-playbook': (v) => setEditDefaultPlaybook(String(v)),
+    'default-limit': (v) => setEditDefaultLimit(String(v)),
+    'inventory-include-platform': (v) => setEditInventoryIncludePlatform(Boolean(v)),
+    'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
+    'inventory-ignore-paths': (v) => setEditInventoryIgnorePaths(v as string[]),
+    'agent-pool-ids': (v) => setEditPoolIds(v as string[]),
+    'owner-email': (v) => setEditOwner(String(v)),
+    labels: (v) => setEditLabels(v as Record<string, string>),
+    'var-files': (v) => setEditVarFiles(v as string[]),
+    // `''` is "no connection", which the column stores as NULL.
+    'vcs-connection-id': (v) => setEditVcsConnectionId(String(v) || null),
+    'vcs-repo-url': (v) => setEditVcsRepoUrl(String(v)),
+    'vcs-branch': (v) => setEditVcsBranch(String(v)),
+    'vcs-workflow': (v) =>
+      setEditVcsWorkflow(String(v) as 'merge_then_apply' | 'apply_then_merge'),
+    'auto-merge': (v) => setEditAutoMerge(Boolean(v)),
+    'auto-merge-strategy': (v) =>
+      setEditAutoMergeStrategy(String(v) as 'merge' | 'squash' | 'rebase'),
+    'trigger-prefixes': (v) => setEditTriggerPrefixes(v as string[]),
+    'drift-ignore-rules': (v) => setEditDriftIgnoreRules(v as string[]),
+    'oidc-audiences': (v) => setEditOidcAudiences(v as OidcAudiences),
+  }
+
+  /** The settings card's context. One `mode` for the whole card, because one
+   *  Edit button governs all of it. */
+  const settingsCtx: GroupCtx = {
+    mode: settingsEditing ? 'edit' : 'view',
+    values: settingsValues,
+    onChange: (attr, v) => SETTINGS_SETTERS[attr]?.(v),
+    engine: engineId,
+    label: fieldLabel,
+    hint: settingsHint,
+    busy: saving,
+  }
+
+  /** The Ansible group's context.
+   *
+   *  `FIELDS` declares every Ansible attribute a dependent of
+   *  `configure-enabled`, which is right for the CREATE form — there is nothing
+   *  to configure before the operation is declared. On the edit tab it is not,
+   *  and that is a decision already taken and already asserted: the config
+   *  directory is "always present rather than revealed" in
+   *  `responsive.spec.ts`'s own words (#1966), and `inventory.spec.ts` fills
+   *  the path, the playbook and the limit on a fresh workspace without ticking
+   *  anything. Hiding them would also hide the only place an operator can SEE
+   *  what a workspace is configured to run.
+   *
+   *  So the gate is reported satisfied for this group alone. The three
+   *  TRIGGERS — which genuinely do nothing without the operation — keep theirs,
+   *  in the operations group above, where `configure-trigger.spec.ts` asserts
+   *  they are absent until configure is on.
+   *
+   *  The shared table has no way to say "a dependent on create, always shown on
+   *  edit", which is the real gap; this is the local answer until it does. */
+  const ansibleCtx: GroupCtx = {
+    ...settingsCtx,
+    values: { ...settingsValues, 'configure-enabled': true },
+  }
+
+  /** The same card, forced read-only, for the two fields an operator may see
+   *  and not change: `engine` is identity and immutable after create, and
+   *  ownership grants workspace admin so only a platform admin may move it. */
+  const settingsViewCtx: GroupCtx = { ...settingsCtx, mode: 'view' }
+
+  /** A context for one of the cards that PATCHes immediately on change.
+   *
+   *  `values` is the STORED row, never an edit buffer: there is no buffer to
+   *  read, because the change has already been sent by the time the next
+   *  render happens. */
+  const instantCtx = (
+    onChange: (attr: string, value: unknown) => void,
+    busy: boolean,
+    hint?: (attr: string) => ReactNode,
+  ): GroupCtx => ({
+    mode: perms['can-update'] ? 'edit' : 'view',
+    values: storedValues,
+    onChange,
+    engine: engineId,
+    label: fieldLabel,
+    hint,
+    busy,
+  })
+
+  /** A card's own hint line, with its in-flight indicator. The indicator sits
+   *  in the hint rather than beside the control because that is where the old
+   *  markup put it, and it is the only feedback an instant PATCH gives. */
+  const savingHint = (key: string, busy: boolean): ReactNode => (
+    <p className="text-xs text-slate-500 mt-1">
+      {t(key)}
+      {busy && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
+    </p>
+  )
+
+  /** Whether a settings field's gate is on.
+   *
+   *  `<Field>` applies this itself; this is for the eight fields that span
+   *  both grid columns, which keep their own `sm:col-span-2` wrapper because
+   *  `WsField` has no way to widen one — a list editor squeezed into half a
+   *  row is a worse outcome than a hand-written wrapper. */
+  const settingsShows = (attr: string): boolean =>
+    dependencyMet(FIELD_BY_ATTR[attr], settingsValues)
+
+  /** The Enabled/Disabled toggle every boolean in this card renders.
+   *
+   *  One helper rather than the ten near-identical copies it replaces. Two
+   *  details in it are load-bearing rather than decorative:
+   *
+   *    - the wrapping `<label>` IS the tap target. A bare 16px checkbox is not
+   *      one at phone width, and `min-h-11` gives the row 44px while
+   *      collapsing to nothing on a precise pointer.
+   *    - the explicit `aria-label`. Without it the accessible name is the
+   *      CONCATENATION of the field's own label and this row's Enabled /
+   *      Disabled text, so the name would change as the control toggles — and
+   *      the e2e suite locates several of these by their exact label. */
+  const settingsToggle = (attr: string): ReactNode => {
+    const id = FIELD_BY_ATTR[attr]?.id ?? attr
+    const checked = Boolean(settingsValues[attr])
+    return (
+      <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+        <input
+          id={id}
+          data-testid={id}
+          type="checkbox"
+          checked={checked}
+          disabled={saving}
+          aria-label={fieldLabel(attr)}
+          onChange={(e) => SETTINGS_SETTERS[attr]?.(e.target.checked)}
+          className="rounded border-slate-600 bg-slate-700 text-brand-600"
+        />
+        <span className="text-sm text-slate-200">
+          {checked ? t('common.enabled') : t('common.disabled')}
+        </span>
+      </label>
+    )
+  }
+
+  /** A boolean's READ view.
+   *
+   *  The `?? fallback` mirrors the column default, so a workspace read from an
+   *  API that predates the attribute reads as what it actually does. The span
+   *  carries the testid because `WsField` puts its own `<id>-value` on the
+   *  `<dd>`, and the e2e specs assert the Enabled / Disabled text by the
+   *  shorter name these controls have always had. */
+  const toggleDisplay = (attr: string, fallback: boolean): ReactNode => (
+    <span data-testid={FIELD_BY_ATTR[attr]?.id ?? attr}>
+      {Boolean(settingsValues[attr] ?? fallback) ? t('common.enabled') : t('common.disabled')}
+    </span>
+  )
+
+  /** The Enabled/Disabled toggle for a card that PATCHes on change.
+   *
+   *  The same two load-bearing details as `settingsToggle` — the wrapping
+   *  label as the 44px tap target, and the explicit `aria-label` so the name
+   *  does not become "<field> Enabled" and change as it toggles. */
+  const instantToggle = (attr: string, ctx: GroupCtx, checked: boolean): ReactNode => {
+    const id = FIELD_BY_ATTR[attr]?.id ?? attr
+    return (
+      <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+        <input
+          id={id}
+          data-testid={id}
+          type="checkbox"
+          checked={checked}
+          aria-label={fieldLabel(attr)}
+          disabled={ctx.busy}
+          onChange={(e) => ctx.onChange(attr, e.target.checked)}
+          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+        />
+        <span className="text-sm text-slate-200">
+          {checked ? t('common.enabled') : t('common.disabled')}
+        </span>
+      </label>
+    )
+  }
+
+  /** The three-way AI mode words, shared by the summary and the policy gate. */
+  const aiModeLabel = (v: string | null | undefined): string =>
+    v === 'enabled'
+      ? t('aiSummary.modeEnabled')
+      : v === 'disabled'
+        ? t('aiSummary.modeDisabled')
+        : t('aiSummary.modeDefault')
+
+  /** The drift card. Only the INTERVAL is a field here: the enable toggle, the
+   *  dismiss and `Check now` are actions and stay exactly what they were. */
+  const driftCtx: GroupCtx = instantCtx(
+    (_attr, v) => handleDriftIntervalChange(Number(v)),
+    savingDrift,
+  )
+
+  const planExpiryCtx: GroupCtx = instantCtx(
+    (_attr, v) => handlePlanExpiryChange(Number(v)),
+    savingPlanExpiry,
+  )
+
+  const aiCtx: GroupCtx = {
+    ...instantCtx(
+      (attr, v) => handleAiSummaryAttrUpdate({ [attr]: v }),
+      savingAiSummary,
+      (attr) =>
+        attr === 'ai-policy-mode' ? (
+          // Says plainly what `disabled` does NOT do. A workspace admin
+          // setting it and believing they have opted out of a fleet-wide
+          // blocking control is the misunderstanding this line prevents.
+          <p className="mt-1 text-xs text-slate-500">{t('aiSummary.policyModeNote')}</p>
+        ) : null,
+    ),
+    // Both columns are nullable and `default` is what NULL means, so a select
+    // needs a concrete value to match one of its options against.
+    values: {
+      ...storedValues,
+      'ai-summary-mode': attrs['ai-summary-mode'] || 'default',
+      'ai-policy-mode': attrs['ai-policy-mode'] || 'default',
+    },
+  }
+
+  const scanCtx: GroupCtx = {
+    ...instantCtx((attr, v) => handleSecurityScanAttrUpdate({ [attr]: v }), savingSecurityScan),
+    values: {
+      ...storedValues,
+      'security-scan-enforcement': attrs['security-scan-enforcement'] || 'advisory',
+      'security-scan-engine': attrs['security-scan-engine'] || 'checkov',
+      'security-scan-severity-threshold': attrs['security-scan-severity-threshold'] || 'high',
+    },
+  }
+
+  const debugCtx: GroupCtx = instantCtx(
+    (_attr, v) => handleDebugModeUpdate(Boolean(v)),
+    savingDebugMode,
+    () => savingHint('debugMode.hint', savingDebugMode),
+  )
+
+  const forkCtx: GroupCtx = {
+    ...instantCtx(
+      (_attr, v) => handleForkPlansUpdate(Boolean(v)),
+      savingForkPlans,
+      () => savingHint('allowForkPrPlans.hint', savingForkPlans),
+    ),
+    // See the card below: the attribute is declared a dependent of
+    // `vcs-connection-id` for the create form's sake, and this surface shows
+    // the switch regardless.
+    // `true` rather than a fake id: `dependencyMet` takes a boolean gate at
+    // face value, and nothing here can mistake it for a connection.
+    values: { ...storedValues, 'vcs-connection-id': true },
+  }
+
+  const slackCtx: GroupCtx = instantCtx(
+    (_attr, v) => handleSlackChannelUpdate(String(v).trim()),
+    savingSlackChannel,
+    () => savingHint('slack.hint', savingSlackChannel),
+  )
+
   return (
     <>
       <NavBar />
@@ -2640,177 +3067,257 @@ function WorkspaceDetailContent() {
                   })}
                 </div>
               )}
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.name')}</dt>
-                  {editing ? (
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      // A Pulumi workspace is named project::stack, which the plain rule rejects.
-                      pattern={isPulumi ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*' : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'} maxLength={90}
-                      title={isPulumi ? t('fields.nameTitlePulumi') : t('fields.nameTitle')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs.name}</dd>
+              {/* Nine groups rather than one flat list of thirty-two controls
+                  (#2253). The field set, the grouping and the markup are all
+                  shared with the create form; what stays here is the save —
+                  everything below writes into the `edit*` buffer and lands on
+                  one `Save changes`. */}
+              <div className="space-y-6 min-w-0">
+                <Group id="identity" ctx={settingsCtx} title={t('groups.identity')}>
+                  <Field
+                    attr="name"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs.name}
+                    control={
+                      <input
+                        id="ws-name"
+                        data-testid="ws-name"
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        // A Pulumi workspace is named project::stack, which the plain rule rejects.
+                        pattern={isPulumi ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*' : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
+                        maxLength={90}
+                        title={isPulumi ? t('fields.nameTitlePulumi') : t('fields.nameTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  {/* Identity, and immutable after create — so it is shown
+                      read-only even mid-edit. Absent on Terraform, where it is
+                      the default and naming it would be noise. */}
+                  {attrs.engine && attrs.engine !== 'terraform' && (
+                    <Field
+                      attr="engine"
+                      ctx={settingsViewCtx}
+                      kind="text"
+                      display={
+                        <span data-testid="ws-engine">
+                          {isPulumi ? t('fields.enginePulumi') : attrs.engine}
+                        </span>
+                      }
+                    />
                   )}
-                </div>
-                {attrs.engine && attrs.engine !== 'terraform' && (
-                  <div>
-                    <dt className="text-xs text-slate-500">{t('fields.engine')}</dt>
-                    <dd className="mt-1 text-sm text-slate-200" data-testid="ws-engine">{isPulumi ? t('fields.enginePulumi') : attrs.engine}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.executionMode')}</dt>
-                  {editing ? (
-                    <select value={editExecMode} onChange={(e) => setEditExecMode(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                      <option value="local">{t('fields.execModeLocal')}</option>
-                      <option value="agent">{t('fields.execModeAgent')}</option>
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['execution-mode']}</dd>
+                </Group>
+
+                <Group id="execution" ctx={settingsCtx} title={t('groups.execution')}>
+                  <Field
+                    attr="execution-mode"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={attrs['execution-mode']}
+                    options={[
+                      { value: 'local', label: t('fields.execModeLocal') },
+                      { value: 'agent', label: t('fields.execModeAgent') },
+                    ]}
+                  />
+                  <Field
+                    attr="auto-apply-mode"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={tMode(
+                      autoApplyModeKey(
+                        attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never'),
+                      ),
+                    )}
+                    // Values are the API enum; the labels are translated.
+                    options={[
+                      { value: 'never', label: tMode('never') },
+                      { value: 'always', label: tMode('always') },
+                      { value: 'create', label: tMode('create') },
+                      { value: 'create_update', label: tMode('createUpdate') },
+                    ]}
+                  />
+                  <Field
+                    attr="resource-cpu"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs['resource-cpu']}
+                    control={
+                      <input
+                        id="ws-cpu"
+                        data-testid="ws-cpu"
+                        type="text"
+                        value={editCpu}
+                        onChange={(e) => setEditCpu(e.target.value)}
+                        pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
+                        title={t('fields.cpuRequestTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  <Field
+                    attr="resource-memory"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs['resource-memory']}
+                    control={
+                      <input
+                        id="ws-mem"
+                        data-testid="ws-mem"
+                        type="text"
+                        value={editMemory}
+                        onChange={(e) => setEditMemory(e.target.value)}
+                        pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
+                        title={t('fields.memoryRequestTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  <Field
+                    attr="parallelism"
+                    ctx={settingsCtx}
+                    kind="number"
+                    display={attrs.parallelism ?? 10}
+                    control={
+                      <input
+                        id="ws-parallelism"
+                        data-testid="ws-parallelism"
+                        type="number"
+                        min={1}
+                        max={256}
+                        value={editParallelism}
+                        onChange={(e) => setEditParallelism(e.target.value)}
+                        title={t('fields.parallelismTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  {/* Terraform-only: the execution backend picks the binary
+                      *within* the Terraform engine, so it has no meaning on
+                      Pulumi. Guarded here rather than by `engines` in the
+                      shared table, which does not carry one for it. */}
+                  {!isPulumi && (
+                    <Field
+                      attr="execution-backend"
+                      ctx={settingsCtx}
+                      kind="select"
+                      display={attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}
+                      options={[
+                        { value: 'tofu', label: 'OpenTofu' },
+                        { value: 'terraform', label: 'Terraform' },
+                      ]}
+                    />
                   )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.autoApply')}</dt>
-                  {editing ? (
-                    <select
-                      aria-label={t('fields.autoApply')}
-                      value={editAutoApplyMode}
-                      onChange={(e) => setEditAutoApplyMode(e.target.value)}
-                      className="mt-1 w-full px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"
-                    >
-                      {/* Values are the API enum; the labels are translated. */}
-                      <option value="never">{tMode('never')}</option>
-                      <option value="always">{tMode('always')}</option>
-                      <option value="create">{tMode('create')}</option>
-                      <option value="create_update">{tMode('createUpdate')}</option>
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{tMode(autoApplyModeKey(attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never')))}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.cpuRequest')}</dt>
-                  {editing ? (
-                    <input type="text" value={editCpu} onChange={(e) => setEditCpu(e.target.value)}
-                      pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
-                      title={t('fields.cpuRequestTitle')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['resource-cpu']}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.memoryRequest')}</dt>
-                  {editing ? (
-                    <input type="text" value={editMemory} onChange={(e) => setEditMemory(e.target.value)}
-                      pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
-                      title={t('fields.memoryRequestTitle')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['resource-memory']}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.parallelism')}</dt>
-                  {editing ? (
-                    <input type="number" min={1} max={256} value={editParallelism}
-                      onChange={(e) => setEditParallelism(e.target.value)}
-                      title={t('fields.parallelismTitle')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs.parallelism ?? 10}</dd>
-                  )}
-                </div>
-                {/* Terraform-only: the execution backend picks the binary
-                    *within* the Terraform engine, so it has no meaning on
-                    Pulumi. */}
-                {!isPulumi && (
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.executionBackend')}</dt>
-                  {editing ? (
-                    <select value={editBackend} onChange={(e) => setEditBackend(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                      <option value="tofu">OpenTofu</option>
-                      <option value="terraform">Terraform</option>
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}</dd>
-                  )}
-                </div>
-                )}
-                {/* Every engine pins a version — since #1559 a Pulumi
-                    workspace's is the Pulumi CLI its runs use — so this is shown
-                    on all of them, with suggestions keyed on the engine. */}
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.version')}</dt>
-                  {editing ? (
-                    <>
-                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder={t('fields.versionPlaceholder')}
-                        pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                        title={t('fields.versionTitle')}
-                        className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                      <datalist id="edit-version-suggestions">
-                        {versionSuggestions.map(v => (
-                          <option key={v} value={v} />
-                        ))}
-                      </datalist>
-                    </>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || t('common.default')}</dd>
-                  )}
-                </div>
-                {!isPulumi && (
-                <div>
-                  <dt className="text-xs text-slate-500">Terragrunt</dt>
-                  {editing ? (
-                    <div className="mt-1 space-y-2">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={editTerragruntEnabled} onChange={(e) => setEditTerragruntEnabled(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                        <span className="text-sm text-slate-200">{editTerragruntEnabled ? t('fields.terragruntEnabledAgent') : t('common.disabled')}</span>
-                      </label>
-                      {editTerragruntEnabled && (
-                        <input type="text" value={editTerragruntVersion} onChange={(e) => setEditTerragruntVersion(e.target.value)} placeholder={t('fields.terragruntVersionPlaceholder')}
+                  {/* Every engine pins a version — since #1559 a Pulumi
+                      workspace's is the Pulumi CLI its runs use — so this is
+                      shown on all of them, with suggestions keyed on the engine. */}
+                  <Field
+                    attr="engine-version"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs['terraform-version'] || t('common.default')}
+                    control={
+                      <>
+                        <input
+                          id="ws-version"
+                          data-testid="ws-version"
+                          type="text"
+                          list="edit-version-suggestions"
+                          value={editVersion}
+                          onChange={(e) => setEditVersion(e.target.value)}
+                          placeholder={t('fields.versionPlaceholder')}
                           pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                          title={t('fields.terragruntVersionTitle')}
-                          className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                          title={t('fields.versionTitle')}
+                          className={EDIT_INPUT}
+                        />
+                        <datalist id="edit-version-suggestions">
+                          {versionSuggestions.map((v) => (
+                            <option key={v} value={v} />
+                          ))}
+                        </datalist>
+                      </>
+                    }
+                  />
+                  {/* Hand-written rather than two `<Field>`s, and the one place
+                      in this card that is: `LABEL_KEY` points both terragrunt
+                      attributes at Enabled/Disabled STATE strings, and the
+                      version one carries an unsatisfied `{version}` ICU
+                      argument that would render as a raw key. One composite
+                      control is also how it has always read — the version only
+                      means anything once the checkbox is ticked. */}
+                  {!isPulumi && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-slate-500">Terragrunt</dt>
+                      {settingsEditing ? (
+                        <div className="mt-1 space-y-2">
+                          <label className="flex items-center gap-2 min-h-11 sm:min-h-0">
+                            <input
+                              type="checkbox"
+                              checked={editTerragruntEnabled}
+                              aria-label="Terragrunt" /* i18n-ignore: a product name, like the <dt> above it */
+                              onChange={(e) => setEditTerragruntEnabled(e.target.checked)}
+                              className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                            />
+                            <span className="text-sm text-slate-200">
+                              {editTerragruntEnabled
+                                ? t('fields.terragruntEnabledAgent')
+                                : t('common.disabled')}
+                            </span>
+                          </label>
+                          {editTerragruntEnabled && (
+                            <input
+                              type="text"
+                              value={editTerragruntVersion}
+                              onChange={(e) => setEditTerragruntVersion(e.target.value)}
+                              placeholder={t('fields.terragruntVersionPlaceholder')}
+                              pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
+                              title={t('fields.terragruntVersionTitle')}
+                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <dd className="mt-1 text-sm text-slate-200">
+                          {attrs['terragrunt-enabled']
+                            ? t('fields.terragruntEnabledVersion', {
+                                version: attrs['terragrunt-version'] || '1.0',
+                              })
+                            : t('common.disabled')}
+                        </dd>
                       )}
                     </div>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? t('fields.terragruntEnabledVersion', { version: attrs['terragrunt-version'] || '1.0' }) : t('common.disabled')}</dd>
                   )}
-                </div>
-                )}
-                {isPulumi && (
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs text-slate-500">{t('fields.bindPlan')}</dt>
-                    {editing ? (
-                      <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                        <input type="checkbox" checked={editBindPlan} onChange={(e) => setEditBindPlan(e.target.checked)}
-                          aria-label={t('fields.bindPlan')} data-testid="ws-bind-plan"
-                          className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                        <span className="text-sm text-slate-200">{editBindPlan ? t('common.enabled') : t('common.disabled')}</span>
-                      </label>
-                    ) : (
-                      <dd className="mt-1 text-sm text-slate-200" data-testid="ws-bind-plan-value">{attrs['pulumi-bind-plan'] ? t('common.enabled') : t('common.disabled')}</dd>
-                    )}
-                    <p className="mt-1 text-xs text-slate-400">
-                      {t.rich('fields.bindPlanHelp', {
-                        docs: (chunks) => (
-                          <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline">{chunks}</a>
-                        ),
-                      })}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.workingDirectory')}</dt>
-                  {editing ? (
-                    <input type="text" value={editWorkingDir} onChange={(e) => setEditWorkingDir(e.target.value)} placeholder={t('fields.workingDirectoryPlaceholder')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
+                  <Field
+                    attr="working-directory"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs['working-directory'] || '/'}
+                    placeholder={t('fields.workingDirectoryPlaceholder')}
+                  />
+                  {/* Full width, for the help paragraph's sake. */}
+                  {isPulumi && (
+                    <div className="sm:col-span-2 min-w-0">
+                      <dt className="text-xs text-slate-500">{t('fields.bindPlan')}</dt>
+                      {settingsEditing ? (
+                        <dd className="mt-1">{settingsToggle('pulumi-bind-plan')}</dd>
+                      ) : (
+                        <dd className="mt-1 text-sm text-slate-200" data-testid="ws-bind-plan-value">
+                          {attrs['pulumi-bind-plan'] ? t('common.enabled') : t('common.disabled')}
+                        </dd>
+                      )}
+                      <p className="mt-1 text-xs text-slate-400">
+                        {t.rich('fields.bindPlanHelp', {
+                          docs: (chunks) => (
+                            <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline">{chunks}</a>
+                          ),
+                        })}
+                      </p>
+                    </div>
                   )}
-                </div>
+                </Group>
+
                 {/* Which operations this workspace HAS (#1966). Sat
                     immediately above the Ansible group because
                     `configure-enabled` is what brings that group's whole
@@ -2819,940 +3326,735 @@ function WorkspaceDetailContent() {
                     looking like the declaration, which is the shape #1929
                     shipped and #1966 undid.
 
-                    Two checkboxes, not one select or a radio group: the two
-                    are independent, all four combinations are meaningful
-                    except both-false, and anything that collapsed them into a
-                    single control would have to invent a state the columns do
-                    not have. */}
-                <div className="sm:col-span-2 border-t border-slate-800 pt-4">
-                  <dt className="text-sm text-slate-300">{t('fields.operations')}</dt>
-                  {/* One `dd` for the whole group, so the nested fields can use
-                      plain `label`/`p` — a `dd` three divs down from the `dl`
-                      is not a conforming description list. */}
-                  <dd className="mt-1">
-                    <p className="text-xs text-slate-500">{t('fields.operationsHint')}</p>
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="min-w-0">
-                        <label
-                          htmlFor="ws-plan-apply-enabled"
-                          className="block text-xs text-slate-500"
-                        >
-                          {t('fields.planApplyEnabled')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <>
-                            {/* The wrapping label IS the tap target: a bare
-                                20px checkbox is not one at phone width, and
-                                `min-h-11` on the row gives the whole thing 44px
-                                while collapsing on a precise pointer. */}
-                            <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                              {/* An explicit `aria-label`, as `bindPlan` above
-                                  does. Without it the accessible name is the
-                                  CONCATENATION of the field label and this
-                                  row's own Enabled/Disabled text, which makes
-                                  the control ambiguous to name — and the state
-                                  word would change the name as it toggles. */}
-                              <input
-                                id="ws-plan-apply-enabled"
-                                type="checkbox"
-                                checked={editPlanApplyEnabled}
-                                onChange={(e) => setEditPlanApplyEnabled(e.target.checked)}
-                                aria-label={t('fields.planApplyEnabled')}
-                                className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                              />
-                              <span className="text-sm text-slate-200">
-                                {editPlanApplyEnabled ? t('common.enabled') : t('common.disabled')}
-                              </span>
-                            </label>
-                          </>
-                        ) : (
-                          // `?? true` mirrors the column default, so a
-                          // workspace read from an API that predates the
-                          // attribute reads as what it actually does.
-                          <p
-                            className="mt-1 text-sm text-slate-200"
-                            data-testid="ws-plan-apply-enabled"
-                          >
-                            {(attrs['plan-apply-enabled'] ?? true)
-                              ? t('common.enabled')
-                              : t('common.disabled')}
-                          </p>
-                        )}
-                        <p className="mt-1 text-xs text-slate-400">
-                          {t('fields.planApplyEnabledHint')}
-                        </p>
-                      </div>
-                      <div className="min-w-0">
-                        <label
-                          htmlFor="ws-configure-enabled"
-                          className="block text-xs text-slate-500"
-                        >
-                          {t('fields.configureEnabled')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                            <input
-                              id="ws-configure-enabled"
-                              type="checkbox"
-                              checked={editConfigureEnabled}
-                              onChange={(e) => setEditConfigureEnabled(e.target.checked)}
-                              aria-label={t('fields.configureEnabled')}
-                              className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                            />
-                            <span className="text-sm text-slate-200">
-                              {editConfigureEnabled ? t('common.enabled') : t('common.disabled')}
-                            </span>
-                          </label>
-                        ) : (
-                          <p
-                            className="mt-1 text-sm text-slate-200"
-                            data-testid="ws-configure-enabled"
-                          >
-                            {(attrs['configure-enabled'] ?? false)
-                              ? t('common.enabled')
-                              : t('common.disabled')}
-                          </p>
-                        )}
-                        <p className="mt-1 text-xs text-slate-400">
-                          {t('fields.configureEnabledHint')}
-                        </p>
-                      </div>
-                      {/* How a configure STARTS (#1974). Shown only once the
-                          operation is declared -- offering a trigger for an
-                          operation the workspace does not have would be two
-                          controls that do nothing, and the declaration is the
-                          one an operator sets first. Read from the edit state
-                          while editing so turning configure on reveals them
-                          immediately rather than after a save. */}
-                      {(editing && perms['can-update'] ? editConfigureEnabled : attrs['configure-enabled']) && (
-                        <>
-                          <div className="min-w-0">
-                            <label
-                              htmlFor="ws-auto-configure-enabled"
-                              className="block text-xs text-slate-500"
-                            >
-                              {t('fields.autoConfigureEnabled')}
-                            </label>
-                            {editing && perms['can-update'] ? (
-                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                                <input
-                                  id="ws-auto-configure-enabled"
-                                  type="checkbox"
-                                  checked={editAutoConfigureEnabled}
-                                  onChange={(e) => setEditAutoConfigureEnabled(e.target.checked)}
-                                  aria-label={t('fields.autoConfigureEnabled')}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                                />
-                                <span className="text-sm text-slate-200">
-                                  {editAutoConfigureEnabled ? t('common.enabled') : t('common.disabled')}
-                                </span>
-                              </label>
-                            ) : (
-                              <p
-                                className="mt-1 text-sm text-slate-200"
-                                data-testid="ws-auto-configure-enabled"
-                              >
-                                {(attrs['auto-configure-enabled'] ?? false)
-                                  ? t('common.enabled')
-                                  : t('common.disabled')}
-                              </p>
-                            )}
-                            <p className="mt-1 text-xs text-slate-400">
-                              {/* What it WILL target, not just that it is on: an
-                                  empty default limit means the whole inventory,
-                                  and that is the fact worth putting in front of
-                                  somebody turning this on. */}
-                              {(attrs['default-limit'] || '').trim()
-                                ? t('fields.autoConfigureEnabledHintLimited', {
-                                    limit: (attrs['default-limit'] || '').trim(),
-                                  })
-                                : t('fields.autoConfigureEnabledHint')}
-                            </p>
-                          </div>
-                          <div className="min-w-0">
-                            <label
-                              htmlFor="ws-configure-after-apply"
-                              className="block text-xs text-slate-500"
-                            >
-                              {t('fields.configureAfterApply')}
-                            </label>
-                            {editing && perms['can-update'] ? (
-                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                                <input
-                                  id="ws-configure-after-apply"
-                                  type="checkbox"
-                                  checked={editConfigureAfterApply}
-                                  onChange={(e) => setEditConfigureAfterApply(e.target.checked)}
-                                  aria-label={t('fields.configureAfterApply')}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                                />
-                                <span className="text-sm text-slate-200">
-                                  {editConfigureAfterApply ? t('common.enabled') : t('common.disabled')}
-                                </span>
-                              </label>
-                            ) : (
-                              <p
-                                className="mt-1 text-sm text-slate-200"
-                                data-testid="ws-configure-after-apply"
-                              >
-                                {(attrs['configure-after-apply'] ?? false)
-                                  ? t('common.enabled')
-                                  : t('common.disabled')}
-                              </p>
-                            )}
-                            <p className="mt-1 text-xs text-slate-400">
-                              {t('fields.configureAfterApplyHint')}
-                            </p>
-                          </div>
-                          <div className="min-w-0">
-                            <label
-                              htmlFor="ws-configure-all-hosts"
-                              className="block text-xs text-slate-500"
-                            >
-                              {t('fields.configureAllHosts')}
-                            </label>
-                            {editing && perms['can-update'] ? (
-                              <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                                <input
-                                  id="ws-configure-all-hosts"
-                                  type="checkbox"
-                                  checked={editConfigureAllHosts}
-                                  onChange={(e) => setEditConfigureAllHosts(e.target.checked)}
-                                  aria-label={t('fields.configureAllHosts')}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                                />
-                                <span className="text-sm text-slate-200">
-                                  {editConfigureAllHosts ? t('common.enabled') : t('common.disabled')}
-                                </span>
-                              </label>
-                            ) : (
-                              <p
-                                className="mt-1 text-sm text-slate-200"
-                                data-testid="ws-configure-all-hosts"
-                              >
-                                {(attrs['configure-all-hosts'] ?? false)
-                                  ? t('common.enabled')
-                                  : t('common.disabled')}
-                              </p>
-                            )}
-                            <p className="mt-1 text-xs text-slate-400">
-                              {t('fields.configureAllHostsHint')}
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    {editing && perms['can-update'] && editHasNoOperations && (
-                      // The server refuses this pair (#1966); Save is disabled
-                      // above, and this is the sentence that says why.
+                    Two checkboxes, not one select or a radio group: the two are
+                    independent, all four combinations are meaningful except
+                    both-false, and anything that collapsed them into a single
+                    control would have to invent a state the columns do not
+                    have.
+
+                    The three TRIGGERS below them (#1974) are dependents of
+                    `configure-enabled`, so the shared table hides them while it
+                    is off — offering a trigger for an operation the workspace
+                    does not have would be three controls that do nothing. They
+                    read the edit buffer, so ticking Configure reveals them
+                    immediately rather than after a save. */}
+                <Group
+                  id="operations"
+                  ctx={settingsCtx}
+                  title={t('groups.operations')}
+                  description={
+                    <p className="text-xs text-slate-500 mb-3">{t('fields.operationsHint')}</p>
+                  }
+                >
+                  <Field
+                    attr="plan-apply-enabled"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('plan-apply-enabled', true)}
+                    control={settingsToggle('plan-apply-enabled')}
+                  />
+                  <Field
+                    attr="configure-enabled"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('configure-enabled', false)}
+                    control={settingsToggle('configure-enabled')}
+                  />
+                  <Field
+                    attr="auto-configure-enabled"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('auto-configure-enabled', false)}
+                    control={settingsToggle('auto-configure-enabled')}
+                  />
+                  <Field
+                    attr="configure-after-apply"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('configure-after-apply', false)}
+                    control={settingsToggle('configure-after-apply')}
+                  />
+                  <Field
+                    attr="configure-all-hosts"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('configure-all-hosts', false)}
+                    control={settingsToggle('configure-all-hosts')}
+                  />
+                  {settingsEditing && editHasNoOperations && (
+                    // The server refuses this pair (#1966); Save is disabled
+                    // above, and this is the sentence that says why.
+                    <div className="sm:col-span-2 min-w-0">
                       <p
-                        className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+                        className="mt-1 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
                         data-testid="ws-operations-none"
                       >
                         {t('fields.operationsNone')}
                       </p>
-                    )}
-                  </dd>
-                </div>
-                {/* Where the configure operation runs, and what it does by
-                    default (#1929) — sat beside `working-directory` because
-                    they answer the same question for the configure half of a
-                    run: where in the repository this workspace's code lives.
-                    `inventory_settings` and its own VCS binding are gone — the
-                    inventory now uses the workspace's `vcs-*` attributes
-                    edited in the VCS section below. */}
-                <div className="sm:col-span-2 border-t border-slate-800 pt-4">
-                  <dt className="text-sm text-slate-300">{t('fields.ansibleConfigure')}</dt>
-                  {/* One `dd` for the whole group, so the nested fields can use
-                      plain `label`/`p` — a `dd` three divs down from the `dl`
-                      is not a conforming description list. */}
-                  <dd className="mt-1">
-                    <p className="text-xs text-slate-500">{t('fields.ansibleConfigureHint')}</p>
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* min-w-0 on every grid item: a grid item's min-width is
-                          `auto`, so a select whose longest option is a long
-                          translated string pushes the row past the viewport
-                          however `w-full` the control itself is. */}
-                      <div className="min-w-0">
-                        <label
-                          htmlFor="ws-config-directory"
-                          className="block text-xs text-slate-500"
-                        >
-                          {t('fields.configDirectory')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <>
-                            {/* A plain text box, exactly as `working-directory`
-                                above: the path is just a path, and `''` is the
-                                configuration version's root. #1929's mode select
-                                existed because NULL meant "no configure
-                                operation" — that declaration is
-                                `configure-enabled` above now (#1966), so the
-                                mode had nothing left to choose between.
+                    </div>
+                  )}
+                </Group>
 
-                                No `aria-label`: the `htmlFor` label above names
-                                this input, and an aria-label would override it
-                                with the same words for no gain. */}
-                            <input
-                              id="ws-config-directory"
-                              type="text"
-                              value={editConfigDir}
-                              onChange={(e) => setEditConfigDir(e.target.value)}
-                              placeholder={t('fields.configDirectoryPlaceholder')}
-                              title={t('fields.configDirectoryTitle')}
-                              data-testid="ws-config-directory-input"
-                              className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            />
-                            <p className="mt-1 text-xs text-slate-400">
-                              {t('fields.configDirectoryRootHint')}
-                            </p>
-                          </>
+                {/* Where the configure operation runs, and what it does by
+                    default (#1929). The whole group depends on
+                    `configure-enabled`, so it is absent entirely until the
+                    operation is declared. `inventory_settings` and its own VCS
+                    binding are gone — the inventory now uses the workspace's
+                    `vcs-*` attributes edited in the Version control group. */}
+                <Group
+                  id="ansible"
+                  ctx={ansibleCtx}
+                  title={t('groups.ansible')}
+                  description={
+                    <p className="text-xs text-slate-500 mb-3">{t('fields.ansibleConfigureHint')}</p>
+                  }
+                >
+                  <Field
+                    attr="config-directory"
+                    ctx={ansibleCtx}
+                    kind="text"
+                    // TWO states, not three. The absent one went with the
+                    // nullable column (#1966), so an empty value is the
+                    // configuration version's root and says so — rendering it
+                    // as `/` the way `working-directory` does would be true but
+                    // less legible for a path whose being empty is a choice.
+                    display={
+                      <span data-testid="ws-config-directory">
+                        {attrs['config-directory'] ? (
+                          <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                            {attrs['config-directory']}
+                          </code>
                         ) : (
-                          // TWO states now, not three. The absent one went with
-                          // the nullable column (#1966), so an empty value is
-                          // the configuration version's root and says so —
-                          // rendering it as `/` the way `working-directory`
-                          // does would be true but less legible for a path
-                          // whose being empty is a deliberate choice.
-                          <p
-                            className="mt-1 text-sm text-slate-200"
-                            data-testid="ws-config-directory"
-                          >
-                            {attrs['config-directory'] ? (
-                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
-                                {attrs['config-directory']}
-                              </code>
-                            ) : (
-                              t('fields.configDirectoryRoot')
-                            )}
-                          </p>
+                          t('fields.configDirectoryRoot')
                         )}
-                      </div>
-                      <div className="min-w-0">
-                        <label
-                          htmlFor="ws-inventory-include-platform"
-                          className="block text-xs text-slate-500"
-                          title={t('fields.inventoryIncludePlatformTitle')}
-                        >
-                          {t('fields.inventoryIncludePlatform')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <>
-                            <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
-                              <input
-                                id="ws-inventory-include-platform"
-                                type="checkbox"
-                                checked={editInventoryIncludePlatform}
-                                onChange={(e) => setEditInventoryIncludePlatform(e.target.checked)}
-                                className="rounded border-slate-600 bg-slate-700 text-brand-600"
-                              />
-                              <span className="text-sm text-slate-200">
-                                {editInventoryIncludePlatform
-                                  ? t('common.enabled')
-                                  : t('common.disabled')}
-                              </span>
-                            </label>
-                            <p className="mt-1 text-xs text-slate-400">
-                              {t('fields.inventoryIncludePlatformHint')}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-200">
-                            {(attrs['inventory-include-platform'] ?? true)
-                              ? t('common.enabled')
-                              : t('common.disabled')}
-                          </p>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <label htmlFor="ws-default-playbook" className="block text-xs text-slate-500">
-                          {t('fields.defaultPlaybook')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <input
-                            id="ws-default-playbook"
-                            type="text"
-                            value={editDefaultPlaybook}
-                            onChange={(e) => setEditDefaultPlaybook(e.target.value)}
-                            placeholder={t('fields.defaultPlaybookPlaceholder')}
-                            title={t('fields.defaultPlaybookTitle')}
-                            className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                          />
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-200">
-                            {attrs['default-playbook'] ? (
-                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
-                                {attrs['default-playbook']}
-                              </code>
-                            ) : (
-                              <span className="text-slate-500">{t('common.none')}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <label htmlFor="ws-default-limit" className="block text-xs text-slate-500">
-                          {t('fields.defaultLimit')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <input
-                            id="ws-default-limit"
-                            type="text"
-                            value={editDefaultLimit}
-                            onChange={(e) => setEditDefaultLimit(e.target.value)}
-                            placeholder={t('fields.defaultLimitPlaceholder')}
-                            title={t('fields.defaultLimitTitle')}
-                            className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                          />
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-200">
-                            {attrs['default-limit'] ? (
-                              <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
-                                {attrs['default-limit']}
-                              </code>
-                            ) : (
-                              <span className="text-slate-500">{t('common.none')}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                      <div className="sm:col-span-2 min-w-0">
-                        <label className="block text-xs text-slate-500">
-                          {t('fields.inventoryPaths')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <div className="mt-1 space-y-2">
-                            <p className="text-xs text-slate-400">{t('fields.inventoryPathsHint')}</p>
-                            {/* The shared editor rather than this page's older
-                                inline list: its row actions are real buttons with
-                                a background and a 44px tap target, which bare
-                                coloured text is not. */}
-                            <StringListEditor
-                              values={editInventoryPaths}
-                              onChange={setEditInventoryPaths}
-                              placeholder={t('fields.inventoryPathsPlaceholder')}
-                              addLabel={t('fields.inventoryPathsAdd')}
-                            />
-                          </div>
-                        ) : (
-                          // An ORDERED list, because the order is the precedence
-                          // order — a later source wins per variable — so a
-                          // read that lost it would misreport the merge.
-                          <div className="mt-1 text-sm text-slate-200">
-                            {(attrs['inventory-paths'] || []).length > 0 ? (
-                              <ol className="flex flex-col gap-1">
-                                {(attrs['inventory-paths'] || []).map((path) => (
-                                  <li key={path}>
-                                    <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
-                                      {path}
-                                    </code>
-                                  </li>
-                                ))}
-                              </ol>
-                            ) : (
-                              <span className="text-slate-500">{t('common.none')}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="sm:col-span-2 min-w-0">
-                        <label className="block text-xs text-slate-500">
-                          {t('fields.inventoryIgnorePaths')}
-                        </label>
-                        {editing && perms['can-update'] ? (
-                          <div className="mt-1 space-y-2">
-                            <p className="text-xs text-slate-400">
-                              {t('fields.inventoryIgnorePathsHint')}
-                            </p>
-                            <StringListEditor
-                              values={editInventoryIgnorePaths}
-                              onChange={setEditInventoryIgnorePaths}
-                              placeholder={t('fields.inventoryIgnorePathsPlaceholder')}
-                              addLabel={t('fields.inventoryIgnorePathsAdd')}
-                            />
-                          </div>
-                        ) : (
-                          <div className="mt-1 text-sm text-slate-200">
-                            {(attrs['inventory-ignore-paths'] || []).length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {(attrs['inventory-ignore-paths'] || []).map((path) => (
-                                  <code
-                                    key={path}
-                                    className="bg-slate-700 px-2 py-0.5 rounded text-xs"
-                                  >
-                                    {path}
-                                  </code>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-slate-500">{t('common.none')}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.agentPools')}</dt>
-                  {editing ? (
-                    <div className="mt-1 space-y-1">
-                      <p className="text-xs text-slate-400">{t('fields.agentPoolsHint')}</p>
-                      {poolRows.length === 0 ? (
-                        <p className="text-sm text-slate-400">{t('common.none')}</p>
-                      ) : (
-                        <ul className="space-y-1">
-                          {poolRows.map(({ id, name, assignable }) => {
-                            const selected = editPoolIds.includes(id)
-                            return (
-                              <li key={id}>
-                                <label
-                                  className={`flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                                    assignable
-                                      ? 'cursor-pointer bg-slate-700/60 text-slate-100 hover:bg-slate-700'
-                                      : 'cursor-not-allowed bg-slate-800/60 text-slate-400'
-                                  }`}
-                                  title={assignable ? undefined : t('fields.agentPoolsLocked')}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    disabled={!assignable}
-                                    onChange={() =>
-                                      setEditPoolIds((prev) =>
-                                        prev.includes(id)
-                                          ? prev.filter((existing) => existing !== id)
-                                          : // Append, so the stored order is the
-                                            // order the operator picked.
-                                            [...prev, id]
-                                      )
-                                    }
-                                    className="h-4 w-4 rounded border-slate-500 bg-slate-800 text-brand-500 focus:ring-1 focus:ring-brand-500"
-                                  />
-                                  <span>{name}</span>
-                                  {!assignable && (
-                                    <span className="ms-auto text-xs">
-                                      {t('fields.agentPoolsLocked')}
-                                    </span>
-                                  )}
-                                </label>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  ) : (
-                    <dd className="mt-1 flex flex-wrap gap-1 text-sm text-slate-200">
-                      {(attrs['agent-pool-ids'] || []).length === 0
-                        ? t('common.none')
-                        : (attrs['agent-pool-ids'] || []).map((id) => (
-                            <span
-                              key={id}
-                              className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
-                            >
-                              {poolLabel(id)}
-                            </span>
-                          ))}
-                    </dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.owner')}</dt>
-                  {editing && isAdmin() ? (
-                    <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['owner-email'] || t('common.none')}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.vcsConnection')}</dt>
-                  {editing ? (
-                    <select
-                      value={editVcsConnectionId || ''}
-                      onChange={(e) => setEditVcsConnectionId(e.target.value || null)}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="">{t('common.none')}</option>
-                      {vcsConnections.map((c) => (
-                        <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-connection-name'] || t('common.none')}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.vcsRepository')}</dt>
-                  {editing ? (
-                    <input type="text" value={editVcsRepoUrl} onChange={(e) => setEditVcsRepoUrl(e.target.value)} placeholder="https://github.com/org/repo"
-                      pattern="https?://.+"
-                      title={t('fields.vcsRepositoryTitle')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">
-                      {attrs['vcs-repo-url'] ? (
-                        <a href={attrs['vcs-repo-url']} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300">{attrs['vcs-repo-url']}</a>
-                      ) : t('common.none')}
-                    </dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.vcsBranch')}</dt>
-                  {editing ? (
-                    <input type="text" value={editVcsBranch} onChange={(e) => setEditVcsBranch(e.target.value)} placeholder={t('fields.vcsBranchPlaceholder')} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || t('common.default')}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.vcsWorkflow')}</dt>
-                  {editing ? (
-                    <select
-                      value={editVcsWorkflow}
-                      onChange={(e) => setEditVcsWorkflow(e.target.value as 'merge_then_apply' | 'apply_then_merge')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="merge_then_apply">{t('fields.vcsWorkflowMergeThenApply')}</option>
-                      <option value="apply_then_merge">{t('fields.vcsWorkflowApplyThenMerge')}</option>
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-workflow']}</dd>
-                  )}
-                </div>
-                {editing && editVcsWorkflow === 'apply_then_merge' && (
-                  <div className="sm:col-span-2 rounded border border-amber-700 bg-amber-900/30 p-3 text-xs text-amber-100">
-                    <p className="font-medium">{t('vcsWorkflowWarning.title')}</p>
-                    <p className="mt-1">
-                      {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRbac'), {
-                        em: (chunks) => <em> {chunks}</em>,
-                      })}
-                    </p>
-                    <p className="mt-1">
-                      {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRecommended'), {
-                        strong: (chunks) => <strong>{chunks}</strong>,
-                      })}
-                    </p>
-                    <p className="mt-1">
-                      {t.rich('vcsWorkflowWarning.credit', {
-                        atlantis: (chunks) => (
-                          <a href="https://www.runatlantis.io/" target="_blank" rel="noopener noreferrer" className="underline">{chunks}</a>
-                        ),
-                      })}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-xs text-slate-500">{phaseWord('fieldsAutoMerge')}</dt>
-                  {editing ? (
-                    <label className="mt-1 flex items-center gap-2">
+                      </span>
+                    }
+                    control={
                       <input
-                        type="checkbox"
-                        checked={editAutoMerge}
-                        onChange={(e) => setEditAutoMerge(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                        id="ws-config-dir"
+                        data-testid="ws-config-directory-input"
+                        type="text"
+                        value={editConfigDir}
+                        onChange={(e) => setEditConfigDir(e.target.value)}
+                        placeholder={t('fields.configDirectoryPlaceholder')}
+                        title={t('fields.configDirectoryTitle')}
+                        className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
-                      <span className="text-sm text-slate-200">{editAutoMerge ? t('common.enabled') : t('common.disabled')}</span>
-                    </label>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge'] ? t('common.enabled') : t('common.disabled')}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('fields.autoMergeStrategy')}</dt>
-                  {editing ? (
-                    <select
-                      value={editAutoMergeStrategy}
-                      onChange={(e) => setEditAutoMergeStrategy(e.target.value as 'merge' | 'squash' | 'rebase')}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="merge">merge</option>
-                      <option value="squash">squash</option>
-                      <option value="rebase">rebase</option>
-                    </select>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge-strategy']}</dd>
-                  )}
-                </div>
-                {attrs['vcs-connection-name'] && !editing && (
-                  <div>
-                    <dt className="text-xs text-slate-500">{t('fields.vcsPolling')}</dt>
-                    <dd className="mt-1 text-sm">
-                      {attrs['vcs-last-error'] ? (
-                        <span className="text-red-400" title={attrs['vcs-last-error']}>{t('vcsPolling.error')}{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
-                      ) : vcsPollStalled ? (
-                        // No error recorded, but the newest ATTEMPT is newer than the
-                        // newest SUCCESS — the polls are failing without leaving a
-                        // message. Reporting that as green was the misleading half
-                        // of #1089.
-                        <span className="text-amber-400">
-                          {t('vcsPolling.stalled', {
-                            attempted: new Date(attrs['vcs-last-attempted-at']!).toLocaleString(),
-                            succeeded: attrs['vcs-last-polled-at']
-                              ? new Date(attrs['vcs-last-polled-at']).toLocaleString()
-                              : t('vcsPolling.never'),
-                          })}
-                        </span>
-                      ) : attrs['vcs-last-polled-at'] ? (
-                        <span className="text-green-400">{t('vcsPolling.ok', { time: new Date(attrs['vcs-last-polled-at']).toLocaleString() })}</span>
-                      ) : (
-                        <span className="text-slate-400">{t('vcsPolling.notPolled')}</span>
-                      )}
-                    </dd>
-                  </div>
-                )}
-                <div className="sm:col-span-2">
-                  <dt
-                    className="text-xs text-slate-500 mb-1"
-                    title={t('fields.labelsTitle')}
-                  >
-                    {t('fields.labels')}
-                  </dt>
-                  {editing && perms['can-update'] ? (
-                    <LabelsEditor labels={editLabels} onChange={setEditLabels} />
-                  ) : (
-                    <dd className="mt-1">
-                      <LabelsEditor labels={attrs.labels || {}} readOnly />
-                    </dd>
-                  )}
-                </div>
-                {!isPulumi && (
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">{t('fields.varFiles')}</dt>
-                  {editing && perms['can-update'] ? (
-                    <div className="space-y-2">
-                      {editVarFiles.map((f, i) => (
-                        <div key={f} className="flex items-center gap-2">
-                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
-                          <button
-                            onClick={() => setEditVarFiles(editVarFiles.filter((_, j) => j !== i))}
-                            className="text-xs text-red-400 hover:text-red-300"
-                          >{t('actions.remove')}</button>
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newVarFile}
-                          onChange={(e) => setNewVarFile(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newVarFile.trim()) {
-                              e.preventDefault()
-                              const v = newVarFile.trim()
-                              if (!editVarFiles.includes(v)) {
-                                setEditVarFiles([...editVarFiles, v])
-                              }
-                              setNewVarFile('')
-                            }
-                          }}
-                          placeholder={t('fields.varFilesPlaceholder')}
-                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                        <button
-                          onClick={() => {
-                            if (newVarFile.trim()) {
-                              const v = newVarFile.trim()
-                              if (!editVarFiles.includes(v)) {
-                                setEditVarFiles([...editVarFiles, v])
-                              }
-                              setNewVarFile('')
-                            }
-                          }}
-                          className="text-xs text-brand-400 hover:text-brand-300"
-                        >{t('actions.add')}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">
-                      {(attrs['var-files'] || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {attrs['var-files'].map((f) => (
-                            <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
-                          ))}
-                        </div>
+                    }
+                  />
+                  <Field
+                    attr="inventory-include-platform"
+                    ctx={ansibleCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('inventory-include-platform', true)}
+                    control={settingsToggle('inventory-include-platform')}
+                  />
+                  <Field
+                    attr="default-playbook"
+                    ctx={ansibleCtx}
+                    kind="text"
+                    display={
+                      attrs['default-playbook'] ? (
+                        <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                          {attrs['default-playbook']}
+                        </code>
                       ) : (
                         <span className="text-slate-500">{t('common.none')}</span>
-                      )}
-                    </dd>
-                  )}
-                </div>
-                )}
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">{t('fields.triggerPrefixes')}</dt>
-                  {editing && perms['can-update'] ? (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-400">{t('fields.triggerPrefixesHint')}</p>
-                      {editTriggerPrefixes.map((f, i) => (
-                        <div key={f} className="flex items-center gap-2">
-                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
-                          <button
-                            onClick={() => setEditTriggerPrefixes(editTriggerPrefixes.filter((_, j) => j !== i))}
-                            className="text-xs text-red-400 hover:text-red-300"
-                          >{t('actions.remove')}</button>
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newTriggerPrefix}
-                          onChange={(e) => setNewTriggerPrefix(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newTriggerPrefix.trim()) {
-                              e.preventDefault()
-                              const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
-                              if (v && !editTriggerPrefixes.includes(v)) {
-                                setEditTriggerPrefixes([...editTriggerPrefixes, v])
-                              }
-                              setNewTriggerPrefix('')
-                            }
-                          }}
-                          placeholder={t('fields.triggerPrefixesPlaceholder')}
-                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                        <button
-                          onClick={() => {
-                            if (newTriggerPrefix.trim()) {
-                              const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
-                              if (v && !editTriggerPrefixes.includes(v)) {
-                                setEditTriggerPrefixes([...editTriggerPrefixes, v])
-                              }
-                              setNewTriggerPrefix('')
-                            }
-                          }}
-                          className="text-xs text-brand-400 hover:text-brand-300"
-                        >{t('actions.add')}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">
-                      {(attrs['trigger-prefixes'] || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {attrs['trigger-prefixes'].map((f) => (
-                            <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
-                          ))}
-                        </div>
+                      )
+                    }
+                    control={
+                      <input
+                        id="ws-default-playbook"
+                        data-testid="ws-default-playbook"
+                        type="text"
+                        value={editDefaultPlaybook}
+                        onChange={(e) => setEditDefaultPlaybook(e.target.value)}
+                        placeholder={t('fields.defaultPlaybookPlaceholder')}
+                        title={t('fields.defaultPlaybookTitle')}
+                        className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    }
+                  />
+                  <Field
+                    attr="default-limit"
+                    ctx={ansibleCtx}
+                    kind="text"
+                    display={
+                      attrs['default-limit'] ? (
+                        <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                          {attrs['default-limit']}
+                        </code>
                       ) : (
-                        <span className="text-slate-500">{t('fields.triggerPrefixesNone')}</span>
+                        <span className="text-slate-500">{t('common.none')}</span>
+                      )
+                    }
+                    control={
+                      <input
+                        id="ws-default-limit"
+                        data-testid="ws-default-limit"
+                        type="text"
+                        value={editDefaultLimit}
+                        onChange={(e) => setEditDefaultLimit(e.target.value)}
+                        placeholder={t('fields.defaultLimitPlaceholder')}
+                        title={t('fields.defaultLimitTitle')}
+                        className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    }
+                  />
+                  <div className="sm:col-span-2 min-w-0">
+                    <dt className="text-xs text-slate-500">{t('fields.inventoryPaths')}</dt>
+                    {settingsEditing ? (
+                      <dd className="mt-1 space-y-2">
+                        <p className="text-xs text-slate-400">{t('fields.inventoryPathsHint')}</p>
+                        {/* The shared editor rather than this page's older
+                            inline list: its row actions are real buttons with a
+                            background and a 44px tap target, which bare
+                            coloured text is not. */}
+                        <StringListEditor
+                          values={editInventoryPaths}
+                          onChange={setEditInventoryPaths}
+                          placeholder={t('fields.inventoryPathsPlaceholder')}
+                          addLabel={t('fields.inventoryPathsAdd')}
+                        />
+                      </dd>
+                    ) : (
+                      // An ORDERED list, because the order is the precedence
+                      // order — a later source wins per variable — so a read
+                      // that lost it would misreport the merge.
+                      <dd className="mt-1 text-sm text-slate-200">
+                        {(attrs['inventory-paths'] || []).length > 0 ? (
+                          <ol className="flex flex-col gap-1">
+                            {(attrs['inventory-paths'] || []).map((path) => (
+                              <li key={path}>
+                                <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                                  {path}
+                                </code>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <span className="text-slate-500">{t('common.none')}</span>
+                        )}
+                      </dd>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2 min-w-0">
+                    <dt className="text-xs text-slate-500">{t('fields.inventoryIgnorePaths')}</dt>
+                    {settingsEditing ? (
+                      <dd className="mt-1 space-y-2">
+                        <p className="text-xs text-slate-400">
+                          {t('fields.inventoryIgnorePathsHint')}
+                        </p>
+                        <StringListEditor
+                          values={editInventoryIgnorePaths}
+                          onChange={setEditInventoryIgnorePaths}
+                          placeholder={t('fields.inventoryIgnorePathsPlaceholder')}
+                          addLabel={t('fields.inventoryIgnorePathsAdd')}
+                        />
+                      </dd>
+                    ) : (
+                      <dd className="mt-1 text-sm text-slate-200">
+                        {(attrs['inventory-ignore-paths'] || []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(attrs['inventory-ignore-paths'] || []).map((path) => (
+                              <code
+                                key={path}
+                                className="bg-slate-700 px-2 py-0.5 rounded text-xs"
+                              >
+                                {path}
+                              </code>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">{t('common.none')}</span>
+                        )}
+                      </dd>
+                    )}
+                  </div>
+                </Group>
+
+                <Group id="pools" ctx={settingsCtx} title={t('groups.pools')}>
+                  <Field
+                    attr="agent-pool-ids"
+                    ctx={settingsCtx}
+                    kind="list"
+                    display={
+                      <span className="flex flex-wrap gap-1">
+                        {(attrs['agent-pool-ids'] || []).length === 0
+                          ? t('common.none')
+                          : (attrs['agent-pool-ids'] || []).map((id) => (
+                              <span
+                                key={id}
+                                className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
+                              >
+                                {poolLabel(id)}
+                              </span>
+                            ))}
+                      </span>
+                    }
+                    control={
+                      <div className="mt-1 space-y-1">
+                        {poolRows.length === 0 ? (
+                          <p className="text-sm text-slate-400">{t('common.none')}</p>
+                        ) : (
+                          <ul className="space-y-1">
+                            {poolRows.map(({ id, name, assignable }) => {
+                              const selected = editPoolIds.includes(id)
+                              return (
+                                <li key={id}>
+                                  <label
+                                    className={`flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+                                      assignable
+                                        ? 'cursor-pointer bg-slate-700/60 text-slate-100 hover:bg-slate-700'
+                                        : 'cursor-not-allowed bg-slate-800/60 text-slate-400'
+                                    }`}
+                                    title={assignable ? undefined : t('fields.agentPoolsLocked')}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      disabled={!assignable}
+                                      onChange={() =>
+                                        setEditPoolIds((prev) =>
+                                          prev.includes(id)
+                                            ? prev.filter((existing) => existing !== id)
+                                            : // Append, so the stored order is
+                                              // the order the operator picked.
+                                              [...prev, id]
+                                        )
+                                      }
+                                      className="h-4 w-4 rounded border-slate-500 bg-slate-800 text-brand-500 focus:ring-1 focus:ring-brand-500"
+                                    />
+                                    <span>{name}</span>
+                                    {!assignable && (
+                                      <span className="ms-auto text-xs">
+                                        {t('fields.agentPoolsLocked')}
+                                      </span>
+                                    )}
+                                  </label>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    }
+                  />
+                </Group>
+
+                <Group id="metadata" ctx={settingsCtx} title={t('groups.metadata')}>
+                  {/* Platform-admin only: ownership grants workspace admin, so
+                      anyone else sees the value and cannot move it. */}
+                  <Field
+                    attr="owner-email"
+                    ctx={isAdmin() ? settingsCtx : settingsViewCtx}
+                    kind="text"
+                    display={attrs['owner-email'] || t('common.none')}
+                    control={
+                      <input
+                        id="ws-owner"
+                        data-testid="ws-owner"
+                        type="email"
+                        value={editOwner}
+                        onChange={(e) => setEditOwner(e.target.value)}
+                        placeholder="user@example.com"
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  <div className="sm:col-span-2 min-w-0">
+                    <dt className="text-xs text-slate-500 mb-1" title={t('fields.labelsTitle')}>
+                      {t('fields.labels')}
+                    </dt>
+                    {settingsEditing ? (
+                      <dd className="mt-1">
+                        <LabelsEditor labels={editLabels} onChange={setEditLabels} />
+                      </dd>
+                    ) : (
+                      <dd className="mt-1">
+                        <LabelsEditor labels={attrs.labels || {}} readOnly />
+                      </dd>
+                    )}
+                  </div>
+                  {!isPulumi && (
+                    <div className="sm:col-span-2 min-w-0">
+                      <dt className="text-xs text-slate-500 mb-1">{t('fields.varFiles')}</dt>
+                      {settingsEditing ? (
+                        <dd className="space-y-2">
+                          {editVarFiles.map((f, i) => (
+                            <div key={f} className="flex items-center gap-2">
+                              <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
+                              <button
+                                onClick={() => setEditVarFiles(editVarFiles.filter((_, j) => j !== i))}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                              >{t('actions.remove')}</button>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newVarFile}
+                              onChange={(e) => setNewVarFile(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newVarFile.trim()) {
+                                  e.preventDefault()
+                                  const v = newVarFile.trim()
+                                  if (!editVarFiles.includes(v)) {
+                                    setEditVarFiles([...editVarFiles, v])
+                                  }
+                                  setNewVarFile('')
+                                }
+                              }}
+                              placeholder={t('fields.varFilesPlaceholder')}
+                              className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            />
+                            <button
+                              onClick={() => {
+                                if (newVarFile.trim()) {
+                                  const v = newVarFile.trim()
+                                  if (!editVarFiles.includes(v)) {
+                                    setEditVarFiles([...editVarFiles, v])
+                                  }
+                                  setNewVarFile('')
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
+                            >{t('actions.add')}</button>
+                          </div>
+                        </dd>
+                      ) : (
+                        <dd className="mt-1 text-sm text-slate-200">
+                          {(attrs['var-files'] || []).length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {attrs['var-files'].map((f) => (
+                                <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">{t('common.none')}</span>
+                          )}
+                        </dd>
                       )}
-                    </dd>
+                    </div>
                   )}
-                </div>
+                </Group>
+
+                {/* The four fields below `vcs-connection-id` are its
+                    DEPENDENTS, so with no connection they are absent rather
+                    than rendered against a gate nobody set (#2253). The
+                    connection selector itself is never hidden — hiding a
+                    dependent removes something meaningless, while hiding the
+                    gate removes the only way to reach the feature. */}
+                <Group id="vcs" ctx={settingsCtx} title={t('groups.vcs')}>
+                  <Field
+                    attr="vcs-connection-id"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={attrs['vcs-connection-name'] || t('common.none')}
+                    options={[
+                      { value: '', label: t('common.none') },
+                      ...vcsConnections.map((c) => ({
+                        value: c.id,
+                        label: `${c.attributes.name} (${c.attributes.provider})`,
+                      })),
+                    ]}
+                  />
+                  <Field
+                    attr="vcs-repo-url"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={
+                      attrs['vcs-repo-url'] ? (
+                        <a href={attrs['vcs-repo-url']} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300">{attrs['vcs-repo-url']}</a>
+                      ) : (
+                        t('common.none')
+                      )
+                    }
+                    control={
+                      <input
+                        id="ws-vcs-repo"
+                        data-testid="ws-vcs-repo"
+                        type="text"
+                        value={editVcsRepoUrl}
+                        onChange={(e) => setEditVcsRepoUrl(e.target.value)}
+                        placeholder="https://github.com/org/repo"
+                        pattern="https?://.+"
+                        title={t('fields.vcsRepositoryTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  <Field
+                    attr="vcs-branch"
+                    ctx={settingsCtx}
+                    kind="text"
+                    display={attrs['vcs-branch'] || t('common.default')}
+                    placeholder={t('fields.vcsBranchPlaceholder')}
+                  />
+                  <Field
+                    attr="vcs-workflow"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={attrs['vcs-workflow']}
+                    options={[
+                      { value: 'merge_then_apply', label: t('fields.vcsWorkflowMergeThenApply') },
+                      { value: 'apply_then_merge', label: t('fields.vcsWorkflowApplyThenMerge') },
+                    ]}
+                  />
+                  {settingsEditing && editVcsWorkflow === 'apply_then_merge' && (
+                    <div className="sm:col-span-2 min-w-0 rounded border border-amber-700 bg-amber-900/30 p-3 text-xs text-amber-100">
+                      <p className="font-medium">{t('vcsWorkflowWarning.title')}</p>
+                      <p className="mt-1">
+                        {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRbac'), {
+                          em: (chunks) => <em> {chunks}</em>,
+                        })}
+                      </p>
+                      <p className="mt-1">
+                        {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRecommended'), {
+                          strong: (chunks) => <strong>{chunks}</strong>,
+                        })}
+                      </p>
+                      <p className="mt-1">
+                        {t.rich('vcsWorkflowWarning.credit', {
+                          atlantis: (chunks) => (
+                            <a href="https://www.runatlantis.io/" target="_blank" rel="noopener noreferrer" className="underline">{chunks}</a>
+                          ),
+                        })}
+                      </p>
+                    </div>
+                  )}
+                  <Field
+                    attr="auto-merge"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('auto-merge', false)}
+                    control={settingsToggle('auto-merge')}
+                  />
+                  <Field
+                    attr="auto-merge-strategy"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={attrs['auto-merge-strategy']}
+                    // Wire values, so they are not translated.
+                    options={[
+                      { value: 'merge', label: 'merge' },
+                      { value: 'squash', label: 'squash' },
+                      { value: 'rebase', label: 'rebase' },
+                    ]}
+                  />
+                  {attrs['vcs-connection-name'] && !settingsEditing && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-slate-500">{t('fields.vcsPolling')}</dt>
+                      <dd className="mt-1 text-sm">
+                        {attrs['vcs-last-error'] ? (
+                          <span className="text-red-400" title={attrs['vcs-last-error']}>{t('vcsPolling.error')}{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
+                        ) : vcsPollStalled ? (
+                          // No error recorded, but the newest ATTEMPT is newer
+                          // than the newest SUCCESS — the polls are failing
+                          // without leaving a message. Reporting that as green
+                          // was the misleading half of #1089.
+                          <span className="text-amber-400">
+                            {t('vcsPolling.stalled', {
+                              attempted: new Date(attrs['vcs-last-attempted-at']!).toLocaleString(),
+                              succeeded: attrs['vcs-last-polled-at']
+                                ? new Date(attrs['vcs-last-polled-at']).toLocaleString()
+                                : t('vcsPolling.never'),
+                            })}
+                          </span>
+                        ) : attrs['vcs-last-polled-at'] ? (
+                          <span className="text-green-400">{t('vcsPolling.ok', { time: new Date(attrs['vcs-last-polled-at']).toLocaleString() })}</span>
+                        ) : (
+                          <span className="text-slate-400">{t('vcsPolling.notPolled')}</span>
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                  {settingsShows('trigger-prefixes') && (
+                    <div className="sm:col-span-2 min-w-0">
+                      <dt className="text-xs text-slate-500 mb-1">{t('fields.triggerPrefixes')}</dt>
+                      {settingsEditing ? (
+                        <dd className="space-y-2">
+                          <p className="text-xs text-slate-400">{t('fields.triggerPrefixesHint')}</p>
+                          {editTriggerPrefixes.map((f, i) => (
+                            <div key={f} className="flex items-center gap-2">
+                              <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
+                              <button
+                                onClick={() => setEditTriggerPrefixes(editTriggerPrefixes.filter((_, j) => j !== i))}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                              >{t('actions.remove')}</button>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newTriggerPrefix}
+                              onChange={(e) => setNewTriggerPrefix(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newTriggerPrefix.trim()) {
+                                  e.preventDefault()
+                                  const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
+                                  if (v && !editTriggerPrefixes.includes(v)) {
+                                    setEditTriggerPrefixes([...editTriggerPrefixes, v])
+                                  }
+                                  setNewTriggerPrefix('')
+                                }
+                              }}
+                              placeholder={t('fields.triggerPrefixesPlaceholder')}
+                              className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            />
+                            <button
+                              onClick={() => {
+                                if (newTriggerPrefix.trim()) {
+                                  const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
+                                  if (v && !editTriggerPrefixes.includes(v)) {
+                                    setEditTriggerPrefixes([...editTriggerPrefixes, v])
+                                  }
+                                  setNewTriggerPrefix('')
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
+                            >{t('actions.add')}</button>
+                          </div>
+                        </dd>
+                      ) : (
+                        <dd className="mt-1 text-sm text-slate-200">
+                          {(attrs['trigger-prefixes'] || []).length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {attrs['trigger-prefixes'].map((f) => (
+                                <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">{t('fields.triggerPrefixesNone')}</span>
+                          )}
+                        </dd>
+                      )}
+                    </div>
+                  )}
+                </Group>
+
                 {/* Terraform's alone (#1561): the rules are globs over
                     Terraform attribute paths, and a Pulumi drift run's artifact
                     is a preview digest the classifier cannot read. The server
-                    now declines to apply them for Pulumi, so offering the
-                    editor here would only invite rules that silently do
-                    nothing. Defining them in URN terms is the other half of
-                    #1561. */}
+                    declines to apply them for Pulumi, so offering the editor
+                    here would only invite rules that silently do nothing.
+                    Guarded here because the shared table carries no `engines`
+                    for this attribute. Defining them in URN terms is the other
+                    half of #1561. */}
                 {!isPulumi && (
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">{t('fields.driftIgnoreRules')}</dt>
-                  {editing && perms['can-update'] ? (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-400">
-                        {t.rich('fields.driftIgnoreRulesHint', {
-                          star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
-                          dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
-                          n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
-                          starIdx: () => <code className="text-[10px] bg-slate-800 px-1">[*]</code>,
-                          docs: (chunks) => <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">{chunks}</a>,
-                        })}
-                      </p>
-                      {editDriftIgnoreRules.map((r, i) => (
-                        <div key={`${r}-${i}`} className="flex items-center gap-2">
-                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{r}</code>
-                          <button
-                            onClick={() => setEditDriftIgnoreRules(editDriftIgnoreRules.filter((_, j) => j !== i))}
-                            className="text-xs text-red-400 hover:text-red-300"
-                          >{t('actions.remove')}</button>
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newDriftIgnoreRule}
-                          onChange={(e) => setNewDriftIgnoreRule(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newDriftIgnoreRule.trim()) {
-                              e.preventDefault()
-                              const v = newDriftIgnoreRule.trim()
-                              if (v && !editDriftIgnoreRules.includes(v)) {
-                                setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
-                              }
-                              setNewDriftIgnoreRule('')
-                            }
-                          }}
-                          placeholder="e.g. module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
-                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
-                        />
-                        <button
-                          onClick={() => {
-                            if (newDriftIgnoreRule.trim()) {
-                              const v = newDriftIgnoreRule.trim()
-                              if (v && !editDriftIgnoreRules.includes(v)) {
-                                setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
-                              }
-                              setNewDriftIgnoreRule('')
-                            }
-                          }}
-                          className="text-xs text-brand-400 hover:text-brand-300"
-                        >{t('actions.add')}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200">
-                      {(attrs['drift-ignore-rules'] || []).length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {attrs['drift-ignore-rules'].map((r) => (
-                            <code key={r} className="bg-slate-700 px-2 py-0.5 rounded text-xs font-mono">{r}</code>
+                  <Group id="governance" ctx={settingsCtx} title={t('groups.governance')}>
+                    <div className="sm:col-span-2 min-w-0">
+                      <dt className="text-xs text-slate-500 mb-1">{t('fields.driftIgnoreRules')}</dt>
+                      {settingsEditing ? (
+                        <dd className="space-y-2">
+                          <p className="text-xs text-slate-400">
+                            {t.rich('fields.driftIgnoreRulesHint', {
+                              star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
+                              dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
+                              n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
+                              starIdx: () => <code className="text-[10px] bg-slate-800 px-1">[*]</code>,
+                              docs: (chunks) => <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">{chunks}</a>,
+                            })}
+                          </p>
+                          {editDriftIgnoreRules.map((r, i) => (
+                            <div key={`${r}-${i}`} className="flex items-center gap-2">
+                              <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{r}</code>
+                              <button
+                                onClick={() => setEditDriftIgnoreRules(editDriftIgnoreRules.filter((_, j) => j !== i))}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                              >{t('actions.remove')}</button>
+                            </div>
                           ))}
-                        </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newDriftIgnoreRule}
+                              onChange={(e) => setNewDriftIgnoreRule(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newDriftIgnoreRule.trim()) {
+                                  e.preventDefault()
+                                  const v = newDriftIgnoreRule.trim()
+                                  if (v && !editDriftIgnoreRules.includes(v)) {
+                                    setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
+                                  }
+                                  setNewDriftIgnoreRule('')
+                                }
+                              }}
+                              placeholder="e.g. module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
+                              className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                            />
+                            <button
+                              onClick={() => {
+                                if (newDriftIgnoreRule.trim()) {
+                                  const v = newDriftIgnoreRule.trim()
+                                  if (v && !editDriftIgnoreRules.includes(v)) {
+                                    setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
+                                  }
+                                  setNewDriftIgnoreRule('')
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
+                            >{t('actions.add')}</button>
+                          </div>
+                        </dd>
                       ) : (
-                        <span className="text-slate-500">{t('fields.driftIgnoreRulesNone')}</span>
-                      )}
-                    </dd>
-                  )}
-                </div>
-                )}
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">{t('fields.oidcAudiences')}</dt>
-                  {editing && perms['can-update'] ? (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
-                      {/* `value` is the owned set and `fallbacks` the catalogue
-                          for the keys in force, so an inherited entry is shown
-                          and offered for override rather than edited in place,
-                          and only the owned set is saved. */}
-                      {editOidcAudiences === null ? (
-                        <p className="text-xs text-slate-500">
-                          {t('fields.oidcAudiencesLoading')}
-                        </p>
-                      ) : (
-                        <OidcAudiencesEditor
-                          value={editOidcAudiences}
-                          fallbacks={oidcAudienceSplit.fallbacks}
-                          onChange={setEditOidcAudiences}
-                          inert={!oidcDefaults.issuerEnabled}
-                          audiencePlaceholder={t('fields.oidcAudiencesPlaceholder')}
-                          addAudienceLabel={t('fields.oidcAudiencesAdd')}
-                        />
+                        <dd className="mt-1 text-sm text-slate-200">
+                          {(attrs['drift-ignore-rules'] || []).length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {attrs['drift-ignore-rules'].map((r) => (
+                                <code key={r} className="bg-slate-700 px-2 py-0.5 rounded text-xs font-mono">{r}</code>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">{t('fields.driftIgnoreRulesNone')}</span>
+                          )}
+                        </dd>
                       )}
                     </div>
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200" data-testid="oidc-audiences">
-                      {Object.keys(attrs['oidc-audiences'] || {}).length > 0 ? (
-                        <OidcAudiencesEditor
-                          value={oidcAudienceSplit.owned}
-                          fallbacks={oidcAudienceSplit.fallbacks}
-                          readOnly
-                        />
-                      ) : (
-                        <span className="text-slate-500">{t('fields.oidcAudiencesNone')}</span>
-                      )}
-                    </dd>
-                  )}
-                </div>
-              </dl>
+                  </Group>
+                )}
+
+                <Group id="cloudIdentity" ctx={settingsCtx} title={t('groups.cloudIdentity')}>
+                  <div className="sm:col-span-2 min-w-0">
+                    <dt className="text-xs text-slate-500 mb-1">{t('fields.oidcAudiences')}</dt>
+                    {settingsEditing ? (
+                      <dd className="space-y-2">
+                        <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
+                        {/* `value` is the owned set and `fallbacks` the
+                            catalogue for the keys in force, so an inherited
+                            entry is shown and offered for override rather than
+                            edited in place, and only the owned set is saved. */}
+                        {editOidcAudiences === null ? (
+                          <p className="text-xs text-slate-500">
+                            {t('fields.oidcAudiencesLoading')}
+                          </p>
+                        ) : (
+                          <OidcAudiencesEditor
+                            value={editOidcAudiences}
+                            fallbacks={oidcAudienceSplit.fallbacks}
+                            onChange={setEditOidcAudiences}
+                            inert={!oidcDefaults.issuerEnabled}
+                            audiencePlaceholder={t('fields.oidcAudiencesPlaceholder')}
+                            addAudienceLabel={t('fields.oidcAudiencesAdd')}
+                          />
+                        )}
+                      </dd>
+                    ) : (
+                      <dd className="mt-1 text-sm text-slate-200" data-testid="oidc-audiences">
+                        {Object.keys(attrs['oidc-audiences'] || {}).length > 0 ? (
+                          <OidcAudiencesEditor
+                            value={oidcAudienceSplit.owned}
+                            fallbacks={oidcAudienceSplit.fallbacks}
+                            readOnly
+                          />
+                        ) : (
+                          <span className="text-slate-500">{t('fields.oidcAudiencesNone')}</span>
+                        )}
+                      </dd>
+                    )}
+                  </div>
+                </Group>
+              </div>
               {lockoutWarning && (
                 <div className="mt-4 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg">
                   <p className="text-sm text-amber-300 mb-2">{lockoutWarning}</p>
@@ -3833,23 +4135,39 @@ function WorkspaceDetailContent() {
                   </span>
                 )}
               </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs text-slate-500">{t('drift.checkInterval')}</dt>
-                  <dd className="mt-1">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                {/* The interval is a DEPENDENT of the toggle in the header, so
+                    with drift off it is absent rather than shown holding an
+                    `86400` nothing is using (#2253). The toggle itself is never
+                    hidden — hiding a dependent removes something meaningless,
+                    while hiding a feature's own switch removes the only way to
+                    discover it. `Check now` goes the same way, which is what
+                    retires its "Enable drift detection first" tooltip. */}
+                <Field
+                  attr="drift-detection-interval-seconds"
+                  ctx={driftCtx}
+                  kind="select"
+                  display={
+                    DRIFT_INTERVALS.find(
+                      (di) => di.value === (attrs['drift-detection-interval-seconds'] || 86400),
+                    )?.label ?? String(attrs['drift-detection-interval-seconds'])
+                  }
+                  control={
                     <select
+                      id="ws-drift-interval"
+                      data-testid="ws-drift-interval"
                       value={attrs['drift-detection-interval-seconds'] || 86400}
                       onChange={(e) => handleDriftIntervalChange(Number(e.target.value))}
                       disabled={savingDrift}
-                      className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className={EDIT_INPUT}
                     >
                       {DRIFT_INTERVALS.map((di) => (
                         <option key={di.value} value={di.value}>{di.label}</option>
                       ))}
                     </select>
-                  </dd>
-                </div>
-                <div>
+                  }
+                />
+                <div className="min-w-0">
                   <dt className="text-xs text-slate-500">{t('drift.status')}</dt>
                   <dd className="mt-1 flex items-center gap-2">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${driftStatusBadge(attrs['drift-status']).cls}`}>
@@ -3867,19 +4185,19 @@ function WorkspaceDetailContent() {
                     )}
                   </dd>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="text-xs text-slate-500">{t('drift.lastChecked')}</dt>
                   <dd className="mt-1 text-sm text-slate-200">
                     {attrs['drift-last-checked-at'] ? new Date(attrs['drift-last-checked-at']).toLocaleString() : t('common.never')}
                   </dd>
                 </div>
-                {perms['can-queue-run'] && (
-                  <div className="flex items-end">
+                {perms['can-queue-run'] && attrs['drift-detection-enabled'] && (
+                  <div className="flex items-end min-w-0">
                     <button
                       onClick={handleCheckDriftNow}
-                      disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
+                      disabled={checkingDrift || attrs.locked}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                      title={!attrs['drift-detection-enabled'] ? t('drift.checkNowTitleDisabled') : attrs.locked ? t('common.workspaceLocked') : phaseWord('driftCheckNowTitle')}
+                      title={attrs.locked ? t('common.workspaceLocked') : phaseWord('driftCheckNowTitle')}
                     >
                       {checkingDrift ? t('actions.queuing') : t('drift.checkNow')}
                     </button>
@@ -3896,22 +4214,30 @@ function WorkspaceDetailContent() {
                   {phaseWord('planExpiryDescription')}
                 </p>
               </div>
-              <dl>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('planExpiry.expireAfter')}</dt>
-                  <dd className="mt-1">
+              <dl className="grid grid-cols-1 min-w-0">
+                <Field
+                  attr="plan-expiry-seconds"
+                  ctx={planExpiryCtx}
+                  kind="select"
+                  display={
+                    PLAN_EXPIRY_OPTIONS.find((o) => o.value === (attrs['plan-expiry-seconds'] || 0))
+                      ?.label ?? String(attrs['plan-expiry-seconds'])
+                  }
+                  control={
                     <select
+                      id="ws-plan-expiry"
+                      data-testid="ws-plan-expiry"
                       value={attrs['plan-expiry-seconds'] || 0}
                       onChange={(e) => handlePlanExpiryChange(Number(e.target.value))}
                       disabled={savingPlanExpiry}
-                      className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className={EDIT_INPUT}
                     >
                       {PLAN_EXPIRY_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
-                  </dd>
-                </div>
+                  }
+                />
               </dl>
             </div>
 
@@ -3925,75 +4251,47 @@ function WorkspaceDetailContent() {
                   </p>
                 </div>
               </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs text-slate-500">{t('aiSummary.mode')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <select
-                        value={attrs['ai-summary-mode'] || 'default'}
-                        onChange={(e) => handleAiSummaryAttrUpdate({ 'ai-summary-mode': e.target.value })}
-                        disabled={savingAiSummary}
-                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="default">{t('aiSummary.modeDefault')}</option>
-                        <option value="enabled">{t('aiSummary.modeEnabled')}</option>
-                        <option value="disabled">{t('aiSummary.modeDisabled')}</option>
-                      </select>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['ai-summary-mode'] === 'enabled'
-                          ? t('aiSummary.modeEnabled')
-                          : attrs['ai-summary-mode'] === 'disabled'
-                            ? t('aiSummary.modeDisabled')
-                            : t('aiSummary.modeDefault')}
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                {/* The policy gate layered on the same summary (#1766). Its
-                    own per-workspace override, because a workspace may want
-                    the narrative without the gate or the other way round. */}
-                <div>
-                  <dt className="text-xs text-slate-500">{t('aiSummary.policyMode')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <select
-                        // A <dt> does not label a <select>, so name it here —
-                        // otherwise the control is unreachable by label to a
-                        // screen reader and to a test.
-                        aria-label={t('aiSummary.policyMode')}
-                        data-testid="ai-policy-mode"
-                        value={attrs['ai-policy-mode'] || 'default'}
-                        onChange={(e) =>
-                          handleAiSummaryAttrUpdate({ 'ai-policy-mode': e.target.value })
-                        }
-                        disabled={savingAiSummary}
-                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="default">{t('aiSummary.modeDefault')}</option>
-                        <option value="enabled">{t('aiSummary.modeEnabled')}</option>
-                        <option value="disabled">{t('aiSummary.modeDisabled')}</option>
-                      </select>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['ai-policy-mode'] === 'enabled'
-                          ? t('aiSummary.modeEnabled')
-                          : attrs['ai-policy-mode'] === 'disabled'
-                            ? t('aiSummary.modeDisabled')
-                            : t('aiSummary.modeDefault')}
-                      </span>
-                    )}
-                    {/* Says plainly what `disabled` does NOT do. A workspace
-                        admin setting it and believing they have opted out of a
-                        fleet-wide blocking control is the misunderstanding this
-                        line exists to prevent. */}
-                    <p className="mt-1 text-xs text-slate-500">
-                      {t('aiSummary.policyModeNote')}
-                    </p>
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                <Field
+                  attr="ai-summary-mode"
+                  ctx={aiCtx}
+                  kind="select"
+                  display={aiModeLabel(attrs['ai-summary-mode'])}
+                  options={[
+                    { value: 'default', label: t('aiSummary.modeDefault') },
+                    { value: 'enabled', label: t('aiSummary.modeEnabled') },
+                    { value: 'disabled', label: t('aiSummary.modeDisabled') },
+                  ]}
+                />
+                {/* The policy gate layered on the same summary (#1766). Its own
+                    per-workspace override, because a workspace may want the
+                    narrative without the gate or the other way round. */}
+                <Field
+                  attr="ai-policy-mode"
+                  ctx={aiCtx}
+                  kind="select"
+                  display={aiModeLabel(attrs['ai-policy-mode'])}
+                  control={
+                    <select
+                      id="ws-ai-policy-mode"
+                      data-testid="ai-policy-mode"
+                      value={attrs['ai-policy-mode'] || 'default'}
+                      onChange={(e) =>
+                        handleAiSummaryAttrUpdate({ 'ai-policy-mode': e.target.value })
+                      }
+                      disabled={savingAiSummary}
+                      className={EDIT_INPUT}
+                    >
+                      <option value="default">{t('aiSummary.modeDefault')}</option>
+                      <option value="enabled">{t('aiSummary.modeEnabled')}</option>
+                      <option value="disabled">{t('aiSummary.modeDisabled')}</option>
+                    </select>
+                  }
+                />
+                {/* Full width, and its label carries an "(optional, additive)"
+                    suffix `WsField` has no room for, so this one stays by
+                    hand. */}
+                <div className="sm:col-span-2 min-w-0">
                   <dt className="text-xs text-slate-500">
                     {t('aiSummary.contextLabel')}
                     <span className="ms-2 text-slate-600">{t('aiSummary.contextLabelSuffix')}</span>
@@ -4024,10 +4322,7 @@ function WorkspaceDetailContent() {
                     ) : (
                       <p className="text-sm text-slate-500 italic">{t('aiSummary.noContext')}</p>
                     )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('aiSummary.contextHint')}
-                      {savingAiSummary && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
-                    </p>
+                    {savingHint('aiSummary.contextHint', savingAiSummary)}
                   </dd>
                 </div>
               </dl>
@@ -4048,87 +4343,50 @@ function WorkspaceDetailContent() {
                   <p className="text-xs text-slate-500 mt-1">{t('securityScan.description')}</p>
                 </div>
               </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs text-slate-500">{t('securityScan.enforcement')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <select
-                        aria-label={t('securityScan.enforcement')}
-                        value={attrs['security-scan-enforcement'] || 'advisory'}
-                        onChange={(e) =>
-                          handleSecurityScanAttrUpdate({ 'security-scan-enforcement': e.target.value })
-                        }
-                        disabled={savingSecurityScan}
-                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="off">{t('securityScan.enforcementOff')}</option>
-                        <option value="advisory">{t('securityScan.enforcementAdvisory')}</option>
-                        <option value="enforced">{t('securityScan.enforcementEnforced')}</option>
-                      </select>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['security-scan-enforcement'] === 'off'
-                          ? t('securityScan.enforcementOff')
-                          : attrs['security-scan-enforcement'] === 'enforced'
-                            ? t('securityScan.enforcementEnforced')
-                            : t('securityScan.enforcementAdvisory')}
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('securityScan.engine')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <select
-                        aria-label={t('securityScan.engine')}
-                        value={attrs['security-scan-engine'] || 'checkov'}
-                        onChange={(e) =>
-                          handleSecurityScanAttrUpdate({ 'security-scan-engine': e.target.value })
-                        }
-                        disabled={savingSecurityScan}
-                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="checkov">{t('securityScan.engineCheckov')}</option>
-                        <option value="trivy">{t('securityScan.engineTrivy')}</option>
-                        <option value="both">{t('securityScan.engineBoth')}</option>
-                      </select>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['security-scan-engine'] || 'checkov'}
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('securityScan.threshold')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <select
-                        aria-label={t('securityScan.threshold')}
-                        value={attrs['security-scan-severity-threshold'] || 'high'}
-                        onChange={(e) =>
-                          handleSecurityScanAttrUpdate({
-                            'security-scan-severity-threshold': e.target.value,
-                          })
-                        }
-                        disabled={savingSecurityScan}
-                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="critical">{t('securityScan.thresholdCritical')}</option>
-                        <option value="high">{t('securityScan.thresholdHigh')}</option>
-                        <option value="medium">{t('securityScan.thresholdMedium')}</option>
-                        <option value="low">{t('securityScan.thresholdLow')}</option>
-                      </select>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['security-scan-severity-threshold'] || 'high'}
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                <Field
+                  attr="security-scan-enforcement"
+                  ctx={scanCtx}
+                  kind="select"
+                  display={
+                    attrs['security-scan-enforcement'] === 'off'
+                      ? t('securityScan.enforcementOff')
+                      : attrs['security-scan-enforcement'] === 'enforced'
+                        ? t('securityScan.enforcementEnforced')
+                        : t('securityScan.enforcementAdvisory')
+                  }
+                  options={[
+                    { value: 'off', label: t('securityScan.enforcementOff') },
+                    { value: 'advisory', label: t('securityScan.enforcementAdvisory') },
+                    { value: 'enforced', label: t('securityScan.enforcementEnforced') },
+                  ]}
+                />
+                <Field
+                  attr="security-scan-engine"
+                  ctx={scanCtx}
+                  kind="select"
+                  display={attrs['security-scan-engine'] || 'checkov'}
+                  options={[
+                    { value: 'checkov', label: t('securityScan.engineCheckov') },
+                    { value: 'trivy', label: t('securityScan.engineTrivy') },
+                    { value: 'both', label: t('securityScan.engineBoth') },
+                  ]}
+                />
+                <Field
+                  attr="security-scan-severity-threshold"
+                  ctx={scanCtx}
+                  kind="select"
+                  display={attrs['security-scan-severity-threshold'] || 'high'}
+                  options={[
+                    { value: 'critical', label: t('securityScan.thresholdCritical') },
+                    { value: 'high', label: t('securityScan.thresholdHigh') },
+                    { value: 'medium', label: t('securityScan.thresholdMedium') },
+                    { value: 'low', label: t('securityScan.thresholdLow') },
+                  ]}
+                />
+                {/* Full width, and its label carries an "(optional)" suffix, so
+                    this one stays by hand. */}
+                <div className="sm:col-span-2 min-w-0">
                   <dt className="text-xs text-slate-500">
                     {t('securityScan.skipRules')}
                     <span className="ms-2 text-slate-600">{t('securityScan.skipRulesSuffix')}</span>
@@ -4167,12 +4425,7 @@ function WorkspaceDetailContent() {
                     ) : (
                       <p className="text-sm text-slate-500 italic">{t('securityScan.noSkipRules')}</p>
                     )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('securityScan.skipRulesHint')}
-                      {savingSecurityScan && (
-                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
-                      )}
-                    </p>
+                    {savingHint('securityScan.skipRulesHint', savingSecurityScan)}
                   </dd>
                 </div>
               </dl>
@@ -4195,41 +4448,25 @@ function WorkspaceDetailContent() {
                   </span>
                 )}
               </div>
-              <dl>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('debugMode.label')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          aria-label={t('debugMode.label')}
-                          checked={!!attrs['debug-mode']}
-                          onChange={(e) => handleDebugModeUpdate(e.target.checked)}
-                          disabled={savingDebugMode}
-                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
-                        />
-                        <span className="text-sm text-slate-200">
-                          {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
-                        </span>
-                      </label>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
-                      </span>
-                    )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('debugMode.hint')}
-                      {savingDebugMode && (
-                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
-                      )}
-                    </p>
-                  </dd>
-                </div>
+              <dl className="grid grid-cols-1 min-w-0">
+                <Field
+                  attr="debug-mode"
+                  ctx={debugCtx}
+                  kind="checkbox"
+                  display={attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
+                  control={instantToggle('debug-mode', debugCtx, !!attrs['debug-mode'])}
+                />
               </dl>
             </div>
 
             {/* Speculative plans on fork pull requests (GHSA-gp5w-76rw-c452) */}
+            {/* The toggle is this feature's OWN switch, not a dependent, so it
+                is shown whether or not a VCS connection exists — hiding it
+                would remove the only place the setting can be discovered, and
+                `workspaces.spec.ts` asserts it visible on a workspace that has
+                no connection. `FIELDS` marks the attribute a dependent of
+                `vcs-connection-id`, which is right for the create form and
+                wrong here, so this card renders the control directly. */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
@@ -4249,37 +4486,17 @@ function WorkspaceDetailContent() {
                   </span>
                 )}
               </div>
-              <dl>
-                <div>
-                  <dt className="text-xs text-slate-500">{t('allowForkPrPlans.label')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          aria-label={t('allowForkPrPlans.label')}
-                          checked={!!attrs['allow-fork-pr-plans']}
-                          onChange={(e) => handleForkPlansUpdate(e.target.checked)}
-                          disabled={savingForkPlans}
-                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
-                        />
-                        <span className="text-sm text-slate-200">
-                          {attrs['allow-fork-pr-plans'] ? t('common.enabled') : t('common.disabled')}
-                        </span>
-                      </label>
-                    ) : (
-                      <span className="text-sm text-slate-200">
-                        {attrs['allow-fork-pr-plans'] ? t('common.enabled') : t('common.disabled')}
-                      </span>
-                    )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('allowForkPrPlans.hint')}
-                      {savingForkPlans && (
-                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
-                      )}
-                    </p>
-                  </dd>
-                </div>
+              <dl className="grid grid-cols-1 min-w-0">
+                {/* A DEPENDENT of `vcs-connection-id`: with no connection there
+                    are no pull requests to plan, so the control is absent
+                    rather than offered against a gate nobody set (#2253). */}
+                <Field
+                  attr="allow-fork-pr-plans"
+                  ctx={forkCtx}
+                  kind="checkbox"
+                  display={attrs['allow-fork-pr-plans'] ? t('common.enabled') : t('common.disabled')}
+                  control={instantToggle('allow-fork-pr-plans', forkCtx, !!attrs['allow-fork-pr-plans'])}
+                />
               </dl>
             </div>
 
@@ -4289,41 +4506,42 @@ function WorkspaceDetailContent() {
               <p className="text-sm text-slate-400 mt-1">
                 {phaseWord('slackDescription')}
               </p>
-              <dl className="mt-4">
-                <div>
-                  <dt className="text-xs text-slate-500">{t('slack.channel')}</dt>
-                  <dd className="mt-1">
-                    {perms['can-update'] ? (
-                      <input
-                        type="text"
-                        value={slackChannelDraft ?? attrs['slack-channel'] ?? ''}
-                        onChange={(e) => setSlackChannelDraft(e.target.value)}
-                        onBlur={() => {
-                          if (
-                            slackChannelDraft !== null &&
-                            slackChannelDraft !== (attrs['slack-channel'] ?? '')
-                          ) {
-                            handleSlackChannelUpdate(slackChannelDraft.trim())
-                          } else {
-                            setSlackChannelDraft(null)
-                          }
-                        }}
-                        placeholder={t('slack.channelPlaceholder')}
-                        maxLength={128}
-                        disabled={savingSlackChannel}
-                        className="w-full sm:w-96 px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
-                      />
-                    ) : attrs['slack-channel'] ? (
-                      <p className="text-sm text-slate-200 font-mono">{attrs['slack-channel']}</p>
+              <dl className="mt-4 grid grid-cols-1 min-w-0">
+                <Field
+                  attr="slack-channel"
+                  ctx={slackCtx}
+                  kind="text"
+                  display={
+                    attrs['slack-channel'] ? (
+                      <span className="font-mono">{attrs['slack-channel']}</span>
                     ) : (
-                      <p className="text-sm text-slate-500 italic">{t('slack.notSet')}</p>
-                    )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('slack.hint')}
-                      {savingSlackChannel && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
-                    </p>
-                  </dd>
-                </div>
+                      <span className="text-slate-500 italic">{t('slack.notSet')}</span>
+                    )
+                  }
+                  control={
+                    <input
+                      id="ws-slack-channel"
+                      data-testid="ws-slack-channel"
+                      type="text"
+                      value={slackChannelDraft ?? attrs['slack-channel'] ?? ''}
+                      onChange={(e) => setSlackChannelDraft(e.target.value)}
+                      onBlur={() => {
+                        if (
+                          slackChannelDraft !== null &&
+                          slackChannelDraft !== (attrs['slack-channel'] ?? '')
+                        ) {
+                          handleSlackChannelUpdate(slackChannelDraft.trim())
+                        } else {
+                          setSlackChannelDraft(null)
+                        }
+                      }}
+                      placeholder={t('slack.channelPlaceholder')}
+                      maxLength={128}
+                      disabled={savingSlackChannel}
+                      className="mt-1 w-full sm:w-96 px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                    />
+                  }
+                />
               </dl>
             </div>
 
