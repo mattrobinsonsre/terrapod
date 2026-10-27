@@ -28,15 +28,24 @@ pytestmark = pytest.mark.asyncio
 MOD = "terrapod.services.variable_service"
 
 
-def _var(key: str, value: str, category: str, *, apply_only: bool = False):
+def _var(
+    key: str,
+    value: str,
+    category: str,
+    *,
+    apply_only: bool = False,
+    configure_only: bool = False,
+):
     v = MagicMock()
     v.key, v.value, v.category = key, value, category
     v.structured, v.sensitive, v.value_source = False, False, "static"
-    # Set explicitly: an absent attribute on a MagicMock answers with a
-    # DISTINCT auto-attribute per row, so every resolution key would
-    # differ and nothing would collapse -- precedence would read as
-    # broken when it is the fixture that is (#2189).
+    # BOTH set explicitly: an absent attribute on a MagicMock answers with a
+    # DISTINCT auto-attribute per row, so every resolution key would differ and
+    # nothing would collapse -- precedence would read as broken when it is the
+    # fixture that is (#2189, and again for `configure_only` in #2190, where it
+    # presented as the LOWER-precedence value appearing beside the winner).
     v.apply_only = apply_only
+    v.configure_only = configure_only
     return v
 
 
@@ -159,10 +168,17 @@ class TestTheIdentityIsAssertedInBothPlacesItMustBe:
     to agree or the database permits what the resolver cannot represent (or the
     reverse, which is how this defect survived).
 
-    The tuple is four columns rather than the three these test names mention:
-    `apply_only` is a second, orthogonal dimension of the same identity
-    (#2189), so a standard and an apply-only variable may share a
-    `(key, category)` exactly as two categories may share a key."""
+    The tuple is FIVE columns rather than the one these test names mention.
+    `apply_only` is a second orthogonal dimension of the same identity (#2189)
+    and `configure_only` a third (#2190), so a standard, an apply-only and a
+    configure-only variable may all share a `(key, category)` exactly as two
+    categories may share a key.
+
+    Asserted as EQUALITY rather than as a subset, deliberately: a subset check
+    would pass while a column was silently dropped, which is precisely what
+    happened when #1898's migration recreated both constraints without
+    `apply_only` and left #2189 dead at the database level. Widen the expected
+    tuple when a dimension is added; do not relax the assertion."""
 
     def test_the_workspace_constraint_carries_the_category(self) -> None:
         from terrapod.db.models import Variable
@@ -172,7 +188,7 @@ class TestTheIdentityIsAssertedInBothPlacesItMustBe:
             for arg in Variable.__table_args__
             if hasattr(arg, "columns") and getattr(arg, "name", "") == "uq_variables_workspace_key"
         }
-        assert cols == {("workspace_id", "key", "category", "apply_only")}
+        assert cols == {("workspace_id", "key", "category", "apply_only", "configure_only")}
 
     def test_the_variable_set_constraint_carries_it_too(self) -> None:
         from terrapod.db.models import VariableSetVariable
@@ -182,7 +198,7 @@ class TestTheIdentityIsAssertedInBothPlacesItMustBe:
             for arg in VariableSetVariable.__table_args__
             if hasattr(arg, "columns") and getattr(arg, "name", "") == "uq_variable_set_variables"
         }
-        assert cols == {("variable_set_id", "key", "category", "apply_only")}
+        assert cols == {("variable_set_id", "key", "category", "apply_only", "configure_only")}
 
 
 class TestTheTwoDimensionsOfTheIdentityAreIndependent:

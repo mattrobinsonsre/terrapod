@@ -92,6 +92,21 @@ GIT_AUTH_CATEGORIES = frozenset({"git_http_auth", "git_ssh_auth"})
 #: has anything to do with it.
 PHASES_SEEING_APPLY_ONLY = frozenset({"apply", "configure"})
 
+#: The phases a configure-only variable (#2190) reaches. One producer for the
+#: same reason as the set above, and pinned as a set so adding a phase is a
+#: decision rather than a default -- which is how the line above went wrong the
+#: first time.
+#:
+#: A THIRD slot rather than a rename of the second, because a configure already
+#: receives every apply-only row. `apply_only` therefore cannot express "not in
+#: an apply either", and that is exactly what the fleet's own credential wants:
+#: an SSH private key to the estate has no business in a plan OR an apply, where
+#: an apply at least legitimately uses the cloud token it holds.
+#:
+#: So the three states a key can be held in are: ordinary (every phase),
+#: apply-only (apply and configure), configure-only (configure alone).
+PHASES_SEEING_CONFIGURE_ONLY = frozenset({"configure"})
+
 #: Ansible's two credential classes (#1933). `key` carries the same KIND of thing
 #: as it does for git auth -- what the credential applies to -- but what that IS
 #: differs per category, so the two are stated separately below rather than
@@ -198,6 +213,7 @@ async def create_variable(
     structured: bool = False,
     sensitive: bool = False,
     apply_only: bool = False,
+    configure_only: bool = False,
     value_source: str = "static",
 ) -> Variable:
     """Create a workspace variable."""
@@ -216,6 +232,7 @@ async def create_variable(
         structured=structured,
         sensitive=sensitive,
         apply_only=apply_only,
+        configure_only=configure_only,
         value_source=value_source,
         version_id=_version_hash(key, value, category),
     )
@@ -234,6 +251,7 @@ async def update_variable(
     structured: bool | None = None,
     sensitive: bool | None = None,
     apply_only: bool | None = None,
+    configure_only: bool | None = None,
     value_source: str | None = None,
 ) -> Variable:
     """Update an existing variable."""
@@ -250,6 +268,9 @@ async def update_variable(
 
     if apply_only is not None:
         var.apply_only = apply_only
+
+    if configure_only is not None:
+        var.configure_only = configure_only
 
     was_sensitive = var.sensitive
 
@@ -361,15 +382,41 @@ async def resolve_variables(
     # from an environment variable of the same name, apply_only separates the
     # plan's copy from the apply's.
     resolved: dict[object, ResolvedVariable] = {}
-    include_apply_only = phase is None or phase in PHASES_SEEING_APPLY_ONLY
 
-    def _key(category: str, k: str, apply_only: bool) -> object:
-        return (category, k) if phase is not None else (category, k, apply_only)
+    def _reaches(row) -> bool:
+        """Whether a row of this slot reaches the phase being resolved for.
+
+        `configure_only` is tested FIRST, so a both-true row -- which the write
+        boundary refuses, but which no resolution should be undefined for --
+        takes the narrower answer rather than the wider one. Failing closed is
+        the only safe direction for a slot whose purpose is withholding a
+        credential.
+        """
+        if phase is None:
+            return True
+        if row.configure_only:
+            return phase in PHASES_SEEING_CONFIGURE_ONLY
+        if row.apply_only:
+            return phase in PHASES_SEEING_APPLY_ONLY
+        return True
+
+    def _key(category: str, k: str, apply_only: bool, configure_only: bool) -> object:
+        # Both flags join the key when no phase was asked for, and that is not
+        # "no filter": the only caller passing nothing is prompt redaction,
+        # which must see EVERY half of a standard/apply-only/configure-only
+        # family or a secret that could reach the model cannot be scrubbed.
+        # Omitting `configure_only` here would collapse an ordinary row and the
+        # fleet's credential of the same key to one value -- the exact defect
+        # #2192 fixed for `apply_only`, one slot over.
+        if phase is not None:
+            return (category, k)
+        return (category, k, apply_only, configure_only)
 
     def _put(row) -> None:
-        if row.apply_only and not include_apply_only:
+        if not _reaches(row):
             return
-        resolved[_key(row.category, row.key, row.apply_only)] = ResolvedVariable(
+        slot = _key(row.category, row.key, row.apply_only, row.configure_only)
+        resolved[slot] = ResolvedVariable(
             key=row.key,
             value=row.value,
             category=row.category,
@@ -379,18 +426,27 @@ async def resolve_variables(
         )
 
     def _tier(rows) -> None:
-        """One precedence tier. Standard rows first, then apply-only, so an
-        apply-only row shadows its standard twin inside this tier and nowhere
-        else."""
+        """One precedence tier, narrowest slot last.
+
+        Standard rows, then apply-only, then configure-only -- so on a configure
+        the fleet's own credential shadows both of its twins, and on an apply the
+        apply-only row shadows its standard twin, each inside this tier and
+        nowhere else. `_put` drops a row the phase excludes, so no branch is
+        needed here.
+
+        Ordered by how FEW phases a slot reaches rather than by name: the more
+        specific statement about a key wins, which is the same reading that made
+        apply-only shadow standard in the first place.
+        """
         rows = list(rows)
         for row in rows:
-            if not row.apply_only:
+            if not row.apply_only and not row.configure_only:
                 _put(row)
-        # Second, so an apply-only row overwrites its standard twin's entry --
-        # but only inside this tier. `_put` drops it when the phase excludes it,
-        # so no branch is needed here.
         for row in rows:
-            if row.apply_only:
+            if row.apply_only and not row.configure_only:
+                _put(row)
+        for row in rows:
+            if row.configure_only:
                 _put(row)
 
     # Layer 1: Non-priority variable sets (global + assigned)

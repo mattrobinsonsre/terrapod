@@ -178,22 +178,58 @@ def _reject_vault_on_credential_envelope(value_source: str, category: str | None
 _UNIQUE_VIOLATION = "23505"
 
 
+def _phase_slot_guard(*, apply_only: bool, configure_only: bool, key: str) -> None:
+    """Refuse a row that is both apply-only and configure-only (#2190).
+
+    Two independent booleans are the right shape -- a parsed value kept in step
+    across the API, the SDK, the provider, MCP and the UI gets mistyped into a
+    third meaning eventually, and a boolean cannot be -- and the cost is that
+    this combination is representable. It is refused here rather than given a
+    resolution, because no resolution of it is one anybody would predict: the
+    two flags name overlapping phase sets, so "both" is either their union
+    (wider than either flag, which is the opposite of what a withholding flag is
+    for) or their intersection (a configure, which `configure_only` already
+    says on its own).
+
+    At the WRITE boundary rather than dropped at resolution, following
+    `_credential_envelope_guard`, and for the same reason: a 422 naming the
+    conflict is cheaper than explaining months later why a variable nobody can
+    see is in the database. `resolve_variables` still fails closed on such a row
+    if one ever exists, by testing `configure_only` first.
+    """
+    if apply_only and configure_only:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Variable {key!r} cannot be both apply-only and configure-only. "
+                "Apply-only already reaches a configure, so configure-only alone is "
+                "what withholds a variable from an apply as well as from a plan."
+            ),
+        )
+
+
 def _variable_conflict(
-    exc: IntegrityError, key: str, apply_only: bool | None, *, scope: str
+    exc: IntegrityError,
+    key: str,
+    apply_only: bool | None,
+    *,
+    scope: str,
+    configure_only: bool | None = None,
 ) -> HTTPException:
     """Say which slot is taken, because the caller cannot otherwise tell.
 
-    A key may be held twice -- once plan+apply, once apply-only (#2189) -- so the
-    uniqueness constraint is on the pair. That makes a collision possible in a
-    way it was not before: CLEARING the apply-only flag on a variable can bring
-    it into conflict with a standard variable of the same name that it coexisted
-    with a moment earlier. The global integrity net answers that with "Resource
-    already exists or violates a constraint", which names neither the key nor
-    the reason and leaves an operator with no way to work out what they did.
+    A key may be held once per SLOT -- plan+apply, apply-only (#2189), or
+    configure-only (#2190) -- so the uniqueness constraint is on the whole
+    tuple. That makes a collision possible in a way it was not before: CLEARING
+    either flag on a variable can bring it into conflict with another of the
+    same name that it coexisted with a moment earlier. The global integrity net
+    answers that with "Resource already exists or violates a constraint", which
+    names neither the key nor the reason and leaves an operator with no way to
+    work out what they did.
 
-    So name the key and the slot. When the caller did not send `apply-only` the
-    flag is not what moved, so the message does not claim to know which slot --
-    overstating it would send them to the wrong variable.
+    So name the key and the slot. When the caller sent neither flag they are not
+    what moved, so the message does not claim to know which slot -- overstating
+    it would send them to the wrong variable.
     """
     sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
     if sqlstate != _UNIQUE_VIOLATION:
@@ -202,16 +238,24 @@ def _variable_conflict(
         # the caller.
         return HTTPException(status_code=500, detail="Could not save the variable")
     rule = (
-        "A key can be held twice only when exactly one copy is apply-only, so "
-        "change the apply-only flag on one of them, or delete the other."
+        "A key can be held once per slot -- plan+apply, apply-only, or "
+        "configure-only -- so change the flags on one of them, or delete the other."
     )
-    if apply_only is None:
+    if apply_only is None and configure_only is None:
         return HTTPException(
             status_code=409, detail=f"{scope} already holds a variable named {key!r}. {rule}"
         )
     # The article travels with the phrase: "a apply-only" otherwise, which a
-    # substring assertion on the slot name does not catch.
-    held = "an apply-only" if apply_only else "a plan+apply"
+    # substring assertion on the slot name does not catch. Narrowest slot first,
+    # matching resolution's own order, so a both-true request -- which
+    # `_phase_slot_guard` refuses before this is reached -- could not report the
+    # wider slot even if it arrived here.
+    if configure_only:
+        held = "a configure-only"
+    elif apply_only:
+        held = "an apply-only"
+    else:
+        held = "a plan+apply"
     return HTTPException(
         status_code=409,
         detail=f"{scope} already holds {held} variable named {key!r}. {rule}",
@@ -397,6 +441,7 @@ def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
             "value": _visible_value(var),
             "sensitive": var.sensitive,
             "apply-only": var.apply_only,
+            "configure-only": var.configure_only,
             "category": variable_service.wire_category(var.category, tfe_surface=tfe_surface),
             # Both names, always equal. `hcl` is what go-tfe reads (#1435).
             "structured": var.structured,
@@ -514,6 +559,11 @@ async def create_workspace_var(
     _credential_envelope_guard(
         category=attrs.get("category", "terraform"), key=key, value=attrs.get("value", "")
     )
+    _phase_slot_guard(
+        apply_only=bool(attrs.get("apply-only", False)),
+        configure_only=bool(attrs.get("configure-only", False)),
+        key=key,
+    )
 
     try:
         var = await variable_service.create_variable(
@@ -526,6 +576,7 @@ async def create_workspace_var(
             structured=_structured_from(attrs, default=False),
             sensitive=force_sensitive or attrs.get("sensitive", False),
             apply_only=attrs.get("apply-only", False),
+            configure_only=attrs.get("configure-only", False),
             value_source=value_source,
         )
         await db.commit()
@@ -534,7 +585,11 @@ async def create_workspace_var(
     except IntegrityError as e:
         await db.rollback()
         raise _variable_conflict(
-            e, attrs.get("key", ""), attrs.get("apply-only", False), scope="This workspace"
+            e,
+            attrs.get("key", ""),
+            attrs.get("apply-only", False),
+            scope="This workspace",
+            configure_only=attrs.get("configure-only", False),
         ) from e
 
     from terrapod.redis.client import publish_workspace_event
@@ -587,6 +642,16 @@ async def update_workspace_var(
             key=eff_key,
             value=attrs["value"] if "value" in attrs else var.value,
         )
+        # The MERGED pair, not the sent one: a PATCH that sets one flag against
+        # a row already carrying the other produces the refused combination, and
+        # a guard reading only the request would miss exactly that edit.
+        _phase_slot_guard(
+            apply_only=bool(attrs["apply-only"] if "apply-only" in attrs else var.apply_only),
+            configure_only=bool(
+                attrs["configure-only"] if "configure-only" in attrs else var.configure_only
+            ),
+            key=eff_key,
+        )
         var = await variable_service.update_variable(
             db,
             var,
@@ -597,6 +662,7 @@ async def update_workspace_var(
             structured=_structured_from(attrs),
             sensitive=attrs.get("sensitive"),
             apply_only=attrs.get("apply-only"),
+            configure_only=attrs.get("configure-only"),
             value_source=value_source,
         )
         await db.commit()
@@ -607,7 +673,13 @@ async def update_workspace_var(
         # instead would lazy-load on a session whose flush has failed, and the
         # caller gets PendingRollbackError rather than the 409 this exists for.
         await db.rollback()
-        raise _variable_conflict(e, eff_key, attrs.get("apply-only"), scope="This workspace") from e
+        raise _variable_conflict(
+            e,
+            eff_key,
+            attrs.get("apply-only"),
+            scope="This workspace",
+            configure_only=attrs.get("configure-only"),
+        ) from e
 
     from terrapod.redis.client import publish_workspace_event
 
@@ -941,6 +1013,7 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str, *, tfe_surface: bool =
             "value": _visible_value(vsv),
             "sensitive": vsv.sensitive,
             "apply-only": vsv.apply_only,
+            "configure-only": vsv.configure_only,
             "category": variable_service.wire_category(vsv.category, tfe_surface=tfe_surface),
             "structured": vsv.structured,
             "hcl": vsv.structured,
@@ -995,6 +1068,10 @@ async def create_varset_var(
     # a phase attribute: a different value per phase is two rows with one
     # flagged, which is why the uniqueness tuple carries the flag.
     apply_only = attrs.get("apply-only", False)
+    # Withheld from a plan AND from an apply (#2190): the fleet's own credential.
+    # A third slot rather than a rename, because an apply-only row already
+    # reaches a configure.
+    configure_only = attrs.get("configure-only", False)
     try:
         category = variable_service._validated_category(attrs.get("category", "terraform"))
     except ValueError as e:
@@ -1010,6 +1087,7 @@ async def create_varset_var(
         structured=bool(_structured_from(attrs, default=False)),
     )
     _credential_envelope_guard(category=category, key=key, value=value)
+    _phase_slot_guard(apply_only=bool(apply_only), configure_only=bool(configure_only), key=key)
     if value_source == "vault":
         await _reject_vault_varset_on_local(
             db, vs, when="Cannot add an OpenBao/Vault-sourced variable"
@@ -1027,6 +1105,7 @@ async def create_varset_var(
         structured=_structured_from(attrs, default=False),
         sensitive=sensitive,
         apply_only=apply_only,
+        configure_only=configure_only,
         version_id=variable_service._version_hash(key, value, category),
     )
     db.add(vsv)
@@ -1034,7 +1113,9 @@ async def create_varset_var(
         await db.commit()
     except IntegrityError as e:
         await db.rollback()
-        raise _variable_conflict(e, key, apply_only, scope="This variable set") from e
+        raise _variable_conflict(
+            e, key, apply_only, scope="This variable set", configure_only=configure_only
+        ) from e
     await db.refresh(vsv)
 
     return JSONResponse(
@@ -1117,6 +1198,15 @@ async def update_varset_var(
         vsv.sensitive = attrs["sensitive"]
     if "apply-only" in attrs:
         vsv.apply_only = bool(attrs["apply-only"])
+    if "configure-only" in attrs:
+        vsv.configure_only = bool(attrs["configure-only"])
+    # After both assignments, so the guard sees the MERGED pair rather than the
+    # request's half of it.
+    _phase_slot_guard(
+        apply_only=bool(vsv.apply_only),
+        configure_only=bool(vsv.configure_only),
+        key=str(vsv.key),
+    )
 
     # Security: a sensitive → non-sensitive downgrade must not expose the
     # previously-hidden value. If no fresh value was supplied in the same
@@ -1132,7 +1222,11 @@ async def update_varset_var(
     except IntegrityError as e:
         await db.rollback()
         raise _variable_conflict(
-            e, requested_key, attrs.get("apply-only"), scope="This variable set"
+            e,
+            requested_key,
+            attrs.get("apply-only"),
+            scope="This variable set",
+            configure_only=attrs.get("configure-only"),
         ) from e
     await db.refresh(vsv)
     return JSONResponse(content={"data": _vsvar_json(vsv, varset_id, tfe_surface=_is_tfe(request))})

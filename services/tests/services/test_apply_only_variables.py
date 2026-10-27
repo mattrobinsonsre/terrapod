@@ -16,10 +16,19 @@ from terrapod.services import variable_service
 class _Row:
     """The attributes `resolve_variables` reads off a variable row."""
 
-    def __init__(self, key, value, apply_only=False, category="env", sensitive=False):
+    def __init__(
+        self,
+        key,
+        value,
+        apply_only=False,
+        category="env",
+        sensitive=False,
+        configure_only=False,
+    ):
         self.key = key
         self.value = value
         self.apply_only = apply_only
+        self.configure_only = configure_only
         self.category = category
         self.structured = False
         self.sensitive = sensitive
