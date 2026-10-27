@@ -1038,7 +1038,27 @@ function WorkspacesPageInner() {
       case 'working-directory':
         return hintText(t('form.workingDirectoryHint'))
       case 'pulumi-bind-plan':
-        return hintText(tDetail('fields.bindPlanHelp'))
+        // t.rich: carries a <docs> link. The SECOND of the two rich hints,
+        // and the one the browser did not reveal -- bind-plan renders for
+        // Pulumi only and the form defaults to Terraform, so it would have
+        // thrown for whoever first selected Pulumi. Found by the gate, not by
+        // the demo, which is the argument for having both.
+        return (
+          <p className="mt-1 text-xs text-slate-400">
+            {tDetail.rich('fields.bindPlanHelp', {
+              docs: (chunks) => (
+                <a
+                  href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-400 hover:text-brand-300 underline"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        )
       case 'plan-apply-enabled':
         return hintText(tDetail('fields.planApplyEnabledHint'))
       case 'configure-enabled':
@@ -1066,7 +1086,32 @@ function WorkspacesPageInner() {
       case 'trigger-prefixes':
         return hintText(tDetail('fields.triggerPrefixesHint'))
       case 'drift-ignore-rules':
-        return hintText(tDetail('fields.driftIgnoreRulesHint'))
+        // t.rich, NOT t: this hint is the ONE field hint carrying rich-text
+        // tags (<star>, <dot>, <n>, <starIdx>, <docs>), and plain `t` throws
+        // FORMATTING_ERROR per missing tag -- ten console errors and a
+        // fallback string, which is how it shipped until the form was driven
+        // in a browser. Components match the edit tab's rendering so the two
+        // forms read identically.
+        return (
+          <p className="mt-1 text-xs text-slate-400">
+            {tDetail.rich('fields.driftIgnoreRulesHint', {
+              star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
+              dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
+              n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
+              starIdx: () => <code className="text-[10px] bg-slate-800 px-1">[*]</code>,
+              docs: (chunks) => (
+                <a
+                  href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-brand-400 hover:underline"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        )
       case 'ai-summary-context':
         return hintText(tDetail('aiSummary.contextHint'))
       case 'ai-policy-mode':

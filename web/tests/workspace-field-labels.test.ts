@@ -50,6 +50,16 @@ function labelKeys(): Map<string, string> {
   return out
 }
 
+/** Resolve a dotted key from the catalogue ROOT, or undefined. */
+function resolveRoot(key: string): string | undefined {
+  let node: unknown = EN
+  for (const part of key.split('.')) {
+    if (typeof node !== 'object' || node === null) return undefined
+    node = (node as Record<string, unknown>)[part]
+  }
+  return typeof node === 'string' ? node : undefined
+}
+
 /** Resolve a dotted key under `workspaceDetail`, or undefined. */
 function resolve(key: string): string | undefined {
   let node: unknown = EN.workspaceDetail
@@ -143,5 +153,49 @@ test('no label key points at a hint, placeholder or title by mistake', () => {
     wrong,
     [],
     `label key(s) point at explanatory text rather than a label: ${wrong.join('; ')}`,
+  )
+})
+
+test('no hint rendered with plain t() carries rich-text tags', () => {
+  // The same class as the ICU-argument label above, one layer over, and it
+  // SHIPPED: `fields.driftIgnoreRulesHint` carries `<star>`, `<dot>`, `<n>`,
+  // `<starIdx>` and `<docs>`, and the create form rendered it with plain `t()`
+  // — which throws FORMATTING_ERROR once per missing tag and falls back to the
+  // raw string. Ten console errors on opening the form, invisible to tsc,
+  // eslint, i18n:check and every unit test, and found only by driving the page
+  // in a browser.
+  //
+  // So this reads the form's own source: a key handed to `t(...)` or
+  // `hintText(t...(...))` must resolve to a value with NO tags. A key needing
+  // tags has to go through `t.rich` with a component per tag, which this
+  // deliberately does not try to validate — it only catches the plain call.
+  const forms = [
+    'src/app/workspaces/page.tsx',
+    'src/app/workspaces/[id]/page.tsx',
+  ]
+  const offenders: string[] = []
+  let inspected = 0
+  for (const rel of forms) {
+    const src = readFileSync(join(ROOT, rel), 'utf8')
+    // `hintText(tDetail('fields.xHint'))` / `hintText(t('form.yHint'))`
+    for (const m of src.matchAll(/hintText\(\s*[A-Za-z]*\.?t?[A-Za-z]*\(\s*'([A-Za-z0-9.]+)'/g)) {
+      const key = m[1]
+      inspected += 1
+      const value = resolve(key) ?? resolveRoot(key)
+      if (value && /<[a-zA-Z]+>/.test(value)) {
+        offenders.push(`${rel}: ${key}`)
+      }
+    }
+  }
+  assert.ok(
+    inspected >= 10,
+    `only ${inspected} plain hint calls found; the matcher has probably stopped ` +
+      'matching the forms rather than the forms having stopped rendering hints',
+  )
+  assert.deepEqual(
+    offenders,
+    [],
+    'hint(s) carrying rich-text tags are rendered with plain t(), which throws ' +
+      `FORMATTING_ERROR at render — use t.rich with a component per tag: ${offenders.join('; ')}`,
   )
 })
