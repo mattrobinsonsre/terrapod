@@ -271,6 +271,34 @@ func (r *variableResource) ImportState(ctx context.Context, req resource.ImportS
 
 var _ resource.ResourceWithModifyPlan = &variableResource{}
 
+// changeDetecting is what KeepComputedWhenUnchanged compares to decide whether
+// a re-plan is a genuine no-op.
+//
+// EVERY attribute a write can change has to be in here. An omitted one makes
+// the compare look unchanged while the attribute itself moved, so the carried
+// attributes below are pinned to their state values as KNOWN -- and the apply
+// then returns different ones, which is "Provider produced inconsistent result
+// after apply". `apply_only` was omitted when it was added (#2189) and
+// `updated_at` carries `onupdate` on the server, so flipping it alone hit
+// exactly that.
+//
+// TestEveryAttributeIsAccountedForInTheRePlanGate derives the membership from
+// the schema, so a new attribute cannot be left out silently.
+var changeDetecting = []string{
+	"workspace_id", "key", "value", "category", "structured", "hcl",
+	"sensitive", "apply_only", "description", "value_source",
+}
+
+// carriedWhenUnchanged are the attributes the server moves on every write, kept
+// at their state values on a true no-op re-plan so it does not propose an
+// update that never converges.
+var carriedWhenUnchanged = []string{"version_id", "updated_at"}
+
+// serverAssignedAndImmutable never move after create, so they are neither
+// compared nor carried: `id` identifies the row for its whole life, and
+// `created_at` is already pinned by UseStateForUnknown.
+var serverAssignedAndImmutable = []string{"id", "created_at"}
+
 // ModifyPlan keeps a no-change re-plan empty. See
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
@@ -278,10 +306,7 @@ func (r *variableResource) ModifyPlan(ctx context.Context, req resource.ModifyPl
 	// Before KeepComputedWhenUnchanged, which compares the PLANNED workspace_id
 	// against state -- it has to see the defaulted value, not the null one.
 	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
-	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
-		[]string{"workspace_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
-		[]string{"version_id", "updated_at"},
-	)
+	planmods.KeepComputedWhenUnchanged(ctx, req, resp, changeDetecting, carriedWhenUnchanged)
 }
 
 // buildCreateVariableRequest projects the Terraform model into the

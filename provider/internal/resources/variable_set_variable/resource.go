@@ -48,14 +48,27 @@ var (
 	_ resource.ResourceWithModifyPlan  = &variableSetVariableResource{}
 )
 
+// changeDetecting is what KeepComputedWhenUnchanged compares to decide whether
+// a re-plan is a genuine no-op. See the identical list on terrapod_variable for
+// why an omitted attribute produces "Provider produced inconsistent result
+// after apply" rather than a missed optimisation.
+var changeDetecting = []string{
+	"varset_id", "key", "value", "category", "structured", "hcl",
+	"sensitive", "apply_only", "description", "value_source",
+}
+
+// carriedWhenUnchanged are the attributes the server moves on every write.
+var carriedWhenUnchanged = []string{"version_id", "updated_at"}
+
+// serverAssignedAndImmutable never move after create, so they are neither
+// compared nor carried.
+var serverAssignedAndImmutable = []string{"id", "created_at"}
+
 // ModifyPlan keeps a no-change re-plan empty. See
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
 func (r *variableSetVariableResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
-		[]string{"varset_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
-		[]string{"version_id", "updated_at"},
-	)
+	planmods.KeepComputedWhenUnchanged(ctx, req, resp, changeDetecting, carriedWhenUnchanged)
 }
 
 type variableSetVariableResource struct {
