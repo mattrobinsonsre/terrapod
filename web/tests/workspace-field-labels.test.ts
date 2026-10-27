@@ -15,9 +15,10 @@
 // see it: `i18n:check` compares locales against `en` rather than checking that
 // anything ASKS for a key, and `i18n:lint` only catches raw JSX literals.
 //
-// Read as TEXT rather than imported, because `workspace-fields.tsx` carries JSX
-// and this runner has no transpiler — the same reason the Python parity gate
-// reads it with a regex.
+// Read as TEXT rather than imported. The table now lives in `src/lib` and IS
+// importable, but these assertions are about what the file DECLARES -- a
+// mapping entry pointing at the wrong key resolves fine at runtime, so reading
+// the declaration is the point rather than a limitation.
 //
 // Run with: npm run test:unit   (node:test, no test framework dependency)
 
@@ -27,7 +28,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dirname, '..')
-const SOURCE = readFileSync(join(ROOT, 'src/components/workspace-fields.tsx'), 'utf8')
+const SOURCE = readFileSync(join(ROOT, 'src/lib/workspace-fields.ts'), 'utf8')
 const EN = JSON.parse(readFileSync(join(ROOT, 'messages/en.json'), 'utf8')) as Record<
   string,
   unknown

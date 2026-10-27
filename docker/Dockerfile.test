@@ -93,7 +93,7 @@ COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/
 # diverged to 13 controls against ~50 accepted attributes in the first place.
 # Without these two files the gate raises rather than passing vacuously; the
 # `_surface()` helper says so in its own error.
-COPY web/src/components/workspace-fields.tsx ./web/src/components/workspace-fields.tsx
+COPY web/src/lib/workspace-fields.ts ./web/src/lib/workspace-fields.ts
 COPY web/src/app/workspaces/page.tsx ./web/src/app/workspaces/page.tsx
 COPY "web/src/app/workspaces/[id]/page.tsx" "./web/src/app/workspaces/[id]/page.tsx"
 # Read by tests/auth/test_cli_login_timing.py, which ties this page's

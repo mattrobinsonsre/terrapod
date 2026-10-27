@@ -566,12 +566,12 @@ class TestTheOtherDirectionOfParity:
 # workflow were absent. No test could see it, because create and edit shared no
 # code -- only chrome -- so there was nothing for a gate to compare.
 #
-# The subject is `FIELDS` in `web/src/components/workspace-fields.tsx`, which
+# The subject is `FIELDS` in `web/src/lib/workspace-fields.ts`, which
 # both forms now build themselves from. That is what makes this checkable at
 # all: one table, two readers, so an attribute cannot reach one form and miss
 # the other.
 
-_WS_FIELDS = _surface("web/src/components/workspace-fields.tsx")
+_WS_FIELDS = _surface("web/src/lib/workspace-fields.ts")
 _CREATE_GUI = _surface("web/src/app/workspaces/page.tsx")
 _EDIT_GUI = _surface("web/src/app/workspaces/[id]/page.tsx")
 
@@ -694,7 +694,7 @@ class TestCreateCanSetWhatEditCanSet:
         assert unreachable == [], (
             f"attribute(s) {unreachable} are accepted by the workspace create or "
             "PATCH path but are absent from FIELDS in "
-            "web/src/components/workspace-fields.tsx, so neither the create form "
+            "web/src/lib/workspace-fields.ts, so neither the create form "
             "nor the Configuration tab offers them. Add them to FIELDS with a "
             "group — both forms then render them — or, if the attribute is not a "
             "setting, record it in _NOT_A_FORM_FIELD with the reason."
