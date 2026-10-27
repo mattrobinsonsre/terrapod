@@ -163,7 +163,11 @@ export const FIELDS: readonly FieldSpec[] = [
 
   // --- execution --------------------------------------------------------
   { attr: 'execution-mode', id: 'ws-exec', group: 'execution' },
-  { attr: 'execution-backend', id: 'ws-backend', group: 'execution' },
+  // Terraform-only: it picks the binary *within* the Terraform engine (tofu or
+  // terraform), so it has no meaning on Pulumi. The Configuration tab has
+  // always hidden it on a Pulumi workspace and an e2e test asserts it is
+  // absent there, so the restriction belongs here rather than in each form.
+  { attr: 'execution-backend', id: 'ws-backend', group: 'execution', engines: ['terraform'] },
   {
     attr: 'engine-version',
     id: 'ws-version',
@@ -352,7 +356,18 @@ export const FIELDS: readonly FieldSpec[] = [
     // is meaningful, the caller just may not change it.
   },
   { attr: 'labels', id: 'ws-labels', group: 'metadata', advanced: true, summary: 'count' },
-  { attr: 'var-files', id: 'ws-var-files', group: 'metadata', advanced: true, summary: 'count' },
+  // `.tfvars` files, so Terraform-only — same reason and same history as
+  // `execution-backend` above: the Configuration tab hides it on a Pulumi
+  // workspace and an e2e test pins that, so the engine restriction is declared
+  // once here instead of being re-derived by whichever form renders it.
+  {
+    attr: 'var-files',
+    id: 'ws-var-files',
+    group: 'metadata',
+    advanced: true,
+    summary: 'count',
+    engines: ['terraform'],
+  },
 
   // --- cloud identity ---------------------------------------------------
   {
