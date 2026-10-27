@@ -91,9 +91,8 @@ async def get_inventory_workspace(db: AsyncSession, workspace_id: uuid.UUID):
     """The workspace row, for its inventory roots and binding (#1929).
 
     There is no settings object any more. The roots (`config_directory`,
-    `inventory_paths`), the run defaults (`default_playbook`, `default_limit`)
-    and the resolution switches (`inventory_include_platform`,
-    `inventory_ignore_paths`) are all workspace columns, and the VCS binding is
+    `inventory_paths`) and the run defaults (`default_playbook`,
+    `default_limit`) are all workspace columns, and the VCS binding is
     the workspace's own -- one binding per workspace, because Terraform and
     Ansible in different repositories is not supported (#1407 point 11).
 

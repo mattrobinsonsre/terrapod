@@ -135,8 +135,6 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "inventory_paths": list(ws.inventory_paths or []),
         "default_playbook": ws.default_playbook,
         "default_limit": ws.default_limit,
-        "inventory_include_platform": ws.inventory_include_platform,
-        "inventory_ignore_paths": list(ws.inventory_ignore_paths or []),
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
@@ -654,12 +652,6 @@ async def restore_workspace(
         inventory_paths=list(settings.get("inventory_paths") or []),
         default_playbook=settings.get("default_playbook") or "",
         default_limit=settings.get("default_limit") or "",
-        # `is not False` rather than `or True`: the stored value is the one that
-        # matters and False is a real choice, so a truthiness fallback would
-        # silently turn the declared rows back on for a workspace that had
-        # resolved the git source alone.
-        inventory_include_platform=settings.get("inventory_include_platform") is not False,
-        inventory_ignore_paths=list(settings.get("inventory_ignore_paths") or []),
         stack=settings.get("stack"),
         var_files=list(settings.get("var_files") or []),
         # Empty for a snapshot taken before this column existed, which is the

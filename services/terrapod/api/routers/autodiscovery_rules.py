@@ -111,8 +111,6 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "inventory-paths": list(rule.inventory_paths or []),
             "default-playbook": rule.default_playbook,
             "default-limit": rule.default_limit,
-            "inventory-include-platform": rule.inventory_include_platform,
-            "inventory-ignore-paths": list(rule.inventory_ignore_paths or []),
             "resource-memory": rule.resource_memory,
             # The EE sidecar's pair, templated like the orchestrator's (#2154).
             "ee-resource-cpu": rule.ee_resource_cpu,
@@ -389,10 +387,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-    for _key, _col in (
-        ("inventory-paths", "inventory_paths"),
-        ("inventory-ignore-paths", "inventory_ignore_paths"),
-    ):
+    for _key, _col in (("inventory-paths", "inventory_paths"),):
         if _key in attrs:
             value = attrs[_key]
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
@@ -404,13 +399,6 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     ):
         if _key in attrs:
             out[_col] = str(attrs[_key] or "")
-    if "inventory-include-platform" in attrs:
-        value = attrs["inventory-include-platform"]
-        if not isinstance(value, bool):
-            raise HTTPException(
-                status_code=422, detail="inventory-include-platform must be a boolean"
-            )
-        out["inventory_include_platform"] = value
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
@@ -876,8 +864,6 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         inventory_paths=fields.get("inventory_paths", []),
         default_playbook=fields.get("default_playbook", ""),
         default_limit=fields.get("default_limit", ""),
-        inventory_include_platform=fields.get("inventory_include_platform", True),
-        inventory_ignore_paths=fields.get("inventory_ignore_paths", []),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
         auto_apply=fields.get("auto_apply", False),

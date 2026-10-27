@@ -410,8 +410,6 @@ async def find_or_autocreate_workspace(
         inventory_paths=list(rule.inventory_paths or []),
         default_playbook=rule.default_playbook,
         default_limit=rule.default_limit,
-        inventory_include_platform=rule.inventory_include_platform,
-        inventory_ignore_paths=list(rule.inventory_ignore_paths or []),
         resource_memory=rule.resource_memory,
         # Templated like the orchestrator's pair (#2154); `""` materialises a
         # workspace that inherits the deployment default, which is what a rule

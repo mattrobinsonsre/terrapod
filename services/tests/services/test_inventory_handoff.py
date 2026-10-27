@@ -106,8 +106,6 @@ class _Workspace:
         self.id = uuid.uuid4()
         self.configure_enabled = configure_enabled
         self.config_directory = config_directory
-        self.inventory_include_platform = True
-        self.inventory_ignore_paths: list[str] = []
         self.inventory_paths: list[str] = ["hosts.yml"]
         self.ansible_version = ""
         self.vcs_connection_id = uuid.uuid4()

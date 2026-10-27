@@ -464,10 +464,8 @@ def sanitize_working_directory(raw: str) -> str:
 
 #: The Ansible roots and run defaults (#1929). `inventory_paths` is the same
 #: shape as a trigger prefix -- a short ordered list of repo-relative paths --
-#: so it takes the same bound; `inventory_ignore_paths` holds globs rather than
-#: roots and a real repository accumulates more of them.
+#: so it takes the same bound.
 MAX_INVENTORY_PATHS = 20
-MAX_INVENTORY_IGNORE_PATHS = 50
 MAX_ANSIBLE_PATH_LEN = 500
 
 
@@ -662,21 +660,6 @@ def validate_inventory_paths(raw: object) -> list[str]:
     if raw is None:
         return []
     return _validate_path_list(raw, "inventory-paths", MAX_INVENTORY_PATHS)
-
-
-def validate_inventory_ignore_paths(raw: object) -> list[str]:
-    """Globs pruned from a fetched inventory source before ansible reads it.
-
-    The trailing-slash refusal earns its keep here rather than merely being
-    consistent: `_apply_ignore_paths` matches against a path relative to the
-    config root, and that path carries **no trailing slash even for a
-    directory**. So `cache/` is a pattern that reads as "exclude this
-    directory" and excludes nothing -- which fails in the direction that looks
-    harmless, leaving the source wider than the operator asked for.
-    """
-    if raw is None:
-        return []
-    return _validate_path_list(raw, "inventory-ignore-paths", MAX_INVENTORY_IGNORE_PATHS)
 
 
 def validate_ansible_run_default(raw: object, field: str) -> str:

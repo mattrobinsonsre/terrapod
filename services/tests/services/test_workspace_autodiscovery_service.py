@@ -547,8 +547,6 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "inventory_paths",
         "default_playbook",
         "default_limit",
-        "inventory_include_platform",
-        "inventory_ignore_paths",
         "resource_cpu",
         "resource_memory",
         # The EE sidecar's own pair (#2154). A rule that can size the

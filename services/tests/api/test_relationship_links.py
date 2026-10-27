@@ -85,8 +85,6 @@ class TestAutodiscoveryRule:
             inventory_paths=[],
             default_playbook="",
             default_limit="",
-            inventory_include_platform=True,
-            inventory_ignore_paths=[],
             resource_cpu="1",
             parallelism=10,
             resource_memory="2Gi",

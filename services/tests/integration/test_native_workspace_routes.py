@@ -129,12 +129,6 @@ class TestTheNativeSurfaceServesEveryEngine:
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-limit": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
-        "inventory-include-platform": (
-            "an Ansible concept; the TFE surface serves Terraform alone (#1929)"
-        ),
-        "inventory-ignore-paths": (
-            "an Ansible concept; the TFE surface serves Terraform alone (#1929)"
-        ),
     }
 
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):

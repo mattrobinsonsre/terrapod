@@ -88,8 +88,6 @@ def _mock_workspace(
     ws.inventory_paths = []
     ws.default_playbook = ""
     ws.default_limit = ""
-    ws.inventory_include_platform = True
-    ws.inventory_ignore_paths = []
     ws.locked = locked
     ws.lock_id = lock_id
     ws.lock_reason = lock_reason
@@ -2649,8 +2647,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
                             "inventory-paths": ["inventory/production", "inventory/extra"],
                             "default-playbook": "site.yml",
                             "default-limit": "web:!web-09",
-                            "inventory-include-platform": False,
-                            "inventory-ignore-paths": ["*.bak"],
                         }
                     }
                 },
@@ -2665,8 +2661,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         # Stored byte for byte: `--limit` is ansible's own syntax and `!` is
         # meaningful in it, so nothing here may rewrite the pattern.
         assert ws.default_limit == "web:!web-09"
-        assert ws.inventory_include_platform is False
-        assert ws.inventory_ignore_paths == ["*.bak"]
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2698,7 +2692,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         assert resp.status_code == 201, resp.text
         ws = next(w for w in added if getattr(w, "name", None) == "plain-ws")
         assert ws.config_directory == ""
-        assert ws.inventory_include_platform is True
         # The declaration's defaults are the compatibility story (#1966).
         assert ws.plan_apply_enabled is True
         assert ws.configure_enabled is False
@@ -2739,8 +2732,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         ws.inventory_paths = ["inventory/production"]
         ws.default_playbook = "site.yml"
         ws.default_limit = "web"
-        ws.inventory_include_platform = False
-        ws.inventory_ignore_paths = ["*.bak"]
         app, mock_db = _make_app(_user(roles=["admin"]))
         ws_result = MagicMock()
         ws_result.scalar_one_or_none.return_value = ws
@@ -2757,8 +2748,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         assert a["inventory-paths"] == ["inventory/production"]
         assert a["default-playbook"] == "site.yml"
         assert a["default-limit"] == "web"
-        assert a["inventory-include-platform"] is False
-        assert a["inventory-ignore-paths"] == ["*.bak"]
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2821,8 +2810,6 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             "inventory-paths",
             "default-playbook",
             "default-limit",
-            "inventory-include-platform",
-            "inventory-ignore-paths",
         ):
             assert key not in a, f"{key} reached the TFE-compatible wire"
 
@@ -2881,9 +2868,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             ({"inventory-paths": "inventory"}, "a bare string is not a list"),
             ({"inventory-paths": [1]}, "entries must be strings"),
             ({"inventory-paths": ["../x"]}, "traversal in an entry"),
-            ({"inventory-include-platform": "false"}, "a stringified bool is refused"),
             ({"default-playbook": 7}, "a non-string answers 422, not 500"),
-            ({"inventory-ignore-paths": {"a": 1}}, "a mapping is not a list"),
         ],
     )
     async def test_a_bad_value_is_422_not_500(

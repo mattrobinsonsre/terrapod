@@ -395,8 +395,6 @@ field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
 field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
-field CreateWorkspaceRequest.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
-field CreateWorkspaceRequest.InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
 field CreateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
@@ -1271,8 +1269,6 @@ field UpdateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,o
 field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
-field UpdateWorkspaceRequest.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
-field UpdateWorkspaceRequest.InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
 field UpdateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
@@ -1490,8 +1486,6 @@ field Workspace.EngineVersion string `json:"engine-version,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
 field Workspace.ID string `json:"id"`
-field Workspace.InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
-field Workspace.InventoryIncludePlatform bool `json:"inventory-include-platform"`
 field Workspace.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field Workspace.Labels map[string]string `json:"labels,omitempty"`
 field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`

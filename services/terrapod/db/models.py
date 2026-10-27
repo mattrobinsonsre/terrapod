@@ -575,20 +575,6 @@ class Workspace(Base):
     #: per run rather than in the playbook.
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
-    #: Whether the declared inventory rows take part in resolution (#1929).
-    #:
-    #: False resolves the git source alone, which is how an operator moves a
-    #: repository's existing inventory in before declaring anything.
-    inventory_include_platform: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-    #: Paths to drop from a fetched git inventory source before ansible sees it.
-    #:
-    #: Ansible reads a directory as ONE source, taking every file in it, so this
-    #: is the only way to leave a file out of a source that is a directory.
-    #: Without it the source stays WIDER than the operator asked for, which is
-    #: the direction that reads as harmless and is not.
-    inventory_ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
-
     #: The Pulumi stack this workspace is, when it is one (#1570). NULL for
     #: Terraform, and for any Pulumi workspace created before this column.
     #:
@@ -1958,8 +1944,6 @@ class AutodiscoveryRule(Base):
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    inventory_include_platform: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    inventory_ignore_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: The EE sidecar's request, templated like the pair above (#2154). `""`

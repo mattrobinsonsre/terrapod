@@ -175,12 +175,6 @@ type Workspace struct {
 	// DefaultLimit is the default `--limit` for a configure run. Empty means
 	// the whole inventory, which is ansible's own default.
 	DefaultLimit string `json:"default-limit,omitempty"`
-	// InventoryIncludePlatform is whether the rows declared through the
-	// inventory API contribute to the resolution. **Defaults to true**, so an
-	// absent value is NOT false — see the read in workspaceFromResource.
-	InventoryIncludePlatform bool `json:"inventory-include-platform"`
-	// InventoryIgnorePaths are paths excluded from the resolution.
-	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901), keyed
 	// on the provider configuration a token is for: `aws`, or `aws.west` for
 	// one aliased configuration. Empty means this workspace mints nothing and
@@ -418,14 +412,6 @@ type CreateWorkspaceRequest struct {
 	// empty value here is omitted rather than sent.
 	DefaultPlaybook string `json:"default-playbook,omitempty"`
 	DefaultLimit    string `json:"default-limit,omitempty"`
-	// InventoryIncludePlatform is whether rows declared through the inventory
-	// API contribute to the resolution. A POINTER because the server-side
-	// default is **true**: a plain bool could not send false, so the one
-	// request that resolves the git source alone would silently not apply.
-	InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
-	// InventoryIgnorePaths are paths excluded from the resolution. Same
-	// nil-versus-empty rule as InventoryPaths.
-	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -593,12 +579,6 @@ type UpdateWorkspaceRequest struct {
 	// `debug-mode` and `ai-policy-mode` shipped with.
 	DefaultPlaybook *string `json:"default-playbook,omitempty"`
 	DefaultLimit    *string `json:"default-limit,omitempty"`
-	// InventoryIncludePlatform is a pointer for the same reason: the default
-	// is true, so false has to be able to travel.
-	InventoryIncludePlatform *bool `json:"inventory-include-platform,omitempty"`
-	// InventoryIgnorePaths excludes paths from the resolution. Same
-	// nil-versus-empty rule as InventoryPaths.
-	InventoryIgnorePaths []string `json:"inventory-ignore-paths,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -961,12 +941,6 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DefaultLimit != "" {
 		attrs["default-limit"] = req.DefaultLimit
 	}
-	if req.InventoryIncludePlatform != nil {
-		attrs["inventory-include-platform"] = *req.InventoryIncludePlatform
-	}
-	if req.InventoryIgnorePaths != nil {
-		attrs["inventory-ignore-paths"] = req.InventoryIgnorePaths
-	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
@@ -1155,12 +1129,6 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		// inventory.
 		attrs["default-limit"] = *req.DefaultLimit
 	}
-	if req.InventoryIncludePlatform != nil {
-		attrs["inventory-include-platform"] = *req.InventoryIncludePlatform
-	}
-	if req.InventoryIgnorePaths != nil {
-		attrs["inventory-ignore-paths"] = req.InventoryIgnorePaths
-	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
@@ -1341,7 +1309,6 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),
 		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
 		DefaultLimit:                  GetStringAttr(res, "default-limit"),
-		InventoryIgnorePaths:          GetListAttr(res, "inventory-ignore-paths"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:                     GetStringAttr(res, "vcs-branch"),
 		VCSWorkflow:                   GetStringAttr(res, "vcs-workflow"),
@@ -1385,15 +1352,6 @@ func workspaceFromResource(res *Resource) *Workspace {
 		SlackChannel:                  GetStringAttr(res, "slack-channel"),
 		CreatedAt:                     GetStringAttr(res, "created-at"),
 		UpdatedAt:                     GetStringAttr(res, "updated-at"),
-	}
-	// `inventory-include-platform` defaults to TRUE, so an absent key is not
-	// false -- it is a server that predates #1929, or the TFE-compatible route,
-	// which drops all six. Reading it as false would report the declared rows
-	// as excluded on every workspace of every older server, and a provider
-	// would then show drift on a setting nobody had touched.
-	ws.InventoryIncludePlatform = true
-	if v := GetBoolPtrAttr(res, "inventory-include-platform"); v != nil {
-		ws.InventoryIncludePlatform = *v
 	}
 	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		ws.DriftDetectionIntervalSeconds = &v
