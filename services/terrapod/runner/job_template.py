@@ -124,6 +124,20 @@ _EE_CREDENTIALS_DIR = f"{_EE_SHARED_DIR}/credentials"
 #: inside the EE, which mounts only this volume and the workspace, and the
 #: orchestrator has to read back what it wrote.
 _EE_CALLBACK_DIR = f"{_EE_SHARED_DIR}/callback"
+#: Where a configure's cloud identity tokens are written (#2259).
+#:
+#: On the SHARED volume rather than at `cloud_identity.TOKEN_DIR`, which is the
+#: documented path for a plan or an apply. That one is an `emptyDir` mounted
+#: into the orchestrator ALONE, because the engine runs there; for a configure
+#: the thing presenting the token is ansible, which runs in the EE, and the EE
+#: mounts only this volume and the workspace. A token written to the documented
+#: path would therefore be minted, delivered, logged as delivered -- and
+#: invisible to the only process that has to read it.
+#:
+#: Here rather than on the workspace volume for the same reason as the
+#: inventory and the credentials: the file is Terrapod's, not part of the
+#: operator's fetched tree.
+_EE_OIDC_DIR = f"{_EE_SHARED_DIR}/oidc"
 #: The group both containers reach the shared volumes through. The orchestrator
 #: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
@@ -446,6 +460,7 @@ def _add_execution_environment(
             {"name": "TP_EE_INVENTORY_DIR", "value": _EE_INVENTORY_DIR},
             {"name": "TP_EE_CREDENTIALS_DIR", "value": _EE_CREDENTIALS_DIR},
             {"name": "TP_EE_CALLBACK_DIR", "value": _EE_CALLBACK_DIR},
+            {"name": "TP_EE_OIDC_DIR", "value": _EE_OIDC_DIR},
             {
                 "name": _EE_TOKEN_ENV,
                 "valueFrom": {
@@ -470,6 +485,7 @@ def _add_execution_environment(
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
                 f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} {_EE_CALLBACK_DIR} "
+                f"{_EE_OIDC_DIR} "
                 f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
             ],
             "securityContext": {

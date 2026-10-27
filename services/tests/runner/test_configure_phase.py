@@ -258,6 +258,101 @@ class TestTheConfigureFlowIsWired:
         )
         return calls[0]
 
+    def test_the_cloud_identity_phase_is_called_at_all(self):
+        """The whole of #2259's first half. `_run_configure_phase` returns from
+        step 7c, BEFORE the entrypoint reaches `cloud_identity.run` at step 10,
+        so for as long as the configure phase has existed nothing minted a
+        token for one -- a federated workspace ran its playbook with the agent
+        pool's identity and nothing said so.
+        """
+        fn = self._function()
+        # A CALL, not a mention. `"cloud_identity" in ast.dump(fn)` passes on
+        # the strength of this function's own DOCSTRING, which names
+        # `cloud_identity.TOKEN_DIR` to explain why the tokens go elsewhere --
+        # so that form survived deleting the call outright. Found by reading
+        # which tests a mutation killed rather than how many.
+        calls = [
+            n
+            for n in ast.walk(fn)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "run"
+            and isinstance(n.func.value, ast.Name)
+            and n.func.value.id == "cloud_identity"
+        ]
+        assert len(calls) == 1, (
+            "nothing mints this configure's cloud identity, so a federated "
+            "workspace silently falls through to the agent pool's"
+        )
+
+    def test_it_is_asked_NOT_to_discover(self):
+        """`discover_providers=False`, as a literal.
+
+        A playbook has no provider graph to walk, and the keyword is also what
+        the API keys its own non-discovering branch on. Asserting the keyword
+        merely EXISTS would be satisfied by `discover_providers=True`, which is
+        the defect restored -- so the value is read.
+        """
+        call = self._call(fn=self._function(), module="cloud_identity", func_attr="run")
+        passed = {k.arg: k.value for k in call.keywords}
+        assert "discover_providers" in passed, "the configure path asks the engine to discover"
+        value = passed["discover_providers"]
+        assert isinstance(value, ast.Constant) and value.value is False, (
+            "expected the literal False; a playbook has no provider graph to walk"
+        )
+
+    def test_the_tokens_GO_TO_THE_SHARED_VOLUME(self):
+        """The second half, and the one no behavioural test can see.
+
+        Without `token_dir` the phase writes to `cloud_identity.TOKEN_DIR`,
+        which is an emptyDir mounted into the ORCHESTRATOR alone. Ansible runs
+        in the execution environment, which mounts only the shared volume and
+        the workspace -- so the token would be minted, delivered, logged as
+        delivered, and unreadable by the one process that needs it. Every
+        assertion about minting would still pass.
+        """
+        call = self._call(fn=self._function(), module="cloud_identity", func_attr="run")
+        passed = {k.arg: k.value for k in call.keywords}
+        assert "token_dir" in passed, (
+            "the tokens land at the engine's directory, which the execution "
+            "environment does not mount"
+        )
+        # The resolver, not a literal: the path is a property of the Job's
+        # volume layout, so a literal here would be a second place to change it.
+        assert "ee_token_dir" in ast.unparse(passed["token_dir"]), (
+            "expected cloud_identity.ee_token_dir(), which reads TP_EE_OIDC_DIR"
+        )
+
+    def test_the_identity_environment_is_PASSED_to_the_configure(self):
+        """The third half. Minting and delivering a token the playbook's
+        environment never learns about leaves it findable only by hard-coding a
+        path -- and `TERRAPOD_OIDC_TOKEN_DIR` is what the documentation tells an
+        operator to read, precisely because a configure's directory differs
+        from the engine's.
+
+        Same shape as the vault assertion below: the name the phase's return
+        was bound to has to REACH the `extra_env` expression. Merged rather
+        than replacing, because three concerns now contribute to it.
+        """
+        fn = self._function()
+        configure_call = self._call(fn=fn, module="configure", func_attr="run")
+        passed = {k.arg: k.value for k in configure_call.keywords}
+        assert "extra_env" in passed
+
+        bound = {
+            t.id
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Assign) and "cloud_identity" in ast.dump(node.value)
+            for t in node.targets
+            if isinstance(t, ast.Name)
+        }
+        assert bound, "cloud_identity.run()'s return is not bound to anything"
+        reached = ast.unparse(passed["extra_env"])
+        assert any(name in reached for name in bound), (
+            f"none of {sorted(bound)} reaches extra_env ({reached!r}), so the token "
+            "directory never reaches the playbook's environment"
+        )
+
     def test_the_credential_phase_is_called(self):
         src = __import__("ast").dump(self._function())
         assert "ansible_auth" in src, "nothing materialises the credentials"

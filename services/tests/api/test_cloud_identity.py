@@ -208,7 +208,13 @@ async def _call(
     if status is not None:
         run.status = status
     elif not isinstance(run.status, str):
-        run.status = "applying" if user.run_phase == "apply" else "planning"
+        # Three phases, not two. `LIVE_STATES_FOR_PHASE` admits `configure`
+        # only while the run is `configuring`, so deriving `planning` for one
+        # would 409 every configure test for a reason that has nothing to do
+        # with what it is asserting.
+        run.status = {"apply": "applying", "configure": "configuring"}.get(
+            user.run_phase or "", "planning"
+        )
 
     settings = MagicMock()
     settings.auth.oidc_issuer = cfg or _enabled()
@@ -1540,6 +1546,126 @@ class TestAnEngineThatCannotDiscover:
         )
         assert cap["claims"]["phase"] == "apply"
         assert cap["claims"]["sub"].endswith(":phase:apply")
+
+
+class TestAConfigureDoesNotDiscover:
+    """A configure is minted the whole mapping, whatever its engine (#2259).
+
+    The defect this guards is specific and silent. A configure is a phase of a
+    **Terraform** workspace, so `discovers_provider_configurations(ws.engine)`
+    answers True -- and yet the run has no provider graph to walk at all: it
+    runs a playbook, and which clouds its tasks touch is not expressed as
+    provider blocks anywhere. Keyed on the engine alone, every configure landed
+    on the discovering branch, presented the empty list its runner correctly
+    sent, intersected it to nothing and was answered 204. A federated
+    workspace would have fallen through to the agent pool's broader identity
+    for exactly the operation that asked for its own, with nothing in the
+    response saying so.
+
+    So the engine and the phase are BOTH consulted, and the phase is taken
+    from the presented token rather than the request body -- the same source
+    the liveness gate uses, and for the reason GHSA-xmrf-hxq9-m59m exists.
+    """
+
+    async def test_a_configure_on_a_terraform_workspace_gets_everything(self):
+        ws, run, cfg = _scenario(
+            catalogue={"vault": ["https://vault.example.com"]},
+            override={"aws": ["sts.example.com"]},
+            engine="terraform",
+        )
+        resp, cap = await _call(
+            _user(run_id=str(run.id), phase="configure"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert sorted(t["target"] for t in _tokens(resp)) == ["aws", "vault"]
+        # One token per target still, and each with only its own audiences --
+        # not relaxed just because the set was not discovered.
+        by_target = {t["target"]: t["audiences"] for t in _tokens(resp)}
+        assert by_target["aws"] == ["sts.example.com"]
+        assert by_target["vault"] == ["https://vault.example.com"]
+        assert len(cap["all"]) == 2
+
+    async def test_a_plan_on_the_SAME_fixture_is_still_204(self):
+        """The contrast, and the only form that proves anything here.
+
+        Both assertions on one fixture: a configure gets the catalogue key, a
+        plan sending the same empty list does not. Asserted separately, each
+        passes whether or not the phase is consulted -- the configure case
+        because the workspace's own key is minted regardless (#2108), the plan
+        case because 204 is its answer either way. It is the pair that pins
+        the phase as the thing that decides.
+        """
+        ws, run, cfg = _scenario(
+            catalogue={"vault": ["https://vault.example.com"]}, engine="terraform"
+        )
+        cfg_resp, _ = await _call(
+            _user(run_id=str(run.id), phase="configure"), run, ws, providers=[], cfg=cfg
+        )
+        assert cfg_resp.status_code == 200
+        assert [t["target"] for t in _tokens(cfg_resp)] == ["vault"]
+
+        ws2, run2, cfg2 = _scenario(
+            catalogue={"vault": ["https://vault.example.com"]}, engine="terraform"
+        )
+        plan_resp, _ = await _call(
+            _user(run_id=str(run2.id), phase="plan"), run2, ws2, providers=[], cfg=cfg2
+        )
+        assert plan_resp.status_code == 204, (
+            "a DISCOVERING run's empty list still means 'this configuration declares "
+            "no provider'; widening that would be the regression"
+        )
+
+    async def test_a_bad_discovery_outcome_is_not_held_against_a_configure(self):
+        """`failed`/`unparsed` describe reading a graph a configure never read.
+
+        Its runner sends `ok` with an empty list, so this pins that the route
+        does not depend on the outcome -- a lagging or future runner reporting
+        something else still gets its tokens rather than a 409 about a graph
+        that was never walked.
+        """
+        ws, run, cfg = _scenario(catalogue={"aws": ["sts.example.com"]}, engine="terraform")
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="configure"),
+            run,
+            ws,
+            providers=[],
+            discovery="failed",
+            detail="no graph for a playbook",
+            cfg=cfg,
+        )
+        assert resp.status_code == 200
+        assert [t["target"] for t in _tokens(resp)] == ["aws"]
+
+    async def test_the_claim_names_the_configure_phase(self):
+        """The claim an operator's trust policy conditions on."""
+        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="terraform")
+        resp, cap = await _call(
+            _user(run_id=str(run.id), phase="configure"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert cap["claims"]["phase"] == "configure"
+        assert cap["claims"]["sub"].endswith(":phase:configure")
+
+    async def test_a_configure_cannot_mint_unless_it_is_CONFIGURING(self):
+        """The liveness gate applies to the new phase like the other two.
+
+        Worth its own case because the phase was added to
+        `LIVE_STATES_FOR_PHASE` before anything minted one, so nothing had ever
+        exercised it -- and a phase missing from that map falls back to the
+        union of every live state, which would admit a `planning` run.
+        """
+        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="terraform")
+        with pytest.raises(HTTPException) as e:
+            await _call(
+                _user(run_id=str(run.id), phase="configure"),
+                run,
+                ws,
+                providers=[],
+                cfg=cfg,
+                status="planned",
+            )
+        assert e.value.status_code == 409
+        assert "configure" in e.value.detail
 
 
 class TestOnlyARunEXECUTINGThePhaseCanMint:

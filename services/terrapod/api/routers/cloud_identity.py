@@ -229,16 +229,25 @@ async def mint_cloud_identity_tokens(
     is answered 204 **before** the outcome is examined, so a graph failure
     cannot fail a run that was never using this feature.
 
-    **An engine that cannot discover gets every identity the workspace
-    resolves** (#2006). Terraform's runner enumerates its provider
-    configurations with a static `graph` walk; Pulumi's cannot, because a Pulumi
-    program is arbitrary code whose provider instances are built at runtime and
-    the thing that would run it is what needs the credentials. So for a
-    non-discovering engine this mints the whole resolved mapping rather than an
-    intersection, and `discovers_provider_configurations` on the engine strategy
-    is what decides -- read here off the workspace row, because the runner image
-    does not ship `terrapod.engines` and a runner's claim about its own engine
-    would be the runner's rather than the platform's.
+    **A run that cannot discover gets every identity the workspace resolves**
+    (#2006). Terraform's runner enumerates its provider configurations with a
+    static `graph` walk; Pulumi's cannot, because a Pulumi program is arbitrary
+    code whose provider instances are built at runtime and the thing that would
+    run it is what needs the credentials. So for a non-discovering run this
+    mints the whole resolved mapping rather than an intersection.
+
+    **Two things decide it, not one: the engine AND the phase** (#2259). The
+    engine is read off the workspace row, because the runner image does not
+    ship `terrapod.engines` and a runner's claim about its own engine would be
+    the runner's rather than the platform's. The phase matters because a
+    CONFIGURE is a phase of a *Terraform* workspace -- `discovers_provider_
+    configurations("terraform")` is True -- and yet it has nothing to walk: it
+    runs a playbook, not a configuration, and which clouds its tasks touch is
+    not expressed as provider blocks anywhere. Keyed on the engine alone, every
+    configure would land on the discovering branch, present the empty list its
+    runner correctly sent, intersect to nothing, and be answered 204 -- a
+    federated workspace falling through to the agent pool's broader identity
+    for exactly the operation that asked for its own.
 
     Two consequences, both deliberate. The discovery outcome is not examined for
     such an engine, because its runner never ran a graph command and an outcome
@@ -344,7 +353,13 @@ async def mint_cloud_identity_tokens(
     # (#2006). Two reasons it belongs on this side: the runner image does not
     # ship `terrapod.engines` at all, and a claim about which engine a runner is
     # would be the runner's own, where this is the platform's.
-    discovers = discovers_provider_configurations(ws.engine)
+    #
+    # AND of the PHASE (#2259): a configure runs a playbook, so there is no
+    # provider graph to walk however capable its engine is. The phase is taken
+    # from `user.run_phase` -- the PRESENTED TOKEN -- which is the same source
+    # the liveness gate above uses and for the same reason: a request body
+    # claiming a phase is the thing GHSA-xmrf-hxq9-m59m exists to refuse.
+    discovers = discovers_provider_configurations(ws.engine) and user.run_phase != "configure"
 
     # Which keys are the WORKSPACE'S OWN, and which only the catalogue answers
     # (#2108). The split decides both the discovery gate below and what the
@@ -469,10 +484,10 @@ async def mint_cloud_identity_tokens(
                 status_code=409,
                 detail=(
                     f"This workspace resolves {len(snapshot)} cloud identity targets and "
-                    f"its engine cannot determine which of them this run uses, so all of "
-                    f"them would be minted -- more than the {MAX_TARGETS} this endpoint "
-                    f"issues for one run. Narrow the workspace's `oidc_audiences` to the "
-                    f"targets it needs."
+                    f"this run cannot determine which of them it uses, so all of them "
+                    f"would be minted -- more than the {MAX_TARGETS} this endpoint issues "
+                    f"for one run. Narrow the workspace's `oidc_audiences` to the targets "
+                    f"it needs."
                 ),
             )
         if payload.providers:
@@ -480,9 +495,10 @@ async def mint_cloud_identity_tokens(
             # cannot have discovered. Worth a line: it means one side believes
             # discovery happened.
             logger.info(
-                "cloud identity: provider list ignored for a non-discovering engine",
+                "cloud identity: provider list ignored for a non-discovering run",
                 run_id=run_id,
                 engine=ws.engine,
+                phase=user.run_phase,
                 sent=len(payload.providers),
             )
         for t in sorted(snapshot):

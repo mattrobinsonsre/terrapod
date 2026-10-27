@@ -552,6 +552,30 @@ before the header is shown in every view.
 A log with no header is one from a runner image that predates this. It renders
 in full, and the per-host picker is simply not offered.
 
+## Cloud credentials: a configure gets its own federated identity
+
+A configure presents the workspace's own cloud identity rather than the agent
+pool's, exactly as a plan and an apply do — see
+[Per-workspace cloud identity](cloud-identity.md). Three things are specific to
+a configure and all three are in
+[Ansible configure](cloud-identity.md#ansible-configure):
+
+* **The tokens are at `/tp/oidc`**, not the engine's `/var/run/terrapod/oidc`,
+  because ansible runs in the execution environment and that is the directory
+  both containers share. Read it from `TERRAPOD_OIDC_TOKEN_DIR` rather than
+  hard-coding either path.
+* **The claim is `phase: configure`**, so a trust policy conditioning on the
+  phase has to name it. A role an apply may assume is not thereby assumable by
+  a configure.
+* **Every identity the workspace resolves is minted**, because a playbook has
+  no provider graph to narrow by.
+
+**The configuration that turns a token into credentials goes in your
+playbook.** Terrapod writes the file and exports the directory; it sets no
+cloud credential environment and has no per-collection handling. The worked
+example on that page configures `amazon.aws`, `azure.azcollection`,
+`google.cloud` and `community.hashi_vault` from one `environment:` block.
+
 ## A play that targets the execution environment itself needs `ansible_remote_tmp`
 
 Most configures target managed nodes over SSH and need nothing here. But a play
@@ -598,3 +622,7 @@ play to fix the local case.
 | A push to the playbook does nothing | `auto-configure-enabled` is off, or the changed file is outside `config-directory` |
 | A configure ran against more hosts than expected | `default-limit` is empty, which means the whole inventory — check the Resolved view with the limit you intended |
 | An apply did not configure | `configure-after-apply` is off, or the apply was a destroy |
+| A cloud module says it has no credentials | the playbook sets no cloud credential environment, or it points at the engine's `/var/run/terrapod/oidc` rather than a configure's `/tp/oidc` — read `TERRAPOD_OIDC_TOKEN_DIR` |
+| A cloud rejects the token with a signature error | the value was read with surrounding whitespace — `| trim` the file for the forms that take the token rather than a path |
+| `The specified OIDC token file does not exist` | Azure's `oidc_token_file_path` names a path that is not there, usually the engine's directory rather than a configure's |
+| The cloud refuses an otherwise valid token | the trust policy conditions on `phase` and does not name `configure` |

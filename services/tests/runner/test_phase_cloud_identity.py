@@ -28,6 +28,7 @@ matters; the API can.
 import json
 import stat
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import httpx
@@ -870,3 +871,37 @@ class TestEveryMintedTokenIsRegisteredForRedaction:
         """The contrast, so the test above cannot pass by registering
         unconditionally."""
         assert self._run_registering(tmp_path, mint=[]) == []
+
+
+class TestTheExecutionEnvironmentsTokenDirectory:
+    """`ee_token_dir()` -- where a CONFIGURE's tokens go (#2259).
+
+    Read from the environment rather than taken as an argument, matching
+    `configure_inventory.inventory_dir` and
+    `ansible_collections.collections_dir`: the path is a property of the Job's
+    volume layout, not of the run.
+    """
+
+    def test_it_reads_the_job_s_variable(self, monkeypatch):
+        monkeypatch.setenv(cloud_identity.EE_TOKEN_DIR_ENV, "/tp/elsewhere")
+        assert cloud_identity.ee_token_dir() == Path("/tp/elsewhere")
+
+    def test_it_falls_back_to_the_shared_volume(self, monkeypatch):
+        """For a runner newer than the listener that launched it. That cannot
+        happen for a configure -- the listener is what adds the sidecar at all
+        -- but a resolver returning a usable path beats one returning None."""
+        monkeypatch.delenv(cloud_identity.EE_TOKEN_DIR_ENV, raising=False)
+        assert cloud_identity.ee_token_dir() == Path("/tp/oidc")
+
+    def test_an_EMPTY_variable_falls_back_rather_than_resolving_to_the_cwd(self, monkeypatch):
+        """`Path("")` is `.`, so a blank value would write the tokens into
+        whatever directory the runner happens to be in -- which for a configure
+        is the operator's own fetched tree."""
+        monkeypatch.setenv(cloud_identity.EE_TOKEN_DIR_ENV, "")
+        assert cloud_identity.ee_token_dir() == Path("/tp/oidc")
+
+    def test_it_is_NOT_the_engine_s_directory(self):
+        """The whole point. Asserted as a relationship rather than a literal:
+        if these two were ever made equal, a configure's tokens would land
+        where the execution environment cannot read them."""
+        assert cloud_identity.ee_token_dir() != cloud_identity.TOKEN_DIR
