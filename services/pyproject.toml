@@ -33,8 +33,18 @@ httpx = "^0.28.0"
 slack-sdk = "^3.33.0"
 pyyaml = "^6.0.0"
 aiofiles = "^25.1.0"
-# AWS S3
-aioboto3 = "^15.5.0"
+# AWS S3 and KMS. aiobotocore DIRECTLY, not through aioboto3 (#2263).
+#
+# aioboto3 wraps aiobotocore to add a boto3-style `resource` API and the S3
+# transfer helpers, and Terrapod used NEITHER -- every call in storage/s3.py and
+# crypto/providers.py is a low-level botocore operation. What it did do was
+# hard-pin `aiobotocore[boto3]==2.25.1`, which capped `boto3 <1.40.62` and so
+# made every patched litellm uninstallable; it had also gone 362 days without a
+# release while aiobotocore shipped 2.25.1 -> 3.10.0.
+#
+# Deliberately WITHOUT the `[boto3]` extra: nothing here imports boto3, so this
+# brings botocore alone and boto3 is left entirely to litellm's own constraint.
+aiobotocore = "^3.10"
 # Azure Blob Storage
 azure-storage-blob = "^12.25.0"
 azure-identity = "^1.21.0"
@@ -75,8 +85,34 @@ standard-imghdr = "^3.13"
 # speaks OpenAI Chat Completions request shape to LiteLLM; LiteLLM
 # handles per-provider request translation and auth in-process.
 #
-# Upper bound <2.0 is the standard major-version cap. Lower bound
-# 1.87 patches the proxy-mode CVEs (CVE-2026-40217, CVE-2026-42203,
+# Upper bound <1.104, NOT <2.0, and the reason is a cap of litellm's own
+# (#2263). litellm 1.104.0 added `filelock<4.0` — a fortnight after filelock
+# cut 4.0.0, so a precautionary major-version cap rather than a response to
+# anything broken. filelock's own CVE-2026-112907, CVE-2026-112913 and
+# CVE-2026-112940 are fixed ONLY in 4.2.1, so any litellm from 1.104 up drags
+# filelock from 4.2.4 down to 3.x and reintroduces all three — against a
+# package we neither declare nor import.
+#
+# 1.103.x carries no such cap and IS patched for CVE-2026-114612 (fix points
+# 1.100.4, 1.101.3, 1.102.2, 1.103.1), so this range takes the patch and keeps
+# filelock clean. Measured both ways with pip-audit rather than reasoned.
+#
+# EXIT: litellm relaxes `filelock<4.0`. Then drop this upper bound back to
+# <2.0. Checkable in one call:
+#
+#   curl -s https://pypi.org/pypi/litellm/json \
+#     | jq -r '.info.requires_dist[]' | grep '^filelock'
+#
+# Lower bound 1.103.1 patches CVE-2026-114612: the proxy seals secrets at rest
+# and mints session tokens with ONE key, so an `internal_user` can have a
+# forged admin credential encrypted for them and present it back as a bearer
+# token, reaching proxy_admin and arbitrary command execution via the MCP stdio
+# endpoint. Exploitable in the DEFAULT configuration above 1.91.0. It was
+# unreachable here — library-only via acompletion(), proxy never started — and
+# bumped anyway, because a reachability argument is a claim about today's call
+# sites and a floor is a fact about the artifact.
+#
+# 1.87 was the previous floor and patches the earlier proxy-mode CVEs (CVE-2026-40217, CVE-2026-42203,
 # CVE-2026-42208, CVE-2026-42271) — all proxy-only, not reachable from
 # how Terrapod uses litellm (library-only via acompletion(), proxy
 # never started) — and relaxes the aiohttp pin from ==3.13.5 to
@@ -88,7 +124,36 @@ standard-imghdr = "^3.13"
 # requires_python = <3.14, so the whole project was pinned to 3.13 by
 # one dependency. That cap is gone as of 1.99.0 (<3.15,>=3.10), which
 # is what let the floor move to 3.14 in 2.0 (#1461).
-litellm = ">=1.87,<2.0"
+#
+# UPPER BOUND <1.104 EXCLUDES litellm's OWN filelock cap (#2263), and that is
+# why it is not <2.0. litellm 1.104.0 added `filelock<4.0` a fortnight after
+# filelock cut 4.0.0 — a precautionary major-version cap, not a response to
+# anything broken. filelock's CVE-2026-112907, CVE-2026-112913 and
+# CVE-2026-112940 were introduced in 3.20.4 and fixed only in 4.2.1, so every
+# version that cap permits above 3.20.3 carries all three, against a package we
+# neither declare nor import and reach only through litellm and
+# huggingface-hub. A capped litellm therefore drags filelock from 4.2.4 down to
+# 3.x and trades one accepted, proxy-only, unreachable advisory for three local
+# rename/symlink ones.
+#
+# Not a new untested pairing: `main` already ran litellm 1.97.0 against filelock
+# 4.2.4, and 1.97.0 predates filelock 4.0.0 entirely. The cap-free 1.103.x line
+# is the same situation with the proxy CVE fixed.
+#
+# LOWER BOUND 1.103.1 patches CVE-2026-114612 — the proxy seals secrets at rest
+# and mints session tokens with ONE key, so an `internal_user` can have a forged
+# admin credential encrypted for them and present it back as a bearer token,
+# reaching proxy_admin and arbitrary command execution via the MCP stdio
+# endpoint. Exploitable in the DEFAULT configuration above 1.91.0. Unreachable
+# here and bumped anyway, because a reachability argument is a claim about
+# today's call sites while a floor is a fact about the artifact. 1.103.1 is the
+# fix point on the cap-free line; the others are 1.100.4, 1.101.3 and 1.102.2.
+#
+# EXIT: litellm relaxes `filelock<4.0`, after which this returns to <2.0.
+#
+#   curl -s https://pypi.org/pypi/litellm/json \
+#     | jq -r '.info.requires_dist[]' | grep '^filelock'
+litellm = ">=1.103.1,<1.104"
 # Required at RUNTIME by litellm's completion() path: litellm 1.9x lazily imports
 # litellm.responses.mcp -> litellm.proxy.common_utils.http_parsing_utils, which
 # does an unconditional `import orjson`. orjson is one of litellm's own optional
@@ -197,7 +262,6 @@ warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 module = [
-    "aioboto3",
     "aiobotocore.*",
     "azure.*",
     "google.*",

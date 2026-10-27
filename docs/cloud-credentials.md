@@ -94,7 +94,7 @@ When a pod starts, the cloud provider's mutating admission webhook injects the n
 
 The platform's object-storage backends are workload-identity-native and hold **no** static keys:
 
-- **AWS S3** — via `aioboto3`, which resolves credentials through the standard AWS credential chain (IRSA web-identity token).
+- **AWS S3** — via `aiobotocore`, which resolves credentials through the standard AWS credential chain (IRSA web-identity token).
 - **Azure Blob** — via `DefaultAzureCredential`, which resolves the federated Workload Identity token.
 - **GCS** — via Application Default Credentials (Workload Identity Federation on GKE).
 

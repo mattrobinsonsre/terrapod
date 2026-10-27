@@ -170,18 +170,18 @@ class AwsKmsKEKProvider:
         self._region = region or None
 
     async def wrap(self, dek: bytes) -> str:
-        import aioboto3
+        from aiobotocore.session import get_session
 
-        session = aioboto3.Session()
-        async with session.client("kms", region_name=self._region) as kms:
+        session = get_session()
+        async with session.create_client("kms", region_name=self._region) as kms:
             resp = await kms.encrypt(KeyId=self._key_id, Plaintext=dek)
             return base64.b64encode(resp["CiphertextBlob"]).decode("ascii")
 
     async def unwrap(self, wrapped: str) -> bytes:
-        import aioboto3
+        from aiobotocore.session import get_session
 
-        session = aioboto3.Session()
-        async with session.client("kms", region_name=self._region) as kms:
+        session = get_session()
+        async with session.create_client("kms", region_name=self._region) as kms:
             resp = await kms.decrypt(KeyId=self._key_id, CiphertextBlob=base64.b64decode(wrapped))
             return resp["Plaintext"]
 

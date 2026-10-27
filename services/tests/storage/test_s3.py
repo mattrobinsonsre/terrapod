@@ -63,7 +63,12 @@ class TestS3StoreUnit:
             return cm
 
         store._session = MagicMock()
-        store._session.client = _client
+        # `create_client`, not `client`: the session is aiobotocore's now
+        # rather than aioboto3's (#2263). A mock on the old name is not
+        # reached, which is how a test that still passes can stop asserting
+        # anything -- here it failed loudly instead, because the capture dict
+        # stayed empty.
+        store._session.create_client = _client
 
         await store._get_client()
 
@@ -106,7 +111,7 @@ class TestS3StoreUnit:
 
         store = S3Store(bucket="kms-bucket", region="us-east-1")
         # Force the client to the legacy SigV2 signer.
-        store._client = await store._session.client(
+        store._client = await store._session.create_client(
             "s3", region_name="us-east-1", config=Config(signature_version="s3")
         ).__aenter__()
         try:
