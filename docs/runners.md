@@ -229,6 +229,8 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.maxTokenTTLSeconds` | `7200` | Maximum runner token TTL (2 hours) |
 | `runners.staleTimeoutSeconds` | `3600` | Mark run as errored if no Job status after this long |
 | `runners.driftMaxDurationSeconds` | `1800` | Max time a drift run may spend in `planning` before the reconciler errors it. Independent of `staleTimeoutSeconds` (which fires on dead listeners) — this one fires on terraform legitimately running too long for a background plan-only check. Set to `0` to disable |
+| `runners.configureTimeoutMinutes` | `180` | Minutes an Ansible **configure** Job may run before Kubernetes ends it. Sent only for a configure, so plan, apply, preview and up keep the Job builder's own 60 minutes and are unaffected. A backstop rather than a prediction — a playbook walking a few hundred hosts legitimately runs for hours |
+| `runners.configureNoProgressSeconds` | `1800` | Seconds a configure may produce **no new output** before the reconciler errors it. `0` disables. This is what distinguishes "still working" from "stuck", which a duration ceiling cannot. Deliberately generous: ansible prints nothing while a single task runs, so a legitimate forty-minute `command` looks exactly like a wedge |
 
 ### Per-Workspace Resources
 

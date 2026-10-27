@@ -11,6 +11,7 @@ The API owns all run lifecycle state. The reconciler:
 Registered as a periodic task (2s interval) in app.py.
 """
 
+import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -85,6 +86,92 @@ def _phase_start_of(run: Run) -> datetime | None:
         "applying": run.apply_started_at,
         "configuring": run.configure_started_at,
     }.get(run.status, run.apply_started_at)
+
+
+#: Where a configure's progress marker lives (#1977). Redis rather than a
+#: module global, because every replica runs the reconciler loop and in-process
+#: state is not multi-replica safe (architecture principle 11).
+_PROGRESS_PREFIX = "tp:configure_progress:"
+
+
+async def _check_configure_progress(db: AsyncSession, run: Run, phase: str) -> None:
+    """Error a configure that has produced no NEW output for too long (#1977).
+
+    **The signal is content CHANGE, not arrival, and that is the whole design.**
+    The reconciler publishes a `stream_logs` event every cycle and the listener
+    answers it whether or not ansible produced anything, so the live snapshot is
+    rewritten roughly every ten seconds regardless. A detector keyed on "did an
+    upload arrive recently" could therefore never fire -- it would report every
+    run as healthy for ever, which is the absent-signal-reads-as-passing shape.
+
+    **It lives here, at the `running` branch, and could not live in
+    `_check_stale`.** That function is only reached when
+    `get_job_status_from_redis` returns None, and a configure that is wedged is
+    still reporting `running` -- so the stale path never sees it.
+
+    **The generous default is not timidity.** Ansible's stdout callback emits
+    nothing while a single task runs, so a legitimate `command` that takes forty
+    minutes is indistinguishable from a wedge by this signal. So this bounds
+    "nothing at all is happening" and nothing finer; the wall-clock bound is
+    `configure_timeout_minutes` on the Job itself.
+
+    **An absent snapshot is NOT no-progress.** It means the listener has stopped
+    answering, which is `_check_stale`'s business, and reporting it here would
+    name the wrong cause to whoever reads the error.
+    """
+    cfg = load_runner_config()
+    window = cfg.configure_no_progress_seconds
+    if window <= 0 or not run.is_configure or run.status != "configuring":
+        return
+
+    from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+
+    redis = get_redis_client()
+    live = await redis.get(f"{LOG_STREAM_PREFIX}{run.id}:{phase}")
+    if not live:
+        return
+    if isinstance(live, str):
+        live = live.encode()
+    # A 500-line tail, so well under the 10 MB the no-sync-work-in-async
+    # checklist draws its line at.
+    digest = hashlib.sha256(live).hexdigest()[:32]
+
+    key = f"{_PROGRESS_PREFIX}{run.id}:{phase}"
+    now = datetime.now(UTC)
+    prior = await redis.get(key)
+    if prior is not None:
+        if isinstance(prior, bytes):
+            prior = prior.decode()
+        prior_digest, _, prior_at = prior.partition(":")
+        if prior_digest == digest:
+            # Unchanged. Deliberately does NOT rewrite the marker -- rewriting
+            # it would reset the clock on every tick and the window could never
+            # elapse.
+            try:
+                first_seen = datetime.fromtimestamp(float(prior_at), UTC)
+            except ValueError:
+                first_seen = now
+            silent = now - first_seen
+            if silent > timedelta(seconds=window):
+                await _handle_failed(
+                    db,
+                    run,
+                    f"Configure produced no output for {int(silent.total_seconds())}s "
+                    f"(no-progress window {window}s)",
+                )
+                await _reap_abandoned_job(run)
+                logger.warning(
+                    "Configure errored: no progress",
+                    run_id=str(run.id),
+                    silent_seconds=int(silent.total_seconds()),
+                    window_seconds=window,
+                )
+            return
+
+    # New output (or the first observation): restart the clock. The TTL is
+    # comfortably past the window so the marker cannot expire mid-measurement
+    # and silently reset it.
+    await redis.setex(key, max(window * 2, 600), f"{digest}:{now.timestamp()}")
 
 
 async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
@@ -405,7 +492,11 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
         return
 
     if status == "running":
-        return  # Still running, no-op
+        # Reporting `running` is not the same as making progress (#1977). This
+        # is the only branch a wedged configure reaches, because `_check_stale`
+        # is only called when no status was reported at all.
+        await _check_configure_progress(db, run, phase)
+        return
 
     if status == "unschedulable":
         # The Job's pod can't be scheduled (insufficient cluster resources, or

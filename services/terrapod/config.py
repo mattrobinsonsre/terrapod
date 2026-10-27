@@ -263,6 +263,39 @@ class RunnerConfig(BaseSettings):
             "yet passed its probe."
         ),
     )
+    configure_timeout_minutes: int = Field(
+        default=180,
+        description=(
+            "Minutes an Ansible configure Job may run before Kubernetes ends "
+            "it (#1977). Its own setting rather than the Job builder's 60, "
+            "because the two bound different things: a terraform plan that has "
+            "not finished in an hour is almost certainly stuck, while a "
+            "playbook walking a few hundred hosts legitimately runs for hours "
+            "-- a patch run across a thousand hosts is not unusual. Sent only "
+            "for a configure, so plan, apply, preview and up keep the "
+            "builder's default exactly as they always have. This is a BACKSTOP "
+            "rather than a prediction: `configure_no_progress_seconds` is the "
+            "setting that catches a configure which has actually stopped."
+        ),
+    )
+    configure_no_progress_seconds: int = Field(
+        default=1800,
+        description=(
+            "Seconds a configure may produce NO NEW OUTPUT before the "
+            "reconciler errors it (#1977). 0 disables. This is the signal that "
+            "distinguishes 'still working' from 'stuck', which a duration "
+            "ceiling cannot: a configure is bounded in wall-clock by "
+            "`configure_timeout_minutes`, but a play wedged on one unreachable "
+            "host would otherwise burn that whole ceiling before anything "
+            "noticed.\n\n"
+            "Deliberately generous, because the premise 'ansible is chatty' is "
+            "FALSE for a single long task -- the stdout callback emits nothing "
+            "while a task runs, so a legitimate `command` that takes forty "
+            "minutes looks identical to a wedge. A tight value here would kill "
+            "working runs, so this bounds 'nothing at all is happening' and "
+            "nothing finer."
+        ),
+    )
     drift_max_duration_seconds: int = Field(
         default=1800,
         description=(

@@ -298,6 +298,41 @@ resolved inventory named. A host in the second set and not the first is shown as
 and this is the absence of one. Without that, a run that aborted after one host
 of fifty would read as a clean one-host success.
 
+## How long a configure may run, and how a stuck one is noticed
+
+A configure is bounded by two settings, and they answer different questions.
+
+**`runners.configureTimeoutMinutes`** (default 180) is the wall-clock ceiling on
+the Job. It exists because every other bound in the run infrastructure was sized
+for a `terraform plan`: a plan that has not finished in an hour is almost
+certainly stuck, while a playbook across a few hundred hosts legitimately runs
+for hours. It is sent **only** for a configure, so plan, apply, preview and up
+keep the builder's own 60 minutes and nothing changes for a deployment that runs
+no playbooks.
+
+**`runners.configureNoProgressSeconds`** (default 1800, `0` disables) is the one
+that actually catches a stuck configure. A play wedged on a single unreachable
+host would otherwise burn the whole ceiling before anything noticed, so the
+reconciler errors a configure that has produced **no new output** for this long.
+
+Two things about it are worth knowing, because both are counter-intuitive:
+
+- **It measures new output, not activity.** Terrapod refreshes the live log every
+  few seconds whether or not ansible produced anything, so "has something
+  arrived" would always be true. The signal is that the output has *changed*.
+- **It is deliberately generous, and cannot safely be tight.** Ansible prints
+  nothing while a single task runs, so a legitimate `command` that takes forty
+  minutes is indistinguishable from a wedge by this signal alone. Setting it
+  near your longest single task will kill working runs. It bounds "nothing at
+  all is happening" and nothing finer.
+
+A configure that is **cancelled** — from the run page, or by a newer run — is
+interrupted rather than killed: ansible is signalled once, stops at the task it
+is on, and the run reports that it was interrupted rather than that the playbook
+failed. Hosts it had not reached are reported as not reached, which is what
+[Retrying only the hosts that are left](#retrying-only-the-hosts-that-are-left)
+acts on.
+
 ### Retrying only the hosts that are left
 
 A configure that fails partway has configured some hosts and not others, and the

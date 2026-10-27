@@ -66,7 +66,6 @@ class PulumiRunOptions:
     resource_cpu: str = ""
     resource_memory: str = ""
     parallelism: int = 0
-    timeout_minutes: int = 0
     env_vars: list[dict[str, Any]] = field(default_factory=list)
     #: Save the preview's plan and bind the update to it (#1553). Off by default.
     bind_plan: bool = False
@@ -270,7 +269,6 @@ class PulumiStrategy:
             resource_cpu=attrs.get("resource-cpu", ""),
             resource_memory=attrs.get("resource-memory", ""),
             parallelism=attrs.get("parallelism", 0),
-            timeout_minutes=attrs.get("timeout-minutes", 0),
             bind_plan=bool(attrs.get("pulumi-bind-plan", False)),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
@@ -307,7 +305,10 @@ class PulumiStrategy:
         #                    point of the split.
         #   env_vars         `options_from_attrs` never populates it, so this sent
         #                    an empty list and discarded every real env var.
-        #   timeout_minutes  defaults to 0, overriding the builder's 60.
+        #   timeout_minutes  defaulted to 0, overriding the builder's 60. The field
+        #                    itself is GONE (#1977): it was declared, assigned and read
+        #                    by nothing, and the API now sends `timeout-minutes` only
+        #                    for a configure, which Pulumi never runs.
         #   resource_*       default to "", overriding "1" / "2Gi".
         #
         # Passing them twice raised TypeError before any of the rest could bite,

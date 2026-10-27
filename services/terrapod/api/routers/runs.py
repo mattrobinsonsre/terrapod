@@ -3653,6 +3653,19 @@ async def next_run(
         # run page needs to show ("the workspace's default" against "this run
         # asked for X"), and resolving it in both places is how two copies of a
         # precedence rule come to disagree.
+        # The configure ceiling (#1977). Sent ONLY here, in the configure
+        # branch, which is what keeps every plan, apply, preview and up on the
+        # Job builder's own 60-minute default -- so this adds a bound for the
+        # one phase that needs a different one and changes nothing for the
+        # engines that do not.
+        #
+        # `timeout-minutes` already existed as a wire key read by nobody:
+        # `engines/pulumi.py` read it into an options field that was
+        # deliberately not forwarded, and the API never sent it. So this makes
+        # a declared-but-dead key real rather than inventing plumbing.
+        from terrapod.config import load_runner_config as _lrc
+
+        attributes["timeout-minutes"] = _lrc().configure_timeout_minutes
         attributes["default-playbook"] = ws.default_playbook or ""
         attributes["default-limit"] = ws.default_limit or ""
         if run.playbook:

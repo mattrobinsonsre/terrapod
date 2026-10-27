@@ -1868,6 +1868,12 @@ jobs:
           # bounds how long a sidecar has to become ready, and a missing render
           # line on either leaves the code default winning silently.
           echo "$out" | grep -q "ee_startup_timeout_seconds: 600" || { echo "FAIL: runners.yaml ee_startup_timeout_seconds not rendered — a stalled execution environment would hang to the stale timeout with the operator's window ignored"; exit 1; }
+          # #1977. Leg 3 of the config-channel contract: miss the render line
+          # and the operator sets the value, it never reaches the pod, and the
+          # code default wins silently. Greps the RENDERED output, not the
+          # template, which is the only thing that catches it.
+          echo "$out" | grep -q "configure_timeout_minutes: 180" || { echo "FAIL: runners.yaml configure_timeout_minutes not rendered — a configure would be killed at the builder's 60 minutes with the operator's ceiling ignored"; exit 1; }
+          echo "$out" | grep -q "configure_no_progress_seconds: 1800" || { echo "FAIL: runners.yaml configure_no_progress_seconds not rendered — a wedged configure would burn its whole ceiling with nothing noticing"; exit 1; }
           echo "$out" | grep -q 'default_ee_resource_cpu: "500m"' || { echo "FAIL: config.yaml default_ee_resource_cpu not rendered — a workspace that sizes no EE would take the code default, ignoring the operator's"; exit 1; }
           echo "$out" | grep -q 'default_ee_resource_memory: "1Gi"' || { echo "FAIL: config.yaml default_ee_resource_memory not rendered"; exit 1; }
           # Which environments are selectable (#2154). The repository is what a
