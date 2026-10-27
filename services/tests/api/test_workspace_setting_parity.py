@@ -573,6 +573,7 @@ class TestTheOtherDirectionOfParity:
 
 _WS_FIELDS = _surface("web/src/components/workspace-fields.tsx")
 _CREATE_GUI = _surface("web/src/app/workspaces/page.tsx")
+_EDIT_GUI = _surface("web/src/app/workspaces/[id]/page.tsx")
 
 #: Attributes the write path accepts that are NOT workspace settings, and why.
 #:
@@ -718,16 +719,35 @@ class TestCreateCanSetWhatEditCanSet:
 
         This repo has shipped five flag-nothing-reads defects, so a shared table
         whose whole purpose is to be consumed twice gets an explicit check that
-        it is. Grepping for the import is enough: a page that imports the group
-        helpers cannot render a field set of its own without them."""
-        for label, surface in (("create form", _CREATE_GUI), ("field table", _WS_FIELDS)):
+        it is.
+
+        BOTH, deliberately. A one-sided version of this check -- which is what I
+        wrote first -- passes while the edit tab renders a field set of its own,
+        and the edit tab is the side that already had all 50 fields. So the
+        divergence it would miss is precisely the one that existed before #2253,
+        pointing the other way: create conforming to the table while the tab
+        drifts off it. A gate that can only catch one direction of a symmetric
+        invariant is the shape this repo keeps relearning.
+        """
+        for label, surface in (
+            ("create form", _CREATE_GUI),
+            ("edit tab", _EDIT_GUI),
+            ("field table", _WS_FIELDS),
+        ):
             assert surface.exists(), f"{label} missing at {surface}"
-        create = _CREATE_GUI.read_text()
-        assert "workspace-fields" in create, (
-            "the create form does not import the shared field table, so the two "
-            "forms can diverge again exactly as they did before #2253 — which is "
-            "the whole thing this gate exists to prevent"
-        )
-        assert "groupFields" in create or "FIELDS" in create, (
-            "the create form imports the module but never reads the field set"
+        # Collected rather than asserted per form, so the failure names EVERY
+        # side that has drifted. Failing on the first hides whether the second
+        # is wired at all, which would make the two-sided check above
+        # indistinguishable from the one-sided one it replaced.
+        problems: list[str] = []
+        for label, surface in (("create form", _CREATE_GUI), ("edit tab", _EDIT_GUI)):
+            src = surface.read_text()
+            if "workspace-field" not in src:
+                problems.append(f"{label}: does not import the shared field code")
+            elif not ("groupFields" in src or "FIELDS" in src or "<Group" in src):
+                problems.append(f"{label}: imports the module but never reads the field set")
+        assert problems == [], (
+            "the workspace forms do not both build themselves from the shared field "
+            f"table, so they can diverge again exactly as they did before #2253: "
+            f"{problems}"
         )

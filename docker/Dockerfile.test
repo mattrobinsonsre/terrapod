@@ -95,6 +95,7 @@ COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/
 # `_surface()` helper says so in its own error.
 COPY web/src/components/workspace-fields.tsx ./web/src/components/workspace-fields.tsx
 COPY web/src/app/workspaces/page.tsx ./web/src/app/workspaces/page.tsx
+COPY "web/src/app/workspaces/[id]/page.tsx" "./web/src/app/workspaces/[id]/page.tsx"
 # Read by tests/auth/test_cli_login_timing.py, which ties this page's
 # POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
 COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx
