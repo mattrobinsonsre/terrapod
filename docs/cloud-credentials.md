@@ -191,7 +191,7 @@ speculative plan on a pull request executes code nobody has reviewed yet; see
 apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply)
 for the threat and its limits, and [Cloud Identity → A separate ServiceAccount
 for the apply
-phase](cloud-identity.md#a-separate-serviceaccount-for-the-apply-phase) for a
+phase](cloud-identity.md#separate-serviceaccounts-per-phase) for a
 worked example per cloud.
 
 Three things follow from it being an ordinary ServiceAccount:

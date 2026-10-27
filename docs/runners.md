@@ -742,7 +742,7 @@ runners:
   azureWorkloadIdentity: false
 ```
 
-### A separate ServiceAccount for the apply phase
+### Separate ServiceAccounts per phase
 
 A run's `plan`, its `apply` and any `configure` are **separate Jobs**, and the
 apply and configure phases can each be given their own ServiceAccount:
@@ -781,7 +781,7 @@ configuring it is to put the plan phase on a narrower cloud role, because a
 speculative pull-request plan runs unreviewed code; see [Security Hardening →
 Give the plan phase a narrower identity than the
 apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply),
-and [Cloud Identity](cloud-identity.md#a-separate-serviceaccount-for-the-apply-phase)
+and [Cloud Identity](cloud-identity.md#separate-serviceaccounts-per-phase)
 for a worked example per cloud.
 
 **The Job spec is built by the listener**, which reads

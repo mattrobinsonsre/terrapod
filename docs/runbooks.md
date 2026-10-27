@@ -2330,7 +2330,7 @@ one case where a passing plan says nothing about the apply.
 
 Worth answering directly whenever a phase fails to authenticate to your cloud,
 or after configuring
-[`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase)
+[`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase)
 and wanting to see that it took effect. The apply phase uses that account when it
 is configured; every other Job uses `runners.serviceAccount`.
 

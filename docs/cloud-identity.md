@@ -25,7 +25,7 @@ permissions without standing up a second listener.
 
 The last third of this page covers two controls that separate a run's **plan**
 from its **apply** without the issuer being involved at all — [a second
-ServiceAccount for the apply phase](#a-separate-serviceaccount-for-the-apply-phase)
+ServiceAccount for the apply phase](#separate-serviceaccounts-per-phase)
 and [apply-only variables](#apply-only-variables). They live here because they
 answer the same question as the [`phase`
 claim](#the-phase-claim-and-why-write-permissions-belong-behind-it), and both are
@@ -1281,7 +1281,7 @@ and an apply receives the writing one, and the configuration is just
 
 ---
 
-## A separate ServiceAccount for the apply phase
+## Separate ServiceAccounts per phase
 
 The `phase` claim above separates the phases **inside a federated token**, so
 the cloud does the deciding. There is a second, independent way to separate them,

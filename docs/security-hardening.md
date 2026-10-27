@@ -679,10 +679,10 @@ own cloud identity or the values it receives:
 
 | Control | What it separates | Needs the OIDC issuer? |
 |---|---|---|
-| [`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase) | the Job's **Kubernetes ServiceAccount**, and therefore its IRSA / Workload Identity cloud role | no |
+| [`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase) | the Job's **Kubernetes ServiceAccount**, and therefore its IRSA / Workload Identity cloud role | no |
 | [the `phase` claim](cloud-identity.md#the-phase-claim-and-why-write-permissions-belong-behind-it) | the **role a federated token may assume**, decided by your cloud's trust policy | yes |
 | [apply-only variables](cloud-identity.md#apply-only-variables) | which **variable values** each phase receives | no |
-| [`runners.configureServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase) | the **configure** Job's ServiceAccount, and therefore its cloud role. Unset, a configure takes the *plan's* account, never the apply's | no |
+| [`runners.configureServiceAccount`](runners.md#separate-serviceaccounts-per-phase) | the **configure** Job's ServiceAccount, and therefore its cloud role. Unset, a configure takes the *plan's* account, never the apply's | no |
 | [configure-only variables](cloud-identity.md#configure-only-variables) | values a **configure alone** receives — the fleet's own credential, withheld from an apply as well as from a plan | no |
 
 **The recommended posture**, for a deployment where pull requests drive plans:
