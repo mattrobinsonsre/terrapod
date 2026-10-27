@@ -188,12 +188,10 @@ neither has to be set.
 ### Leaving a file out is `ignore_patterns`, in your own `ansible.cfg`
 
 Ansible reads a directory as one source and takes every file in it, so a file
-sitting in an inventory directory that is not an inventory needs excluding.
-**Ansible already owns that control**, and it is the better home for it:
-`ignore_patterns` is versioned beside the inventory it describes, and it is in
-force for a practitioner running `ansible-inventory` by hand against the same
-tree. A Terrapod-side ignore list applied only when resolving through Terrapod,
-so local and central resolution could disagree about the host set.
+sitting in an inventory directory that is not an inventory needs excluding. That
+control is `ignore_patterns`, and it lives in your own `ansible.cfg`: versioned
+beside the inventory it describes, and in force both for a configure run and for
+a practitioner running `ansible-inventory` by hand against the same tree.
 
 Terrapod writes no `ansible.cfg` and sets `ANSIBLE_CONFIG` nowhere, and it
 forces no ignore setting through the environment, so a committed `ignore_patterns`
