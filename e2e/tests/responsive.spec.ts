@@ -2058,7 +2058,7 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
   })
 })
 
-test.describe('Apply-only variables (#2189)', () => {
+test.describe('Phase-slot variables (#2189, #2190)', () => {
   test('a long key plus its apply-only badge does not push the page sideways', async ({ page }) => {
     // The badge sits beside the KEY rather than next to the category pill,
     // because the category column is `hidden sm:table-cell` -- invisible at
@@ -2084,6 +2084,27 @@ test.describe('Apply-only variables (#2189)', () => {
     // is not rendered at all.
     await expect(page.getByText('arn:plan', { exact: true }).filter({ visible: true })).toBeVisible()
     await expect(page.getByText('arn:apply', { exact: true }).filter({ visible: true })).toBeVisible()
+
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('a configure-only badge beside a long key does not push the page sideways', async ({
+    page,
+  }) => {
+    // Three slots means a key can now carry three rows, so the same wrapping
+    // question applies to a second inline badge -- and at this width the
+    // category pill that would otherwise tell the rows apart is not rendered.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2e-resp-cfgonly'))
+    const longKey = 'ANSIBLE_BECOME_PASSWORD_FOR_THE_PRODUCTION_FLEET_ROLLOUT'
+    await seedVariable(token, wsId, longKey, 'ordinary', false, false)
+    await seedVariable(token, wsId, longKey, 'fleet-secret', false, true)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+
+    const badge = page.getByText('Configure only', { exact: true }).filter({ visible: true })
+    await expect(badge).toHaveCount(1, { timeout: 10_000 })
+    await expect(badge).toBeVisible()
 
     await expectNoHorizontalPageScroll(page)
   })

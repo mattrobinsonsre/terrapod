@@ -586,7 +586,7 @@ test.describe('Vault templated files — RBAC negative (regular user, #1648)', (
   })
 })
 
-test.describe('Apply-only variables (#2189)', () => {
+test.describe('Phase-slot variables (#2189, #2190)', () => {
   let wsId: string
   let adminToken: string
 
@@ -679,5 +679,78 @@ test.describe('Apply-only variables (#2189)', () => {
 
     // And nothing was saved: the row is still badged.
     await expect(page.locator(`tr:has-text("${key}")`).filter({ hasText: 'Apply only' })).toHaveCount(1)
+  })
+
+  test('one key sits in all three slots, each distinguishable', async ({ page }) => {
+    // The five-column uniqueness tuple is what permits this, and the badges are
+    // what make it usable: three rows of one key are otherwise three
+    // identical-looking lines, and the category pill that might distinguish
+    // them is `hidden sm:table-cell`.
+    const key = `TRIO_${Date.now()}`
+    await seedVariable(adminToken, wsId, key, 'ordinary', false, false)
+    await seedVariable(adminToken, wsId, key, 'for-apply', true, false)
+    await seedVariable(adminToken, wsId, key, 'for-configure', false, true)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const rows = page.locator(`tr:has-text("${key}")`)
+    await expect(rows).toHaveCount(3, { timeout: 10_000 })
+
+    const applyBadged = rows.filter({ hasText: 'Apply only' })
+    const configureBadged = rows.filter({ hasText: 'Configure only' })
+    await expect(applyBadged).toHaveCount(1)
+    await expect(configureBadged).toHaveCount(1)
+    await expect(applyBadged).toContainText('for-apply')
+    await expect(configureBadged).toContainText('for-configure')
+  })
+
+  test('the create form can set configure-only, and the new row is badged', async ({ page }) => {
+    const key = `CFGFORM_${Date.now()}`
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+    await page.fill('#var-key', key)
+    await page.fill('#var-val', 'from-the-form')
+
+    await page.locator('label:has-text("Configure only") input[type="checkbox"]').check()
+    await page.click('form button:has-text("Add Variable")')
+
+    const row = page.locator(`tr:has-text("${key}")`)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await expect(row).toContainText('Configure only')
+  })
+
+  test('the two slots are mutually exclusive, and the reason is TEXT not a tooltip', async ({
+    page,
+  }) => {
+    // The one property only a browser can exercise. The server refuses the
+    // combination with a 422, so the form must not offer it -- and the reason
+    // has to be readable on TOUCH, where a mis-tap is likeliest and a
+    // hover-only `title` explains nothing at all.
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+
+    const applyBox = page
+      .locator('label:has-text("Apply only") input[type="checkbox"]')
+      .filter({ visible: true })
+      .first()
+    const configureBox = page
+      .locator('label:has-text("Configure only") input[type="checkbox"]')
+      .filter({ visible: true })
+      .first()
+
+    // Neither disabled to begin with, or the assertions below prove nothing.
+    await expect(applyBox).toBeEnabled()
+    await expect(configureBox).toBeEnabled()
+
+    await applyBox.check()
+    await expect(configureBox).toBeDisabled()
+    await expect(
+      page.getByText('A variable sits in one slot at a time', { exact: false }).first(),
+    ).toBeVisible()
+
+    // And symmetrically, which is what catches a rule written on one control.
+    await applyBox.uncheck()
+    await expect(configureBox).toBeEnabled()
+    await configureBox.check()
+    await expect(applyBox).toBeDisabled()
   })
 })
