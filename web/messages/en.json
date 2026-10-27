@@ -2261,6 +2261,8 @@
       "followOffTitle": "Follow the live tail",
       "end": "End",
       "endTitle": "Jump to the end of the log",
+      "lastOutput": "Last output {when}",
+      "lastOutputTitle": "How long ago this configure last produced output. One that stays quiet for too long is errored.",
       "index": {
         "label": "Jump to",
         "action": {

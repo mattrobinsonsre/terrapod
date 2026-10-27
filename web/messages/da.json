@@ -2274,7 +2274,9 @@
         "label": "Filtrér efter vært",
         "title": "Vis kun output fra én enkelt vært. Opgaveoverskrifter og opsummeringen bliver fortsat vist.",
         "all": "Alle værter"
-      }
+      },
+      "lastOutput": "Seneste output {when}",
+      "lastOutputTitle": "Hvor længe siden denne konfiguration sidst producerede output. En, der er stille for længe, fejler."
     },
     "policyPanel": {
       "heading": "Politiktjek",

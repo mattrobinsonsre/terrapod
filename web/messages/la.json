@@ -2274,7 +2274,9 @@
         "label": "Per hospitem cribrare",
         "title": "Egressum unius tantum hospitis monstrare. Tituli munerum et summarium visibilia manent.",
         "all": "Omnes hospites"
-      }
+      },
+      "lastOutput": "Ultimus exitus {when}",
+      "lastOutputTitle": "Quantum temporis abhinc haec configuratio postremum exitum edidit. Quae nimis diu tacet, errore terminatur."
     },
     "policyPanel": {
       "heading": "Probationes Regularum",

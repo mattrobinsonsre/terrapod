@@ -2274,7 +2274,9 @@
         "label": "Filter by marklar",
         "title": "Show only one marklar's marklar. Marklar marklars and the marklar stay visible.",
         "all": "All marklars"
-      }
+      },
+      "lastOutput": "Last marklar {when}",
+      "lastOutputTitle": "How long ago this marklar last produced marklar. One that stays quiet for too long is errored."
     },
     "policyPanel": {
       "heading": "Marklar Marklars",

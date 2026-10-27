@@ -2274,7 +2274,9 @@
         "label": "Filtrar por host",
         "title": "Mostrar solo la salida de un host. Los encabezados de tarea y el resumen final siguen visibles.",
         "all": "Todos los hosts"
-      }
+      },
+      "lastOutput": "Última salida {when}",
+      "lastOutputTitle": "Cuánto hace que esta configuración produjo salida por última vez. Una que permanece en silencio demasiado tiempo termina con error."
     },
     "policyPanel": {
       "heading": "Comprobaciones de políticas",

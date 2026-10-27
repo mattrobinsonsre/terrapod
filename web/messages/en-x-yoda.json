@@ -2274,7 +2274,9 @@
         "label": "By host, filter",
         "title": "Only one host's output, show it does. Visible, task headings and the recap stay.",
         "all": "All hosts, these are"
-      }
+      },
+      "lastOutput": "Output last, {when} it was",
+      "lastOutputTitle": "Produced output last, this configure did, this long ago. Errored it is, if quiet too long it stays."
     },
     "policyPanel": {
       "heading": "Checks, Policy",

@@ -2274,7 +2274,9 @@
         "label": "Filter by hand",
         "title": "Show only one hand''s output. Task headin''s an'' th'' recap stay in sight.",
         "all": "All hands"
-      }
+      },
+      "lastOutput": "Last word from the crew {when}",
+      "lastOutputTitle": "How long since this riggin' last hollered aught. One that stays silent too long be sunk."
     },
     "policyPanel": {
       "heading": "Policy Checks",

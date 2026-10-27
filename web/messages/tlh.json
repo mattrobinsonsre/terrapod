@@ -2274,7 +2274,9 @@
         "label": "host DarSeH",
         "title": "wa' host chel neH 'ang. Qu' permey tlhoS je leghlu'taH.",
         "all": "Hoch hostmey"
-      }
+      },
+      "lastOutput": "Qaq mughom {when}",
+      "lastOutputTitle": "poH nI' qaStaHvIS mughom Qav chenmoH ghu'vam. tam 'e' ruch 'ej nI'chugh, Qagh."
     },
     "policyPanel": {
       "heading": "chut toblu'mey",

@@ -2274,7 +2274,9 @@
         "label": "Filtrer par hôte",
         "title": "Afficher uniquement la sortie d''un seul hôte. Les en-têtes de tâche et le récapitulatif restent visibles.",
         "all": "Tous les hôtes"
-      }
+      },
+      "lastOutput": "Dernière sortie {when}",
+      "lastOutputTitle": "Depuis combien de temps cette configuration a produit une sortie pour la dernière fois. Une configuration trop longtemps silencieuse échoue."
     },
     "policyPanel": {
       "heading": "Vérifications de politiques",

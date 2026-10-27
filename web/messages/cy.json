@@ -2274,7 +2274,9 @@
         "label": "Hidlo yn ôl gwesteiwr",
         "title": "Dangos allbwn un gwesteiwr yn unig. Mae penawdau'r tasgau a'r crynodeb terfynol yn aros yn weladwy.",
         "all": "Pob gwesteiwr"
-      }
+      },
+      "lastOutput": "Allbwn diwethaf {when}",
+      "lastOutputTitle": "Pa mor bell yn ôl y cynhyrchodd y ffurfweddiad hwn allbwn ddiwethaf. Mae un sy'n aros yn dawel yn rhy hir yn methu."
     },
     "policyPanel": {
       "heading": "Gwiriadau Polisi",

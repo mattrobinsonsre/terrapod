@@ -2274,7 +2274,9 @@
         "label": "Filteren op host",
         "title": "Alleen de uitvoer van één host weergeven. Taakkoppen en de samenvatting blijven zichtbaar.",
         "all": "Alle hosts"
-      }
+      },
+      "lastOutput": "Laatste uitvoer {when}",
+      "lastOutputTitle": "Hoe lang geleden deze configuratie voor het laatst uitvoer produceerde. Een die te lang stil blijft, mislukt."
     },
     "policyPanel": {
       "heading": "Beleidscontroles",

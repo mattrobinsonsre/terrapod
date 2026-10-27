@@ -2274,7 +2274,9 @@
         "label": "Ana makineye göre filtrele",
         "title": "Yalnızca tek bir ana makinenin çıktısını göster. Görev başlıkları ve özet görünür kalır.",
         "all": "Tüm ana makineler"
-      }
+      },
+      "lastOutput": "Son çıktı {when}",
+      "lastOutputTitle": "Bu yapılandırmanın en son ne zaman çıktı ürettiği. Çok uzun süre sessiz kalan hatayla sonlandırılır."
     },
     "policyPanel": {
       "heading": "Politika Denetimleri",

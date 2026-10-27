@@ -2274,7 +2274,9 @@
         "label": "Filtruj po hoście",
         "title": "Pokazuj wyjście tylko jednego hosta. Nagłówki zadań i podsumowanie pozostają widoczne.",
         "all": "Wszystkie hosty"
-      }
+      },
+      "lastOutput": "Ostatnie wyjście {when}",
+      "lastOutputTitle": "Jak dawno ta konfiguracja wygenerowała ostatnie wyjście. Ta, która zbyt długo milczy, kończy się błędem."
     },
     "policyPanel": {
       "heading": "Sprawdzenia zasad",

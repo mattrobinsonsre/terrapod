@@ -2274,7 +2274,9 @@
         "label": "Filtrer etter vert",
         "title": "Vis bare utdata fra én enkelt vert. Oppgaveoverskrifter og sammendraget er fortsatt synlige.",
         "all": "Alle verter"
-      }
+      },
+      "lastOutput": "Siste utdata {when}",
+      "lastOutputTitle": "Hvor lenge siden denne konfigureringen sist produserte utdata. En som er stille for lenge, feiler."
     },
     "policyPanel": {
       "heading": "Regelkontroller",
