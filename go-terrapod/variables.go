@@ -58,10 +58,16 @@ type Variable struct {
 	Structured bool `json:"structured"`
 	HCL        bool `json:"hcl"`
 	Sensitive  bool `json:"sensitive"`
-	// ApplyOnly withholds this variable from a plan and delivers it only to
-	// an apply (#2189). A different value per phase is TWO variables with the
-	// same key, one flagged; the apply-only one wins on an apply. Orthogonal to
-	// Category -- the uniqueness tuple carries both.
+	// ApplyOnly withholds this variable from a plan and delivers it to an
+	// apply AND to an Ansible configure (#2189). Not "only to an apply",
+	// which this said until #2190: a configure runs the repository's
+	// playbooks against real hosts, so it is a write with apply-equivalent
+	// blast radius and receives these rows deliberately (#2200). To withhold
+	// a variable from an apply as well, use ConfigureOnly.
+	//
+	// A different value per phase is TWO variables with the same key, one
+	// flagged; the apply-only one wins on an apply. Orthogonal to Category --
+	// the uniqueness tuple carries both.
 	ApplyOnly bool `json:"apply-only"`
 	// ConfigureOnly withholds this variable from a plan AND from an apply,
 	// delivering it only to an Ansible configure (#2190). The fleet's own

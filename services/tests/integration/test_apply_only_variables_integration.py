@@ -25,7 +25,7 @@ one.
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from terrapod.db.models import (
     Variable,
@@ -44,7 +44,7 @@ WS_ENDPOINT = "/api/v2/organizations/default/workspaces"
 VARSET_ENDPOINT = "/api/v2/organizations/default/varsets"
 
 
-def _var_body(key: str, value: str, *, apply_only: bool) -> dict:
+def _var_body(key: str, value: str, *, apply_only: bool, configure_only: bool = False) -> dict:
     return {
         "data": {
             "type": "vars",
@@ -53,6 +53,7 @@ def _var_body(key: str, value: str, *, apply_only: bool) -> dict:
                 "value": value,
                 "category": "env",
                 "apply-only": apply_only,
+                "configure-only": configure_only,
             },
         }
     }
@@ -457,3 +458,234 @@ class TestTheDefaultIsInvisible:
                 await db.execute(select(Variable).where(Variable.workspace_id == ws))
             ).scalar_one()
             assert row.apply_only is False
+
+
+class TestTheThirdSlot:
+    """Configure-only rows, against a real database (#2190).
+
+    At this tier because every property here is one the unit tiers cannot see:
+    the uniqueness constraint is enforced by Postgres and this is the only tier
+    whose schema comes from running the migration chain rather than from
+    `Base.metadata`, which is exactly how #2189 came to be dead at the database
+    level while a green suite ran over four-column models.
+    """
+
+    async def test_one_key_is_held_in_ALL_THREE_slots(self, app, client):
+        """The whole point of widening the tuple to five columns.
+
+        Three rows, one key. A test using two would pass with the constraint
+        still at four columns, because the pair it tests is the one #2189
+        already permitted.
+        """
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"trio-{uuid.uuid4().hex[:8]}")
+        for body in (
+            _var_body("TOKEN", "ordinary", apply_only=False),
+            _var_body("TOKEN", "for-apply", apply_only=True),
+            _var_body("TOKEN", "for-configure", apply_only=False, configure_only=True),
+        ):
+            resp = await client.post(f"/api/v2/workspaces/{ws}/vars", json=body, headers=AUTH)
+            assert resp.status_code == 201, resp.text
+
+    async def test_a_FOURTH_row_in_an_occupied_slot_is_still_refused(self, app, client):
+        """The constraint must still forbid a genuine duplicate. Widening it is
+        permissive, and a widening that went too far -- or a nullable column,
+        which Postgres treats as distinct -- would silently stop catching any
+        duplicate at all while the constraint still appeared to be there."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"dup3-{uuid.uuid4().hex[:8]}")
+        body = _var_body("TOKEN", "first", apply_only=False, configure_only=True)
+        assert (
+            await client.post(f"/api/v2/workspaces/{ws}/vars", json=body, headers=AUTH)
+        ).status_code == 201
+        again = await client.post(
+            f"/api/v2/workspaces/{ws}/vars",
+            json=_var_body("TOKEN", "second", apply_only=False, configure_only=True),
+            headers=AUTH,
+        )
+        assert again.status_code == 409, again.text
+        assert "configure-only" in again.json()["errors"][0]["detail"]
+
+    async def test_both_flags_together_are_refused_at_the_write(self, app, client):
+        """422, not a resolution. Two independent booleans make the combination
+        representable, and neither reading of it is one anybody would predict:
+        the union is wider than either flag, which is the opposite of what a
+        withholding flag is for, and the intersection is what configure-only
+        already says alone."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"both-{uuid.uuid4().hex[:8]}")
+        resp = await client.post(
+            f"/api/v2/workspaces/{ws}/vars",
+            json=_var_body("TOKEN", "v", apply_only=True, configure_only=True),
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["errors"][0]["detail"]
+        assert "apply-only" in detail and "configure-only" in detail
+
+    async def test_a_PATCH_that_creates_the_combination_is_refused_too(self, app, client):
+        """The edit a request-only guard would miss: setting one flag against a
+        row that already carries the other. The guard reads the MERGED pair."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"merge-{uuid.uuid4().hex[:8]}")
+        created = await client.post(
+            f"/api/v2/workspaces/{ws}/vars",
+            json=_var_body("TOKEN", "v", apply_only=True),
+            headers=AUTH,
+        )
+        assert created.status_code == 201, created.text
+        var_id = created.json()["data"]["id"]
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws}/vars/{var_id}",
+            json={"data": {"type": "vars", "attributes": {"configure-only": True}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+    async def test_each_phase_gets_its_own_value_for_one_key(self, app, client):
+        """The delivery property, all three phases on one fixture.
+
+        Stated as a cross product rather than three separate assertions: each
+        alone passes whether or not the new flag is in the filter, because a
+        plan excludes it either way and a configure includes apply-only either
+        way. It is the three together that pin which slot each phase gets.
+        """
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"phases-{uuid.uuid4().hex[:8]}")
+        for body in (
+            _var_body("TOKEN", "ordinary", apply_only=False),
+            _var_body("TOKEN", "for-apply", apply_only=True),
+            _var_body("TOKEN", "for-configure", apply_only=False, configure_only=True),
+        ):
+            assert (
+                await client.post(f"/api/v2/workspaces/{ws}/vars", json=body, headers=AUTH)
+            ).status_code == 201
+
+        ws_id = uuid.UUID(ws.removeprefix("ws-"))
+        async with get_db_session() as db:
+            plan = _by_key(await resolve_variables(db, ws_id, phase="plan"))
+            apply = _by_key(await resolve_variables(db, ws_id, phase="apply"))
+            configure = _by_key(await resolve_variables(db, ws_id, phase="configure"))
+
+        assert plan["TOKEN"].value == "ordinary", "a plan must see neither withheld row"
+        assert apply["TOKEN"].value == "for-apply", (
+            "an apply sees apply-only and must NOT see configure-only"
+        )
+        assert configure["TOKEN"].value == "for-configure", (
+            "a configure sees all three and the narrowest wins"
+        )
+
+    async def test_a_configure_only_key_is_absent_from_an_apply_not_empty(self, app, client):
+        """An empty value reaches terraform as a DECLARED variable, which is a
+        different thing from an undeclared one -- so the row must be absent
+        rather than present-and-blank. The same property #2189 pinned for a
+        plan, one slot over."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"absent-{uuid.uuid4().hex[:8]}")
+        assert (
+            await client.post(
+                f"/api/v2/workspaces/{ws}/vars",
+                json=_var_body("SSH_KEY", "secret", apply_only=False, configure_only=True),
+                headers=AUTH,
+            )
+        ).status_code == 201
+        ws_id = uuid.UUID(ws.removeprefix("ws-"))
+        async with get_db_session() as db:
+            apply = _by_key(await resolve_variables(db, ws_id, phase="apply"))
+            plan = _by_key(await resolve_variables(db, ws_id, phase="plan"))
+        assert "SSH_KEY" not in apply
+        assert "SSH_KEY" not in plan
+
+    async def test_a_phase_blind_resolution_keeps_ALL_THREE_rows(self, app, client):
+        """Prompt redaction is the only caller passing no phase, and it must see
+        every half of the family or a secret that could reach the model cannot
+        be scrubbed. With `configure_only` missing from the phase-blind key, an
+        ordinary row and the fleet's credential of the same key collapse to one
+        value -- the exact defect #2192 fixed for `apply_only`."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"blind-{uuid.uuid4().hex[:8]}")
+        for body in (
+            _var_body("TOKEN", "ordinary", apply_only=False),
+            _var_body("TOKEN", "for-apply", apply_only=True),
+            _var_body("TOKEN", "for-configure", apply_only=False, configure_only=True),
+        ):
+            assert (
+                await client.post(f"/api/v2/workspaces/{ws}/vars", json=body, headers=AUTH)
+            ).status_code == 201
+        ws_id = uuid.UUID(ws.removeprefix("ws-"))
+        async with get_db_session() as db:
+            everything = await resolve_variables(db, ws_id, phase=None)
+        values = sorted(v.value for v in everything if v.key == "TOKEN")
+        assert values == ["for-apply", "for-configure", "ordinary"], (
+            f"phase-blind resolution dropped a row: {values}"
+        )
+
+    async def test_a_priority_set_standard_row_still_beats_a_workspace_configure_only_row(
+        self, app, client
+    ):
+        """The precedence inversion that must not ship, extended to the third
+        slot. Resolution is within a tier, never a pass over the chain -- a pass
+        would let a workspace row beat a priority variable set's and invert the
+        authority order those sets exist to establish, on the one phase that
+        reaches real hosts."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"prio-{uuid.uuid4().hex[:8]}")
+        ws_id = uuid.UUID(ws.removeprefix("ws-"))
+        assert (
+            await client.post(
+                f"/api/v2/workspaces/{ws}/vars",
+                json=_var_body(
+                    "TOKEN", "workspace-configure", apply_only=False, configure_only=True
+                ),
+                headers=AUTH,
+            )
+        ).status_code == 201
+
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {
+                        "name": f"prio-{uuid.uuid4().hex[:8]}",
+                        "global": True,
+                        "priority": True,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert vs.status_code == 201, vs.text
+        vs_id = vs.json()["data"]["id"]
+        assert (
+            await client.post(
+                f"/api/v2/varsets/{vs_id}/relationships/vars",
+                json=_var_body("TOKEN", "priority-standard", apply_only=False),
+                headers=AUTH,
+            )
+        ).status_code == 201
+
+        async with get_db_session() as db:
+            configure = _by_key(await resolve_variables(db, ws_id, phase="configure"))
+        assert configure["TOKEN"].value == "priority-standard", (
+            "a workspace configure-only row beat a priority set's standard row, which "
+            "inverts the authority order priority sets exist to establish"
+        )
+
+    async def test_the_column_defaults_to_false_at_the_database(self, app, client):
+        """Not a Python-side default. Postgres treats NULLs as distinct in a
+        unique constraint, so a nullable column left NULL on pre-migration rows
+        would silently stop both constraints catching duplicates for exactly
+        those rows, while the constraint still appeared to be there."""
+        async with get_db_session() as db:
+            row = await db.execute(
+                text(
+                    "SELECT is_nullable, column_default FROM information_schema.columns "
+                    "WHERE table_name = 'variables' AND column_name = 'configure_only'"
+                )
+            )
+            nullable, default = row.one()
+        assert nullable == "NO", "a nullable flag disables the uniqueness constraint it joins"
+        assert default is not None and "false" in default.lower(), (
+            f"the backfill must be in the database, not in Python: {default!r}"
+        )

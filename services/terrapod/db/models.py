@@ -2402,8 +2402,12 @@ class Variable(Base):
     #: or terraform variable and inherits sets, scoping and precedence unchanged.
     value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    #: Withhold this variable from a plan and deliver it only to an apply
-    #: (#2189). A credential only the apply needs — a write-capable token, a
+    #: Withhold this variable from a plan and deliver it to an apply AND to an
+    #: Ansible configure (#2189). Not "only to an apply", which this said until
+    #: #2190: a configure runs the repository's playbooks against real hosts, so
+    #: it is a write with apply-equivalent blast radius and receives these rows
+    #: deliberately (`PHASES_SEEING_APPLY_ONLY`, #2200). To withhold a variable
+    #: from an apply as well, use `configure_only` below. A credential only the apply needs — a write-capable token, a
     #: deploy key — is then never in the environment of a plan, which executes
     #: the configuration's code and so runs a pull request's code.
     #:
@@ -2544,8 +2548,12 @@ class VariableSetVariable(Base):
     #: or terraform variable and inherits sets, scoping and precedence unchanged.
     value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    #: Withhold this variable from a plan and deliver it only to an apply
-    #: (#2189). A credential only the apply needs — a write-capable token, a
+    #: Withhold this variable from a plan and deliver it to an apply AND to an
+    #: Ansible configure (#2189). Not "only to an apply", which this said until
+    #: #2190: a configure runs the repository's playbooks against real hosts, so
+    #: it is a write with apply-equivalent blast radius and receives these rows
+    #: deliberately (`PHASES_SEEING_APPLY_ONLY`, #2200). To withhold a variable
+    #: from an apply as well, use `configure_only` below. A credential only the apply needs — a write-capable token, a
     #: deploy key — is then never in the environment of a plan, which executes
     #: the configuration's code and so runs a pull request's code.
     #:
