@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, Suspense, useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { Fragment, Suspense, useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { engineWord } from '@/lib/phase-vocabulary'
@@ -34,6 +34,30 @@ import {
 } from '@/lib/workspace-filter'
 import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
 import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
+import {
+  CREATE_INPUT,
+  FIELD_BY_ATTR,
+  GROUPS,
+  LABEL_KEY,
+  dependencyMet,
+  groupFields,
+  toAttributes,
+  type GroupId,
+} from '@/components/workspace-fields'
+import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { LabelsEditor } from '@/components/labels-editor'
+import {
+  OidcAudiencesEditor,
+  StringListEditor,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
+} from '@/components/template-editors'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
+import {
+  formatCollectionLines,
+  parseCollectionLines,
+  type AnsibleCollection,
+} from '@/lib/ansible-collections'
 import {
   type GroupMode,
   type WorkspaceGroup,
@@ -232,6 +256,97 @@ function WorkspaceGroupRows({
   )
 }
 
+/**
+ * The create form's initial values, keyed as the API names each attribute.
+ *
+ * ONE object rather than ~50 `useState` hooks, because the form now renders the
+ * shared field set (#2253) and the groups hand back `(attr, value)` pairs. It
+ * is also the shape `toAttributes` consumes, so nothing translates between a
+ * control and the wire.
+ *
+ * WHAT IS SEEDED, and why it is not simply "everything empty": an absent value
+ * renders a checkbox unchecked and a `<select>` showing its first option, so a
+ * field whose column default is anything other than false/empty would have the
+ * form STATE THE OPPOSITE of what it is about to create. The values below are
+ * each read off `Workspace.__table__` — `plan-apply-enabled` and
+ * `inventory-include-platform` default true, and every select here has a real
+ * default — so the form shows what the API will store. Fields whose default is
+ * false or empty are deliberately absent: `toAttributes` drops `undefined`, so
+ * an untouched field is not sent at all and the API applies its own default,
+ * which keeps the payload to what the operator actually saw.
+ *
+ * `engine` is a parameter because switching engine re-seeds the version: a
+ * Pulumi workspace pins the 3.x Pulumi CLI where Terraform's are 1.x, so
+ * carrying one across would submit a version that does not exist (#1559).
+ */
+function createDefaults(engine: string): Record<string, unknown> {
+  return {
+    // identity
+    name: '',
+    engine,
+    // execution
+    'execution-mode': 'local',
+    'execution-backend': 'tofu',
+    'engine-version': defaultEngineVersion(engine),
+    'working-directory': '',
+    'auto-apply-mode': 'never',
+    parallelism: 10,
+    'resource-cpu': '1',
+    'resource-memory': '2Gi',
+    // operations — the one boolean pair whose defaults differ
+    'plan-apply-enabled': true,
+    // ansible
+    'inventory-include-platform': true,
+    // pools
+    'agent-pool-ids': [],
+    // vcs
+    'vcs-connection-id': '',
+    'vcs-repo-url': '',
+    'vcs-branch': '',
+    'vcs-workflow': 'merge_then_apply',
+    'auto-merge-strategy': 'merge',
+    // governance
+    'drift-detection-interval-seconds': 86400,
+    // ai
+    'ai-summary-mode': 'default',
+    'ai-policy-mode': 'default',
+    // security scanning
+    'security-scan-engine': 'checkov',
+    'security-scan-enforcement': 'advisory',
+    'security-scan-severity-threshold': 'high',
+    // metadata / cloud identity — the two map-valued attributes, whose editors
+    // want a real object rather than undefined
+    labels: {},
+    'oidc-audiences': {},
+  }
+}
+
+/**
+ * The attributes the create form does not offer, with the reason.
+ *
+ * `owner-email` is accepted on PATCH and NOT by the create path, which sets
+ * `owner_email=user.email` — the creator is the owner. Rendering it would take
+ * an operator's input and silently ignore it, which is worse than its absence,
+ * and ownership grants workspace admin so it is a platform-admin change made
+ * deliberately afterwards rather than a field on a create form.
+ */
+const CREATE_OMITS: ReadonlySet<string> = new Set(['owner-email'])
+
+/**
+ * Whether a group collapses into a `<details>` in the create form.
+ *
+ * DERIVED from the shared table rather than listed here: a group whose every
+ * rendered field is `advanced` holds nothing needed to create a workspace, so
+ * it collapses — and `Group` puts what it holds in the summary, so a collapsed
+ * group still cannot conceal a value. Deriving it means a field changing its
+ * `advanced` flag, or a group gaining a plain field, moves this with it instead
+ * of leaving a stale list behind.
+ */
+function groupIsAdvanced(group: GroupId, engine: string): boolean {
+  const rendered = groupFields(group, engine).filter((f) => !CREATE_OMITS.has(f.attr))
+  return rendered.length > 0 && rendered.every((f) => f.advanced)
+}
+
 // Wrapped in <Suspense> at the bottom — `useSearchParams()` triggers Next.js's
 // CSR bailout, and without a boundary the whole page fails to build statically.
 function WorkspacesPageInner() {
@@ -244,6 +359,16 @@ function WorkspacesPageInner() {
   // form carries an engine selector, so the engine is in view before the
   // workspace exists — and the auto-apply hint sits directly beneath it.
   const tPhase = useTranslations()
+  // The create form's field labels and group headings come from the detail
+  // page's namespace, which already carries them translated in every catalogue
+  // — so the form inherits ~50 labels rather than needing them translated 33
+  // times. `workspace-field-groups.tsx` records why the namespace keeps the
+  // detail page's name.
+  const tDetail = useTranslations('workspaceDetail')
+  // The deployment's audience catalogue, so an inherited entry reads as
+  // inherited in the create form too. Fail-soft: a failed probe degrades to an
+  // empty catalogue rather than a broken editor.
+  const oidcDefaults = useOidcAudienceDefaults()
   const fmt = useFormat()
   // Translate a filter-suggestion's category hint (its stable English key stays
   // the internal value; only the displayed label is localized).
@@ -470,34 +595,31 @@ function WorkspacesPageInner() {
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
-  const [newName, setNewName] = useState('')
-  // Which engine, not which binary — `newBackend` below picks tofu vs terraform
-  // *within* the Terraform engine. Workspaces are created here, with the
-  // provider, or via the API; never by an engine's own CLI (#1535).
-  const [newEngine, setNewEngine] = useState('terraform')
+  // ONE values object, keyed by API attribute, in place of the thirteen `new*`
+  // hooks this form used to carry (#2253). The thirteen were the whole problem:
+  // a hook per control meant adding a field cost a hook, a reset line and a
+  // payload line, so the form stopped at 13 of the ~50 attributes create
+  // accepts and the rest were reachable only by creating a workspace and then
+  // editing it.
+  const [values, setValues] = useState<Record<string, unknown>>(() =>
+    createDefaults('terraform'),
+  )
+  const setValue = useCallback((attr: string, value: unknown) => {
+    setValues((prev) => ({ ...prev, [attr]: value }))
+  }, [])
+  // Which engine, not which binary — `execution-backend` picks tofu vs
+  // terraform *within* the Terraform engine. Workspaces are created here, with
+  // the provider, or via the API; never by an engine's own CLI (#1535).
+  const engine = String(values.engine ?? 'terraform')
   // The hint under the auto-apply selector describes a phase, so it follows the
-  // engine the form is set to (#1911). `newEngine` has no unset state — it is
-  // initialised to Terraform, the <select> is controlled with no placeholder
-  // option, and on a single-engine deployment the selector is not rendered at
-  // all — so a Terraform-only install and an untouched form both read Terraform's
+  // engine the form is set to (#1911). The engine has no unset state — it is
+  // seeded to Terraform, the <select> is controlled with no placeholder option,
+  // and on a single-engine deployment the selector is not rendered at all — so
+  // a Terraform-only install and an untouched form both read Terraform's
   // wording without needing a special case. The four MODE values beside it stay
   // put: they render the literal wire values (`never`, `always`, `create`,
   // `create/update`), which are identifiers, not prose.
-  const phaseWord = (name: string) => engineWord(tPhase, newEngine, name)
-  const [newExecMode, setNewExecMode] = useState('local')
-  // The mode, not the boolean (#1301). The API accepts `auto-apply-mode` on
-  // POST, but this form only ever sent `auto-apply` — so a conditional mode
-  // could only be reached by creating the workspace and then editing it.
-  const [newAutoApplyMode, setNewAutoApplyMode] = useState('never')
-  const [newBackend, setNewBackend] = useState('tofu')
-  const [newVersion, setNewVersion] = useState(defaultEngineVersion('terraform'))
-  const [newCpu, setNewCpu] = useState('1')
-  const [newMemory, setNewMemory] = useState('2Gi')
-  const [newWorkingDir, setNewWorkingDir] = useState('')
-  const [newVcsConnectionId, setNewVcsConnectionId] = useState('')
-  const [newVcsRepoUrl, setNewVcsRepoUrl] = useState('')
-  const [newVcsBranch, setNewVcsBranch] = useState('')
-  const [newAgentPoolId, setNewAgentPoolId] = useState('')
+  const phaseWord = (name: string) => engineWord(tPhase, engine, name)
   const [creating, setCreating] = useState(false)
 
   // Version suggestions. Keyed on the *tool* the version pins, which the engine
@@ -758,7 +880,7 @@ function WorkspacesPageInner() {
   // Fetch version suggestions when the tool the version pins changes and the
   // form is open. A Pulumi workspace pins the Pulumi CLI; every other engine
   // pins whichever Terraform-family binary its execution backend names.
-  const versionTool = versionToolFor(newEngine, newBackend)
+  const versionTool = versionToolFor(engine, String(values['execution-backend'] ?? 'tofu'))
   useEffect(() => {
     if (!showCreate || versionTool === versionsTool) return
     apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${versionTool}`)
@@ -773,9 +895,16 @@ function WorkspacesPageInner() {
   // Switching engine invalidates whatever version is in the box: Pulumi's
   // releases are 3.x and Terraform's are 1.x, so carrying one across would
   // submit a version that does not exist on the engine now selected.
+  //
+  // Returns `prev` untouched when the version already matches, so the effect's
+  // run on mount — where it would otherwise write the value it just seeded — is
+  // not a second render.
   useEffect(() => {
-    setNewVersion(defaultEngineVersion(newEngine))
-  }, [newEngine])
+    const seeded = defaultEngineVersion(engine)
+    setValues((prev) =>
+      prev['engine-version'] === seeded ? prev : { ...prev, 'engine-version': seeded },
+    )
+  }, [engine])
 
   async function loadWorkspaces() {
     try {
@@ -795,6 +924,37 @@ function WorkspacesPageInner() {
     setCreating(true)
     setError('')
     try {
+      // ONE payload builder, shared with the Configuration tab (#2253). It is
+      // what keeps the two rules below out of this function, each of which is a
+      // 422 waiting to happen and neither visible from a field's declaration:
+      // never send an alias beside its canonical key (the API derives
+      // `auto-apply` from `auto-apply-mode`, and refuses `engine-version`
+      // alongside a disagreeing `terraform-version`), and `vcs-connection` is a
+      // RELATIONSHIP rather than an attribute, so it comes back under its own
+      // key to be placed below instead of being dropped into `attributes` where
+      // the API would ignore it.
+      //
+      // `create: true` is what emits `engine`: the native create route reads it
+      // off the body and no PATCH path accepts it, so omitting it here would
+      // make every workspace Terraform and leave Pulumi uncreatable from the UI
+      // — the #1535 defect over again.
+      //
+      // `include` sends only what the form actually SHOWED, on the same two
+      // conditions the groups render on: the field applies to this engine, and
+      // its gating boolean is on. So turning configure on, typing a playbook
+      // and turning it back off does not quietly ship the playbook, and a
+      // Pulumi workspace is not sent a Terraform-family execution backend it
+      // has no use for. Each omitted column takes its own default, which is
+      // what the operator saw in place of the field.
+      const { attributes, vcsConnectionId } = toAttributes(values, {
+        create: true,
+        include: (attr) => {
+          const spec = FIELD_BY_ATTR[attr]
+          if (!spec) return true
+          if (spec.engines && !spec.engines.includes(engine)) return false
+          return dependencyMet(spec, values)
+        },
+      })
       // The native surface, because it is the only one that can carry an engine
       // — the TFE-compatible route is Terraform-only by design. The web UI ships
       // in the same Helm release as the API, so there is no version skew to keep
@@ -805,27 +965,11 @@ function WorkspacesPageInner() {
         body: JSON.stringify({
           data: {
             type: 'workspaces',
-            attributes: {
-              name: newName,
-              engine: newEngine,
-              'execution-mode': newExecMode,
-              'execution-backend': newBackend,
-              'terraform-version': newVersion,
-              // Send the mode alone. The API derives `auto-apply` from it and
-              // rejects both keys in one request, so sending the pair would be
-              // a 422.
-              'auto-apply-mode': newAutoApplyMode,
-              'resource-cpu': newCpu,
-              'resource-memory': newMemory,
-              'working-directory': newWorkingDir,
-              'vcs-repo-url': newVcsRepoUrl,
-              'vcs-branch': newVcsBranch,
-              ...(newAgentPoolId ? { 'agent-pool-id': newAgentPoolId } : {}),
-            },
-            ...(newVcsConnectionId ? {
+            attributes,
+            ...(vcsConnectionId ? {
               relationships: {
                 'vcs-connection': {
-                  data: { id: newVcsConnectionId, type: 'vcs-connections' },
+                  data: { id: vcsConnectionId, type: 'vcs-connections' },
                 },
               },
             } : {}),
@@ -836,19 +980,10 @@ function WorkspacesPageInner() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `${t('createFailed')} (${res.status})`)
       }
-      setNewName('')
-      setNewEngine('terraform')
-      setNewExecMode('local')
-      setNewBackend('tofu')
-      setNewVersion(defaultEngineVersion('terraform'))
-      setNewAutoApplyMode('never')
-      setNewCpu('1')
-      setNewMemory('2Gi')
-      setNewWorkingDir('')
-      setNewVcsConnectionId('')
-      setNewVcsRepoUrl('')
-      setNewVcsBranch('')
-      setNewAgentPoolId('')
+      // One reset, where there were thirteen. A field added to the shared table
+      // is cleared by this line without being named here — which is the other
+      // half of why the old form stopped at thirteen controls.
+      setValues(createDefaults('terraform'))
       setShowCreate(false)
       await loadWorkspaces()
     } catch (err) {
@@ -856,6 +991,691 @@ function WorkspacesPageInner() {
     } finally {
       setCreating(false)
     }
+  }
+
+  // ── the create form's shared field set (#2253) ──────────────────────────
+  //
+  // What the groups need to render themselves. `onChange` is the page's
+  // decision, which is the whole reason a group takes it: this form collects
+  // everything for one POST, where the Configuration tab batches behind an
+  // Edit/Save toggle and the AI and security cards PATCH on change.
+  const createCtx: GroupCtx = {
+    mode: 'create',
+    values,
+    onChange: setValue,
+    engine,
+    label: (attr) => tDetail(LABEL_KEY[attr]),
+    hint: (attr) => createHint(attr),
+    busy: creating,
+  }
+
+  const hintText = (node: ReactNode) => (
+    <p className="mt-1 text-xs text-slate-500">{node}</p>
+  )
+
+  /** The explanatory line under a field, where one exists already translated. */
+  function createHint(attr: string): ReactNode {
+    switch (attr) {
+      // The composed `project::stack` name is the one an operator must get
+      // right before the browser will let the form submit at all, so its hint
+      // is shown rather than left to the input's `title`.
+      case 'name':
+        return engine === 'pulumi' ? (
+          <p className="mt-1 text-xs text-slate-400" data-testid="ws-pulumi-name-hint">
+            {t.rich('form.pulumiNameHint', {
+              code: (c) => <code className="bg-slate-700 px-1 rounded">{c}</code>,
+            })}
+          </p>
+        ) : undefined
+      case 'engine':
+        return <p className="mt-1 text-xs text-slate-400">{t('form.engineHelp')}</p>
+      case 'auto-apply-mode':
+        return hintText(phaseWord('formAutoApplyModeHint'))
+      case 'resource-cpu':
+        return hintText(t('form.cpuHint'))
+      case 'resource-memory':
+        return hintText(t('form.memoryHint'))
+      case 'working-directory':
+        return hintText(t('form.workingDirectoryHint'))
+      case 'pulumi-bind-plan':
+        return hintText(tDetail('fields.bindPlanHelp'))
+      case 'plan-apply-enabled':
+        return hintText(tDetail('fields.planApplyEnabledHint'))
+      case 'configure-enabled':
+        return hintText(tDetail('fields.configureEnabledHint'))
+      case 'auto-configure-enabled':
+        return hintText(tDetail('fields.autoConfigureEnabledHint'))
+      case 'configure-after-apply':
+        return hintText(tDetail('fields.configureAfterApplyHint'))
+      case 'configure-all-hosts':
+        return hintText(tDetail('fields.configureAllHostsHint'))
+      case 'config-directory':
+        return hintText(tDetail('fields.configDirectoryRootHint'))
+      case 'inventory-include-platform':
+        return hintText(tDetail('fields.inventoryIncludePlatformHint'))
+      case 'inventory-paths':
+        return hintText(tDetail('fields.inventoryPathsHint'))
+      case 'inventory-ignore-paths':
+        return hintText(tDetail('fields.inventoryIgnorePathsHint'))
+      case 'ansible-collections':
+        return hintText(tDetail('fields.ansibleCollectionsHint'))
+      case 'agent-pool-ids':
+        return hintText(tDetail('fields.agentPoolsHint'))
+      case 'allow-fork-pr-plans':
+        return hintText(tDetail('allowForkPrPlans.hint'))
+      case 'trigger-prefixes':
+        return hintText(tDetail('fields.triggerPrefixesHint'))
+      case 'drift-ignore-rules':
+        return hintText(tDetail('fields.driftIgnoreRulesHint'))
+      case 'ai-summary-context':
+        return hintText(tDetail('aiSummary.contextHint'))
+      case 'ai-policy-mode':
+        return hintText(tDetail('aiSummary.policyModeNote'))
+      case 'oidc-audiences':
+        return hintText(tDetail('fields.oidcAudiencesHint'))
+      case 'debug-mode':
+        return hintText(tDetail('debugMode.hint'))
+      case 'slack-channel':
+        return hintText(tDetail('slack.hint'))
+      default:
+        return undefined
+    }
+  }
+
+  // Option sets. Every label is a `t(...)` call or a wire identifier read out
+  // of an array, never a literal in the JSX below — a raw literal would be a
+  // new entry in the hardcoded-string allowlist, which is the gate that keeps
+  // untranslated copy out of the UI.
+  const execModeOptions = [
+    { value: 'local', label: tDetail('fields.execModeLocal') },
+    { value: 'agent', label: tDetail('fields.execModeAgent') },
+  ]
+  // The two Terraform-family binaries. Product names, so they are not
+  // translated in any catalogue; read from here rather than written into the
+  // JSX so they are not new hardcoded literals either.
+  const backendOptions = [
+    { value: 'tofu', label: 'OpenTofu' },
+    { value: 'terraform', label: 'Terraform' },
+  ]
+  // The four MODE values are wire identifiers, which is why they read the same
+  // in every language — `common.autoApplyMode` renders them verbatim.
+  const autoApplyOptions = [
+    { value: 'never', label: tMode('never') },
+    { value: 'always', label: tMode('always') },
+    { value: 'create', label: tMode('create') },
+    { value: 'create_update', label: tMode('createUpdate') },
+  ]
+  const vcsWorkflowOptions = [
+    { value: 'merge_then_apply', label: tDetail('fields.vcsWorkflowMergeThenApply') },
+    { value: 'apply_then_merge', label: tDetail('fields.vcsWorkflowApplyThenMerge') },
+  ]
+  // Git's own merge-method names, as the API spells them.
+  const mergeStrategyOptions = ['merge', 'squash', 'rebase'].map((s) => ({
+    value: s,
+    label: s,
+  }))
+  const driftIntervalOptions = [
+    { value: '3600', label: tDetail('intervals.1hour') },
+    { value: '14400', label: tDetail('intervals.4hours') },
+    { value: '43200', label: tDetail('intervals.12hours') },
+    { value: '86400', label: tDetail('intervals.24hours') },
+    { value: '172800', label: tDetail('intervals.48hours') },
+    { value: '259200', label: tDetail('intervals.3days') },
+    { value: '604800', label: tDetail('intervals.7days') },
+  ]
+  const aiModeOptions = [
+    { value: 'default', label: tDetail('aiSummary.modeDefault') },
+    { value: 'enabled', label: tDetail('aiSummary.modeEnabled') },
+    { value: 'disabled', label: tDetail('aiSummary.modeDisabled') },
+  ]
+  const scanEnforcementOptions = [
+    { value: 'off', label: tDetail('securityScan.enforcementOff') },
+    { value: 'advisory', label: tDetail('securityScan.enforcementAdvisory') },
+    { value: 'enforced', label: tDetail('securityScan.enforcementEnforced') },
+  ]
+  const scanEngineOptions = [
+    { value: 'checkov', label: tDetail('securityScan.engineCheckov') },
+    { value: 'trivy', label: tDetail('securityScan.engineTrivy') },
+    { value: 'both', label: tDetail('securityScan.engineBoth') },
+  ]
+  const scanThresholdOptions = [
+    { value: 'critical', label: tDetail('securityScan.thresholdCritical') },
+    { value: 'high', label: tDetail('securityScan.thresholdHigh') },
+    { value: 'medium', label: tDetail('securityScan.thresholdMedium') },
+    { value: 'low', label: tDetail('securityScan.thresholdLow') },
+  ]
+
+  /** A list-valued attribute's current value, for the row editors. */
+  const listOf = (attr: string): string[] => {
+    const v = values[attr]
+    return Array.isArray(v) ? (v as unknown[]).map(String) : []
+  }
+
+  /**
+   * The groups' contents, keyed by group so the render below can walk `GROUPS`
+   * and keep both forms in the table's order.
+   *
+   * Each field names its own control kind, which is deliberate: there is no
+   * form library here and a schema-driven renderer would make every future
+   * field a fight with an abstraction. `control` is the escape hatch for the
+   * inputs that carry their own validation or their own editor.
+   */
+  const groupBody: Record<GroupId, ReactNode> = {
+    identity: (
+      <>
+        <Field
+          attr="name"
+          ctx={createCtx}
+          kind="text"
+          control={
+            /* The pattern must widen for Pulumi: a stack is named
+               `project::stack`, and without this the browser blocks the only
+               valid name before the form can submit, so the engine would be
+               uncreatable from the UI entirely (#1535). */
+            <input
+              id="ws-name"
+              data-testid="ws-name"
+              type="text"
+              value={String(values.name ?? '')}
+              onChange={(e) => setValue('name', e.target.value)}
+              required
+              pattern={engine === 'pulumi'
+                ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*'
+                : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
+              title={engine === 'pulumi' ? t('form.namePatternPulumi') : t('form.namePattern')}
+              placeholder={engine === 'pulumi' ? t('form.namePlaceholderPulumi') : t('form.namePlaceholder')}
+              className={CREATE_INPUT}
+            />
+          }
+        />
+        {/* Only when there is a choice to make. Keyed on what the BUILD
+            contains rather than on what an operator enabled, because the engine
+            on/off switch is gone (#1986) — so a Terraform-only deployment sees
+            no picker and creates Terraform workspaces, which is what the seeded
+            value already says. */}
+        {engines.length > 1 && (
+          <Field
+            attr="engine"
+            ctx={createCtx}
+            kind="select"
+            control={
+              <select
+                id="ws-engine"
+                data-testid="ws-engine-select"
+                value={engine}
+                onChange={(e) => setValue('engine', e.target.value)}
+                className={CREATE_INPUT}
+              >
+                {engines.map((e) => (
+                  <option key={e} value={e}>{engineName(e)}</option>
+                ))}
+              </select>
+            }
+          />
+        )}
+      </>
+    ),
+
+    execution: (
+      <>
+        <Field attr="execution-mode" ctx={createCtx} kind="select" options={execModeOptions} />
+        {/* Terraform-only, and the table says so rather than this form — the
+            engine restriction lives on the field spec so both forms inherit it.
+            The version is NOT restricted that way: every engine pins one, and
+            since #1559 a Pulumi workspace's is the Pulumi CLI it runs. */}
+        <Field attr="execution-backend" ctx={createCtx} kind="select" options={backendOptions} />
+        <Field
+          attr="engine-version"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <>
+              <input
+                id="ws-version"
+                data-testid="ws-version"
+                type="text"
+                list="version-suggestions"
+                value={String(values['engine-version'] ?? '')}
+                onChange={(e) => setValue('engine-version', e.target.value)}
+                pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
+                title={t('form.versionTitle')}
+                placeholder={t('form.versionPlaceholder')}
+                className={CREATE_INPUT}
+              />
+              <datalist id="version-suggestions">
+                {versionSuggestions.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+            </>
+          }
+        />
+        <Field
+          attr="working-directory"
+          ctx={createCtx}
+          kind="text"
+          placeholder={t('form.workingDirectoryPlaceholder')}
+        />
+        <Field attr="auto-apply-mode" ctx={createCtx} kind="select" options={autoApplyOptions} />
+        <Field attr="terragrunt-enabled" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="terragrunt-version"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.terragruntVersionPlaceholder')}
+        />
+        <Field attr="pulumi-bind-plan" ctx={createCtx} kind="checkbox" />
+        <Field attr="parallelism" ctx={createCtx} kind="number" min={1} max={256} />
+        <Field
+          attr="resource-cpu"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <input
+              id="ws-cpu"
+              data-testid="ws-cpu"
+              type="text"
+              value={String(values['resource-cpu'] ?? '')}
+              onChange={(e) => setValue('resource-cpu', e.target.value)}
+              pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
+              title={t('form.cpuTitle')}
+              placeholder="1"
+              className={CREATE_INPUT}
+            />
+          }
+        />
+        <Field
+          attr="resource-memory"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <input
+              id="ws-mem"
+              data-testid="ws-mem"
+              type="text"
+              value={String(values['resource-memory'] ?? '')}
+              onChange={(e) => setValue('resource-memory', e.target.value)}
+              pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
+              title={t('form.memoryTitle')}
+              placeholder="2Gi"
+              className={CREATE_INPUT}
+            />
+          }
+        />
+      </>
+    ),
+
+    operations: (
+      <>
+        <Field attr="plan-apply-enabled" ctx={createCtx} kind="checkbox" />
+        <Field attr="configure-enabled" ctx={createCtx} kind="checkbox" />
+        <Field attr="auto-configure-enabled" ctx={createCtx} kind="checkbox" />
+        <Field attr="configure-after-apply" ctx={createCtx} kind="checkbox" />
+        <Field attr="configure-all-hosts" ctx={createCtx} kind="checkbox" />
+      </>
+    ),
+
+    ansible: (
+      <>
+        <Field
+          attr="config-directory"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.configDirectoryPlaceholder')}
+        />
+        <Field
+          attr="default-playbook"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.defaultPlaybookPlaceholder')}
+        />
+        <Field
+          attr="default-limit"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.defaultLimitPlaceholder')}
+        />
+        <Field attr="inventory-include-platform" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="inventory-paths"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('inventory-paths')}
+              onChange={(next) => setValue('inventory-paths', next)}
+              placeholder={tDetail('fields.inventoryPathsPlaceholder')}
+              addLabel={tDetail('fields.inventoryPathsAdd')}
+            />
+          }
+        />
+        <Field
+          attr="inventory-ignore-paths"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('inventory-ignore-paths')}
+              onChange={(next) => setValue('inventory-ignore-paths', next)}
+              placeholder={tDetail('fields.inventoryIgnorePathsPlaceholder')}
+              addLabel={tDetail('fields.inventoryIgnorePathsAdd')}
+            />
+          }
+        />
+        <Field
+          attr="ansible-version"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.ansibleVersionPlaceholder')}
+        />
+        <Field
+          attr="ansible-execution-environment"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.ansibleExecutionEnvironmentPlaceholder')}
+        />
+        {/* The wire shape is `{name, version?}` objects, so the values stay
+            wire-shaped here and the editor formats them as `name:version`
+            lines — the same helper pair the autodiscovery rule form uses, so
+            the two agree on the format. */}
+        <Field
+          attr="ansible-collections"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={formatCollectionLines(
+                (values['ansible-collections'] as AnsibleCollection[] | undefined) ?? [],
+              )}
+              onChange={(next) => setValue('ansible-collections', parseCollectionLines(next))}
+              placeholder={tDetail('fields.ansibleCollectionsPlaceholder')}
+              addLabel={tDetail('fields.ansibleCollectionsAdd')}
+            />
+          }
+        />
+        <Field attr="ee-resource-cpu" ctx={createCtx} kind="text" placeholder="1" />
+        <Field attr="ee-resource-memory" ctx={createCtx} kind="text" placeholder="2Gi" />
+      </>
+    ),
+
+    pools: (
+      /* A SET, not one pool: runs are offered to every pool at once. The
+         checkbox list mirrors the Configuration tab's, append-ordered so the
+         stored order is the order the operator picked. `pool:assign` is
+         enforced server-side on every pool in the set, so a pool the caller may
+         read but not assign is refused with a 422 rather than hidden here. */
+      <Field
+        attr="agent-pool-ids"
+        ctx={createCtx}
+        kind="list"
+        control={
+          agentPools.length === 0 ? (
+            <p className="text-sm text-slate-400">{tDetail('common.none')}</p>
+          ) : (
+            <ul className="space-y-1">
+              {agentPools.map((p) => {
+                const selected = listOf('agent-pool-ids').includes(p.id)
+                return (
+                  <li key={p.id}>
+                    <label className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer bg-slate-700/60 text-slate-100 hover:bg-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() =>
+                          setValue(
+                            'agent-pool-ids',
+                            selected
+                              ? listOf('agent-pool-ids').filter((id) => id !== p.id)
+                              : [...listOf('agent-pool-ids'), p.id],
+                          )
+                        }
+                        className="h-4 w-4 rounded border-slate-500 bg-slate-800 text-brand-500 focus:ring-1 focus:ring-brand-500"
+                      />
+                      <span className="min-w-0 break-words">{p.attributes.name}</span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        }
+      />
+    ),
+
+    vcs: (
+      <>
+        <Field
+          attr="vcs-connection-id"
+          ctx={createCtx}
+          kind="select"
+          control={
+            <select
+              id="ws-vcs-conn"
+              data-testid="ws-vcs-conn"
+              value={String(values['vcs-connection-id'] ?? '')}
+              onChange={(e) => setValue('vcs-connection-id', e.target.value)}
+              className={CREATE_INPUT}
+            >
+              <option value="">{t('form.none')}</option>
+              {vcsConnections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.attributes.name} ({c.attributes.provider})
+                </option>
+              ))}
+            </select>
+          }
+        />
+        <Field
+          attr="vcs-repo-url"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <input
+              id="ws-vcs-repo"
+              data-testid="ws-vcs-repo"
+              type="text"
+              value={String(values['vcs-repo-url'] ?? '')}
+              onChange={(e) => setValue('vcs-repo-url', e.target.value)}
+              pattern="https?://.+"
+              title={t('form.vcsRepoUrlTitle')}
+              placeholder={t('form.vcsRepoUrlPlaceholder')}
+              className={CREATE_INPUT}
+            />
+          }
+        />
+        <Field
+          attr="vcs-branch"
+          ctx={createCtx}
+          kind="text"
+          placeholder={t('form.vcsBranchPlaceholder')}
+        />
+        <Field attr="vcs-workflow" ctx={createCtx} kind="select" options={vcsWorkflowOptions} />
+        <Field attr="auto-merge" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="auto-merge-strategy"
+          ctx={createCtx}
+          kind="select"
+          options={mergeStrategyOptions}
+        />
+        <Field attr="allow-fork-pr-plans" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="trigger-prefixes"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('trigger-prefixes')}
+              onChange={(next) => setValue('trigger-prefixes', next)}
+              placeholder={tDetail('fields.triggerPrefixesPlaceholder')}
+            />
+          }
+        />
+      </>
+    ),
+
+    governance: (
+      <>
+        <Field attr="drift-detection-enabled" ctx={createCtx} kind="checkbox" />
+        {/* Seconds on the wire, named intervals in the UI — the same set the
+            Configuration tab offers. Stored as a number so `toAttributes` sends
+            what the column holds. */}
+        <Field
+          attr="drift-detection-interval-seconds"
+          ctx={createCtx}
+          kind="select"
+          options={driftIntervalOptions}
+          control={
+            <select
+              id="ws-drift-interval"
+              data-testid="ws-drift-interval"
+              value={String(values['drift-detection-interval-seconds'] ?? 86400)}
+              onChange={(e) =>
+                setValue('drift-detection-interval-seconds', Number(e.target.value))
+              }
+              className={CREATE_INPUT}
+            >
+              {driftIntervalOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          }
+        />
+        <Field
+          attr="drift-ignore-rules"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('drift-ignore-rules')}
+              onChange={(next) => setValue('drift-ignore-rules', next)}
+            />
+          }
+        />
+        <Field attr="plan-expiry-seconds" ctx={createCtx} kind="number" min={0} />
+      </>
+    ),
+
+    ai: (
+      <>
+        <Field attr="ai-summary-mode" ctx={createCtx} kind="select" options={aiModeOptions} />
+        <Field attr="ai-policy-mode" ctx={createCtx} kind="select" options={aiModeOptions} />
+        {/* Free prose up to 4000 characters, so a textarea rather than the
+            single-line primitive. */}
+        <Field
+          attr="ai-summary-context"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <textarea
+              id="ws-ai-summary-context"
+              data-testid="ws-ai-summary-context"
+              rows={3}
+              maxLength={4000}
+              value={String(values['ai-summary-context'] ?? '')}
+              onChange={(e) => setValue('ai-summary-context', e.target.value)}
+              placeholder={tDetail('aiSummary.contextPlaceholder')}
+              className={CREATE_INPUT}
+            />
+          }
+        />
+      </>
+    ),
+
+    security: (
+      <>
+        <Field
+          attr="security-scan-enforcement"
+          ctx={createCtx}
+          kind="select"
+          options={scanEnforcementOptions}
+        />
+        <Field
+          attr="security-scan-engine"
+          ctx={createCtx}
+          kind="select"
+          options={scanEngineOptions}
+        />
+        <Field
+          attr="security-scan-severity-threshold"
+          ctx={createCtx}
+          kind="select"
+          options={scanThresholdOptions}
+        />
+        <Field
+          attr="security-scan-skip-rules"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('security-scan-skip-rules')}
+              onChange={(next) => setValue('security-scan-skip-rules', next)}
+            />
+          }
+        />
+      </>
+    ),
+
+    metadata: (
+      /* `owner-email` is absent on purpose — see `CREATE_OMITS`. */
+      <>
+        <Field
+          attr="labels"
+          ctx={createCtx}
+          kind="text"
+          control={
+            <LabelsEditor
+              labels={(values.labels as Record<string, string> | undefined) ?? {}}
+              onChange={(next) => setValue('labels', next)}
+            />
+          }
+        />
+        <Field
+          attr="var-files"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('var-files')}
+              onChange={(next) => setValue('var-files', next)}
+              placeholder={tDetail('fields.varFilesPlaceholder')}
+            />
+          }
+        />
+      </>
+    ),
+
+    cloudIdentity: (
+      /* A map of provider configuration to its audiences, not a list — one
+         token is minted per key. The same editor the autodiscovery rule form
+         uses, so an inherited entry reads as inherited here too. */
+      <Field
+        attr="oidc-audiences"
+        ctx={createCtx}
+        kind="text"
+        control={
+          <OidcAudiencesEditor
+            value={(values['oidc-audiences'] as OidcAudiences | undefined) ?? {}}
+            fallbacks={oidcDefaults.audiences}
+            inert={!oidcDefaults.issuerEnabled}
+            onChange={(next) => setValue('oidc-audiences', sanitizeOidcAudiences(next))}
+            audiencePlaceholder={tDetail('fields.oidcAudiencesPlaceholder')}
+            addAudienceLabel={tDetail('fields.oidcAudiencesAdd')}
+          />
+        }
+      />
+    ),
+
+    diagnostics: (
+      <>
+        <Field attr="debug-mode" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="slack-channel"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('slack.channelPlaceholder')}
+        />
+      </>
+    ),
   }
 
   return (
@@ -881,210 +1701,30 @@ function WorkspacesPageInner() {
         {error && <ErrorBanner message={error} />}
 
         {showCreate && (
-          <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div>
-                <label htmlFor="ws-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
-                {/* A Pulumi workspace is named `project::stack` — the composed name
-                    `pulumi stack select` resolves to. Without widening the pattern the
-                    browser blocks the only valid name before the form can submit, so the
-                    engine would be uncreatable from the UI entirely (#1535). */}
-                <input
-                  id="ws-name"
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                  pattern={newEngine === 'pulumi'
-                    ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*'
-                    : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
-                  title={newEngine === 'pulumi' ? t('form.namePatternPulumi') : t('form.namePattern')}
-                  placeholder={newEngine === 'pulumi' ? t('form.namePlaceholderPulumi') : t('form.namePlaceholder')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-                {newEngine === 'pulumi' && (
-                  <p className="mt-1 text-xs text-slate-400" data-testid="ws-pulumi-name-hint">
-                    {t.rich('form.pulumiNameHint', { code: (c) => <code className="bg-slate-700 px-1 rounded">{c}</code> })}
-                  </p>
-                )}
-              </div>
-              {engines.length > 1 && (
-              <div>
-                <label htmlFor="ws-engine" className="block text-sm font-medium text-slate-300 mb-1">{t('form.engine')}</label>
-                <select
-                  id="ws-engine"
-                  value={newEngine}
-                  onChange={(e) => setNewEngine(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  {engines.map(e => (
-                    <option key={e} value={e}>{engineName(e)}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-400">{t('form.engineHelp')}</p>
-              </div>
-              )}
-              <div>
-                <label htmlFor="ws-exec" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionMode')}</label>
-                <select
-                  id="ws-exec"
-                  value={newExecMode}
-                  onChange={(e) => setNewExecMode(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  <option value="local">{t('form.local')}</option>
-                  <option value="agent">{t('form.agent')}</option>
-                </select>
-              </div>
-              {/* Terraform-only: the execution backend picks the binary *within*
-                  the Terraform engine, so it has no meaning on Pulumi. The
-                  version below is not in here — every engine pins a version, and
-                  since #1559 a Pulumi workspace's is the Pulumi CLI it runs. */}
-              {newEngine !== 'pulumi' && (
-              <div>
-                <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionBackend')}</label>
-                <select
-                  id="ws-backend"
-                  value={newBackend}
-                  onChange={(e) => setNewBackend(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  <option value="tofu">OpenTofu</option>
-                  <option value="terraform">Terraform</option>
-                </select>
-              </div>
-              )}
-              <div>
-                <label htmlFor="ws-version" className="block text-sm font-medium text-slate-300 mb-1">{t('form.version')}</label>
-                <input
-                  id="ws-version"
-                  type="text"
-                  list="version-suggestions"
-                  value={newVersion}
-                  onChange={(e) => setNewVersion(e.target.value)}
-                  pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                  title={t('form.versionTitle')}
-                  placeholder={t('form.versionPlaceholder')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-                <datalist id="version-suggestions">
-                  {versionSuggestions.map(v => (
-                    <option key={v} value={v} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">{t('form.cpuRequest')}</label>
-                <input
-                  id="ws-cpu"
-                  type="text"
-                  value={newCpu}
-                  onChange={(e) => setNewCpu(e.target.value)}
-                  pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
-                  title={t('form.cpuTitle')}
-                  placeholder="1"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-                <p className="mt-1 text-xs text-slate-500">{t('form.cpuHint')}</p>
-              </div>
-              <div>
-                <label htmlFor="ws-mem" className="block text-sm font-medium text-slate-300 mb-1">{t('form.memoryRequest')}</label>
-                <input
-                  id="ws-mem"
-                  type="text"
-                  value={newMemory}
-                  onChange={(e) => setNewMemory(e.target.value)}
-                  pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
-                  title={t('form.memoryTitle')}
-                  placeholder="2Gi"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-                <p className="mt-1 text-xs text-slate-500">{t('form.memoryHint')}</p>
-              </div>
-              {newExecMode === 'agent' && (
-              <div>
-                <label htmlFor="ws-pool" className="block text-sm font-medium text-slate-300 mb-1">{t('form.agentPool')}</label>
-                <select
-                  id="ws-pool"
-                  value={newAgentPoolId}
-                  onChange={(e) => setNewAgentPoolId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  <option value="">{t('form.none')}</option>
-                  {agentPools.map((p) => (
-                    <option key={p.id} value={p.id}>{p.attributes.name}</option>
-                  ))}
-                </select>
-              </div>
-              )}
-              <div>
-                <label htmlFor="ws-auto-apply-mode" className="block text-sm font-medium text-slate-300 mb-1">{t('form.autoApply')}</label>
-                <select
-                  id="ws-auto-apply-mode"
-                  value={newAutoApplyMode}
-                  onChange={(e) => setNewAutoApplyMode(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  <option value="never">{tMode('never')}</option>
-                  <option value="always">{tMode('always')}</option>
-                  <option value="create">{tMode('create')}</option>
-                  <option value="create_update">{tMode('createUpdate')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-500">{phaseWord('formAutoApplyModeHint')}</p>
-              </div>
-              <div>
-                <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">{t('form.workingDirectory')}</label>
-                <input
-                  id="ws-workdir"
-                  type="text"
-                  value={newWorkingDir}
-                  onChange={(e) => setNewWorkingDir(e.target.value)}
-                  placeholder={t('form.workingDirectoryPlaceholder')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-                <p className="mt-1 text-xs text-slate-500">{t('form.workingDirectoryHint')}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div>
-                <label htmlFor="ws-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsConnection')}</label>
-                <select
-                  id="ws-vcs-conn"
-                  value={newVcsConnectionId}
-                  onChange={(e) => setNewVcsConnectionId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                >
-                  <option value="">{t('form.none')}</option>
-                  {vcsConnections.map((c) => (
-                    <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="ws-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsRepoUrl')}</label>
-                <input
-                  id="ws-vcs-repo"
-                  type="text"
-                  value={newVcsRepoUrl}
-                  onChange={(e) => setNewVcsRepoUrl(e.target.value)}
-                  pattern="https?://.+"
-                  title={t('form.vcsRepoUrlTitle')}
-                  placeholder={t('form.vcsRepoUrlPlaceholder')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label htmlFor="ws-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsBranch')}</label>
-                <input
-                  id="ws-vcs-branch"
-                  type="text"
-                  value={newVcsBranch}
-                  onChange={(e) => setNewVcsBranch(e.target.value)}
-                  placeholder={t('form.vcsBranchPlaceholder')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+          <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4 min-w-0">
+            {/* The shared field groups, in the table's own order (#2253). This
+                form and the Configuration tab render one field set from
+                `FIELDS`, so a new workspace attribute reaches both or fails the
+                parity gate — where before they shared only chrome and NOT ONE
+                field component, and drifted until create offered 13 controls
+                against the ~50 the create route accepts.
+
+                A group renders nothing when every field in it is behind an off
+                gate, so the form is no longer than it was until an operator
+                turns something on: with configure off there is no Ansible
+                block, and with no VCS connection chosen there is no workflow or
+                auto-merge. */}
+            {GROUPS.map((g) => (
+              <Group
+                key={g}
+                id={g}
+                ctx={createCtx}
+                title={tDetail(`groups.${g}`)}
+                advanced={groupIsAdvanced(g, engine)}
+              >
+                {groupBody[g]}
+              </Group>
+            ))}
             <button
               type="submit"
               disabled={creating}

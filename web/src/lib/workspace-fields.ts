@@ -43,7 +43,6 @@
  * genuinely share.
  */
 
-import type { ReactNode } from 'react'
 
 // Defined here rather than imported, which is this tree's convention for a
 // field-group component: `ansible-credential-fields.tsx` and
