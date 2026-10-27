@@ -1043,6 +1043,158 @@ Everything else on this page applies unchanged to a Pulumi workspace — the
 catalogue, the merge semantics, the `phase` claim, the trust-policy conditions,
 rotation, and the staleness refusal between preview and update.
 
+## Ansible configure
+
+**Terrapod delivers a file and nothing else.** It writes one token per target
+and exports the directory that holds them; it knows nothing about AWS, Azure,
+GCP or Vault, sets no cloud credential environment of its own, and has no
+per-collection handling anywhere. **The configuration that turns a token into
+credentials belongs in your playbook**, where the collections you actually use
+are known — which is the same position the Terraform and Pulumi sections take,
+where the provider block is yours and Terrapod only supplies the path.
+
+Two things about a configure differ from a plan or an apply, and both matter.
+
+**The directory is `/tp/oidc`, not `/var/run/terrapod/oidc`.** Ansible does not
+run where the engine runs. The engine is a child of the orchestrator container,
+which is where the engine path is mounted; ansible runs in the execution
+environment, which mounts only the shared volume and the workspace. A token
+written to the engine path would be minted, delivered, logged as delivered —
+and invisible to the process that has to read it. So read the directory from
+the environment rather than hard-coding either path:
+
+```yaml
+vars:
+  oidc_dir: "{{ lookup('env', 'TERRAPOD_OIDC_TOKEN_DIR') | default('/tp/oidc', true) }}"
+```
+
+**A configure presents `phase: configure`.** A distinct phase in the claim, not
+the apply identity wearing a different hat, so a trust policy conditioning on
+`phase` must name it — see
+[The `phase` claim](#the-phase-claim-and-why-write-permissions-belong-behind-it).
+A role an apply may assume is not thereby assumable by a configure, which is the
+point: a playbook reaching a fleet is a different blast radius from a plan.
+
+A configure also gets **every** identity the workspace resolves, with no
+intersection. A playbook has no provider graph to walk — which clouds its tasks
+touch is a property of the tasks, not of provider blocks — so there is nothing
+to discover and nothing to narrow by. Pulumi gets the same treatment for the
+same reason, which makes `MAX_TARGETS` the real bound rather than slack, and it
+is enforced with a refusal rather than a truncation.
+
+### Every collection takes it from the environment
+
+Each of these four reads its own environment variables, so one `environment:`
+block on the play configures all of them and there is no per-collection idiom to
+remember. Measured against `amazon.aws` 12.0.0, `azure.azcollection` 4.1.0,
+`google.cloud` 1.15.0 and `community.hashi_vault` 7.1.0.
+
+| Target | Environment it reads | Takes |
+|---|---|---|
+| **AWS** | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`, optional `AWS_ROLE_SESSION_NAME` | a **path** |
+| **Azure** | `AZURE_FEDERATED_TOKEN_FILE`, with `AZURE_CLIENT_ID`, `AZURE_TENANT`, `AZURE_SUBSCRIPTION_ID` | a **path** |
+| **GCP** | `GCP_AUTH_KIND=application`, `GOOGLE_APPLICATION_CREDENTIALS` naming an external-account file your play writes | a **path**, indirectly |
+| **Vault** | `ANSIBLE_HASHI_VAULT_AUTH_METHOD=jwt`, `ANSIBLE_HASHI_VAULT_ROLE_ID`, `ANSIBLE_HASHI_VAULT_JWT`, `VAULT_ADDR` | the token **value** |
+
+**Vault is the one that takes the value rather than the path**, so the play
+reads the file — `ANSIBLE_HASHI_VAULT_JWT` holds the JWT itself. That asymmetry
+is the collection's, not Terrapod's, and it is the most likely mistake here.
+
+```yaml
+- name: Configure the fleet
+  hosts: all
+  vars:
+    oidc_dir: "{{ lookup('env', 'TERRAPOD_OIDC_TOKEN_DIR') | default('/tp/oidc', true) }}"
+    gcp_adc: "{{ oidc_dir }}/gcp/adc.json"
+
+  environment:
+    # A path. botocore's own resolver reads these directly and needs no
+    # configuration file. The role ARN is yours: Terrapod issues the token and
+    # knows nothing about the role it is presented to.
+    AWS_ROLE_ARN: arn:aws:iam::123456789012:role/terrapod-prod-dns
+    AWS_WEB_IDENTITY_TOKEN_FILE: "{{ oidc_dir }}/aws/token"
+    AWS_ROLE_SESSION_NAME: terrapod-configure
+
+    # Also a path. The client and tenant ids are yours, as in every other form.
+    AZURE_CLIENT_ID: 00000000-0000-0000-0000-000000000000
+    AZURE_TENANT: 11111111-1111-1111-1111-111111111111
+    AZURE_SUBSCRIPTION_ID: 22222222-2222-2222-2222-222222222222
+    AZURE_FEDERATED_TOKEN_FILE: "{{ oidc_dir }}/azurerm/token"
+
+    # Application Default Credentials, pointed at the file the first task
+    # writes. `auth_kind` has no choice for federation, so `application` plus
+    # an external-account file is the route.
+    GCP_AUTH_KIND: application
+    GOOGLE_APPLICATION_CREDENTIALS: "{{ gcp_adc }}"
+
+    # The token VALUE, so read the file. `| trim` is not optional — see below.
+    VAULT_ADDR: https://vault.example.com
+    ANSIBLE_HASHI_VAULT_AUTH_METHOD: jwt
+    ANSIBLE_HASHI_VAULT_ROLE_ID: terrapod-prod-dns
+    ANSIBLE_HASHI_VAULT_JWT: "{{ lookup('file', oidc_dir ~ '/vault/token') | trim }}"
+
+  tasks:
+    - name: Write the GCP external-account credential file
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.copy:
+        dest: "{{ gcp_adc }}"
+        mode: "0600"
+        content: |
+          {
+            "type": "external_account",
+            "audience": "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/terrapod/providers/terrapod",
+            "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+            "token_url": "https://sts.googleapis.com/v1/token",
+            "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/terrapod-prod-dns@my-project.iam.gserviceaccount.com:generateAccessToken",
+            "credential_source": { "file": "{{ oidc_dir }}/gcp/token" }
+          }
+
+    - name: Read a secret from Vault
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.set_fact:
+        api_key: "{{ lookup('community.hashi_vault.vault_kv2_get', 'app/config').secret.api_key }}"
+
+    - name: Tag the instance this host runs on
+      delegate_to: localhost
+      amazon.aws.ec2_tag:
+        region: eu-west-1
+        resource: "{{ instance_id }}"
+        tags:
+          configured-by: terrapod
+```
+
+`module_defaults` is an equally good home for the three that expose a module
+option — Azure's `oidc_token_file_path`, Vault's `auth_method`/`role_id`/`jwt`,
+and AWS's `profile` if you would rather write a shared config file naming
+`role_arn` and `web_identity_token_file`. Use whichever suits your playbook; the
+environment form is shown above because all four support it, so it is one idiom
+rather than three plus an exception. **AWS has no module option for the token
+itself** — `aws_config` is passed to botocore's client `Config`, which carries
+retries, timeouts and endpoints and no credential keys at all, so
+`aws_config: {web_identity_token_file: …}` fails with
+`TypeError: Got unexpected keyword argument`.
+
+**The map key names the directory.** A catalogue entry called `azurerm` is read
+at `<dir>/azurerm/token` whichever engine or phase the workspace runs, so name
+the entries after what you configure and the path and the block agree.
+
+**`| trim` matters for the value form.** A token is written with no trailing
+newline, but a reader that adds or keeps surrounding whitespace sends a JWT the
+cloud rejects with a signature error rather than a parse error — which reads as
+a key problem rather than a whitespace one.
+
+**Where the module runs is where the token has to be.** The files are in the
+execution environment, so a cloud module must execute there — `delegate_to:
+localhost`, `connection: local`, or a play whose hosts are local. A cloud
+module running on a remote managed node will not find the token, and
+`environment:` applies at the point the module executes, not on the controller.
+
+Everything else on this page applies unchanged to a configure — the catalogue,
+the merge semantics, the trust-policy conditions, rotation, and the audience
+limits.
+
 ## The `phase` claim, and why write permissions belong behind it
 
 Every token claims the phase it was minted for: `plan` or `apply`.
