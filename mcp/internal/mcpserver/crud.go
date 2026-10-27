@@ -430,16 +430,17 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_variable_set ────────────────────────────────────────
 	type variableSetIn struct {
-		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
-		Key         string `json:"key" jsonschema:"the variable key"`
-		Value       string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
-		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, git_ssh_auth, ansible_machine_auth or ansible_vault_auth (default terraform); native is accepted as an equivalent name for terraform. terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The other four are credential categories: the value is a JSON envelope rather than a literal, all four are always sensitive whatever you ask for, and none accepts an OpenBao/Vault value source. In the two ansible_* categories the key is the credential's NAME. For ansible_machine_auth the INVENTORY says where it is used, with a ${terrapod:<name>.<field>} placeholder the runner substitutes while rendering, so it can fill any connection variable; for ansible_vault_auth the name is also the vault ID label"`
-		Structured  *bool  `json:"structured,omitempty" jsonschema:"the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false"`
-		HCL         *bool  `json:"hcl,omitempty" jsonschema:"deprecated alias for structured; both are the same flag"`
-		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
-		ApplyOnly   *bool  `json:"apply_only,omitempty" jsonschema:"withhold this variable from a plan and deliver it only to an apply; default false. A plan executes the configuration's code, so a credential only the apply needs should not be in a plan's environment. For a different value per phase, set TWO variables with the same key — one ordinary, one apply_only — and the apply-only one wins on an apply"`
-		Description string `json:"description,omitempty" jsonschema:"optional human description"`
-		ValueSource string `json:"value_source,omitempty" jsonschema:"static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from OpenBao (or HashiCorp Vault) at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod. Add \"file\":{\"name\":\"gcp/adc.json\"} to the reference to deliver the secret as a file on the runner: the variable then holds the file's absolute path (usable as file(var.x), or by a tool reading a path from an env var). name defaults to the key; a relative name lands under /var/run/terrapod/files/, a name starting ~/ in the runner's home (e.g. ~/.aws/credentials). Not allowed with structured=true (or its alias hcl=true). The file's content is exactly one of: the reference's field (add \"encoding\":\"base64\" inside file to decode it to UTF-8 text); \"template\" inside file with no field, a logic-less template over the one read such as \"[default]\\naws_access_key_id = {{ access_key }}\\n\" (dotted names reach into maps; filters json, base64decode, trim, lines, indent N; _lease.ttl, _lease.renewable, _lease.expires_at when the secret has a lease; at most 16 KiB); or \"format\" inside file with no field, json or env for the whole secret, optionally narrowed by \"fields\":[...]"`
+		WorkspaceID   string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
+		Key           string `json:"key" jsonschema:"the variable key"`
+		Value         string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
+		Category      string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, git_ssh_auth, ansible_machine_auth or ansible_vault_auth (default terraform); native is accepted as an equivalent name for terraform. terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The other four are credential categories: the value is a JSON envelope rather than a literal, all four are always sensitive whatever you ask for, and none accepts an OpenBao/Vault value source. In the two ansible_* categories the key is the credential's NAME. For ansible_machine_auth the INVENTORY says where it is used, with a ${terrapod:<name>.<field>} placeholder the runner substitutes while rendering, so it can fill any connection variable; for ansible_vault_auth the name is also the vault ID label"`
+		Structured    *bool  `json:"structured,omitempty" jsonschema:"the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false"`
+		HCL           *bool  `json:"hcl,omitempty" jsonschema:"deprecated alias for structured; both are the same flag"`
+		Sensitive     *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
+		ApplyOnly     *bool  `json:"apply_only,omitempty" jsonschema:"withhold this variable from a plan and deliver it to an apply AND to an Ansible configure; default false. A plan executes the configuration's code, so a credential only the apply needs should not be in a plan's environment; a configure runs the repository's playbooks against real hosts, so it receives apply-only rows too. To withhold a variable from an apply as well, use configure_only instead. For a different value per phase, set TWO variables with the same key — one ordinary, one apply_only — and the apply-only one wins on an apply"`
+		ConfigureOnly *bool  `json:"configure_only,omitempty" jsonschema:"withhold this variable from a plan AND from an apply, delivering it only to an Ansible configure; default false. For the fleet's own credential — an SSH private key to the estate, a become password — which nothing in a plan or an apply has any business holding. A THIRD slot rather than a variant of apply_only, because apply_only already means apply AND configure, so it cannot express withholding from an apply too. Setting both apply_only and configure_only is REFUSED by the server with a 422 rather than resolved"`
+		Description   string `json:"description,omitempty" jsonschema:"optional human description"`
+		ValueSource   string `json:"value_source,omitempty" jsonschema:"static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from OpenBao (or HashiCorp Vault) at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod. Add \"file\":{\"name\":\"gcp/adc.json\"} to the reference to deliver the secret as a file on the runner: the variable then holds the file's absolute path (usable as file(var.x), or by a tool reading a path from an env var). name defaults to the key; a relative name lands under /var/run/terrapod/files/, a name starting ~/ in the runner's home (e.g. ~/.aws/credentials). Not allowed with structured=true (or its alias hcl=true). The file's content is exactly one of: the reference's field (add \"encoding\":\"base64\" inside file to decode it to UTF-8 text); \"template\" inside file with no field, a logic-less template over the one read such as \"[default]\\naws_access_key_id = {{ access_key }}\\n\" (dotted names reach into maps; filters json, base64decode, trim, lines, indent N; _lease.ttl, _lease.renewable, _lease.expires_at when the secret has a lease; at most 16 KiB); or \"format\" inside file with no field, json or env for the whole secret, optionally narrowed by \"fields\":[...]"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_variable_set",
@@ -448,7 +449,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"category=terraform is the right answer on EVERY engine — it is the engine's own parameter channel, not Terraform's alone. On a Pulumi workspace it becomes stack config: the key passes through verbatim (including a namespaced form such as aws:region), sensitive=true makes it a real Pulumi secret so the engine renders it as [secret] in previews and state, and structured=true sets a nested value rather than a literal dotted key. It overrides a committed Pulumi.<stack>.yaml key of the same name and leaves the rest of that file alone. " +
 			"Set value_source=vault to store a reference to an OpenBao (or HashiCorp Vault) secret instead of a literal, so the secret stays in OpenBao/Vault and is read per run — an unresolvable reference fails the run rather than delivering nothing. " +
 			"A reference with a \"file\" object delivers the secret as a file and the variable holds its path, for providers and tools that only read credentials from a file. " +
-			"Set apply_only=true to withhold the variable from a plan and deliver it only to an apply, so a write-capable credential is never in the environment of a plan that runs a pull request's code. Returns the variable.",
+			"Set apply_only=true to withhold the variable from a plan and deliver it to an apply AND to an Ansible configure, so a write-capable credential is never in the environment of a plan that runs a pull request's code; a configure runs the repository's playbooks against real hosts, so it receives apply-only rows too. " +
+			"Set configure_only=true for the third slot: withheld from a plan AND from an apply, delivered only to a configure — the fleet's own credential, such as an SSH private key to the estate or a become password. The two flags are mutually exclusive; setting both is refused with a 422. Returns the variable.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
@@ -470,13 +472,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		switch {
 		case err == nil && existing != nil:
 			v, uerr := c.UpdateVariable(ctx, in.WorkspaceID, existing.ID, terrapod.UpdateVariableRequest{
-				Value:       &in.Value,
-				Category:    category,
-				Structured:  firstSet(in.Structured, in.HCL),
-				Sensitive:   in.Sensitive,
-				ApplyOnly:   in.ApplyOnly,
-				Description: strPtrOrNil(in.Description),
-				ValueSource: strPtrOrNil(in.ValueSource),
+				Value:         &in.Value,
+				Category:      category,
+				Structured:    firstSet(in.Structured, in.HCL),
+				Sensitive:     in.Sensitive,
+				ApplyOnly:     in.ApplyOnly,
+				ConfigureOnly: in.ConfigureOnly,
+				Description:   strPtrOrNil(in.Description),
+				ValueSource:   strPtrOrNil(in.ValueSource),
 			})
 			if uerr != nil {
 				return errResult(uerr), nil, nil
@@ -486,14 +489,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			return errResult(err), nil, nil
 		}
 		v, cerr := c.CreateVariable(ctx, in.WorkspaceID, terrapod.CreateVariableRequest{
-			Key:         in.Key,
-			Value:       in.Value,
-			Category:    category,
-			Structured:  boolOrFalse(firstSet(in.Structured, in.HCL)),
-			Sensitive:   boolOrFalse(in.Sensitive),
-			ApplyOnly:   boolOrFalse(in.ApplyOnly),
-			Description: in.Description,
-			ValueSource: in.ValueSource,
+			Key:           in.Key,
+			Value:         in.Value,
+			Category:      category,
+			Structured:    boolOrFalse(firstSet(in.Structured, in.HCL)),
+			Sensitive:     boolOrFalse(in.Sensitive),
+			ApplyOnly:     boolOrFalse(in.ApplyOnly),
+			ConfigureOnly: boolOrFalse(in.ConfigureOnly),
+			Description:   in.Description,
+			ValueSource:   in.ValueSource,
 		})
 		if cerr != nil {
 			return errResult(cerr), nil, nil
