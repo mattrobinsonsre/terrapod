@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Rig all hands",
       "configureAllHostsHint": "A riggin'' order th'' platform sets sail fer ye takes only th'' hands a manifest change touched, unless th'' Ansible code shifted since th'' last one. Hoist this t'' always sweep th'' whole manifest, arr.",
       "eeCpuRequest": "Ansible CPU askin'",
-      "eeMemoryRequest": "Ansible memory askin'"
+      "eeMemoryRequest": "Ansible memory askin'",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt version"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

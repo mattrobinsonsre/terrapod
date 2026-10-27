@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Configure all marklars",
       "configureAllHostsHint": "A marklar the marklar starts for you targets only the marklars a marklar marklar touched, unless the Ansible marklar moved since the last one. Turn this on to always sweep the whole marklar.",
       "eeCpuRequest": "Ansible marklar marklar",
-      "eeMemoryRequest": "Ansible marklar marklar"
+      "eeMemoryRequest": "Ansible marklar marklar",
+      "terragruntEnabled": "Marklar",
+      "terragruntVersion": "Marklar marklar"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

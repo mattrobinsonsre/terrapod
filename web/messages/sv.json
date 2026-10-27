@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Konfigurera alla värdar",
       "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet.",
       "eeCpuRequest": "Ansible CPU-begäran",
-      "eeMemoryRequest": "Ansible minnesbegäran"
+      "eeMemoryRequest": "Ansible minnesbegäran",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

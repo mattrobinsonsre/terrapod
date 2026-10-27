@@ -2686,7 +2686,9 @@
       "configureAllHosts": "配置所有主机",
       "configureAllHostsHint": "由平台自动发起的配置仅以清单变更触及的主机为目标；若自上次配置以来 Ansible 代码有所改动，则不受此限制。开启后，始终以整个清单为目标。",
       "eeCpuRequest": "Ansible CPU 请求",
-      "eeMemoryRequest": "Ansible 内存请求"
+      "eeMemoryRequest": "Ansible 内存请求",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

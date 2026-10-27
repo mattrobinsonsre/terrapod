@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Configurar todos os hosts",
       "configureAllHostsHint": "Uma configuração que a plataforma inicia por si abrange apenas os hosts que uma alteração de inventário tocou, a menos que o código do Ansible se tenha alterado desde a última. Ative isto para abranger sempre todo o inventário.",
       "eeCpuRequest": "Pedido de CPU do Ansible",
-      "eeMemoryRequest": "Pedido de memória do Ansible"
+      "eeMemoryRequest": "Pedido de memória do Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versão do Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

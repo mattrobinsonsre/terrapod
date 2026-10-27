@@ -332,6 +332,11 @@ export const FIELDS: readonly FieldSpec[] = [
     group: 'governance',
     advanced: true,
     summary: 'count',
+    // The third Terraform-only field the table had lost, and the one with the
+    // sharpest evidence: `pulumi-workspace.spec.ts` asserts it absent at :326
+    // and visible at :339, i.e. it uses this field's presence to tell the two
+    // engines apart. Drift classification reads a Terraform plan.
+    engines: ['terraform'],
   },
   {
     attr: 'plan-expiry-seconds',
@@ -544,8 +549,14 @@ export const LABEL_KEY: Record<string, string> = {
   'engine-version': 'fields.version',
   'working-directory': 'fields.workingDirectory',
   'auto-apply-mode': 'fields.autoApply',
-  'terragrunt-enabled': 'fields.terragruntEnabledAgent',
-  'terragrunt-version': 'fields.terragruntEnabledVersion',
+  // NOT `fields.terragruntEnabledAgent` ('Enabled (agent mode)') -- that is a
+  // STATE word the read view shows, not a label. And emphatically not
+  // `fields.terragruntEnabledVersion`, which is `'Enabled (v{version})'`: an
+  // ICU message requiring an argument, so using it as a label THROWS
+  // MISSING_FORMAT_VALUE and renders a raw key. Both labels were lifted from
+  // `adminAutodiscovery.form`, where the English was already identical.
+  'terragrunt-enabled': 'fields.terragruntEnabled',
+  'terragrunt-version': 'fields.terragruntVersion',
   'pulumi-bind-plan': 'fields.bindPlan',
   parallelism: 'fields.parallelism',
   'resource-cpu': 'fields.cpuRequest',

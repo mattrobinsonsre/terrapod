@@ -2686,7 +2686,9 @@
       "configureAllHosts": "All hosts, configure",
       "configureAllHostsHint": "Only the hosts an inventory change touched, a configure the platform starts for you targets — unless since the last one, moved the Ansible code has. To always sweep the whole inventory, on turn this.",
       "eeCpuRequest": "request, Ansible CPU",
-      "eeMemoryRequest": "request, Ansible memory"
+      "eeMemoryRequest": "request, Ansible memory",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version, Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

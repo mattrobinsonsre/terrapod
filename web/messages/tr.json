@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Tüm ana makineleri yapılandırma",
       "configureAllHostsHint": "Ansible kodu son yapılandırmadan bu yana değişmedikçe, platformun sizin yerinize başlattığı bir yapılandırma yalnızca bir envanter değişikliğinin dokunduğu ana makineleri hedefler. Her zaman tüm envanteri hedeflemek için bunu açın.",
       "eeCpuRequest": "Ansible CPU isteği",
-      "eeMemoryRequest": "Ansible bellek isteği"
+      "eeMemoryRequest": "Ansible bellek isteği",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt sürümü"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

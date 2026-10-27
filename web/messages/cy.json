@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Cyflunio pob gwesteiwr",
       "configureAllHostsHint": "Mae cyflunio a gychwynnir gan y platfform ar eich rhan yn targedu dim ond y gwesteiwyr yr effeithiodd newid i''r rhestr eiddo arnynt, oni bai bod cod Ansible wedi newid ers y cyflunio diwethaf. Trowch hyn ymlaen i ysgubo''r rhestr eiddo gyfan bob tro.",
       "eeCpuRequest": "Cais CPU Ansible",
-      "eeMemoryRequest": "Cais cof Ansible"
+      "eeMemoryRequest": "Cais cof Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Fersiwn Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

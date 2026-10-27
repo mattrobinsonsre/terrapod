@@ -2686,7 +2686,9 @@
       "configureAllHosts": "تهيئة كل المضيفات",
       "configureAllHostsHint": "التهيئة التي تبدأها المنصة نيابةً عنك تستهدف فقط المضيفات التي مسّها تغيير في المخزون، ما لم يتغيّر كود Ansible منذ التهيئة الأخيرة. فعّل هذا لاستهداف المخزون بأكمله دائمًا.",
       "eeCpuRequest": "طلب معالج Ansible",
-      "eeMemoryRequest": "طلب ذاكرة Ansible"
+      "eeMemoryRequest": "طلب ذاكرة Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "إصدار Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",

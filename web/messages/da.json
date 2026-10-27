@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Konfigurer alle værter",
       "configureAllHostsHint": "En konfigurationskørsel, som platformen selv starter, når kun de værter, som en ændring i inventaret berørte, medmindre Ansible-koden har ændret sig siden den forrige. Slå dette til for altid at køre hele inventaret igennem.",
       "eeCpuRequest": "Ansible CPU-anmodning",
-      "eeMemoryRequest": "Ansible hukommelsesanmodning"
+      "eeMemoryRequest": "Ansible hukommelsesanmodning",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

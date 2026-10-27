@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Configurare omnes hospites",
       "configureAllHostsHint": "Configuratio quam suggestus sua sponte incipit solos hospites petit quos mutatio inventarii tetigit, nisi codex Ansible post ultimam mutatus est. Hoc accende ut semper totum inventarium petatur.",
       "eeCpuRequest": "Postulatio CPU Ansible",
-      "eeMemoryRequest": "Postulatio memoriae Ansible"
+      "eeMemoryRequest": "Postulatio memoriae Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versio Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

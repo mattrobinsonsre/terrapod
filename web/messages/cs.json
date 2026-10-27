@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Konfigurace všech hostitelů",
       "configureAllHostsHint": "Konfigurace, kterou platforma spustí sama, zasáhne jen hostitele, jichž se dotkla změna inventáře — pokud se od předchozí konfigurace nezměnil kód Ansible. Zapněte to, chcete-li vždy zasáhnout celý inventář.",
       "eeCpuRequest": "Požadavek CPU pro Ansible",
-      "eeMemoryRequest": "Požadavek paměti pro Ansible"
+      "eeMemoryRequest": "Požadavek paměti pro Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Verze Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

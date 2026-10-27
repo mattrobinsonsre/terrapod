@@ -2686,7 +2686,9 @@
       "configureAllHosts": "תצורה לכל המארחים",
       "configureAllHostsHint": "תצורה שהפלטפורמה מתחילה בשבילך מכוונת רק אל המארחים שבהם נגע שינוי במלאי, אלא אם קוד Ansible השתנה מאז התצורה הקודמת. הפעל את זה כדי לכוון תמיד אל המלאי כולו.",
       "eeCpuRequest": "בקשת CPU של Ansible",
-      "eeMemoryRequest": "בקשת זיכרון של Ansible"
+      "eeMemoryRequest": "בקשת זיכרון של Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "גרסת Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",

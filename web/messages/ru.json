@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Настройка всех хостов",
       "configureAllHostsHint": "Настройка, которую платформа запускает сама, охватывает только хосты, затронутые изменением инвентаря, — если только код Ansible не менялся со времени предыдущей настройки. Включите это, чтобы всегда охватывать весь инвентарь.",
       "eeCpuRequest": "Запрос CPU для Ansible",
-      "eeMemoryRequest": "Запрос памяти для Ansible"
+      "eeMemoryRequest": "Запрос памяти для Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Версия Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Авторизация делегирована вашему репозиторию VCS.",

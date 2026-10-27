@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Hoch hostmey Qum",
       "configureAllHostsHint": "Qum Qav-vo'' Ansible De'' choHbe''chugh, ghom tetlh choH Hotbogh hostmey neH nID pat taghbogh Qum. reH Hoch ghom tetlh-vaD Qu'' paq qaSmoHmeH, yIchu''.",
       "eeCpuRequest": "Ansible CPU tlhob",
-      "eeMemoryRequest": "Ansible qawHaq tlhob"
+      "eeMemoryRequest": "Ansible qawHaq tlhob",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt mI'"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

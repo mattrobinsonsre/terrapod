@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Kaikkien isäntien määritys",
       "configureAllHostsHint": "Alustan itse käynnistämä määritys kohdistuu vain niihin isäntiin, joihin inventaarion muutos osui, ellei Ansible-koodi ole muuttunut edellisen määrityksen jälkeen. Ota tämä käyttöön kohdistaaksesi aina koko inventaarioon.",
       "eeCpuRequest": "Ansiblen CPU-pyyntö",
-      "eeMemoryRequest": "Ansiblen muistipyyntö"
+      "eeMemoryRequest": "Ansiblen muistipyyntö",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versio"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

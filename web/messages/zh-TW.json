@@ -2686,7 +2686,9 @@
       "configureAllHosts": "設定所有主機",
       "configureAllHostsHint": "由平台自動發起的設定僅以清冊變動觸及的主機為目標；若自上次設定以來 Ansible 程式碼有所變動，則不受此限制。開啟後，一律以整份清冊為目標。",
       "eeCpuRequest": "Ansible CPU 請求",
-      "eeMemoryRequest": "Ansible 記憶體請求"
+      "eeMemoryRequest": "Ansible 記憶體請求",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

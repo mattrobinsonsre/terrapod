@@ -2686,7 +2686,9 @@
       "configureAllHosts": "すべてのホストを構成",
       "configureAllHostsHint": "プラットフォームが自動的に開始する構成は、インベントリの変更が及んだホストのみを対象とします。ただし、前回の構成以降に Ansible のコードが変更されている場合は絞り込みません。これをオンにすると、常にインベントリ全体を対象とします。",
       "eeCpuRequest": "AnsibleのCPUリクエスト",
-      "eeMemoryRequest": "Ansibleのメモリリクエスト"
+      "eeMemoryRequest": "Ansibleのメモリリクエスト",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt バージョン"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

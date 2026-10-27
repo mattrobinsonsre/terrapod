@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Konfigurer alle verter",
       "configureAllHostsHint": "En konfigurasjonskjøring som plattformen selv starter, når bare de vertene som en endring i inventaret berørte, med mindre Ansible-koden har endret seg siden den forrige. Slå dette på for alltid å gå gjennom hele inventaret.",
       "eeCpuRequest": "Ansible CPU-forespørsel",
-      "eeMemoryRequest": "Ansible minneforespørsel"
+      "eeMemoryRequest": "Ansible minneforespørsel",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versjon"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

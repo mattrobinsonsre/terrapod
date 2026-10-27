@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Konfigur all teh hostz",
       "configureAllHostsHint": "A konfigur wot teh platfurm startz fer u only getz teh hostz wot an inventoree change touchd, unless teh Ansibul code moovd sinse teh last wun. Turn dis on 2 alwayz sweep teh whole inventoree. srsly",
       "eeCpuRequest": "Ansibul CPU requist",
-      "eeMemoryRequest": "Ansibul memoreh requist"
+      "eeMemoryRequest": "Ansibul memoreh requist",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt vershun"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

@@ -107,6 +107,28 @@ test('every group has a heading', () => {
   assert.deepEqual(missing, [], `group(s) with no heading in en.json: ${missing.join(', ')}`)
 })
 
+test('no label requires an ICU argument, which would throw at render', () => {
+  // The sharpest version of the near-miss below, and the one that is not a
+  // wrong string but a CRASH: `fields.terragruntEnabledVersion` is
+  // `'Enabled (v{version})'`, so using it as a label raises
+  // MISSING_FORMAT_VALUE and next-intl renders the raw key. It RESOLVES
+  // perfectly, so the resolution test above passes it, and a reviewer reading
+  // the map sees a plausible key name.
+  const offenders: string[] = []
+  for (const [attr, key] of labelKeys()) {
+    const value = resolve(key)
+    if (value && /\{\s*[A-Za-z0-9_]+/.test(value)) {
+      offenders.push(`${attr} -> ${key} = ${JSON.stringify(value)}`)
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    'label(s) point at an ICU message needing an argument, which throws at render: ' +
+      offenders.join('; '),
+  )
+})
+
 test('no label key points at a hint, placeholder or title by mistake', () => {
   // A near-miss that type-checks, resolves, and renders the wrong string: the
   // catalogue carries `fields.ansibleVersion` next to

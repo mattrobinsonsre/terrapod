@@ -2686,7 +2686,9 @@
       "configureAllHosts": "پیکربندی همه میزبان‌ها",
       "configureAllHostsHint": "پیکربندی‌ای که سکو برای شما آغاز می‌کند تنها میزبان‌هایی را هدف می‌گیرد که تغییری در موجودی به آن‌ها دست زده باشد، مگر آنکه کد Ansible از آخرین پیکربندی تغییر کرده باشد. این گزینه را روشن کنید تا همیشه کل موجودی هدف قرار گیرد.",
       "eeCpuRequest": "درخواست CPU برای Ansible",
-      "eeMemoryRequest": "درخواست حافظه برای Ansible"
+      "eeMemoryRequest": "درخواست حافظه برای Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "نسخه Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "مجوزدهی به مخزن VCS شما واگذار شده است.",

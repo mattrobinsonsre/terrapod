@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Alle hosts configureren",
       "configureAllHostsHint": "Een configure-run die het platform zelf start, bereikt alleen de hosts die door een wijziging in de inventaris zijn geraakt, tenzij de Ansible-code sinds de vorige run is gewijzigd. Zet dit aan om altijd de hele inventaris te doorlopen.",
       "eeCpuRequest": "Ansible CPU-aanvraag",
-      "eeMemoryRequest": "Ansible geheugenaanvraag"
+      "eeMemoryRequest": "Ansible geheugenaanvraag",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versie"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

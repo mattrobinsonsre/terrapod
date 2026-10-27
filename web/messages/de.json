@@ -2686,7 +2686,9 @@
       "configureAllHosts": "Alle Hosts konfigurieren",
       "configureAllHostsHint": "Ein Konfigurationslauf, den die Plattform selbst startet, erreicht nur die Hosts, die eine Änderung am Inventar berührt hat — es sei denn, der Ansible-Code hat sich seit dem vorigen Lauf geändert. Aktivieren Sie dies, damit immer das ganze Inventar durchlaufen wird.",
       "eeCpuRequest": "Ansible-CPU-Anforderung",
-      "eeMemoryRequest": "Ansible-Speicher-Anforderung"
+      "eeMemoryRequest": "Ansible-Speicher-Anforderung",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-Version"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
