@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Konfigur aftr apply",
       "configureAfterApplyHint": "Evry apply heer is followd by a konfigur on teh same run, so a CLI apply streemz teh playbook outputz too. A destroy nevr konfigurz.",
       "configureAllHosts": "Konfigur all teh hostz",
-      "configureAllHostsHint": "A konfigur wot teh platfurm startz fer u only getz teh hostz wot an inventoree change touchd, unless teh Ansibul code moovd sinse teh last wun. Turn dis on 2 alwayz sweep teh whole inventoree. srsly"
+      "configureAllHostsHint": "A konfigur wot teh platfurm startz fer u only getz teh hostz wot an inventoree change touchd, unless teh Ansibul code moovd sinse teh last wun. Turn dis on 2 alwayz sweep teh whole inventoree. srsly",
+      "eeCpuRequest": "Ansibul CPU requist",
+      "eeMemoryRequest": "Ansibul memoreh requist"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Cleer teh reportd drift state. Teh nekst scheduld check will repopulayt it frum reality.",
       "lastChecked": "Last Checkd",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enabul drift deteckshun furst"
+      "checkNowTitleDisabled": "Enabul drift deteckshun furst",
+      "enabledLabel": "Drift deteckshun"
     },
     "intervals": {
       "disabled": "Disabld",
@@ -3268,6 +3271,20 @@
       "hint": "A run getz dis werkspace environmint variablez, sensitiv valuez, any Vault-resolvd secretz an da jobz cloud identitee. Sumwun openin a pull rekwest from a fork haz no rite access an can not merge, so a speculativ plan iz da only way der code reechez doze credenshulz. Turn dis on fer a werkspace dat holdz nuffin wurth takin — a publik module repozitory acceptin communitee contribushunz, sez I. Pull rekwestz from branchez in da repozitory itself iz unaffectd an alwayz plan.",
       "activeBadge": "Awn",
       "confirmEnable": "Plan pull rekwestz opend from forkz? Der authorz code wil run wif dis werkspace credenshulz an dekrypted variablez, wifout anywun approovin it furst."
+    },
+    "groups": {
+      "identity": "Identitee",
+      "execution": "Eksekushun",
+      "operations": "Opurashunz",
+      "ansible": "Ansibul Konfigur",
+      "pools": "Agent Poolz",
+      "vcs": "Vershun kontrol",
+      "governance": "Drift an plan lyfesykul",
+      "ai": "AI summry",
+      "security": "Sekurity scannin",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloud identitee",
+      "diagnostics": "Dyagnostiks"
     }
   },
   "graphs": {

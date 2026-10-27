@@ -2684,7 +2684,9 @@
       "configureAfterApply": "apply, Configure after",
       "configureAfterApplyHint": "By a configure on the same run, every apply here is followed. The playbook''s output too, a CLI apply streams. Configure, a destroy never does.",
       "configureAllHosts": "All hosts, configure",
-      "configureAllHostsHint": "Only the hosts an inventory change touched, a configure the platform starts for you targets — unless since the last one, moved the Ansible code has. To always sweep the whole inventory, on turn this."
+      "configureAllHostsHint": "Only the hosts an inventory change touched, a configure the platform starts for you targets — unless since the last one, moved the Ansible code has. To always sweep the whole inventory, on turn this.",
+      "eeCpuRequest": "request, Ansible CPU",
+      "eeMemoryRequest": "request, Ansible memory"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "The reported drift state, clear. From reality, the next scheduled check repopulate it will.",
       "lastChecked": "Checked, Last",
       "checkNow": "Now, Check",
-      "checkNowTitleDisabled": "Drift detection first, enable it"
+      "checkNowTitleDisabled": "Drift detection first, enable it",
+      "enabledLabel": "Detection, Drift"
     },
     "intervals": {
       "disabled": "Disabled",
@@ -3268,6 +3271,20 @@
       "hint": "This workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity, a run receives. No write access has someone opening a pull request from a fork, and merge they cannot, so the only way their code reaches those credentials, a speculative plan is. For a workspace that holds nothing worth taking, turn this on — a public module repository accepting community contributions, say. Unaffected are pull requests from branches in the repository itself, and always plan they do.",
       "activeBadge": "On",
       "confirmEnable": "Pull requests opened from forks, plan? With this workspace's credentials and decrypted variables, their authors' code will run, without anyone approving it first."
+    },
+    "groups": {
+      "identity": "Identity",
+      "execution": "Execution",
+      "operations": "Operations",
+      "ansible": "configure, Ansible",
+      "pools": "Pools, Agent",
+      "vcs": "Control, Version",
+      "governance": "Lifecycle, drift and plan",
+      "ai": "Summary, AI",
+      "security": "Scanning, Security",
+      "metadata": "Metadata",
+      "cloudIdentity": "Identity, cloud",
+      "diagnostics": "Diagnostics"
     }
   },
   "graphs": {

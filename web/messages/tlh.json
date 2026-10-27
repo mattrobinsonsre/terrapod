@@ -2684,7 +2684,9 @@
       "configureAfterApply": "lo''lu''DI'' Qum",
       "configureAfterApplyHint": "Sar rapDaq naDev Hoch lo'' tlha'' Qum, vaj Qu'' paq chel lI'' CLI lo'' je. not Qum Qaw''.",
       "configureAllHosts": "Hoch hostmey Qum",
-      "configureAllHostsHint": "Qum Qav-vo'' Ansible De'' choHbe''chugh, ghom tetlh choH Hotbogh hostmey neH nID pat taghbogh Qum. reH Hoch ghom tetlh-vaD Qu'' paq qaSmoHmeH, yIchu''."
+      "configureAllHostsHint": "Qum Qav-vo'' Ansible De'' choHbe''chugh, ghom tetlh choH Hotbogh hostmey neH nID pat taghbogh Qum. reH Hoch ghom tetlh-vaD Qu'' paq qaSmoHmeH, yIchu''.",
+      "eeCpuRequest": "Ansible CPU tlhob",
+      "eeMemoryRequest": "Ansible qawHaq tlhob"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "maqlu'bogh tlhotlh Dotlh teq. tob veb tlhamlu'bogh 'oH buy'qa'moH teHvo'.",
       "lastChecked": "toblu' Qav",
       "checkNow": "DaH tob",
-      "checkNowTitleDisabled": "tlhotlh tu' wa'DIch chu'"
+      "checkNowTitleDisabled": "tlhotlh tu' wa'DIch chu'",
+      "enabledLabel": "tlhotlh tu'"
     },
     "intervals": {
       "disabled": "chu'Ha'lu'pu'",
@@ -3268,6 +3271,20 @@
       "hint": "Qumwo'vam choHlaHmey, pegh De'mey, Vault-vo' Sambogh peghmey, je Qu' 'eng pong Hev Sar. fork-vo' PR poSmoHbogh ghot ghItlh chaw' ghajbe' 'ej merge laHbe'; vaj Hech nab neH 'oH He'e' ngoqDaj pegh ghoSmeH. pagh ngaSbogh Qumwo'vaD wa' yIchu' — ghom boQ Hevbogh qawHaq pegh Hutlhbogh. qawHaq paQmeyvo' poSmoHlu'bogh PRmey choHbe'lu', 'ej reH nab Hevlu'.",
       "activeBadge": "chu'lu'",
       "confirmEnable": "fork-vo' poSmoHlu'bogh PRmey DanabmoH'a'? pagh chaw'DI' vay', Qumwo'vam pegh je choHlaHmey lo'taHvIS qonwI'chaj ngoq qaS."
+    },
+    "groups": {
+      "identity": "pong",
+      "execution": "Qap",
+      "operations": "Qu''mey",
+      "ansible": "Ansible Qum",
+      "pools": "Duy bIQ'a'mey",
+      "vcs": "mI'mey SeH",
+      "governance": "chIch je nab yIn poH",
+      "ai": "AI naw'",
+      "security": "Hujqu'ghach Sup",
+      "metadata": "De'De'",
+      "cloudIdentity": "'eng pong",
+      "diagnostics": "Qagh Sam"
     }
   },
   "graphs": {

@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Konfiguracja po zastosowaniu",
       "configureAfterApplyHint": "Po każdym zastosowaniu tutaj następuje konfiguracja w tym samym uruchomieniu, więc zastosowanie z CLI przesyła strumieniowo także wyjście playbooka. Niszczenie nigdy nie konfiguruje.",
       "configureAllHosts": "Konfiguracja wszystkich hostów",
-      "configureAllHostsHint": "Konfiguracja, którą platforma uruchamia sama, obejmuje tylko hosty, których dotknęła zmiana w inwentarzu — chyba że kod Ansible zmienił się od poprzedniej konfiguracji. Włącz to, aby zawsze objąć cały inwentarz."
+      "configureAllHostsHint": "Konfiguracja, którą platforma uruchamia sama, obejmuje tylko hosty, których dotknęła zmiana w inwentarzu — chyba że kod Ansible zmienił się od poprzedniej konfiguracji. Włącz to, aby zawsze objąć cały inwentarz.",
+      "eeCpuRequest": "Żądanie CPU dla Ansible",
+      "eeMemoryRequest": "Żądanie pamięci dla Ansible"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Wyczyść zgłoszony stan dryfu. Następne zaplanowane sprawdzenie ponownie wypełni go na podstawie rzeczywistości.",
       "lastChecked": "Ostatnio sprawdzono",
       "checkNow": "Sprawdź teraz",
-      "checkNowTitleDisabled": "Najpierw włącz wykrywanie dryfu"
+      "checkNowTitleDisabled": "Najpierw włącz wykrywanie dryfu",
+      "enabledLabel": "Wykrywanie dryfu"
     },
     "intervals": {
       "disabled": "Wyłączone",
@@ -3268,6 +3271,20 @@
       "hint": "Uruchomienie otrzymuje zmienne środowiskowe tej przestrzeni roboczej, wartości wrażliwe, wszystkie sekrety pobrane przez Vault oraz tożsamość chmurową zadania. Kto otwiera pull request z forka, nie ma uprawnień do zapisu i nie może scalić zmian, więc plan spekulatywny to jedyna droga, którą jego kod dociera do tych poświadczeń. Włącz to dla przestrzeni roboczej, w której nie ma nic wartego zabrania — na przykład dla publicznego repozytorium modułów przyjmującego wkład społeczności. Pull requesty z gałęzi samego repozytorium nie są tym objęte i zawsze otrzymują plan.",
       "activeBadge": "Wł.",
       "confirmEnable": "Planować pull requesty otwarte z forków? Kod ich autorów zostanie uruchomiony z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, bez niczyjego wcześniejszego zatwierdzenia."
+    },
+    "groups": {
+      "identity": "Tożsamość",
+      "execution": "Wykonanie",
+      "operations": "Operacje",
+      "ansible": "Konfiguracja Ansible",
+      "pools": "Pule agentów",
+      "vcs": "Kontrola wersji",
+      "governance": "Dryf i cykl życia planu",
+      "ai": "Podsumowanie AI",
+      "security": "Skanowanie bezpieczeństwa",
+      "metadata": "Metadane",
+      "cloudIdentity": "Tożsamość w chmurze",
+      "diagnostics": "Diagnostyka"
     }
   },
   "graphs": {

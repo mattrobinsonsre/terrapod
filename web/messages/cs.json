@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Konfigurace po použití",
       "configureAfterApplyHint": "Po každém použití zde následuje konfigurace ve stejném běhu, takže použití z CLI streamuje i výstup playbooku. Zničení nikdy nekonfiguruje.",
       "configureAllHosts": "Konfigurace všech hostitelů",
-      "configureAllHostsHint": "Konfigurace, kterou platforma spustí sama, zasáhne jen hostitele, jichž se dotkla změna inventáře — pokud se od předchozí konfigurace nezměnil kód Ansible. Zapněte to, chcete-li vždy zasáhnout celý inventář."
+      "configureAllHostsHint": "Konfigurace, kterou platforma spustí sama, zasáhne jen hostitele, jichž se dotkla změna inventáře — pokud se od předchozí konfigurace nezměnil kód Ansible. Zapněte to, chcete-li vždy zasáhnout celý inventář.",
+      "eeCpuRequest": "Požadavek CPU pro Ansible",
+      "eeMemoryRequest": "Požadavek paměti pro Ansible"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Vymazat nahlášený stav odchýlení. Další naplánovaná kontrola jej znovu naplní podle reality.",
       "lastChecked": "Naposledy zkontrolováno",
       "checkNow": "Zkontrolovat nyní",
-      "checkNowTitleDisabled": "Nejprve povolte detekci odchýlení"
+      "checkNowTitleDisabled": "Nejprve povolte detekci odchýlení",
+      "enabledLabel": "Detekce odchýlení"
     },
     "intervals": {
       "disabled": "Zakázáno",
@@ -3268,6 +3271,20 @@
       "hint": "Běh dostane proměnné prostředí tohoto pracovního prostoru, citlivé hodnoty, všechna tajemství získaná přes Vault a cloudovou identitu úlohy. Kdo otevře pull request z forku, nemá právo zápisu a nemůže slučovat, takže spekulativní plán je jediná cesta, kterou se jeho kód k těmto přihlašovacím údajům dostane. Zapněte to pro pracovní prostor, v němž není nic, co by stálo za odnesení — třeba pro veřejný repozitář modulů přijímající příspěvky komunity. Pull requesty z větví samotného repozitáře to neovlivní a plán dostanou vždy.",
       "activeBadge": "Zapnuto",
       "confirmEnable": "Plánovat pull requesty otevřené z forků? Kód jejich autorů poběží s přihlašovacími údaji a dešifrovanými proměnnými tohoto pracovního prostoru, aniž by to někdo předem schválil."
+    },
+    "groups": {
+      "identity": "Identita",
+      "execution": "Spuštění",
+      "operations": "Operace",
+      "ansible": "Konfigurace Ansible",
+      "pools": "Fondy agentů",
+      "vcs": "Správa verzí",
+      "governance": "Odchýlení a životní cyklus plánu",
+      "ai": "Souhrn AI",
+      "security": "Bezpečnostní kontrola",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloudová identita",
+      "diagnostics": "Diagnostika"
     }
   },
   "graphs": {

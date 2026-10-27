@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Configurar tras apply",
       "configureAfterApplyHint": "Cada apply de aquí va seguido de una configuración en la misma ejecución, así que un apply desde la CLI también transmite la salida del playbook. Una destrucción nunca configura.",
       "configureAllHosts": "Configurar todos los hosts",
-      "configureAllHostsHint": "Una configuración que la plataforma inicia por sí sola abarca solo los hosts que tocó un cambio de inventario, salvo que el código de Ansible haya cambiado desde la última. Actívalo para abarcar siempre todo el inventario."
+      "configureAllHostsHint": "Una configuración que la plataforma inicia por sí sola abarca solo los hosts que tocó un cambio de inventario, salvo que el código de Ansible haya cambiado desde la última. Actívalo para abarcar siempre todo el inventario.",
+      "eeCpuRequest": "Solicitud de CPU de Ansible",
+      "eeMemoryRequest": "Solicitud de memoria de Ansible"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Borrar el estado de desviación reportado. La siguiente comprobación programada lo repoblará a partir de la realidad.",
       "lastChecked": "Última comprobación",
       "checkNow": "Comprobar ahora",
-      "checkNowTitleDisabled": "Habilite primero la detección de desviación"
+      "checkNowTitleDisabled": "Habilite primero la detección de desviación",
+      "enabledLabel": "Detección de desviación"
     },
     "intervals": {
       "disabled": "Deshabilitado",
@@ -3268,6 +3271,20 @@
       "hint": "Una ejecución recibe las variables de entorno de este espacio de trabajo, los valores sensibles, cualquier secreto resuelto con Vault y la identidad en la nube del job. Quien abre una pull request desde un fork no tiene acceso de escritura ni puede fusionar, así que un plan especulativo es la única vía por la que su código llega a esas credenciales. Actívalo en un espacio de trabajo que no guarde nada que merezca la pena robar: un repositorio público de módulos que acepta contribuciones de la comunidad, por ejemplo. Las pull requests desde ramas del propio repositorio no se ven afectadas y siempre se planifican.",
       "activeBadge": "Activado",
       "confirmEnable": "¿Ejecutar planes en las pull requests abiertas desde forks? El código de sus autores se ejecutará con las credenciales y las variables descifradas de este espacio de trabajo, sin que nadie lo apruebe antes."
+    },
+    "groups": {
+      "identity": "Identidad",
+      "execution": "Ejecución",
+      "operations": "Operaciones",
+      "ansible": "Configuración de Ansible",
+      "pools": "Grupos de agentes",
+      "vcs": "Control de versiones",
+      "governance": "Desviación y ciclo de vida del plan",
+      "ai": "Resumen de IA",
+      "security": "Análisis de seguridad",
+      "metadata": "Metadatos",
+      "cloudIdentity": "Identidad en la nube",
+      "diagnostics": "Diagnósticos"
     }
   },
   "graphs": {

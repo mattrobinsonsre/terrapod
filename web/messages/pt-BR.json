@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Configurar após o apply",
       "configureAfterApplyHint": "Cada apply aqui é seguido por uma configuração na mesma execução, portanto um apply pela CLI também transmite a saída do playbook. Um destroy nunca configura.",
       "configureAllHosts": "Configurar todos os hosts",
-      "configureAllHostsHint": "Uma configuração que a plataforma inicia por conta própria abrange somente os hosts que uma alteração de inventário tocou, a menos que o código do Ansible tenha mudado desde a última. Ative isto para abranger sempre todo o inventário."
+      "configureAllHostsHint": "Uma configuração que a plataforma inicia por conta própria abrange somente os hosts que uma alteração de inventário tocou, a menos que o código do Ansible tenha mudado desde a última. Ative isto para abranger sempre todo o inventário.",
+      "eeCpuRequest": "Requisição de CPU do Ansible",
+      "eeMemoryRequest": "Requisição de memória do Ansible"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Limpar o estado de drift relatado. A próxima verificação agendada o repopulará com base na realidade.",
       "lastChecked": "Última Verificação",
       "checkNow": "Verificar Agora",
-      "checkNowTitleDisabled": "Ative a detecção de drift primeiro"
+      "checkNowTitleDisabled": "Ative a detecção de drift primeiro",
+      "enabledLabel": "Detecção de Drift"
     },
     "intervals": {
       "disabled": "Desativado",
@@ -3268,6 +3271,20 @@
       "hint": "Uma execução recebe as variáveis de ambiente deste espaço de trabalho, os valores sensíveis, quaisquer segredos resolvidos pelo Vault e a identidade de nuvem do job. Quem abre uma pull request a partir de um fork não tem acesso de escrita e não pode fazer merge, então um plano especulativo é o único caminho pelo qual o código dessa pessoa alcança essas credenciais. Ative isto para um espaço de trabalho que não guarda nada que valha a pena levar — um repositório público de módulos que aceita contribuições da comunidade, por exemplo. Pull requests de branches do próprio repositório não são afetadas e sempre geram plano.",
       "activeBadge": "Ligado",
       "confirmEnable": "Planejar pull requests abertas a partir de forks? O código de seus autores será executado com as credenciais e as variáveis descriptografadas deste espaço de trabalho, sem que ninguém aprove antes."
+    },
+    "groups": {
+      "identity": "Identidade",
+      "execution": "Execução",
+      "operations": "Operações",
+      "ansible": "Configuração do Ansible",
+      "pools": "Pools de agentes",
+      "vcs": "Controle de versão",
+      "governance": "Drift e ciclo de vida do plano",
+      "ai": "Resumo de IA",
+      "security": "Verificação de segurança",
+      "metadata": "Metadados",
+      "cloudIdentity": "Identidade na nuvem",
+      "diagnostics": "Diagnósticos"
     }
   },
   "graphs": {

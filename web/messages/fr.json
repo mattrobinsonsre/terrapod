@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Configurer après application",
       "configureAfterApplyHint": "Chaque application ici est suivie d''une configuration dans la même exécution, de sorte qu''une application depuis la CLI diffuse aussi la sortie du playbook. Une destruction ne configure jamais.",
       "configureAllHosts": "Configurer tous les hôtes",
-      "configureAllHostsHint": "Une configuration que la plateforme lance d''elle-même ne vise que les hôtes qu''un changement d''inventaire a touchés, sauf si le code Ansible a changé depuis la dernière. Activez ceci pour toujours viser l''inventaire entier."
+      "configureAllHostsHint": "Une configuration que la plateforme lance d''elle-même ne vise que les hôtes qu''un changement d''inventaire a touchés, sauf si le code Ansible a changé depuis la dernière. Activez ceci pour toujours viser l''inventaire entier.",
+      "eeCpuRequest": "Demande CPU Ansible",
+      "eeMemoryRequest": "Demande de mémoire Ansible"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Effacer l'état de dérive signalé. La prochaine vérification planifiée le repeuplera à partir de la réalité.",
       "lastChecked": "Dernière vérification",
       "checkNow": "Vérifier maintenant",
-      "checkNowTitleDisabled": "Activez d'abord la détection de dérive"
+      "checkNowTitleDisabled": "Activez d'abord la détection de dérive",
+      "enabledLabel": "Détection de dérive"
     },
     "intervals": {
       "disabled": "Désactivé",
@@ -3268,6 +3271,20 @@
       "hint": "Une exécution reçoit les variables d'environnement de cet espace de travail, les valeurs sensibles, tous les secrets résolus via Vault et l'identité cloud du job. Qui ouvre une pull request depuis un fork n'a pas d'accès en écriture et ne peut pas fusionner : un plan spéculatif est donc le seul moyen pour son code d'atteindre ces identifiants. Activez ceci pour un espace de travail qui ne contient rien à dérober — un dépôt de modules public ouvert aux contributions de la communauté, par exemple. Les pull requests issues de branches du dépôt lui-même ne sont pas concernées et donnent toujours lieu à un plan.",
       "activeBadge": "Activé",
       "confirmEnable": "Lancer un plan sur les pull requests ouvertes depuis un fork ? Le code de leurs auteurs s'exécutera avec les identifiants et les variables déchiffrées de cet espace de travail, sans approbation préalable."
+    },
+    "groups": {
+      "identity": "Identité",
+      "execution": "Exécution",
+      "operations": "Opérations",
+      "ansible": "Configuration Ansible",
+      "pools": "Pools d'agents",
+      "vcs": "Gestion de versions",
+      "governance": "Dérive et cycle de vie des plans",
+      "ai": "Résumé IA",
+      "security": "Analyse de sécurité",
+      "metadata": "Métadonnées",
+      "cloudIdentity": "Identité cloud",
+      "diagnostics": "Diagnostic"
     }
   },
   "graphs": {

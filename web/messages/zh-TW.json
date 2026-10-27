@@ -2684,7 +2684,9 @@
       "configureAfterApply": "套用後執行設定",
       "configureAfterApplyHint": "此處的每一次套用之後，都會在同一次執行中緊接一次設定，因此從 CLI 發起的套用也會串流輸出 playbook 的紀錄。銷毀執行從不進行設定。",
       "configureAllHosts": "設定所有主機",
-      "configureAllHostsHint": "由平台自動發起的設定僅以清冊變動觸及的主機為目標；若自上次設定以來 Ansible 程式碼有所變動，則不受此限制。開啟後，一律以整份清冊為目標。"
+      "configureAllHostsHint": "由平台自動發起的設定僅以清冊變動觸及的主機為目標；若自上次設定以來 Ansible 程式碼有所變動，則不受此限制。開啟後，一律以整份清冊為目標。",
+      "eeCpuRequest": "Ansible CPU 請求",
+      "eeMemoryRequest": "Ansible 記憶體請求"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "清除已報告的漂移狀態。下次計畫檢查將根據實際情況重新填充它。",
       "lastChecked": "上次檢查",
       "checkNow": "立即檢查",
-      "checkNowTitleDisabled": "請先啟用漂移檢測"
+      "checkNowTitleDisabled": "請先啟用漂移檢測",
+      "enabledLabel": "漂移檢測"
     },
     "intervals": {
       "disabled": "已停用",
@@ -3268,6 +3271,20 @@
       "hint": "一次執行會取得此工作區的環境變數、敏感值、所有由 Vault 解析的密鑰，以及該工作的雲端身分。從 fork 發起拉取請求的人沒有寫入權限，也無法合併，因此推測性計畫是其程式碼接觸到這些憑證的唯一途徑。請只為沒有任何值得竊取之物的工作區開啟它 — 例如一個接受社群貢獻的公開模組儲存庫。來自儲存庫自身分支的拉取請求不受影響，始終會執行計畫。",
       "activeBadge": "已開啟",
       "confirmEnable": "要為從 fork 發起的拉取請求執行計畫嗎？其作者的程式碼將使用此工作區的憑證與已解密的變數執行，且無需任何人事先核准。"
+    },
+    "groups": {
+      "identity": "身分",
+      "execution": "執行",
+      "operations": "作業",
+      "ansible": "Ansible 設定",
+      "pools": "代理集區",
+      "vcs": "版本控制",
+      "governance": "漂移與計畫生命週期",
+      "ai": "AI 摘要",
+      "security": "安全掃描",
+      "metadata": "後設資料",
+      "cloudIdentity": "雲端身分",
+      "diagnostics": "診斷"
     }
   },
   "graphs": {

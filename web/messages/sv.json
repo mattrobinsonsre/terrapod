@@ -2684,7 +2684,9 @@
       "configureAfterApply": "Konfigurera efter tillämpning",
       "configureAfterApplyHint": "Varje tillämpning här följs av en konfigurering i samma körning, så även en tillämpning från CLI strömmar playbookens utdata. En förstörelse konfigurerar aldrig.",
       "configureAllHosts": "Konfigurera alla värdar",
-      "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet."
+      "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet.",
+      "eeCpuRequest": "Ansible CPU-begäran",
+      "eeMemoryRequest": "Ansible minnesbegäran"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -2724,7 +2726,8 @@
       "dismissTitle": "Rensa det rapporterade drifttillståndet. Nästa schemalagda kontroll återfyller det från verkligheten.",
       "lastChecked": "Senast kontrollerad",
       "checkNow": "Kontrollera nu",
-      "checkNowTitleDisabled": "Aktivera driftupptäckt först"
+      "checkNowTitleDisabled": "Aktivera driftupptäckt först",
+      "enabledLabel": "Driftupptäckt"
     },
     "intervals": {
       "disabled": "Inaktiverad",
@@ -3268,6 +3271,20 @@
       "hint": "En körning får den här arbetsytans miljövariabler, känsliga värden, alla hemligheter som hämtats via Vault och jobbets molnidentitet. Den som öppnar en pull request från en fork har ingen skrivbehörighet och kan inte merga, så en spekulativ plan är den enda vägen för deras kod till de här autentiseringsuppgifterna. Slå på detta för en arbetsyta som inte innehåller något värt att ta — till exempel ett publikt modulförråd som tar emot bidrag från communityn. Pull requests från grenar i själva förrådet påverkas inte och planeras alltid.",
       "activeBadge": "På",
       "confirmEnable": "Planera pull requests som öppnats från forkar? Deras författares kod körs med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler, utan att någon godkänner det först."
+    },
+    "groups": {
+      "identity": "Identitet",
+      "execution": "Körning",
+      "operations": "Operationer",
+      "ansible": "Ansible-konfiguration",
+      "pools": "Agentpooler",
+      "vcs": "Versionshantering",
+      "governance": "Drift och planens livscykel",
+      "ai": "AI-sammanfattning",
+      "security": "Säkerhetsskanning",
+      "metadata": "Metadata",
+      "cloudIdentity": "Molnidentitet",
+      "diagnostics": "Diagnostik"
     }
   },
   "graphs": {
