@@ -161,8 +161,6 @@ export default function BulkUpdatePage() {
   const [uDefaultPlaybook, setUDefaultPlaybook] = useState('')
   const [uSetDefaultLimit, setUSetDefaultLimit] = useState(false)
   const [uDefaultLimit, setUDefaultLimit] = useState('')
-  // A tri-state '' | 'true' | 'false', as terragrunt-enabled below.
-  const [uInventoryIncludePlatform, setUInventoryIncludePlatform] = useState('')
   const [uExecBackend, setUExecBackend] = useState('')
   const [uExecMode, setUExecMode] = useState('')
   // '' means "leave unchanged"; anything else is an auto-apply mode (#1276).
@@ -204,8 +202,6 @@ export default function BulkUpdatePage() {
   const [uInventoryPaths, setUInventoryPaths] = useState<string[]>([])
   const [uSetAnsibleCollections, setUSetAnsibleCollections] = useState(false)
   const [uAnsibleCollections, setUAnsibleCollections] = useState<string[]>([])
-  const [uSetInventoryIgnorePaths, setUSetInventoryIgnorePaths] = useState(false)
-  const [uInventoryIgnorePaths, setUInventoryIgnorePaths] = useState<string[]>([])
   // Only to tell the operator when the deployment publishes no issuer, so an
   // entry added here could never be minted for. No partition on this surface:
   // the value IS the override — unlike a workspace read, nothing is merged
@@ -297,8 +293,6 @@ export default function BulkUpdatePage() {
     if (uSetConfigDirectory) u['config-directory'] = uConfigDirectory.trim()
     if (uSetDefaultPlaybook) u['default-playbook'] = uDefaultPlaybook.trim()
     if (uSetDefaultLimit) u['default-limit'] = uDefaultLimit.trim()
-    if (uInventoryIncludePlatform)
-      u['inventory-include-platform'] = uInventoryIncludePlatform === 'true'
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
     // Send the mode, never the boolean — the endpoint 422s if both are set.
@@ -335,8 +329,6 @@ export default function BulkUpdatePage() {
       u['inventory-paths'] = uInventoryPaths.map((s) => s.trim()).filter(Boolean)
     if (uSetAnsibleCollections)
       u['ansible-collections'] = parseCollectionLines(uAnsibleCollections)
-    if (uSetInventoryIgnorePaths)
-      u['inventory-ignore-paths'] = uInventoryIgnorePaths.map((s) => s.trim()).filter(Boolean)
     // Blank audience rows are refused by the server rather than dropped, and
     // so is a provider whose list came out empty — removing the key is the way
     // to stop overriding one. An empty row left in the editor would otherwise
@@ -1182,25 +1174,6 @@ export default function BulkUpdatePage() {
                   </>
                 )}
               </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-inventory-include-platform">
-                  {tWs('fields.inventoryIncludePlatform')}
-                </label>
-                <select
-                  id="bu-inventory-include-platform"
-                  value={uInventoryIncludePlatform}
-                  onChange={(e) => setUInventoryIncludePlatform(e.target.value)}
-                  title={tWs('fields.inventoryIncludePlatformTitle')}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.inventoryIncludePlatformHint')}
-                </p>
-              </div>
             </div>
             <div className="mt-3">
               <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
@@ -1285,28 +1258,6 @@ export default function BulkUpdatePage() {
                   onChange={setUAnsibleCollections}
                   placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
                   addLabel={tWs('fields.ansibleCollectionsAdd')}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-              <input
-                type="checkbox"
-                checked={uSetInventoryIgnorePaths}
-                onChange={(e) => setUSetInventoryIgnorePaths(e.target.checked)}
-              />
-              {t('update.setInventoryIgnorePaths')}
-            </label>
-            {uSetInventoryIgnorePaths && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-400">{tWs('fields.inventoryIgnorePathsHint')}</p>
-                <StringListEditor
-                  values={uInventoryIgnorePaths}
-                  onChange={setUInventoryIgnorePaths}
-                  placeholder={tWs('fields.inventoryIgnorePathsPlaceholder')}
-                  addLabel={tWs('fields.inventoryIgnorePathsAdd')}
                 />
               </div>
             )}

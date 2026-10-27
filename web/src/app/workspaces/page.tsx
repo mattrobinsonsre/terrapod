@@ -268,12 +268,12 @@ function WorkspaceGroupRows({
  * renders a checkbox unchecked and a `<select>` showing its first option, so a
  * field whose column default is anything other than false/empty would have the
  * form STATE THE OPPOSITE of what it is about to create. The values below are
- * each read off `Workspace.__table__` — `plan-apply-enabled` and
- * `inventory-include-platform` default true, and every select here has a real
- * default — so the form shows what the API will store. Fields whose default is
- * false or empty are deliberately absent: `toAttributes` drops `undefined`, so
- * an untouched field is not sent at all and the API applies its own default,
- * which keeps the payload to what the operator actually saw.
+ * each read off `Workspace.__table__` — `plan-apply-enabled` defaults true, and
+ * every select here has a real default — so the form shows what the API will
+ * store. Fields whose default is false or empty are deliberately absent:
+ * `toAttributes` drops `undefined`, so an untouched field is not sent at all
+ * and the API applies its own default, which keeps the payload to what the
+ * operator actually saw.
  *
  * `engine` is a parameter because switching engine re-seeds the version: a
  * Pulumi workspace pins the 3.x Pulumi CLI where Terraform's are 1.x, so
@@ -295,8 +295,6 @@ function createDefaults(engine: string): Record<string, unknown> {
     'resource-memory': '2Gi',
     // operations — the one boolean pair whose defaults differ
     'plan-apply-enabled': true,
-    // ansible
-    'inventory-include-platform': true,
     // pools
     'agent-pool-ids': [],
     // vcs
@@ -1071,12 +1069,8 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.configureAllHostsHint'))
       case 'config-directory':
         return hintText(tDetail('fields.configDirectoryRootHint'))
-      case 'inventory-include-platform':
-        return hintText(tDetail('fields.inventoryIncludePlatformHint'))
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
-      case 'inventory-ignore-paths':
-        return hintText(tDetail('fields.inventoryIgnorePathsHint'))
       case 'ansible-collections':
         return hintText(tDetail('fields.ansibleCollectionsHint'))
       case 'agent-pool-ids':
@@ -1380,7 +1374,6 @@ function WorkspacesPageInner() {
           kind="text"
           placeholder={tDetail('fields.defaultLimitPlaceholder')}
         />
-        <Field attr="inventory-include-platform" ctx={createCtx} kind="checkbox" />
         <Field
           attr="inventory-paths"
           ctx={createCtx}
@@ -1391,19 +1384,6 @@ function WorkspacesPageInner() {
               onChange={(next) => setValue('inventory-paths', next)}
               placeholder={tDetail('fields.inventoryPathsPlaceholder')}
               addLabel={tDetail('fields.inventoryPathsAdd')}
-            />
-          }
-        />
-        <Field
-          attr="inventory-ignore-paths"
-          ctx={createCtx}
-          kind="list"
-          control={
-            <StringListEditor
-              values={listOf('inventory-ignore-paths')}
-              onChange={(next) => setValue('inventory-ignore-paths', next)}
-              placeholder={tDetail('fields.inventoryIgnorePathsPlaceholder')}
-              addLabel={tDetail('fields.inventoryIgnorePathsAdd')}
             />
           }
         />

@@ -120,8 +120,6 @@ interface WorkspaceAttrs {
   'inventory-paths'?: string[]
   'default-playbook'?: string
   'default-limit'?: string
-  'inventory-include-platform'?: boolean
-  'inventory-ignore-paths'?: string[]
   locked: boolean
   // Why the workspace is locked and who locked it (#1705). Null when unlocked,
   // and absent from an older API.
@@ -514,10 +512,6 @@ function WorkspaceDetailContent() {
   const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
-  // Matches the column default: the hosts and groups declared in Terrapod take
-  // part in resolution unless the workspace deliberately turns them off.
-  const [editInventoryIncludePlatform, setEditInventoryIncludePlatform] = useState(true)
-  const [editInventoryIgnorePaths, setEditInventoryIgnorePaths] = useState<string[]>([])
   const [editBindPlan, setEditBindPlan] = useState(false)
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -1382,8 +1376,6 @@ function WorkspaceDetailContent() {
     setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
-    setEditInventoryIncludePlatform(workspace.attributes['inventory-include-platform'] ?? true)
-    setEditInventoryIgnorePaths(workspace.attributes['inventory-ignore-paths'] || [])
     setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1473,8 +1465,6 @@ function WorkspaceDetailContent() {
               'inventory-paths': editInventoryPaths.filter((entry) => entry !== ''),
               'default-playbook': editDefaultPlaybook,
               'default-limit': editDefaultLimit,
-              'inventory-include-platform': editInventoryIncludePlatform,
-              'inventory-ignore-paths': editInventoryIgnorePaths.filter((entry) => entry !== ''),
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
@@ -2566,9 +2556,7 @@ function WorkspaceDetailContent() {
         'config-directory': editConfigDir,
         'default-playbook': editDefaultPlaybook,
         'default-limit': editDefaultLimit,
-        'inventory-include-platform': editInventoryIncludePlatform,
         'inventory-paths': editInventoryPaths,
-        'inventory-ignore-paths': editInventoryIgnorePaths,
         'agent-pool-ids': editPoolIds,
         'owner-email': editOwner,
         labels: editLabels,
@@ -2591,10 +2579,8 @@ function WorkspaceDetailContent() {
     'configure-enabled': 'fields.configureEnabledHint',
     'configure-after-apply': 'fields.configureAfterApplyHint',
     'configure-all-hosts': 'fields.configureAllHostsHint',
-    'inventory-include-platform': 'fields.inventoryIncludePlatformHint',
     'config-directory': 'fields.configDirectoryRootHint',
     'inventory-paths': 'fields.inventoryPathsHint',
-    'inventory-ignore-paths': 'fields.inventoryIgnorePathsHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
     'oidc-audiences': 'fields.oidcAudiencesHint',
@@ -2615,9 +2601,9 @@ function WorkspaceDetailContent() {
       )
     }
     const key = SETTINGS_HINTS[attr]
-    // Hints that only make sense beside a control, which is where the old
-    // markup put them too — a read view that repeated them would be noise.
-    const editOnly = attr === 'config-directory' || attr === 'inventory-include-platform'
+    // A hint that only makes sense beside a control, which is where the old
+    // markup put it too — a read view that repeated it would be noise.
+    const editOnly = attr === 'config-directory'
     if (!key || (editOnly && !settingsEditing)) return null
     return <p className="mt-1 text-xs text-slate-400">{t(key)}</p>
   }
@@ -2652,9 +2638,7 @@ function WorkspaceDetailContent() {
     'config-directory': (v) => setEditConfigDir(String(v)),
     'default-playbook': (v) => setEditDefaultPlaybook(String(v)),
     'default-limit': (v) => setEditDefaultLimit(String(v)),
-    'inventory-include-platform': (v) => setEditInventoryIncludePlatform(Boolean(v)),
     'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
-    'inventory-ignore-paths': (v) => setEditInventoryIgnorePaths(v as string[]),
     'agent-pool-ids': (v) => setEditPoolIds(v as string[]),
     'owner-email': (v) => setEditOwner(String(v)),
     labels: (v) => setEditLabels(v as Record<string, string>),
@@ -3443,13 +3427,6 @@ function WorkspaceDetailContent() {
                     }
                   />
                   <Field
-                    attr="inventory-include-platform"
-                    ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('inventory-include-platform', true)}
-                    control={settingsToggle('inventory-include-platform')}
-                  />
-                  <Field
                     attr="default-playbook"
                     ctx={ansibleCtx}
                     kind="text"
@@ -3532,39 +3509,6 @@ function WorkspaceDetailContent() {
                               </li>
                             ))}
                           </ol>
-                        ) : (
-                          <span className="text-slate-500">{t('common.none')}</span>
-                        )}
-                      </dd>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2 min-w-0">
-                    <dt className="text-xs text-slate-500">{t('fields.inventoryIgnorePaths')}</dt>
-                    {settingsEditing ? (
-                      <dd className="mt-1 space-y-2">
-                        <p className="text-xs text-slate-400">
-                          {t('fields.inventoryIgnorePathsHint')}
-                        </p>
-                        <StringListEditor
-                          values={editInventoryIgnorePaths}
-                          onChange={setEditInventoryIgnorePaths}
-                          placeholder={t('fields.inventoryIgnorePathsPlaceholder')}
-                          addLabel={t('fields.inventoryIgnorePathsAdd')}
-                        />
-                      </dd>
-                    ) : (
-                      <dd className="mt-1 text-sm text-slate-200">
-                        {(attrs['inventory-ignore-paths'] || []).length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {(attrs['inventory-ignore-paths'] || []).map((path) => (
-                              <code
-                                key={path}
-                                className="bg-slate-700 px-2 py-0.5 rounded text-xs"
-                              >
-                                {path}
-                              </code>
-                            ))}
-                          </div>
                         ) : (
                           <span className="text-slate-500">{t('common.none')}</span>
                         )}

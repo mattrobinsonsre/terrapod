@@ -67,8 +67,6 @@ interface AutodiscoveryRule {
     'inventory-paths'?: string[]
     'default-playbook'?: string
     'default-limit'?: string
-    'inventory-include-platform'?: boolean
-    'inventory-ignore-paths'?: string[]
     'resource-cpu': string
     parallelism: number
     'resource-memory': string
@@ -190,10 +188,6 @@ export default function AutodiscoveryPage() {
   const [inventoryPaths, setInventoryPaths] = useState<string[]>([])
   const [defaultPlaybook, setDefaultPlaybook] = useState('')
   const [defaultLimit, setDefaultLimit] = useState('')
-  // Matches the column default: the rows declared in Terrapod take part in
-  // resolution unless a rule deliberately turns them off.
-  const [inventoryIncludePlatform, setInventoryIncludePlatform] = useState(true)
-  const [inventoryIgnorePaths, setInventoryIgnorePaths] = useState<string[]>([])
   const [resourceCpu, setResourceCpu] = useState('1')
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
@@ -336,8 +330,6 @@ export default function AutodiscoveryPage() {
     setInventoryPaths([])
     setDefaultPlaybook('')
     setDefaultLimit('')
-    setInventoryIncludePlatform(true)
-    setInventoryIgnorePaths([])
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setAutoApplyMode('never')
@@ -405,8 +397,6 @@ export default function AutodiscoveryPage() {
     setInventoryPaths(a['inventory-paths'] || [])
     setDefaultPlaybook(a['default-playbook'] || '')
     setDefaultLimit(a['default-limit'] || '')
-    setInventoryIncludePlatform(a['inventory-include-platform'] ?? true)
-    setInventoryIgnorePaths(a['inventory-ignore-paths'] || [])
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
     setEngine(a.engine || 'terraform')
@@ -487,8 +477,6 @@ export default function AutodiscoveryPage() {
       'inventory-paths': inventoryPaths.map(s => s.trim()).filter(Boolean),
       'default-playbook': defaultPlaybook.trim(),
       'default-limit': defaultLimit.trim(),
-      'inventory-include-platform': inventoryIncludePlatform,
-      'inventory-ignore-paths': inventoryIgnorePaths.map(s => s.trim()).filter(Boolean),
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
       engine,
@@ -1071,8 +1059,8 @@ export default function AutodiscoveryPage() {
                   are only where that operation runs.
 
                   Yes/no selects rather than checkboxes, matching every other
-                  boolean on this form — `inventory-include-platform` below is
-                  the immediate sibling. */}
+                  boolean on this form — `pulumi-bind-plan` above is the
+                  nearest sibling. */}
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">{tWs('fields.operations')}</label>
                 <p className="text-xs text-slate-500 mb-2">{tWs('fields.operationsHint')}</p>
@@ -1203,24 +1191,6 @@ export default function AutodiscoveryPage() {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <label htmlFor="ad-inventory-include-platform" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.inventoryIncludePlatform')}
-                    </label>
-                    <select
-                      id="ad-inventory-include-platform"
-                      value={inventoryIncludePlatform ? 'true' : 'false'}
-                      onChange={e => setInventoryIncludePlatform(e.target.value === 'true')}
-                      title={tWs('fields.inventoryIncludePlatformTitle')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.inventoryIncludePlatformHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
                     <label htmlFor="ad-default-playbook" className="block text-xs text-slate-500 mb-1">
                       {tWs('fields.defaultPlaybook')}
                     </label>
@@ -1271,20 +1241,6 @@ export default function AutodiscoveryPage() {
                     onChange={setAnsibleCollections}
                     placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
                     addLabel={tWs('fields.ansibleCollectionsAdd')}
-                  />
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs text-slate-500 mb-1">
-                    {tWs('fields.inventoryIgnorePaths')}
-                  </label>
-                  <p className="text-xs text-slate-500 mb-2">
-                    {tWs('fields.inventoryIgnorePathsHint')}
-                  </p>
-                  <StringListEditor
-                    values={inventoryIgnorePaths}
-                    onChange={setInventoryIgnorePaths}
-                    placeholder={tWs('fields.inventoryIgnorePathsPlaceholder')}
-                    addLabel={tWs('fields.inventoryIgnorePathsAdd')}
                   />
                 </div>
               </div>
