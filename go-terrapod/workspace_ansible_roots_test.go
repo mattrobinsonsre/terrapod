@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// The two operation declarations a workspace carries (#1966) and the six
+// The two operation declarations a workspace carries (#1966) and the four
 // ansible roots and run defaults beside them (#1929): plan-apply-enabled,
-// configure-enabled, config-directory, inventory-paths, default-playbook,
-// default-limit, inventory-include-platform and inventory-ignore-paths.
+// configure-enabled, config-directory, inventory-paths, default-playbook and
+// default-limit.
 //
 // The reflective gates in wire_completeness_test.go already prove each of the
-// eight reaches the wire and decodes. They cannot see the three properties
+// six reaches the wire and decodes. They cannot see the two properties
 // below, each of which is a RELATIONSHIP between two values rather than the
 // presence of one -- and each of which corrupts data rather than merely
 // losing it:
@@ -33,11 +33,7 @@ import (
 //     update request still takes a pointer, to tell "leave it alone" from "set
 //     it to the root".
 //
-//  2. `inventory-include-platform` DEFAULTS TO TRUE, so an absent key is not
-//     false. `IsZero()` on a bool that defaults to true is false either way,
-//     so the decode gate passes whether or not the line exists.
-//
-//  3. An empty non-nil slice must travel as `[]`, because that is the only
+//  2. An empty non-nil slice must travel as `[]`, because that is the only
 //     request that removes every inventory path. A nil slice must not travel
 //     at all, or a PATCH overwrites a list the caller never mentioned.
 
@@ -194,53 +190,13 @@ func TestUpdateOmitsConfigDirectoryWhenNeitherIsSet(t *testing.T) {
 	}
 }
 
-// ── 2. inventory-include-platform defaults to TRUE ───────────────────────────
-
-func TestIncludePlatformAbsentReadsAsTrueAndFalseReadsAsFalse(t *testing.T) {
-	// Both halves matter. Absent-as-false would report the declared rows as
-	// excluded on every workspace of a server predating #1929 (and on every
-	// workspace read through /api/tfe/v2, which drops all six). An explicit
-	// false read as true would hide the setting being switched off.
-	absent := workspaceFromResource(&Resource{
-		ID: "ws-1", Type: "workspaces",
-		Attributes: map[string]json.RawMessage{"name": json.RawMessage(`"api"`)},
-	})
-	if !absent.InventoryIncludePlatform {
-		t.Error("an absent inventory-include-platform read as false; the column " +
-			"defaults to true, so this reports the declared rows as excluded")
-	}
-
-	off := workspaceFromResource(&Resource{
-		ID: "ws-1", Type: "workspaces",
-		Attributes: map[string]json.RawMessage{
-			"name":                       json.RawMessage(`"api"`),
-			"inventory-include-platform": json.RawMessage(`false`),
-		},
-	})
-	if off.InventoryIncludePlatform {
-		t.Error("an explicit false read as true — a workspace resolving its git " +
-			"source alone would report its declared rows as contributing")
-	}
-}
-
-func TestUpdateSendsIncludePlatformFalse(t *testing.T) {
-	// The *bool exists for this case: a plain bool would drop false and
-	// "resolve the git source alone" would be a silent no-op.
-	off := false
-	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{InventoryIncludePlatform: &off})
-	if got, ok := attrs["inventory-include-platform"]; !ok || got != false {
-		t.Errorf("update dropped inventory-include-platform=false (got %v, present=%v)", got, ok)
-	}
-}
-
-// ── 3. nil omits, empty non-nil clears ──────────────────────────────────────
+// ── 2. nil omits, empty non-nil clears ──────────────────────────────────────
 
 func TestEmptySlicesTravelSoEveryPathCanBeRemoved(t *testing.T) {
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{
-		InventoryPaths:       []string{},
-		InventoryIgnorePaths: []string{},
+		InventoryPaths: []string{},
 	})
-	for _, key := range []string{"inventory-paths", "inventory-ignore-paths"} {
+	for _, key := range []string{"inventory-paths"} {
 		got, ok := attrs[key]
 		if !ok {
 			t.Errorf("update dropped an explicit empty %s — the one request that "+
@@ -267,8 +223,7 @@ func TestEmptySlicesTravelSoEveryPathCanBeRemoved(t *testing.T) {
 func TestNilSlicesAndPointersAreOmittedSoPatchLeavesThemAlone(t *testing.T) {
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{Name: "api"})
 	for _, key := range []string{
-		"inventory-paths", "inventory-ignore-paths",
-		"default-playbook", "default-limit", "inventory-include-platform",
+		"inventory-paths", "default-playbook", "default-limit",
 	} {
 		if _, present := attrs[key]; present {
 			t.Errorf("update sent %q when the caller set nothing — PATCH would "+
@@ -298,24 +253,19 @@ func TestCreateWorkspaceWithAnsibleRoots_Happy(t *testing.T) {
 	f := newWorkspaceFixtureServer(t)
 	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "configure-only", map[string]any{
-			"config-directory":           "ansible",
-			"inventory-paths":            []string{"inventory/production", "inventory/extra.yml"},
-			"default-playbook":           "site.yml",
-			"default-limit":              "web",
-			"inventory-include-platform": false,
-			"inventory-ignore-paths":     []string{"archive/"},
+			"config-directory": "ansible",
+			"inventory-paths":  []string{"inventory/production", "inventory/extra.yml"},
+			"default-playbook": "site.yml",
+			"default-limit":    "web",
 		})))
 	}
 	c := f.client()
-	off := false
 	ws, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
-		Name:                     "configure-only",
-		ConfigDirectory:          "ansible",
-		InventoryPaths:           []string{"inventory/production", "inventory/extra.yml"},
-		DefaultPlaybook:          "site.yml",
-		DefaultLimit:             "web",
-		InventoryIncludePlatform: &off,
-		InventoryIgnorePaths:     []string{"archive/"},
+		Name:            "configure-only",
+		ConfigDirectory: "ansible",
+		InventoryPaths:  []string{"inventory/production", "inventory/extra.yml"},
+		DefaultPlaybook: "site.yml",
+		DefaultLimit:    "web",
 	})
 	if err != nil {
 		t.Fatalf("CreateWorkspace: %v", err)
@@ -331,14 +281,7 @@ func TestCreateWorkspaceWithAnsibleRoots_Happy(t *testing.T) {
 	if ws.DefaultPlaybook != "site.yml" || ws.DefaultLimit != "web" {
 		t.Errorf("defaults: playbook=%q limit=%q", ws.DefaultPlaybook, ws.DefaultLimit)
 	}
-	if ws.InventoryIncludePlatform {
-		t.Error("InventoryIncludePlatform decoded as true from an explicit false")
-	}
-	if len(ws.InventoryIgnorePaths) != 1 || ws.InventoryIgnorePaths[0] != "archive/" {
-		t.Errorf("InventoryIgnorePaths = %v", ws.InventoryIgnorePaths)
-	}
-
-	// Write side: every one of the six is in the body the server received.
+	// Write side: every one of the four is in the body the server received.
 	var sent struct {
 		Data struct {
 			Attributes map[string]any `json:"attributes"`
@@ -349,7 +292,7 @@ func TestCreateWorkspaceWithAnsibleRoots_Happy(t *testing.T) {
 	}
 	for _, key := range []string{
 		"config-directory", "inventory-paths", "default-playbook",
-		"default-limit", "inventory-include-platform", "inventory-ignore-paths",
+		"default-limit",
 	} {
 		if _, present := sent.Data.Attributes[key]; !present {
 			t.Errorf("create body dropped %q: %s", key, f.lastBody)

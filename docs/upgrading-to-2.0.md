@@ -954,16 +954,3 @@ own EE images do), or by adding one to the image you have.
 probe, ahead of the binary checks, so a non-conforming image fails at pod start naming the
 uid — rather than part way through a playbook on a file it cannot read, which is where the
 older, looser contract would have sent you.
-
-## Before you upgrade
-
-1. Read the sections above and make the edits they name.
-2. Run `terraform plan` (or `tofu plan`) against your Terrapod-managing
-   configuration and confirm it is empty. A non-empty plan after a type-only edit
-   means a value changed as well as its shape — check it before applying.
-3. Upgrade the chart. Runner and listener images within the
-   [supported skew window](versioning-and-support.md#component-version-skew)
-   continue to work — **provided they are new enough to call `/api/v1`**. The
-   alias they used before is removed in 2.0, so an image predating the minor
-   that moved them cannot talk to a 2.0 API however recent it otherwise is. See
-   "The `/api/terrapod/v1` alias is removed" above.

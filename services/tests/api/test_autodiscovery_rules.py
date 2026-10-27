@@ -65,8 +65,6 @@ def _mock_rule(
     r.inventory_paths = []
     r.default_playbook = ""
     r.default_limit = ""
-    r.inventory_include_platform = True
-    r.inventory_ignore_paths = []
     r.resource_cpu = "1"
     r.parallelism = 10
     r.resource_memory = "2Gi"

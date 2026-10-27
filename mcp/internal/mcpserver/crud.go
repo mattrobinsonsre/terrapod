@@ -81,15 +81,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// means the configuration version's root, so on CREATE "" and omitted
 		// mean the same thing and there is no third state left to express
 		// (#1966). The declaration lives in ConfigureEnabled above.
-		AutoConfigureEnabled     *bool    `json:"auto_configure_enabled,omitempty" jsonschema:"whether a PUSH that changes this workspace's ansible config root queues a configure. DEFAULTS TO FALSE. It runs the workspace's default_playbook against its default_limit, because a push carries no run options -- which is also what BOUNDS it: a workspace whose default_limit names a canary group cannot be made to fire wider by a git push. Needs configure_enabled; without it this is inert"`
-		ConfigureAllHosts        *bool    `json:"configure_all_hosts,omitempty" jsonschema:"whether a DERIVED configure -- one an inventory change or an apply produced, rather than one somebody asked for with a limit -- targets EVERY host rather than only the hosts that changed. DEFAULTS TO FALSE, which narrows. Narrowing is conditioned on what justifies breadth: new playbook or role code has to reach every host, while a changed HOST is no reason to touch the others, so a derived configure narrows when the ansible code under config_directory is unchanged since the last successful configure and goes wide when it moved. This flag is the override and it WIDENS -- a flag someone forgets leaves you configuring more, not less. It does not affect a configure you create with an explicit limit, which targets what you asked for"`
-		ConfigureAfterApply      *bool    `json:"configure_after_apply,omitempty" jsonschema:"whether an APPLY on this workspace is followed by a configure ON THE SAME RUN. DEFAULTS TO FALSE. It is a workspace setting rather than a per-run option because the terraform/tofu CLI cannot pass one, and keeping the configure attached to the run means a remote execution keeps streaming its logs. The host set still comes from the inventory and the limit from default_limit -- the apply decides only WHEN. A DESTROY apply never chains one. Needs configure_enabled"`
-		ConfigDirectory          string   `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
-		InventoryPaths           []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
-		DefaultPlaybook          string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
-		DefaultLimit             string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
-		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
-		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one"`
+		AutoConfigureEnabled *bool    `json:"auto_configure_enabled,omitempty" jsonschema:"whether a PUSH that changes this workspace's ansible config root queues a configure. DEFAULTS TO FALSE. It runs the workspace's default_playbook against its default_limit, because a push carries no run options -- which is also what BOUNDS it: a workspace whose default_limit names a canary group cannot be made to fire wider by a git push. Needs configure_enabled; without it this is inert"`
+		ConfigureAllHosts    *bool    `json:"configure_all_hosts,omitempty" jsonschema:"whether a DERIVED configure -- one an inventory change or an apply produced, rather than one somebody asked for with a limit -- targets EVERY host rather than only the hosts that changed. DEFAULTS TO FALSE, which narrows. Narrowing is conditioned on what justifies breadth: new playbook or role code has to reach every host, while a changed HOST is no reason to touch the others, so a derived configure narrows when the ansible code under config_directory is unchanged since the last successful configure and goes wide when it moved. This flag is the override and it WIDENS -- a flag someone forgets leaves you configuring more, not less. It does not affect a configure you create with an explicit limit, which targets what you asked for"`
+		ConfigureAfterApply  *bool    `json:"configure_after_apply,omitempty" jsonschema:"whether an APPLY on this workspace is followed by a configure ON THE SAME RUN. DEFAULTS TO FALSE. It is a workspace setting rather than a per-run option because the terraform/tofu CLI cannot pass one, and keeping the configure attached to the run means a remote execution keeps streaming its logs. The host set still comes from the inventory and the limit from default_limit -- the apply decides only WHEN. A DESTROY apply never chains one. Needs configure_enabled"`
+		ConfigDirectory      string   `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
+		InventoryPaths       []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
+		DefaultPlaybook      string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
+		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_create",
@@ -150,16 +148,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AutoConfigureEnabled: in.AutoConfigureEnabled,
 			ConfigureAfterApply:  in.ConfigureAfterApply,
 			ConfigureAllHosts:    in.ConfigureAllHosts,
-			// #1929's six. ConfigDirectory is an ordinary path now, so "" and
+			// #1929's four. ConfigDirectory is an ordinary path now, so "" and
 			// omitted mean the same thing on create and a plain string is the
 			// honest type; the SDK drops an empty one, which costs nothing
 			// because "" is also the server's default (#1966).
-			ConfigDirectory:          in.ConfigDirectory,
-			InventoryPaths:           in.InventoryPaths,
-			DefaultPlaybook:          in.DefaultPlaybook,
-			DefaultLimit:             in.DefaultLimit,
-			InventoryIncludePlatform: in.InventoryIncludePlatform,
-			InventoryIgnorePaths:     in.InventoryIgnorePaths,
+			ConfigDirectory: in.ConfigDirectory,
+			InventoryPaths:  in.InventoryPaths,
+			DefaultPlaybook: in.DefaultPlaybook,
+			DefaultLimit:    in.DefaultLimit,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
@@ -204,12 +200,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// configuration version's root", and on a workspace rooted at
 		// `ansible` those are different requests. It no longer carries a
 		// third state -- turning the operation off is ConfigureEnabled.
-		ConfigDirectory          *string  `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
-		InventoryPaths           []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
-		DefaultPlaybook          *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
-		DefaultLimit             *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
-		InventoryIncludePlatform *bool    `json:"inventory_include_platform,omitempty" jsonschema:"whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part"`
-		InventoryIgnorePaths     []string `json:"inventory_ignore_paths,omitempty" jsonschema:"paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone"`
+		ConfigDirectory *string  `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
+		InventoryPaths  []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
+		DefaultPlaybook *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
+		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		// Resource sizing (#2154). Absent from this tool until #2154, so an
 		// agent could read a workspace's sizing with terrapod_workspace_get and
 		// not change it. That asymmetry is now closed for everything except
@@ -280,7 +274,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Description: "Update a workspace's settings. Only the fields you pass change; omitted fields are left alone. " +
 			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run. " +
 			"Which OPERATIONS the workspace has lives here as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle) and configure_enabled (the ansible configure operation). configure_enabled=false is how you turn a configure operation off, and it leaves config_directory where it is so re-enabling resumes in the same directory; turning BOTH off is refused (422) against the resulting row. " +
-			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit, inventory_include_platform, inventory_ignore_paths) — there is no separate inventory-settings object to configure.",
+			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit) — there is no separate inventory-settings object to configure.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceUpdateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.WorkspaceID == "" {
@@ -317,16 +311,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AutoConfigureEnabled: in.AutoConfigureEnabled,
 			ConfigureAfterApply:  in.ConfigureAfterApply,
 			ConfigureAllHosts:    in.ConfigureAllHosts,
-			// #1929's six. ConfigDirectory keeps its pointer so "leave the
+			// #1929's four. ConfigDirectory keeps its pointer so "leave the
 			// stored root alone" stays distinguishable from "move it to the
 			// configuration version's root"; a nil sends nothing, which is
 			// what makes turning the operation off leave the path untouched.
-			ConfigDirectory:          in.ConfigDirectory,
-			InventoryPaths:           in.InventoryPaths,
-			DefaultPlaybook:          in.DefaultPlaybook,
-			DefaultLimit:             in.DefaultLimit,
-			InventoryIncludePlatform: in.InventoryIncludePlatform,
-			InventoryIgnorePaths:     in.InventoryIgnorePaths,
+			ConfigDirectory: in.ConfigDirectory,
+			InventoryPaths:  in.InventoryPaths,
+			DefaultPlaybook: in.DefaultPlaybook,
+			DefaultLimit:    in.DefaultLimit,
 			// #2154's two pairs. Plain strings, so the SDK's own `!= ""` guards
 			// decide what reaches the wire -- which means an empty value cannot
 			// be SENT, and clearing an EE size back to the deployment default is

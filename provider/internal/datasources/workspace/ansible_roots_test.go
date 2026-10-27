@@ -116,52 +116,15 @@ func TestDataSourceReadsTheOperationsWithTheirOwnDefaults(t *testing.T) {
 	}
 }
 
-func TestDataSourceReadsIncludePlatformAbsentAsTrue(t *testing.T) {
-	// The column defaults to TRUE, so a plain GetBoolAttr -- which answers
-	// false for an absent key -- reports the declared rows as excluded on
-	// every workspace of a server predating #1929, and on every workspace read
-	// through /api/tfe/v2, which drops all six attributes. Both directions are
-	// asserted: absent must be true, and an explicit false must stay false.
-	ctx := context.Background()
-
-	cases := []struct {
-		name  string
-		attrs map[string]any
-		want  bool
-	}{
-		{"absent is true", map[string]any{"name": "api"}, true},
-		{"explicit true", map[string]any{"name": "api", "inventory-include-platform": true}, true},
-		{"explicit false", map[string]any{"name": "api", "inventory-include-platform": false}, false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var m workspaceDataSourceModel
-			res := wsResource(t, tc.attrs)
-			if diags := readDataSourceModel(ctx, res, &m); diags.HasError() {
-				t.Fatalf("read: %v", diags)
-			}
-			if m.InventoryIncludePlatform.IsNull() || m.InventoryIncludePlatform.IsUnknown() {
-				t.Fatalf("inventory_include_platform read back as %v, want a concrete value",
-					m.InventoryIncludePlatform)
-			}
-			if got := m.InventoryIncludePlatform.ValueBool(); got != tc.want {
-				t.Errorf("inventory_include_platform = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 	ctx := context.Background()
 
 	var m workspaceDataSourceModel
 	res := wsResource(t, map[string]any{
-		"name":                   "configure-only",
-		"inventory-paths":        []string{"inventory/production", "inventory/extra.yml"},
-		"default-playbook":       "site.yml",
-		"default-limit":          "web",
-		"inventory-ignore-paths": []string{"archive/"},
+		"name":             "configure-only",
+		"inventory-paths":  []string{"inventory/production", "inventory/extra.yml"},
+		"default-playbook": "site.yml",
+		"default-limit":    "web",
 	})
 	if diags := readDataSourceModel(ctx, res, &m); diags.HasError() {
 		t.Fatalf("read: %v", diags)
@@ -177,11 +140,6 @@ func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 	if m.DefaultLimit.ValueString() != "web" {
 		t.Errorf("default_limit = %q", m.DefaultLimit.ValueString())
 	}
-	ig := m.InventoryIgnorePaths.Elements()
-	if len(ig) != 1 || ig[0].(types.String).ValueString() != "archive/" {
-		t.Errorf("inventory_ignore_paths = %v", ig)
-	}
-
 	// Empty reads as null for the two strings, so a workspace declaring no
 	// default stays out of a consumer's comparisons. `config_directory` is
 	// deliberately NOT in this set any more -- see its own test above.
@@ -193,8 +151,7 @@ func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 		t.Errorf("absent defaults read back as playbook=%v limit=%v, want null",
 			m2.DefaultPlaybook, m2.DefaultLimit)
 	}
-	if !m2.InventoryPaths.IsNull() || !m2.InventoryIgnorePaths.IsNull() {
-		t.Errorf("absent lists read back as paths=%v ignore=%v, want null",
-			m2.InventoryPaths, m2.InventoryIgnorePaths)
+	if !m2.InventoryPaths.IsNull() {
+		t.Errorf("absent inventory_paths read back as %v, want null", m2.InventoryPaths)
 	}
 }

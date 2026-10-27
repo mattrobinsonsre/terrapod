@@ -90,7 +90,7 @@ func TestEverySurfaceTakingAWorkspaceIDDefaultsIt(t *testing.T) {
 	// matching nothing and passing. 14 when written: 11 resources (the 7 that
 	// already took a workspace id, plus the 4 inventory ones) and 3 data
 	// sources. Now 13: terrapod_inventory_settings was one of those four and
-	// is gone (#1929) -- its six fields are workspace columns, so the roots
+	// is gone (#1929) -- its fields became workspace columns, so the roots
 	// are set on terrapod_workspace itself and there is no separate resource
 	// to default a workspace id on. Derived by the test itself, so re-count
 	// from its own log line rather than from this comment if it ever trips.

@@ -237,10 +237,6 @@ def _validate_inventory_paths(raw: object) -> list[str]:
     return _422(workspace_settings.validate_inventory_paths, raw)
 
 
-def _validate_inventory_ignore_paths(raw: object) -> list[str]:
-    return _422(workspace_settings.validate_inventory_ignore_paths, raw)
-
-
 def _validate_drift_ignore_rules(raw: object) -> list[str]:
     return _422(workspace_settings.validate_drift_ignore_rules, raw)
 
@@ -794,8 +790,6 @@ def _workspace_json(
                 "inventory-paths": list(ws.inventory_paths or []),
                 "default-playbook": ws.default_playbook,
                 "default-limit": ws.default_limit,
-                "inventory-include-platform": ws.inventory_include_platform,
-                "inventory-ignore-paths": list(ws.inventory_ignore_paths or []),
                 # One version, two spellings (#1559). `engine-version` is the
                 # canonical one now that the column pins whichever engine the
                 # workspace runs. `terraform-version` is not deprecated and is
@@ -1018,8 +1012,6 @@ def _workspace_json(
             "inventory-paths",
             "default-playbook",
             "default-limit",
-            "inventory-include-platform",
-            "inventory-ignore-paths",
         ):
             payload["data"]["attributes"].pop(_native_only, None)
     return payload
@@ -1688,14 +1680,6 @@ async def _create_workspace_impl(
             workspace_settings.validate_ansible_run_default,
             attrs.get("default-limit"),
             "default-limit",
-        ),
-        inventory_include_platform=_422(
-            workspace_settings.validate_bool,
-            attrs.get("inventory-include-platform", True),
-            "inventory-include-platform",
-        ),
-        inventory_ignore_paths=_validate_inventory_ignore_paths(
-            attrs.get("inventory-ignore-paths")
         ),
         # All four resource requests go through one rule (#2154). The
         # orchestrator's two were accepted unvalidated, so "half a cpu" stored
@@ -2485,16 +2469,6 @@ async def update_workspace(
             workspace_settings.validate_ansible_run_default,
             attrs["default-limit"],
             "default-limit",
-        )
-    if "inventory-include-platform" in attrs:
-        ws.inventory_include_platform = _422(
-            workspace_settings.validate_bool,
-            attrs["inventory-include-platform"],
-            "inventory-include-platform",
-        )
-    if "inventory-ignore-paths" in attrs:
-        ws.inventory_ignore_paths = _validate_inventory_ignore_paths(
-            attrs["inventory-ignore-paths"]
         )
     if "parallelism" in attrs:
         ws.parallelism = _validate_parallelism(attrs["parallelism"])

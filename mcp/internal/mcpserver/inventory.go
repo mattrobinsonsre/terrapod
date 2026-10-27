@@ -36,11 +36,11 @@ import (
 //
 // There was once a `terrapod_inventory_settings` pair of tools over a 1:1 row
 // carrying its own VCS binding. That row is gone: the config directory, the
-// inventory paths, the run defaults and the include-platform switch are
-// WORKSPACE fields, read with `terrapod_workspace_get` and set with
-// `terrapod_workspace_update`, and the workspace's own `vcs_*` settings are the
-// single VCS binding. The tools here declare the rows that are merged with
-// that source; they do not configure where it is.
+// inventory paths and the run defaults are WORKSPACE fields, read with
+// `terrapod_workspace_get` and set with `terrapod_workspace_update`, and the
+// workspace's own `vcs_*` settings are the single VCS binding. The tools here
+// declare the rows that are merged with that source; they do not configure
+// where it is.
 //
 // Whether a workspace has an ansible inventory at all is `configure_enabled`
 // (#1966), which is a workspace field beside them — NOT an empty

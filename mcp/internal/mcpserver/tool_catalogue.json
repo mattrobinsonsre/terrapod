@@ -1331,23 +1331,6 @@
           "description": "local or agent (default: server default)",
           "type": "string"
         },
-        "inventory_ignore_paths": {
-          "description": "paths excluded from the inventory resolution. Pass an empty list to remove every one",
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "inventory_include_platform": {
-          "description": "whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part",
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
         "inventory_paths": {
           "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source",
           "items": {
@@ -1662,23 +1645,6 @@
         "execution_mode": {
           "description": "local or agent",
           "type": "string"
-        },
-        "inventory_ignore_paths": {
-          "description": "paths excluded from the inventory resolution. Pass an empty list to remove every one. Omitting the field leaves the stored list alone",
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "inventory_include_platform": {
-          "description": "whether the inventory rows declared through Terrapod (the terrapod_inventory_* tools) contribute to the resolved inventory. DEFAULTS TO TRUE, so passing false is a real change: it resolves the git source in inventory_paths alone and the declared hosts and groups stop taking part",
-          "type": [
-            "null",
-            "boolean"
-          ]
         },
         "inventory_paths": {
           "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone",

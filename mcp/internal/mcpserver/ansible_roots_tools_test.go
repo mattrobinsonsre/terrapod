@@ -56,20 +56,17 @@ func TestWorkspaceCreateSendsEveryAnsibleRoot(t *testing.T) {
 	})
 
 	callTool(t, sess, "terrapod_workspace_create", map[string]any{
-		"name":                       "configure-only",
-		"config_directory":           "ansible",
-		"inventory_paths":            []any{"inventory/production", "inventory/extra.yml"},
-		"default_playbook":           "site.yml",
-		"default_limit":              "web",
-		"inventory_include_platform": false,
-		"inventory_ignore_paths":     []any{"archive/"},
+		"name":             "configure-only",
+		"config_directory": "ansible",
+		"inventory_paths":  []any{"inventory/production", "inventory/extra.yml"},
+		"default_playbook": "site.yml",
+		"default_limit":    "web",
 	})
 
 	for key, want := range map[string]any{
-		"config-directory":           "ansible",
-		"default-playbook":           "site.yml",
-		"default-limit":              "web",
-		"inventory-include-platform": false,
+		"config-directory": "ansible",
+		"default-playbook": "site.yml",
+		"default-limit":    "web",
 	} {
 		got, sent := attrs[key]
 		if !sent {
@@ -89,9 +86,6 @@ func TestWorkspaceCreateSendsEveryAnsibleRoot(t *testing.T) {
 	}
 	if len(paths) != 2 || paths[0] != "inventory/production" || paths[1] != "inventory/extra.yml" {
 		t.Errorf("create sent inventory-paths = %v — the order IS the precedence", paths)
-	}
-	if ig, ok := attrs["inventory-ignore-paths"].([]any); !ok || len(ig) != 1 {
-		t.Errorf("create sent inventory-ignore-paths = %#v", attrs["inventory-ignore-paths"])
 	}
 }
 
@@ -190,7 +184,6 @@ func TestWorkspaceCreateOmitsAnUnsetConfigDirectory(t *testing.T) {
 	}
 	for _, key := range []string{
 		"inventory-paths", "default-playbook", "default-limit",
-		"inventory-include-platform", "inventory-ignore-paths",
 	} {
 		if _, sent := attrs[key]; sent {
 			t.Errorf("an unset %s was still sent: %#v", key, attrs[key])
@@ -212,17 +205,14 @@ func TestWorkspaceUpdateSendsEveryAnsibleRoot(t *testing.T) {
 		// Empty strings, because clearing is the direction that a plain
 		// `!= ""` guard would drop: "stop defaulting to a playbook" and
 		// "widen the run back to the whole inventory" are both expressed by "".
-		"default_playbook":           "",
-		"default_limit":              "",
-		"inventory_include_platform": false,
-		"inventory_ignore_paths":     []any{},
+		"default_playbook": "",
+		"default_limit":    "",
 	})
 
 	for key, want := range map[string]any{
-		"config-directory":           "ansible",
-		"default-playbook":           "",
-		"default-limit":              "",
-		"inventory-include-platform": false,
+		"config-directory": "ansible",
+		"default-playbook": "",
+		"default-limit":    "",
 	} {
 		got, sent := attrs[key]
 		if !sent {
@@ -233,12 +223,36 @@ func TestWorkspaceUpdateSendsEveryAnsibleRoot(t *testing.T) {
 			t.Errorf("update sent %q = %#v, want %#v", key, got, want)
 		}
 	}
-	// An explicit empty list is the one request that removes every entry.
-	if ig, sent := attrs["inventory-ignore-paths"]; !sent {
-		t.Error("update dropped an explicit empty inventory_ignore_paths, so the one " +
-			"call that clears it would silently do nothing")
-	} else if l, ok := ig.([]any); !ok || len(l) != 0 {
-		t.Errorf("update sent inventory-ignore-paths = %#v, want an empty list", ig)
+}
+
+// An explicit EMPTY list is the one request that removes every source, and it
+// is the direction a `len() > 0` guard anywhere on the path would drop. It is
+// its own test because the call above has to pass a non-empty list to assert
+// the content, and it lives here rather than inside that one because
+// `inventory_paths` inherited the property from `inventory_ignore_paths`: that
+// field carried the only wire test of an empty slice travelling, and it was
+// removed with the field (#2256), so without this the remaining slice root
+// advertises "pass an empty list to remove every source" with nothing pinning
+// that it reaches the server.
+func TestWorkspaceUpdateSendsAnExplicitlyEmptyInventoryPaths(t *testing.T) {
+	var attrs map[string]any
+	sess := crudCaller(t, func(w http.ResponseWriter, r *http.Request) {
+		attrs = writeAttrs(t, r)
+		echoWorkspace(w)
+	})
+
+	callTool(t, sess, "terrapod_workspace_update", map[string]any{
+		"workspace_id":    "ws-1",
+		"inventory_paths": []any{},
+	})
+
+	paths, sent := attrs["inventory-paths"]
+	if !sent {
+		t.Fatal("update dropped an explicit empty inventory_paths, so the one call that " +
+			"removes every inventory source would silently do nothing")
+	}
+	if l, ok := paths.([]any); !ok || len(l) != 0 {
+		t.Errorf("update sent inventory-paths = %#v, want an empty list", paths)
 	}
 }
 
@@ -372,7 +386,7 @@ func TestWorkspaceUpdateOmitsUnsetAnsibleRoots(t *testing.T) {
 
 	for _, key := range []string{
 		"config-directory", "inventory-paths", "default-playbook",
-		"default-limit", "inventory-include-platform", "inventory-ignore-paths",
+		"default-limit",
 		// The declarations are in this list for the same reason and a
 		// sharper one: a rename that also sent plan-apply-enabled would,
 		// on a false Go zero value, silently retire the workspace.

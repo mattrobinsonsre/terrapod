@@ -93,8 +93,6 @@ _FIELD_MAP: dict[str, str] = {
     "inventory-paths": "inventory_paths",
     "default-playbook": "default_playbook",
     "default-limit": "default_limit",
-    "inventory-include-platform": "inventory_include_platform",
-    "inventory-ignore-paths": "inventory_ignore_paths",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     # The Ansible execution environment's own pair (#2154). Separate from the
@@ -425,14 +423,10 @@ _SETTING_RULES: dict[str, Any] = {
     "configure-after-apply": lambda v: workspace_settings.validate_bool(v, "configure-after-apply"),
     "config-directory": workspace_settings.validate_config_directory,
     "inventory-paths": workspace_settings.validate_inventory_paths,
-    "inventory-ignore-paths": workspace_settings.validate_inventory_ignore_paths,
     "default-playbook": lambda v: workspace_settings.validate_ansible_run_default(
         v, "default-playbook"
     ),
     "default-limit": lambda v: workspace_settings.validate_ansible_run_default(v, "default-limit"),
-    "inventory-include-platform": lambda v: workspace_settings.validate_bool(
-        v, "inventory-include-platform"
-    ),
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,

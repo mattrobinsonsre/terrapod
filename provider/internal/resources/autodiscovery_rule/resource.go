@@ -34,8 +34,6 @@
 //	"inventory-paths"    -> inventory_paths     (list of strings, optional+computed; ordered, order is precedence)
 //	"default-playbook"   -> default_playbook    (string, optional+computed)
 //	"default-limit"      -> default_limit       (string, optional+computed)
-//	"inventory-include-platform" -> inventory_include_platform (bool, optional+computed, default true)
-//	"inventory-ignore-paths" -> inventory_ignore_paths (list of strings, optional+computed)
 //	"parallelism"        -> parallelism
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
@@ -118,30 +116,28 @@ type autodiscoveryRuleModel struct {
 	// Which operations a materialised workspace has (#1966), and the roots
 	// each one uses (#1929). Templated onto every workspace this rule
 	// creates, exactly like the settings further down -- the rule carries the
-	// same eight columns the workspace does, with the same defaults, so a
-	// rule written before any of this goes on producing plan/apply
-	// workspaces rooted at the configuration version's root.
-	PlanApplyEnabled         types.Bool   `tfsdk:"plan_apply_enabled"`
-	ConfigureEnabled         types.Bool   `tfsdk:"configure_enabled"`
-	AutoConfigureEnabled     types.Bool   `tfsdk:"auto_configure_enabled"`
-	ConfigureAfterApply      types.Bool   `tfsdk:"configure_after_apply"`
-	ConfigureAllHosts        types.Bool   `tfsdk:"configure_all_hosts"`
-	ConfigDirectory          types.String `tfsdk:"config_directory"`
-	InventoryPaths           types.List   `tfsdk:"inventory_paths"`
-	DefaultPlaybook          types.String `tfsdk:"default_playbook"`
-	DefaultLimit             types.String `tfsdk:"default_limit"`
-	InventoryIncludePlatform types.Bool   `tfsdk:"inventory_include_platform"`
-	InventoryIgnorePaths     types.List   `tfsdk:"inventory_ignore_paths"`
-	ResourceCPU              types.String `tfsdk:"resource_cpu"`
-	EEResourceCPU            types.String `tfsdk:"ee_resource_cpu"`
-	EEResourceMemory         types.String `tfsdk:"ee_resource_memory"`
-	Parallelism              types.Int64  `tfsdk:"parallelism"`
-	ResourceMemory           types.String `tfsdk:"resource_memory"`
-	AutoApply                types.Bool   `tfsdk:"auto_apply"`
-	AutoApplyMode            types.String `tfsdk:"auto_apply_mode"`
-	Labels                   types.Map    `tfsdk:"labels"`
-	OwnerEmail               types.String `tfsdk:"owner_email"`
-	OnDirectoryDelete        types.String `tfsdk:"on_directory_delete"`
+	// same columns the workspace does, with the same defaults, so a rule
+	// written before any of this goes on producing plan/apply workspaces
+	// rooted at the configuration version's root.
+	PlanApplyEnabled     types.Bool   `tfsdk:"plan_apply_enabled"`
+	ConfigureEnabled     types.Bool   `tfsdk:"configure_enabled"`
+	AutoConfigureEnabled types.Bool   `tfsdk:"auto_configure_enabled"`
+	ConfigureAfterApply  types.Bool   `tfsdk:"configure_after_apply"`
+	ConfigureAllHosts    types.Bool   `tfsdk:"configure_all_hosts"`
+	ConfigDirectory      types.String `tfsdk:"config_directory"`
+	InventoryPaths       types.List   `tfsdk:"inventory_paths"`
+	DefaultPlaybook      types.String `tfsdk:"default_playbook"`
+	DefaultLimit         types.String `tfsdk:"default_limit"`
+	ResourceCPU          types.String `tfsdk:"resource_cpu"`
+	EEResourceCPU        types.String `tfsdk:"ee_resource_cpu"`
+	EEResourceMemory     types.String `tfsdk:"ee_resource_memory"`
+	Parallelism          types.Int64  `tfsdk:"parallelism"`
+	ResourceMemory       types.String `tfsdk:"resource_memory"`
+	AutoApply            types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode        types.String `tfsdk:"auto_apply_mode"`
+	Labels               types.Map    `tfsdk:"labels"`
+	OwnerEmail           types.String `tfsdk:"owner_email"`
+	OnDirectoryDelete    types.String `tfsdk:"on_directory_delete"`
 
 	// Templated onto every workspace this rule materialises (#1763).
 	SecurityScanEnforcement       types.String `tfsdk:"security_scan_enforcement"`
@@ -534,30 +530,6 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"inventory_include_platform": schema.BoolAttribute{
-				MarkdownDescription: "Whether the inventory rows declared through Terrapod " +
-					"(the `terrapod_inventory_host`, `_group`, `_host_group`, " +
-					"`_group_child` and `_*_var` resources) contribute to the resolved " +
-					"inventory on workspaces this rule creates. **Defaults to true.** Set " +
-					"it false to resolve the git source in `inventory_paths` alone.",
-				Optional: true,
-				Computed: true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"inventory_ignore_paths": schema.ListAttribute{
-				ElementType: types.StringType,
-				MarkdownDescription: "Paths excluded from the inventory resolution on " +
-					"workspaces this rule creates. **Defaults to empty.** Omitting this " +
-					"attribute leaves any existing server-side value untouched; set " +
-					"`inventory_ignore_paths = []` to clear it.",
-				Optional: true,
-				Computed: true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"parallelism": schema.Int64Attribute{
@@ -1245,15 +1217,14 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 			attrs[f.key] = f.val.ValueString()
 		}
 	}
-	// Both lists reach the wire as a non-nil `[]string`, so an explicit empty
-	// list arrives as `[]` and clears. Order is precedence for ansible, so
-	// neither may be treated as a set anywhere along the path.
+	// The list reaches the wire as a non-nil `[]string`, so an explicit empty
+	// list arrives as `[]` and clears. Order is precedence for ansible, so it
+	// may not be treated as a set anywhere along the path.
 	for _, f := range []struct {
 		key string
 		val types.List
 	}{
 		{"inventory-paths", m.InventoryPaths},
-		{"inventory-ignore-paths", m.InventoryIgnorePaths},
 	} {
 		if !f.val.IsNull() && !f.val.IsUnknown() {
 			paths := make([]string, 0, len(f.val.Elements()))
@@ -1272,17 +1243,15 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	}{
 		{"debug-mode", m.DebugMode},
 		{"allow-fork-pr-plans", m.AllowForkPRPlans},
-		// The three ansible booleans (#1966, #1929). Membership-tested by the
-		// server too, so an explicit `false` is honoured rather than read as
-		// "not supplied" -- which is the direction that matters for
-		// `plan-apply-enabled` and `inventory-include-platform`, both of whose
-		// defaults are TRUE.
+		// The ansible booleans (#1966). Membership-tested by the server too, so
+		// an explicit `false` is honoured rather than read as "not supplied" --
+		// which is the direction that matters for `plan-apply-enabled`, whose
+		// default is TRUE.
 		{"plan-apply-enabled", m.PlanApplyEnabled},
 		{"configure-enabled", m.ConfigureEnabled},
 		{"auto-configure-enabled", m.AutoConfigureEnabled},
 		{"configure-after-apply", m.ConfigureAfterApply},
 		{"configure-all-hosts", m.ConfigureAllHosts},
-		{"inventory-include-platform", m.InventoryIncludePlatform},
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
 		{"drift-detection-enabled", m.DriftDetectionEnabled},
@@ -1574,7 +1543,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	if v := terrapod.GetBoolPtrAttr(res, "configure-all-hosts"); v != nil {
 		m.ConfigureAllHosts = types.BoolValue(*v)
 	}
-	// The ansible roots and run defaults (#1929), read side. All three
+	// The ansible roots and run defaults (#1929), read side. The three
 	// strings are non-nullable columns whose empty value is meaningful, so
 	// these are unconditional projections -- no empty-means-null treatment,
 	// which for `config-directory` would report every workspace rooted at its
@@ -1583,12 +1552,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ConfigDirectory = types.StringValue(terrapod.GetStringAttr(res, "config-directory"))
 	m.DefaultPlaybook = types.StringValue(terrapod.GetStringAttr(res, "default-playbook"))
 	m.DefaultLimit = types.StringValue(terrapod.GetStringAttr(res, "default-limit"))
-	// Default TRUE when absent, same reasoning as the two booleans above.
-	m.InventoryIncludePlatform = types.BoolValue(true)
-	if v := terrapod.GetBoolPtrAttr(res, "inventory-include-platform"); v != nil {
-		m.InventoryIncludePlatform = types.BoolValue(*v)
-	}
-	// Both lists keep a PRIOR NULL when the server holds nothing, so a rule
+	// The list keeps a PRIOR NULL when the server holds nothing, so a rule
 	// that never declared the attribute does not plan a diff against `[]`.
 	// Collapsing an empty server answer to null unconditionally -- which is
 	// what the two Optional-only lists above do -- would instead fail the
@@ -1599,7 +1563,6 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		into *types.List
 	}{
 		{"inventory-paths", &m.InventoryPaths},
-		{"inventory-ignore-paths", &m.InventoryIgnorePaths},
 	} {
 		paths := terrapod.GetListAttr(res, f.key)
 		if len(paths) == 0 && f.into.IsNull() {

@@ -74,7 +74,6 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		m.DriftIgnoreRules = types.ListNull(types.StringType)
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
 		m.InventoryPaths = types.ListNull(types.StringType)
-		m.InventoryIgnorePaths = types.ListNull(types.StringType)
 		m.OIDCAudiences = types.MapNull(audienceElemType)
 		m.AnsibleCollections = types.ListNull(ansibleCollectionObjType)
 
@@ -91,8 +90,6 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 			m.SecurityScanSkipRules = strList("CKV_AWS_24")
 		case "inventory_paths":
 			m.InventoryPaths = strList("inventory/production")
-		case "inventory_ignore_paths":
-			m.InventoryIgnorePaths = strList("archive/")
 		case "oidc_audiences":
 			// A map of lists since #1901, not a list — the one entry in
 			// unmanagedCollections whose shape differs.

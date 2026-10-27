@@ -213,12 +213,22 @@ def _refuse_plugin_sources(root: Path) -> None:
     2. **`ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment** -- no
        `auto`, which is the generic dispatcher that reads a file's `plugin:` key
        and runs whatever it names, and no `script`.
-    3. **This.** Disabling the plugin does not make the file inert, it makes it
-       GARBAGE INPUT: a `*.aws_ec2.yml` ends in `.yml`, so the `yaml` plugin's
-       `verify_file` claims it whatever is inside and then treats `plugin:`,
-       `regions:` and `filters:` as GROUP NAMES. An operator would get a
-       confusing parse result rather than an answer, so the file is named and
-       refused instead.
+    3. **This, and it is LEGIBILITY rather than enforcement.** Measured against
+       ansible-core: its own `yaml` plugin recognises a plugin config and refuses
+       it -- "Plugin configuration YAML file, not YAML inventory" -- and the
+       forced `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED` promotes that to
+       `ERROR! Completely failed to parse inventory source`, rc=1, with nothing
+       partial returned. So ansible already fails CLOSED and layer 2's env var is
+       what makes it do so. This layer exists because ansible names the file and
+       not what to do about it: we name the plugin it asks for and say that cloud
+       discovery is declared in Terraform instead.
+
+       An earlier version of this docstring claimed the `yaml` plugin would claim
+       the file and read `plugin:`/`regions:`/`filters:` as GROUP NAMES, leaving a
+       confusing parse result. That is false, and recorded here because it is the
+       kind of wrong reason that survives review: it describes a silent-misparse
+       hazard that does not exist, and so argues for this layer being load-bearing
+       when it is not.
 
     The exec bit is stripped in the same walk. #1970 measured a static
     `hosts.yml` beside an executable `sneaky.sh` resolving to the union of both:
@@ -513,15 +523,13 @@ async def platform_rev(db, workspace_id: uuid.UUID) -> str:
         count, stamp = result.one()
         parts.append(f"{int(count or 0)}@{stamp.isoformat() if stamp else '-'}")
 
-    # The workspace's own inventory settings too (#1929): flipping
-    # `inventory_include_platform`, or moving a root, changes the resolution
-    # without touching a single inventory row. `updated_at` moves on any
-    # workspace edit, which is wider than needed and safe in the only direction
-    # that matters -- a spurious miss costs one resolution, a missed change
-    # serves a stale host set.
+    # The workspace's own inventory settings too (#1929): moving a root changes
+    # the resolution without touching a single inventory row. `updated_at` moves
+    # on any workspace edit, which is wider than needed and safe in the only
+    # direction that matters -- a spurious miss costs one resolution, a missed
+    # change serves a stale host set.
     result = await db.execute(
         select(
-            Workspace.inventory_include_platform,
             Workspace.config_directory,
             Workspace.inventory_paths,
             Workspace.updated_at,
@@ -530,8 +538,7 @@ async def platform_rev(db, workspace_id: uuid.UUID) -> str:
     row = result.first()
     if row:
         parts.append(
-            f"s{int(bool(row[0]))}:{row[1] or '-'}:{','.join(row[2] or [])}"
-            f"@{row[3].isoformat() if row[3] else '-'}"
+            f"{row[0] or '-'}:{','.join(row[1] or [])}@{row[2].isoformat() if row[2] else '-'}"
         )
     else:
         parts.append("s-")
@@ -685,7 +692,6 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
     from terrapod.services import inventory_service as inv
 
     ws = await inv.get_inventory_workspace(db, run.workspace_id)
-    include_platform = ws.inventory_include_platform if ws else True
 
     # Same gate as `resolve`, minus the branch-head lookup: a CV is only a git
     # source for a workspace that has declared a configure operation (#1966),
@@ -701,7 +707,6 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
         db,
         run.workspace_id,
         ws=ws,
-        include_platform=include_platform,
         git_sha="",
         limit=limit,
         config_version_id=cv_id,
@@ -719,7 +724,6 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
     from terrapod.services import inventory_service as inv
 
     ws = await inv.get_inventory_workspace(db, workspace_id)
-    include_platform = ws.inventory_include_platform if ws else True
     git_sha = ""
     # A git source needs a binding AND a config root: `config_directory` being
     # `configure_enabled` is the declaration (#1966): a workspace that has not
@@ -742,7 +746,6 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
         db,
         workspace_id,
         ws=ws,
-        include_platform=include_platform,
         git_sha=git_sha,
         limit=limit,
     )
@@ -867,7 +870,6 @@ async def _resolve_uncached(
     workspace_id: uuid.UUID,
     *,
     ws,
-    include_platform: bool,
     git_sha: str,
     limit: str | None,
     config_version_id: uuid.UUID | None = None,
@@ -904,17 +906,15 @@ async def _resolve_uncached(
             cwd = config_root
             sources.extend(_inventory_sources(ws, config_root))
 
-        if include_platform:
-            rendered = await _declared_sources(db, workspace_id)
-            platform_file = workdir / "platform.yml"
-            await asyncio.to_thread(platform_file.write_text, rendered)
-            sources.append(platform_file)
-
-        if not sources:
-            # A defined empty result, not an error: a workspace that has turned
-            # the declared rows off and bound no repository has an inventory of
-            # no hosts, and saying so is the honest answer.
-            return {"hosts": {}, "groups": {}, "children": {}}
+        # The declared rows always take part (#2256). `_declared_sources` renders
+        # `all:` even with none declared and ansible resolves that to no hosts, so
+        # a workspace that has declared nothing and bound no repository gets its
+        # defined empty result from the same path as everything else rather than
+        # from a special case.
+        rendered = await _declared_sources(db, workspace_id)
+        platform_file = workdir / "platform.yml"
+        await asyncio.to_thread(platform_file.write_text, rendered)
+        sources.append(platform_file)
 
         document = await run_ansible_inventory(sources, scratch=workdir, limit=limit, cwd=cwd)
         return normalise(document)
@@ -1034,60 +1034,8 @@ async def _materialise_config_root(storage_key: str, ws, workdir: Path, *, origi
             f"have at that commit"
         )
 
-    # BEFORE the plugin scan, not after: an ignored file should not be read at
-    # all, and scanning one would refuse the resolution over a file the
-    # operator had already taken out of the source.
-    await asyncio.to_thread(_apply_ignore_paths, root, list(ws.inventory_ignore_paths or []))
     await asyncio.to_thread(_refuse_plugin_sources, root)
     return root
-
-
-def _apply_ignore_paths(root: Path, patterns: list[str]) -> None:
-    """Remove anything under `root` an ignore pattern matches.
-
-    Ansible reads a directory as one source, taking every file in it, so this
-    is the only way to leave a file out of an inventory whose source is a
-    directory. Without it `ignore_paths` would be accepted, stored, serialised
-    and honoured by nothing -- and the failure is in the direction that reads
-    as harmless: the source stays WIDER than the operator asked for, so hosts
-    they had excluded appear. Hosts appearing is as wrong as hosts
-    disappearing, and far less alarming to look at.
-
-    Patterns are globs against the path RELATIVE TO `root`, so they are
-    relative to `config_directory` (#1929) -- the config root this fetched, not
-    the Terraform `working_directory`. That is the only coherent reading: the
-    two are configured together and one names the source the other narrows, and
-    it means an operator never writes a prefix they did not choose. Same matcher
-    as an autodiscovery rule's `ignore_patterns` (`_match_glob`), so the two
-    mean the same thing.
-
-    Note `rel` carries NO trailing slash even for a directory, so a pattern
-    written `cache/` would match nothing at all. `validate_inventory_ignore_paths`
-    refuses a trailing slash for exactly that reason -- it is a pattern that
-    looks like it excludes a directory and silently excludes nothing.
-
-    Synchronous, called through `asyncio.to_thread`: a directory walk and
-    unlinks are blocking I/O over something that could realistically be large.
-    """
-    if not patterns:
-        return
-
-    from terrapod.services.workspace_autodiscovery_service import _match_glob
-
-    cleaned = [p.strip() for p in patterns if p.strip()]
-    if not cleaned:
-        return
-
-    # Deepest first, so removing a directory cannot invalidate a path already
-    # queued beneath it.
-    for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-        rel = path.relative_to(root).as_posix()
-        if not any(_match_glob(rel, pattern) for pattern in cleaned):
-            continue
-        if path.is_dir():
-            shutil.rmtree(path, ignore_errors=True)
-        else:
-            path.unlink(missing_ok=True)
 
 
 def _extract(tarball: str, dest: Path) -> None:

@@ -606,8 +606,14 @@ invocation consumes them.
 | `inventory-paths` | list of strings | The inventory sources, in order, each a file or a directory, relative to `config-directory`. Empty falls through to the `inventory` pathlist in the operator's own `ansible.cfg` |
 | `default-playbook` | string | The playbook a configure runs when the run names none |
 | `default-limit` | string | The default `--limit`. Empty is the whole inventory |
-| `inventory-include-platform` | bool | Whether the declared inventory rows take part in resolution. Default `true`; `false` resolves the repository source alone |
-| `inventory-ignore-paths` | list of strings | Paths pruned from a fetched inventory source before ansible reads it. Ansible takes every file in a directory, so this is the only way to leave one out |
+
+**The declared inventory rows always take part in resolution.** There is no
+attribute to switch them off, because declaring none already says it: with no
+rows the rendered platform document is `all:` alone, which resolves cleanly and
+contributes nothing. **Leaving a file out of a VCS inventory source is
+`ignore_patterns` in the operator's own `ansible.cfg`** — see
+[Leaving a file out is `ignore_patterns`, in your own `ansible.cfg`](ansible-inventory.md#leaving-a-file-out-is-ignore_patterns-in-your-own-ansiblecfg).
+Note those values are **regexes, not globs**.
 
 **`config-directory` is an ordinary path with no null state**, exactly like
 `working-directory` beside it: `""` means the configuration version's root, and

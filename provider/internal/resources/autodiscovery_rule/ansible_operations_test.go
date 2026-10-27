@@ -12,20 +12,20 @@ import (
 // Which operations a materialised workspace has (#1966) and the roots each one
 // uses (#1929), templated onto every workspace this rule creates.
 //
-// The rule carried NONE of the six #1929 columns until now -- a gap left when
-// those became workspace columns -- so a Terraform-declared rule could not
+// The rule carried NONE of #1929's columns until now -- a gap left when those
+// became workspace columns -- so a Terraform-declared rule could not
 // materialise a configure-capable workspace at all, however the workspaces it
-// created were then edited by hand. The eight attributes here close that and
-// add #1966's two.
+// created were then edited by hand. The attributes here close that and add
+// #1966's two.
 //
-// The server already accepts and serialises all eight on
+// The server already accepts and serialises every one of them on
 // POST/PATCH /api/v1/autodiscovery-rules; it membership-tests each key
 // (`if "config-directory" in attrs`) rather than testing truthiness, which is
 // what the empty-value cases below depend on.
 
-func TestTheEightAnsibleAttributesAreAllOnTheSchema(t *testing.T) {
+func TestTheAnsibleAttributesAreAllOnTheSchema(t *testing.T) {
 	// The gap this change closes, asserted as a gap: before it, every one of
-	// the six #1929 names was missing from this resource entirely, so a
+	// #1929's names was missing from this resource entirely, so a
 	// practitioner's `config_directory = "ansible"` in a rule block was an
 	// unknown-attribute error.
 	var resp resource.SchemaResponse
@@ -37,7 +37,6 @@ func TestTheEightAnsibleAttributesAreAllOnTheSchema(t *testing.T) {
 	for _, name := range []string{
 		"plan_apply_enabled", "configure_enabled", "config_directory",
 		"inventory_paths", "default_playbook", "default_limit",
-		"inventory_include_platform", "inventory_ignore_paths",
 	} {
 		a, ok := resp.Schema.Attributes[name]
 		if !ok {
@@ -50,8 +49,9 @@ func TestTheEightAnsibleAttributesAreAllOnTheSchema(t *testing.T) {
 		}
 		// Optional+Computed throughout, the convention for every templated
 		// workspace setting on this resource: the server answers with a
-		// concrete value for all eight, so Optional alone would plan null
-		// against it and fail the apply of any rule that omits the attribute.
+		// concrete value for every one of them, so Optional alone would plan
+		// null against it and fail the apply of any rule that omits the
+		// attribute.
 		if !a.IsComputed() {
 			t.Errorf("%s must be Computed: the server supplies a default the provider "+
 				"does not, so an Optional-only attribute plans null against a concrete "+
@@ -130,15 +130,14 @@ func TestTheThreeAnsibleStringsTravelEvenWhenEmpty(t *testing.T) {
 	})
 }
 
-func TestTheInventoryListsKeepTheirOrderAndAnEmptyListClears(t *testing.T) {
+func TestTheInventoryListKeepsItsOrderAndAnEmptyListClears(t *testing.T) {
 	// Order is precedence for ansible, so a reordering is a behaviour change
-	// and neither list may be treated as a set anywhere along the path.
+	// and the list may not be treated as a set anywhere along the path.
 	attrs := buildAutodiscoveryRuleAttrs(&autodiscoveryRuleModel{
 		InventoryPaths: types.ListValueMust(types.StringType, []attr.Value{
 			types.StringValue("inventory/production"),
 			types.StringValue("inventory/extra.yml"),
 		}),
-		InventoryIgnorePaths: types.ListValueMust(types.StringType, []attr.Value{}),
 	})
 
 	got, ok := attrs["inventory-paths"].([]string)
@@ -152,23 +151,35 @@ func TestTheInventoryListsKeepTheirOrderAndAnEmptyListClears(t *testing.T) {
 	// An explicit empty list is a real request: it removes every entry. It has
 	// to arrive as a non-nil `[]string` so it marshals as `[]` rather than
 	// being dropped.
-	ignore, ok := attrs["inventory-ignore-paths"].([]string)
+	attrs = buildAutodiscoveryRuleAttrs(&autodiscoveryRuleModel{
+		InventoryPaths: types.ListValueMust(types.StringType, []attr.Value{}),
+	})
+	cleared, ok := attrs["inventory-paths"].([]string)
 	if !ok {
-		t.Fatalf("an explicit empty inventory_ignore_paths is %T, want []string — the one "+
-			"config that clears it would silently do nothing", attrs["inventory-ignore-paths"])
+		t.Fatalf("an explicit empty inventory_paths is %T, want []string — the one "+
+			"config that clears it would silently do nothing", attrs["inventory-paths"])
 	}
-	if len(ignore) != 0 {
-		t.Errorf("inventory-ignore-paths = %v, want empty", ignore)
+	// NIL is the case that matters, and the type assertion above cannot see
+	// it: a nil []string in an `any` still asserts to []string with ok=true
+	// and still has len 0, so asserting only the type and the length passes on
+	// the one value that breaks the clear. A nil slice marshals as `null`
+	// rather than `[]`, and the server membership-tests the key -- so it would
+	// arrive present and null, which is not a clear.
+	if cleared == nil {
+		t.Error("an explicit empty inventory_paths reached the attrs map as a NIL " +
+			"[]string — it marshals as null rather than `[]`, so the one config " +
+			"that clears it would silently do nothing")
+	}
+	if len(cleared) != 0 {
+		t.Errorf("inventory-paths = %v, want empty", cleared)
 	}
 
 	// Omitted means omitted, so a rule that does not manage the attribute
 	// leaves whatever the server holds.
 	attrs = buildAutodiscoveryRuleAttrs(&autodiscoveryRuleModel{
-		InventoryPaths:       types.ListNull(types.StringType),
-		InventoryIgnorePaths: types.ListUnknown(types.StringType),
+		InventoryPaths: types.ListNull(types.StringType),
 	})
 	assertAttr(t, attrs, "inventory-paths", nil)
-	assertAttr(t, attrs, "inventory-ignore-paths", nil)
 }
 
 func TestTheRuleReadsTheOperationsWithTheirOwnDefaults(t *testing.T) {
@@ -184,22 +195,19 @@ func TestTheRuleReadsTheOperationsWithTheirOwnDefaults(t *testing.T) {
 		attrs         map[string]any
 		wantPlanApply bool
 		wantConfigure bool
-		wantInclude   bool
 	}{
 		{"absent takes each column's own default",
-			map[string]any{"name-template": "x"}, true, false, true},
+			map[string]any{"name-template": "x"}, true, false},
 		{"configure-only", map[string]any{
-			"name-template":              "x",
-			"plan-apply-enabled":         false,
-			"configure-enabled":          true,
-			"inventory-include-platform": false,
-		}, false, true, false},
-		{"all three explicitly on", map[string]any{
-			"name-template":              "x",
-			"plan-apply-enabled":         true,
-			"configure-enabled":          true,
-			"inventory-include-platform": true,
-		}, true, true, true},
+			"name-template":      "x",
+			"plan-apply-enabled": false,
+			"configure-enabled":  true,
+		}, false, true},
+		{"both explicitly on", map[string]any{
+			"name-template":      "x",
+			"plan-apply-enabled": true,
+			"configure-enabled":  true,
+		}, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := &autodiscoveryRuleModel{}
@@ -213,10 +221,9 @@ func TestTheRuleReadsTheOperationsWithTheirOwnDefaults(t *testing.T) {
 			}{
 				{"plan_apply_enabled", m.PlanApplyEnabled, tc.wantPlanApply},
 				{"configure_enabled", m.ConfigureEnabled, tc.wantConfigure},
-				{"inventory_include_platform", m.InventoryIncludePlatform, tc.wantInclude},
 			} {
 				if f.got.IsNull() || f.got.IsUnknown() {
-					t.Fatalf("%s read back as %v, want a concrete value — all three are "+
+					t.Fatalf("%s read back as %v, want a concrete value — both are "+
 						"Computed, so a null read-back is the inconsistent-result shape",
 						f.what, f.got)
 				}
@@ -288,8 +295,7 @@ func TestTheRuleReadPreservesAPriorNullListButNotAPriorEmptyOne(t *testing.T) {
 
 	t.Run("a prior null survives an empty server answer", func(t *testing.T) {
 		m := &autodiscoveryRuleModel{
-			InventoryPaths:       types.ListNull(types.StringType),
-			InventoryIgnorePaths: types.ListNull(types.StringType),
+			InventoryPaths: types.ListNull(types.StringType),
 		}
 		if d := readAutodiscoveryRuleIntoModel(ctx, ruleResource(t, map[string]any{
 			"name-template": "x",
@@ -300,28 +306,24 @@ func TestTheRuleReadPreservesAPriorNullListButNotAPriorEmptyOne(t *testing.T) {
 			t.Errorf("inventory_paths materialised as %v from a prior null and an "+
 				"empty server value", m.InventoryPaths)
 		}
-		if !m.InventoryIgnorePaths.IsNull() {
-			t.Errorf("inventory_ignore_paths materialised as %v", m.InventoryIgnorePaths)
-		}
 	})
 
 	t.Run("a prior empty list stays an empty list", func(t *testing.T) {
 		empty := types.ListValueMust(types.StringType, []attr.Value{})
-		m := &autodiscoveryRuleModel{InventoryPaths: empty, InventoryIgnorePaths: empty}
+		m := &autodiscoveryRuleModel{InventoryPaths: empty}
 		// The server echoes `[]`, and separately an older server sends
 		// nothing at all; neither may come back as null against a plan of [].
 		for _, attrs := range []map[string]any{
-			{"name-template": "x", "inventory-paths": []string{}, "inventory-ignore-paths": []string{}},
+			{"name-template": "x", "inventory-paths": []string{}},
 			{"name-template": "x"},
 		} {
 			got := &autodiscoveryRuleModel{
-				InventoryPaths:       m.InventoryPaths,
-				InventoryIgnorePaths: m.InventoryIgnorePaths,
+				InventoryPaths: m.InventoryPaths,
 			}
 			if d := readAutodiscoveryRuleIntoModel(ctx, ruleResource(t, attrs), got); d.HasError() {
 				t.Fatalf("read: %v", d)
 			}
-			if got.InventoryPaths.IsNull() || got.InventoryIgnorePaths.IsNull() {
+			if got.InventoryPaths.IsNull() {
 				t.Errorf("an explicit empty list read back as null from %v — that is "+
 					"\"Provider produced inconsistent result after apply\"", attrs)
 			}
