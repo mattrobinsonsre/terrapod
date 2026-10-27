@@ -175,10 +175,15 @@ arbitrarily many inventory files, and the order within it is the operator's
 business through filenames — the convention of numeric prefixes
 (`00-common.yml`, `10-prod.yml`, …) works exactly as it does outside Terrapod.
 
-**The binding is independent of the workspace's own Terraform VCS binding**, and
-that is why these are their own fields rather than a reference to it. Even in one
-repository the root directory differs — `terraform/` against `ansible/` — and a
-workspace with no infrastructure of its own has no Terraform binding at all.
+**The binding is the workspace's own, and the root is what differs** — see
+[There is one VCS binding, and it is the workspace's](#there-is-one-vcs-binding-and-it-is-the-workspaces)
+above. Even in one repository the directory is not the same one: `terraform/`
+against `ansible/`. That is what `config_directory` is for, and why it is its own
+column rather than a reference to `working_directory` — one repository, two
+roots. A workspace with no infrastructure of its own still uses that one binding;
+what it lacks is any Terraform for `working_directory` to point at, which costs
+it nothing, because both roots default to the configuration version's root and
+neither has to be set.
 
 ### Leaving a file out is `ignore_patterns`, in your own `ansible.cfg`
 
