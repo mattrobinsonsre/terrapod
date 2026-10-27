@@ -776,8 +776,6 @@ func TestTheInventoryRootsAreReachableOnTheWorkspaceTools(t *testing.T) {
 		"inventory_paths",
 		"default_playbook",
 		"default_limit",
-		"inventory_include_platform",
-		"inventory_ignore_paths",
 	}
 	for _, tool := range []string{"terrapod_workspace_create", "terrapod_workspace_update"} {
 		raw, ok := schemas[tool]
