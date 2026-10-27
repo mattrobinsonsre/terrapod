@@ -97,7 +97,7 @@ function Control({
 }: {
   attr: string
   ctx: GroupCtx
-  kind: 'text' | 'number' | 'select' | 'checkbox'
+  kind: 'text' | 'number' | 'select' | 'checkbox' | 'list'
   options?: { value: string; label: string }[]
   placeholder?: string
   min?: number
@@ -109,6 +109,35 @@ function Control({
   const disabled = ctx.busy || ctx.readOnly?.has(attr)
   const cls = inputClass(ctx.mode)
 
+  if (kind === 'list') {
+    // One entry per line. Deliberately plain: the two forms set the same five
+    // list-valued attributes, and a bespoke add/remove editor per attribute is
+    // what the edit tab already has -- those pass `control` below rather than
+    // being reimplemented here, so this primitive serves the create side and
+    // anything that does not need per-row controls. Blank lines are dropped on
+    // the way out, so a trailing newline is not an empty entry the API refuses.
+    const asLines = Array.isArray(v) ? (v as unknown[]).map(String).join('\n') : ''
+    return (
+      <textarea
+        id={id}
+        data-testid={id}
+        rows={3}
+        value={asLines}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) =>
+          ctx.onChange(
+            attr,
+            e.target.value
+              .split('\n')
+              .map((s) => s.trim())
+              .filter((s) => s !== ''),
+          )
+        }
+        className={`${cls} font-mono`}
+      />
+    )
+  }
   if (kind === 'checkbox') {
     return (
       <input
@@ -168,23 +197,45 @@ export function Field({
   placeholder,
   min,
   max,
+  control,
 }: {
   attr: string
   ctx: GroupCtx
-  kind: 'text' | 'number' | 'select' | 'checkbox'
+  kind: 'text' | 'number' | 'select' | 'checkbox' | 'list'
   options?: { value: string; label: string }[]
   /** What `view` mode shows; defaults to the raw value. */
   display?: ReactNode
   placeholder?: string
   min?: number
   max?: number
+  /**
+   * A bespoke control in place of the primitive.
+   *
+   * The escape hatch that keeps this from becoming a form framework: the edit
+   * tab has real per-row editors for the path lists and uses
+   * `labels-editor.tsx` for labels, and reimplementing those here would make
+   * every future field an argument with an abstraction. A field passing
+   * `control` still gets the group's label, view mode, hint and dependency
+   * hiding -- only the input differs.
+   */
+  control?: ReactNode
 }) {
   if (!shown(attr, ctx)) return null
   const spec = FIELD_BY_ATTR[attr]
   const v = ctx.values[attr]
   const shownValue =
     display ??
-    (kind === 'checkbox' ? (Boolean(v) ? '✓' : '—') : v === undefined || v === '' ? '—' : String(v))
+    (kind === 'checkbox'
+      ? Boolean(v)
+        ? '✓'
+        : '—'
+      : kind === 'list'
+        ? Array.isArray(v) && v.length > 0
+          ? (v as unknown[]).map(String).join(', ')
+          : '—'
+        : v === undefined || v === ''
+          ? '—'
+          : String(v))
   return (
     <WsField
       id={spec?.id ?? attr}
@@ -193,15 +244,17 @@ export function Field({
       display={shownValue}
       hint={ctx.hint?.(attr)}
     >
-      <Control
-        attr={attr}
-        ctx={ctx}
-        kind={kind}
-        options={options}
-        placeholder={placeholder}
-        min={min}
-        max={max}
-      />
+      {control ?? (
+        <Control
+          attr={attr}
+          ctx={ctx}
+          kind={kind}
+          options={options}
+          placeholder={placeholder}
+          min={min}
+          max={max}
+        />
+      )}
     </WsField>
   )
 }
