@@ -307,7 +307,13 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'allow-fork-pr-plans',
     id: 'ws-allow-fork-pr-plans',
     group: 'vcs',
-    dependsOn: 'vcs-connection-id',
+    // NO `dependsOn`, and that is the rule rather than an omission: this is a
+    // FEATURE'S OWN TOGGLE, and hiding one of those removes the only way to
+    // discover the feature exists -- where hiding a DEPENDENT only removes
+    // something meaningless. I had declared it a dependent of
+    // `vcs-connection-id`; `workspaces.spec.ts:663` creates a workspace with
+    // no VCS connection at all and asserts the toggle is visible, which is
+    // both the existing behaviour and the correct one.
   },
   {
     attr: 'trigger-prefixes',
