@@ -465,66 +465,7 @@ func configWith(t *testing.T, ctx context.Context, r resource.Resource, set map[
 	return tfsdk.Config{Schema: sr.Schema, Raw: tftypes.NewValue(objType, vals)}
 }
 
-// ── #1929's remaining five, unchanged by #1966 ─────────────────────────────
-
-func TestIncludePlatformReachesTheWireIncludingFalse(t *testing.T) {
-	// The server default is TRUE, so false is the interesting direction: a
-	// plain bool on the request would drop it and "resolve the git source
-	// alone" would be a silent no-op.
-	ctx := context.Background()
-
-	for _, tc := range []struct {
-		name string
-		val  types.Bool
-		want *bool
-	}{
-		{"explicitly true", types.BoolValue(true), ptr(true)},
-		{"explicitly false", types.BoolValue(false), ptr(false)},
-		{"omitted", types.BoolNull(), nil},
-		{"unknown", types.BoolUnknown(), nil},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var m workspaceModel
-			m.InventoryIncludePlatform = tc.val
-
-			create, diags := buildCreateWorkspaceRequest(ctx, &m)
-			if diags.HasError() {
-				t.Fatalf("create: %v", diags)
-			}
-			checkBoolPtr(t, "create", create.InventoryIncludePlatform, tc.want)
-
-			update, diags := buildUpdateWorkspaceRequest(ctx, &m)
-			if diags.HasError() {
-				t.Fatalf("update: %v", diags)
-			}
-			checkBoolPtr(t, "update", update.InventoryIncludePlatform, tc.want)
-		})
-	}
-}
-
-func TestIncludePlatformReadsBackAConcreteValue(t *testing.T) {
-	// Optional+Computed, so a null read-back is the "inconsistent result after
-	// apply" shape. Both values must survive, and false especially: the SDK
-	// resolves an ABSENT attribute to true, so a decoder bug here shows up as
-	// a workspace reporting its declared rows as contributing when the
-	// operator has switched them off.
-	ctx := context.Background()
-
-	for _, want := range []bool{true, false} {
-		var m workspaceModel
-		ws := &terrapod.Workspace{ID: "ws-a", Name: "a", InventoryIncludePlatform: want}
-		if diags := readWorkspaceIntoModel(ctx, ws, &m); diags.HasError() {
-			t.Fatalf("read: %v", diags)
-		}
-		if m.InventoryIncludePlatform.IsNull() || m.InventoryIncludePlatform.IsUnknown() {
-			t.Fatalf("inventory_include_platform read back as %v, want a concrete value",
-				m.InventoryIncludePlatform)
-		}
-		if got := m.InventoryIncludePlatform.ValueBool(); got != want {
-			t.Errorf("inventory_include_platform = %v, want %v", got, want)
-		}
-	}
-}
+// ── #1929's roots left unchanged by #1966 ──────────────────────────────────
 
 func TestPlaybookAndLimitTravelAsPointersSoTheyCanBeCleared(t *testing.T) {
 	ctx := context.Background()
@@ -564,7 +505,6 @@ func TestInventoryPathsPreserveOrderAndAnEmptyListClears(t *testing.T) {
 		types.StringValue("inventory/production"),
 		types.StringValue("inventory/extra.yml"),
 	})
-	m.InventoryIgnorePaths = types.ListValueMust(types.StringType, []attr.Value{})
 
 	create, diags := buildCreateWorkspaceRequest(ctx, &m)
 	if diags.HasError() {
@@ -576,15 +516,6 @@ func TestInventoryPathsPreserveOrderAndAnEmptyListClears(t *testing.T) {
 		t.Errorf("create sent inventory-paths %v — order is precedence and must survive",
 			create.InventoryPaths)
 	}
-	// An explicit empty list is a real request: it removes every entry. A nil
-	// slice would be omitted by the SDK and marshal as absent, so the clear
-	// has to arrive as a non-nil empty slice.
-	if create.InventoryIgnorePaths == nil {
-		t.Error("create dropped an explicit empty inventory_ignore_paths — the one " +
-			"config that clears it would silently do nothing")
-	} else if len(create.InventoryIgnorePaths) != 0 {
-		t.Errorf("create sent inventory-ignore-paths %v, want empty", create.InventoryIgnorePaths)
-	}
 
 	update, diags := buildUpdateWorkspaceRequest(ctx, &m)
 	if diags.HasError() {
@@ -593,8 +524,28 @@ func TestInventoryPathsPreserveOrderAndAnEmptyListClears(t *testing.T) {
 	if len(update.InventoryPaths) != 2 || update.InventoryPaths[0] != "inventory/production" {
 		t.Errorf("update sent inventory-paths %v", update.InventoryPaths)
 	}
-	if update.InventoryIgnorePaths == nil {
-		t.Error("update dropped an explicit empty inventory_ignore_paths")
+
+	// An explicit empty list is a real request: it removes every source. A nil
+	// slice would be omitted by the SDK and marshal as absent, so the clear
+	// has to arrive as a non-nil empty slice.
+	var cleared workspaceModel
+	cleared.InventoryPaths = types.ListValueMust(types.StringType, []attr.Value{})
+	createCleared, diags := buildCreateWorkspaceRequest(ctx, &cleared)
+	if diags.HasError() {
+		t.Fatalf("create: %v", diags)
+	}
+	if createCleared.InventoryPaths == nil {
+		t.Error("create dropped an explicit empty inventory_paths — the one " +
+			"config that clears it would silently do nothing")
+	} else if len(createCleared.InventoryPaths) != 0 {
+		t.Errorf("create sent inventory-paths %v, want empty", createCleared.InventoryPaths)
+	}
+	updateCleared, diags := buildUpdateWorkspaceRequest(ctx, &cleared)
+	if diags.HasError() {
+		t.Fatalf("update: %v", diags)
+	}
+	if updateCleared.InventoryPaths == nil {
+		t.Error("update dropped an explicit empty inventory_paths")
 	}
 }
 
@@ -607,10 +558,8 @@ func TestOmittedRootsAreNotSentSoAnUnmanagedValueSurvives(t *testing.T) {
 
 	var m workspaceModel
 	m.InventoryPaths = types.ListNull(types.StringType)
-	m.InventoryIgnorePaths = types.ListNull(types.StringType)
 	m.DefaultPlaybook = types.StringNull()
 	m.DefaultLimit = types.StringNull()
-	m.InventoryIncludePlatform = types.BoolNull()
 	m.ConfigDirectory = types.StringNull()
 	m.PlanApplyEnabled = types.BoolNull()
 	m.ConfigureEnabled = types.BoolNull()
@@ -622,19 +571,11 @@ func TestOmittedRootsAreNotSentSoAnUnmanagedValueSurvives(t *testing.T) {
 	if update.InventoryPaths != nil {
 		t.Errorf("update sent inventory-paths %v when the config omitted it", update.InventoryPaths)
 	}
-	if update.InventoryIgnorePaths != nil {
-		t.Errorf("update sent inventory-ignore-paths %v when the config omitted it",
-			update.InventoryIgnorePaths)
-	}
 	if update.DefaultPlaybook != nil {
 		t.Errorf("update sent default-playbook %q when the config omitted it", *update.DefaultPlaybook)
 	}
 	if update.DefaultLimit != nil {
 		t.Errorf("update sent default-limit %q when the config omitted it", *update.DefaultLimit)
-	}
-	if update.InventoryIncludePlatform != nil {
-		t.Errorf("update sent inventory-include-platform %v when the config omitted it",
-			*update.InventoryIncludePlatform)
 	}
 	if update.ConfigDirectory != nil {
 		t.Errorf("update sent config-directory %q when the config omitted it", *update.ConfigDirectory)
@@ -655,7 +596,6 @@ func TestReadPreservesNullListsWhenTheServerHasNone(t *testing.T) {
 
 	var m workspaceModel
 	m.InventoryPaths = types.ListNull(types.StringType)
-	m.InventoryIgnorePaths = types.ListNull(types.StringType)
 	ws := &terrapod.Workspace{ID: "ws-a", Name: "a"}
 	if diags := readWorkspaceIntoModel(ctx, ws, &m); diags.HasError() {
 		t.Fatalf("read: %v", diags)
@@ -663,9 +603,6 @@ func TestReadPreservesNullListsWhenTheServerHasNone(t *testing.T) {
 	if !m.InventoryPaths.IsNull() {
 		t.Errorf("inventory_paths materialised as %v from a prior null and an empty server value",
 			m.InventoryPaths)
-	}
-	if !m.InventoryIgnorePaths.IsNull() {
-		t.Errorf("inventory_ignore_paths materialised as %v", m.InventoryIgnorePaths)
 	}
 
 	// With values present it reads them, in order.

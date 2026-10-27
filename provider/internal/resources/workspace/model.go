@@ -27,8 +27,6 @@
 //	"ansible-collections"               → ansible_collections (list of {name, version})
 //	"default-playbook"                  → default_playbook    (string, optional+computed)
 //	"default-limit"                     → default_limit       (string, optional+computed)
-//	"inventory-include-platform"        → inventory_include_platform (bool, optional+computed; defaults true)
-//	"inventory-ignore-paths"            → inventory_ignore_paths (list, optional+computed)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
@@ -129,8 +127,6 @@ type workspaceModel struct {
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
-	InventoryIncludePlatform      types.Bool   `tfsdk:"inventory_include_platform"`
-	InventoryIgnorePaths          types.List   `tfsdk:"inventory_ignore_paths"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`

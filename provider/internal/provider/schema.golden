@@ -115,8 +115,6 @@ data terrapod_workspace.engine_version required=false optional=false computed=tr
 data terrapod_workspace.execution_backend required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
-data terrapod_workspace.inventory_ignore_paths required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
-data terrapod_workspace.inventory_include_platform required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.inventory_paths required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -221,8 +219,6 @@ resource terrapod_autodiscovery_rule.execution_hook_templates required=false opt
 resource terrapod_autodiscovery_rule.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ignore_patterns required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
-resource terrapod_autodiscovery_rule.inventory_ignore_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
-resource terrapod_autodiscovery_rule.inventory_include_platform required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.inventory_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.labels required=false optional=true computed=true sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
@@ -586,8 +582,6 @@ resource terrapod_workspace.engine_version required=false optional=true computed
 resource terrapod_workspace.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_workspace.inventory_ignore_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
-resource terrapod_workspace.inventory_include_platform required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.inventory_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType

@@ -156,7 +156,6 @@ var unmanagedCollections = []struct {
 	{"drift_ignore_rules", "[]", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
 	{"security_scan_skip_rules", "[]", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
 	{"inventory_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryPaths }},
-	{"inventory_ignore_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryIgnorePaths }},
 	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
 	{"ansible_collections", "[]", func(m *workspaceModel) attr.Value { return m.AnsibleCollections }},
 }
@@ -839,29 +838,6 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"inventory_include_platform": schema.BoolAttribute{
-				Description: "Whether the inventory rows declared through Terrapod (the " +
-					"`terrapod_inventory_host`, `_group`, `_host_group`, `_group_child` " +
-					"and `_*_var` resources) contribute to the resolved inventory. " +
-					"**Defaults to true.** Set it false to resolve the git source in " +
-					"`inventory_paths` alone.",
-				Optional: true,
-				Computed: true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"inventory_ignore_paths": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "Paths excluded from the inventory resolution. Omitting this " +
-					"attribute leaves any existing server-side value untouched — it does " +
-					"not clear it; set `inventory_ignore_paths = []` to clear.",
-				Optional: true,
-				Computed: true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"working_directory": schema.StringAttribute{
 				Description: "Working directory relative to the repo root.",
 				Optional:    true,
@@ -1528,7 +1504,7 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
-	// #1929's six.
+	// #1929's remaining four.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
 		// removes every source, so it has to reach the wire as `[]`.
@@ -1540,17 +1516,6 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
 		req.AnsibleCollections = c
-	}
-	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
-		ignore := []string{}
-		for _, v := range m.InventoryIgnorePaths.Elements() {
-			ignore = append(ignore, v.(types.String).ValueString())
-		}
-		req.InventoryIgnorePaths = ignore
-	}
-	if !m.InventoryIncludePlatform.IsNull() && !m.InventoryIncludePlatform.IsUnknown() {
-		v := m.InventoryIncludePlatform.ValueBool()
-		req.InventoryIncludePlatform = &v
 	}
 	// An ordinary path now (#1966): a plain string on the request, like
 	// `working_directory` below. An unknown -- which is what an omitted
@@ -1765,7 +1730,7 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
-	// #1929's six.
+	// #1929's remaining four.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
 		// removes every source, so it has to reach the wire as `[]`.
@@ -1777,17 +1742,6 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
 		req.AnsibleCollections = c
-	}
-	if !m.InventoryIgnorePaths.IsNull() && !m.InventoryIgnorePaths.IsUnknown() {
-		ignore := []string{}
-		for _, v := range m.InventoryIgnorePaths.Elements() {
-			ignore = append(ignore, v.(types.String).ValueString())
-		}
-		req.InventoryIgnorePaths = ignore
-	}
-	if !m.InventoryIncludePlatform.IsNull() && !m.InventoryIncludePlatform.IsUnknown() {
-		v := m.InventoryIncludePlatform.ValueBool()
-		req.InventoryIncludePlatform = &v
 	}
 	// Still a POINTER on the update request, where create takes a plain
 	// string: that is what lets `&""` travel as an explicit "" and move the
@@ -2005,7 +1959,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
 	m.ConfigureAllHosts = types.BoolValue(ws.ConfigureAllHosts)
 
-	// #1929's six, read side.
+	// #1929's remaining four, read side.
 	//
 	// `config_directory` is an ordinary non-nullable path now (#1966), so this
 	// is an unconditional projection like `working_directory` below -- and it
@@ -2028,10 +1982,6 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.DefaultLimit = types.StringNull()
 	}
-	// No empty-means-null treatment: false is a real value here, and the
-	// SDK already resolves an absent attribute to the column default (true),
-	// so this is a straight projection.
-	m.InventoryIncludePlatform = types.BoolValue(ws.InventoryIncludePlatform)
 	if ws.VCSRepoURL != "" {
 		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
 	} else {
@@ -2236,9 +2186,8 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.SecurityScanSkipRules = ssVal
 	}
 
-	// Inventory paths and ignore paths (#1929) -- same null-vs-empty
-	// preservation rule as the four lists above. Order is precedence for
-	// inventory_paths, which ListValueFrom preserves.
+	// Inventory paths (#1929) -- same null-vs-empty preservation rule as the
+	// four lists above. Order is precedence, which ListValueFrom preserves.
 	if m.InventoryPaths.IsNull() && len(ws.InventoryPaths) == 0 {
 		m.InventoryPaths = types.ListNull(types.StringType)
 	} else {
@@ -2252,13 +2201,6 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		acVal, acDiag := ansibleCollectionsToState(ctx, ws.AnsibleCollections)
 		diags.Append(acDiag...)
 		m.AnsibleCollections = acVal
-	}
-	if m.InventoryIgnorePaths.IsNull() && len(ws.InventoryIgnorePaths) == 0 {
-		m.InventoryIgnorePaths = types.ListNull(types.StringType)
-	} else {
-		iipVal, iipDiag := types.ListValueFrom(ctx, types.StringType, ws.InventoryIgnorePaths)
-		diags.Append(iipDiag...)
-		m.InventoryIgnorePaths = iipVal
 	}
 
 	// OIDC audiences (#1901) — a SELECTIVE read, unlike every other collection
