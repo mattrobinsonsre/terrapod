@@ -172,7 +172,19 @@ export const FIELDS: readonly FieldSpec[] = [
 
   // --- execution --------------------------------------------------------
   { attr: 'execution-mode', id: 'ws-exec', group: 'execution' },
-  { attr: 'execution-backend', id: 'ws-backend', group: 'execution' },
+  {
+    attr: 'execution-backend',
+    id: 'ws-backend',
+    group: 'execution',
+    // Terraform only -- it picks the tofu-or-terraform BINARY, which a Pulumi
+    // workspace has no use for. The hand-written edit tab gated it on
+    // `!isPulumi` and `e2e/tests/pulumi-workspace.spec.ts` asserts it is
+    // absent there, commented 'Terraform-only settings are hidden rather than
+    // shown and ignored'. The restriction was lost when the fields were ported
+    // into this table, so the create form would have offered a Pulumi
+    // workspace a binary picker.
+    engines: ['terraform'],
+  },
   {
     attr: 'engine-version',
     id: 'ws-version',
@@ -361,7 +373,17 @@ export const FIELDS: readonly FieldSpec[] = [
     // is meaningful, the caller just may not change it.
   },
   { attr: 'labels', id: 'ws-labels', group: 'metadata', advanced: true, summary: 'count' },
-  { attr: 'var-files', id: 'ws-var-files', group: 'metadata', advanced: true, summary: 'count' },
+  {
+    attr: 'var-files',
+    id: 'ws-var-files',
+    group: 'metadata',
+    advanced: true,
+    summary: 'count',
+    // Terraform only: `.tfvars` files. Same provenance as `execution-backend`
+    // above -- gated `!isPulumi` on the edit tab and asserted absent by the
+    // Pulumi spec.
+    engines: ['terraform'],
+  },
 
   // --- cloud identity ---------------------------------------------------
   {
