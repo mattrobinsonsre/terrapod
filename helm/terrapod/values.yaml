@@ -2073,6 +2073,19 @@ runners:
   # background-priority — a 30-minute cap is a generous SLO for "tell me
   # if there's drift". Set to 0 to disable the cap.
   driftMaxDurationSeconds: 1800
+  # Minutes an Ansible configure Job may run before Kubernetes ends it. Its own
+  # setting rather than the Job builder's 60: a terraform plan that has not
+  # finished in an hour is almost certainly stuck, while a playbook walking a
+  # few hundred hosts legitimately runs for hours. Sent only for a configure,
+  # so plan, apply, preview and up are unaffected. A BACKSTOP — the setting
+  # below is what catches a configure that has actually stopped.
+  configureTimeoutMinutes: 180
+  # Seconds a configure may produce NO NEW OUTPUT before the reconciler errors
+  # it. 0 disables. Deliberately generous: ansible's stdout callback emits
+  # nothing while a single task runs, so a legitimate forty-minute `command`
+  # looks exactly like a wedge. This bounds "nothing at all is happening" and
+  # nothing finer.
+  configureNoProgressSeconds: 1800
 
   # Auto-retry for FAILED platform-initiated lifecycle destroys (a catalog
   # instance destroy or an autodiscovery directory destroy). terraform destroy

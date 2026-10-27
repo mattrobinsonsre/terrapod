@@ -2274,7 +2274,9 @@
         "label": "Filtrovat podle hostitele",
         "title": "Zobrazit výstup jen jednoho hostitele. Záhlaví úloh a souhrn zůstávají viditelné.",
         "all": "Všichni hostitelé"
-      }
+      },
+      "lastOutput": "Poslední výstup {when}",
+      "lastOutputTitle": "Jak dlouho je to, co tato konfigurace naposledy něco vypsala. Ta, která zůstane příliš dlouho zticha, skončí chybou."
     },
     "policyPanel": {
       "heading": "Kontroly zásad",

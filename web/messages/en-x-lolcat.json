@@ -2274,7 +2274,9 @@
         "label": "Filtur by host",
         "title": "Show only one host''s output. Task headingz an teh rekap stay visibul.",
         "all": "All hostz"
-      }
+      },
+      "lastOutput": "LAST OUTPUTZ {when}",
+      "lastOutputTitle": "HOW LONG AGO DIS CONFIGUREZ MAED WORDZ. IF IT STAY QUIET 2 LONG IT GOES BOOM."
     },
     "policyPanel": {
       "heading": "Policy Checkz",

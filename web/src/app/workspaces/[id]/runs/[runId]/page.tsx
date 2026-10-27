@@ -21,6 +21,7 @@ import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
 import { createLogFollower, type LogFollower } from '@/lib/log-follower'
+import { useFormat } from '@/lib/format'
 import { logPaneHeightPx } from '@/lib/log-pane-height'
 import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
 import { filterHostLog, parseHostLog, pickerHostList, stripHostTags } from '@/lib/host-log'
@@ -82,6 +83,8 @@ interface RunAttrs {
   // first, and without it a standalone configure. Either way its output is
   // its own log artifact, which is what the Configure pane reads (#2144).
   'is-configure'?: boolean
+  /** When a LIVE configure's output last changed (#1977). Absent otherwise. */
+  'last-output-at'?: string
   // `tofu plan -out=FILE` (#1903) -- apply-capable, apply deferred.
   'save-plan': boolean
   'is-destroy': boolean
@@ -485,6 +488,7 @@ function LogPanel({
   logComplete = false,
   onRefresh,
   engine,
+  lastOutputAt,
 }: {
   log: string | null
   precomputedHtml?: string
@@ -495,6 +499,20 @@ function LogPanel({
   isStreaming: boolean
   /** The run's engine, so the plan index names the summary block its way (#1911). */
   engine?: string
+  /**
+   * When a LIVE configure's output last changed (#1977), RFC3339.
+   *
+   * The API sends it only while `status` is `configuring`, so this is
+   * `undefined` for every plan, apply and finished run and the indicator is
+   * data-gated by its own absence -- a terraform-only deployment never renders
+   * it and has nothing to turn off.
+   *
+   * It answers the question a streaming log cannot: a quiet pane looks
+   * identical whether ansible is mid-task or wedged. A configure silent past
+   * `configureNoProgressSeconds` is errored, so this counts up only within the
+   * window the server is willing to wait.
+   */
+  lastOutputAt?: string | null
   /**
    * True once the server has marked this phase's log complete (#1590). The
    * plan index appears only then: a settled log parses in one pass, so the
@@ -516,6 +534,8 @@ function LogPanel({
   // The per-host status strings are the Hosts tab's (#1928), reused rather
   // than restated, so the picker and the table cannot disagree about a word.
   const tHosts = useTranslations('runDetail.hosts')
+  // #1977's quiet-for indicator renders a locale-aware relative time.
+  const fmt = useFormat()
   const tRoot = useTranslations()
   const summaryLabel = engineWord(tRoot, engine, 'logIndexSummary')
   const isTouch = useIsTouch()
@@ -1003,6 +1023,21 @@ function LogPanel({
                   })}
                 </select>
               </>
+            )}
+            {/* How long this configure has been quiet (#1977). Deliberately
+                NOT a control: the row already carries seven and the responsive
+                guard calls it the point where a phone starts scrolling
+                sideways, so this is text that wraps rather than an eighth
+                button. Data-gated on the attribute, which the API sends only
+                for a live configure. */}
+            {isStreaming && lastOutputAt && (
+              <span
+                data-testid={`log-last-output-${phase}`}
+                className="px-2 py-1 text-xs text-slate-500"
+                title={t('log.lastOutputTitle')}
+              >
+                {t('log.lastOutput', { when: fmt.relativeTime(lastOutputAt) })}
+              </span>
             )}
             {/* "End" jumps to the tail (one-shot). Distinct from Follow: End is a
                 single scroll-to-bottom, always available; Follow is the streaming
@@ -2553,6 +2588,8 @@ function RunDetailPageInner() {
             loading={configureLogLoading}
             emptyMessage={t('log.configureEmpty')}
             phase="configure"
+            // #1977. Only ever present on a live configure.
+            lastOutputAt={attrs['last-output-at']}
             engine={engine}
             runId={runId}
             isStreaming={attrs.status === 'configuring'}

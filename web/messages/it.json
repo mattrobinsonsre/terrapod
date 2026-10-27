@@ -2274,7 +2274,9 @@
         "label": "Filtra per host",
         "title": "Mostra l''output di un solo host. Le intestazioni dei task e il riepilogo finale restano visibili.",
         "all": "Tutti gli host"
-      }
+      },
+      "lastOutput": "Ultimo output {when}",
+      "lastOutputTitle": "Quanto tempo fa questa configurazione ha prodotto output per l'ultima volta. Una che resta in silenzio troppo a lungo termina in errore."
     },
     "policyPanel": {
       "heading": "Controlli dei criteri",

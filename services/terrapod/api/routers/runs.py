@@ -1102,6 +1102,21 @@ async def show_run(
         state_version_id=sv_id,
         **view,
     )
+    # How long a configure has been quiet (#1977). Present only while one is in
+    # flight, which is runtime adaptation rather than an accidental asymmetry:
+    # #1977's own standing requirement is to "surface what is relevant to what
+    # the deployment actually contains", and a terraform-only deployment never
+    # sees this key at all. Gating it on the status is also what keeps it to one
+    # Redis GET for exactly the runs a run page is already polling, and zero for
+    # every other run read -- `_run_json` is sync and could not do this without
+    # a Redis call on every read of every run.
+    if run.status == "configuring":
+        from terrapod.services.run_reconciler import last_output_at
+
+        quiet_since = await last_output_at(str(run.id), "configure")
+        if quiet_since is not None:
+            document["data"]["attributes"]["last-output-at"] = _rfc3339(quiet_since)
+
     # The CLI reads a run's task stages with `include=task_stages` and needs
     # each stage's `stage` attribute from `included` (#1704).
     includes = {i.strip() for i in request.query_params.get("include", "").split(",")}
@@ -3653,6 +3668,19 @@ async def next_run(
         # run page needs to show ("the workspace's default" against "this run
         # asked for X"), and resolving it in both places is how two copies of a
         # precedence rule come to disagree.
+        # The configure ceiling (#1977). Sent ONLY here, in the configure
+        # branch, which is what keeps every plan, apply, preview and up on the
+        # Job builder's own 60-minute default -- so this adds a bound for the
+        # one phase that needs a different one and changes nothing for the
+        # engines that do not.
+        #
+        # `timeout-minutes` already existed as a wire key read by nobody:
+        # `engines/pulumi.py` read it into an options field that was
+        # deliberately not forwarded, and the API never sent it. So this makes
+        # a declared-but-dead key real rather than inventing plumbing.
+        from terrapod.config import load_runner_config as _lrc
+
+        attributes["timeout-minutes"] = _lrc().configure_timeout_minutes
         attributes["default-playbook"] = ws.default_playbook or ""
         attributes["default-limit"] = ws.default_limit or ""
         if run.playbook:

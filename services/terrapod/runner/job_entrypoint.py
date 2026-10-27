@@ -1501,7 +1501,19 @@ def main(argv: list[str] | None = None) -> int:
     # summaries from the latest phase that has them, else the last error the
     # runner logged. Latest phase first, so a plan that failed after a clean
     # init reports the plan.
-    reason = failure_reason.failure_reason(exit_code, [_APPLY_LOG, _PLAN_LOG, _INIT_LOG])
+    # `_CONFIGURE_LOG` belongs here and was missing (#1977): the roll-in loop
+    # twenty lines above already lists all four, so a failed configure's reason
+    # was scraped from the apply, plan and init logs and never from its own.
+    # The same fix applied to one of two sibling lists and not the other.
+    reason = failure_reason.failure_reason(
+        exit_code, [_CONFIGURE_LOG, _APPLY_LOG, _PLAN_LOG, _INIT_LOG]
+    )
+    # An ansible exit code says more than a log scrape can (#1977), and only on
+    # a configure -- a tofu run exiting 99 means nothing in particular.
+    if cfg.phase == "configure":
+        named = failure_reason.ansible_exit_reason(exit_code)
+        if named:
+            reason = named if not reason else f"{named}: {reason}"
 
     try:
         resource_profile.post_profile(cfg, exit_code=exit_code, failure_reason=reason)

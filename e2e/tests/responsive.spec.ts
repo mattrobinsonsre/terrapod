@@ -787,6 +787,11 @@ test.describe('Responsive harness (phone viewport)', () => {
       const json = await res.json();
       json.data.attributes.status = 'configuring';
       json.data.attributes['is-configure'] = true;
+      // #1977's quiet-for indicator sits in this same crowded toolbar, so the
+      // overflow assertion below has to be made with it rendered. The API
+      // sends this only for a live configure, which is what the two lines
+      // above make this run.
+      json.data.attributes['last-output-at'] = new Date(Date.now() - 6 * 60_000).toISOString();
       await route.fulfill({ response: res, body: JSON.stringify(json) });
     });
     await page.route(`**/api/terrapod/v1/runs/${runId}/configure`, (route: Route) =>
@@ -819,7 +824,13 @@ test.describe('Responsive harness (phone viewport)', () => {
     await picker.selectOption(long);
     await expect(page.getByTestId('log-pre-configure').filter({ visible: true }).first())
       .toContainText('TASK [say hello]');
-    // The whole point: a long host name must not widen the page.
+    // #1977. Text rather than an eighth control, precisely because this row is
+    // where a phone starts scrolling sideways -- so it is asserted present AND
+    // inside the overflow check below rather than either alone.
+    await expect(page.getByTestId('log-last-output-configure')).toBeVisible();
+
+    // The whole point: a long host name must not widen the page -- now with
+    // the quiet-for indicator in the same row.
     await expectNoHorizontalPageScroll(page);
   });
 

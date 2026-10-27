@@ -142,6 +142,38 @@ def _bound(text: str) -> str:
     return text[: MAX_REASON_CHARS - 1] + "…"
 
 
+#: Ansible's own exit codes, which are specific where a tofu failure is not
+#: (#1977). Measured against ansible-core 2.21.5 in the published execution
+#: environment: one SIGINT mid-task exits **99** and emits no `PLAY RECAP`, so
+#: an interrupted configure is distinguishable from a play whose hosts failed
+#: (2) or were unreachable (4) rather than arriving as an opaque non-zero.
+#:
+#: Why it matters beyond legibility: a cancelled configure is exactly the case
+#: #1973's partial recovery exists for, and "interrupted" is what tells an
+#: operator the remainder is worth retrying rather than that their playbook is
+#: broken.
+#:
+#: Kept OUT of `failure_reason` itself, which is engine-agnostic and scrapes
+#: tofu-shaped errors -- a tofu run exiting 99 means nothing in particular, so
+#: mapping it there would mislabel one.
+_ANSIBLE_EXIT_REASONS: dict[int, str] = {
+    2: "the playbook failed on one or more hosts",
+    3: "the playbook failed on all hosts",
+    4: "one or more hosts were unreachable",
+    99: "the configure was interrupted before the playbook finished",
+    250: "ansible exited with an unexpected error",
+}
+
+
+def ansible_exit_reason(exit_code: int) -> str | None:
+    """What an ansible exit code means, or None when it is not one we name.
+
+    None for 0 and for anything unrecognised, so the caller falls through to
+    the ordinary log scrape rather than inventing a reason.
+    """
+    return _ANSIBLE_EXIT_REASONS.get(exit_code)
+
+
 def failure_reason(exit_code: int, phase_logs: list[Path]) -> str | None:
     """Why the run failed, or None for a clean exit or an unknown cause.
 

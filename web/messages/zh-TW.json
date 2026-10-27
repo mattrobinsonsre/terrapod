@@ -2274,7 +2274,9 @@
         "label": "依主機篩選",
         "title": "僅顯示一台主機的輸出。任務標題與彙總仍會保持可見。",
         "all": "所有主機"
-      }
+      },
+      "lastOutput": "最後輸出 {when}",
+      "lastOutputTitle": "此設定上次產生輸出距今多久。沉默過久的設定會被判為錯誤。"
     },
     "policyPanel": {
       "heading": "策略檢查",

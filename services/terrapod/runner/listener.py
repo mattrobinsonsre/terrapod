@@ -890,6 +890,11 @@ class RunnerListener:
                 workspace_id=attrs.get("workspace-id", ""),
                 resource_cpu=attrs.get("resource-cpu", "1"),
                 resource_memory=attrs.get("resource-memory", "2Gi"),
+                # The run's own Job deadline (#1977). The API sends this only
+                # for a configure, so the builder's 60-minute default still
+                # applies to every plan, apply, preview and up -- the spec this
+                # listener has always built.
+                timeout_minutes=int(attrs.get("timeout-minutes") or 60),
                 # The Ansible execution environment (#2154). Absent from an API
                 # that predates it, and absent on every plan and apply, so the
                 # default renders exactly the spec this listener always built:

@@ -2274,7 +2274,9 @@
         "label": "Nach Host filtern",
         "title": "Nur die Ausgabe eines einzelnen Hosts anzeigen. Task-Überschriften und die Zusammenfassung bleiben sichtbar.",
         "all": "Alle Hosts"
-      }
+      },
+      "lastOutput": "Letzte Ausgabe {when}",
+      "lastOutputTitle": "Wie lange es her ist, dass diese Konfiguration zuletzt eine Ausgabe erzeugt hat. Eine, die zu lange still bleibt, wird mit einem Fehler beendet."
     },
     "policyPanel": {
       "heading": "Richtlinienprüfungen",

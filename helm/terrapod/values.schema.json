@@ -488,6 +488,14 @@
         },
         "applyServiceAccount": {
           "$ref": "#/$defs/serviceAccountSpec"
+        },
+        "configureTimeoutMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "configureNoProgressSeconds": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -2203,12 +2211,19 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "ee_repository": { "type": "string" },
+            "ee_repository": {
+              "type": "string"
+            },
             "execution_environments": {
               "type": "object",
-              "additionalProperties": { "type": "string" }
+              "additionalProperties": {
+                "type": "string"
+              }
             },
-            "availability_ttl_seconds": { "type": "integer", "minimum": 0 }
+            "availability_ttl_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "catalog": {

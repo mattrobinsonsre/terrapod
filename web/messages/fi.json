@@ -2274,7 +2274,9 @@
         "label": "Suodata isännän mukaan",
         "title": "Näytä vain yhden isännän tuloste. Tehtävien otsikot ja yhteenveto pysyvät näkyvissä.",
         "all": "Kaikki isännät"
-      }
+      },
+      "lastOutput": "Viimeisin tuloste {when}",
+      "lastOutputTitle": "Kuinka kauan sitten tämä konfigurointi tuotti viimeksi tulostetta. Liian kauan hiljaa pysyvä päättyy virheeseen."
     },
     "policyPanel": {
       "heading": "Käytäntötarkistukset",

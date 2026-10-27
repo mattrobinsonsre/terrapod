@@ -2274,7 +2274,9 @@
         "label": "Filtrera efter värd",
         "title": "Visa endast utdata från en enda värd. Uppgiftsrubriker och sammanfattningen förblir synliga.",
         "all": "Alla värdar"
-      }
+      },
+      "lastOutput": "Senaste utdata {when}",
+      "lastOutputTitle": "Hur länge sedan denna konfigurering senast producerade utdata. En som är tyst för länge misslyckas."
     },
     "policyPanel": {
       "heading": "Policykontroller",
