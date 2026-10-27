@@ -2417,6 +2417,28 @@ class Variable(Base):
     apply_only: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=sa.false()
     )
+
+    #: Withhold from a plan AND from an apply; deliver only to a configure
+    #: (#2190). The fleet's own credential -- an SSH private key to the estate,
+    #: a become password -- which nothing in a plan or an apply has any business
+    #: holding.
+    #:
+    #: A THIRD slot rather than a rename of the second, because a configure
+    #: already receives every apply-only row: `PHASES_SEEING_APPLY_ONLY` is
+    #: `{"apply", "configure"}` (#2200), on the grounds that a configure runs
+    #: the repository's playbooks against real hosts and is a write with
+    #: apply-equivalent blast radius. So `apply_only` cannot express "not in an
+    #: apply either", which is precisely what a machine credential wants.
+    #:
+    #: Two booleans rather than a three-valued field, following #2189 and the
+    #: workspace operation flags (#1966): a parsed value kept in step across the
+    #: API, the SDK, the provider, MCP and the UI gets mistyped into a third
+    #: meaning eventually, and a boolean cannot be. Both-true is therefore
+    #: representable and is refused at the write boundary, rather than being
+    #: given a resolution nobody would predict.
+    configure_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -2429,7 +2451,8 @@ class Variable(Base):
     workspace: Mapped[Workspace] = relationship(back_populates="variables")
 
     __table_args__ = (
-        # A variable is identified by (key, category, apply_only), not key alone.
+        # A variable is identified by (key, category, apply_only, configure_only),
+        # not key alone.
         #
         # (key, category) is #1898: a workspace may hold `native:region` and
         # `env:region` at once -- an input variable and an environment variable of
@@ -2437,9 +2460,21 @@ class Variable(Base):
         # refused. `apply_only` is #2189: the same key may ALSO be held twice with
         # one copy withheld from the plan, so a read-only role can serve plans
         # while a writing role serves applies. The two are orthogonal, so the
-        # constraint carries both rather than choosing.
+        # constraint carries both rather than choosing. `configure_only` is #2190,
+        # a THIRD orthogonal dimension: the same key may be held once more as the
+        # fleet's own credential, reaching neither a plan nor an apply. A later
+        # migration that drops and recreates this constraint must list all three
+        # -- #1898's did exactly that and silently took `apply_only` back out, and
+        # only `tests/integration/test_migrated_schema_matches_models.py` can see
+        # it, because every other tier builds its tables from this metadata rather
+        # than by running the chain.
         sa.UniqueConstraint(
-            "workspace_id", "key", "category", "apply_only", name="uq_variables_workspace_key"
+            "workspace_id",
+            "key",
+            "category",
+            "apply_only",
+            "configure_only",
+            name="uq_variables_workspace_key",
         ),
         Index("ix_variables_workspace_id", "workspace_id"),
     )
@@ -2524,6 +2559,28 @@ class VariableSetVariable(Base):
     apply_only: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=sa.false()
     )
+
+    #: Withhold from a plan AND from an apply; deliver only to a configure
+    #: (#2190). The fleet's own credential -- an SSH private key to the estate,
+    #: a become password -- which nothing in a plan or an apply has any business
+    #: holding.
+    #:
+    #: A THIRD slot rather than a rename of the second, because a configure
+    #: already receives every apply-only row: `PHASES_SEEING_APPLY_ONLY` is
+    #: `{"apply", "configure"}` (#2200), on the grounds that a configure runs
+    #: the repository's playbooks against real hosts and is a write with
+    #: apply-equivalent blast radius. So `apply_only` cannot express "not in an
+    #: apply either", which is precisely what a machine credential wants.
+    #:
+    #: Two booleans rather than a three-valued field, following #2189 and the
+    #: workspace operation flags (#1966): a parsed value kept in step across the
+    #: API, the SDK, the provider, MCP and the UI gets mistyped into a third
+    #: meaning eventually, and a boolean cannot be. Both-true is therefore
+    #: representable and is refused at the write boundary, rather than being
+    #: given a resolution nobody would predict.
+    configure_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -2536,9 +2593,14 @@ class VariableSetVariable(Base):
     variable_set: Mapped[VariableSet] = relationship(back_populates="variables")
 
     __table_args__ = (
-        # Same identity as a workspace variable (#1898, #2189).
+        # Same identity as a workspace variable (#1898, #2189, #2190).
         sa.UniqueConstraint(
-            "variable_set_id", "key", "category", "apply_only", name="uq_variable_set_variables"
+            "variable_set_id",
+            "key",
+            "category",
+            "apply_only",
+            "configure_only",
+            name="uq_variable_set_variables",
         ),
         Index("ix_variable_set_variables_set_id", "variable_set_id"),
     )
