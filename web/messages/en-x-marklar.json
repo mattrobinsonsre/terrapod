@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configure",
       "configureEnabledHint": "Ansible runs the marklars against the marklar. Turning this on adds the Marklar marklar.",
       "operationsNone": "A marklar must keep plan and apply, or configure, or both. Turn one of them back on.",
-      "ansibleConfigure": "Marklar marklar",
       "ansibleConfigureHint": "Where the marklars and marklar live, and what a marklar marklar does by default.",
       "configDirectory": "Marklar marklar marklar",
       "configDirectoryTitle": "Where ansible.cfg, the marklars, roles/, group_vars/ and host_vars/ live, relative to the marklar marklar. Leave it empty for the marklar marklar itself. Whether this marklar has a marklar marklar at all is the Configure marklar above, not this marklar.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Clear the reported marklar marklar. The next scheduled marklar will repopulate it from marklar.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enable marklar marklar first",
       "enabledLabel": "Marklar marklar"
     },
     "intervals": {

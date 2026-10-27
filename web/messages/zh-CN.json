@@ -2602,7 +2602,6 @@
       "configureEnabled": "配置",
       "configureEnabledHint": "Ansible 针对清单运行 playbook。启用后会出现 清单 选项卡。",
       "operationsNone": "工作区必须保留计划与应用、配置，或两者之一。请重新启用其中一项。",
-      "ansibleConfigure": "Ansible 配置",
       "ansibleConfigureHint": "playbook 与清单所在的位置，以及配置运行默认的行为。",
       "configDirectory": "Ansible 配置目录",
       "configDirectoryTitle": "ansible.cfg、playbook、roles/、group_vars/ 和 host_vars/ 所在的位置，相对于仓库根目录。若就是仓库根目录本身，请留空。此工作区是否拥有配置操作由上方的 配置 设置决定，而不是这个路径。",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "清除已报告的漂移状态。下次计划检查将根据实际情况重新填充它。",
       "lastChecked": "上次检查",
       "checkNow": "立即检查",
-      "checkNowTitleDisabled": "请先启用漂移检测",
       "enabledLabel": "漂移检测"
     },
     "intervals": {

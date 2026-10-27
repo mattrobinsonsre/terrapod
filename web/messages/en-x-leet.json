@@ -2602,7 +2602,6 @@
       "configureEnabled": "C0nf1gur3",
       "configureEnabledHint": "4n51bl3 run5 7h3 pl4yb00k5 4g41n57 7h3 1nv3n70ry. 7urn1ng 7h15 0n 4dd5 7h3 1nv3n70ry 74b.",
       "operationsNone": "4 w0rk5p4c3 mu57 k33p pl4n 4nd 4pply, 0r c0nf1gur3, 0r b07h. 7urn 0n3 0f 7h3m b4ck 0n.",
-      "ansibleConfigure": "4n51bl3 c0nf1gur3",
       "ansibleConfigureHint": "Wh3r3 7h3 pl4yb00k5 4nd 1nv3n70ry l1v3, 4nd wh47 4 c0nf1gur3 run d035 by d3f4ul7.",
       "configDirectory": "4n51bl3 c0nf1g d1r3c70ry",
       "configDirectoryTitle": "Wh3r3 4n51bl3.cfg, 7h3 pl4yb00k5, r0l35/, gr0up_v4r5/ 4nd h057_v4r5/ l1v3, r3l471v3 70 7h3 r3p05170ry r007. L34v3 17 3mp7y f0r 7h3 r3p05170ry r007 1753lf. Wh37h3r 7h15 w0rk5p4c3 h45 4 c0nf1gur3 0p3r4710n 47 4ll 15 7h3 C0nf1gur3 53771ng 4b0v3, n07 7h15 p47h.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Cl34r 7h3 r3p0r73d dr1f7 57473. 7h3 n3x7 5ch3dul3d ch3ck w1ll r3p0pul473 17 fr0m r34l17y.",
       "lastChecked": "L457 Ch3ck3d",
       "checkNow": "Ch3ck N0w",
-      "checkNowTitleDisabled": "3n4bl3 dr1f7 d373c710n f1r57",
       "enabledLabel": "Dr1f7 d373c710n"
     },
     "intervals": {

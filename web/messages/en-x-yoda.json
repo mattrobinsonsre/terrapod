@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configure",
       "configureEnabledHint": "Against the inventory, Ansible runs the playbooks. The Inventory tab, turning this on adds.",
       "operationsNone": "Plan and apply, or configure, or both, a workspace must keep. Back on, turn one of them.",
-      "ansibleConfigure": "configure, Ansible",
       "ansibleConfigureHint": "Where the playbooks and inventory live, and what by default a configure run does.",
       "configDirectory": "directory, Ansible config",
       "configDirectoryTitle": "Relative to the repository root, where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, this is. For the repository root itself, leave it empty. The Configure setting above it is, not this path, that decides whether a configure operation at all this workspace has.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "The reported drift state, clear. From reality, the next scheduled check repopulate it will.",
       "lastChecked": "Checked, Last",
       "checkNow": "Now, Check",
-      "checkNowTitleDisabled": "Drift detection first, enable it",
       "enabledLabel": "Detection, Drift"
     },
     "intervals": {

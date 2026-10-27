@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurieren",
       "configureEnabledHint": "Ansible führt die Playbooks gegen das Inventar aus. Wird dies aktiviert, erscheint der Tab Inventar.",
       "operationsNone": "Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten. Aktivieren Sie eines davon wieder.",
-      "ansibleConfigure": "Ansible-Konfiguration",
       "ansibleConfigureHint": "Wo die Playbooks und das Inventar liegen und was ein Konfigurationslauf standardmäßig tut.",
       "configDirectory": "Ansible-Konfigurationsverzeichnis",
       "configDirectoryTitle": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer lassen für das Repository-Wurzelverzeichnis selbst. Ob dieser Workspace überhaupt eine Konfigurationsoperation hat, entscheidet die Einstellung Konfigurieren oben, nicht dieser Pfad.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Den gemeldeten Drift-Status löschen. Die nächste geplante Prüfung füllt ihn anhand des tatsächlichen Zustands neu.",
       "lastChecked": "Zuletzt geprüft",
       "checkNow": "Jetzt prüfen",
-      "checkNowTitleDisabled": "Aktivieren Sie zuerst die Drift-Erkennung",
       "enabledLabel": "Drift-Erkennung"
     },
     "intervals": {

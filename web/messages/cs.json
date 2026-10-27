@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurace",
       "configureEnabledHint": "Ansible spouští playbooky proti inventáři. Zapnutím se přidá karta Inventář.",
       "operationsNone": "Pracovní prostor si musí ponechat plánování a použití, konfiguraci nebo obojí. Jedno z nich znovu zapněte.",
-      "ansibleConfigure": "Konfigurace Ansible",
       "ansibleConfigureHint": "Kde leží playbooky a inventář a co konfigurační běh dělá ve výchozím stavu.",
       "configDirectory": "Konfigurační adresář Ansible",
       "configDirectoryTitle": "Kde leží ansible.cfg, playbooky, roles/, group_vars/ a host_vars/, relativně ke kořeni repozitáře. Pro samotný kořen repozitáře nechte prázdné. Jestli tento pracovní prostor vůbec má konfigurační operaci, rozhoduje nastavení Konfigurace výše, nikoli tato cesta.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Vymazat nahlášený stav odchýlení. Další naplánovaná kontrola jej znovu naplní podle reality.",
       "lastChecked": "Naposledy zkontrolováno",
       "checkNow": "Zkontrolovat nyní",
-      "checkNowTitleDisabled": "Nejprve povolte detekci odchýlení",
       "enabledLabel": "Detekce odchýlení"
     },
     "intervals": {

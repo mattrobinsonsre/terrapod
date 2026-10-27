@@ -47,7 +47,7 @@ const panel = read('src', 'components', 'inventory-panel.tsx')
 const bulk = read('src', 'app', 'admin', 'bulk-update', 'page.tsx')
 const autodiscovery = read('src', 'app', 'admin', 'autodiscovery', 'page.tsx')
 /** The shared field table both workspace forms render from (#2253). */
-const fields = read('src', 'components', 'workspace-fields.tsx')
+const fields = read('src', 'lib', 'workspace-fields.ts')
 
 /** Every surface that writes a workspace or the rule that materialises one. */
 const WRITERS = [
@@ -150,7 +150,7 @@ test('the read-only render has TWO states, and the empty one says "root"', () =>
 test('both operation booleans are offered on the workspace editor', () => {
   // The property is unchanged; where it is written down moved. Since #2253 the
   // editor renders from the shared field table, so the DOM id and the label key
-  // live in `workspace-fields.tsx` and the page names only the attribute — the
+  // live in `lib/workspace-fields.ts` and the page names only the attribute — the
   // literal `id="ws-plan-apply-enabled"` this used to match is now derived from
   // `FIELD_BY_ATTR`.
   //

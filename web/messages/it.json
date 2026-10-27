@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurare",
       "configureEnabledHint": "Ansible esegue i playbook sull'inventario. Attivandolo compare la scheda Inventario.",
       "operationsNone": "Uno spazio di lavoro deve conservare pianificare e applicare, o configurare, o entrambe. Riattivane una.",
-      "ansibleConfigure": "Configurazione Ansible",
       "ansibleConfigureHint": "Dove si trovano i playbook e l'inventario, e cosa fa per impostazione predefinita un'esecuzione di configurazione.",
       "configDirectory": "Directory di configurazione Ansible",
       "configDirectoryTitle": "Dove si trovano ansible.cfg, i playbook, roles/, group_vars/ e host_vars/, rispetto alla radice del repository. Lascia vuoto per la radice del repository stessa. Se questo spazio di lavoro abbia o no un'operazione di configurazione lo decide l'impostazione Configurare qui sopra, non questo percorso.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Cancella lo stato di deriva segnalato. Il prossimo controllo pianificato lo ripopolerà a partire dalla realtà.",
       "lastChecked": "Ultimo controllo",
       "checkNow": "Controlla ora",
-      "checkNowTitleDisabled": "Attiva prima il rilevamento della deriva",
       "enabledLabel": "Rilevamento della deriva"
     },
     "intervals": {

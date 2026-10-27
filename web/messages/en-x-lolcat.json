@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigur",
       "configureEnabledHint": "Ansibul runz teh playbookz agenst teh inventree. Turnin dis on addz teh Inventree tab.",
       "operationsNone": "A werkspace must keep plan an apply, or konfigur, or bof. Turn wun of em bak on. srsly",
-      "ansibleConfigure": "Ansibul Konfigur",
       "ansibleConfigureHint": "Wher teh playbookz an teh inventoree livez, an wot a konfigur run doez by defawlt.",
       "configDirectory": "Ansibul Konfig Direktoree",
       "configDirectoryTitle": "Wher ansible.cfg an teh playbookz an roles/ an group_vars/ an host_vars/ livez, relativ ta teh reepo root. Leev it empteh fer teh reepo root itself. Wether dis werkspace haz a konfigur opurashun at all iz teh Konfigur setting abuv, not dis path. srsly",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Cleer teh reportd drift state. Teh nekst scheduld check will repopulayt it frum reality.",
       "lastChecked": "Last Checkd",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enabul drift deteckshun furst",
       "enabledLabel": "Drift deteckshun"
     },
     "intervals": {

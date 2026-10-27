@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurare",
       "configureEnabledHint": "Ansible libellos ludendi adversus inventarium exsequitur. Hoc activatum plicam Inventarium addit.",
       "operationsNone": "Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet. Unum eorum rursus activa.",
-      "ansibleConfigure": "Configuratio Ansible",
       "ansibleConfigureHint": "Ubi libelli ludendi et inventarium habitant, et quid cursus configurandi praedefinite agat.",
       "configDirectory": "Directorium configurationis Ansible",
       "configDirectoryTitle": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum relinque pro ipsa radice repositorii. Utrum hoc spatium operis operationem configurandi omnino habeat, optio Configurare supra decernit, non haec via.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Vacua statum aberrationis relatum. Proxima inspectio ordinata eum ex realitate reimplebit.",
       "lastChecked": "Ultimo Inspectum",
       "checkNow": "Nunc Inspicere",
-      "checkNowTitleDisabled": "Prius inventionem aberrationis activa",
       "enabledLabel": "Inventio Aberrationis"
     },
     "intervals": {

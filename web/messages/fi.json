@@ -2602,7 +2602,6 @@
       "configureEnabled": "Määritys",
       "configureEnabledHint": "Ansible ajaa playbookit inventaariota vasten. Tämän käyttöönotto lisää Inventaario-välilehden.",
       "operationsNone": "Työtilan on säilytettävä suunnittelu ja käyttöönotto, määritys tai molemmat. Ota toinen niistä uudelleen käyttöön.",
-      "ansibleConfigure": "Ansible-määritys",
       "ansibleConfigureHint": "Missä playbookit ja inventaario sijaitsevat ja mitä määritysajo tekee oletuksena.",
       "configDirectory": "Ansible-asetushakemisto",
       "configDirectoryTitle": "Missä ansible.cfg, playbookit, roles/, group_vars/ ja host_vars/ sijaitsevat, suhteessa tietovaraston juureen. Jätä tyhjäksi, jos kyse on tietovaraston juuresta itsestään. Onko tällä työtilalla lainkaan määritystoimintoa, ratkaisee yllä oleva Määritys-asetus eikä tämä polku.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Tyhjennä raportoitu ajautumatila. Seuraava ajoitettu tarkistus täyttää sen uudelleen todellisuudesta.",
       "lastChecked": "Viimeksi tarkistettu",
       "checkNow": "Tarkista nyt",
-      "checkNowTitleDisabled": "Ota ajautuman tunnistus ensin käyttöön",
       "enabledLabel": "Ajautuman tunnistus"
     },
     "intervals": {

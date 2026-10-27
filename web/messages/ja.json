@@ -2602,7 +2602,6 @@
       "configureEnabled": "構成",
       "configureEnabledHint": "Ansible がインベントリに対してプレイブックを実行します。これを有効にすると インベントリ タブが追加されます。",
       "operationsNone": "ワークスペースはプランと適用、構成、またはその両方のいずれかを保持する必要があります。どちらか一方を再度有効にしてください。",
-      "ansibleConfigure": "Ansible 構成",
       "ansibleConfigureHint": "プレイブックとインベントリの場所、および構成実行の既定の動作。",
       "configDirectory": "Ansible 設定ディレクトリ",
       "configDirectoryTitle": "ansible.cfg、プレイブック、roles/、group_vars/、host_vars/ の場所をリポジトリのルートからの相対パスで指定します。リポジトリのルート自体の場合は空のままにしてください。このワークスペースが構成操作を持つかどうかは、上の 構成 設定が決めるものであり、このパスではありません。",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "報告されたドリフト状態をクリアします。次回のスケジュールされたチェックが実際の状態から再取得します。",
       "lastChecked": "最終チェック",
       "checkNow": "今すぐチェック",
-      "checkNowTitleDisabled": "まずドリフト検出を有効にしてください",
       "enabledLabel": "ドリフト検出"
     },
     "intervals": {

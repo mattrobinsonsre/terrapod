@@ -2602,7 +2602,6 @@
       "configureEnabled": "Yapılandırma",
       "configureEnabledHint": "Ansible, playbook'ları envantere karşı çalıştırır. Bunu açmak Envanter sekmesini ekler.",
       "operationsNone": "Bir çalışma alanı planlama ve uygulamayı, yapılandırmayı ya da ikisini birlikte korumalıdır. Bunlardan birini yeniden açın.",
-      "ansibleConfigure": "Ansible yapılandırması",
       "ansibleConfigureHint": "Playbook'ların ve envanterin bulunduğu yer ve bir yapılandırma çalıştırmasının varsayılan olarak ne yaptığı.",
       "configDirectory": "Ansible yapılandırma dizini",
       "configDirectoryTitle": "ansible.cfg, playbook'lar, roles/, group_vars/ ve host_vars/ dosyalarının depo kökünden göreli olarak bulunduğu yer. Deponun kendi kökü için boş bırakın. Bu çalışma alanının hiç yapılandırma işlemi olup olmadığına yukarıdaki Yapılandırma ayarı karar verir, bu yol değil.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Bildirilen sürüklenme durumunu temizle. Bir sonraki planlı denetim onu gerçeklikten yeniden dolduracak.",
       "lastChecked": "Son Denetim",
       "checkNow": "Şimdi Denetle",
-      "checkNowTitleDisabled": "Önce sürüklenme tespitini etkinleştirin",
       "enabledLabel": "Sürüklenme Tespiti"
     },
     "intervals": {

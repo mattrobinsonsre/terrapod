@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configureren",
       "configureEnabledHint": "Ansible voert de playbooks uit tegen de inventaris. Dit aanzetten voegt het tabblad Inventaris toe.",
       "operationsNone": "Een workspace moet plannen en toepassen, of configureren, of beide houden. Zet er weer één aan.",
-      "ansibleConfigure": "Ansible-configure",
       "ansibleConfigureHint": "Waar de playbooks en de inventaris staan, en wat een configure-run standaard doet.",
       "configDirectory": "Ansible-configuratiemap",
       "configDirectoryTitle": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Laat dit leeg voor de repositorywortel zelf. Of deze workspace überhaupt een configure-operatie heeft, bepaalt de instelling Configureren hierboven, niet dit pad.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Wis de gerapporteerde driftstatus. De volgende geplande controle vult deze opnieuw op basis van de werkelijkheid.",
       "lastChecked": "Laatst gecontroleerd",
       "checkNow": "Nu controleren",
-      "checkNowTitleDisabled": "Schakel eerst driftdetectie in",
       "enabledLabel": "Driftdetectie"
     },
     "intervals": {

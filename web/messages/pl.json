@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfiguracja",
       "configureEnabledHint": "Ansible uruchamia playbooki na inwentarzu. Włączenie tego dodaje kartę Inwentarz.",
       "operationsNone": "Przestrzeń robocza musi zachować planowanie i stosowanie, konfigurację albo oba. Włącz jedno z nich ponownie.",
-      "ansibleConfigure": "Konfiguracja Ansible",
       "ansibleConfigureHint": "Gdzie znajdują się playbooki i inwentarz oraz co domyślnie robi uruchomienie konfiguracji.",
       "configDirectory": "Katalog konfiguracji Ansible",
       "configDirectoryTitle": "Gdzie znajdują się ansible.cfg, playbooki, roles/, group_vars/ i host_vars/, względem katalogu głównego repozytorium. Pozostaw puste dla samego katalogu głównego repozytorium. O tym, czy ta przestrzeń robocza ma operację konfiguracji, decyduje ustawienie Konfiguracja powyżej, a nie ta ścieżka.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Wyczyść zgłoszony stan dryfu. Następne zaplanowane sprawdzenie ponownie wypełni go na podstawie rzeczywistości.",
       "lastChecked": "Ostatnio sprawdzono",
       "checkNow": "Sprawdź teraz",
-      "checkNowTitleDisabled": "Najpierw włącz wykrywanie dryfu",
       "enabledLabel": "Wykrywanie dryfu"
     },
     "intervals": {

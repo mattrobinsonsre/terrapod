@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurera",
       "configureEnabledHint": "Ansible kör playbooken mot inventariet. Att slå på detta lägger till fliken Inventarium.",
       "operationsNone": "En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda. Slå på en av dem igen.",
-      "ansibleConfigure": "Ansible-konfiguration",
       "ansibleConfigureHint": "Var playbooken och inventariet finns, och vad en konfigurationskörning gör som standard.",
       "configDirectory": "Ansible-konfigurationskatalog",
       "configDirectoryTitle": "Var ansible.cfg, playbooken, roles/, group_vars/ och host_vars/ finns, relativt förrådets rot. Lämna tomt för förrådets rot själv. Om den här arbetsytan alls har en konfigurationsoperation avgörs av inställningen Konfigurera ovan, inte av den här sökvägen.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Rensa det rapporterade drifttillståndet. Nästa schemalagda kontroll återfyller det från verkligheten.",
       "lastChecked": "Senast kontrollerad",
       "checkNow": "Kontrollera nu",
-      "checkNowTitleDisabled": "Aktivera driftupptäckt först",
       "enabledLabel": "Driftupptäckt"
     },
     "intervals": {

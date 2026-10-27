@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurar",
       "configureEnabledHint": "Ansible ejecuta los playbooks contra el inventario. Al activarlo aparece la pestaña Inventario.",
       "operationsNone": "Un espacio de trabajo debe conservar planificar y aplicar, o configurar, o ambas. Vuelve a activar una de las dos.",
-      "ansibleConfigure": "Configuración de Ansible",
       "ansibleConfigureHint": "Dónde están los playbooks y el inventario, y qué hace de forma predeterminada una ejecución de configuración.",
       "configDirectory": "Directorio de configuración de Ansible",
       "configDirectoryTitle": "Dónde están ansible.cfg, los playbooks, roles/, group_vars/ y host_vars/, en relación con la raíz del repositorio. Déjalo vacío para la propia raíz del repositorio. Que este espacio de trabajo tenga o no una operación de configuración lo decide el ajuste Configurar de arriba, no esta ruta.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Borrar el estado de desviación reportado. La siguiente comprobación programada lo repoblará a partir de la realidad.",
       "lastChecked": "Última comprobación",
       "checkNow": "Comprobar ahora",
-      "checkNowTitleDisabled": "Habilite primero la detección de desviación",
       "enabledLabel": "Detección de desviación"
     },
     "intervals": {

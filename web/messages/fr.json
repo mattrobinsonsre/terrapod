@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurer",
       "configureEnabledHint": "Ansible exécute les playbooks sur l'inventaire. L'activer fait apparaître l'onglet Inventaire.",
       "operationsNone": "Un espace de travail doit conserver planifier et appliquer, ou configurer, ou les deux. Réactivez l'une des deux.",
-      "ansibleConfigure": "Configuration Ansible",
       "ansibleConfigureHint": "Où se trouvent les playbooks et l'inventaire, et ce que fait par défaut une exécution de configuration.",
       "configDirectory": "Répertoire de configuration Ansible",
       "configDirectoryTitle": "Où se trouvent ansible.cfg, les playbooks, roles/, group_vars/ et host_vars/, par rapport à la racine du dépôt. Laissez vide pour la racine du dépôt elle-même. C'est le réglage Configurer ci-dessus qui détermine si cet espace de travail a une opération de configuration, et non ce chemin.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Effacer l'état de dérive signalé. La prochaine vérification planifiée le repeuplera à partir de la réalité.",
       "lastChecked": "Dernière vérification",
       "checkNow": "Vérifier maintenant",
-      "checkNowTitleDisabled": "Activez d'abord la détection de dérive",
       "enabledLabel": "Détection de dérive"
     },
     "intervals": {

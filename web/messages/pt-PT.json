@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurar",
       "configureEnabledHint": "O Ansible executa os playbooks contra o inventário. Ativar isto acrescenta o separador Inventário.",
       "operationsNone": "Uma área de trabalho tem de manter planear e aplicar, ou configurar, ou ambas. Volte a ativar uma delas.",
-      "ansibleConfigure": "Configuração do Ansible",
       "ansibleConfigureHint": "Onde se encontram os playbooks e o inventário, e o que uma execução de configuração faz por predefinição.",
       "configDirectory": "Diretório de configuração do Ansible",
       "configDirectoryTitle": "Onde se encontram ansible.cfg, os playbooks, roles/, group_vars/ e host_vars/, relativamente à raiz do repositório. Deixe vazio para a própria raiz do repositório. Se esta área de trabalho tem ou não uma operação de configuração é decidido pela definição Configurar acima, não por este caminho.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Limpar o estado de drift relatado. A próxima verificação agendada volta a preenchê-lo com a realidade.",
       "lastChecked": "Última Verificação",
       "checkNow": "Verificar Agora",
-      "checkNowTitleDisabled": "Ative primeiro a deteção de drift",
       "enabledLabel": "Deteção de Drift"
     },
     "intervals": {

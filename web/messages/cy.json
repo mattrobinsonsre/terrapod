@@ -2602,7 +2602,6 @@
       "configureEnabled": "Cyflunio",
       "configureEnabledHint": "Mae Ansible yn rhedeg y llyfrau chwarae yn erbyn y rhestr eiddo. Mae troi hyn ymlaen yn ychwanegu'r tab Rhestr Eiddo.",
       "operationsNone": "Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau. Trowch un ohonynt yn ôl ymlaen.",
-      "ansibleConfigure": "Cyflunio Ansible",
       "ansibleConfigureHint": "Lle mae'r llyfrau chwarae a'r rhestr eiddo yn byw, a beth mae rhediad cyflunio yn ei wneud yn rhagosodedig.",
       "configDirectory": "Cyfeiriadur cyfluniad Ansible",
       "configDirectoryTitle": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Gadewch hwn yn wag ar gyfer gwraidd y gadwrfa ei hun. Y gosodiad Cyflunio uchod sy'n penderfynu a oes gan y gweithle hwn weithrediad cyflunio o gwbl, nid y llwybr hwn.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Clirio'r cyflwr drifft a adroddwyd. Bydd y gwiriad amserlenedig nesaf yn ei ail-boblogi o'r realiti.",
       "lastChecked": "Gwiriwyd Ddiwethaf",
       "checkNow": "Gwirio Nawr",
-      "checkNowTitleDisabled": "Galluogwch ganfod drifft yn gyntaf",
       "enabledLabel": "Canfod Drifft"
     },
     "intervals": {

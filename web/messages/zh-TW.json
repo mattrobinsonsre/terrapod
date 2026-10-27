@@ -2602,7 +2602,6 @@
       "configureEnabled": "設定",
       "configureEnabledHint": "Ansible 針對清單執行 playbook。啟用後會出現 清單 索引標籤。",
       "operationsNone": "工作區必須保留計畫與套用、設定，或兩者之一。請重新啟用其中一項。",
-      "ansibleConfigure": "Ansible 設定",
       "ansibleConfigureHint": "playbook 與清冊所在的位置，以及設定執行預設的行為。",
       "configDirectory": "Ansible 設定目錄",
       "configDirectoryTitle": "ansible.cfg、playbook、roles/、group_vars/ 與 host_vars/ 所在的位置，相對於儲存庫根目錄。若就是儲存庫根目錄本身，請留空。此工作區是否擁有設定作業由上方的 設定 選項決定，而不是這個路徑。",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "清除已報告的漂移狀態。下次計畫檢查將根據實際情況重新填充它。",
       "lastChecked": "上次檢查",
       "checkNow": "立即檢查",
-      "checkNowTitleDisabled": "請先啟用漂移檢測",
       "enabledLabel": "漂移檢測"
     },
     "intervals": {

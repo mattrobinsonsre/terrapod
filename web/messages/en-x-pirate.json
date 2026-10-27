@@ -2602,7 +2602,6 @@
       "configureEnabled": "Riggin''",
       "configureEnabledHint": "Ansible runs th'' playbooks against th'' manifest. Hoistin'' this adds th'' Ship''s Manifest tab.",
       "operationsNone": "A work-deck must keep chart an'' make good, or riggin'', or both. Hoist one o'' them back up, arr.",
-      "ansibleConfigure": "Ansible riggin''",
       "ansibleConfigureHint": "Where th'' playbooks an'' th'' manifest be stowed, an'' what a riggin'' voyage does by default.",
       "configDirectory": "Ansible chart locker",
       "configDirectoryTitle": "Where ansible.cfg, th'' playbooks, roles/, group_vars/ an'' host_vars/ be stowed, reckoned from th'' cargo hold root. Leave it empty fer th'' cargo hold root itself. Whether this work-deck has a riggin'' order at all be th'' Riggin'' settin'' above, not this course, arr.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Clear th'' reported drift state. Th'' next scheduled check will repopulate it from reality.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enable drift detection first, matey",
       "enabledLabel": "Driftin'' detection"
     },
     "intervals": {

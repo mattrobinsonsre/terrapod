@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurer",
       "configureEnabledHint": "Ansible kører playbooks mod inventaret. Slår du dette til, kommer fanen Inventar frem.",
       "operationsNone": "Et arbejdsområde skal beholde planlæg og anvend, eller konfigurer, eller begge. Slå en af dem til igen.",
-      "ansibleConfigure": "Ansible-konfiguration",
       "ansibleConfigureHint": "Hvor playbooks og inventaret ligger, og hvad en konfigurationskørsel gør som standard.",
       "configDirectory": "Ansible-konfigurationsmappe",
       "configDirectoryTitle": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Lad feltet være tomt for depotets rod selv. Om dette arbejdsområde overhovedet har en konfigurationshandling, afgøres af indstillingen Konfigurer ovenfor, ikke af denne sti.",
@@ -2728,7 +2727,6 @@
       "dismissTitle": "Ryd den rapporterede afdriftstilstand. Det næste planlagte tjek genudfylder den fra virkeligheden.",
       "lastChecked": "Sidst tjekket",
       "checkNow": "Tjek nu",
-      "checkNowTitleDisabled": "Aktivér afdriftsregistrering først",
       "enabledLabel": "Afdriftsregistrering"
     },
     "intervals": {
