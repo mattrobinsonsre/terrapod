@@ -23,6 +23,7 @@ import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { WorkspacePicker } from '@/components/workspace-picker'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { PhaseSlotFlags, PhaseSlotNote } from '@/components/phase-slot-flags'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
@@ -207,6 +208,8 @@ interface Variable {
     structured: boolean
     sensitive: boolean
     'apply-only'?: boolean
+    /** The third phase slot (#2190): a configure sees it, a plan and an apply do not. */
+    'configure-only'?: boolean
     description: string
     /** "static" or "vault" (#1439). */
     'value-source'?: string
@@ -552,6 +555,7 @@ function WorkspaceDetailContent() {
   const [varCategory, setVarCategory] = useState('native')
   const [varSensitive, setVarSensitive] = useState(false)
   const [varApplyOnly, setVarApplyOnly] = useState(false)
+  const [varConfigureOnly, setVarConfigureOnly] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   // Git module-source auth builder (#1028): when the category is git_http_auth /
   // git_ssh_auth the form swaps to discrete credential fields that serialize into
@@ -700,6 +704,7 @@ function WorkspaceDetailContent() {
   const [editVarCategory, setEditVarCategory] = useState('native')
   const [editVarSensitive, setEditVarSensitive] = useState(false)
   const [editVarApplyOnly, setEditVarApplyOnly] = useState(false)
+  const [editVarConfigureOnly, setEditVarConfigureOnly] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
 
@@ -1858,6 +1863,16 @@ function WorkspaceDetailContent() {
     }
   }
 
+  // The ADD form's two phase-slot flags, bridged to the shared control so the
+  // mutual exclusion (#2190) is the one in `PhaseSlotFlags` rather than a
+  // second copy of the rule written out here.
+  const phaseSlots = { applyOnly: varApplyOnly, configureOnly: varConfigureOnly }
+
+  function patchPhaseSlots(patch: Partial<typeof phaseSlots>) {
+    if (patch.applyOnly !== undefined) setVarApplyOnly(patch.applyOnly)
+    if (patch.configureOnly !== undefined) setVarConfigureOnly(patch.configureOnly)
+  }
+
   // Flat edit state, shaped for the shared edit panel.
   const editPanelState = {
     key: editVarKey,
@@ -1865,6 +1880,7 @@ function WorkspaceDetailContent() {
     category: editVarCategory,
     sensitive: editVarSensitive,
     applyOnly: editVarApplyOnly,
+    configureOnly: editVarConfigureOnly,
     hcl: editVarHcl,
     source: editVarSource,
     vault: editVaultRef,
@@ -1876,6 +1892,7 @@ function WorkspaceDetailContent() {
     if (patch.category !== undefined) setEditVarCategory(patch.category)
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
     if (patch.applyOnly !== undefined) setEditVarApplyOnly(patch.applyOnly)
+    if (patch.configureOnly !== undefined) setEditVarConfigureOnly(patch.configureOnly)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
     if (patch.vault) setEditVaultRef(patch.vault)
@@ -1905,6 +1922,7 @@ function WorkspaceDetailContent() {
               // does not show for it.
               sensitive: isGitCat || isAnsibleCat || isVaultSource ? true : varSensitive,
               'apply-only': varApplyOnly,
+              'configure-only': varConfigureOnly,
               hcl: varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
             },
@@ -1920,6 +1938,7 @@ function WorkspaceDetailContent() {
       setVarCategory('native')
       setVarSensitive(false)
       setVarApplyOnly(false)
+      setVarConfigureOnly(false)
       setVarHcl(false)
       setGitSource('vcs_connection')
       setGitVcsConnId('')
@@ -2133,6 +2152,7 @@ function WorkspaceDetailContent() {
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
     setEditVarApplyOnly(v.attributes['apply-only'] ?? false)
+    setEditVarConfigureOnly(v.attributes['configure-only'] ?? false)
     setEditVarHcl(v.attributes.structured)
     ensureVaultAvailability()
 
@@ -2168,6 +2188,7 @@ function WorkspaceDetailContent() {
         category: editVarCategory,
         sensitive: isEditVault || isEditAnsible ? true : editVarSensitive,
         'apply-only': editVarApplyOnly,
+        'configure-only': editVarConfigureOnly,
         hcl: isEditAnsible ? false : editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
@@ -4589,16 +4610,22 @@ function WorkspaceDetailContent() {
                       value={varValue}
                       onChange={setVarValue}
                     />
-                    {/* Apply-only still applies, and on a credential it is the
-                        flag that matters most (#2189): a machine credential
-                        the configure needs is one the plan has no use for.
-                        There is no Sensitive checkbox — the API forces an
-                        Ansible credential sensitive, so a tickbox here would
-                        be a choice the operator does not have. */}
-                    <label className="flex items-center gap-2 cursor-pointer" title={t('variables.applyOnlyHint')}>
-                      <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">{t('variables.applyOnly')}</span>
-                    </label>
+                    {/* The phase slots still apply, and on a credential they
+                        matter most (#2189, #2190): a machine credential the
+                        configure needs is one the plan has no use for, and
+                        the fleet's own key is one the apply has no use for
+                        either. There is no Sensitive checkbox — the API
+                        forces an Ansible credential sensitive, so a tickbox
+                        here would be a choice the operator does not have. */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <PhaseSlotFlags
+                        namespace="workspaceDetail.variables"
+                        state={phaseSlots}
+                        onChange={patchPhaseSlots}
+                        labelClassName="text-sm text-slate-300"
+                      />
+                    </div>
+                    <PhaseSlotNote namespace="workspaceDetail.variables" state={phaseSlots} />
                   </>
                 )}
 
@@ -4633,17 +4660,24 @@ function WorkspaceDetailContent() {
                       <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>
                       <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1" rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
                     </div>
-                    <div className="flex items-end gap-4">
+                    {/* `flex-wrap` is load-bearing with four checkboxes: at
+                        phone width a single row of them overflows the grid
+                        cell, and a horizontal page scroll is the one thing the
+                        mobile guard refuses outright. */}
+                    <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                         <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
                       </label>
                       {/* Universal: withheld from the plan whatever the
-                          category (#2189). */}
-                      <label className="flex items-center gap-2 cursor-pointer" title={t('variables.applyOnlyHint')}>
-                        <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                        <span className="text-sm text-slate-300">{t('variables.applyOnly')}</span>
-                      </label>
+                          category (#2189), and from the apply as well when
+                          only a configure has any use for it (#2190). */}
+                      <PhaseSlotFlags
+                        namespace="workspaceDetail.variables"
+                        state={phaseSlots}
+                        onChange={patchPhaseSlots}
+                        labelClassName="text-sm text-slate-300"
+                      />
                       {/* Only a native variable can be typed: an environment
                           variable is a string by definition, so offering the
                           flag there was always meaningless (#1435).
@@ -4660,6 +4694,13 @@ function WorkspaceDetailContent() {
                           <span className="text-sm text-slate-300">{t('variables.structured')}</span>
                         </label>
                       )}
+                      {/* `w-full` puts the note on its own line of the wrapped
+                          row rather than squeezing it between two checkboxes. */}
+                      <PhaseSlotNote
+                        namespace="workspaceDetail.variables"
+                        state={phaseSlots}
+                        className="w-full text-xs text-slate-500"
+                      />
                     </div>
                   </div>
                 )}
@@ -4785,6 +4826,17 @@ function WorkspaceDetailContent() {
                               {v.attributes['apply-only'] && (
                                 <span title={t('variables.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
                               )}
+                              {/* A third slot means a key can now be held
+                                  THREE times, so the badge carries more
+                                  weight than it did: without it the rows are
+                                  identical text, and the category pill that
+                                  might otherwise tell them apart is
+                                  `hidden sm:table-cell`. Teal rather than
+                                  amber so the two slots are distinguishable
+                                  at a glance on adjacent rows. */}
+                              {v.attributes['configure-only'] && (
+                                <span title={t('variables.configureOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
+                              )}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
@@ -4845,6 +4897,9 @@ function WorkspaceDetailContent() {
                             {v.attributes.key}
                             {v.attributes['apply-only'] && (
                               <span title={t('variables.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                            )}
+                            {v.attributes['configure-only'] && (
+                              <span title={t('variables.configureOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
                             )}
                           </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

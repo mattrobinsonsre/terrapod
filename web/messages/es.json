@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativa",
       "structured": "Estructurada",
       "applyOnly": "Solo apply",
-      "applyOnlyHint": "Se retiene en un plan y se entrega solo a un apply. Un plan ejecuta el código de la configuración, así que una credencial que solo necesita el apply no debería estar en el entorno de un plan."
+      "applyOnlyHint": "Se retiene en un plan y se entrega solo a un apply. Un plan ejecuta el código de la configuración, así que una credencial que solo necesita el apply no debería estar en el entorno de un plan.",
+      "configureOnly": "Solo configurar",
+      "configureOnlyHint": "Se entrega solo a un configurar y se retiene tanto en un plan como en un apply. La credencial de la propia flota — una clave SSH del parque, una contraseña become — no pinta nada en ninguno de los dos.",
+      "phaseSlotExclusive": "Una variable ocupa una sola ranura a la vez. Solo apply llega a un apply y a un configurar; Solo configurar llega únicamente a un configurar."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configuración de Pulumi",
       "applyOnly": "Solo apply",
-      "applyOnlyHint": "Se retiene en un plan y se entrega solo a un apply. Un plan ejecuta el código de la configuración, así que una credencial que solo necesita el apply no debería estar en el entorno de un plan."
+      "applyOnlyHint": "Se retiene en un plan y se entrega solo a un apply. Un plan ejecuta el código de la configuración, así que una credencial que solo necesita el apply no debería estar en el entorno de un plan.",
+      "configureOnly": "Solo configurar",
+      "configureOnlyHint": "Se entrega solo a un configurar y se retiene tanto en un plan como en un apply. La credencial de la propia flota — una clave SSH del parque, una contraseña become — no pinta nada en ninguno de los dos.",
+      "phaseSlotExclusive": "Una variable ocupa una sola ranura a la vez. Solo apply llega a un apply y a un configurar; Solo configurar llega únicamente a un configurar."
     },
     "runs": {
       "options": "Opciones",

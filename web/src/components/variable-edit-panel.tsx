@@ -14,6 +14,7 @@
 import { useTranslations } from 'next-intl'
 
 import { nativeCategoryKey } from '@/lib/variable-category'
+import { PhaseSlotFlags, PhaseSlotNote } from '@/components/phase-slot-flags'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { VaultReferenceFields, type VaultReferenceValue } from '@/components/vault-reference-fields'
 import {
@@ -53,6 +54,7 @@ export interface VariableEditState {
   category: string
   sensitive: boolean
   applyOnly: boolean
+  configureOnly: boolean
   hcl: boolean
   source: 'static' | 'vault'
   vault: VaultReferenceValue
@@ -101,6 +103,10 @@ export function VariableEditPanel({
    */
   saveError?: string
 }) {
+  // The namespace is spelled out at each call rather than hoisted to a
+  // constant: `scripts/check-i18n-keys-resolve.mjs` extracts it by matching a
+  // string LITERAL, so a module whose namespace is a constant is skipped
+  // entirely -- hoisting it would drop every key in this file out of that gate.
   const t = useTranslations('workspaceDetail.variables')
   const tc = useTranslations('workspaceDetail.actions')
   const ta = useTranslations('ansibleCredentials')
@@ -243,16 +249,16 @@ export function VariableEditPanel({
             <span className="text-xs text-slate-400">{t('sensitive')}</span>
           </label>
           {/* Universal: a credential only the apply needs is withheld from the
-              plan whatever its category (#2189). */}
-          <label className="flex items-center gap-2 cursor-pointer" title={t('applyOnlyHint')}>
-            <input
-              type="checkbox"
-              checked={state.applyOnly}
-              onChange={(e) => onChange({ applyOnly: e.target.checked })}
-              className="rounded border-slate-600 bg-slate-700 text-brand-600"
-            />
-            <span className="text-xs text-slate-400">{t('applyOnly')}</span>
-          </label>
+              plan whatever its category (#2189), and the fleet's own
+              credential is withheld from the apply as well (#2190). Shared,
+              so the mutual exclusion the API refuses with a 422 is one rule
+              rather than one per write surface. */}
+          <PhaseSlotFlags
+            namespace="workspaceDetail.variables"
+            state={state}
+            onChange={onChange}
+            labelClassName="text-xs text-slate-400"
+          />
           {/* Only where a value can be typed at all. An environment variable
               is a string by definition and a git credential is a JSON
               envelope, so the flag meant nothing there and the API refuses it
@@ -291,6 +297,7 @@ export function VariableEditPanel({
           </button>
         </div>
       </div>
+      <PhaseSlotNote namespace="workspaceDetail.variables" state={state} />
       {saveError && (
         <p
           role="alert"

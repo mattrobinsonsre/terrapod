@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativní",
       "structured": "Strukturovaná",
       "applyOnly": "Pouze apply",
-      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan."
+      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan.",
+      "configureOnly": "Pouze konfigurace",
+      "configureOnlyHint": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply. Přihlašovací údaje samotné flotily — SSH klíč ke strojům, heslo become — nemají s ani jedním z nich nic společného.",
+      "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Konfigurace Pulumi",
       "applyOnly": "Pouze apply",
-      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan."
+      "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan.",
+      "configureOnly": "Pouze konfigurace",
+      "configureOnlyHint": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply. Přihlašovací údaje samotné flotily — SSH klíč ke strojům, heslo become — nemají s ani jedním z nich nic společného.",
+      "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace."
     },
     "runs": {
       "options": "Možnosti",

@@ -1026,7 +1026,10 @@
       "categoryNative": "Naytiv",
       "structured": "Strukchurd",
       "applyOnly": "apply onlee",
-      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly.",
+      "configureOnly": "konfigur onlee",
+      "configureOnlyHint": "Only gived to da konfigur, an hidden from da plan AN da apply. Da fleetz own sekrit — a SSH key to all da boxes, a become passwurd — haz no bizniz in either one. srsly.",
+      "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumiz confg",
       "applyOnly": "apply onlee",
-      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly."
+      "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly.",
+      "configureOnly": "konfigur onlee",
+      "configureOnlyHint": "Only gived to da konfigur, an hidden from da plan AN da apply. Da fleetz own sekrit — a SSH key to all da boxes, a become passwurd — haz no bizniz in either one. srsly.",
+      "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all."
     },
     "runs": {
       "options": "Opshunz",

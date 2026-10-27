@@ -1026,7 +1026,10 @@
       "categoryNative": "Brodorol",
       "structured": "Strwythuredig",
       "applyOnly": "Gweithredu yn unig",
-      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun."
+      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun.",
+      "configureOnly": "Cyflunio yn unig",
+      "configureOnlyHint": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu. Nid oes a wnelo tystlythyr y fflyd ei hun — allwedd SSH i'r ystad, cyfrinair become — â'r naill na'r llall.",
+      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Ffurfweddiad Pulumi",
       "applyOnly": "Gweithredu yn unig",
-      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun."
+      "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun.",
+      "configureOnly": "Cyflunio yn unig",
+      "configureOnlyHint": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu. Nid oes a wnelo tystlythyr y fflyd ei hun — allwedd SSH i'r ystad, cyfrinair become — â'r naill na'r llall.",
+      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd."
     },
     "runs": {
       "options": "Opsiynau",

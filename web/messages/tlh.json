@@ -1026,7 +1026,10 @@
       "categoryNative": "juH Segh",
       "structured": "chenmoHlu'bogh",
       "applyOnly": "lo' neH",
-      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS.",
+      "configureOnly": "Qum neH",
+      "configureOnlyHint": "Qum neH vInob; nab je lo' je vIghoj. Duj De' — SSH ngaQHa'moHwI', become mu'qaD — nab 'ebDaq lo' 'ebDaq je tu'lu'be'nIS.",
+      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi numtaH",
       "applyOnly": "lo' neH",
-      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS."
+      "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS.",
+      "configureOnly": "Qum neH",
+      "configureOnlyHint": "Qum neH vInob; nab je lo' je vIghoj. Duj De' — SSH ngaQHa'moHwI', become mu'qaD — nab 'ebDaq lo' 'ebDaq je tu'lu'be'nIS.",
+      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch."
     },
     "runs": {
       "options": "wIvmey",

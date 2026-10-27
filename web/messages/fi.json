@@ -1026,7 +1026,10 @@
       "categoryNative": "Natiivi",
       "structured": "Rakenteinen",
       "applyOnly": "Vain apply",
-      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön.",
+      "configureOnly": "Vain määritys",
+      "configureOnlyHint": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta. Laitekannan oma tunnistetieto — SSH-avain koneille, become-salasana — ei kuulu kumpaankaan niistä.",
+      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-määritys",
       "applyOnly": "Vain apply",
-      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön."
+      "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön.",
+      "configureOnly": "Vain määritys",
+      "configureOnlyHint": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta. Laitekannan oma tunnistetieto — SSH-avain koneille, become-salasana — ei kuulu kumpaankaan niistä.",
+      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen."
     },
     "runs": {
       "options": "Vaihtoehdot",

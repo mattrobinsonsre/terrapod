@@ -1026,7 +1026,10 @@
       "categoryNative": "네이티브",
       "structured": "구조화됨",
       "applyOnly": "apply 전용",
-      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다."
+      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다.",
+      "configureOnly": "구성 전용",
+      "configureOnlyHint": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다. 플릿 자체의 자격 증명 — 설비에 대한 SSH 키나 become 암호 — 은 둘 중 어느 쪽과도 상관이 없습니다.",
+      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi 구성",
       "applyOnly": "apply 전용",
-      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다."
+      "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다.",
+      "configureOnly": "구성 전용",
+      "configureOnlyHint": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다. 플릿 자체의 자격 증명 — 설비에 대한 SSH 키나 become 암호 — 은 둘 중 어느 쪽과도 상관이 없습니다.",
+      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다."
     },
     "runs": {
       "options": "옵션",

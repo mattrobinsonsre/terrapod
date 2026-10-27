@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativ",
       "structured": "Strukturert",
       "applyOnly": "Bare apply",
-      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan."
+      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan.",
+      "configureOnly": "Bare konfigurer",
+      "configureOnlyHint": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply. Flåtens egen legitimasjon — en SSH-nøkkel til maskinparken, et become-passord — hører ikke hjemme i noen av dem.",
+      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-konfigurasjon",
       "applyOnly": "Bare apply",
-      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan."
+      "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan.",
+      "configureOnly": "Bare konfigurer",
+      "configureOnlyHint": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply. Flåtens egen legitimasjon — en SSH-nøkkel til maskinparken, et become-passord — hører ikke hjemme i noen av dem.",
+      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer."
     },
     "runs": {
       "options": "Alternativer",

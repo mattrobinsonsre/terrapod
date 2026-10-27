@@ -1026,7 +1026,10 @@
       "categoryNative": "Native",
       "structured": "Structurée",
       "applyOnly": "apply uniquement",
-      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan."
+      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan.",
+      "configureOnly": "Configurer uniquement",
+      "configureOnlyHint": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply. L'identifiant de la flotte elle-même — une clé SSH vers le parc, un mot de passe become — n'a rien à faire ni dans l'un ni dans l'autre.",
+      "phaseSlotExclusive": "Une variable n'occupe qu'un emplacement à la fois. apply uniquement atteint un apply et un configurer ; Configurer uniquement n'atteint qu'un configurer."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configuration Pulumi",
       "applyOnly": "apply uniquement",
-      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan."
+      "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan.",
+      "configureOnly": "Configurer uniquement",
+      "configureOnlyHint": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply. L'identifiant de la flotte elle-même — une clé SSH vers le parc, un mot de passe become — n'a rien à faire ni dans l'un ni dans l'autre.",
+      "phaseSlotExclusive": "Une variable n'occupe qu'un emplacement à la fois. apply uniquement atteint un apply et un configurer ; Configurer uniquement n'atteint qu'un configurer."
     },
     "runs": {
       "options": "Options",

@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativ",
       "structured": "Strukturerad",
       "applyOnly": "Endast apply",
-      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö."
+      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö.",
+      "configureOnly": "Endast konfigurera",
+      "configureOnlyHint": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply. Flottans egen behörighet — en SSH-nyckel till maskinparken, ett become-lösenord — hör inte hemma i någon av dem.",
+      "phaseSlotExclusive": "En variabel upptar bara en plats i taget. Endast apply når en apply och en konfigurera; Endast konfigurera når bara en konfigurera."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-konfiguration",
       "applyOnly": "Endast apply",
-      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö."
+      "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö.",
+      "configureOnly": "Endast konfigurera",
+      "configureOnlyHint": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply. Flottans egen behörighet — en SSH-nyckel till maskinparken, ett become-lösenord — hör inte hemma i någon av dem.",
+      "phaseSlotExclusive": "En variabel upptar bara en plats i taget. Endast apply når en apply och en konfigurera; Endast konfigurera når bara en konfigurera."
     },
     "runs": {
       "options": "Alternativ",

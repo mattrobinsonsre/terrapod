@@ -1026,7 +1026,10 @@
       "categoryNative": "Native it is",
       "structured": "Structured",
       "applyOnly": "Apply only, it is",
-      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be.",
+      "configureOnly": "Configure only, it is",
+      "configureOnlyHint": "Only to a configure, delivered. From a plan and from an apply, withheld. The fleet's own credential — an SSH key to the estate, a become password — business in either, it has not.",
+      "phaseSlotExclusive": "In one slot at a time, a variable sits. An apply and a configure, Apply only reaches; a configure alone, Configure only reaches."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Config, Pulumi",
       "applyOnly": "Apply only, it is",
-      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be."
+      "applyOnlyHint": "From a plan, withheld. Only to an apply, delivered. The configuration's code, a plan runs — so in a plan's environment, a credential only the apply needs should not be.",
+      "configureOnly": "Configure only, it is",
+      "configureOnlyHint": "Only to a configure, delivered. From a plan and from an apply, withheld. The fleet's own credential — an SSH key to the estate, a become password — business in either, it has not.",
+      "phaseSlotExclusive": "In one slot at a time, a variable sits. An apply and a configure, Apply only reaches; a configure alone, Configure only reaches."
     },
     "runs": {
       "options": "Options",

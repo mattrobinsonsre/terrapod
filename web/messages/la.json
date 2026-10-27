@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativa",
       "structured": "Structa",
       "applyOnly": "Tantum apply",
-      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent."
+      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent.",
+      "configureOnly": "Tantum configurare",
+      "configureOnlyHint": "Soli configurare traditur et tam a plan quam ab apply retinetur. Credentia ipsius classis — clavis SSH ad praedium, tessera become — in neutro quicquam agunt.",
+      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configuratio Pulumi",
       "applyOnly": "Tantum apply",
-      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent."
+      "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent.",
+      "configureOnly": "Tantum configurare",
+      "configureOnlyHint": "Soli configurare traditur et tam a plan quam ab apply retinetur. Credentia ipsius classis — clavis SSH ad praedium, tessera become — in neutro quicquam agunt.",
+      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit."
     },
     "runs": {
       "options": "Optiones",

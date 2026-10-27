@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativa",
       "structured": "Estruturada",
       "applyOnly": "Apenas apply",
-      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan.",
+      "configureOnly": "Apenas configurar",
+      "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan como de um apply. A credencial da própria frota — uma chave SSH do parque, uma palavra-passe become — não tem nada que fazer em nenhum dos dois.",
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar de cada vez. Apenas apply alcança um apply e um configurar; Apenas configurar alcança apenas um configurar."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configuração do Pulumi",
       "applyOnly": "Apenas apply",
-      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan."
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan.",
+      "configureOnly": "Apenas configurar",
+      "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan como de um apply. A credencial da própria frota — uma chave SSH do parque, uma palavra-passe become — não tem nada que fazer em nenhum dos dois.",
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar de cada vez. Apenas apply alcança um apply e um configurar; Apenas configurar alcança apenas um configurar."
     },
     "runs": {
       "options": "Opções",

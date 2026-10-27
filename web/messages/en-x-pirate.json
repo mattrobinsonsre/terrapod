@@ -1026,7 +1026,10 @@
       "categoryNative": "Ship''s own",
       "structured": "Rigged",
       "applyOnly": "Apply only, matey",
-      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold."
+      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold.",
+      "configureOnly": "Riggin' only, matey",
+      "configureOnlyHint": "Handed only to a riggin', an' kept from a plan an' from an apply alike. The fleet's own key — an SSH key to the whole squadron, a become password — has no business in either one.",
+      "phaseSlotExclusive": "A variable sits in but one berth at a time. Apply only, matey reaches an apply an' a riggin'; Riggin' only, matey reaches a riggin' alone."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi riggin''",
       "applyOnly": "Apply only, matey",
-      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold."
+      "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold.",
+      "configureOnly": "Riggin' only, matey",
+      "configureOnlyHint": "Handed only to a riggin', an' kept from a plan an' from an apply alike. The fleet's own key — an SSH key to the whole squadron, a become password — has no business in either one.",
+      "phaseSlotExclusive": "A variable sits in but one berth at a time. Apply only, matey reaches an apply an' a riggin'; Riggin' only, matey reaches a riggin' alone."
     },
     "runs": {
       "options": "Options",
