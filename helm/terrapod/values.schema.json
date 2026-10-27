@@ -489,6 +489,9 @@
         "applyServiceAccount": {
           "$ref": "#/$defs/serviceAccountSpec"
         },
+        "configureServiceAccount": {
+          "$ref": "#/$defs/serviceAccountSpec"
+        },
         "configureTimeoutMinutes": {
           "type": "integer",
           "minimum": 1

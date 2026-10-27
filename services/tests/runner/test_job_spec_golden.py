@@ -189,6 +189,35 @@ SCENARIOS: dict[str, dict] = {
         "config_directory": "",
         "playbook": "site.yml",
     },
+    # The CONFIGURE account, ON (#2190). What this pins that `configure-only`
+    # cannot: a configure takes its OWN account when one is set, and the apply
+    # account set alongside it is still not the one chosen -- the two features
+    # are independent, and a branch that fell through to the apply's would be
+    # invisible with only one of them configured.
+    "configure-sa-on-configure": {
+        "phase": "configure",
+        "apply_service_account_name": "terrapod-runner-apply",
+        "configure_service_account_name": "terrapod-runner-configure",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "config_directory": "ansible",
+        "playbook": "site.yml",
+    },
+    # The same account set, on a PLAN. It must not leak: a configure account is
+    # the narrowest of the three and a plan taking it would be a privilege
+    # change nobody asked for, in the direction that breaks the plan rather
+    # than widening it.
+    "configure-sa-on-plan": {
+        "phase": "plan",
+        "configure_service_account_name": "terrapod-runner-configure",
+    },
+    # And on an APPLY, where the apply account must still win. This is the
+    # scenario that would catch a three-way branch written with the arms in the
+    # wrong order, which no single-phase test can see.
+    "configure-sa-on-apply": {
+        "phase": "apply",
+        "apply_service_account_name": "terrapod-runner-apply",
+        "configure_service_account_name": "terrapod-runner-configure",
+    },
     # A configure carrying Ansible credentials (#1933). What this pins is the
     # part of the delivery the Job spec decides: `ansible-auth.json` becomes an
     # item of the per-run Secret's projected volume, mounted beside the tfvars
@@ -243,6 +272,12 @@ def _cfg():
     # every apply scenario's serviceAccountName to a mock repr (#2189). The two
     # `apply-sa-*` scenarios below pin the feature ON.
     cfg.apply_service_account_name = ""
+    # Off, same mechanism and the same trap one slot over (#2190): unset it
+    # arrives as a truthy MagicMock and fires the configure-phase branch, which
+    # moved both configure scenarios' serviceAccountName to a mock repr --
+    # caught only because the repr embeds a memory address and the golden
+    # therefore failed loudly. A value that did not would have been accepted.
+    cfg.configure_service_account_name = ""
     cfg.termination_grace_period_seconds = 120
     cfg.extra_env_from = []
     # The shared mock leaves this False, and the CA block is gated on
@@ -275,6 +310,8 @@ def _render(name: str) -> dict:
     # lives in the config rather than in the run options (#2189).
     if "apply_service_account_name" in scenario:
         cfg.apply_service_account_name = scenario.pop("apply_service_account_name")
+    if "configure_service_account_name" in scenario:
+        cfg.configure_service_account_name = scenario.pop("configure_service_account_name")
     neutral = dict(BASE)
     neutral.update({k: v for k, v in scenario.items() if k not in option_fields})
     return TerraformStrategy().build_job_spec(options=options, runner_config=cfg, **neutral)

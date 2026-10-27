@@ -773,11 +773,30 @@ def build_job_spec(
     # (#2189). A positional test pins the ordering, the same shape as the
     # flush-inside-try gate.
     #
-    # The apply account is optional and absent by default, so every phase falls
-    # back to the base one and the rendered spec is byte-identical.
+    # Both extra accounts are optional and absent by default, so every phase
+    # falls back to the base one and the rendered spec is byte-identical.
+    #
+    # A CONFIGURE takes the base (plan) account unless given its own (#2190),
+    # and that direction is deliberate: a configure is not a Terraform apply and
+    # holds no cloud-mutating role by nature, so an operator who sets nothing
+    # gets a configure that cannot reach what an apply can. Defaulting it to the
+    # apply account would quietly hand every configure the cloud write
+    # principal.
+    #
+    # Note this is the opposite direction from apply-only VARIABLES, where a
+    # configure sits on the apply side (`PHASES_SEEING_APPLY_ONLY`). Both are
+    # right for their own axis: an apply-only variable is often the machine
+    # credential a configure needs, while a ServiceAccount is a cloud principal
+    # a configure has no reason to hold.
+    #
+    # ONE assignment site, which `test_only_one_site_assigns_the_service_account_name`
+    # pins -- a second would make the mount flag below readable from a different
+    # value than the pod runs as.
     effective_service_account = runner_config.service_account_name
     if phase == "apply" and runner_config.apply_service_account_name:
         effective_service_account = runner_config.apply_service_account_name
+    elif phase == "configure" and runner_config.configure_service_account_name:
+        effective_service_account = runner_config.configure_service_account_name
 
     # Build Job spec
     job_spec = {

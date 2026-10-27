@@ -170,6 +170,7 @@ class RunnerConfig(BaseSettings):
     #: apply presents `phase: apply` and resolves to the base identity plus any
     #: extra apply identity. Base plus an optional extra for the apply, both ways.
     apply_service_account_name: str = Field(default="")
+    configure_service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
     #: How long a failed runner pod is held open for inspection when its

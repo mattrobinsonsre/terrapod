@@ -21,6 +21,9 @@ data:
     {{- with (include "terrapod.runnerApplyServiceAccountName" .) }}
     apply_service_account_name: {{ . | quote }}
     {{- end }}
+    {{- with (include "terrapod.runnerConfigureServiceAccountName" .) }}
+    configure_service_account_name: {{ . | quote }}
+    {{- end }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
     debug_linger_seconds: {{ .Values.runners.debugLingerSeconds }}
