@@ -446,6 +446,7 @@ export async function seedVariable(
   key: string,
   value = 'seed-value',
   applyOnly = false,
+  configureOnly = false,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/v2/workspaces/${workspaceId}/vars`, {
     method: 'POST',
@@ -463,6 +464,7 @@ export async function seedVariable(
           sensitive: false,
           hcl: false,
           'apply-only': applyOnly,
+          'configure-only': configureOnly,
         },
       },
     }),

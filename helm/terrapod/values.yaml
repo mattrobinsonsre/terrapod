@@ -2175,6 +2175,22 @@ runners:
     name: ""
     annotations: {}
 
+  # The CONFIGURE phase's account (#2190), the same shape as the apply one and
+  # with the same default-off mechanism: leave `create: false` and `name: ""`
+  # and nothing is rendered, so every phase keeps `serviceAccount` above.
+  #
+  # Absent means "use the PLAN's account", NOT the apply's. A configure is not a
+  # Terraform apply and holds no cloud-mutating role by nature, so an operator
+  # who sets nothing gets a configure that cannot reach what an apply can;
+  # defaulting it to the apply account would quietly hand every configure the
+  # cloud write principal. Set this when a configure genuinely needs its own
+  # cloud role -- reading a parameter store, say -- and keep it narrower than
+  # the apply's.
+  configureServiceAccount:
+    create: false
+    name: ""
+    annotations: {}
+
   # Azure Workload Identity requires a pod label on runner Jobs.
   # Enable this when using Azure WI — harmless on non-Azure clusters.
   azureWorkloadIdentity: false

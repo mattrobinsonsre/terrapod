@@ -25,7 +25,7 @@ permissions without standing up a second listener.
 
 The last third of this page covers two controls that separate a run's **plan**
 from its **apply** without the issuer being involved at all — [a second
-ServiceAccount for the apply phase](#a-separate-serviceaccount-for-the-apply-phase)
+ServiceAccount for the apply phase](#separate-serviceaccounts-per-phase)
 and [apply-only variables](#apply-only-variables). They live here because they
 answer the same question as the [`phase`
 claim](#the-phase-claim-and-why-write-permissions-belong-behind-it), and both are
@@ -1281,12 +1281,12 @@ and an apply receives the writing one, and the configuration is just
 
 ---
 
-## A separate ServiceAccount for the apply phase
+## Separate ServiceAccounts per phase
 
-The `phase` claim above separates the two phases **inside a federated token**, so
+The `phase` claim above separates the phases **inside a federated token**, so
 the cloud does the deciding. There is a second, independent way to separate them,
-and it works whether or not the issuer is enabled: give the **apply** phase its
-own Kubernetes ServiceAccount.
+and it works whether or not the issuer is enabled: give the **apply** phase — and,
+if it needs one, the **configure** phase — its own Kubernetes ServiceAccount.
 
 ```yaml
 runners:
@@ -1301,12 +1301,19 @@ runners:
     name: "terrapod-runner-apply"
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-apply
+
+  configureServiceAccount:   # OPTIONAL -- used by the configure phase only
+    create: true
+    name: "terrapod-runner-configure"
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-configure
 ```
 
-`runners.applyServiceAccount` defaults to `create: false` and `name: ""`, and
-**that default renders nothing**: no second ServiceAccount in the namespace, and
-no `apply_service_account_name` key in the runner ConfigMap. A deployment that
-ignores this keeps one account for every phase, exactly as before.
+`runners.applyServiceAccount` and `runners.configureServiceAccount` both default
+to `create: false` and `name: ""`, and **that default renders nothing**: no extra
+ServiceAccount in the namespace, and no `apply_service_account_name` or
+`configure_service_account_name` key in the runner ConfigMap. A deployment that
+ignores them keeps one account for every phase, exactly as before.
 
 It is an ordinary Kubernetes ServiceAccount, so the cloud identity it carries is
 the one **you** annotate onto it — the same IRSA / Workload Identity annotations
@@ -1325,17 +1332,19 @@ picks up whatever its own account federates to.
 ### Which phase gets which account
 
 A runner Job has three phases — `plan`, `apply` and `configure` — and the rule
-is one line: **the apply phase uses `runners.applyServiceAccount` when it is
-set, and every other Job uses `runners.serviceAccount`.**
+is one line: **each phase uses its own account when one is set, and falls back
+to `runners.serviceAccount` when it is not.** Only the apply and the configure
+have an account of their own to set; the plan *is* the fall-through.
 
 | Job | ServiceAccount |
 |---|---|
 | `plan` — a speculative pull-request plan, a drift-detection run, a CLI-initiated plan on an agent-mode workspace, and the plan half of an apply-capable run | `runners.serviceAccount` |
 | `apply` — including a destroy apply | `runners.applyServiceAccount` if set, otherwise `runners.serviceAccount` |
-| `configure` — an Ansible configure, standalone or following an apply | `runners.serviceAccount` |
+| `configure` — an Ansible configure, standalone or following an apply | `runners.configureServiceAccount` if set, otherwise `runners.serviceAccount` |
 
-**So a configure runs under the pool's own account, and that is a perfectly
-good way to give a playbook cloud credentials.** An annotated
+**So a configure runs under the pool's own account unless you give it one, and
+the pool's account is a perfectly good way to give a playbook cloud
+credentials.** An annotated
 `runners.serviceAccount` gives the execution environment IRSA, Workload
 Identity or Azure Workload Identity, and the collections pick it up through
 their own credential chains with nothing in the playbook and no federation at
@@ -1346,16 +1355,46 @@ when the workspace rather than the pool should be the credential boundary; it
 is not a prerequisite for a configure having credentials, and which to use is
 your choice.
 
-**A configure takes the plan side, not the apply side**, and that is the
-deliberate direction: a configure is not a Terraform apply and holds no
-cloud-mutating role by nature, so an operator who sets nothing has a configure
-that cannot reach what an apply can. Defaulting it to
-`runners.applyServiceAccount` would quietly hand every configure the cloud
-write principal.
+**When `runners.configureServiceAccount` is unset a configure takes the PLAN's
+account, never the apply's**, and that is the deliberate direction: a configure
+is not a Terraform apply and holds no cloud-mutating role by nature, so an
+operator who sets nothing has a configure that cannot reach what an apply can.
+Defaulting it to `runners.applyServiceAccount` would quietly hand every configure
+the cloud write principal.
 
-If you want a configure to hold different cloud permissions from an apply, the
-`phase: configure` claim expresses that in the cloud's own trust policy — see
-[The `phase` claim](#the-phase-claim-and-why-write-permissions-belong-behind-it).
+#### The variables go the other way, and both are right
+
+An **apply-only variable** is delivered to a configure, while the **apply
+ServiceAccount** is not. That asymmetry reads as an oversight and is not: the two
+are statements about different things. An apply-only variable is often exactly
+the machine credential a configure needs — it is withheld from the plan because a
+plan runs unreviewed pull-request code, and a configure is a write with
+apply-equivalent blast radius. A ServiceAccount is a **cloud principal**, and a
+configure has no reason to hold the one that mutates your cloud.
+
+So the rule of thumb is: **values follow blast radius, identities follow need.**
+A credential that should reach a configure and nothing else has its own slot —
+[configure-only](#configure-only-variables) — rather than borrowing the apply's.
+
+#### Three ways to give a configure its own cloud permissions
+
+They compose, and they are listed cheapest first:
+
+1. **`runners.configureServiceAccount`** — a third Kubernetes account, annotated
+   at its own cloud role. Needs no issuer and no public path, like the apply
+   account. Keep it **narrower than the apply's**: reach for it when a configure
+   genuinely needs a cloud role of its own, such as reading a parameter store.
+2. **The `phase: configure` claim** — expresses the distinction in the cloud's
+   own trust policy, so a role an apply may assume is not thereby assumable by a
+   configure. See
+   [The `phase` claim](#the-phase-claim-and-why-write-permissions-belong-behind-it).
+3. **Per-workspace federation** — makes the workspace rather than the pool the
+   credential boundary. See [Ansible configure](#ansible-configure).
+
+The same warning applies to the configure account as to the apply one: its
+annotations are the point. An account with no cloud-identity annotations has no
+cloud identity at all, so creating one and forgetting to annotate it breaks the
+configure rather than narrowing anything.
 
 **Annotate both accounts, not just the apply one.** A plan is not a dry run: it
 refreshes state and evaluates `data` sources, so the plan account still needs
@@ -1609,9 +1648,10 @@ variables, which beat a **non-priority** variable set. Apply-only resolves
   want — see
   [the runbook](runbooks.md#a-plan-or-apply-fails-on-a-credential-marked-apply-only).
   The two [Ansible credential](ansible-credentials.md) categories are the one
-  place the flag does nothing useful: a **configure** is on the apply side of this
-  line, and a configure is the only phase those categories are delivered to at
-  all.
+  place `apply-only` does nothing useful: a **configure** is on the apply side of
+  this line, and a configure is the only phase those categories are delivered to
+  at all. [`configure-only`](#configure-only-variables) is the flag that says so
+  on the row itself.
 
 > **One upgrade note.** Create apply-only variables once the rollout has
 > finished. During a rolling upgrade a replica still on the previous version does
@@ -1619,6 +1659,102 @@ variables, which beat a **non-priority** variable set. Apply-only resolves
 > when it resolves a key that has both rows it treats them as one duplicated key
 > and may hand either value to a plan. There is nothing to do beyond waiting for
 > the rollout, and nothing to undo afterwards.
+
+---
+
+## Configure-only variables
+
+A variable also carries a **`configure-only`** flag. It withholds the value from
+a plan **and from an apply**, delivering it only to an [Ansible
+configure](ansible-configure.md). It is for the fleet's own credential — an SSH
+private key to the estate, a become password, a bastion passphrase — which
+nothing in a plan or an apply has any business holding.
+
+```json
+{ "data": { "type": "vars",
+            "attributes": { "key": "BECOME_PASSWORD",
+                            "category": "env",
+                            "sensitive": true,
+                            "configure-only": true } } }
+```
+
+The two [Ansible credential](ansible-credentials.md) categories —
+`ansible_machine_auth` and `ansible_vault_auth` — are delivered to a configure
+and to nothing else whatever the flag says, so setting it there records the
+intent on the row rather than changing where the value goes. It is an ordinary
+`terraform` or `env` variable, like the one above, where the flag decides
+delivery.
+
+### Why a third slot rather than a wider apply-only
+
+Because **a configure already receives every apply-only row.** That is settled
+and deliberate — a configure runs the repository's playbooks against real hosts,
+so it is a write with apply-equivalent blast radius rather than a speculative
+read. The consequence is that `apply-only` cannot express *"and not in an apply
+either"*, which is exactly what a machine credential wants: an apply at least
+legitimately uses the cloud token it holds, whereas nothing in an apply has a use
+for the key to your estate.
+
+So there are three slots, and the only thing that distinguishes them is how few
+phases they reach:
+
+| Slot | `apply-only` | `configure-only` | plan | apply | configure |
+|---|---|---|---|---|---|
+| ordinary | `false` | `false` | yes | yes | yes |
+| apply-only | `true` | `false` | — | yes | yes |
+| configure-only | `false` | `true` | — | — | yes |
+
+**Setting both is refused with a `422`**, naming the key. Two independent
+booleans make the combination representable — which is the price of a shape that
+cannot be mistyped into a third meaning the way a parsed string eventually is —
+so it is refused at the write boundary rather than given a resolution nobody
+would predict. Apply-only already reaches a configure, so configure-only on its
+own is what withholds a variable from an apply as well as from a plan.
+
+### Precedence, and the narrowest slot
+
+Nothing about the tier chain changes: a **priority** variable set still beats
+**workspace** variables, which still beat a **non-priority** set, and the
+shadowing is **within a tier, never across the chain**.
+
+Inside a tier, the **narrowest slot wins** — the more specific statement about a
+key is the one that applies, which is the same reading that made an apply-only
+row shadow its standard twin in the first place:
+
+- On a **configure**, a configure-only row shadows both an apply-only and a
+  standard row of the same key in its own tier.
+- On an **apply**, configure-only rows are excluded entirely, so an apply-only
+  row shadows its standard twin exactly as before.
+- On a **plan**, both flagged slots are excluded. A key held *only* as a flagged
+  row is **absent** from a plan — not present and empty.
+
+A priority set's standard row still beats a workspace configure-only row, for the
+same reason it beats a workspace apply-only one: otherwise anyone with workspace
+write access could escape a platform-mandated value by declaring a narrower twin
+of it.
+
+A key may therefore be held **once per slot** — the uniqueness constraint is
+`(workspace, key, category, apply-only, configure-only)`, and the same shape for
+a variable set. A genuine duplicate is still `409`, and the message names which
+slot is already taken.
+
+### What configure-only is not
+
+- **It is not an encryption or secrecy setting**, any more than `apply-only` is.
+  `sensitive` is unchanged and orthogonal; the flag answers *which phase receives
+  this value*, nothing else. The two [Ansible
+  credential](ansible-credentials.md) categories are always `sensitive`
+  regardless.
+- **It is not a substitute for the ServiceAccount split.** It decides which
+  *values* a phase receives; the account decides what the Job's *cloud identity*
+  can do. Both exist because neither implies the other — see
+  [The variables go the other way, and both are
+  right](#the-variables-go-the-other-way-and-both-are-right).
+- **It does not make a configure safe to run unreviewed.** A configure executes
+  the repository's playbooks against real hosts. Withholding a credential from a
+  plan narrows what unreviewed pull-request code can reach; it says nothing about
+  who may start a configure, which is [workspace
+  RBAC](ansible-configure.md#who-may).
 
 ---
 

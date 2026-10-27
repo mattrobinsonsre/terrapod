@@ -366,6 +366,37 @@ credential **is** delivered to it.
 So marking one apply-only changes nothing about whether a configure can
 authenticate. It is not the thing to look at when one cannot.
 
+### `configure-only` is the flag that says what these categories already are
+
+[`configure-only`](cloud-identity.md#configure-only-variables) withholds a
+variable from a plan **and from an apply**, delivering it only to a configure. It
+exists for exactly the kind of secret these two categories carry — an SSH private
+key to the estate, a become password, a vault passphrase — which nothing in a
+plan or an apply has any business holding.
+
+For `ansible_machine_auth` and `ansible_vault_auth` the flag changes no delivery,
+because those categories already reach a configure and nothing else. What it
+changes is that the **row says so**, so an operator reading the variable list can
+see the intent without knowing the category's delivery rule. Setting it is
+therefore optional here and recommended:
+
+```json
+{ "data": { "type": "vars",
+            "attributes": { "key": "fleet-ssh",
+                            "category": "ansible_machine_auth",
+                            "configure-only": true,
+                            "value": "{\"username\": \"deploy\", \"private_key\": \"...\"}" } } }
+```
+
+Where it changes delivery is on an **ordinary** `terraform` or `env` variable
+that a playbook needs and no apply does — a bastion passphrase read from the
+environment, say. Mark that `configure-only` and it is in no apply's environment
+at all; `apply-only` would have left it there.
+
+**Setting both flags is refused with a `422`.** Apply-only already reaches a
+configure, so configure-only on its own is what withholds a value from an apply
+as well as from a plan.
+
 ## Log safety
 
 Credential handling is log-safe by construction, and the mechanism matters more

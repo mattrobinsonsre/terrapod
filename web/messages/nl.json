@@ -1026,7 +1026,10 @@
       "categoryNative": "Native",
       "structured": "Gestructureerd",
       "applyOnly": "Alleen apply",
-      "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan."
+      "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan.",
+      "configureOnly": "Alleen configureren",
+      "configureOnlyHint": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden. De credential van de vloot zelf — een SSH-sleutel naar het machinepark, een become-wachtwoord — hoort in geen van beide thuis.",
+      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-configuratie",
       "applyOnly": "Alleen apply",
-      "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan."
+      "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan.",
+      "configureOnly": "Alleen configureren",
+      "configureOnlyHint": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden. De credential van de vloot zelf — een SSH-sleutel naar het machinepark, een become-wachtwoord — hoort in geen van beide thuis.",
+      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren."
     },
     "runs": {
       "options": "Opties",

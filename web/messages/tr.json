@@ -1026,7 +1026,10 @@
       "categoryNative": "Yerel",
       "structured": "Yapılandırılmış",
       "applyOnly": "Yalnızca apply",
-      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır."
+      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır.",
+      "configureOnly": "Yalnızca yapılandırma",
+      "configureOnlyHint": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır. Filonun kendi kimlik bilgisi — makinelere giden SSH anahtarı, become parolası — bunların hiçbiriyle ilgili değildir.",
+      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi yapılandırması",
       "applyOnly": "Yalnızca apply",
-      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır."
+      "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır.",
+      "configureOnly": "Yalnızca yapılandırma",
+      "configureOnlyHint": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır. Filonun kendi kimlik bilgisi — makinelere giden SSH anahtarı, become parolası — bunların hiçbiriyle ilgili değildir.",
+      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır."
     },
     "runs": {
       "options": "Seçenekler",

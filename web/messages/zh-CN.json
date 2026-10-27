@@ -1026,7 +1026,10 @@
       "categoryNative": "原生",
       "structured": "结构化",
       "applyOnly": "仅 apply",
-      "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。"
+      "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。",
+      "configureOnly": "仅配置",
+      "configureOnlyHint": "仅交付给配置，对 plan 和 apply 都隐藏。机群自身的凭据 — 通往设备的 SSH 密钥、become 口令 — 与这两者都无关。",
+      "phaseSlotExclusive": "一个变量一次只占用一个槽位。“仅 apply”会到达 apply 和配置；“仅配置”只会到达配置。"
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi 配置",
       "applyOnly": "仅 apply",
-      "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。"
+      "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。",
+      "configureOnly": "仅配置",
+      "configureOnlyHint": "仅交付给配置，对 plan 和 apply 都隐藏。机群自身的凭据 — 通往设备的 SSH 密钥、become 口令 — 与这两者都无关。",
+      "phaseSlotExclusive": "一个变量一次只占用一个槽位。“仅 apply”会到达 apply 和配置；“仅配置”只会到达配置。"
     },
     "runs": {
       "options": "选项",

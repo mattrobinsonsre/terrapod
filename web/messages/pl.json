@@ -1026,7 +1026,10 @@
       "categoryNative": "Natywna",
       "structured": "Strukturalna",
       "applyOnly": "Tylko apply",
-      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan.",
+      "configureOnly": "Tylko konfiguracja",
+      "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
+      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Konfiguracja Pulumi",
       "applyOnly": "Tylko apply",
-      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan."
+      "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan.",
+      "configureOnly": "Tylko konfiguracja",
+      "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
+      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji."
     },
     "runs": {
       "options": "Opcje",

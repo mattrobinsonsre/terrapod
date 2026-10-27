@@ -672,15 +672,18 @@ an unreviewed pull request is a path to changing or destroying infrastructure,
 and no amount of reviewing the plan output afterwards helps, because the code ran
 first.
 
-Terrapod runs `plan` and `apply` as separate Kubernetes Jobs, so the two phases
-can hold different identities. Three independent controls get you there, and they
-compose — none is a prerequisite for another:
+Terrapod runs `plan`, `apply` and `configure` as separate Kubernetes Jobs, so
+each phase can hold a different identity. Independent controls get you there and
+they compose — none is a prerequisite for another — splitting either the Job's
+own cloud identity or the values it receives:
 
 | Control | What it separates | Needs the OIDC issuer? |
 |---|---|---|
-| [`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase) | the Job's **Kubernetes ServiceAccount**, and therefore its IRSA / Workload Identity cloud role | no |
+| [`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase) | the Job's **Kubernetes ServiceAccount**, and therefore its IRSA / Workload Identity cloud role | no |
 | [the `phase` claim](cloud-identity.md#the-phase-claim-and-why-write-permissions-belong-behind-it) | the **role a federated token may assume**, decided by your cloud's trust policy | yes |
 | [apply-only variables](cloud-identity.md#apply-only-variables) | which **variable values** each phase receives | no |
+| [`runners.configureServiceAccount`](runners.md#separate-serviceaccounts-per-phase) | the **configure** Job's ServiceAccount, and therefore its cloud role. Unset, a configure takes the *plan's* account, never the apply's | no |
+| [configure-only variables](cloud-identity.md#configure-only-variables) | values a **configure alone** receives — the fleet's own credential, withheld from an apply as well as from a plan | no |
 
 **The recommended posture**, for a deployment where pull requests drive plans:
 
@@ -692,7 +695,12 @@ compose — none is a prerequisite for another:
 2. Mark any credential **only an apply needs** — a deploy token, a write-capable
    API key — as `apply-only`, so it is not in a plan's environment at all. Where
    the same key needs a weaker value for plans, declare it twice: once ordinary
-   with the read-only value, once `apply-only` with the write one.
+   with the read-only value, once `apply-only` with the write one. Note an
+   apply-only value is also delivered to a **configure**, which is a write with
+   apply-equivalent blast radius; a credential that should reach *only* a
+   configure — an SSH key to the fleet, a become password — is
+   [`configure-only`](cloud-identity.md#configure-only-variables) instead, which
+   withholds it from the apply too.
 3. If the issuer is enabled, condition write permissions on `phase: apply` in the
    cloud's trust policy as well. It is the same separation enforced in a second
    place, by the cloud rather than by Kubernetes.

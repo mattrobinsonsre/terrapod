@@ -23,8 +23,19 @@ type VariableSetVariable struct {
 	// See Variable.ApplyOnly (#2189). An apply-only row in a variable SET
 	// shadows its standard twin inside the set's own precedence tier only --
 	// a priority set's standard row still beats a workspace apply-only one.
-	ApplyOnly   bool   `json:"apply-only"`
-	Description string `json:"description,omitempty"`
+	ApplyOnly bool `json:"apply-only"`
+	// ConfigureOnly withholds this variable from a plan AND from an apply,
+	// delivering it only to an Ansible configure (#2190). The fleet's own
+	// credential -- an SSH private key to the estate, a become password --
+	// which nothing in a plan or an apply has any business holding.
+	//
+	// A THIRD slot rather than a rename of ApplyOnly, because a configure
+	// already receives every apply-only row: apply-only means "apply and
+	// configure", so it cannot express "not in an apply either".
+	//
+	// Both flags set is REFUSED by the server with a 422 rather than resolved.
+	ConfigureOnly bool   `json:"configure-only"`
+	Description   string `json:"description,omitempty"`
 
 	// ValueSource is "static" or "vault" (#1439) — the same reference model as
 	// a workspace variable, so a Vault-backed credential can be defined once in
@@ -42,28 +53,30 @@ type VariableSetVariable struct {
 // CreateVarsetVariableRequest is the input shape for adding a
 // variable to a varset.
 type CreateVarsetVariableRequest struct {
-	Key         string
-	Value       string
-	Category    string
-	Structured  bool
-	HCL         bool
-	Sensitive   bool
-	ApplyOnly   bool
-	Description string
-	ValueSource string
+	Key           string
+	Value         string
+	Category      string
+	Structured    bool
+	HCL           bool
+	Sensitive     bool
+	ApplyOnly     bool
+	ConfigureOnly bool
+	Description   string
+	ValueSource   string
 }
 
 // UpdateVarsetVariableRequest is the partial-update shape.
 type UpdateVarsetVariableRequest struct {
-	Key         string
-	Value       *string
-	Category    string
-	Structured  *bool
-	HCL         *bool
-	Sensitive   *bool
-	ApplyOnly   *bool
-	Description *string
-	ValueSource *string
+	Key           string
+	Value         *string
+	Category      string
+	Structured    *bool
+	HCL           *bool
+	Sensitive     *bool
+	ApplyOnly     *bool
+	ConfigureOnly *bool
+	Description   *string
+	ValueSource   *string
 }
 
 // CreateVarsetVariable adds a variable to a varset.
@@ -155,6 +168,9 @@ func varsetVarCreateAttrs(req CreateVarsetVariableRequest) map[string]any {
 	if req.Sensitive {
 		attrs["sensitive"] = true
 	}
+	if req.ConfigureOnly {
+		attrs["configure-only"] = true
+	}
 	if req.ApplyOnly {
 		attrs["apply-only"] = true
 	}
@@ -189,6 +205,9 @@ func varsetVarUpdateAttrs(req UpdateVarsetVariableRequest) map[string]any {
 	if req.ApplyOnly != nil {
 		attrs["apply-only"] = *req.ApplyOnly
 	}
+	if req.ConfigureOnly != nil {
+		attrs["configure-only"] = *req.ConfigureOnly
+	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
@@ -208,18 +227,19 @@ func parseVarsetVariable(body []byte) (*VariableSetVariable, error) {
 
 func varsetVarFromResource(res *Resource) *VariableSetVariable {
 	return &VariableSetVariable{
-		ID:          res.ID,
-		Key:         GetStringAttr(res, "key"),
-		Value:       GetStringAttr(res, "value"),
-		Category:    GetStringAttr(res, "category"),
-		Structured:  GetBoolAttr(res, "structured"),
-		HCL:         GetBoolAttr(res, "hcl"),
-		Sensitive:   GetBoolAttr(res, "sensitive"),
-		ApplyOnly:   GetBoolAttr(res, "apply-only"),
-		Description: GetStringAttr(res, "description"),
-		ValueSource: GetStringAttr(res, "value-source"),
-		VersionID:   GetStringAttr(res, "version-id"),
-		CreatedAt:   GetStringAttr(res, "created-at"),
-		UpdatedAt:   GetStringAttr(res, "updated-at"),
+		ID:            res.ID,
+		Key:           GetStringAttr(res, "key"),
+		Value:         GetStringAttr(res, "value"),
+		Category:      GetStringAttr(res, "category"),
+		Structured:    GetBoolAttr(res, "structured"),
+		HCL:           GetBoolAttr(res, "hcl"),
+		Sensitive:     GetBoolAttr(res, "sensitive"),
+		ApplyOnly:     GetBoolAttr(res, "apply-only"),
+		ConfigureOnly: GetBoolAttr(res, "configure-only"),
+		Description:   GetStringAttr(res, "description"),
+		ValueSource:   GetStringAttr(res, "value-source"),
+		VersionID:     GetStringAttr(res, "version-id"),
+		CreatedAt:     GetStringAttr(res, "created-at"),
+		UpdatedAt:     GetStringAttr(res, "updated-at"),
 	}
 }

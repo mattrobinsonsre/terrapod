@@ -2451,6 +2451,7 @@ POST /api/tfe/v2/workspaces/{id}/vars
       "category": "env",
       "sensitive": false,
       "apply-only": false,
+      "configure-only": false,
       "description": "AWS region for provider"
     }
   }
@@ -2479,35 +2480,69 @@ whether a value is typed has a bug worth surfacing.
 
 <a id="apply-only-variables-api"></a>
 
-`apply-only` (boolean, default `false`) **withholds the variable from a plan and
-delivers it only to an apply**, so a credential only the apply needs is not in
-the environment of a plan — which executes the configuration's code, including a
-pull request's. It is accepted on create and on `PATCH`, returned on every read,
-and settable on a variable-set variable too (below).
+`apply-only` (boolean, default `false`) **withholds the variable from a plan**
+and delivers it to the phases that change things — an **apply** and a
+**configure** — so a credential a plan does not need is not in the environment of
+a plan, which executes the configuration's code, including a pull request's. It
+is accepted on create and on `PATCH`, returned on every read, and settable on a
+variable-set variable too (below).
+
+`configure-only` (boolean, default `false`) withholds the variable from a plan
+**and from an apply**, delivering it only to an **Ansible configure**. It is the
+fleet's own credential — an SSH private key to the estate, a become password —
+which nothing in a plan or an apply has any business holding. It is accepted,
+returned and settable in exactly the same places.
+
+The two flags are a **third slot, not a rename of the second**, because a
+configure already receives every apply-only row. `apply-only` therefore cannot
+express "not in an apply either", which is precisely what a machine credential
+wants. The three states a key can be held in:
+
+| Slot | `apply-only` | `configure-only` | Reaches |
+|---|---|---|---|
+| ordinary | `false` | `false` | plan, apply, configure |
+| apply-only | `true` | `false` | apply, configure |
+| configure-only | `false` | `true` | configure |
+
+Read the other way round, by phase:
 
 | Phase | What it receives |
 |---|---|
-| `plan` | Only variables with `apply-only: false`. A key that has *only* an apply-only row is **absent**, not present-and-empty. |
-| `apply` | Every variable, with an apply-only row shadowing a standard row of the same key **within its own precedence tier**. |
+| `plan` | Only variables with both flags `false`. A key that has *only* a flagged row is **absent**, not present-and-empty. |
+| `apply` | Every variable except configure-only ones, with an apply-only row shadowing a standard row of the same key **within its own precedence tier**. |
+| `configure` | Every variable, with the narrowest slot winning inside a tier — a configure-only row shadows both of its twins, and an apply-only row shadows a standard one. |
+
+**Both flags `true` is refused with `422`**, naming the key. The combination is
+representable because these are two independent booleans rather than one parsed
+field, and it is refused at the write boundary rather than given a resolution
+nobody would predict: apply-only already reaches a configure, so configure-only
+on its own is what withholds a variable from an apply as well as from a plan.
 
 **A different value per phase is two variables with the same `key`**, one of them
-flagged — so a key may appear twice on one workspace (or twice in one variable
-set) provided the two rows differ in `apply-only`. The uniqueness constraint is
-`(workspace, key, apply-only)`; a genuine duplicate, same key and same flag, is
-still refused with `409`.
+flagged — so a key may be held **once per slot** on one workspace (or in one
+variable set). The uniqueness constraint is
+`(workspace, key, category, apply-only, configure-only)`; a genuine duplicate,
+same key and same flags, is still refused with `409`, and the message names which
+slot is taken.
 
 Precedence is otherwise unchanged — priority variable set > workspace variables >
 non-priority variable set — and the shadowing is **within a tier, never across
 the chain**: a priority set's standard row still beats a workspace apply-only
 row, so a workspace owner cannot escape a platform-mandated value on an apply.
 
-`apply-only` is independent of `sensitive` and of `category`: it says *which
-phase receives this value*, not how secret it is, and an apply-only variable is
+Both flags are independent of `sensitive` and of `category`: they say *which
+phase receives this value*, not how secret it is, and a flagged variable is
 stored and audited exactly like any other, and covered by the same opt-in
 [app-layer encryption](encryption-at-rest.md) when that is enabled. Marking a `git_http_auth`
 or `git_ssh_auth` credential apply-only withholds it from the plan's `init`,
-which is rarely what is wanted. Full semantics:
-[Cloud Identity → Apply-only variables](cloud-identity.md#apply-only-variables).
+which is rarely what is wanted; marking one configure-only withholds it from
+`init` on an apply as well, which is rarer still. The two
+[Ansible credential](ansible-credentials.md) categories are the other way round —
+they are delivered to a configure and to nothing else, so `configure-only` is the
+flag that says so on the row itself and keeps the fleet's key out of an apply's
+environment. Full semantics:
+[Cloud Identity → Apply-only variables](cloud-identity.md#apply-only-variables)
+and [Configure-only variables](cloud-identity.md#configure-only-variables).
 
 **Required permission:** `write` on the workspace.
 
@@ -2567,10 +2602,11 @@ DELETE /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 
 A variable-set variable carries the same attributes as a workspace variable —
 `key`, `value`, `category`, `hcl`, `sensitive`, `value-source`, `description` —
-and the same [`apply-only`](#apply-only-variables-api) boolean, with the same
-meaning and the same default of `false`. Its uniqueness constraint is
-`(variable set, key, apply-only)`, so one set may hold a standard and an
-apply-only row for the same key and a true duplicate is still `409`.
+and the same [`apply-only` and `configure-only`](#apply-only-variables-api)
+booleans, with the same meanings and the same default of `false`. Its uniqueness
+constraint is `(variable set, key, category, apply-only, configure-only)`, so one
+set may hold a standard, an apply-only and a configure-only row for the same key,
+and a true duplicate is still `409`.
 
 The shadowing stays inside the set's own precedence tier: an apply-only row in a
 **priority** set beats that set's standard row on an apply, while a priority

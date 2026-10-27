@@ -344,6 +344,7 @@ field CreateVCSConnectionRequest.Token string
 field CreateVCSConnectionRequest.WebhookSecret string
 field CreateVariableRequest.ApplyOnly bool `json:"apply-only,omitempty"`
 field CreateVariableRequest.Category string `json:"category"`
+field CreateVariableRequest.ConfigureOnly bool `json:"configure-only,omitempty"`
 field CreateVariableRequest.Description string `json:"description,omitempty"`
 field CreateVariableRequest.HCL bool `json:"hcl,omitempty"`
 field CreateVariableRequest.Key string `json:"key"`
@@ -358,6 +359,7 @@ field CreateVariableSetRequest.Name string
 field CreateVariableSetRequest.Priority bool
 field CreateVarsetVariableRequest.ApplyOnly bool
 field CreateVarsetVariableRequest.Category string
+field CreateVarsetVariableRequest.ConfigureOnly bool
 field CreateVarsetVariableRequest.Description string
 field CreateVarsetVariableRequest.HCL bool
 field CreateVarsetVariableRequest.Key string
@@ -1219,6 +1221,7 @@ field UpdateVCSConnectionRequest.Token string
 field UpdateVCSConnectionRequest.WebhookSecret *string
 field UpdateVariableRequest.ApplyOnly *bool `json:"apply-only,omitempty"`
 field UpdateVariableRequest.Category string `json:"category,omitempty"`
+field UpdateVariableRequest.ConfigureOnly *bool `json:"configure-only,omitempty"`
 field UpdateVariableRequest.Description *string `json:"description,omitempty"`
 field UpdateVariableRequest.HCL *bool `json:"hcl,omitempty"`
 field UpdateVariableRequest.Key string `json:"key,omitempty"`
@@ -1233,6 +1236,7 @@ field UpdateVariableSetRequest.Name string
 field UpdateVariableSetRequest.Priority *bool
 field UpdateVarsetVariableRequest.ApplyOnly *bool
 field UpdateVarsetVariableRequest.Category string
+field UpdateVarsetVariableRequest.ConfigureOnly *bool
 field UpdateVarsetVariableRequest.Description *string
 field UpdateVarsetVariableRequest.HCL *bool
 field UpdateVarsetVariableRequest.Key string
@@ -1350,6 +1354,7 @@ field VCSLabelTotal.Value string `json:"value"`
 field ValidationError.Detail string
 field Variable.ApplyOnly bool `json:"apply-only"`
 field Variable.Category string `json:"category"`
+field Variable.ConfigureOnly bool `json:"configure-only"`
 field Variable.CreatedAt string `json:"created-at,omitempty"`
 field Variable.Description string `json:"description,omitempty"`
 field Variable.HCL bool `json:"hcl"`
@@ -1373,6 +1378,7 @@ field VariableSet.VarCount int64 `json:"var-count"`
 field VariableSet.WorkspaceCount int64 `json:"workspace-count"`
 field VariableSetVariable.ApplyOnly bool `json:"apply-only"`
 field VariableSetVariable.Category string `json:"category"`
+field VariableSetVariable.ConfigureOnly bool `json:"configure-only"`
 field VariableSetVariable.CreatedAt string `json:"created-at,omitempty"`
 field VariableSetVariable.Description string `json:"description,omitempty"`
 field VariableSetVariable.HCL bool `json:"hcl"`

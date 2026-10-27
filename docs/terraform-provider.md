@@ -296,28 +296,39 @@ silence the warning.
 
 `terrapod_variable` and `terrapod_variable_set_variable` both carry an
 **`apply_only`** boolean: set it and the variable is withheld from a plan and
-delivered only to an apply, so a credential only the apply needs is not in the
-environment of a plan — which executes the configuration's code, including a
-pull request's.
+delivered to the phases that change things — an apply **and a configure** — so a
+credential a plan does not need is not in the environment of a plan, which
+executes the configuration's code, including a pull request's.
 
-It is `Optional + Computed` with a default of `false`, so a configuration that
-does not mention it plans clean and nothing drifts. Because a *different value
-per phase* is two variables rather than one, declare the pair explicitly, as in
+They also carry a **`configure_only`** boolean, which withholds the variable from
+a plan *and from an apply*, delivering it only to an Ansible configure. It is for
+the fleet's own credential — an SSH private key to the estate, a become password
+— which nothing in a plan or an apply has any business holding. It is a third
+slot rather than a wider `apply_only`, because a configure already receives every
+apply-only row, so `apply_only` cannot express "not in an apply either".
+**Setting both on one resource is refused by the server with a `422`.**
+
+Both are `Optional + Computed` with a default of `false`, so a configuration that
+does not mention them plans clean and nothing drifts. Because a *different value
+per phase* is several variables rather than one, declare each explicitly, as in
 the example above; the server's uniqueness constraint is
-`(workspace, key, apply_only)` (and `(varset, key, apply_only)`), so the two
-resources coexist and a true duplicate is refused with `409`.
+`(workspace, key, category, apply_only, configure_only)` (and the same shape for
+a variable set), so the resources coexist and a true duplicate is refused with
+`409`.
 
-Two things to know before reaching for it:
+Two things to know before reaching for them:
 
 - **A plan is not a dry run**, so a plan still runs the configuration's code and
   still needs read. The flag narrows what a plan holds; it does not sandbox it.
   See [Security Hardening → Give the plan phase a narrower identity than the
   apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply).
-- **Shadowing is within a precedence tier, never across the chain.** An
-  apply-only row beats a standard row of the same key in the *same* tier; a
-  priority variable set's standard row still beats a workspace apply-only row.
-  Full semantics: [Cloud Identity → Apply-only
-  variables](cloud-identity.md#apply-only-variables).
+- **Shadowing is within a precedence tier, never across the chain**, and the
+  narrowest slot wins inside one. An apply-only row beats a standard row of the
+  same key in the *same* tier, and on a configure a configure-only row beats
+  both; a priority variable set's standard row still beats a workspace flagged
+  row. Full semantics: [Cloud Identity → Apply-only
+  variables](cloud-identity.md#apply-only-variables) and [Configure-only
+  variables](cloud-identity.md#configure-only-variables).
 
 ## Reserved-name note
 

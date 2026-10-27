@@ -112,11 +112,26 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"apply_only": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Withhold this variable from a plan and deliver it only to an " +
-					"apply. A plan executes the configuration's code, so a credential only " +
-					"the apply needs should not be in a plan's environment. For a different " +
-					"value per phase, declare TWO variables with the same `key` — one " +
-					"ordinary and one `apply_only` — and the apply-only one wins on an apply.",
+				Description: "Withhold this variable from a plan, delivering it to an apply " +
+					"AND to an Ansible configure. A plan executes the configuration's code, " +
+					"so a credential a plan does not need should not be in its environment; " +
+					"a configure runs the repository's playbooks against real hosts, so it " +
+					"is a write with apply-equivalent blast radius and receives these rows " +
+					"deliberately. To withhold a variable from an apply as well, use " +
+					"`configure_only`. For a different value per phase, declare TWO " +
+					"variables with the same `key` — one ordinary and one `apply_only` — " +
+					"and the apply-only one wins on an apply.",
+			},
+			"configure_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Withhold this variable from a plan AND from an apply, delivering " +
+					"it only to an Ansible configure. The fleet's own credential — an SSH " +
+					"private key to the estate, a become password — which nothing in a plan " +
+					"or an apply has any business holding. This is a THIRD slot rather than a " +
+					"variant of `apply_only`, because a configure already receives every " +
+					"apply-only row: `apply_only` means \"apply and configure\", so it cannot " +
+					"express \"not in an apply either\". Setting both flags on one variable is " +
+					"refused by the server with a 422 rather than resolved.",
 			},
 			"description": schema.StringAttribute{
 				Optional: true, Description: "Description.",
@@ -271,6 +286,34 @@ func (r *variableResource) ImportState(ctx context.Context, req resource.ImportS
 
 var _ resource.ResourceWithModifyPlan = &variableResource{}
 
+// changeDetecting is what KeepComputedWhenUnchanged compares to decide whether
+// a re-plan is a genuine no-op.
+//
+// EVERY attribute a write can change has to be in here. An omitted one makes
+// the compare look unchanged while the attribute itself moved, so the carried
+// attributes below are pinned to their state values as KNOWN -- and the apply
+// then returns different ones, which is "Provider produced inconsistent result
+// after apply". `apply_only` was omitted when it was added (#2189) and
+// `updated_at` carries `onupdate` on the server, so flipping it alone hit
+// exactly that; `configure_only` (#2190) is in from the start.
+//
+// TestEveryAttributeIsAccountedForInTheRePlanGate derives the membership from
+// the schema, so a new attribute cannot be left out silently.
+var changeDetecting = []string{
+	"workspace_id", "key", "value", "category", "structured", "hcl",
+	"sensitive", "apply_only", "configure_only", "description", "value_source",
+}
+
+// carriedWhenUnchanged are the attributes the server moves on every write, kept
+// at their state values on a true no-op re-plan so it does not propose an
+// update that never converges.
+var carriedWhenUnchanged = []string{"version_id", "updated_at"}
+
+// serverAssignedAndImmutable never move after create, so they are neither
+// compared nor carried: `id` identifies the row for its whole life, and
+// `created_at` is already pinned by UseStateForUnknown.
+var serverAssignedAndImmutable = []string{"id", "created_at"}
+
 // ModifyPlan keeps a no-change re-plan empty. See
 // planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
 // cannot do this alone.
@@ -278,10 +321,7 @@ func (r *variableResource) ModifyPlan(ctx context.Context, req resource.ModifyPl
 	// Before KeepComputedWhenUnchanged, which compares the PLANNED workspace_id
 	// against state -- it has to see the defaulted value, not the null one.
 	planmods.DefaultWorkspaceID(ctx, req, resp, r.client.DefaultWorkspace)
-	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
-		[]string{"workspace_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
-		[]string{"version_id", "updated_at"},
-	)
+	planmods.KeepComputedWhenUnchanged(ctx, req, resp, changeDetecting, carriedWhenUnchanged)
 }
 
 // buildCreateVariableRequest projects the Terraform model into the
@@ -305,6 +345,9 @@ func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest
 	}
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		req.ApplyOnly = m.ApplyOnly.ValueBool()
+	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		req.ConfigureOnly = m.ConfigureOnly.ValueBool()
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
@@ -342,6 +385,10 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 	if !m.ApplyOnly.IsNull() && !m.ApplyOnly.IsUnknown() {
 		a := m.ApplyOnly.ValueBool()
 		req.ApplyOnly = &a
+	}
+	if !m.ConfigureOnly.IsNull() && !m.ConfigureOnly.IsUnknown() {
+		c := m.ConfigureOnly.ValueBool()
+		req.ConfigureOnly = &c
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -384,6 +431,7 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
 	m.ApplyOnly = types.BoolValue(v.ApplyOnly)
+	m.ConfigureOnly = types.BoolValue(v.ConfigureOnly)
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)

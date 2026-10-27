@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativ",
       "structured": "Strukturiert",
       "applyOnly": "Nur apply",
-      "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen."
+      "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen.",
+      "configureOnly": "Nur Konfigurieren",
+      "configureOnlyHint": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen. Das Zugangsdatum der Flotte selbst — ein SSH-Schlüssel zum Bestand, ein become-Passwort — hat in keinem von beiden etwas zu suchen.",
+      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-Konfiguration",
       "applyOnly": "Nur apply",
-      "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen."
+      "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen.",
+      "configureOnly": "Nur Konfigurieren",
+      "configureOnlyHint": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen. Das Zugangsdatum der Flotte selbst — ein SSH-Schlüssel zum Bestand, ein become-Passwort — hat in keinem von beiden etwas zu suchen.",
+      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren."
     },
     "runs": {
       "options": "Optionen",

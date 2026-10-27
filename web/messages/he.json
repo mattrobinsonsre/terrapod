@@ -1026,7 +1026,10 @@
       "categoryNative": "מקורי",
       "structured": "מובנה",
       "applyOnly": "apply בלבד",
-      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan."
+      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan.",
+      "configureOnly": "תצורה בלבד",
+      "configureOnlyHint": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply. פרטי ההתחברות של הצי עצמו — מפתח SSH למערך, סיסמת become — אינם שייכים לאף אחד מהשניים.",
+      "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "תצורת Pulumi",
       "applyOnly": "apply בלבד",
-      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan."
+      "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan.",
+      "configureOnly": "תצורה בלבד",
+      "configureOnlyHint": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply. פרטי ההתחברות של הצי עצמו — מפתח SSH למערך, סיסמת become — אינם שייכים לאף אחד מהשניים.",
+      "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד."
     },
     "runs": {
       "options": "אפשרויות",

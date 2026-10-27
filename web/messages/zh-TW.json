@@ -1026,7 +1026,10 @@
       "categoryNative": "原生",
       "structured": "結構化",
       "applyOnly": "僅 apply",
-      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。"
+      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。",
+      "configureOnly": "僅設定",
+      "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
+      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。"
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi 配置",
       "applyOnly": "僅 apply",
-      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。"
+      "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。",
+      "configureOnly": "僅設定",
+      "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
+      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。"
     },
     "runs": {
       "options": "選項",

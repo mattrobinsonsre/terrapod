@@ -1026,7 +1026,10 @@
       "categoryNative": "ネイティブ",
       "structured": "構造化",
       "applyOnly": "apply のみ",
-      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。"
+      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。",
+      "configureOnly": "構成のみ",
+      "configureOnlyHint": "構成にのみ渡し、plan にも apply にも渡しません。フリート自体の資格情報 — 設備への SSH 鍵や become パスワード — は、そのどちらにも関係ありません。",
+      "phaseSlotExclusive": "変数が入るスロットは一度にひとつだけです。「apply のみ」は apply と構成に届き、「構成のみ」は構成だけに届きます。"
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi 設定",
       "applyOnly": "apply のみ",
-      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。"
+      "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。",
+      "configureOnly": "構成のみ",
+      "configureOnlyHint": "構成にのみ渡し、plan にも apply にも渡しません。フリート自体の資格情報 — 設備への SSH 鍵や become パスワード — は、そのどちらにも関係ありません。",
+      "phaseSlotExclusive": "変数が入るスロットは一度にひとつだけです。「apply のみ」は apply と構成に届き、「構成のみ」は構成だけに届きます。"
     },
     "runs": {
       "options": "オプション",

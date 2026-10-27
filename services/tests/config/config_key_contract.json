@@ -7,6 +7,7 @@
   "[runners.yaml] configure_no_progress_seconds",
   "[runners.yaml] configure_retries",
   "[runners.yaml] configure_retry_backoff_seconds",
+  "[runners.yaml] configure_service_account_name",
   "[runners.yaml] configure_timeout_minutes",
   "[runners.yaml] credentials_secret_name",
   "[runners.yaml] debug_linger_seconds",

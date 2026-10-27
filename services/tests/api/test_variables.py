@@ -45,6 +45,7 @@ def _mock_var(
     ws_id=None,
     var_id=None,
     apply_only=False,
+    configure_only=False,
 ):
     var = MagicMock()
     var.id = var_id or uuid.uuid4()
@@ -53,6 +54,7 @@ def _mock_var(
     var.value = value
     var.sensitive = sensitive
     var.apply_only = apply_only
+    var.configure_only = configure_only
     var.category = "terraform"
     var.structured = False
     var.value_source = "static"
@@ -403,7 +405,9 @@ class TestVariableSetCRUD:
         assert resp.status_code == 403
 
 
-def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True, apply_only=False):
+def _mock_vsvar(
+    key="db_pass", value="s3cr3t", sensitive=True, apply_only=False, configure_only=False
+):
     v = MagicMock()
     v.id = uuid.uuid4()
     v.variable_set_id = uuid.uuid4()
@@ -411,6 +415,7 @@ def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True, apply_only=False)
     v.value = value
     v.sensitive = sensitive
     v.apply_only = apply_only
+    v.configure_only = configure_only
     v.category = "terraform"
     v.structured = False
     v.value_source = "static"

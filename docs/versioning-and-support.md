@@ -174,7 +174,7 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   moves them together (the listener Deployment carries a `checksum/runner-config`
   annotation, so a ConfigMap change rolls it), which is why this is reachable
   only where `listener.image.tag` is pinned behind the chart. The current example
-  is [`runners.applyServiceAccount`](runners.md#a-separate-serviceaccount-for-the-apply-phase):
+  is [`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase):
   an older listener runs the apply phase on `runners.serviceAccount`, so a
   deployment that believes its plans are on a narrower cloud role is not getting
   the split. **Unpin, or upgrade listeners with the chart, before relying on a

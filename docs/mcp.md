@@ -148,21 +148,32 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
 | `terrapod_workspace_varsets` | read-only | The variable sets that apply to a workspace, and how each one came to apply: explicit assignment, `global`, or an assignment rule. |
-| `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). `apply_only` withholds the variable from a plan and delivers it only to an apply — see the note below. |
+| `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). `apply_only` withholds the variable from a plan, delivering it to an apply **and a configure**; `configure_only` withholds it from an apply as well, delivering it to a configure alone — see the note below. |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |
 
 **`terrapod_variable_set` is an upsert keyed on `key` alone, which bounds what it
-can do with `apply_only`.** The flag itself works: pass `apply_only: true` and the
-variable is withheld from a plan and delivered only to an apply
-([Cloud Identity → Apply-only
-variables](cloud-identity.md#apply-only-variables)). What the tool cannot express
-is the **pair** — the same key held twice, once ordinary and once apply-only, so
-each phase gets a different value. It looks the key up, finds whichever row
-matches first, and updates that one, so a second call with the same key flips the
-existing row rather than adding its twin. Declare a pair through the API, the
+can do with the two phase flags.** The flags themselves work:
+
+- `apply_only: true` withholds the variable from a plan and delivers it to an
+  apply **and a configure** ([Cloud Identity → Apply-only
+  variables](cloud-identity.md#apply-only-variables)). A configure runs the
+  repository's playbooks against real hosts, so it is a write with
+  apply-equivalent blast radius rather than a speculative read.
+- `configure_only: true` withholds it from a plan **and from an apply**,
+  delivering it to a configure alone ([Configure-only
+  variables](cloud-identity.md#configure-only-variables)) — the fleet's own
+  credential, such as an SSH private key to the estate.
+- Setting **both** is refused with a `422`, because apply-only already reaches a
+  configure.
+
+What the tool cannot express is the **set** — the same key held in more than one
+slot, so each phase gets a different value. It looks the key up, finds whichever
+row matches first, and updates that one, so a second call with the same key flips
+the existing row rather than adding its twin. Declare several slots through the
+API, the
 [Terraform provider](terraform-provider.md#apply_only-on-the-two-variable-resources)
 or the UI; use the tool for the single-row case, where a value is simply not
-wanted on plans.
+wanted on plans, or not on applies either.
 
 **Four workspace attributes are deliberately not settable through MCP**, and their
 absence is a decision rather than an oversight: `debug-mode` arms a pod that holds

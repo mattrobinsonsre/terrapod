@@ -58,12 +58,29 @@ type Variable struct {
 	Structured bool `json:"structured"`
 	HCL        bool `json:"hcl"`
 	Sensitive  bool `json:"sensitive"`
-	// ApplyOnly withholds this variable from a plan and delivers it only to
-	// an apply (#2189). A different value per phase is TWO variables with the
-	// same key, one flagged; the apply-only one wins on an apply. Orthogonal to
-	// Category -- the uniqueness tuple carries both.
-	ApplyOnly   bool   `json:"apply-only"`
-	Description string `json:"description,omitempty"`
+	// ApplyOnly withholds this variable from a plan and delivers it to an
+	// apply AND to an Ansible configure (#2189). Not "only to an apply",
+	// which this said until #2190: a configure runs the repository's
+	// playbooks against real hosts, so it is a write with apply-equivalent
+	// blast radius and receives these rows deliberately (#2200). To withhold
+	// a variable from an apply as well, use ConfigureOnly.
+	//
+	// A different value per phase is TWO variables with the same key, one
+	// flagged; the apply-only one wins on an apply. Orthogonal to Category --
+	// the uniqueness tuple carries both.
+	ApplyOnly bool `json:"apply-only"`
+	// ConfigureOnly withholds this variable from a plan AND from an apply,
+	// delivering it only to an Ansible configure (#2190). The fleet's own
+	// credential -- an SSH private key to the estate, a become password --
+	// which nothing in a plan or an apply has any business holding.
+	//
+	// A THIRD slot rather than a rename of ApplyOnly, because a configure
+	// already receives every apply-only row: apply-only means "apply and
+	// configure", so it cannot express "not in an apply either".
+	//
+	// Both flags set is REFUSED by the server with a 422 rather than resolved.
+	ConfigureOnly bool   `json:"configure-only"`
+	Description   string `json:"description,omitempty"`
 
 	// ValueSource is "static" (Value is the literal) or "vault" (Value is a
 	// reference Terrapod resolves server-side at run time, #1439). For a vault
@@ -101,11 +118,12 @@ type CreateVariableRequest struct {
 	Category string `json:"category"`
 	// Set either; Structured is preferred. Setting both to different values is
 	// rejected by the server rather than silently resolved (#1435).
-	Structured  bool   `json:"structured,omitempty"`
-	HCL         bool   `json:"hcl,omitempty"`
-	Sensitive   bool   `json:"sensitive,omitempty"`
-	ApplyOnly   bool   `json:"apply-only,omitempty"`
-	Description string `json:"description,omitempty"`
+	Structured    bool   `json:"structured,omitempty"`
+	HCL           bool   `json:"hcl,omitempty"`
+	Sensitive     bool   `json:"sensitive,omitempty"`
+	ApplyOnly     bool   `json:"apply-only,omitempty"`
+	ConfigureOnly bool   `json:"configure-only,omitempty"`
+	Description   string `json:"description,omitempty"`
 	// ValueSource defaults to "static" when empty. Set "vault" and put the
 	// JSON reference in Value; Terrapod forces Sensitive on either way. Add a
 	// "file" object to the reference to deliver the secret as a file — see
@@ -123,15 +141,16 @@ type CreateVariableRequest struct {
 // preserves its id + history) — pass an empty string when not
 // renaming.
 type UpdateVariableRequest struct {
-	Key         string  `json:"key,omitempty"`
-	Value       *string `json:"value,omitempty"`
-	Category    string  `json:"category,omitempty"`
-	Structured  *bool   `json:"structured,omitempty"`
-	HCL         *bool   `json:"hcl,omitempty"`
-	Sensitive   *bool   `json:"sensitive,omitempty"`
-	ApplyOnly   *bool   `json:"apply-only,omitempty"`
-	Description *string `json:"description,omitempty"`
-	ValueSource *string `json:"value-source,omitempty"`
+	Key           string  `json:"key,omitempty"`
+	Value         *string `json:"value,omitempty"`
+	Category      string  `json:"category,omitempty"`
+	Structured    *bool   `json:"structured,omitempty"`
+	HCL           *bool   `json:"hcl,omitempty"`
+	Sensitive     *bool   `json:"sensitive,omitempty"`
+	ApplyOnly     *bool   `json:"apply-only,omitempty"`
+	ConfigureOnly *bool   `json:"configure-only,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	ValueSource   *string `json:"value-source,omitempty"`
 }
 
 // CreateVariable creates a variable scoped to a workspace.
@@ -353,6 +372,9 @@ func variableCreateAttrs(req CreateVariableRequest) map[string]any {
 	if req.Sensitive {
 		attrs["sensitive"] = true
 	}
+	if req.ConfigureOnly {
+		attrs["configure-only"] = true
+	}
 	if req.ApplyOnly {
 		attrs["apply-only"] = true
 	}
@@ -390,6 +412,9 @@ func variableUpdateAttrs(req UpdateVariableRequest) map[string]any {
 	if req.ApplyOnly != nil {
 		attrs["apply-only"] = *req.ApplyOnly
 	}
+	if req.ConfigureOnly != nil {
+		attrs["configure-only"] = *req.ConfigureOnly
+	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
@@ -409,16 +434,17 @@ func parseVariable(body []byte) (*Variable, error) {
 
 func variableFromResource(res *Resource) *Variable {
 	return &Variable{
-		ID:          res.ID,
-		Key:         GetStringAttr(res, "key"),
-		Value:       GetStringAttr(res, "value"),
-		Category:    GetStringAttr(res, "category"),
-		Structured:  GetBoolAttr(res, "structured"),
-		HCL:         GetBoolAttr(res, "hcl"),
-		Sensitive:   GetBoolAttr(res, "sensitive"),
-		ApplyOnly:   GetBoolAttr(res, "apply-only"),
-		Description: GetStringAttr(res, "description"),
-		ValueSource: GetStringAttr(res, "value-source"),
+		ID:            res.ID,
+		Key:           GetStringAttr(res, "key"),
+		Value:         GetStringAttr(res, "value"),
+		Category:      GetStringAttr(res, "category"),
+		Structured:    GetBoolAttr(res, "structured"),
+		HCL:           GetBoolAttr(res, "hcl"),
+		Sensitive:     GetBoolAttr(res, "sensitive"),
+		ApplyOnly:     GetBoolAttr(res, "apply-only"),
+		ConfigureOnly: GetBoolAttr(res, "configure-only"),
+		Description:   GetStringAttr(res, "description"),
+		ValueSource:   GetStringAttr(res, "value-source"),
 		// #1565. Absent on an older server, where it reads as false -- see the
 		// field's own comment for why that is the safe default.
 		VersionID: GetStringAttr(res, "version-id"),

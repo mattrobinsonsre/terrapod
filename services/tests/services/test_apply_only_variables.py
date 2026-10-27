@@ -16,10 +16,19 @@ from terrapod.services import variable_service
 class _Row:
     """The attributes `resolve_variables` reads off a variable row."""
 
-    def __init__(self, key, value, apply_only=False, category="env", sensitive=False):
+    def __init__(
+        self,
+        key,
+        value,
+        apply_only=False,
+        category="env",
+        sensitive=False,
+        configure_only=False,
+    ):
         self.key = key
         self.value = value
         self.apply_only = apply_only
+        self.configure_only = configure_only
         self.category = category
         self.structured = False
         self.sensitive = sensitive
@@ -95,6 +104,61 @@ class TestTheDuplicatePair:
         default. A new phase that silently inherits either answer is how this
         went wrong the first time."""
         assert variable_service.PHASES_SEEING_APPLY_ONLY == {"apply", "configure"}
+
+    async def test_the_phases_seeing_configure_only_are_exactly_configure(self):
+        """Pinned as a set for the same reason (#2190). Widening this to include
+        `apply` would make the flag identical to `apply_only` and silently
+        deliver the fleet's credential to every apply."""
+        assert variable_service.PHASES_SEEING_CONFIGURE_ONLY == {"configure"}
+
+    async def test_every_withholding_phase_is_one_a_CLAIM_CAN_YIELD(self):
+        """The reader half, derived from `claim_next_run`'s own tuple list.
+
+        A withholding flag is INERT unless some claim hands the delivery site
+        that phase: `runs.py` resolves with the phase `claim_next_run` returned,
+        so a phase set naming something no claim yields would withhold a
+        variable from every run and deliver it to none -- a flag nothing reads,
+        which this repository has shipped four times under other names.
+
+        Derived by parsing the claim loop rather than by listing the phases
+        here, because a hand-kept list would be a second place for the answer to
+        live and the drift would be invisible: both sides would still look
+        complete.
+        """
+        import ast
+        import pathlib as _pathlib
+
+        from terrapod.services import run_service
+
+        tree = ast.parse(_pathlib.Path(run_service.__file__).read_text())
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.AsyncFunctionDef) and n.name == "claim_next_run"
+        )
+        # The loop's iterable is a list of (target_status, phase, next_status).
+        yielded = {
+            elt.elts[1].value
+            for node in ast.walk(fn)
+            if isinstance(node, ast.For) and isinstance(node.iter, ast.List)
+            for elt in node.iter.elts
+            if isinstance(elt, ast.Tuple)
+            and len(elt.elts) == 3
+            and isinstance(elt.elts[1], ast.Constant)
+            and isinstance(elt.elts[1].value, str)
+        }
+        assert len(yielded) >= 3, (
+            f"only parsed {sorted(yielded)} from claim_next_run; the matcher has "
+            "probably stopped matching the claim loop rather than the loop having shrunk"
+        )
+        for phase_set_name in ("PHASES_SEEING_APPLY_ONLY", "PHASES_SEEING_CONFIGURE_ONLY"):
+            phases = getattr(variable_service, phase_set_name)
+            unreachable = phases - yielded
+            assert not unreachable, (
+                f"{phase_set_name} names {sorted(unreachable)}, which no claim in "
+                f"claim_next_run yields (it yields {sorted(yielded)}) -- so a variable "
+                "in that slot would be withheld from every run and delivered to none"
+            )
 
     async def test_an_unknown_phase_still_excludes_apply_only(self, seed):
         """Fail-closed stays the default for anything not named: withholding a

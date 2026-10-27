@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativa",
       "structured": "Strutturata",
       "applyOnly": "Solo apply",
-      "applyOnlyHint": "Trattenuta da un plan e consegnata solo a un apply. Un plan esegue il codice della configurazione, quindi una credenziale che serve solo all'apply non dovrebbe trovarsi nell'ambiente di un plan."
+      "applyOnlyHint": "Trattenuta da un plan e consegnata solo a un apply. Un plan esegue il codice della configurazione, quindi una credenziale che serve solo all'apply non dovrebbe trovarsi nell'ambiente di un plan.",
+      "configureOnly": "Solo configurare",
+      "configureOnlyHint": "Consegnata solo a un configurare e trattenuta sia da un plan sia da un apply. La credenziale della flotta stessa — una chiave SSH verso il parco macchine, una password become — non ha nulla a che fare con nessuno dei due.",
+      "phaseSlotExclusive": "Una variabile occupa un solo posto alla volta. Solo apply raggiunge un apply e un configurare; Solo configurare raggiunge soltanto un configurare."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configurazione Pulumi",
       "applyOnly": "Solo apply",
-      "applyOnlyHint": "Trattenuta da un plan e consegnata solo a un apply. Un plan esegue il codice della configurazione, quindi una credenziale che serve solo all'apply non dovrebbe trovarsi nell'ambiente di un plan."
+      "applyOnlyHint": "Trattenuta da un plan e consegnata solo a un apply. Un plan esegue il codice della configurazione, quindi una credenziale che serve solo all'apply non dovrebbe trovarsi nell'ambiente di un plan.",
+      "configureOnly": "Solo configurare",
+      "configureOnlyHint": "Consegnata solo a un configurare e trattenuta sia da un plan sia da un apply. La credenziale della flotta stessa — una chiave SSH verso il parco macchine, una password become — non ha nulla a che fare con nessuno dei due.",
+      "phaseSlotExclusive": "Una variabile occupa un solo posto alla volta. Solo apply raggiunge un apply e un configurare; Solo configurare raggiunge soltanto un configurare."
     },
     "runs": {
       "options": "Opzioni",

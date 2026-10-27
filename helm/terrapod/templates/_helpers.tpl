@@ -128,6 +128,25 @@ nothing keeps one account for every phase and a byte-identical rendered spec.
 {{- end }}
 
 {{/*
+The CONFIGURE phase's runner service account name (#2190), or "" when the
+feature is off. Same mechanism as the apply one above: empty means the ConfigMap
+key and the ServiceAccount object are both unrendered, so a deployment that sets
+nothing keeps one account for every phase.
+
+Absent means "use the PLAN's", not "use the apply's" -- a configure holds no
+cloud-mutating role by nature, so falling back to the apply account would hand
+every configure the cloud write principal.
+*/}}
+{{- define "terrapod.runnerConfigureServiceAccountName" -}}
+{{- $sa := .Values.runners.configureServiceAccount | default dict }}
+{{- if $sa.create }}
+{{- default (printf "%s-runner-configure" (include "terrapod.fullname" .)) $sa.name }}
+{{- else }}
+{{- default "" $sa.name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Listener service account name.
 */}}
 {{- define "terrapod.listenerServiceAccountName" -}}

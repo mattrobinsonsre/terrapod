@@ -552,6 +552,36 @@ before the header is shown in every view.
 A log with no header is one from a runner image that predates this. It renders
 in full, and the per-host picker is simply not offered.
 
+## Variables a configure receives, and the ones only it receives
+
+A configure resolves the workspace's variables exactly as a plan and an apply do,
+through the same precedence chain. Two per-variable flags decide which phases see
+a value, and a configure sits on an unusual side of each:
+
+| Slot | plan | apply | configure |
+|---|---|---|---|
+| ordinary | yes | yes | yes |
+| [`apply-only`](cloud-identity.md#apply-only-variables) | — | yes | **yes** |
+| [`configure-only`](cloud-identity.md#configure-only-variables) | — | — | yes |
+
+**An apply-only variable reaches a configure.** That is deliberate rather than an
+accident of naming: a configure runs the repository's playbooks against real
+hosts, so it is a write with apply-equivalent blast radius rather than a
+speculative read of unreviewed pull-request code. A credential an apply needs is
+usually one a configure needs too.
+
+**A configure-only variable reaches nothing else.** It is for the fleet's own
+credential — an SSH private key to the estate, a become password, a bastion
+passphrase — which nothing in a plan or an apply has any business holding. Both
+flags set on one row is refused with a `422`, because apply-only already reaches
+a configure and so configure-only alone is what withholds a value from an apply
+as well as from a plan.
+
+A key may be held **once per slot**, so the same name can carry a different value
+per phase. The [two Ansible credential
+categories](ansible-credentials.md#apply-only-and-the-phase-a-credential-reaches)
+are delivered to a configure regardless of either flag.
+
 ## Cloud credentials: a configure gets its own federated identity
 
 A configure presents the workspace's own cloud identity rather than the agent
@@ -575,6 +605,38 @@ playbook.** Terrapod writes the file and exports the directory; it sets no
 cloud credential environment and has no per-collection handling. The worked
 example on that page configures `amazon.aws`, `azure.azcollection`,
 `google.cloud` and `community.hashi_vault` from one `environment:` block.
+
+### Or give the configure phase its own ServiceAccount
+
+Federation is not the only way, and it is not a prerequisite. A configure Job can
+be run under a Kubernetes ServiceAccount of its own, annotated at its own cloud
+role:
+
+```yaml
+runners:
+  configureServiceAccount:   # OPTIONAL -- configure Jobs only
+    create: true
+    name: "terrapod-runner-configure"
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-configure"
+```
+
+It is **off by default** (`create: false`, `name: ""`), and unset it renders
+nothing at all — no account, and no key in the runner ConfigMap.
+
+**Unset, a configure takes the `plan` phase's account, never the apply's.** A
+configure is not a Terraform apply and holds no cloud-mutating role by nature, so
+defaulting it to `runners.applyServiceAccount` would quietly hand every configure
+the cloud write principal. The annotations are the whole point: an account
+without them has no cloud identity at all, so creating one and forgetting to
+annotate it breaks the configure rather than narrowing anything.
+
+Note this is the **opposite direction from apply-only variables**, which *are*
+delivered to a configure. Both are right for their own axis — an apply-only
+variable is often the machine credential a configure needs, while a
+ServiceAccount is a cloud principal a configure has no reason to hold. See
+[Cloud Identity → Which phase gets which
+account](cloud-identity.md#which-phase-gets-which-account).
 
 ## A play that targets the execution environment itself needs `ansible_remote_tmp`
 

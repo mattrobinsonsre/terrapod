@@ -1026,7 +1026,10 @@
       "categoryNative": "Nativa",
       "structured": "Estruturada",
       "applyOnly": "Somente apply",
-      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan."
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan.",
+      "configureOnly": "Somente configurar",
+      "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply. A credencial da própria frota — uma chave SSH do parque, uma senha become — não tem o que fazer em nenhum dos dois.",
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar por vez. Somente apply alcança um apply e um configurar; Somente configurar alcança apenas um configurar."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Configuração do Pulumi",
       "applyOnly": "Somente apply",
-      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan."
+      "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan.",
+      "configureOnly": "Somente configurar",
+      "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply. A credencial da própria frota — uma chave SSH do parque, uma senha become — não tem o que fazer em nenhum dos dois.",
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar por vez. Somente apply alcança um apply e um configurar; Somente configurar alcança apenas um configurar."
     },
     "runs": {
       "options": "Opções",

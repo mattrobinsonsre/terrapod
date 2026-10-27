@@ -1026,7 +1026,10 @@
       "categoryNative": "Native",
       "structured": "Struktureret",
       "applyOnly": "Kun apply",
-      "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø."
+      "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø.",
+      "configureOnly": "Kun konfigurer",
+      "configureOnlyHint": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply. Flådens egen legitimation — en SSH-nøgle til maskinparken, en become-adgangskode — hører ikke hjemme i nogen af dem.",
+      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer."
     }
   },
   "adminAutodiscovery": {
@@ -2830,7 +2833,10 @@
       "categoryTerraform": "Terraform",
       "categoryPulumiConfig": "Pulumi-konfiguration",
       "applyOnly": "Kun apply",
-      "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø."
+      "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø.",
+      "configureOnly": "Kun konfigurer",
+      "configureOnlyHint": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply. Flådens egen legitimation — en SSH-nøgle til maskinparken, en become-adgangskode — hører ikke hjemme i nogen af dem.",
+      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer."
     },
     "runs": {
       "options": "Indstillinger",

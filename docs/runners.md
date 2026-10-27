@@ -742,10 +742,10 @@ runners:
   azureWorkloadIdentity: false
 ```
 
-### A separate ServiceAccount for the apply phase
+### Separate ServiceAccounts per phase
 
-A run's `plan` and its `apply` are **separate Jobs**, and the apply phase can be
-given its own ServiceAccount:
+A run's `plan`, its `apply` and any `configure` are **separate Jobs**, and the
+apply and configure phases can each be given their own ServiceAccount:
 
 | Helm value | Default | What it does |
 |---|---|---|
@@ -755,25 +755,39 @@ given its own ServiceAccount:
 | `runners.applyServiceAccount.create` | **`false`** | Create a second account for the apply phase. |
 | `runners.applyServiceAccount.name` | **`""`** | The apply account. Empty resolves to `<release>-runner-apply` when `create: true`, and to **nothing at all** when `create: false` — which is what keeps the feature off. Set it with `create: false` to adopt an account you manage elsewhere. |
 | `runners.applyServiceAccount.annotations` | `{}` | Its own cloud-identity annotations — **set these**, or the apply has no cloud identity. |
+| `runners.configureServiceAccount.create` | **`false`** | Create a third account for the configure phase. |
+| `runners.configureServiceAccount.name` | **`""`** | The configure account. Empty resolves to `<release>-runner-configure` when `create: true`, and to **nothing at all** when `create: false` — which is what keeps the feature off. Set it with `create: false` to adopt an account you manage elsewhere. |
+| `runners.configureServiceAccount.annotations` | `{}` | Its own cloud-identity annotations — **set these**, or the configure has no cloud identity. |
 
-The resolution is one line: **an `apply` Job uses
-`runners.applyServiceAccount` when it resolves to a non-empty name, and every
-other Job uses `runners.serviceAccount`.** `plan` and `apply` are the only two
-Job phases, so in practice that is "plan on one account, apply on the other".
+The resolution is one line: **a Job uses its phase's own account when that
+resolves to a non-empty name, and `runners.serviceAccount` when it does not.**
+There are three Job phases — `plan`, `apply` and `configure` — and two of them
+have an account of their own to set, so in practice that is "plan on one
+account, apply on another, and a configure on a third if you give it one".
 
-With `applyServiceAccount` left at its defaults **nothing renders** — no second
-ServiceAccount, and no `apply_service_account_name` in the runner ConfigMap — and
-the Job spec is identical to what it was before the value existed. The point of
+**An unset `configureServiceAccount` falls back to the PLAN's account, not the
+apply's.** A configure is not a Terraform apply and holds no cloud-mutating role
+by nature, so defaulting it to the apply account would quietly hand every
+configure the cloud write principal. Note this is the opposite direction from
+[apply-only variables](cloud-identity.md#apply-only-variables), which *are*
+delivered to a configure — see [the asymmetry, and why both are
+right](cloud-identity.md#the-variables-go-the-other-way-and-both-are-right).
+
+With `applyServiceAccount` and `configureServiceAccount` left at their defaults
+**nothing renders** — no extra ServiceAccount, and no `apply_service_account_name`
+or `configure_service_account_name` in the runner ConfigMap — and
+the Job spec is identical to what it was before the values existed. The point of
 configuring it is to put the plan phase on a narrower cloud role, because a
 speculative pull-request plan runs unreviewed code; see [Security Hardening →
 Give the plan phase a narrower identity than the
 apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply),
-and [Cloud Identity](cloud-identity.md#a-separate-serviceaccount-for-the-apply-phase)
+and [Cloud Identity](cloud-identity.md#separate-serviceaccounts-per-phase)
 for a worked example per cloud.
 
 **The Job spec is built by the listener**, which reads
-`apply_service_account_name` from the runner ConfigMap — and `RunnerConfig`
-ignores keys it does not recognise, so a listener image older than this value
+`apply_service_account_name` and `configure_service_account_name` from the runner
+ConfigMap — and `RunnerConfig`
+ignores keys it does not recognise, so a listener image older than either value
 runs every phase on `runners.serviceAccount` without reporting anything. An
 ordinary `helm upgrade` rolls the listener alongside the ConfigMap (the
 Deployment carries a `checksum/runner-config` annotation), so this is a concern

@@ -11,6 +11,7 @@ import { AssignmentRuleEditor, AssignmentRuleSummary, type AssignmentRule } from
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { PhaseSlotFlags, PhaseSlotNote } from '@/components/phase-slot-flags'
 import {
   VariableEditPanel,
   type VariableEditState,
@@ -62,6 +63,8 @@ interface Variable {
     structured: boolean
     sensitive: boolean
     'apply-only'?: boolean
+    /** The third phase slot (#2190): a configure sees it, a plan and an apply do not. */
+    'configure-only'?: boolean
     description: string
   }
 }
@@ -128,6 +131,7 @@ export default function VariableSetDetailPage() {
   const [varCategory, setVarCategory] = useState('native')
   const [varSensitive, setVarSensitive] = useState(false)
   const [varApplyOnly, setVarApplyOnly] = useState(false)
+  const [varConfigureOnly, setVarConfigureOnly] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
@@ -188,11 +192,22 @@ export default function VariableSetDetailPage() {
   const [editVarCategory, setEditVarCategory] = useState('native')
   const [editVarSensitive, setEditVarSensitive] = useState(false)
   const [editVarApplyOnly, setEditVarApplyOnly] = useState(false)
+  const [editVarConfigureOnly, setEditVarConfigureOnly] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
   const [editVarVault, setEditVarVault] = useState<VaultReferenceValue>(emptyVaultReference)
   const isEditGitCat = editVarCategory === 'git_http_auth' || editVarCategory === 'git_ssh_auth'
+
+  // The ADD form's two phase-slot flags, bridged to the shared control so the
+  // mutual exclusion (#2190) is the one in `PhaseSlotFlags` rather than a
+  // second copy of the rule written out here.
+  const phaseSlots = { applyOnly: varApplyOnly, configureOnly: varConfigureOnly }
+
+  function patchPhaseSlots(patch: Partial<typeof phaseSlots>) {
+    if (patch.applyOnly !== undefined) setVarApplyOnly(patch.applyOnly)
+    if (patch.configureOnly !== undefined) setVarConfigureOnly(patch.configureOnly)
+  }
 
   // The panel takes one object; this page keeps a field per input. Bridge the
   // two rather than refactoring the state, so the desktop row and the mobile
@@ -203,6 +218,7 @@ export default function VariableSetDetailPage() {
     category: editVarCategory,
     sensitive: editVarSensitive,
     applyOnly: editVarApplyOnly,
+    configureOnly: editVarConfigureOnly,
     hcl: editVarHcl,
     source: editVarSource,
     vault: editVarVault,
@@ -214,6 +230,7 @@ export default function VariableSetDetailPage() {
     if (patch.category !== undefined) setEditVarCategory(patch.category)
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
     if (patch.applyOnly !== undefined) setEditVarApplyOnly(patch.applyOnly)
+    if (patch.configureOnly !== undefined) setEditVarConfigureOnly(patch.configureOnly)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
     if (patch.vault !== undefined) setEditVarVault(patch.vault)
@@ -399,6 +416,7 @@ export default function VariableSetDetailPage() {
               // (#1933). Otherwise honour the checkbox.
               sensitive: isVaultSource || isAnsibleCat ? true : varSensitive,
               'apply-only': varApplyOnly,
+              'configure-only': varConfigureOnly,
               structured: isAnsibleCat ? false : varHcl,
               'value-source': isVaultSource ? 'vault' : 'static',
             },
@@ -414,6 +432,7 @@ export default function VariableSetDetailPage() {
       setVarCategory('native')
       setVarSensitive(false)
       setVarApplyOnly(false)
+      setVarConfigureOnly(false)
       setVarHcl(false)
       setVarSource('static')
       setVarVault(emptyVaultReference())
@@ -442,6 +461,7 @@ export default function VariableSetDetailPage() {
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
     setEditVarApplyOnly(v.attributes['apply-only'] ?? false)
+    setEditVarConfigureOnly(v.attributes['configure-only'] ?? false)
     setEditVarHcl(v.attributes.structured)
   }
 
@@ -463,6 +483,7 @@ export default function VariableSetDetailPage() {
         category: editVarCategory,
         sensitive: isEditVault || isEditAnsible ? true : editVarSensitive,
         'apply-only': editVarApplyOnly,
+        'configure-only': editVarConfigureOnly,
         structured: isEditAnsible ? false : editVarHcl,
         'value-source': isEditVault ? 'vault' : 'static',
       }
@@ -787,12 +808,16 @@ export default function VariableSetDetailPage() {
                       <option value={ANSIBLE_VAULT_CATEGORY}>{ta('categoryVault')}</option>
                     </select>
                   </div>
-                  <div className="flex items-end gap-4">
+                  {/* `flex-wrap` is load-bearing with four checkboxes: at
+                      phone width a single row of them overflows, and a
+                      horizontal page scroll is the one thing the mobile guard
+                      refuses outright. */}
+                  <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
                     {/* Sensitive and Structured are not offered on an Ansible
                         credential: the API forces the first and refuses the
                         second, so both would be controls whose state the save
-                        discards (#1933). Apply-only is offered — on a
-                        credential it is the flag that matters most. */}
+                        discards (#1933). The phase slots ARE offered — on a
+                        credential they are the flags that matter most. */}
                     {!isAnsibleCat && (
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)}
@@ -800,11 +825,12 @@ export default function VariableSetDetailPage() {
                         <span className="text-sm text-slate-300">{t('detail.sensitive')}</span>
                       </label>
                     )}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={varApplyOnly} onChange={(e) => setVarApplyOnly(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">{t('detail.applyOnly')}</span>
-                    </label>
+                    <PhaseSlotFlags
+                      namespace="adminVariableSets.detail"
+                      state={phaseSlots}
+                      onChange={patchPhaseSlots}
+                      labelClassName="text-sm text-slate-300"
+                    />
                     {!isAnsibleCat && (
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)}
@@ -812,6 +838,13 @@ export default function VariableSetDetailPage() {
                         <span className="text-sm text-slate-300">{t('detail.structured')}</span>
                       </label>
                     )}
+                    {/* `w-full` puts the note on its own line of the wrapped
+                        row rather than squeezing it between two checkboxes. */}
+                    <PhaseSlotNote
+                      namespace="adminVariableSets.detail"
+                      state={phaseSlots}
+                      className="w-full text-xs text-slate-500"
+                    />
                   </div>
                 </div>
                 <button type="submit" disabled={addingVar}
@@ -868,6 +901,14 @@ export default function VariableSetDetailPage() {
                               {v.attributes['apply-only'] && (
                                 <span title={t('detail.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
                               )}
+                              {/* A third slot means a key can now be held
+                                  THREE times, so the badge is what tells
+                                  otherwise identical rows apart. Teal rather
+                                  than amber, so the two slots are
+                                  distinguishable at a glance. */}
+                              {v.attributes['configure-only'] && (
+                                <span title={t('detail.configureOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
+                              )}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
@@ -922,6 +963,9 @@ export default function VariableSetDetailPage() {
                             {v.attributes.key}
                             {v.attributes['apply-only'] && (
                               <span title={t('detail.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
+                            )}
+                            {v.attributes['configure-only'] && (
+                              <span title={t('detail.configureOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
                             )}
                           </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
