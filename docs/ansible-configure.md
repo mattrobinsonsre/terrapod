@@ -326,6 +326,13 @@ Two things about it are worth knowing, because both are counter-intuitive:
   near your longest single task will kill working runs. It bounds "nothing at
   all is happening" and nothing finer.
 
+While a configure is running, `GET /api/v1/runs/{id}` carries
+**`last-output-at`** — when its output last changed. That is the field that
+answers "is this advancing?", and it is absent on anything that is not a live
+configure. A configure silent for longer than the setting above is errored, so a
+genuinely stuck one becomes a failed run naming the silence rather than a
+timestamp drifting further into the past.
+
 A configure that is **cancelled** — from the run page, or by a newer run — is
 interrupted rather than killed: ansible is signalled once, stops at the task it
 is on, and the run reports that it was interrupted rather than that the playbook

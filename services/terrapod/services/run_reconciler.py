@@ -94,6 +94,35 @@ def _phase_start_of(run: Run) -> datetime | None:
 _PROGRESS_PREFIX = "tp:configure_progress:"
 
 
+async def last_output_at(run_id: str, phase: str) -> datetime | None:
+    """When this phase's output last CHANGED, or None if not known (#1977).
+
+    The marker `_check_configure_progress` already maintains, read back. It is
+    what distinguishes the two states #1977 asks an operator to be able to tell
+    apart: "quiet for twenty minutes" from "stuck". Stuck is now an errored run
+    carrying the silence in its message; quiet is a run still going whose last
+    output was a while ago, and without this there was nothing to show for it.
+
+    None rather than a guess when the marker is absent -- before the first
+    observation, after it expires, or on a phase that is not a configure.
+    """
+    from terrapod.redis.client import get_redis_client
+
+    try:
+        raw = await get_redis_client().get(f"{_PROGRESS_PREFIX}{run_id}:{phase}")
+    except Exception:  # noqa: BLE001 — a read-only nicety must never fail a run read
+        return None
+    if not raw:
+        return None
+    if isinstance(raw, bytes):
+        raw = raw.decode()
+    _, _, at = raw.partition(":")
+    try:
+        return datetime.fromtimestamp(float(at), UTC)
+    except ValueError:
+        return None
+
+
 async def _check_configure_progress(db: AsyncSession, run: Run, phase: str) -> None:
     """Error a configure that has produced no NEW output for too long (#1977).
 

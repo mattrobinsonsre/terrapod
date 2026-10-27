@@ -174,3 +174,66 @@ def test_the_running_branch_calls_it_BEFORE_returning():
     call = tail.index("_check_configure_progress")
     ret = tail.index("return")
     assert call < ret, "the detector must run before the branch returns"
+
+
+class TestLastOutputAt:
+    """The read side of the same marker (#1977).
+
+    This is what gives an operator the distinction the issue asks for: "stuck"
+    is now an errored run carrying the silence in its message, and "quiet for
+    twenty minutes" is a run still going whose last output was a while ago.
+    """
+
+    @pytest.mark.asyncio
+    async def test_it_returns_when_the_output_last_changed(self):
+        at = time.time() - 300
+        redis = _Redis(None, f"{'a' * 32}:{at}")
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            got = await run_reconciler.last_output_at("run", "configure")
+        assert got is not None
+        assert abs(got.timestamp() - at) < 1
+
+    @pytest.mark.asyncio
+    async def test_an_absent_marker_is_None_rather_than_a_guess(self):
+        redis = _Redis(None, None)
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            assert await run_reconciler.last_output_at("run", "configure") is None
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_marker_is_None_rather_than_a_crash(self):
+        redis = _Redis(None, "not-a-marker")
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            assert await run_reconciler.last_output_at("run", "configure") is None
+
+    @pytest.mark.asyncio
+    async def test_a_redis_failure_cannot_fail_a_run_read(self):
+        """It is surfaced on `GET /runs/{id}`, so a Redis outage must degrade
+        this one attribute rather than break every run page."""
+
+        class _Broken:
+            async def get(self, _key):
+                raise ConnectionError("redis down")
+
+        with patch("terrapod.redis.client.get_redis_client", return_value=_Broken()):
+            assert await run_reconciler.last_output_at("run", "configure") is None
+
+
+def test_the_attribute_is_surfaced_ONLY_while_a_configure_is_in_flight():
+    """Runtime adaptation rather than a flag, per #1977's own requirement that a
+    terraform-only deployment pays nothing: the key is absent from every run
+    read that is not a live configure, and the Redis GET with it.
+
+    Positional, because a behavioural test would have to drive `show_run` for
+    every status and assert an absence.
+    """
+    import inspect
+
+    from terrapod.api.routers import runs as runs_router
+
+    src = inspect.getsource(runs_router.show_run)
+    assert src.count('"last-output-at"') == 1
+    guard = src.index('if run.status == "configuring":')
+    assert src.index('"last-output-at"') > guard, (
+        "set outside the configuring guard, so every run read pays a Redis GET"
+    )
+    assert src.index("last_output_at") > guard, "the Redis read is not gated either"
