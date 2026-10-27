@@ -232,6 +232,44 @@ class TestTheVolumeContract:
         assert pod["securityContext"]["runAsNonRoot"] is True
 
 
+class TestTheCloudIdentityDirectory:
+    """A configure's cloud identity tokens live on the SHARED volume (#2259).
+
+    The engine's `/var/run/terrapod/oidc` is an emptyDir mounted into the
+    orchestrator alone, which is right while the engine is the thing
+    authenticating. For a configure it is ansible, running in the execution
+    environment, which mounts only the shared volume and the workspace -- so a
+    token at the engine's path is minted, delivered, logged as delivered, and
+    unreadable by the only process that needs it.
+    """
+
+    def test_the_directory_is_created_before_anything_writes_to_it(self):
+        """By `agent-copy`, with the sibling directories, and under the uid
+        that will share them. The phase writes a 0600 file into it, so a
+        missing parent is an OSError the run fails on."""
+        cmd = " ".join(_init(_pod(ee_image=EE), "agent-copy")["command"])
+        assert "/tp/oidc" in cmd, (
+            "nothing creates the token directory, so the credential phase fails on its first write"
+        )
+
+    def test_the_orchestrator_is_told_where_it_is(self):
+        """`TP_EE_OIDC_DIR`, so the path stays a property of the Job's volume
+        layout rather than something a phase decides -- matching
+        `TP_EE_INVENTORY_DIR` and `TP_EE_CREDENTIALS_DIR`."""
+        env = {e["name"]: e.get("value") for e in _pod(ee_image=EE)["containers"][0]["env"]}
+        assert env.get("TP_EE_OIDC_DIR") == "/tp/oidc"
+
+    def test_it_is_under_the_shared_volume_the_EE_actually_mounts(self):
+        """The property, rather than the literal: whatever the directory is
+        called, the EE has to be able to read it."""
+        pod = _pod(ee_image=EE)
+        env = {e["name"]: e.get("value") for e in pod["containers"][0]["env"]}
+        ee_mounts = {m["name"]: m["mountPath"] for m in _init(pod, "ee")["volumeMounts"]}
+        assert env["TP_EE_OIDC_DIR"].startswith(ee_mounts["tp"] + "/"), (
+            f"{env['TP_EE_OIDC_DIR']} is not under a path the execution environment mounts"
+        )
+
+
 class TestTheSharedToken:
     def test_both_containers_read_it_from_the_per_run_secret(self):
         pod = _pod(ee_image=EE)

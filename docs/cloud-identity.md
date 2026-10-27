@@ -1191,6 +1191,16 @@ localhost`, `connection: local`, or a play whose hosts are local. A cloud
 module running on a remote managed node will not find the token, and
 `environment:` applies at the point the module executes, not on the controller.
 
+**None of this is required.** A configure runs under the agent pool's
+ServiceAccount like any other Job, so an annotated account gives the execution
+environment IRSA or Workload Identity and the collections find it through their
+own credential chains — no `environment:` block, no token file, no federation.
+See [Which phase gets which account](#which-phase-gets-which-account).
+Federation is the opt-in choice for when the workspace rather than the pool
+should be the credential boundary, and Terrapod sets no cloud credential
+environment of its own either way: coexistence is achieved by absence, and a
+configure is no exception.
+
 Everything else on this page applies unchanged to a configure — the catalogue,
 the merge semantics, the trust-policy conditions, rotation, and the audience
 limits.
@@ -1314,14 +1324,38 @@ picks up whatever its own account federates to.
 
 ### Which phase gets which account
 
-A runner Job has exactly two phases, `plan` and `apply`, and the rule is one
-line: **the apply phase uses `runners.applyServiceAccount` when it is set, and
-every other Job uses `runners.serviceAccount`.**
+A runner Job has three phases — `plan`, `apply` and `configure` — and the rule
+is one line: **the apply phase uses `runners.applyServiceAccount` when it is
+set, and every other Job uses `runners.serviceAccount`.**
 
 | Job | ServiceAccount |
 |---|---|
 | `plan` — a speculative pull-request plan, a drift-detection run, a CLI-initiated plan on an agent-mode workspace, and the plan half of an apply-capable run | `runners.serviceAccount` |
 | `apply` — including a destroy apply | `runners.applyServiceAccount` if set, otherwise `runners.serviceAccount` |
+| `configure` — an Ansible configure, standalone or following an apply | `runners.serviceAccount` |
+
+**So a configure runs under the pool's own account, and that is a perfectly
+good way to give a playbook cloud credentials.** An annotated
+`runners.serviceAccount` gives the execution environment IRSA, Workload
+Identity or Azure Workload Identity, and the collections pick it up through
+their own credential chains with nothing in the playbook and no federation at
+all — `amazon.aws` through botocore's own chain, `google.cloud` with
+`auth_kind: machineaccount` or `application`, `azure.azcollection` with
+`auth_source: msi`. Per-workspace federation is an **opt-in alternative** for
+when the workspace rather than the pool should be the credential boundary; it
+is not a prerequisite for a configure having credentials, and which to use is
+your choice.
+
+**A configure takes the plan side, not the apply side**, and that is the
+deliberate direction: a configure is not a Terraform apply and holds no
+cloud-mutating role by nature, so an operator who sets nothing has a configure
+that cannot reach what an apply can. Defaulting it to
+`runners.applyServiceAccount` would quietly hand every configure the cloud
+write principal.
+
+If you want a configure to hold different cloud permissions from an apply, the
+`phase: configure` claim expresses that in the cloud's own trust policy — see
+[The `phase` claim](#the-phase-claim-and-why-write-permissions-belong-behind-it).
 
 **Annotate both accounts, not just the apply one.** A plan is not a dry run: it
 refreshes state and evaluates `data` sources, so the plan account still needs
