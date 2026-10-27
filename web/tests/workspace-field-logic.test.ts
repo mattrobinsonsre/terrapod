@@ -56,15 +56,42 @@ test('an ABSENT gate reads as off, which is the fail-closed direction', () => {
   assert.equal(dependencyMet(interval, { 'drift-detection-enabled': 'false' }), false)
 })
 
-test('a list-valued advanced field surfaces a COUNT while its group is shut', () => {
-  const held = groupSummary('metadata', 'terraform', { labels: ['a', 'b', 'c'] }, label)
-  const labels = held.find((h) => h.attr === 'labels')
-  assert.ok(labels, 'labels should be summarised')
-  assert.match(labels.text, /3/)
+test('a counted field surfaces a COUNT while its group is shut — ARRAY shape', () => {
+  const held = groupSummary('metadata', 'terraform', { 'var-files': ['a.tfvars', 'b.tfvars'] }, label)
+  const vf = held.find((h) => h.attr === 'var-files')
+  assert.ok(vf, 'var-files should be summarised')
+  assert.match(vf.text, /2/)
 })
 
-test('an empty list says nothing, so a group holding nothing stays quiet', () => {
-  assert.deepEqual(groupSummary('metadata', 'terraform', { labels: [] }, label), [])
+test('a counted field surfaces a COUNT — MAP shape, which is what labels really is', () => {
+  // `labels` is `Mapped[dict[str, Any]]` and `oidc-audiences` is
+  // `Mapped[dict[str, list[str]]]`. An earlier version of this test passed an
+  // ARRAY for labels -- a shape that never occurs -- so it passed while the
+  // implementation reported 0 for every map and a collapsed group holding
+  // labels concealed them. The fixture shape is the whole assertion here.
+  const held = groupSummary(
+    'metadata',
+    'terraform',
+    { labels: { team: 'platform', tier: 'prod', owner: 'sre' } },
+    label,
+  )
+  const labels = held.find((h) => h.attr === 'labels')
+  assert.ok(labels, 'a map-valued field must be summarised, not silently counted as 0')
+  assert.match(labels.text, /3/)
+
+  const auds = groupSummary(
+    'cloudIdentity',
+    'terraform',
+    { 'oidc-audiences': { aws: ['sts.amazonaws.com'], azurerm: ['api://AzureADTokenExchange'] } },
+    label,
+  )
+  assert.ok(auds.some((h) => h.attr === 'oidc-audiences'))
+  assert.match(auds.find((h) => h.attr === 'oidc-audiences')!.text, /2/)
+})
+
+test('an empty collection says nothing, in either shape', () => {
+  assert.deepEqual(groupSummary('metadata', 'terraform', { labels: {} }, label), [])
+  assert.deepEqual(groupSummary('metadata', 'terraform', { 'var-files': [] }, label), [])
   assert.deepEqual(groupSummary('metadata', 'terraform', {}, label), [])
 })
 

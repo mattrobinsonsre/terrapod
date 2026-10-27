@@ -2250,7 +2250,7 @@ test.describe('Workspace form sections (#2253)', () => {
     // from a defaults table — so two labels must surface as a count on the
     // summary while the group is still shut.
     const wsId = await createWorkspace(token, uniqueName('e2e-wsform-advanced'), {
-      labels: ['team:platform', 'tier:prod'],
+      labels: { team: 'platform', tier: 'prod' },
     })
 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)

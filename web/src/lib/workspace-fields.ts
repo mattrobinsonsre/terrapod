@@ -428,7 +428,18 @@ export function groupSummary(
     if (!dependencyMet(spec, values)) continue
     const v = values[spec.attr]
     if (spec.summary === 'count') {
-      const n = Array.isArray(v) ? v.length : 0
+      // ARRAYS AND MAPS BOTH, because two of the five counted attributes are
+      // maps on the wire and an array-only count silently reported 0 for them:
+      // `labels` is `Mapped[dict[str, Any]]` and `oidc-audiences` is
+      // `Mapped[dict[str, list[str]]]`. So a collapsed Metadata group holding
+      // three labels announced nothing -- exactly the concealment this
+      // indicator exists to prevent, in the one direction that is invisible
+      // (a group that looks empty reads as empty).
+      const n = Array.isArray(v)
+        ? v.length
+        : typeof v === 'object' && v !== null
+          ? Object.keys(v as Record<string, unknown>).length
+          : 0
       if (n > 0) out.push({ attr: spec.attr, text: `${label(spec.attr)} ${n}` })
     } else if (spec.summary === 'setOrUnset') {
       const set = v !== undefined && v !== null && v !== '' && v !== 0
