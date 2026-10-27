@@ -823,7 +823,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # an independent operation: the composite case (an apply that is followed by a
     # configure) is two runner Jobs driven by one Run, not one Job doing both.
     if cfg.phase == "configure":
-        return _run_configure_phase(cfg, work_dir=work_dir)
+        return _run_configure_phase(cfg, binary=binary, work_dir=work_dir)
 
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
@@ -935,7 +935,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     return 1
 
 
-def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
+def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> int:
     """Install the content the playbook needs, then run it (#1972).
 
     Both steps go through the SAME execution environment, which is a correctness
@@ -969,9 +969,51 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
     the returns of the first step are the ARGUMENTS of the other two rather than
     process state: `configure._forced_env` strips every inherited `ANSIBLE_*`,
     so an exported vault identity list would be stripped on the way out.
+
+    Cloud identity (#2259) comes second, for the same reason in a weaker form:
+    it is one API request, so it is cheap to fail in, and a playbook driving a
+    cloud API with no usable identity is not going to run whatever the install
+    produces. It is NOT first, because #1933's credentials are a local file read
+    and can refuse without reaching the network at all.
+
+    Three things about it are specific to a configure rather than inherited:
+
+    * **It discovers nothing.** `discover_providers=False`, which is the Pulumi
+      path's mode (#2006), because a playbook has no static provider graph to
+      walk -- which clouds it touches is a property of the tasks, not of a
+      configuration's provider blocks. So the API mints the whole resolved
+      mapping rather than an intersection.
+    * **The tokens go on the SHARED volume**, not at the documented
+      `cloud_identity.TOKEN_DIR`. That directory is mounted into this container
+      alone; ansible runs in the execution environment, which mounts only the
+      shared volume and the workspace. Writing to the documented path would
+      mint a token, log it as delivered, and deliver it to nobody.
+    * **Its env reaches ansible as `extra_env`**, like the credentials above
+      and for the same reason: `configure._forced_env` strips inherited
+      `ANSIBLE_*` on the way out, and in any case ansible is a child of the
+      agent in another container, so this process's `os.environ` is not its
+      environment. The plan path merges into `os.environ` because there the
+      engine is a child of this process.
+
+    Registering the token with the redactor is not phase-specific and needs no
+    help: `register_secret` writes to the module registry `StreamRedactor`
+    reads, and the EE agent's streamed body goes through one -- so a token a
+    cloud module prints is scrubbed from a configure's log exactly as from a
+    plan's. It happens inside the phase, before the stream exists.
     """
     cwd = (work_dir / cfg.config_directory).resolve() if cfg.config_directory else work_dir
     credential_env, credential_refs = ansible_auth.run()
+    # `binary` is passed and deliberately unread, because `discover_providers`
+    # is False -- the same shape as the Pulumi path, which also hands over the
+    # engine binary it is not going to walk a graph with. Keeping the argument
+    # rather than making it optional leaves the plan path's requirement intact.
+    identity_env = cloud_identity.run(
+        cfg,
+        binary=binary,
+        cwd=cwd,
+        discover_providers=False,
+        token_dir=cloud_identity.ee_token_dir(),
+    )
     inventory = configure_inventory.materialise(cfg, resolved=credential_refs)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
     # Capture is best-effort and says so: `deliver` returns None when the plugin
@@ -987,7 +1029,7 @@ def _run_configure_phase(cfg: RunnerConfig, *, work_dir: Path) -> int:
             work_dir=work_dir,
             inventory=inventory,
             log_file=str(_CONFIGURE_LOG),
-            extra_env={**credential_env, **capture_env},
+            extra_env={**credential_env, **identity_env, **capture_env},
         )
     finally:
         # In a `finally` deliberately: the per-host results of a configure that

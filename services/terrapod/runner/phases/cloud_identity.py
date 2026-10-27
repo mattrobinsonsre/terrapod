@@ -118,6 +118,25 @@ logger = structlog.get_logger("runner.phase.cloud_identity")
 #: delivered-file area stay in one place.
 TOKEN_DIR = Path("/var/run/terrapod/oidc")
 
+#: Where a CONFIGURE's tokens go instead, from `TP_EE_OIDC_DIR` (#2259).
+#:
+#: A different directory because a different process presents the token.
+#: `TOKEN_DIR` above is an `emptyDir` mounted into the orchestrator alone,
+#: which is right while the engine is the thing authenticating; for a configure
+#: it is ansible, running in the execution environment, which mounts only the
+#: shared volume and the workspace. So the documented path is unreachable there
+#: and a token written to it would be delivered to nobody.
+#:
+#: Read from the environment rather than taken as an argument, matching
+#: `configure_inventory.inventory_dir` and `ansible_collections.collections_dir`:
+#: the path is a property of the Job's volume layout, not of the run. The
+#: fallback matches `job_template._EE_OIDC_DIR` and exists for a runner newer
+#: than the listener that launched it -- which cannot happen for a configure,
+#: since that listener is what adds the sidecar at all, but a resolver that
+#: returns a usable path is better than one that returns None.
+EE_TOKEN_DIR_ENV = "TP_EE_OIDC_DIR"
+_DEFAULT_EE_TOKEN_DIR = "/tp/oidc"
+
 #: Names the directory, not any one file, for a shell hook or script that would
 #: rather not hard-code it. There is deliberately NO `TF_VAR_` counterpart: a
 #: provider block names the documented path directly
@@ -207,6 +226,14 @@ class Discovery:
     outcome: str
     targets: set[str] = field(default_factory=set)
     detail: str = ""
+
+
+def ee_token_dir() -> Path:
+    """Where a configure's tokens are written, for the EE to read.
+
+    See `EE_TOKEN_DIR_ENV` for why a configure does not use `TOKEN_DIR`.
+    """
+    return Path(os.environ.get(EE_TOKEN_DIR_ENV) or _DEFAULT_EE_TOKEN_DIR)
 
 
 def _write_private(path: Path, content: str) -> None:

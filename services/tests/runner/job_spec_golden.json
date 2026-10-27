@@ -541,6 +541,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -613,7 +617,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -942,6 +946,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1055,7 +1063,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -1380,6 +1388,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1452,7 +1464,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -2369,6 +2381,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -2441,7 +2457,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3041,6 +3057,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -3113,7 +3133,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3425,6 +3445,10 @@
                   "value": "/tp/callback"
                 },
                 {
+                  "name": "TP_EE_OIDC_DIR",
+                  "value": "/tp/oidc"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -3497,7 +3521,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",

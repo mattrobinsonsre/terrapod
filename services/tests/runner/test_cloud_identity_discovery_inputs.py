@@ -199,13 +199,29 @@ class TestTheCallSitePassesThem:
             and n.func.attr == "run"
             and ast.unparse(n.func.value) == "cloud_identity"
         ]
-        assert len(calls) == 2, (
-            f"expected two cloud_identity.run call sites (Terraform and Pulumi), found "
-            f"{len(calls)}; this gate has drifted from the entrypoint"
+        # A FLOOR, not a count. This asserted `== 2` and broke when a third
+        # site was added (#2259's configure path) -- a gate failing on a
+        # correct change, which is the shape that teaches people to edit the
+        # number rather than read the gate. The total is not the property; it
+        # only has to be big enough that a renamed callee fails here instead
+        # of passing on an empty list.
+        assert len(calls) >= 2, (
+            f"expected at least two cloud_identity.run call sites, found {len(calls)}; "
+            f"this gate has probably stopped matching the entrypoint rather than the "
+            f"entrypoint having stopped calling the phase"
         )
-        # The Pulumi path passes `discover_providers=False` and has no var files.
+        # THE discriminator, and it is a property rather than a position: a
+        # non-discovering caller passes `discover_providers=False` explicitly
+        # -- Pulumi because its program builds providers at runtime (#2006), a
+        # configure because a playbook has no provider graph at all (#2259) --
+        # so the one site that omits the keyword is the discovering one.
+        # Exactly one, because two would mean two paths walk a graph and only
+        # one of them is pinned below.
         plan = [c for c in calls if "discover_providers" not in {k.arg for k in c.keywords}]
-        assert len(plan) == 1, "could not identify the discovering call site"
+        assert len(plan) == 1, (
+            f"expected exactly one DISCOVERING call site (the one omitting "
+            f"`discover_providers`), found {len(plan)}"
+        )
         return plan[0]
 
     def test_the_discovering_call_site_passes_var_file_args(self):
