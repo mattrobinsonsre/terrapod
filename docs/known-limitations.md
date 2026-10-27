@@ -145,10 +145,14 @@ are off by default. What they do **not** do:
   `listener.image.tag` to an older release silently keeps one account. This is
   the same shape as the runner-image limitation above, and equally undetectable
   server-side.
-- **The MCP server cannot declare the two-row pair.** `terrapod_variable_set` can
-  set the flag, but it is an upsert keyed on `key` alone, so it cannot hold the
-  same key twice — once ordinary and once apply-only. Use the API, the Terraform
-  provider or the UI for a pair. See [MCP](mcp.md#tools).
+- **The MCP server cannot declare a key in more than one slot.**
+  `terrapod_variable_set` can set `apply_only` and `configure_only`, but it is an
+  upsert keyed on `key` alone, so it cannot hold the same key twice — once
+  ordinary and once flagged. Use the API, the Terraform provider or the UI for a
+  pair. See [MCP](mcp.md#tools).
+- **A listener image predating the configure-phase ServiceAccount ignores it**,
+  exactly as for the apply one above: an older listener runs every configure on
+  `runners.serviceAccount` and says nothing. Undetectable server-side.
 
 ## Object storage
 

@@ -121,7 +121,7 @@ Runner Jobs use a separate ServiceAccount for Terraform workload permissions:
 | Priority | Source | Configured Via |
 |---|---|---|
 | 1 | **The workspace's own federated identity** | the resolved `oidc-audiences` map (deployment catalogue + workspace override) + your own provider block — see [per-workspace cloud identity](cloud-identity.md) |
-| 2 | **The runner SA** | `runners.serviceAccount.name` in Helm values — and, on **apply** Jobs only, `runners.applyServiceAccount.name` instead when that is configured (off by default; see [Apply-phase ServiceAccount](#apply-phase-serviceaccount)) |
+| 2 | **The runner SA** | `runners.serviceAccount.name` in Helm values — and, on **apply** Jobs, `runners.applyServiceAccount.name` instead when that is configured, or on **configure** Jobs `runners.configureServiceAccount.name` (both off by default; see [Apply-phase ServiceAccount](#apply-phase-serviceaccount)) |
 | 3 | **K8s default SA** | Implicit namespace default |
 
 ```yaml
@@ -157,12 +157,13 @@ For multi-cloud or multi-account setups, deploy separate listener Deployments (a
 
 ### Apply-phase ServiceAccount
 
-Terrapod runs a run's `plan` and its `apply` as **separate Kubernetes Jobs**, and
-an operator may give the apply phase its own ServiceAccount:
+Terrapod runs a run's `plan`, its `apply` and any `configure` as **separate
+Kubernetes Jobs**, and an operator may give the apply and the configure phases
+their own ServiceAccounts:
 
 ```yaml
 runners:
-  serviceAccount:            # used by plan Jobs, and by apply Jobs if the below is unset
+  serviceAccount:            # used by plan Jobs, and by any phase whose own account is unset
     create: true
     name: "terrapod-runner-plan"
     annotations:
@@ -173,11 +174,18 @@ runners:
     name: "terrapod-runner-apply"
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-apply"
+
+  configureServiceAccount:   # OPTIONAL -- configure Jobs only
+    create: true
+    name: "terrapod-runner-configure"
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-configure"
 ```
 
-Because a ServiceAccount is how a pod becomes a cloud principal, two accounts
-means the two phases can federate to **two different cloud roles** — a read-only
-one for plans and a writing one for applies. That is worth having because a
+Because a ServiceAccount is how a pod becomes a cloud principal, a separate
+account per phase means each can federate to a **different cloud role** — a
+read-only one for plans, a writing one for applies, and whatever a configure
+actually needs. That is worth having because a
 speculative plan on a pull request executes code nobody has reviewed yet; see
 [Security Hardening → Give the plan phase a narrower identity than the
 apply](security-hardening.md#give-the-plan-phase-a-narrower-identity-than-the-apply)
@@ -198,14 +206,20 @@ Three things follow from it being an ordinary ServiceAccount:
   webhook. Per-workspace cloud identity keeps working unchanged alongside it: a
   federated workspace still gets its token files, and the account underneath is
   the fall-through for every provider configuration that does not name one.
-- **It is off by default and renders nothing when unset.** With
-  `runners.applyServiceAccount` left at `create: false` / `name: ""` there is no
-  second account and no extra runner-config key, and every phase uses
-  `runners.serviceAccount` exactly as before.
+- **They are off by default and render nothing when unset.** With
+  `runners.applyServiceAccount` and `runners.configureServiceAccount` left at
+  `create: false` / `name: ""` there is no extra account and no extra
+  runner-config key, and every phase uses `runners.serviceAccount` exactly as
+  before.
+- **An unset configure account falls back to the PLAN's, not the apply's.** A
+  configure is not a Terraform apply and holds no cloud-mutating role by nature,
+  so defaulting it to the apply account would quietly hand every configure the
+  cloud write principal. Set it when a configure genuinely needs a cloud role of
+  its own, and keep it narrower than the apply's.
 
-Both accounts are created only when `listener.enabled: true`, like the single
-account above. `runners.azureWorkloadIdentity` adds Azure's required pod label to
-every runner Job, so it covers both.
+All three accounts are created only when `listener.enabled: true`, like the
+single account above. `runners.azureWorkloadIdentity` adds Azure's required pod
+label to every runner Job, so it covers all of them.
 
 ---
 
