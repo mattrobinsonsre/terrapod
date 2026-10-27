@@ -955,6 +955,58 @@ probe, ahead of the binary checks, so a non-conforming image fails at pod start 
 uid — rather than part way through a playbook on a file it cannot read, which is where the
 older, looser contract would have sent you.
 
+### Two inventory workspace attributes are removed
+
+**Affects:** any workspace that sets `inventory-include-platform` or
+`inventory-ignore-paths` — in Terraform/OpenTofu, through the API, or in a bulk
+update or autodiscovery rule template. **Remove the attribute.** Neither has a
+replacement attribute, and neither needs one.
+
+| removed | what to do |
+|---|---|
+| `inventory-include-platform` | Delete it. Including the declared inventory rows is now **unconditional** |
+| `inventory-ignore-paths` | Delete it, and move the list to `ignore_patterns` in your own `ansible.cfg` — **rewriting each glob as a regex** |
+
+**`inventory-include-platform` was a provable no-op.** With no rows declared the
+rendered platform document is `all:` and nothing else, which resolves cleanly and
+contributes no hosts, no groups and no variables — so being empty already
+expressed everything setting the flag to `false` could, and the flag had nothing
+to switch off. A workspace that had it `false` resolves exactly as it did,
+provided it declared no rows; one that had it `false` *while* declaring rows was
+hiding them, and will now see them merged.
+
+**`inventory-ignore-paths` moves to ansible, which already owns this control.**
+`ignore_patterns` is honoured — Terrapod writes no `ansible.cfg`, sets
+`ANSIBLE_CONFIG` nowhere and forces no ignore setting — and it is the better
+home: versioned beside the inventory it describes, and in force for a
+practitioner running `ansible-inventory` by hand against the same tree. The
+Terrapod attribute applied only when resolving through Terrapod, so local and
+central resolution could disagree about the host set.
+
+```ini
+[defaults]
+inventory = hosts.d
+
+[inventory]
+ignore_patterns = .*_decommissioned\.yml
+```
+
+**Rewrite each entry: the Terrapod attribute took globs, and `ignore_patterns`
+takes regexes.** This is the one thing that will bite you. Entries are Python
+regexes matched unanchored against the filename, so `*.bak` becomes `.*\.bak`
+and `*_decommissioned.yml` becomes `.*_decommissioned\.yml`. A leading `*` is
+not a valid regex, and **ansible does not degrade gracefully**: it exits
+non-zero with a `re.PatternError` traceback (`*.bak` gives `nothing to repeat`),
+failing the resolution as a whole rather than skipping the one pattern.
+
+**Check whether you need a pattern at all.** `INVENTORY_IGNORE_EXTS` already
+skips `.pyc`, `.pyo`, `.swp`, `.bak`, `~`, `.rpm`, `.md`, `.txt`, `.rst`,
+`.orig`, `.ini`, `.cfg` and `.retry` by default, so a README, a note, a stray
+editor backup or a `.cfg` in an inventory directory was never a source — several
+`inventory-ignore-paths` entries are likely redundant. If you override that
+separate setting (`ignore_extensions`), it **replaces** the list rather than
+adding to it.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

@@ -82,8 +82,6 @@ structure of their own.
 | `inventory_paths` | The inventory sources, in order, each a file or a directory, relative to the config root |
 | `default_playbook` | The playbook a configure runs when the run names none |
 | `default_limit` | The default `--limit`; empty is the whole inventory |
-| `inventory_include_platform` | Whether the declared rows take part in resolution |
-| `inventory_ignore_paths` | Paths to drop from a fetched source before ansible reads it |
 
 **`config_directory` is an ordinary path**, the same shape as
 `working_directory` beside it: `""` means the configuration version's root, and
@@ -118,9 +116,12 @@ repository.
 Either may be absent: the declared rows alone, a repository alone, both, or
 neither — and neither is a defined empty result rather than an error.
 
-Set `inventory_include_platform` to `false` to resolve the repository alone,
-which is how an operator moves a committed inventory in before declaring
-anything of their own.
+**The declared rows always take part, and there is no switch for it.** An
+operator moving a committed inventory in before declaring anything of their own
+simply declares nothing: with no rows, the rendered platform document is `all:`
+and nothing else, which resolves cleanly and contributes no hosts, no groups and
+no variables. Being empty already says everything a switch could have said, so
+the switch said nothing — which is why it is gone rather than defaulted.
 
 ### There is one VCS binding, and it is the workspace's
 
@@ -179,18 +180,58 @@ that is why these are their own fields rather than a reference to it. Even in on
 repository the root directory differs — `terraform/` against `ansible/` — and a
 workspace with no infrastructure of its own has no Terraform binding at all.
 
-`working-directory` and `ignore-paths` are the two ways to narrow the source,
-and they work at different scales. `working-directory` is the path the
-repository is fetched and read from, so it decides what arrives at all.
-`ignore-paths` then prunes what did: each entry is a glob matched against paths
-**relative to `working-directory`**, so an operator never writes a prefix they
-did not choose, and the same matcher an autodiscovery rule's `ignore-patterns`
-uses applies here.
+### Leaving a file out is `ignore_patterns`, in your own `ansible.cfg`
 
-Pruning is the only way to leave a file out of this source, because ansible
-reads a directory as one source and takes every file in it. The prune happens
-before anything else reads the tree, so an excluded file is never scanned and
-cannot refuse the resolution on its own account.
+Ansible reads a directory as one source and takes every file in it, so a file
+sitting in an inventory directory that is not an inventory needs excluding.
+**Ansible already owns that control**, and it is the better home for it:
+`ignore_patterns` is versioned beside the inventory it describes, and it is in
+force for a practitioner running `ansible-inventory` by hand against the same
+tree. A Terrapod-side ignore list applied only when resolving through Terrapod,
+so local and central resolution could disagree about the host set.
+
+Terrapod writes no `ansible.cfg` and sets `ANSIBLE_CONFIG` nowhere, and it
+forces no ignore setting through the environment, so a committed `ignore_patterns`
+is honoured exactly as it is outside Terrapod:
+
+```ini
+[defaults]
+inventory = hosts.d
+
+[inventory]
+ignore_patterns = .*_decommissioned\.yml
+```
+
+The setting is `ignore_patterns` under `[inventory]` (equivalently
+`inventory_ignore_patterns` under `[defaults]`), and the environment variable is
+`ANSIBLE_INVENTORY_IGNORE_REGEX`.
+
+**The values are regular expressions, not globs — and that is the one thing that
+will bite you.** The environment variable's name is the clue. Each entry is a
+Python regex matched unanchored against the **filename**, so a pattern that
+worked as a glob has to be rewritten: `*.bak` becomes `.*\.bak`, and
+`*_decommissioned.yml` becomes `.*_decommissioned\.yml` as above. Because
+matching is unanchored, a bare `\.bak` works too; what does not work is a
+leading `*`.
+
+**An invalid regex is not handled gracefully.** Ansible does not warn and carry
+on — it exits non-zero with a `re.PatternError` traceback. A literal `*.bak` left
+over from a glob fails with `re.PatternError: nothing to repeat`, and it fails
+for the resolution as a whole rather than for the one file.
+
+Before writing a pattern at all, check whether you need one.
+`INVENTORY_IGNORE_EXTS` already skips a long list of extensions by default —
+`.pyc`, `.pyo`, `.swp`, `.bak`, `~`, `.rpm`, `.md`, `.txt`, `.rst`, `.orig`,
+`.ini`, `.cfg` and `.retry` — so a README, a note, a stray editor backup or a
+`.cfg` in an inventory directory is not a source in the first place.
+
+It is a separate setting (`ignore_extensions` under `[inventory]`), and
+**overriding it replaces that list rather than adding to it**. That matters more
+here than it does on a laptop: Terrapod resolves with
+`ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED` on, so a file that stops being
+skipped and cannot be parsed fails the resolution rather than attracting a
+warning nobody reads. If you override the extension list, restate the entries
+you still want skipped.
 
 ### Merge order is fixed: the declared rows win
 
