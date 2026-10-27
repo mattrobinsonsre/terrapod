@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurera",
       "configureEnabledHint": "Ansible kör playbooken mot inventariet. Att slå på detta lägger till fliken Inventarium.",
       "operationsNone": "En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda. Slå på en av dem igen.",
-      "ansibleConfigure": "Ansible-konfiguration",
       "ansibleConfigureHint": "Var playbooken och inventariet finns, och vad en konfigurationskörning gör som standard.",
       "configDirectory": "Ansible-konfigurationskatalog",
       "configDirectoryTitle": "Var ansible.cfg, playbooken, roles/, group_vars/ och host_vars/ finns, relativt förrådets rot. Lämna tomt för förrådets rot själv. Om den här arbetsytan alls har en konfigurationsoperation avgörs av inställningen Konfigurera ovan, inte av den här sökvägen.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Konfigurera efter tillämpning",
       "configureAfterApplyHint": "Varje tillämpning här följs av en konfigurering i samma körning, så även en tillämpning från CLI strömmar playbookens utdata. En förstörelse konfigurerar aldrig.",
       "configureAllHosts": "Konfigurera alla värdar",
-      "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet."
+      "configureAllHostsHint": "En konfigurationskörning som plattformen själv startar når bara de värdar som en ändring i inventariet berörde, om inte Ansible-koden har ändrats sedan den förra. Slå på detta för att alltid gå igenom hela inventariet.",
+      "eeCpuRequest": "Ansible CPU-begäran",
+      "eeMemoryRequest": "Ansible minnesbegäran",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Rensa det rapporterade drifttillståndet. Nästa schemalagda kontroll återfyller det från verkligheten.",
       "lastChecked": "Senast kontrollerad",
       "checkNow": "Kontrollera nu",
-      "checkNowTitleDisabled": "Aktivera driftupptäckt först"
+      "enabledLabel": "Driftupptäckt"
     },
     "intervals": {
       "disabled": "Inaktiverad",
@@ -3268,6 +3271,20 @@
       "hint": "En körning får den här arbetsytans miljövariabler, känsliga värden, alla hemligheter som hämtats via Vault och jobbets molnidentitet. Den som öppnar en pull request från en fork har ingen skrivbehörighet och kan inte merga, så en spekulativ plan är den enda vägen för deras kod till de här autentiseringsuppgifterna. Slå på detta för en arbetsyta som inte innehåller något värt att ta — till exempel ett publikt modulförråd som tar emot bidrag från communityn. Pull requests från grenar i själva förrådet påverkas inte och planeras alltid.",
       "activeBadge": "På",
       "confirmEnable": "Planera pull requests som öppnats från forkar? Deras författares kod körs med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler, utan att någon godkänner det först."
+    },
+    "groups": {
+      "identity": "Identitet",
+      "execution": "Körning",
+      "operations": "Operationer",
+      "ansible": "Ansible-konfiguration",
+      "pools": "Agentpooler",
+      "vcs": "Versionshantering",
+      "governance": "Drift och planens livscykel",
+      "ai": "AI-sammanfattning",
+      "security": "Säkerhetsskanning",
+      "metadata": "Metadata",
+      "cloudIdentity": "Molnidentitet",
+      "diagnostics": "Diagnostik"
     }
   },
   "graphs": {

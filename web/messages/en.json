@@ -2610,7 +2610,6 @@
       "configureEnabled": "Configure",
       "configureEnabledHint": "Ansible runs the playbooks against the inventory. Turning this on adds the Inventory tab.",
       "operationsNone": "A workspace must keep plan and apply, or configure, or both. Turn one of them back on.",
-      "ansibleConfigure": "Ansible configure",
       "ansibleConfigureHint": "Where the playbooks and inventory live, and what a configure run does by default.",
       "configDirectory": "Ansible config directory",
       "configDirectoryTitle": "Where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, relative to the repository root. Leave it empty for the repository root itself. Whether this workspace has a configure operation at all is the Configure setting above, not this path.",
@@ -2692,7 +2691,11 @@
       "configureAfterApply": "Configure after apply",
       "configureAfterApplyHint": "Every apply here is followed by a configure on the same run, so a CLI apply streams the playbook's output too. A destroy never configures.",
       "configureAllHosts": "Configure all hosts",
-      "configureAllHostsHint": "A configure the platform starts for you targets only the hosts an inventory change touched, unless the Ansible code moved since the last one. Turn this on to always sweep the whole inventory."
+      "configureAllHostsHint": "A configure the platform starts for you targets only the hosts an inventory change touched, unless the Ansible code moved since the last one. Turn this on to always sweep the whole inventory.",
+      "eeCpuRequest": "Ansible CPU request",
+      "eeMemoryRequest": "Ansible memory request",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt version"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",
@@ -2732,7 +2735,7 @@
       "dismissTitle": "Clear the reported drift state. The next scheduled check will repopulate it from reality.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enable drift detection first"
+      "enabledLabel": "Drift detection"
     },
     "intervals": {
       "disabled": "Disabled",
@@ -3268,6 +3271,20 @@
       "hint": "A run receives this workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity. Someone opening a pull request from a fork has no write access and cannot merge, so a speculative plan is the only way their code reaches those credentials. Turn this on for a workspace that holds nothing worth taking — a public module repository accepting community contributions, say. Pull requests from branches in the repository itself are unaffected and always plan.",
       "activeBadge": "On",
       "confirmEnable": "Plan pull requests opened from forks? Their authors' code will run with this workspace's credentials and decrypted variables, without anyone approving it first."
+    },
+    "groups": {
+      "identity": "Identity",
+      "execution": "Execution",
+      "operations": "Operations",
+      "ansible": "Ansible configure",
+      "pools": "Agent pools",
+      "vcs": "Version control",
+      "governance": "Drift and plan lifecycle",
+      "ai": "AI summary",
+      "security": "Security scanning",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloud identity",
+      "diagnostics": "Diagnostics"
     }
   },
   "graphs": {

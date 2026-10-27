@@ -2602,7 +2602,6 @@
       "configureEnabled": "配置",
       "configureEnabledHint": "Ansible 针对清单运行 playbook。启用后会出现 清单 选项卡。",
       "operationsNone": "工作区必须保留计划与应用、配置，或两者之一。请重新启用其中一项。",
-      "ansibleConfigure": "Ansible 配置",
       "ansibleConfigureHint": "playbook 与清单所在的位置，以及配置运行默认的行为。",
       "configDirectory": "Ansible 配置目录",
       "configDirectoryTitle": "ansible.cfg、playbook、roles/、group_vars/ 和 host_vars/ 所在的位置，相对于仓库根目录。若就是仓库根目录本身，请留空。此工作区是否拥有配置操作由上方的 配置 设置决定，而不是这个路径。",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "应用后配置",
       "configureAfterApplyHint": "此处的每一次应用之后，都会在同一次运行中紧接一次配置，因此从 CLI 发起的应用也会流式输出 playbook 的日志。销毁运行从不执行配置。",
       "configureAllHosts": "配置所有主机",
-      "configureAllHostsHint": "由平台自动发起的配置仅以清单变更触及的主机为目标；若自上次配置以来 Ansible 代码有所改动，则不受此限制。开启后，始终以整个清单为目标。"
+      "configureAllHostsHint": "由平台自动发起的配置仅以清单变更触及的主机为目标；若自上次配置以来 Ansible 代码有所改动，则不受此限制。开启后，始终以整个清单为目标。",
+      "eeCpuRequest": "Ansible CPU 请求",
+      "eeMemoryRequest": "Ansible 内存请求",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "清除已报告的漂移状态。下次计划检查将根据实际情况重新填充它。",
       "lastChecked": "上次检查",
       "checkNow": "立即检查",
-      "checkNowTitleDisabled": "请先启用漂移检测"
+      "enabledLabel": "漂移检测"
     },
     "intervals": {
       "disabled": "已禁用",
@@ -3268,6 +3271,20 @@
       "hint": "一次运行会获得此工作区的环境变量、敏感值、所有由 Vault 解析的密钥，以及该任务的云身份。从 fork 发起拉取请求的人没有写入权限，也无法合并，因此推测性计划是其代码接触到这些凭据的唯一途径。请只为没有任何值得窃取之物的工作区开启它 — 例如一个接受社区贡献的公开模块仓库。来自仓库自身分支的拉取请求不受影响，始终会执行计划。",
       "activeBadge": "已开启",
       "confirmEnable": "要为从 fork 发起的拉取请求运行计划吗？其作者的代码将使用此工作区的凭据和已解密变量运行，且无需任何人事先批准。"
+    },
+    "groups": {
+      "identity": "身份",
+      "execution": "执行",
+      "operations": "操作",
+      "ansible": "Ansible 配置",
+      "pools": "代理池",
+      "vcs": "版本控制",
+      "governance": "漂移与计划生命周期",
+      "ai": "AI 摘要",
+      "security": "安全扫描",
+      "metadata": "元数据",
+      "cloudIdentity": "云身份",
+      "diagnostics": "诊断"
     }
   },
   "graphs": {

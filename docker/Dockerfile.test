@@ -86,6 +86,19 @@ COPY mcp/internal/mcpserver/crud.go ./mcp/internal/mcpserver/crud.go
 # out of four because the rule was a convention nothing checked.
 COPY web/src/app/admin/bulk-update/page.tsx ./web/src/app/admin/bulk-update/page.tsx
 COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/page.tsx
+# Read by tests/api/test_workspace_setting_parity.py's create/edit parity gate
+# (#2253), which requires every attribute the workspace create path accepts to
+# be offered by the shared field table -- and requires the create form to
+# actually READ that table, because the forms sharing no field code is how they
+# diverged to 13 controls against ~50 accepted attributes in the first place.
+# Without these two files the gate raises rather than passing vacuously; the
+# `_surface()` helper says so in its own error.
+COPY web/src/lib/workspace-fields.ts ./web/src/lib/workspace-fields.ts
+# The whole route, deliberately, because COPY globs its source: `[id]` is a
+# character class matching one of `i`/`d`, never the literal directory, and
+# quoting does not help -- the parser strips quotes and still globs. A per-file
+# COPY of the dynamic route silently copies nothing and the gate then raises.
+COPY web/src/app/workspaces ./web/src/app/workspaces
 # Read by tests/auth/test_cli_login_timing.py, which ties this page's
 # POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
 COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx

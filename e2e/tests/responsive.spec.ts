@@ -2213,3 +2213,78 @@ test.describe('Per-host results (#1928)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 });
+
+test.describe('Workspace form sections (#2253)', () => {
+  // The Configuration tab was 1,762 lines and 57 controls, 42 of them in a
+  // single undivided card, with zero `<details>` in the file. Sectioning it and
+  // collapsing the advanced groups is the fix; these are the guards that the
+  // fix did not buy density at the cost of fitting on a phone.
+  //
+  // Phone width is where it would break: a `<details>` and every grid item has
+  // an intrinsic minimum width and refuses to shrink below its content without
+  // `min-w-0`, which is the single CSS line behind an overflow this repo has
+  // already met once on the autodiscovery page's own collapsed group.
+
+  test('the sectioned Configuration tab fits a phone', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2e-wsform-sections'))
+
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+
+    // The groups are rendered, not just the old flat card. `identity` and
+    // `execution` apply to every workspace, so they are the two that must be
+    // present on a bare Terraform workspace with nothing configured.
+    await expect(page.getByTestId('ws-group-identity')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('ws-group-execution')).toBeVisible()
+
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('an advanced group on the create form is shut, opens, and does not overflow', async ({
+    page,
+  }) => {
+    // The collapsing mechanism is a property of the CREATE form only. The
+    // Configuration tab deliberately passes `advanced` to no group — two of its
+    // groups are all-advanced and existing specs assert their fields visible —
+    // so an earlier version of this test drove `?tab=configuration` and waited
+    // for a `<details>` that page never renders.
+    //
+    // `diagnostics` is all-advanced (debug mode, Slack channel), so the derived
+    // rule collapses it. What a shut group ANNOUNCES is unit-tested instead, in
+    // web/tests/workspace-field-logic.test.ts, against both the array and the
+    // map shape — which is the stronger test, and the only place the map shape
+    // is covered. A fresh create form has nothing set, so there is no count to
+    // surface here and asserting one would be asserting the fixture.
+    await page.goto('/workspaces')
+    await page.getByRole('button', { name: 'New Workspace' }).click()
+
+    const group = page.getByTestId('ws-adv-diagnostics')
+    await expect(group).toBeVisible({ timeout: 15_000 })
+    await expect(group).not.toHaveAttribute('open', /.*/)
+    await expectNoHorizontalPageScroll(page)
+
+    // Open it: the fields appear and the page still does not scroll sideways.
+    await group.locator('summary').click()
+    await expect(group).toHaveAttribute('open', /.*/)
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the create form offers the sections too, and fits a phone', async ({ page }) => {
+    // The headline of #2253: create offered 13 controls against ~50 accepted
+    // attributes, so an operator could not set Operations, Ansible, drift, AI
+    // summary, security scan or the VCS workflow until after the workspace
+    // existed. Both forms now render the same groups, which is what makes the
+    // parity gate checkable — this asserts the groups actually reach the DOM at
+    // phone width rather than only type-checking.
+    await page.goto('/workspaces')
+
+    await page.getByRole('button', { name: 'New Workspace' }).click()
+
+    await expect(page.getByTestId('ws-group-identity')).toBeVisible({ timeout: 15_000 })
+    // A group that did NOT exist on this form before: operations is the whole
+    // plan/apply-versus-configure declaration.
+    await expect(page.getByTestId('ws-group-operations')).toBeVisible()
+
+    await expectNoHorizontalPageScroll(page)
+  })
+})

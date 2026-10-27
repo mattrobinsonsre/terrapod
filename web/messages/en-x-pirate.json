@@ -2602,7 +2602,6 @@
       "configureEnabled": "Riggin''",
       "configureEnabledHint": "Ansible runs th'' playbooks against th'' manifest. Hoistin'' this adds th'' Ship''s Manifest tab.",
       "operationsNone": "A work-deck must keep chart an'' make good, or riggin'', or both. Hoist one o'' them back up, arr.",
-      "ansibleConfigure": "Ansible riggin''",
       "ansibleConfigureHint": "Where th'' playbooks an'' th'' manifest be stowed, an'' what a riggin'' voyage does by default.",
       "configDirectory": "Ansible chart locker",
       "configDirectoryTitle": "Where ansible.cfg, th'' playbooks, roles/, group_vars/ an'' host_vars/ be stowed, reckoned from th'' cargo hold root. Leave it empty fer th'' cargo hold root itself. Whether this work-deck has a riggin'' order at all be th'' Riggin'' settin'' above, not this course, arr.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Rig after th'' apply",
       "configureAfterApplyHint": "Every apply here be followed by a riggin'' on th'' same run, so a CLI apply carries th'' playbook''s output too. A scuttle never rigs.",
       "configureAllHosts": "Rig all hands",
-      "configureAllHostsHint": "A riggin'' order th'' platform sets sail fer ye takes only th'' hands a manifest change touched, unless th'' Ansible code shifted since th'' last one. Hoist this t'' always sweep th'' whole manifest, arr."
+      "configureAllHostsHint": "A riggin'' order th'' platform sets sail fer ye takes only th'' hands a manifest change touched, unless th'' Ansible code shifted since th'' last one. Hoist this t'' always sweep th'' whole manifest, arr.",
+      "eeCpuRequest": "Ansible CPU askin'",
+      "eeMemoryRequest": "Ansible memory askin'",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt version"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Clear th'' reported drift state. Th'' next scheduled check will repopulate it from reality.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enable drift detection first, matey"
+      "enabledLabel": "Driftin'' detection"
     },
     "intervals": {
       "disabled": "Disabled",
@@ -3268,6 +3271,20 @@
       "hint": "A voyage receives this work-deck''s environment variables, sensitive values, any Vault-resolved secrets an'' the job''s cloud colours. A soul openin'' a pull request from a fork has no write access an'' cannot merge, so a speculative plan be the only way their code reaches them credentials. Hoist this fer a work-deck that holds nothin'' worth plunderin'' — a public module repository takin'' in contributions from the crew, say. Pull requests from branches in the repository itself be unaffected an'' always plan.",
       "activeBadge": "Hoisted",
       "confirmEnable": "Plan pull requests hoisted from forks? Their authors'' code will run with this work-deck''s credentials an'' decrypted variables, without a soul approvin'' it first."
+    },
+    "groups": {
+      "identity": "Colours",
+      "execution": "Sailin",
+      "operations": "Orders",
+      "ansible": "Ansible riggin''",
+      "pools": "Agent Crews",
+      "vcs": "Version moorin''s",
+      "governance": "Driftin'' an'' plan voyage",
+      "ai": "AI tally",
+      "security": "Security sweep",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloud colours",
+      "diagnostics": "Soundin''s"
     }
   },
   "graphs": {

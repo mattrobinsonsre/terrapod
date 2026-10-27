@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurare",
       "configureEnabledHint": "Ansible esegue i playbook sull'inventario. Attivandolo compare la scheda Inventario.",
       "operationsNone": "Uno spazio di lavoro deve conservare pianificare e applicare, o configurare, o entrambe. Riattivane una.",
-      "ansibleConfigure": "Configurazione Ansible",
       "ansibleConfigureHint": "Dove si trovano i playbook e l'inventario, e cosa fa per impostazione predefinita un'esecuzione di configurazione.",
       "configDirectory": "Directory di configurazione Ansible",
       "configDirectoryTitle": "Dove si trovano ansible.cfg, i playbook, roles/, group_vars/ e host_vars/, rispetto alla radice del repository. Lascia vuoto per la radice del repository stessa. Se questo spazio di lavoro abbia o no un'operazione di configurazione lo decide l'impostazione Configurare qui sopra, non questo percorso.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Configurare dopo l''apply",
       "configureAfterApplyHint": "Ogni apply qui è seguito da una configurazione nella stessa esecuzione, quindi anche un apply da CLI trasmette l''output del playbook. Una distruzione non configura mai.",
       "configureAllHosts": "Configurare tutti gli host",
-      "configureAllHostsHint": "Una configurazione che la piattaforma avvia da sé copre solo gli host toccati da una modifica dell''inventario, a meno che il codice Ansible non sia cambiato dall''ultima. Attivalo per coprire sempre l''intero inventario."
+      "configureAllHostsHint": "Una configurazione che la piattaforma avvia da sé copre solo gli host toccati da una modifica dell''inventario, a meno che il codice Ansible non sia cambiato dall''ultima. Attivalo per coprire sempre l''intero inventario.",
+      "eeCpuRequest": "Richiesta CPU Ansible",
+      "eeMemoryRequest": "Richiesta memoria Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versione di Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Cancella lo stato di deriva segnalato. Il prossimo controllo pianificato lo ripopolerà a partire dalla realtà.",
       "lastChecked": "Ultimo controllo",
       "checkNow": "Controlla ora",
-      "checkNowTitleDisabled": "Attiva prima il rilevamento della deriva"
+      "enabledLabel": "Rilevamento della deriva"
     },
     "intervals": {
       "disabled": "Disattivato",
@@ -3268,6 +3271,20 @@
       "hint": "Un''esecuzione riceve le variabili d''ambiente di questo spazio di lavoro, i valori sensibili, tutti i segreti risolti tramite Vault e l''identità cloud del job. Chi apre una pull request da un fork non ha accesso in scrittura e non può fare merge, quindi un plan speculativo è l''unico modo in cui il suo codice raggiunge quelle credenziali. Attivalo per uno spazio di lavoro che non custodisce nulla che valga la pena rubare — un repository pubblico di moduli aperto ai contributi della comunità, per esempio. Le pull request dai branch del repository stesso non sono interessate e generano sempre un plan.",
       "activeBadge": "Attivo",
       "confirmEnable": "Eseguire il plan sulle pull request aperte da fork? Il codice dei loro autori verrà eseguito con le credenziali e le variabili decifrate di questo spazio di lavoro, senza che nessuno lo approvi prima."
+    },
+    "groups": {
+      "identity": "Identità",
+      "execution": "Esecuzione",
+      "operations": "Operazioni",
+      "ansible": "Configurazione Ansible",
+      "pools": "Pool di agenti",
+      "vcs": "Controllo versione",
+      "governance": "Deriva e ciclo di vita del plan",
+      "ai": "Riepilogo IA",
+      "security": "Analisi di sicurezza",
+      "metadata": "Metadati",
+      "cloudIdentity": "Identità cloud",
+      "diagnostics": "Diagnostica"
     }
   },
   "graphs": {

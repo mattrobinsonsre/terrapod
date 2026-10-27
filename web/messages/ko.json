@@ -2602,7 +2602,6 @@
       "configureEnabled": "구성",
       "configureEnabledHint": "Ansible 이 인벤토리를 대상으로 플레이북을 실행합니다. 이것을 켜면 인벤토리 탭이 추가됩니다.",
       "operationsNone": "워크스페이스는 플랜 및 적용, 구성 또는 둘 다 중 하나를 유지해야 합니다. 둘 중 하나를 다시 켜십시오.",
-      "ansibleConfigure": "Ansible 구성",
       "ansibleConfigureHint": "플레이북과 인벤토리의 위치, 그리고 구성 실행의 기본 동작입니다.",
       "configDirectory": "Ansible 구성 디렉터리",
       "configDirectoryTitle": "ansible.cfg, 플레이북, roles/, group_vars/, host_vars/ 가 있는 위치를 저장소 루트 기준 상대 경로로 지정합니다. 저장소 루트 자체이면 비워 두십시오. 이 워크스페이스에 구성 작업이 있는지는 위의 구성 설정이 결정하며, 이 경로가 결정하지 않습니다.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "적용 후 구성",
       "configureAfterApplyHint": "여기서의 모든 적용은 같은 실행에서 구성으로 이어지므로, CLI 적용에서도 플레이북의 출력이 스트리밍됩니다. 삭제 실행은 구성하지 않습니다.",
       "configureAllHosts": "모든 호스트 구성",
-      "configureAllHostsHint": "플랫폼이 자동으로 시작하는 구성은 인벤토리 변경이 건드린 호스트만 대상으로 합니다. 다만 이전 구성 이후 Ansible 코드가 변경되었다면 대상을 제한하지 않습니다. 이것을 켜면 항상 전체 인벤토리를 대상으로 합니다."
+      "configureAllHostsHint": "플랫폼이 자동으로 시작하는 구성은 인벤토리 변경이 건드린 호스트만 대상으로 합니다. 다만 이전 구성 이후 Ansible 코드가 변경되었다면 대상을 제한하지 않습니다. 이것을 켜면 항상 전체 인벤토리를 대상으로 합니다.",
+      "eeCpuRequest": "Ansible CPU 요청량",
+      "eeMemoryRequest": "Ansible 메모리 요청량",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 버전"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "보고된 드리프트 상태를 지웁니다. 다음 예약 검사에서 실제 상태로 다시 채워집니다.",
       "lastChecked": "마지막 검사",
       "checkNow": "지금 검사",
-      "checkNowTitleDisabled": "먼저 드리프트 감지를 활성화하세요"
+      "enabledLabel": "드리프트 감지"
     },
     "intervals": {
       "disabled": "사용 안 함",
@@ -3268,6 +3271,20 @@
       "hint": "실행은 이 워크스페이스의 환경 변수, 민감한 값, Vault에서 해석된 시크릿, 그리고 작업의 클라우드 ID를 받습니다. 포크에서 풀 리퀘스트를 연 사람은 쓰기 권한이 없고 병합할 수도 없으므로, 예상 계획이 그 코드가 이러한 자격 증명에 닿는 유일한 경로입니다. 가져갈 만한 것이 전혀 없는 워크스페이스 — 예를 들어 커뮤니티 기여를 받는 공개 모듈 저장소 — 에서는 이것을 켜세요. 저장소 자체의 브랜치에서 연 풀 리퀘스트는 영향을 받지 않으며 항상 계획을 받습니다.",
       "activeBadge": "켜짐",
       "confirmEnable": "포크에서 연 풀 리퀘스트에 계획을 실행할까요? 작성자의 코드가 누구의 승인도 없이 이 워크스페이스의 자격 증명과 복호화된 변수로 실행됩니다."
+    },
+    "groups": {
+      "identity": "아이덴티티",
+      "execution": "실행",
+      "operations": "작업",
+      "ansible": "Ansible 구성",
+      "pools": "에이전트 풀",
+      "vcs": "버전 관리",
+      "governance": "드리프트 및 플랜 수명 주기",
+      "ai": "AI 요약",
+      "security": "보안 검사",
+      "metadata": "메타데이터",
+      "cloudIdentity": "클라우드 아이덴티티",
+      "diagnostics": "진단"
     }
   },
   "graphs": {

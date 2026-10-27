@@ -2602,7 +2602,6 @@
       "configureEnabled": "C0nf1gur3",
       "configureEnabledHint": "4n51bl3 run5 7h3 pl4yb00k5 4g41n57 7h3 1nv3n70ry. 7urn1ng 7h15 0n 4dd5 7h3 1nv3n70ry 74b.",
       "operationsNone": "4 w0rk5p4c3 mu57 k33p pl4n 4nd 4pply, 0r c0nf1gur3, 0r b07h. 7urn 0n3 0f 7h3m b4ck 0n.",
-      "ansibleConfigure": "4n51bl3 c0nf1gur3",
       "ansibleConfigureHint": "Wh3r3 7h3 pl4yb00k5 4nd 1nv3n70ry l1v3, 4nd wh47 4 c0nf1gur3 run d035 by d3f4ul7.",
       "configDirectory": "4n51bl3 c0nf1g d1r3c70ry",
       "configDirectoryTitle": "Wh3r3 4n51bl3.cfg, 7h3 pl4yb00k5, r0l35/, gr0up_v4r5/ 4nd h057_v4r5/ l1v3, r3l471v3 70 7h3 r3p05170ry r007. L34v3 17 3mp7y f0r 7h3 r3p05170ry r007 1753lf. Wh37h3r 7h15 w0rk5p4c3 h45 4 c0nf1gur3 0p3r4710n 47 4ll 15 7h3 C0nf1gur3 53771ng 4b0v3, n07 7h15 p47h.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "C0nf1gur3 4f73r 4pply",
       "configureAfterApplyHint": "3v3ry 4pply h3r3 15 f0ll0w3d by 4 c0nf1gur3 0n 7h3 54m3 run, 50 4 CL1 4pply 57r34m5 7h3 pl4yb00k'5 0u7pu7 700. 4 d357r0y n3v3r c0nf1gur35.",
       "configureAllHosts": "C0nf1gur3 4ll h0575",
-      "configureAllHostsHint": "4 c0nf1gur3 7h3 pl47f0rm 574r75 f0r y0u 74rg375 0nly 7h3 h0575 4n 1nv3n70ry ch4ng3 70uch3d, unl355 7h3 4n51bl3 c0d3 m0v3d 51nc3 7h3 l457 0n3. 7urn 7h15 0n 70 4lw4y5 5w33p 7h3 wh0l3 1nv3n70ry."
+      "configureAllHostsHint": "4 c0nf1gur3 7h3 pl47f0rm 574r75 f0r y0u 74rg375 0nly 7h3 h0575 4n 1nv3n70ry ch4ng3 70uch3d, unl355 7h3 4n51bl3 c0d3 m0v3d 51nc3 7h3 l457 0n3. 7urn 7h15 0n 70 4lw4y5 5w33p 7h3 wh0l3 1nv3n70ry.",
+      "eeCpuRequest": "4n51bl3 CPU r3qu357",
+      "eeMemoryRequest": "4n51bl3 m3m0ry r3qu357",
+      "terragruntEnabled": "73rr4grun7",
+      "terragruntVersion": "73rr4grun7 v3r510n"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Cl34r 7h3 r3p0r73d dr1f7 57473. 7h3 n3x7 5ch3dul3d ch3ck w1ll r3p0pul473 17 fr0m r34l17y.",
       "lastChecked": "L457 Ch3ck3d",
       "checkNow": "Ch3ck N0w",
-      "checkNowTitleDisabled": "3n4bl3 dr1f7 d373c710n f1r57"
+      "enabledLabel": "Dr1f7 d373c710n"
     },
     "intervals": {
       "disabled": "D154bl3d",
@@ -3268,6 +3271,20 @@
       "hint": "4 run r3c31v35 7h15 w0rk5p4c3'5 3nv1r0nm3n7 v4r14bl35, 53n5171v3 v4lu35, 4ny V4ul7-r350lv3d 53cr375 4nd 7h3 j0b'5 cl0ud 1d3n717y. 50m30n3 0p3n1ng 4 pull r3qu357 fr0m 4 f0rk h45 n0 wr173 4cc355 4nd c4nn07 m3rg3, 50 4 5p3cul471v3 pl4n 15 7h3 0nly w4y 7h31r c0d3 r34ch35 7h053 cr3d3n714l5. 7urn 7h15 0n f0r 4 w0rk5p4c3 7h47 h0ld5 n07h1ng w0r7h 74k1ng — 4 publ1c m0dul3 r3p05170ry 4cc3p71ng c0mmun17y c0n7r1bu710n5, 54y. Pull r3qu3575 fr0m br4nch35 1n 7h3 r3p05170ry 1753lf 4r3 un4ff3c73d 4nd 4lw4y5 pl4n.",
       "activeBadge": "0n",
       "confirmEnable": "Pl4n pull r3qu3575 0p3n3d fr0m f0rk5? 7h31r 4u7h0r5' c0d3 w1ll run w17h 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35, w17h0u7 4ny0n3 4ppr0v1ng 17 f1r57."
+    },
+    "groups": {
+      "identity": "1d3n717y",
+      "execution": "3x3cu710n",
+      "operations": "0p3r4710n5",
+      "ansible": "4n51bl3 c0nf1gur3",
+      "pools": "4g3n7 p00l5",
+      "vcs": "V3r510n c0n7r0l",
+      "governance": "Dr1f7 4nd pl4n l1f3cycl3",
+      "ai": "41 5umm4ry",
+      "security": "53cur17y 5c4nn1ng",
+      "metadata": "M374d474",
+      "cloudIdentity": "Cl0ud 1d3n717y",
+      "diagnostics": "D14gn0571c5"
     }
   },
   "graphs": {

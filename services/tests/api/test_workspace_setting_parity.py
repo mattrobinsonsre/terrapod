@@ -27,6 +27,7 @@ that way is to wire a new setting up rather than add a line.
 from __future__ import annotations
 
 import pathlib
+import re
 from collections.abc import Callable
 
 import pytest
@@ -545,3 +546,279 @@ class TestTheOtherDirectionOfParity:
             "that sends one — a Terraform provider, most consequentially — has it "
             f"silently ignored: {unreachable}"
         )
+
+
+# --------------------------------------------------------------------------
+# Create/edit parity (#2253)
+# --------------------------------------------------------------------------
+#
+# A DIFFERENT invariant from the one above, in the same file because it is the
+# same question asked of a different pair of surfaces, and someone looking for
+# "is this setting reachable" should find both here.
+#
+# Above: can a FLEET set this (bulk update)? Here: can a SINGLE workspace set
+# it AT CREATION, or only by creating one and then editing it?
+#
+# It exists because the answer was "only by editing" for roughly three quarters
+# of the settable surface, undetected. The create form offered 13 controls
+# against the ~50 attributes the create route accepts: the whole Operations
+# group, the whole Ansible block, drift, AI summary, security scan and the VCS
+# workflow were absent. No test could see it, because create and edit shared no
+# code -- only chrome -- so there was nothing for a gate to compare.
+#
+# The subject is `FIELDS` in `web/src/lib/workspace-fields.ts`, which
+# both forms now build themselves from. That is what makes this checkable at
+# all: one table, two readers, so an attribute cannot reach one form and miss
+# the other.
+
+_WS_FIELDS = _surface("web/src/lib/workspace-fields.ts")
+_CREATE_GUI = _surface("web/src/app/workspaces/page.tsx")
+_EDIT_GUI = _surface("web/src/app/workspaces/[id]/page.tsx")
+
+#: Attributes the write path accepts that are NOT workspace settings, and why.
+#:
+#: One entry, and it should stay that way: an operation flag is a property of
+#: the request rather than of the workspace, so no form offers it. A second
+#: entry appearing here is worth reading carefully -- the likely truth is that
+#: a real setting has been added and somebody reached for the ledger instead of
+#: the field table, which is the failure mode every exemption list in this repo
+#: has eventually had.
+_NOT_A_FORM_FIELD: dict[str, str] = {
+    "force": (
+        "an operation flag on PATCH (`attrs.get('force', False)`) that overrides a "
+        "refusal for this one request -- not stored, not a setting, and offering it "
+        "as a control would invite an operator to leave it on"
+    ),
+}
+
+#: The functions whose request body IS the workspace write surface.
+#:
+#: Scoped rather than module-wide, deliberately: `tfe_v2` also serves state
+#: versions, so a whole-module walk collects `serial`, `md5`, `lineage` and
+#: reports them as fields the forms are missing. That would be a gate failing
+#: on its own subject rather than on a real gap -- and the fix for it must be a
+#: narrower scope, never an exemption entry per stray key, or the ledger
+#: becomes the place the next real gap hides.
+_WRITE_FUNCTIONS = frozenset({"_create_workspace_impl", "update_workspace"})
+
+
+def _attrs_read_by(function_names: frozenset[str]) -> set[str]:
+    """Every string key the named functions read off an `attrs` mapping."""
+    import ast
+    import inspect
+
+    from terrapod.api.routers import tfe_v2
+
+    tree = ast.parse(inspect.getsource(tfe_v2))
+    defs = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    missing = sorted(function_names - defs)
+    assert missing == [], (
+        f"{missing} not found in tfe_v2 — this gate's scope is named functions, so a "
+        "rename makes it read nothing and pass vacuously. Update _WRITE_FUNCTIONS."
+    )
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            or node.name not in function_names
+        ):
+            continue
+        for inner in ast.walk(node):
+            if (
+                isinstance(inner, ast.Compare)
+                and inner.ops
+                and isinstance(inner.ops[0], ast.In)
+                and isinstance(inner.left, ast.Constant)
+                and isinstance(inner.left.value, str)
+                and isinstance(inner.comparators[0], ast.Name)
+                and inner.comparators[0].id == "attrs"
+            ):
+                found.add(inner.left.value)
+            if (
+                isinstance(inner, ast.Subscript)
+                and isinstance(inner.value, ast.Name)
+                and inner.value.id == "attrs"
+                and isinstance(inner.slice, ast.Constant)
+                and isinstance(inner.slice.value, str)
+            ):
+                found.add(inner.slice.value)
+            if (
+                isinstance(inner, ast.Call)
+                and isinstance(inner.func, ast.Attribute)
+                and inner.func.attr == "get"
+                and isinstance(inner.func.value, ast.Name)
+                and inner.func.value.id == "attrs"
+                and inner.args
+                and isinstance(inner.args[0], ast.Constant)
+                and isinstance(inner.args[0].value, str)
+            ):
+                found.add(inner.args[0].value)
+    return found
+
+
+def _declared_fields() -> tuple[set[str], set[str]]:
+    """`(canonical attrs, accepted aliases)` declared in the shared field table."""
+    src = _WS_FIELDS.read_text()
+    canonical = set(re.findall(r"attr:\s*'([a-z][a-z0-9-]*)'", src))
+    aliases: set[str] = set()
+    for block in re.findall(r"alsoAccepts:\s*\[([^\]]*)\]", src):
+        aliases |= set(re.findall(r"'([a-z][a-z0-9-]*)'", block))
+    return canonical, aliases
+
+
+class TestCreateCanSetWhatEditCanSet:
+    """The create form offers every setting the create route accepts (#2253)."""
+
+    def test_the_field_table_parses(self):
+        """A floor. A renamed key in the table would otherwise make every
+        assertion below pass by finding nothing, which is the shape that makes
+        an introspection gate green and meaningless."""
+        canonical, aliases = _declared_fields()
+        assert len(canonical) >= 40, (
+            f"only {len(canonical)} attrs parsed out of {_WS_FIELDS.name} — the "
+            "matcher has probably stopped matching the table's shape rather than "
+            "the table having emptied"
+        )
+        assert aliases, "no aliases parsed; `alsoAccepts` is declared and should match"
+
+    def test_every_accepted_attribute_reaches_the_forms(self):
+        """The gate. A new workspace attribute must reach both forms, or say why not."""
+        accepted = _attrs_read_by(_WRITE_FUNCTIONS)
+        canonical, aliases = _declared_fields()
+        unreachable = sorted(accepted - canonical - aliases - set(_NOT_A_FORM_FIELD))
+        assert unreachable == [], (
+            f"attribute(s) {unreachable} are accepted by the workspace create or "
+            "PATCH path but are absent from FIELDS in "
+            "web/src/lib/workspace-fields.ts, so neither the create form "
+            "nor the Configuration tab offers them. Add them to FIELDS with a "
+            "group — both forms then render them — or, if the attribute is not a "
+            "setting, record it in _NOT_A_FORM_FIELD with the reason."
+        )
+
+    def test_no_stale_exemption(self):
+        """An entry whose attribute is no longer accepted is removed, not kept.
+
+        The bidirectional half: without it the ledger silently accumulates
+        names that mean nothing, and a reader cannot tell which entries are
+        load-bearing."""
+        accepted = _attrs_read_by(_WRITE_FUNCTIONS)
+        stale = sorted(set(_NOT_A_FORM_FIELD) - accepted)
+        assert stale == [], (
+            f"_NOT_A_FORM_FIELD names {stale}, which the write path no longer "
+            "accepts — delete the entries rather than leaving them to read as "
+            "deliberate"
+        )
+
+    def test_the_field_table_has_readers(self):
+        """FIELDS is read by BOTH forms, not declared and admired.
+
+        This repo has shipped five flag-nothing-reads defects, so a shared table
+        whose whole purpose is to be consumed twice gets an explicit check that
+        it is.
+
+        BOTH, deliberately. A one-sided version of this check -- which is what I
+        wrote first -- passes while the edit tab renders a field set of its own,
+        and the edit tab is the side that already had all 50 fields. So the
+        divergence it would miss is precisely the one that existed before #2253,
+        pointing the other way: create conforming to the table while the tab
+        drifts off it. A gate that can only catch one direction of a symmetric
+        invariant is the shape this repo keeps relearning.
+        """
+        for label, surface in (
+            ("create form", _CREATE_GUI),
+            ("edit tab", _EDIT_GUI),
+            ("field table", _WS_FIELDS),
+        ):
+            assert surface.exists(), f"{label} missing at {surface}"
+        # Collected rather than asserted per form, so the failure names EVERY
+        # side that has drifted. Failing on the first hides whether the second
+        # is wired at all, which would make the two-sided check above
+        # indistinguishable from the one-sided one it replaced.
+        problems: list[str] = []
+        for label, surface in (("create form", _CREATE_GUI), ("edit tab", _EDIT_GUI)):
+            src = surface.read_text()
+            if "workspace-field" not in src:
+                problems.append(f"{label}: does not import the shared field code")
+            elif not ("groupFields" in src or "FIELDS" in src or "<Group" in src):
+                problems.append(f"{label}: imports the module but never reads the field set")
+        assert problems == [], (
+            "the workspace forms do not both build themselves from the shared field "
+            f"table, so they can diverge again exactly as they did before #2253: "
+            f"{problems}"
+        )
+
+
+#: Workspace attributes the API refuses outright on an engine whose strategy says
+#: the feature does not apply, mapped to the predicate that decides it.
+#:
+#: A ledger, so the half that can drift is DERIVED: the engine list is computed
+#: from the predicate over `known_engines()` rather than restated here. Adding a
+#: row is cheap; the floor below stops the map emptying and passing on nothing.
+_ENGINE_GATED_ATTRS = {
+    "security-scan-enforcement": "evaluates_security_scans",
+    "drift-ignore-rules": "honours_drift_ignore_rules",
+}
+
+
+def _declared_engines(attr: str) -> set[str] | None:
+    """The `engines:` list the shared field table declares for `attr`, or None.
+
+    Read as text rather than imported, because the assertion is about what the
+    table DECLARES -- the create form filters on exactly this list before building
+    its payload, so a missing restriction is a 422 the operator meets and no test
+    driving the helper would see.
+    """
+    import re
+
+    src = _surface("web/src/lib/workspace-fields.ts").read_text()
+    m = re.search(r"\{\s*attr: '" + re.escape(attr) + r"'.*?\}", src, re.S)
+    assert m, f"no FIELDS entry for {attr!r}; this gate reads the table by shape"
+    entry = m.group(0)
+    if "engines:" not in entry:
+        return None
+    tail = entry.split("engines:", 1)[1]
+    return set(re.findall(r"'([a-z][a-z0-9_-]*)'", tail.split("]", 1)[0]))
+
+
+def test_scan_enforcement_engines_match_the_api():
+    """The create form must not send an attribute the API refuses for that engine.
+
+    `validate_scan_enforcement` raises unless the value is `off` on an engine
+    `evaluates_security_scans` says False for. The create form sends every
+    attribute it rendered, so without the restriction a Pulumi create 422s and
+    creates NOTHING -- which is how it shipped, and which no unit test saw because
+    `toAttributes` emitted a perfectly well-formed payload the API then refused.
+
+    Derived, not restated: the expected list is computed from the predicate over
+    `known_engines()`, so a new engine, or a predicate changing its mind, fails
+    here rather than reaching an operator as a 422.
+    """
+    from terrapod import engines
+
+    assert len(_ENGINE_GATED_ATTRS) >= 2, "the gated-attribute map has emptied"
+    known = set(engines.known_engines())
+    assert len(known) >= 2, "known_engines() collapsed; this gate needs the real set"
+
+    problems = []
+    for attr, pred_name in _ENGINE_GATED_ATTRS.items():
+        pred = getattr(engines, pred_name)
+        expected = {e for e in known if pred(e)}
+        assert expected != known, (
+            f"{pred_name} allows every known engine, so {attr} needs no restriction "
+            "and this row is dead -- remove it rather than asserting a no-op"
+        )
+        declared = _declared_engines(attr)
+        if declared != expected:
+            problems.append(
+                f"{attr}: the field table declares engines={sorted(declared) if declared else None} "
+                f"but {pred_name} allows {sorted(expected)}"
+            )
+    assert not problems, (
+        "the create form would send an attribute the API refuses for that engine:\n  "
+        + "\n  ".join(problems)
+    )

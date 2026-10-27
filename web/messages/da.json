@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurer",
       "configureEnabledHint": "Ansible kører playbooks mod inventaret. Slår du dette til, kommer fanen Inventar frem.",
       "operationsNone": "Et arbejdsområde skal beholde planlæg og anvend, eller konfigurer, eller begge. Slå en af dem til igen.",
-      "ansibleConfigure": "Ansible-konfiguration",
       "ansibleConfigureHint": "Hvor playbooks og inventaret ligger, og hvad en konfigurationskørsel gør som standard.",
       "configDirectory": "Ansible-konfigurationsmappe",
       "configDirectoryTitle": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Lad feltet være tomt for depotets rod selv. Om dette arbejdsområde overhovedet har en konfigurationshandling, afgøres af indstillingen Konfigurer ovenfor, ikke af denne sti.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Konfigurer efter anvendelse",
       "configureAfterApplyHint": "Hver anvendelse her følges af en konfigurering i samme kørsel, så også en anvendelse fra CLI streamer playbookens output. En nedrivning konfigurerer aldrig.",
       "configureAllHosts": "Konfigurer alle værter",
-      "configureAllHostsHint": "En konfigurationskørsel, som platformen selv starter, når kun de værter, som en ændring i inventaret berørte, medmindre Ansible-koden har ændret sig siden den forrige. Slå dette til for altid at køre hele inventaret igennem."
+      "configureAllHostsHint": "En konfigurationskørsel, som platformen selv starter, når kun de værter, som en ændring i inventaret berørte, medmindre Ansible-koden har ændret sig siden den forrige. Slå dette til for altid at køre hele inventaret igennem.",
+      "eeCpuRequest": "Ansible CPU-anmodning",
+      "eeMemoryRequest": "Ansible hukommelsesanmodning",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Ryd den rapporterede afdriftstilstand. Det næste planlagte tjek genudfylder den fra virkeligheden.",
       "lastChecked": "Sidst tjekket",
       "checkNow": "Tjek nu",
-      "checkNowTitleDisabled": "Aktivér afdriftsregistrering først"
+      "enabledLabel": "Afdriftsregistrering"
     },
     "intervals": {
       "disabled": "Deaktiveret",
@@ -3268,6 +3271,20 @@
       "hint": "En kørsel modtager dette arbejdsområdes miljøvariabler, følsomme værdier, alle hemmeligheder hentet via Vault og jobbets cloud-identitet. Den, der åbner en pull request fra en fork, har ingen skriveadgang og kan ikke merge, så en spekulativ plan er den eneste vej, ad hvilken deres kode når frem til de legitimationsoplysninger. Slå dette til for et arbejdsområde, der ikke rummer noget værd at tage — for eksempel et offentligt modul-repository, der tager imod bidrag fra fællesskabet. Pull requests fra grene i selve repositoryet er upåvirkede og planlægges altid.",
       "activeBadge": "Til",
       "confirmEnable": "Planlæg pull requests åbnet fra forks? Deres forfatteres kode vil køre med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, uden at nogen godkender det først."
+    },
+    "groups": {
+      "identity": "Identitet",
+      "execution": "Kørsel",
+      "operations": "Handlinger",
+      "ansible": "Ansible-konfiguration",
+      "pools": "Agentpuljer",
+      "vcs": "Versionsstyring",
+      "governance": "Afdrift og planens livscyklus",
+      "ai": "AI-opsummering",
+      "security": "Sikkerhedsscanning",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloudidentitet",
+      "diagnostics": "Diagnosticering"
     }
   },
   "graphs": {

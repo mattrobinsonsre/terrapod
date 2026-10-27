@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurer",
       "configureEnabledHint": "Ansible kjører playbookene mot inventaret. Slår du dette på, kommer fanen Inventar fram.",
       "operationsNone": "Et arbeidsområde må beholde planlegg og anvend, eller konfigurer, eller begge. Slå på en av dem igjen.",
-      "ansibleConfigure": "Ansible-konfigurasjon",
       "ansibleConfigureHint": "Hvor playbookene og inventaret ligger, og hva en konfigurasjonskjøring gjør som standard.",
       "configDirectory": "Ansible-konfigurasjonsmappe",
       "configDirectoryTitle": "Hvor ansible.cfg, playbookene, roles/, group_vars/ og host_vars/ ligger, relativt til depotroten. La feltet stå tomt for depotroten selv. Om dette arbeidsområdet i det hele tatt har en konfigurasjonsoperasjon, avgjøres av innstillingen Konfigurer ovenfor, ikke av denne stien.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Konfigurer etter anvendelse",
       "configureAfterApplyHint": "Hver anvendelse her følges av en konfigurering i samme kjøring, så også en anvendelse fra CLI strømmer playbookens utdata. En nedriving konfigurerer aldri.",
       "configureAllHosts": "Konfigurer alle verter",
-      "configureAllHostsHint": "En konfigurasjonskjøring som plattformen selv starter, når bare de vertene som en endring i inventaret berørte, med mindre Ansible-koden har endret seg siden den forrige. Slå dette på for alltid å gå gjennom hele inventaret."
+      "configureAllHostsHint": "En konfigurasjonskjøring som plattformen selv starter, når bare de vertene som en endring i inventaret berørte, med mindre Ansible-koden har endret seg siden den forrige. Slå dette på for alltid å gå gjennom hele inventaret.",
+      "eeCpuRequest": "Ansible CPU-forespørsel",
+      "eeMemoryRequest": "Ansible minneforespørsel",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versjon"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Fjern den rapporterte avdriftstilstanden. Neste planlagte kontroll vil fylle den på nytt fra virkeligheten.",
       "lastChecked": "Sist kontrollert",
       "checkNow": "Kontroller nå",
-      "checkNowTitleDisabled": "Aktiver avdriftsdeteksjon først"
+      "enabledLabel": "Avdriftsdeteksjon"
     },
     "intervals": {
       "disabled": "Deaktivert",
@@ -3268,6 +3271,20 @@
       "hint": "En kjøring mottar dette arbeidsområdets miljøvariabler, sensitive verdier, alle hemmeligheter hentet via Vault og jobbens skyidentitet. Den som åpner en pull request fra en fork har ingen skrivetilgang og kan ikke slå sammen, så en spekulativ plan er den eneste veien koden deres når fram til den legitimasjonen. Slå dette på for et arbeidsområde som ikke rommer noe verdt å ta — for eksempel et offentlig modulrepositorium som tar imot bidrag fra fellesskapet. Pull requests fra grener i selve repositoriet er upåvirket og får alltid plan.",
       "activeBadge": "På",
       "confirmEnable": "Planlegge pull requests som er åpnet fra forker? Koden til forfatterne deres kjøres med dette arbeidsområdets legitimasjon og dekrypterte variabler, uten at noen godkjenner det først."
+    },
+    "groups": {
+      "identity": "Identitet",
+      "execution": "Kjøring",
+      "operations": "Operasjoner",
+      "ansible": "Ansible-konfigurasjon",
+      "pools": "Agentpuljer",
+      "vcs": "Versjonskontroll",
+      "governance": "Avdrift og planens livssyklus",
+      "ai": "AI-sammendrag",
+      "security": "Sikkerhetsskanning",
+      "metadata": "Metadata",
+      "cloudIdentity": "Skyidentitet",
+      "diagnostics": "Diagnostikk"
     }
   },
   "graphs": {

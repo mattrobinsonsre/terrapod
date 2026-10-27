@@ -2602,7 +2602,6 @@
       "configureEnabled": "Cyflunio",
       "configureEnabledHint": "Mae Ansible yn rhedeg y llyfrau chwarae yn erbyn y rhestr eiddo. Mae troi hyn ymlaen yn ychwanegu'r tab Rhestr Eiddo.",
       "operationsNone": "Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau. Trowch un ohonynt yn ôl ymlaen.",
-      "ansibleConfigure": "Cyflunio Ansible",
       "ansibleConfigureHint": "Lle mae'r llyfrau chwarae a'r rhestr eiddo yn byw, a beth mae rhediad cyflunio yn ei wneud yn rhagosodedig.",
       "configDirectory": "Cyfeiriadur cyfluniad Ansible",
       "configDirectoryTitle": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Gadewch hwn yn wag ar gyfer gwraidd y gadwrfa ei hun. Y gosodiad Cyflunio uchod sy'n penderfynu a oes gan y gweithle hwn weithrediad cyflunio o gwbl, nid y llwybr hwn.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Cyflunio ar ôl gweithredu",
       "configureAfterApplyHint": "Mae cyflunio yn dilyn pob gweithrediad yma ar yr un rhediad, felly mae gweithrediad o'r CLI yn ffrydio allbwn y llyfr chwarae hefyd. Nid yw dinistrio byth yn cyflunio.",
       "configureAllHosts": "Cyflunio pob gwesteiwr",
-      "configureAllHostsHint": "Mae cyflunio a gychwynnir gan y platfform ar eich rhan yn targedu dim ond y gwesteiwyr yr effeithiodd newid i''r rhestr eiddo arnynt, oni bai bod cod Ansible wedi newid ers y cyflunio diwethaf. Trowch hyn ymlaen i ysgubo''r rhestr eiddo gyfan bob tro."
+      "configureAllHostsHint": "Mae cyflunio a gychwynnir gan y platfform ar eich rhan yn targedu dim ond y gwesteiwyr yr effeithiodd newid i''r rhestr eiddo arnynt, oni bai bod cod Ansible wedi newid ers y cyflunio diwethaf. Trowch hyn ymlaen i ysgubo''r rhestr eiddo gyfan bob tro.",
+      "eeCpuRequest": "Cais CPU Ansible",
+      "eeMemoryRequest": "Cais cof Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Fersiwn Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Clirio'r cyflwr drifft a adroddwyd. Bydd y gwiriad amserlenedig nesaf yn ei ail-boblogi o'r realiti.",
       "lastChecked": "Gwiriwyd Ddiwethaf",
       "checkNow": "Gwirio Nawr",
-      "checkNowTitleDisabled": "Galluogwch ganfod drifft yn gyntaf"
+      "enabledLabel": "Canfod Drifft"
     },
     "intervals": {
       "disabled": "Wedi'i analluogi",
@@ -3268,6 +3271,20 @@
       "hint": "Mae rhediad yn derbyn newidynnau amgylchedd y gweithle hwn, gwerthoedd sensitif, unrhyw gyfrinachau a ddatryswyd drwy Vault, a hunaniaeth cwmwl y swydd. Nid oes gan rywun sy'n agor cais tynnu o fforch fynediad ysgrifennu ac ni all gyfuno, felly cynllun tybiannol yw'r unig ffordd i'w god gyrraedd y tystlythyrau hynny. Trowch hyn ymlaen ar gyfer gweithle nad yw'n dal dim gwerth ei gymryd — storfa modiwlau gyhoeddus sy'n derbyn cyfraniadau'r gymuned, dyweder. Nid effeithir ar geisiadau tynnu o ganghennau yn y storfa ei hun, ac maent bob amser yn cael cynllun.",
       "activeBadge": "Ymlaen",
       "confirmEnable": "Cynllunio ceisiadau tynnu a agorwyd o fforchau? Bydd cod eu hawduron yn rhedeg gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn, heb i neb ei gymeradwyo ymlaen llaw."
+    },
+    "groups": {
+      "identity": "Hunaniaeth",
+      "execution": "Gweithredu",
+      "operations": "Gweithrediadau",
+      "ansible": "Cyflunio Ansible",
+      "pools": "Pyllau Asiantau",
+      "vcs": "Rheoli fersiwn",
+      "governance": "Drifft a chylch bywyd cynllun",
+      "ai": "Crynodeb AI",
+      "security": "Sgan diogelwch",
+      "metadata": "Metadata",
+      "cloudIdentity": "Hunaniaeth cwmwl",
+      "diagnostics": "Diagnosteg"
     }
   },
   "graphs": {

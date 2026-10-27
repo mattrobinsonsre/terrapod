@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configurare",
       "configureEnabledHint": "Ansible libellos ludendi adversus inventarium exsequitur. Hoc activatum plicam Inventarium addit.",
       "operationsNone": "Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet. Unum eorum rursus activa.",
-      "ansibleConfigure": "Configuratio Ansible",
       "ansibleConfigureHint": "Ubi libelli ludendi et inventarium habitant, et quid cursus configurandi praedefinite agat.",
       "configDirectory": "Directorium configurationis Ansible",
       "configDirectoryTitle": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum relinque pro ipsa radice repositorii. Utrum hoc spatium operis operationem configurandi omnino habeat, optio Configurare supra decernit, non haec via.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Configurare post applicationem",
       "configureAfterApplyHint": "Quamque applicationem hic configuratio in eodem cursu sequitur, ideo applicatio ex CLI etiam egressum libelli ludendi transmittit. Destructio numquam configurat.",
       "configureAllHosts": "Configurare omnes hospites",
-      "configureAllHostsHint": "Configuratio quam suggestus sua sponte incipit solos hospites petit quos mutatio inventarii tetigit, nisi codex Ansible post ultimam mutatus est. Hoc accende ut semper totum inventarium petatur."
+      "configureAllHostsHint": "Configuratio quam suggestus sua sponte incipit solos hospites petit quos mutatio inventarii tetigit, nisi codex Ansible post ultimam mutatus est. Hoc accende ut semper totum inventarium petatur.",
+      "eeCpuRequest": "Postulatio CPU Ansible",
+      "eeMemoryRequest": "Postulatio memoriae Ansible",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versio Terragrunt"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Vacua statum aberrationis relatum. Proxima inspectio ordinata eum ex realitate reimplebit.",
       "lastChecked": "Ultimo Inspectum",
       "checkNow": "Nunc Inspicere",
-      "checkNowTitleDisabled": "Prius inventionem aberrationis activa"
+      "enabledLabel": "Inventio Aberrationis"
     },
     "intervals": {
       "disabled": "Deactivatum",
@@ -3268,6 +3271,20 @@
       "hint": "Exsecutio accipit variabiles ambitus huius loci operis, valores sensibiles, arcana quaelibet per Vault resoluta, atque identitatem nubis operis. Qui rogationem tractionis e furca aperit neque scribendi potestatem habet neque conflare potest; itaque consilium speculativum sola via est qua codex eius ad illas credentias pervenit. Hoc accende pro loco operis qui nihil auferendum continet — exempli gratia, pro repositorio modulorum publico quod conlationes communitatis accipit. Rogationes tractionis e ramis ipsius repositorii non afficiuntur et semper consilium accipiunt.",
       "activeBadge": "Accensum",
       "confirmEnable": "Rogationes tractionis e furcis apertas consiliari? Codex auctorum earum cum credentiis variabilibusque decryptis huius loci operis exsequetur, nemine prius approbante."
+    },
+    "groups": {
+      "identity": "Identitas",
+      "execution": "Executio",
+      "operations": "Operationes",
+      "ansible": "Configuratio Ansible",
+      "pools": "Copiae Actorum",
+      "vcs": "Moderatio versionum",
+      "governance": "Aberratio et vitae cursus consilii",
+      "ai": "Summarium AI",
+      "security": "Scrutinium securitatis",
+      "metadata": "Metadata",
+      "cloudIdentity": "Identitas nubis",
+      "diagnostics": "Diagnostica"
     }
   },
   "graphs": {

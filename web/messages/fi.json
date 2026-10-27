@@ -2602,7 +2602,6 @@
       "configureEnabled": "Määritys",
       "configureEnabledHint": "Ansible ajaa playbookit inventaariota vasten. Tämän käyttöönotto lisää Inventaario-välilehden.",
       "operationsNone": "Työtilan on säilytettävä suunnittelu ja käyttöönotto, määritys tai molemmat. Ota toinen niistä uudelleen käyttöön.",
-      "ansibleConfigure": "Ansible-määritys",
       "ansibleConfigureHint": "Missä playbookit ja inventaario sijaitsevat ja mitä määritysajo tekee oletuksena.",
       "configDirectory": "Ansible-asetushakemisto",
       "configDirectoryTitle": "Missä ansible.cfg, playbookit, roles/, group_vars/ ja host_vars/ sijaitsevat, suhteessa tietovaraston juureen. Jätä tyhjäksi, jos kyse on tietovaraston juuresta itsestään. Onko tällä työtilalla lainkaan määritystoimintoa, ratkaisee yllä oleva Määritys-asetus eikä tämä polku.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Määritys käyttöönoton jälkeen",
       "configureAfterApplyHint": "Jokaista käyttöönottoa täällä seuraa määritys samalla ajolla, joten myös CLI:n käyttöönotto suoratoistaa playbookin tulosteen. Tuhoaminen ei määritä koskaan.",
       "configureAllHosts": "Kaikkien isäntien määritys",
-      "configureAllHostsHint": "Alustan itse käynnistämä määritys kohdistuu vain niihin isäntiin, joihin inventaarion muutos osui, ellei Ansible-koodi ole muuttunut edellisen määrityksen jälkeen. Ota tämä käyttöön kohdistaaksesi aina koko inventaarioon."
+      "configureAllHostsHint": "Alustan itse käynnistämä määritys kohdistuu vain niihin isäntiin, joihin inventaarion muutos osui, ellei Ansible-koodi ole muuttunut edellisen määrityksen jälkeen. Ota tämä käyttöön kohdistaaksesi aina koko inventaarioon.",
+      "eeCpuRequest": "Ansiblen CPU-pyyntö",
+      "eeMemoryRequest": "Ansiblen muistipyyntö",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versio"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Tyhjennä raportoitu ajautumatila. Seuraava ajoitettu tarkistus täyttää sen uudelleen todellisuudesta.",
       "lastChecked": "Viimeksi tarkistettu",
       "checkNow": "Tarkista nyt",
-      "checkNowTitleDisabled": "Ota ajautuman tunnistus ensin käyttöön"
+      "enabledLabel": "Ajautuman tunnistus"
     },
     "intervals": {
       "disabled": "Poissa käytöstä",
@@ -3268,6 +3271,20 @@
       "hint": "Ajo saa tämän työtilan ympäristömuuttujat, arkaluonteiset arvot, kaikki Vaultista haetut salaisuudet ja työn pilvi-identiteetin. Forkista pull requestin avaavalla ei ole kirjoitusoikeutta eikä hän voi yhdistää, joten spekulatiivinen suunnitelma on ainoa reitti, jota pitkin hänen koodinsa pääsee noihin tunnuksiin. Ota tämä käyttöön työtilassa, jossa ei ole mitään viemisen arvoista — vaikkapa julkisessa moduulirepositoriossa, joka ottaa vastaan yhteisön kontribuutioita. Repositorion omista haaroista avatut pull requestit eivät muutu, ja ne suunnitellaan aina.",
       "activeBadge": "Päällä",
       "confirmEnable": "Suunnitellaanko forkeista avatut pull requestit? Niiden tekijöiden koodi ajetaan tämän työtilan tunnuksilla ja puretuilla muuttujilla, ilman että kukaan hyväksyy sitä ensin."
+    },
+    "groups": {
+      "identity": "Identiteetti",
+      "execution": "Suoritus",
+      "operations": "Toiminnot",
+      "ansible": "Ansible-määritys",
+      "pools": "Agenttivarannot",
+      "vcs": "Versionhallinta",
+      "governance": "Ajautuma ja suunnitelman elinkaari",
+      "ai": "Tekoälyn yhteenveto",
+      "security": "Tietoturvatarkistus",
+      "metadata": "Metatiedot",
+      "cloudIdentity": "Pilvi-identiteetti",
+      "diagnostics": "Diagnostiikka"
     }
   },
   "graphs": {

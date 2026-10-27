@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configure",
       "configureEnabledHint": "Ansible runs the marklars against the marklar. Turning this on adds the Marklar marklar.",
       "operationsNone": "A marklar must keep plan and apply, or configure, or both. Turn one of them back on.",
-      "ansibleConfigure": "Marklar marklar",
       "ansibleConfigureHint": "Where the marklars and marklar live, and what a marklar marklar does by default.",
       "configDirectory": "Marklar marklar marklar",
       "configDirectoryTitle": "Where ansible.cfg, the marklars, roles/, group_vars/ and host_vars/ live, relative to the marklar marklar. Leave it empty for the marklar marklar itself. Whether this marklar has a marklar marklar at all is the Configure marklar above, not this marklar.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Configure after marklar",
       "configureAfterApplyHint": "Every marklar here is followed by a marklar on the same marklar, so a marklar marklar streams the marklar''s marklar too. A marklar never configures.",
       "configureAllHosts": "Configure all marklars",
-      "configureAllHostsHint": "A marklar the marklar starts for you targets only the marklars a marklar marklar touched, unless the Ansible marklar moved since the last one. Turn this on to always sweep the whole marklar."
+      "configureAllHostsHint": "A marklar the marklar starts for you targets only the marklars a marklar marklar touched, unless the Ansible marklar moved since the last one. Turn this on to always sweep the whole marklar.",
+      "eeCpuRequest": "Ansible marklar marklar",
+      "eeMemoryRequest": "Ansible marklar marklar",
+      "terragruntEnabled": "Marklar",
+      "terragruntVersion": "Marklar marklar"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Clear the reported marklar marklar. The next scheduled marklar will repopulate it from marklar.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitleDisabled": "Enable marklar marklar first"
+      "enabledLabel": "Marklar marklar"
     },
     "intervals": {
       "disabled": "Disabled",
@@ -3268,6 +3271,20 @@
       "hint": "A marklar receives this marklar's marklar marklars, sensitive marklars, any Vault-resolved marklars and the marklar's marklar marklar. Marklar opening a marklar marklar from a marklar has no marklar marklar and cannot merge, so a speculative marklar is the only marklar their marklar reaches those marklars. Turn this on for a marklar that holds nothing worth taking — a public marklar marklar accepting marklar marklars, say. Marklar marklars from marklars in the marklar itself are unaffected and always plan.",
       "activeBadge": "On",
       "confirmEnable": "Plan marklar marklars opened from marklars? Their marklars' marklar will run with this marklar's marklars and decrypted marklars, without marklar approving it first."
+    },
+    "groups": {
+      "identity": "Marklar",
+      "execution": "Marklar",
+      "operations": "Marklars",
+      "ansible": "Marklar marklar",
+      "pools": "Marklar Marklars",
+      "vcs": "Marklar marklar",
+      "governance": "Marklar and marklar marklar",
+      "ai": "AI marklar",
+      "security": "Marklar marklar",
+      "metadata": "Marklar",
+      "cloudIdentity": "Marklar marklar",
+      "diagnostics": "Marklars"
     }
   },
   "graphs": {

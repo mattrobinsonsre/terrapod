@@ -2602,7 +2602,6 @@
       "configureEnabled": "Configureren",
       "configureEnabledHint": "Ansible voert de playbooks uit tegen de inventaris. Dit aanzetten voegt het tabblad Inventaris toe.",
       "operationsNone": "Een workspace moet plannen en toepassen, of configureren, of beide houden. Zet er weer één aan.",
-      "ansibleConfigure": "Ansible-configure",
       "ansibleConfigureHint": "Waar de playbooks en de inventaris staan, en wat een configure-run standaard doet.",
       "configDirectory": "Ansible-configuratiemap",
       "configDirectoryTitle": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Laat dit leeg voor de repositorywortel zelf. Of deze workspace überhaupt een configure-operatie heeft, bepaalt de instelling Configureren hierboven, niet dit pad.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Configureren na de apply",
       "configureAfterApplyHint": "Op elke apply hier volgt het configureren in dezelfde run, dus ook een apply via de CLI streamt de uitvoer van het playbook. Een destroy configureert nooit.",
       "configureAllHosts": "Alle hosts configureren",
-      "configureAllHostsHint": "Een configure-run die het platform zelf start, bereikt alleen de hosts die door een wijziging in de inventaris zijn geraakt, tenzij de Ansible-code sinds de vorige run is gewijzigd. Zet dit aan om altijd de hele inventaris te doorlopen."
+      "configureAllHostsHint": "Een configure-run die het platform zelf start, bereikt alleen de hosts die door een wijziging in de inventaris zijn geraakt, tenzij de Ansible-code sinds de vorige run is gewijzigd. Zet dit aan om altijd de hele inventaris te doorlopen.",
+      "eeCpuRequest": "Ansible CPU-aanvraag",
+      "eeMemoryRequest": "Ansible geheugenaanvraag",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versie"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Wis de gerapporteerde driftstatus. De volgende geplande controle vult deze opnieuw op basis van de werkelijkheid.",
       "lastChecked": "Laatst gecontroleerd",
       "checkNow": "Nu controleren",
-      "checkNowTitleDisabled": "Schakel eerst driftdetectie in"
+      "enabledLabel": "Driftdetectie"
     },
     "intervals": {
       "disabled": "Uitgeschakeld",
@@ -3268,6 +3271,20 @@
       "hint": "Een uitvoering krijgt de omgevingsvariabelen van deze werkruimte, gevoelige waarden, alle via Vault opgehaalde secrets en de cloudidentiteit van de job. Wie een pull request vanuit een fork opent heeft geen schrijfrechten en kan niet mergen, dus een speculatief plan is de enige weg waarlangs hun code bij die referenties komt. Zet dit aan voor een werkruimte waarin niets te halen valt — bijvoorbeeld een openbare modulerepository die bijdragen uit de community aanneemt. Pull requests vanuit branches in de repository zelf zijn hierdoor niet geraakt en krijgen altijd een plan.",
       "activeBadge": "Aan",
       "confirmEnable": "Pull requests die vanuit een fork zijn geopend plannen? De code van hun auteurs draait met de referenties en ontsleutelde variabelen van deze werkruimte, zonder dat iemand dat eerst goedkeurt."
+    },
+    "groups": {
+      "identity": "Identiteit",
+      "execution": "Uitvoering",
+      "operations": "Operaties",
+      "ansible": "Ansible-configure",
+      "pools": "Agentpools",
+      "vcs": "Versiebeheer",
+      "governance": "Drift en levenscyclus van plannen",
+      "ai": "AI-samenvatting",
+      "security": "Beveiligingsscan",
+      "metadata": "Metadata",
+      "cloudIdentity": "Cloud-identiteit",
+      "diagnostics": "Diagnostiek"
     }
   },
   "graphs": {

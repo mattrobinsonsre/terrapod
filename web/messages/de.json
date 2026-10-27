@@ -2602,7 +2602,6 @@
       "configureEnabled": "Konfigurieren",
       "configureEnabledHint": "Ansible führt die Playbooks gegen das Inventar aus. Wird dies aktiviert, erscheint der Tab Inventar.",
       "operationsNone": "Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten. Aktivieren Sie eines davon wieder.",
-      "ansibleConfigure": "Ansible-Konfiguration",
       "ansibleConfigureHint": "Wo die Playbooks und das Inventar liegen und was ein Konfigurationslauf standardmäßig tut.",
       "configDirectory": "Ansible-Konfigurationsverzeichnis",
       "configDirectoryTitle": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer lassen für das Repository-Wurzelverzeichnis selbst. Ob dieser Workspace überhaupt eine Konfigurationsoperation hat, entscheidet die Einstellung Konfigurieren oben, nicht dieser Pfad.",
@@ -2684,7 +2683,11 @@
       "configureAfterApply": "Konfigurieren nach der Anwendung",
       "configureAfterApplyHint": "Auf jede Anwendung hier folgt ein Konfigurieren im selben Lauf, sodass auch eine Anwendung über die CLI die Ausgabe des Playbooks streamt. Ein Destroy konfiguriert nie.",
       "configureAllHosts": "Alle Hosts konfigurieren",
-      "configureAllHostsHint": "Ein Konfigurationslauf, den die Plattform selbst startet, erreicht nur die Hosts, die eine Änderung am Inventar berührt hat — es sei denn, der Ansible-Code hat sich seit dem vorigen Lauf geändert. Aktivieren Sie dies, damit immer das ganze Inventar durchlaufen wird."
+      "configureAllHostsHint": "Ein Konfigurationslauf, den die Plattform selbst startet, erreicht nur die Hosts, die eine Änderung am Inventar berührt hat — es sei denn, der Ansible-Code hat sich seit dem vorigen Lauf geändert. Aktivieren Sie dies, damit immer das ganze Inventar durchlaufen wird.",
+      "eeCpuRequest": "Ansible-CPU-Anforderung",
+      "eeMemoryRequest": "Ansible-Speicher-Anforderung",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-Version"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -2724,7 +2727,7 @@
       "dismissTitle": "Den gemeldeten Drift-Status löschen. Die nächste geplante Prüfung füllt ihn anhand des tatsächlichen Zustands neu.",
       "lastChecked": "Zuletzt geprüft",
       "checkNow": "Jetzt prüfen",
-      "checkNowTitleDisabled": "Aktivieren Sie zuerst die Drift-Erkennung"
+      "enabledLabel": "Drift-Erkennung"
     },
     "intervals": {
       "disabled": "Deaktiviert",
@@ -3268,6 +3271,20 @@
       "hint": "Ein Lauf erhält die Umgebungsvariablen dieses Arbeitsbereichs, vertrauliche Werte, alle über Vault aufgelösten Geheimnisse und die Cloud-Identität des Jobs. Wer einen Pull Request aus einem Fork öffnet, hat keinen Schreibzugriff und kann nicht mergen – ein spekulativer Plan ist also der einzige Weg, auf dem sein Code an diese Zugangsdaten gelangt. Aktivieren Sie dies für einen Arbeitsbereich, in dem es nichts zu holen gibt – etwa ein öffentliches Modul-Repository, das Beiträge aus der Community annimmt. Pull Requests aus Branches im Repository selbst sind davon nicht betroffen und werden immer geplant.",
       "activeBadge": "Ein",
       "confirmEnable": "Pull Requests aus Forks planen? Der Code ihrer Autoren wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs ausgeführt, ohne dass jemand dies zuvor genehmigt."
+    },
+    "groups": {
+      "identity": "Identität",
+      "execution": "Ausführung",
+      "operations": "Operationen",
+      "ansible": "Ansible-Konfiguration",
+      "pools": "Agent-Pools",
+      "vcs": "Versionsverwaltung",
+      "governance": "Drift und Plan-Lebenszyklus",
+      "ai": "KI-Zusammenfassung",
+      "security": "Sicherheitsprüfung",
+      "metadata": "Metadaten",
+      "cloudIdentity": "Cloud-Identität",
+      "diagnostics": "Diagnose"
     }
   },
   "graphs": {
