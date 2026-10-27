@@ -1,7 +1,14 @@
 """
 AWS S3 storage backend for Terrapod.
 
-Uses aioboto3 for async I/O. The S3 client is pinned to Signature
+Uses aiobotocore for async I/O, directly rather than through aioboto3
+(#2263): aioboto3 added nothing we use -- no `resource` API and no transfer
+helpers -- while hard-pinning `aiobotocore[boto3]==2.25.1`, which capped
+`boto3 <1.40.62` and was the sole reason no patched litellm was installable.
+Every operation below is botocore's own, so the call sites are unchanged; only
+the client construction differs.
+
+The S3 client is pinned to Signature
 Version 4 (`s3v4`) — botocore's implicit default varies by region,
 endpoint and SDK version, and a SigV2 presigned URL is rejected by S3
 for any SSE-KMS-encrypted object (and outright in GovCloud / newer
@@ -16,7 +23,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
-import aioboto3
+from aiobotocore.session import get_session
 from botocore.config import Config
 
 from terrapod.logging_config import get_logger
@@ -54,7 +61,11 @@ class S3Store:
                 expiry_seconds=self._default_expiry,
             )
 
-        self._session = aioboto3.Session(region_name=region)
+        # No region on the session: `create_client` below passes `region_name`
+        # explicitly from the same value, so a session-level default would be a
+        # second place for it to live. aiobotocore's session takes no region at
+        # construction in any case.
+        self._session = get_session()
         self._client: Any = None
 
     def _full_key(self, key: str) -> str:
@@ -71,7 +82,7 @@ class S3Store:
 
     async def _get_client(self) -> Any:
         if self._client is None:
-            self._client = await self._session.client(
+            self._client = await self._session.create_client(
                 "s3",
                 region_name=self._region,
                 endpoint_url=self._endpoint_url,
