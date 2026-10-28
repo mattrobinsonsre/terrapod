@@ -39,6 +39,11 @@ def _ws(**kw):
     ws.default_limit = kw.pop("default_limit", "")
     ws.configure_all_hosts = kw.pop("configure_all_hosts", False)
     ws.config_directory = kw.pop("config_directory", "ansible")
+    # The manual padlock, for the same reason as the two above: left as a
+    # MagicMock attribute it is TRUTHY, so `create_run` would refuse every
+    # configure built here as locked (#1975). Do not delete as noise -- a
+    # configure's behaviour genuinely depends on it.
+    ws.locked = kw.pop("locked", False)
     for k, v in kw.items():
         setattr(ws, k, v)
     return ws
@@ -410,6 +415,9 @@ def _full_ws(**kw):
     ws.default_limit = kw.get("default_limit", "")
     ws.configure_all_hosts = False
     ws.config_directory = "ansible"
+    # The manual padlock. Left as a MagicMock attribute it is TRUTHY, so
+    # `create_run` would refuse every configure built here as locked (#1975).
+    ws.locked = kw.get("locked", False)
     return ws
 
 

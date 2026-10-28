@@ -59,6 +59,11 @@ def _ws(**kw):
     # would be refused as an unknown execution environment.
     ws.ansible_version = kw.get("ansible_version", "")
     ws.ansible_execution_environment = kw.get("ansible_execution_environment", "")
+    # The manual padlock, for the same reason as the two above: left as a
+    # MagicMock attribute it is TRUTHY, so `create_run` would refuse every
+    # configure built here as locked (#1975). Do not delete as noise -- a
+    # configure's behaviour genuinely depends on it.
+    ws.locked = kw.get("locked", False)
     return ws
 
 

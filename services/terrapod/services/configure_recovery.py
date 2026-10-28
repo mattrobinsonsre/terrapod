@@ -338,7 +338,11 @@ async def _retry_one(db: AsyncSession, run: Run, *, retries: int) -> None:
             configuration_version_id=run.configuration_version_id,
             created_by="system",
         )
-    except (run_service.PlanApplyNotEnabled, workspace_settings.ConfigureNotEnabled):
+    except (
+        run_service.PlanApplyNotEnabled,
+        workspace_settings.ConfigureNotEnabled,
+        workspace_settings.WorkspaceLocked,
+    ):
         # CATCH AND SKIP, because this retry is the platform's own decision and
         # not something anybody asked for (#2116's rule: a requested run gets a
         # 4xx naming the column; a platform-decided one skips). The workspace's

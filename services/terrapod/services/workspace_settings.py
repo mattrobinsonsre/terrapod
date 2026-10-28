@@ -589,6 +589,53 @@ class ConfigureNotEnabled(ValueError):
     """
 
 
+class WorkspaceLocked(ValueError):
+    """Raised when a configure is asked for on a manually locked workspace (#1975).
+
+    The third refusal in this module and a `ValueError` for its siblings'
+    reasons: a bare `except ValueError` still catches it, while the explicit
+    type lets a router answer 4xx and lets the platform's own run creators
+    skip quietly instead of logging an error every cycle.
+    """
+
+
+def refuse_configure_on_locked_workspace(workspace, *, is_configure: bool) -> None:
+    """Refuse a configure asked for on a manually locked workspace (#1975).
+
+    The padlock's operator-facing meaning is "nothing touches this workspace",
+    and a configure changes real hosts -- at least as consequential as the
+    state write the lock already stops. The costs are asymmetric, which is what
+    settled it: over-refusing means an operator unlocks, configures and
+    re-locks, while under-refusing means a fleet changes while somebody
+    believed the workspace frozen, which would discredit the padlock for every
+    other use of it.
+
+    **This is not the only thing standing between a lock and a running
+    playbook, and saying otherwise would overstate it.** `claim_next_run`'s
+    gate already refuses to START a `queued` run -- a plan or a standalone
+    configure alike -- whose workspace is locked, so a configure created here
+    would park rather than execute. What this adds is that the caller is told
+    NOW, at the point of asking, instead of being handed a run that silently
+    never starts; and because `create_run` is the one `Run` constructor on the
+    live path, no caller has to restate the rule to get it.
+
+    A force flag was considered and declined (2026-10-27): it would have to
+    reach the API, the SDK, the provider, MCP and the UI, and a force that
+    exists gets used routinely, which is how it stops being deliberate.
+
+    Only a configure is refused. A plan or apply stays queued behind the lock
+    rather than being rejected, which is the right shape for work an operator
+    can simply wait out -- and changing that would be a behaviour change for
+    every Terraform workspace, which this issue did not ask for.
+    """
+    if is_configure and workspace.locked:
+        raise WorkspaceLocked(
+            "this workspace is locked, so it will not be configured — a configure "
+            "changes real hosts, and the lock means nothing touches this workspace. "
+            "Unlock it to configure."
+        )
+
+
 def require_configure_operation(workspace) -> None:
     """Refuse a configure on a workspace that does not declare one (#1974)."""
     if not workspace.configure_enabled:
