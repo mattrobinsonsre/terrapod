@@ -2883,6 +2883,47 @@ Re-queue the run and confirm it reaches `planning`. The refusal happens while th
 server resolves variables, so it fails fast and the message names the key it
 refused — a run that gets past `init` has the credential it needs.
 
+## A run's logs never appear, and the listener looks healthy
+
+The listener logs `Kubernetes refused a diagnostic read; this will not resolve on
+its own -- check the listener's RBAC and namespace`, at **error**, with the status
+and the Job name. The run itself proceeds — the Job runs, the reconciler drives it
+to a terminal state — but the streaming log view stays empty.
+
+That is a permissions or namespace problem rather than a run problem: the listener
+can create the Job and cannot read the pod. The two are separate RBAC verbs, so a
+Role that grants `batch/jobs` without `pods` and `pods/log` produces exactly this.
+
+**It was silent until #2246.** The read swallowed the API's refusal and returned an
+empty string, which the caller could not tell from "the container has not started
+yet" — so a permanent misconfiguration presented as a pod perpetually starting, and
+nothing was logged at any level. The distinction is now made at the point of
+refusal: `401` and `403` are errors, because no amount of waiting grants a
+permission; `404` and `400` stay at debug, because they are the ordinary shape of a
+pod that does not exist yet or a container still being created.
+
+### What to check
+
+The listener's Role in the namespace its Jobs run in — `listener.runnerNamespace`,
+which is not necessarily the release namespace:
+
+```sh
+kubectl auth can-i --as=system:serviceaccount:<ns>:<listener-sa> get pods/log -n <runner-ns>
+kubectl auth can-i --as=system:serviceaccount:<ns>:<listener-sa> list pods -n <runner-ns>
+```
+
+Both must be `yes`. The chart's own `rbac-listener.yaml` grants them; a deployment
+that supplies its own Role, or sets `namespace.createRunner: false` and creates the
+runner namespace by hand, is where they go missing.
+
+A `404` at debug on the same line needs nothing: the pod has not been created yet,
+or it has already been collected. If logs never arrive and you see only `404`, the
+Job is not producing a pod at all — that is [Listener Offline](#listener-offline)
+or a scheduling problem, not this.
+
+
+---
+
 ## A listener re-join logs an orphaned name and gets a new id
 
 The API logs `listener name maps to a record that no longer exists; registering
