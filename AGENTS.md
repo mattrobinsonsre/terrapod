@@ -92,6 +92,7 @@ Two consequences worth knowing before you write path-matching code:
 | `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*` to the API). | TypeScript / React |
 | `go-terrapod/` | Public, canonical Go SDK for the Terrapod API. Source of truth for the Go-side view of every endpoint. | Go |
 | `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (35 `terrapod_*` resources + 14 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
+| `pulumi-provider/` | The **Pulumi provider for Terrapod**, bridged from `provider/` with `pulumi-terraform-bridge` so the Terraform schema stays the single canonical surface — a resource added there appears in Pulumi with no edit here. Published as a plugin; the per-language SDK is generated on the practitioner's machine with `pulumi package add`. See [`docs/pulumi-provider.md`](docs/pulumi-provider.md). | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed provider/module uploads). | Go |
 | `query/` | `terrapod-query` — tofu-native discovery engine for onboarding existing resources (schema → filtered data-source query → `import {}` blocks; MPL, no BUSL). Standalone CLI + baked into the api/runner images. | Go |
@@ -100,9 +101,14 @@ Two consequences worth knowing before you write path-matching code:
 | `alembic/` | Async Alembic migrations (hash-based revision IDs). | Python |
 | `docs/` | User + operator documentation. | Markdown |
 
-The four Go modules at the repo root (`go-terrapod/`, `provider/`,
-`migrate/`, `publish/`) each have their own `go.mod` so their dependency
-surfaces stay independent.
+The Go modules at the repo root (`go-terrapod/`, `provider/`, `pulumi-provider/`, `migrate/`, `publish/`, `query/`, `mcp/`, `loadtest/`, `ee-agent/`) each have their own `go.mod` so
+their dependency surfaces stay independent — `publish/` carries OpenPGP libraries
+the SDK does not, and `pulumi-provider/` carries the bridge's large tree that the
+deliberately thin Terraform provider should not. They are **named rather than
+counted**: a number in prose has nothing enforcing it, and the two sentences this
+replaced said "four" and "five" while there were eight.
+`scripts/docs-audit/check_go_directives.py` asserts every module in the tree is
+named here, and that they all declare the same `go` directive.
 
 ## Build, lint, and test
 

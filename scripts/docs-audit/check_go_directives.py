@@ -111,7 +111,41 @@ def main() -> int:
         return 1
 
     version = next(iter(found))
-    print(f"OK: all {len(mods)} Go modules declare `go {version}`")
+
+    # Second clause: the prose that LISTS the modules lists all of them.
+    #
+    # `AGENTS.md` and `llms.txt` both name the modules rather than counting
+    # them, because a number in prose has nothing enforcing it -- and both were
+    # wrong when this was written, saying "four" and "five" against eight. Named
+    # is better only if the naming is checked, so this is what makes it so. For
+    # `llms.txt` especially: an agent reading an incomplete map cannot tell that
+    # a module is missing, which is the inverse of that file's own no-hallucinated-
+    # entries rule and just as misleading.
+    listing = [pathlib.Path("AGENTS.md"), pathlib.Path("llms.txt")]
+    names = sorted(str(p.parent.relative_to(root)) for p in mods)
+    unnamed: list[str] = []
+    for doc in listing:
+        if not doc.is_file():
+            print(f"FAIL: {doc} is missing", file=sys.stderr)
+            return 1
+        text = doc.read_text(errors="replace")
+        for name in names:
+            if f"`{name}/`" not in text:
+                unnamed.append(f"{doc}: does not name `{name}/`")
+
+    if unnamed:
+        print(
+            "FAIL: a document that lists the Go modules has left one out. Both files name "
+            "them instead of counting them, so the list IS the claim -- and an agent reading "
+            "an incomplete one cannot tell.\n",
+            file=sys.stderr,
+        )
+        for u in unnamed:
+            print(f"  {u}", file=sys.stderr)
+        return 1
+
+    print(f"OK: all {len(mods)} Go modules declare `go {version}`, and both "
+          f"AGENTS.md and llms.txt name every one")
     return 0
 
 
