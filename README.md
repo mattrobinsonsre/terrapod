@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/mattrobinsonsre/terrapod?sort=semver&label=release)](https://github.com/mattrobinsonsre/terrapod/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/mattrobinsonsre/terrapod?sort=semver&include_prereleases&label=release)](https://github.com/mattrobinsonsre/terrapod/releases/latest)
 
 **A free, open-source, self-hosted alternative to Terraform Enterprise and Terraform Cloud (HCP Terraform)** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. Not a fork of either engine; it orchestrates them.
 

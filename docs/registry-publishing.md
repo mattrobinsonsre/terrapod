@@ -429,6 +429,12 @@ jobs:
           rm -f signing-key.asc
 ```
 
+> `releases/latest` follows the repository's **Latest** badge, and a Terrapod
+> pre-release holds that badge while it is the newest version published — so
+> during an alpha or release-candidate period this downloads the pre-release
+> build. For CI you depend on, pin the tag instead:
+> `.../releases/download/v1.11.2/terrapod-publish_linux_amd64.tar.gz`.
+
 The token and signing material come from repository/organization secrets.
 The signing **public** key was registered with Terrapod once, ahead of
 time (prerequisite 1); CI only ever holds the private key transiently.
