@@ -11,6 +11,8 @@ package main
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"os"
 
 	pftfbridge "github.com/pulumi/pulumi-terraform-bridge/v3/pkg/pf/tfbridge"
 
@@ -30,10 +32,24 @@ var schema []byte
 var version = terrapod.SourceBuildVersion
 
 func main() {
+	// The embedded schema carries no version -- tfgen clears it deliberately, and
+	// the plugin-framework server serves these bytes verbatim, so this is the only
+	// place it can come from. Without it `pulumi package add` cannot generate an
+	// SDK in any language (#2267). See `SchemaWithVersion` for the whole account.
+	versioned, err := terrapod.SchemaWithVersion(schema, version)
+	if err != nil {
+		// Fatal rather than serving the schema unversioned. A plugin that starts
+		// and then cannot generate an SDK is the failure this replaced: it looks
+		// healthy, answers `--version`, and fails at the practitioner's first
+		// command with an error about a schema they did not write.
+		fmt.Fprintf(os.Stderr, "pulumi-resource-terrapod: %v\n", err)
+		os.Exit(1)
+	}
+
 	pftfbridge.Main(
 		context.Background(),
 		terrapod.Namespace,
 		terrapod.Provider(version),
-		pftfbridge.ProviderMetadata{PackageSchema: schema},
+		pftfbridge.ProviderMetadata{PackageSchema: versioned},
 	)
 }

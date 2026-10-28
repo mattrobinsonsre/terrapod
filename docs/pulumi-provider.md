@@ -4,6 +4,13 @@ Manage Terrapod itself from a Pulumi program — the same objects the
 [Terraform provider](terraform-provider.md) manages, reached from TypeScript,
 Python, Go or C#.
 
+> **Verified so far:** SDK generation and a compiling resource declaration in
+> **TypeScript**, and SDK generation in **Go**. The generated Go SDK does not
+> yet compile — a name collision in it is tracked separately — and Python and
+> C# have had generation exercised only through the same code path, which is
+> language-independent. Treat anything beyond TypeScript as untested until that
+> is closed out.
+
 It exists because of one concrete gap. A workspace's Ansible inventory is
 [declared from the IaC program that provisions the hosts](ansible-inventory.md),
 as `terrapod_inventory_*` resources. Those are provider resources, so without a
@@ -35,19 +42,38 @@ not written separately. Two consequences, and the second is a real trade:
 Pulumi generates the SDK **on your machine** from the plugin, rather than you
 installing a published package from npm, PyPI or NuGet:
 
+Download the plugin for your platform from a
+[release](https://github.com/mattrobinsonsre/terrapod/releases) and point
+`pulumi package add` at the binary:
+
 ```sh
-pulumi package add pulumi-resource-terrapod
+tar -xzf pulumi-resource-terrapod-vX.Y.Z-<os>-<arch>.tar.gz
+pulumi package add ./pulumi-resource-terrapod
 ```
 
-That downloads the plugin and generates an SDK in the language your project
-uses. Needs Pulumi 3.200.0 or later. The generated `sdk/` directory can be
-committed — useful for a component others consume — or regenerated later with
-`pulumi install`.
+Pulumi extracts the package schema from the binary, generates an SDK in the
+language your project uses, and prints the import line for it. Needs Pulumi
+3.200.0 or later.
 
-This is Pulumi's own recommended path for a provider that is not in its public
-registry, and it is why nothing is published to npm, PyPI or NuGet: the plugin
-is the only artifact, which is also what keeps the restricted-network story
-below simple.
+**It has to be a path, not a name**, and this is the one thing most likely to
+trip you up. `pulumi package add terrapod` resolves the *package* through
+Pulumi's public registry, and this provider is deliberately not in it. Measured
+on Pulumi 3.272.0: the name form fails with `unable to resolve: package terrapod
+not found`, `pulumi plugin install resource terrapod` fails the same way, and
+`PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES` does not change either — that variable
+governs where an already-resolved plugin's binary is fetched from, not package
+discovery.
+
+**Commit the generated SDK directory.** `pulumi package add` records
+`terrapod: terrapod@X.Y.Z` under `packages:` in `Pulumi.yaml` — a registry
+reference — so `pulumi install` on a fresh clone fails to resolve it and cannot
+regenerate the SDK. Either commit the generated directory, which is the simpler
+answer and useful anyway for a component others consume, or re-run
+`pulumi package add ./pulumi-resource-terrapod` after cloning.
+
+Generating locally is Pulumi's own recommended path for a provider outside its
+public registry, and it is why nothing is published to npm, PyPI or NuGet: the
+plugin is the only artifact.
 
 ### 2. Configure it — or don't, inside a run
 
@@ -69,17 +95,18 @@ to you — supplying one and inheriting the other would send the run's own token
 to a host the workspace chose. See
 [cloud identity](cloud-identity.md) for the same pattern on the Terraform side.
 
-**Outside a run** — a practitioner on a laptop — set them yourself, and point
-Pulumi's plugin resolution at your instance:
+**Outside a run** — a practitioner on a laptop — set them yourself:
 
 ```sh
 export TERRAPOD_HOSTNAME=terrapod.example.com
 export TERRAPOD_TOKEN=…
-export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES='pulumi-resource-terrapod=https://terrapod.example.com/api/v1/package-cache/pulumi/'
 ```
 
-That is the same step you already take to install the Terraform provider from
-your own instance rather than from the public registry.
+`PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES` is deliberately **not** part of this.
+It governs plugin downloads *during a run* — which is how an agent run fetches
+provider plugins through the instance's own cache, described below — and it does
+not make `pulumi package add` resolve a package that is not in Pulumi's
+registry. On a laptop, obtain the plugin as a file, per step 1 above.
 
 ### 3. Declare the inventory for what you just provisioned
 
