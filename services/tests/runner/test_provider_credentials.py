@@ -15,6 +15,7 @@ other -- which is why the two are decided together.
 
 from __future__ import annotations
 
+import pathlib
 from types import SimpleNamespace
 
 from terrapod.runner.phases import provider_credentials as pc
@@ -178,12 +179,86 @@ class TestTheEngineGate:
     environment, so anything the Terrapod provider reads, every provider reads.
 
     What is avoidable is handing it to an engine with no resource to use it.
-    `terrapod_inventory_item` is a Terraform resource; Pulumi has no equivalent
-    (#1987), so a Pulumi run would get all of the exposure and none of the use.
+
+    **Pulumi was excluded on exactly that ground and is now admitted (#1987).**
+    The half of the old reasoning that still holds is the cost side, quoted
+    above: the export is not scrubbed and every provider in the configuration
+    can read it. What changed is the benefit side -- a Pulumi program reaches
+    the same `terrapod_inventory_*` resources through the bridged provider, so
+    it is no longer paying exposure for nothing. The old test asserting the
+    refusal is inverted below rather than deleted, because the refusal was
+    correct when written.
     """
 
-    def test_a_pulumi_run_gets_nothing(self):
-        assert pc.export_env(_cfg(), env={}, engine="pulumi") == {}
+    def test_a_pulumi_run_now_gets_it(self):
+        """Inverted by #1987. Before the bridged provider existed this asserted
+        `== {}`, correctly: there was no Pulumi resource to spend the credential
+        on. A Pulumi workspace that cannot authenticate cannot declare the
+        inventory for hosts it just provisioned, which is the second-class
+        outcome #1987 exists to remove."""
+        out = pc.export_env(_cfg(), env={}, engine="pulumi")
+        assert out[pc.HOSTNAME_VAR] == "http://terrapod-api:8000"
+        assert out[pc.TOKEN_VAR] == "runtok:abc"
+
+    def test_the_deference_rule_still_binds_on_a_PULUMI_run(self):
+        """The one security property of this phase, asserted for the newly
+        admitted engine rather than assumed to carry over.
+
+        It is engine-independent by construction -- it rests on `reserved_env`
+        reserving only the `TP_` prefix and Kubernetes giving the last duplicate
+        env entry precedence, neither of which involves the engine -- so this
+        test exists to pin that rather than to discover it. Supplying one of the
+        pair and deferring the other would send this run's token to a host the
+        workspace chose, and that is as true under Pulumi as under Terraform.
+        """
+        # A CONTRAST, deliberately. Asserting only `== {}` would pass just as
+        # well if `pulumi` were absent from SUPPORTED_ENGINES -- the refusal
+        # returns `{}` too -- so the empty result alone cannot tell deference
+        # from exclusion. The first assertion is what makes the rest mean
+        # deference.
+        assert pc.export_env(_cfg(), env={}, engine="pulumi") != {}, "engine must be admitted"
+        for supplied in (pc.HOSTNAME_VAR, pc.TOKEN_VAR):
+            assert pc.export_env(_cfg(), env={supplied: "x"}, engine="pulumi") == {}, supplied
+
+    def test_the_set_is_EXACTLY_this_membership(self):
+        """A floor is not enough for a membership set: a gate that iterates one
+        also passes when the set is widened, and widening is the dangerous
+        direction here -- it hands a credential to an engine nobody asked the
+        question about. So the membership is pinned exactly, and adding an
+        engine means editing this line on purpose."""
+        assert pc.SUPPORTED_ENGINES == frozenset({"", "terraform", "tofu", "opentofu", "pulumi"})
+
+    def test_every_engine_IN_THE_TREE_has_been_decided_about(self):
+        """Derived, because the gate's whole value is that admission is opt-in
+        and NOTHING previously detected a new engine arriving.
+
+        Both engines that exist are now admitted, so the refusal branch is
+        unreachable for any real engine -- which means a third engine module
+        could appear and its author would never meet the question the gate
+        exists to force. This fails when that happens.
+
+        **A failure here is not a bug in the gate.** It means a new engine
+        exists and somebody must decide whether its providers can consume these
+        credentials: add it to SUPPORTED_ENGINES and to the exact-membership
+        test above if they can, and add it to the exempt set here with a reason
+        if they cannot.
+        """
+        import terrapod.engines
+
+        pkg = pathlib.Path(terrapod.engines.__file__).parent
+        found = {p.stem for p in pkg.glob("*.py") if not p.stem.startswith("_")}
+        assert len(found) >= 2, f"only found {found} -- the matcher has stopped matching"
+
+        #: An engine deliberately refused the credentials, with the reason.
+        #: Empty today: both engines reach the Terrapod provider.
+        refused_on_purpose: dict[str, str] = {}
+
+        undecided = found - pc.SUPPORTED_ENGINES - set(refused_on_purpose)
+        assert not undecided, (
+            f"engine(s) {sorted(undecided)} exist in the tree and are in neither "
+            "SUPPORTED_ENGINES nor the refused-on-purpose set, so nobody has decided "
+            "whether they may consume the run's Terrapod token -- see this test's docstring"
+        )
 
     def test_terraform_and_opentofu_both_get_it(self):
         for engine in ("terraform", "tofu", "opentofu"):

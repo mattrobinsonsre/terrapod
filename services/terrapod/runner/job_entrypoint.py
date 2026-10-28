@@ -702,8 +702,9 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     is_pulumi = engine == "pulumi"
 
     # 4a. Let the Terrapod provider authenticate from inside the run, so a
-    # workspace can declare its inventory with `terrapod_inventory_item` and an
-    # empty `provider "terrapod" {}` block (#1968). Exported here rather than in
+    # workspace can declare its inventory with the `terrapod_inventory_*`
+    # resources and an empty `provider "terrapod" {}` block (#1968) -- on a
+    # Pulumi run too, through the bridged provider (#1987). Exported here rather than in
     # the Job spec because only `TP_`-prefixed names are reserved, so a
     # workspace variable could otherwise redirect the provider's host while the
     # spec still supplied the real token -- see the module docstring.
@@ -712,7 +713,8 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # because the export is engine-gated: `exec_subprocess` scrubs the `TP_`
     # prefix and not these names, so the token does reach every provider plugin
     # the configuration loads, and an engine that cannot use it should not be
-    # handed it.
+    # handed it. Both engines that exist can, so the gate admits both; it stays
+    # because adding a third has to be a decision rather than a default.
     for k, v in provider_credentials.export_env(cfg, env=os.environ, engine=engine).items():
         os.environ[k] = v
 

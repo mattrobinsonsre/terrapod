@@ -63,13 +63,20 @@ environment, so anything the Terrapod provider can read, every other provider in
 the configuration can read too. A narrower credential is the real answer and is
 not built yet.
 
-What IS avoidable is exporting it where it cannot possibly be used. The eight
-`terrapod_inventory_*` resources are **Terraform** resources; a Pulumi program
-has no equivalent today (#1987), so a Pulumi run gets the exposure and none of
-the benefit. So the export is gated on the engine, and a new engine has to opt
-in here rather than inheriting it by default -- which is why #1987 must add
-`pulumi` to SUPPORTED_ENGINES and rewrite this paragraph rather than leaving it
-asserting the opposite.
+What IS avoidable is exporting it where it cannot possibly be used, and that is
+what the engine gate is for. **Pulumi is now in it (#1987).** A Pulumi program
+declares the same Terrapod resources through the bridged Pulumi provider, so the
+exposure above buys it exactly what it buys a Terraform run, and withholding the
+credential would leave a Pulumi workspace unable to declare the inventory for
+the hosts it had just provisioned -- the second-class outcome #1987 exists to
+remove.
+
+So the gate now admits every engine that exists (`terraform.py` and `pulumi.py`
+are the only two). It is kept rather than deleted because the property it
+encodes is **opt-in**: a future engine must be added here deliberately, after
+someone has asked whether its providers can use these credentials at all. A
+deleted gate would hand them over by default, which is the decision this one
+exists to force.
 """
 
 from __future__ import annotations
@@ -99,10 +106,13 @@ logger = structlog.get_logger("runner.phase.provider_credentials")
 
 
 #: The engines whose providers can consume these credentials. Terraform and
-#: OpenTofu share one provider protocol and one resource; anything else has to
-#: be added deliberately, because the cost of exporting a credential an engine
-#: cannot use is all exposure and no benefit.
-SUPPORTED_ENGINES = frozenset({"", "terraform", "tofu", "opentofu"})
+#: OpenTofu share one provider protocol and one resource; Pulumi reaches the
+#: same resources through the bridged provider (#1987), which is why it is here
+#: rather than excluded. Anything else has to be added deliberately, because the
+#: cost of exporting a credential an engine cannot use is all exposure and no
+#: benefit -- and that opt-in is the whole point of the set, so a new engine
+#: appearing in the tree must not be added without asking the question.
+SUPPORTED_ENGINES = frozenset({"", "terraform", "tofu", "opentofu", "pulumi"})
 
 
 def export_env(cfg, env: dict[str, str] | None = None, *, engine: str = "") -> dict[str, str]:
@@ -128,9 +138,9 @@ def export_env(cfg, env: dict[str, str] | None = None, *, engine: str = "") -> d
             "provider credentials not exported",
             engine=engine,
             reason=(
-                "the Terrapod provider's inventory resource is a Terraform resource and "
-                "this engine has no equivalent, so exporting the run's token into its "
-                "environment would be exposure with no use for it."
+                "this engine is not known to consume the Terrapod provider's credentials, "
+                "so exporting the run's token into its environment would be exposure with "
+                "no use for it. Add it to SUPPORTED_ENGINES deliberately if it can."
             ),
         )
         return {}
