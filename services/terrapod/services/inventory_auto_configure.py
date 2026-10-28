@@ -132,7 +132,11 @@ async def _create_run(db: AsyncSession, ws: Workspace) -> Run | None:
         # includes `pending`, every later cycle then saw a configure "already on
         # its way" and skipped. One dead run per workspace, then nothing at all.
         return await run_service.queue_run(db, run)
-    except (run_service.PlanApplyNotEnabled, workspace_settings.ConfigureNotEnabled):
+    except (
+        run_service.PlanApplyNotEnabled,
+        workspace_settings.ConfigureNotEnabled,
+        workspace_settings.WorkspaceLocked,
+    ):
         # A run the PLATFORM decided on, so the refusal is caught and skipped
         # rather than raised: erroring once per cycle about a workspace behaving
         # exactly as it declares is noise, which is the #2116 contract's own

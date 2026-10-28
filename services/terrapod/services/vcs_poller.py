@@ -707,6 +707,7 @@ async def _create_vcs_run(
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
+        workspace_settings.WorkspaceLocked,
     ) as exc:
         # The platform decided on this run, so there is nobody to tell: skip
         # quietly rather than logging an error once per poll cycle about a

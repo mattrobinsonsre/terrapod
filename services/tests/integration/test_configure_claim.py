@@ -334,3 +334,98 @@ class TestTheConfigureCompletesTheRun:
             )
             assert outcome.action == "complete_configure", type(strategy).__name__
             assert outcome.phase == "configure", type(strategy).__name__
+
+
+class TestAConfigureAndAnApplyDoNotRunTogether:
+    """#1975: the workspace's single mutating slot covers a configure too.
+
+    **Both directions are seeded, because neither alone establishes the
+    property.** A fixture that only checks "a configure waits for an apply"
+    passes whether or not `configuring` is in the in-flight set -- that
+    direction already held, since a standalone configure is `queued` with
+    `plan_only` refused on it, so it already met the gate. The direction that
+    was silently broken is the converse, and it is only visible when a run is
+    actually sitting in `configuring`.
+
+    Each blocked case carries a positive control. Without one the test would
+    pass if nothing were ever claimable, which is the failure mode that makes a
+    green contention test worthless.
+    """
+
+    async def test_an_apply_capable_run_waits_for_an_in_flight_configure(self, app):
+        """The half #1975 fixed. A configure mutates real hosts for as long as
+        the playbook runs; an apply must not start underneath one."""
+        ws, pool, cv = await _seed("slot-apply-waits")
+        configure = await _queue(ws.id, cv.id, is_configure=True, path=("queued", "configuring"))
+        assert configure.status == "configuring"
+
+        await _queue(ws.id, cv.id, is_configure=False, plan_only=False)
+
+        claimed = await _claim(pool.id)
+        assert claimed is None, (
+            f"claimed {claimed} while a configure was in flight on the "
+            "same workspace — an apply would start against hosts a playbook is "
+            "part-way through changing."
+        )
+
+    async def test_the_control_that_run_IS_claimable_once_the_configure_ends(self, app):
+        """The positive control for the case above.
+
+        Without it, that test passes if the run were unclaimable for any
+        unrelated reason -- a wrong pool, a missing configuration version, a
+        gate nobody noticed.
+        """
+        ws, pool, cv = await _seed("slot-apply-control")
+        configure = await _queue(ws.id, cv.id, is_configure=True, path=("queued", "configuring"))
+        plan = await _queue(ws.id, cv.id, is_configure=False, plan_only=False)
+
+        async with get_db_session() as db:
+            row = (await db.execute(select(Run).where(Run.id == configure.id))).scalar_one()
+            await run_service.transition_run(db, row, "applied")
+            await db.commit()
+
+        claim = await _claim(pool.id)
+        assert claim is not None, (
+            "with the configure finished the apply-capable run must be claimable; if it "
+            "is not, the blocked assertion above proves nothing."
+        )
+        claimed, _phase = claim
+        assert claimed.id == plan.id
+
+    async def test_a_configure_waits_for_an_in_flight_apply(self, app):
+        """The direction that already held, seeded so the pair is a contrast.
+
+        Kept rather than trimmed: it is what makes the set a RELATIONSHIP test.
+        Dropping it would leave a suite that cannot tell "both serialise" from
+        "configures never run".
+        """
+        ws, pool, cv = await _seed("slot-configure-waits")
+        applying = await _queue(
+            ws.id,
+            cv.id,
+            is_configure=False,
+            plan_only=False,
+            path=("queued", "planning", "planned", "confirmed", "applying"),
+        )
+        assert applying.status == "applying"
+
+        await _queue(ws.id, cv.id, is_configure=True)
+
+        claimed = await _claim(pool.id)
+        assert claimed is None, (
+            f"claimed {claimed} while an apply was in flight — a "
+            "configure would target half-applied infrastructure, and a half-written "
+            "inventory with it."
+        )
+
+    async def test_the_control_that_a_configure_IS_claimable_on_a_free_workspace(self, app):
+        ws, pool, cv = await _seed("slot-configure-control")
+        configure = await _queue(ws.id, cv.id, is_configure=True)
+
+        claim = await _claim(pool.id)
+        assert claim is not None, (
+            "a configure on an idle workspace must be claimable; if it is not, the "
+            "blocked assertion above proves nothing."
+        )
+        claimed, phase = claim
+        assert (claimed.id, phase) == (configure.id, "configure")

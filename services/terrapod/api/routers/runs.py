@@ -966,6 +966,14 @@ async def create_run(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+    except workspace_settings.WorkspaceLocked as exc:
+        # 409 rather than the 422 its siblings get, and the difference is the
+        # point: the request is perfectly well formed and would succeed the
+        # moment the padlock came off, so this is a conflict with the
+        # workspace's current STATE rather than something unprocessable about
+        # what was asked. It also matches what a lock conflict already answers
+        # on the TFE surface, so one concept has one status code.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
@@ -1528,6 +1536,14 @@ async def retry_run(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+    except workspace_settings.WorkspaceLocked as exc:
+        # 409 rather than the 422 its siblings get, and the difference is the
+        # point: the request is perfectly well formed and would succeed the
+        # moment the padlock came off, so this is a conflict with the
+        # workspace's current STATE rather than something unprocessable about
+        # what was asked. It also matches what a lock conflict already answers
+        # on the TFE surface, so one concept has one status code.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,

@@ -1299,7 +1299,16 @@ class TestSavedPlanRuns:
         resp = await client.post(f"/api/v2/runs/{saved['id']}/actions/apply", headers=AUTH)
         assert resp.status_code == 409, resp.text
         detail = resp.json()["detail"]
-        assert "awaiting confirmation" in detail or "applying" in detail, detail
+        # Assert the blocking run's OWN status, not a phrase enumerating the
+        # statuses that block. This assertion used to read "applying or
+        # awaiting confirmation", which was already wrong when it was written --
+        # the slot set held `planning` and `canceling` too, so it named two of
+        # five -- and #1975 adding `configuring` is what finally broke it. The
+        # message interpolates the real status, so reading that survives the set
+        # moving again and says more than the prose did.
+        blocking = (await _get_run(client, ordinary["id"]))["attributes"]["status"]
+        assert blocking in detail, detail
+        assert "in flight" in detail, detail
         assert ordinary["id"].removeprefix("run-")[:8] in detail, (
             f"the refusal should name the run in the way, got: {detail}"
         )

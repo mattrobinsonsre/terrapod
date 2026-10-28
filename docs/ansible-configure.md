@@ -182,6 +182,48 @@ autodiscovery rule, so a fleet can declare it once.
 It **widens**, deliberately: a flag someone forgets leaves them configuring
 more, not less.
 
+## One mutating run at a time, per workspace
+
+A workspace runs **one** mutating run at a time, and a configure counts. A
+configure waits for an in-flight plan or apply on the same workspace, and an
+apply waits for an in-flight configure. The second half matters more than it
+sounds: a configure changes real hosts for as long as the playbook runs, so an
+apply starting underneath one would be working on infrastructure a playbook is
+part-way through reconfiguring — and against the inventory it is reading.
+
+This is the same single-slot rule Terraform runs have always followed, extended
+to cover configures rather than a second mechanism. Plan-only runs — a
+speculative pull-request plan, a drift check, a CLI `plan` — never mutate
+anything, so they are exempt and keep running concurrently.
+
+**The cost is real and accepted: a configure can run for hours, so it blocks
+applies for hours.** The release valve is cancellation — a configure can be
+cancelled while queued or while running — and the escape hatch for genuine
+concurrency is separate workspaces, exactly as it is for two Terraform
+workspaces over one cloud account.
+
+A configure held this way sits `queued` until the workspace frees up. It shows
+no "blocked by" reason, and that is deliberate rather than missing: that field
+names the **gate** that decided to hold a run — a run task, a policy set, a
+security scan, an AI policy verdict — and waiting for your turn is a queue
+position rather than a gate's decision. A queued plan behaves the same way.
+
+### A locked workspace refuses a configure outright
+
+Locking a workspace means nothing touches it, and a configure changes real hosts
+— at least as consequential as the state write the lock already stops. So a
+configure asked for on a locked workspace is **refused** (`409`) rather than
+queued, and the refusal says the workspace is locked, because unlocking is the
+way out.
+
+A plan or apply is **not** refused this way: it queues behind the lock and runs
+when the lock comes off, which is right for work you can simply wait out.
+
+There is no force flag, deliberately. One would have to reach the API, the SDK,
+the provider, the MCP server and the UI — and a force that exists gets used
+routinely, which is how it stops being a deliberate act. Unlock the workspace,
+configure it, lock it again.
+
 ## A destroy never configures
 
 An apply that is tearing infrastructure down is never followed by a configure,

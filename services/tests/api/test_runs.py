@@ -160,6 +160,11 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     # #2116: explicit rather than relying on a truthy MagicMock, so that a test
     # setting it False is making a visible choice and not fighting the fixture.
     ws.plan_apply_enabled = True
+    # #1975, same reasoning again: a truthy MagicMock here reads as a manually
+    # LOCKED workspace, and `create_run` refuses a configure on one. Every
+    # configure built on this fixture would be refused for a reason no test
+    # asked for.
+    ws.locked = False
     # #1974, and for the same reason plus a sharper one: truthy
     # `configure_after_apply` would make every run on this fixture a COMPOSITE,
     # so the route would gate it as a configure and `create_run` would resolve
@@ -2813,3 +2818,115 @@ class TestRetryOnlyOutstandingHosts:
         assert resp.status_code == 201
         assert mock_create.await_args.kwargs["ansible_limit"] == "web1:web2:web3"
         mock_outstanding.assert_not_called()
+
+
+class TestALockedWorkspaceRefusesAConfigureOnTheRoute:
+    """The manual padlock refuses a configure at the chokepoint (#1975).
+
+    Driven as a REQUEST with the real `create_run`, for the reason the sibling
+    class above gives: the fix is "the chokepoint refuses and the route
+    translates", and only a request exercises both halves.
+
+    The assertion is on the DETAIL as well as the status, because a status-only
+    assertion would pass for an unrelated conflict.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.run_service.ha_role.ensure_leader", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_configure_on_a_locked_workspace_is_refused_with_409(
+        self, mock_resolve, _leader, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.configure_enabled = True
+        ws.locked = True
+        # `create_run` reads the configuration version with `db.get`, and on an
+        # AsyncMock that returns a mock whose `speculative` is TRUTHY -- so the
+        # configure is refused as speculative (422) before the lock is reached,
+        # which would read as this test failing for its own reason.
+        cv = MagicMock()
+        cv.speculative = False
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.get.return_value = cv
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"is-configure": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 409, (
+            f"expected 409 for a locked workspace, got {resp.status_code} "
+            f"({resp.text}). A lock is a conflict with the workspace's current "
+            "state, not an unprocessable request."
+        )
+        detail = resp.json()["errors"][0]["detail"]
+        assert "locked" in detail.lower(), (
+            f"409 for the wrong reason — got {detail!r}. The refusal has to say the "
+            "workspace is locked, because unlocking is the operator's way out."
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_PLAN_on_a_locked_workspace_is_NOT_refused_here(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """The contrast, and the half that would be a regression if it broke.
+
+        A plan or apply on a locked workspace is held at DISPATCH, queued until
+        the lock comes off -- the right shape for work an operator can wait out.
+        Refusing it here instead would be a behaviour change for every Terraform
+        workspace, which #1975 did not ask for.
+        """
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.locked = True
+
+        run = _mock_run()
+        run.workspace_id = ws.id
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code != 409, (
+            "a plan on a locked workspace must not be refused at create -- it is "
+            "held at dispatch instead, and refusing here would change behaviour for "
+            "every Terraform workspace."
+        )
