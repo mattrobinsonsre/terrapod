@@ -326,6 +326,7 @@
   "registry.package_cache.nuget.enabled",
   "registry.package_cache.nuget.upstream",
   "registry.package_cache.pulumi.enabled",
+  "registry.package_cache.pulumi.first_party_url",
   "registry.package_cache.pulumi.upstream",
   "registry.package_cache.pypi.enabled",
   "registry.package_cache.pypi.upstream",

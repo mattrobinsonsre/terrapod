@@ -1483,6 +1483,30 @@ class PackageEcosystemConfig(BaseModel):
     )
 
 
+class PulumiPluginCacheConfig(PackageEcosystemConfig):
+    """The Pulumi plugin proxy, which has one upstream more than the others.
+
+    Every other ecosystem pulls through to exactly one registry, because the
+    client names a package and Terrapod decides where packages come from. The
+    Pulumi plugin proxy has a second case: **Terrapod publishes a Pulumi plugin
+    of its own** (#1987), and it is not published where Pulumi's are.
+
+    This is a subclass rather than a field on `PackageEcosystemConfig` so the key
+    does not appear on the five ecosystems it means nothing for.
+    """
+
+    first_party_url: str = Field(
+        default="https://github.com/mattrobinsonsre/terrapod/releases/download",
+        description="Download base for Terrapod's OWN Pulumi provider plugin. Assets "
+        "are named `v{version}/pulumi-resource-terrapod-v{version}-{os}-{arch}.tar.gz`, "
+        "so the version is a path segment because a GitHub release asset lives under "
+        "its tag. Separate from `upstream` deliberately: that one is where PULUMI's "
+        "plugins come from, and pointing it here to reach ours would send every other "
+        "plugin to a host that does not have it. Point this at an internal mirror for a "
+        "restricted-network install, the same way the other mirror URLs work.",
+    )
+
+
 class PackageCacheConfig(BaseModel):
     """Pull-through caching for language package registries (#1417).
 
@@ -1508,8 +1532,8 @@ class PackageCacheConfig(BaseModel):
         description="npm registry (packuments and tarballs). Serves Pulumi TypeScript "
         "and JavaScript programs.",
     )
-    pulumi: PackageEcosystemConfig = Field(
-        default_factory=lambda: PackageEcosystemConfig(
+    pulumi: PulumiPluginCacheConfig = Field(
+        default_factory=lambda: PulumiPluginCacheConfig(
             upstream="https://get.pulumi.com/releases/plugins"
         ),
         description="Pulumi resource and language plugins. Point the CLI at it with "

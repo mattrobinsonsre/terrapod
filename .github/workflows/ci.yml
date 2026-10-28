@@ -250,6 +250,21 @@ jobs:
       - name: (docs-audit) A machine credential's key is described with its mechanism
         run: python3 scripts/docs-audit/check_credential_key_prose.py
 
+      # The `go-modules` job below reads its toolchain from ONE module's
+      # directive, and its own comment said the modules "are kept in step by
+      # `check_go_directives.py`" for years before that script existed. Nine
+      # modules happened to agree, so the claim was true by luck. Stdlib only.
+      - name: (docs-audit) Every Go module declares the same toolchain
+        run: python3 scripts/docs-audit/check_go_directives.py
+
+      # Needs only PyYAML, installed above: the parser's regex is extracted from
+      # `pulumi_plugins.py` by `ast` rather than imported, because importing it
+      # drags in `settings` and so SQLAlchemy and the rest of the API closure --
+      # which this job does not install, and which is exactly how the first
+      # version of this step failed in CI while passing locally.
+      - name: (docs-audit) The Pulumi plugin name the cache parses is the one published
+        run: python3 scripts/docs-audit/check_pulumi_plugin_naming.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
@@ -286,6 +301,7 @@ jobs:
         env:
           PYTHONPATH: services
         run: python3 scripts/check-platform-tool-artifacts.py
+
 
   # ── Helm Lint ──────────────────────────────────────────
       - run: pip install pyyaml ijson pytest
@@ -399,6 +415,7 @@ jobs:
             query/go.sum
             mcp/go.sum
             ee-agent/go.sum
+            pulumi-provider/go.sum
 
   # ── go-terrapod Lint ──────────────────────────────────
   # The public Go SDK lives in go-terrapod/ with its own go.mod (no
@@ -450,6 +467,38 @@ jobs:
       - name: (provider-test) Test
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: provider
+
+  # ── Pulumi Provider Lint ──────────────────────────────
+  # The bridged Pulumi provider lives in pulumi-provider/ with its own go.mod,
+  # deliberately: `pulumi-terraform-bridge` pulls in a large dependency tree and
+  # the Terraform provider above is meant to stay thin. It sits here rather than
+  # at the end because it is derived from that provider -- a resource added
+  # there appears in Pulumi with no edit, which `schema_test.go` enforces by
+  # counting rather than trusting.
+
+      - name: (pulumi-provider-lint) Vet
+        run: go vet ./...
+        working-directory: pulumi-provider
+
+      - name: (pulumi-provider-lint) Build
+        run: go build ./...
+        working-directory: pulumi-provider
+
+      - name: (pulumi-provider-lint) golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
+          working-directory: pulumi-provider
+          args: --config=../.golangci.yml
+
+  # ── Pulumi Provider Test ──────────────────────────────
+  # These tests read the COMMITTED `schema.json`, so they fail when it is stale
+  # against the Terraform provider -- which is the whole contract. Regenerate
+  # with `go run ./cmd/pulumi-tfgen-terrapod schema --out cmd/pulumi-resource-terrapod`.
+
+      - name: (pulumi-provider-test) Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: pulumi-provider
 
   # ── Migrate Lint ──────────────────────────────────────
   # The terrapod-migrate binary lives in migrate/ with its own go.mod
@@ -4468,6 +4517,88 @@ jobs:
           path: dist/
           retention-days: 1
 
+  release-pulumi-provider:
+    name: Release — Pulumi Provider (GoReleaser)
+    # The bridged Pulumi provider's plugin binary (#1987). Parallel with the
+    # other goreleaser jobs -- pulumi-provider/.goreleaser.yml is
+    # release.mode=append, so all of them upload to the one Release that
+    # release-create made.
+    #
+    # It publishes the PLUGIN only. No SDK goes to npm, PyPI or NuGet: Pulumi's
+    # own documented path is a locally generated SDK (`pulumi package add`
+    # downloads the plugin and generates it in the user's language), so the
+    # plugin is the whole artifact. That is also what makes the air-gapped story
+    # work -- one tarball, through the cache proxy that already exists.
+    needs: [prepare, release-create]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-create.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: pulumi-provider/go.mod
+          cache-dependency-path: pulumi-provider/go.sum
+
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin tarballs with GoReleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
+        with:
+          distribution: goreleaser
+          version: latest
+          # See release-provider — same parallelism rationale.
+          args: release --clean --parallelism 6
+          workdir: pulumi-provider
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
+
+      # The archive name is a PROTOCOL: `pulumi_plugins.py` parses it on the way
+      # back in, so a cosmetic change to the template silently breaks every
+      # plugin download through the cache -- and the failure would surface to an
+      # operator as a 404 from their own instance. Asserted against the
+      # PUBLISHED assets rather than against the template, because the template
+      # is the thing that would have changed.
+      - name: The published tarballs carry the name the cache parses
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ALREADY carries the `v`: prepare sets it to `${GITHUB_REF#refs/tags/}`,
+          # which strips only the ref prefix. So it is `v1.2.3`, which is both the
+          # Release name and exactly the form the plugin filename wants -- while
+          # GoReleaser's own `{{ .Version }}` strips the `v`, which is why the
+          # archive template in .goreleaser.yml spells it back in.
+          TAG: ${{ needs.prepare.outputs.version }}
+        run: |
+          names=$(gh release view "${TAG}" --repo "${{ github.repository }}" --json assets -q '.assets[].name')
+          missing=0
+          for plat in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 windows-arm64; do
+            want="pulumi-resource-terrapod-${TAG}-${plat}.tar.gz"
+            if ! printf '%s\n' "$names" | grep -qx "$want"; then
+              echo "MISSING: $want"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::$missing plugin tarball(s) absent or misnamed. The name is parsed by"
+            echo "::error::services/terrapod/services/package_cache/pulumi_plugins.py -- a plugin"
+            echo "::error::whose name the cache cannot parse cannot be downloaded by any agent run."
+            exit 1
+          fi
+          echo "all 6 plugin tarballs present and named as the cache parses them"
+
   release-provider:
     name: Release — Provider (GoReleaser)
     # Both goreleaser jobs depend only on release-create — they no
@@ -4733,7 +4864,7 @@ jobs:
     # which is also what the six-site rule asks of every job that runs on a tag.
     # v1.2.2 published while `Migrate Lint` was red for exactly the opposite
     # reason: a hand-listed subset that nobody extended.
-    needs: [prepare, helm-eval-boot, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
+    needs: [prepare, helm-eval-boot, create-manifests, release-create, release-images, release-provider, release-pulumi-provider, release-migrate, release-publish, release-query, release-mcp]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
@@ -4741,6 +4872,7 @@ jobs:
       && needs.release-create.result == 'success'
       && needs.release-images.result == 'success'
       && needs.release-provider.result == 'success'
+      && needs.release-pulumi-provider.result == 'success'
       && needs.release-migrate.result == 'success'
       && needs.release-publish.result == 'success'
       && needs.release-query.result == 'success'
@@ -4885,11 +5017,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, quality-gate, helm-eval-boot, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
+    needs: [prepare, quality-gate, helm-eval-boot, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-pulumi-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.quality-gate.result == 'failure' || needs.helm-eval-boot.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.quality-gate.result == 'failure' || needs.helm-eval-boot.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-pulumi-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -4946,6 +5078,7 @@ jobs:
       - release-create
       - release-images
       - release-provider
+      - release-pulumi-provider
       - release-migrate
       - release-publish
       - release-query
@@ -4980,6 +5113,7 @@ jobs:
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"
             "${{ needs.release-provider.result }}"
+            "${{ needs.release-pulumi-provider.result }}"
             "${{ needs.release-migrate.result }}"
             "${{ needs.release-publish.result }}"
             "${{ needs.release-query.result }}"
