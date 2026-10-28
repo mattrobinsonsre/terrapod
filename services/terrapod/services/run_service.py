@@ -38,15 +38,22 @@ from terrapod.services import (
 )
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
-# Re-exported deliberately. `create_run` is what raises it, so this is where a
-# caller of `create_run` looks for it -- and every one of the fifteen callers
-# already imports this module, so catching it costs them no new import. The
-# rule itself lives next to `validate_operations` in `workspace_settings`,
-# because that is where the declaration it enforces is validated on write.
-from terrapod.services.workspace_settings import (
-    PlanApplyNotEnabled,  # noqa: F401
-    WorkspaceLocked,  # noqa: F401
-)
+# `PlanApplyNotEnabled` is re-exported deliberately. `create_run` is what raises
+# it, so this is where a caller of `create_run` looks for it, and every one of the
+# fifteen callers already imports this module -- so catching it costs them no new
+# import. Sixteen call sites take it from here, which is what makes the re-export
+# load-bearing rather than decorative. The rule itself lives next to
+# `validate_operations` in `workspace_settings`, because that is where the
+# declaration it enforces is validated on write.
+#
+# `WorkspaceLocked` is NOT re-exported, and that asymmetry is deliberate. It was,
+# briefly, added here by analogy with its sibling (#1975) -- and nothing adopted
+# it: all five consumers reach it as `workspace_settings.WorkspaceLocked`, because
+# that is what the fan-out was written against. A re-export nothing reads is a
+# second name for one thing, which is the flag-nothing-reads shape with an import
+# in place of a flag; CodeQL flagged it as an unused import and was right
+# (py/unused-import, alert 555). Take it from `workspace_settings`.
+from terrapod.services.workspace_settings import PlanApplyNotEnabled  # noqa: F401
 
 logger = get_logger(__name__)
 
