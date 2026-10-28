@@ -1116,6 +1116,14 @@ jobs:
   # lint or test job of its own -- which is how it was caught broken in the first
   # place. A broken `loadtest` is now found after the images build rather than
   # before, costing those builds and nothing else, because it ships in no image.
+  #
+  # It is also SKIPPED when the commit's images already exist, which it shares with
+  # most of this file -- and `create-manifests` allows `codeql` to be `skipped` as
+  # well as `success`. That pair looks like a hole and is not: images only exist
+  # because a prior run on the SAME sha wrote the `sha-` manifest, and that run's
+  # own `create-manifests` required `codeql == success`. So a `sha-` manifest implies
+  # some run analysed that commit, and nothing reaches a published artifact
+  # unanalysed -- including on a tag, which only retags what a branch push built.
   codeql:
     name: CodeQL (${{ matrix.language }})
     needs: [prepare, build-images-amd64]
@@ -1178,9 +1186,15 @@ jobs:
               -not -path './node_modules/*' \
               -printf '%h\n' | sort
           )
-          if [ "${#mods[@]}" -lt 7 ]; then
+          # The floor EQUALS the module count, and `check_go_directives.py` keeps
+          # it that way -- it reads this number out of this job and fails when the
+          # two disagree. Slack here is the hole rather than a convenience: this
+          # floor is the only thing between a finder that stopped matching and a
+          # green run over a fraction of the Go code. It sat at 7 against nine
+          # modules (#2275), so two could have vanished unnoticed.
+          if [ "${#mods[@]}" -lt 9 ]; then
             echo "Found only ${#mods[@]} Go module(s): ${mods[*]}"
-            echo "Expected at least 7. The finder has probably stopped matching"
+            echo "Expected at least 9. The finder has probably stopped matching"
             echo "rather than the modules having gone away — failing rather than"
             echo "analysing a fraction of the Go code and reporting success."
             exit 1
@@ -2782,9 +2796,15 @@ jobs:
               -not -path './node_modules/*' \
               -printf '%h\n' | sed 's|^\./||' | sort
           )
-          if [ "${#mods[@]}" -lt 7 ]; then
+          # The floor EQUALS the module count, and `check_go_directives.py` keeps
+          # it that way -- it reads this number out of this job and fails when the
+          # two disagree. Slack here is the hole rather than a convenience: this
+          # floor is the only thing between a finder that stopped matching and a
+          # green run over a fraction of the Go code. It sat at 7 against nine
+          # modules (#2275), so two could have vanished unnoticed.
+          if [ "${#mods[@]}" -lt 9 ]; then
             echo "Found only ${#mods[@]} Go module(s): ${mods[*]}"
-            echo "Expected at least 7 — failing rather than auditing a fraction."
+            echo "Expected at least 9 — failing rather than auditing a fraction."
             exit 1
           fi
           echo "Auditing ${#mods[@]} module(s): ${mods[*]}"
