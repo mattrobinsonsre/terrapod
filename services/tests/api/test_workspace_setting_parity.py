@@ -441,7 +441,6 @@ class TestBooleanSettingsAreCheckedNotCoerced:
         """Source-introspection, because the failure is invisible at runtime:
         a coerced boolean produces a 201 and the wrong stored value."""
         import inspect
-        import re
 
         from terrapod.api.routers import tfe_v2
 
@@ -773,8 +772,6 @@ def _declared_engines(attr: str) -> set[str] | None:
     its payload, so a missing restriction is a 422 the operator meets and no test
     driving the helper would see.
     """
-    import re
-
     src = _surface("web/src/lib/workspace-fields.ts").read_text()
     m = re.search(r"\{\s*attr: '" + re.escape(attr) + r"'.*?\}", src, re.S)
     assert m, f"no FIELDS entry for {attr!r}; this gate reads the table by shape"

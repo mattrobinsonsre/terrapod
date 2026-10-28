@@ -1092,8 +1092,6 @@ def _run_pulumi_phase_inner(  # type: ignore[no-untyped-def]
     Writes to the same per-phase log files the Terraform path uses, so the
     upload/rollup at the end of the run needs no engine-specific handling.
     """
-    import structlog
-
     from terrapod.runner import exec_subprocess
     from terrapod.runner.phases import platform_tool, pulumi_config, pulumi_deps, pulumi_exec
 
@@ -1315,8 +1313,6 @@ def _run_pulumi_hook(point: str) -> int:
     A failing hook fails the run, exactly as it does on the Terraform path: the
     point of a `pre_apply` hook that exits non-zero is that nothing is applied.
     """
-    import structlog
-
     from terrapod.runner.phases import execution_hooks
 
     log = structlog.get_logger("runner.job_entrypoint")
@@ -1354,8 +1350,6 @@ def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-unty
     the Terraform path puts it too: nothing gates on a price, and it downloads a
     pricesheet, so ahead of step 3 it would delay every apply for no one.
     """
-    import structlog
-
     from terrapod.runner.phases import opa, pulumi_preview, uploads
 
     log = structlog.get_logger("runner.job_entrypoint")
@@ -1433,8 +1427,6 @@ def _pulumi_cost(cfg, event_log: Path) -> None:  # type: ignore[no-untyped-def]
     the run finish. `estimate_from_doc` already returns None rather than raising
     for its own failures; this catches the translation's.
     """
-    import structlog
-
     from terrapod.runner.phases import cost, pulumi_preview, uploads
 
     log = structlog.get_logger("runner.job_entrypoint")
