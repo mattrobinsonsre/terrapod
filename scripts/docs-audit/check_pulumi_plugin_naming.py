@@ -17,19 +17,31 @@ That is why this is a docs-audit gate rather than a pytest one -- this job runs
 against a full checkout.
 
 **It checks the real pairing, not a copy of the string.** The template is read
-from the YAML, rendered the way GoReleaser renders it, and fed to the actual
-parser. A test asserting both files contain the same literal would pass while
-the parser's regex had changed underneath it.
+from the YAML, rendered the way GoReleaser renders it, and matched against the
+parser's OWN regex -- extracted from `pulumi_plugins.py` by `ast` rather than
+re-typed here. A gate asserting both files contain the same literal would pass
+while the regex changed underneath it.
+
+**Extracted rather than imported**, and that is not a shortcut: importing
+`terrapod.services.package_cache.pulumi_plugins` drags in `settings`, which
+drags in SQLAlchemy and the rest of the API's dependency closure. The docs-audit
+job installs a handful of packages, not that closure -- so the import version of
+this gate failed in CI with `ModuleNotFoundError: No module named 'sqlalchemy'`
+while passing locally, where the venv has everything. Extraction uses the same
+bytes with no dependency at all, and fails loudly if the construction changes.
 
 Run from the repository root.
 """
 
 from __future__ import annotations
 
+import ast
 import pathlib
+import re
 import sys
 
 GORELEASER = pathlib.Path("pulumi-provider/.goreleaser.yml")
+PARSER = pathlib.Path("services/terrapod/services/package_cache/pulumi_plugins.py")
 
 #: Every platform the config builds, so the gate fails if the matrix and the
 #: naming stop agreeing rather than only checking one lucky combination.
@@ -42,14 +54,63 @@ MIN_PLATFORMS = 6
 SAMPLE_VERSIONS = ("1.2.3", "1.11.1", "2.0.0-rc.1", "1.0.0+build.5")
 
 
+def from_parser() -> tuple[re.Pattern[str], str, str]:
+    """The parser's own regex and its first-party constants, by AST.
+
+    Adjacent string literals are concatenated by Python's parser, so the
+    multi-line `re.compile(r"..." r"...")` arrives as ONE `ast.Constant` and
+    needs no reassembly. Anything else -- an f-string, a variable, a computed
+    pattern -- raises, which is the behaviour wanted: a construction this cannot
+    read is one it cannot vouch for.
+    """
+    tree = ast.parse(PARSER.read_text())
+    pattern: str | None = None
+    consts: dict[str, str] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name):
+            continue
+        if target.id == "_FILENAME":
+            call = node.value
+            if not isinstance(call, ast.Call) or not call.args:
+                raise ValueError("_FILENAME is not a call with arguments")
+            arg = call.args[0]
+            if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+                raise ValueError(
+                    "_FILENAME's pattern is not a single string constant, so it cannot be "
+                    "extracted -- if it is now built dynamically this gate needs rewriting "
+                    "rather than relaxing"
+                )
+            pattern = arg.value
+        elif target.id in ("FIRST_PARTY_PLUGIN", "FIRST_PARTY_KIND"):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                consts[target.id] = node.value.value
+
+    if pattern is None:
+        raise ValueError(f"no _FILENAME assignment found in {PARSER}")
+    for name in ("FIRST_PARTY_PLUGIN", "FIRST_PARTY_KIND"):
+        if name not in consts:
+            raise ValueError(f"no {name} string constant found in {PARSER}")
+    return re.compile(pattern), consts["FIRST_PARTY_PLUGIN"], consts["FIRST_PARTY_KIND"]
+
+
 def main() -> int:
-    sys.path.insert(0, "services")
     try:
         import yaml
     except ModuleNotFoundError:
         print("FAIL: PyYAML is required; the docs-audit job installs it", file=sys.stderr)
         return 1
-    from terrapod.services.package_cache import pulumi_plugins
+
+    if not PARSER.is_file():
+        print(f"FAIL: {PARSER} is missing", file=sys.stderr)
+        return 1
+    try:
+        filename_re, first_party_plugin, first_party_kind = from_parser()
+    except ValueError as exc:
+        print(f"FAIL: cannot read the parser's pattern: {exc}", file=sys.stderr)
+        return 1
 
     if not GORELEASER.is_file():
         print(f"FAIL: {GORELEASER} is missing", file=sys.stderr)
@@ -94,23 +155,24 @@ def main() -> int:
                 + ".tar.gz"
             )
             checked += 1
-            parts = pulumi_plugins.parse_filename(rendered)
-            if parts is None:
+            m = filename_re.match(rendered)
+            if m is None:
                 problems.append(f"{rendered}: the cache's parser REFUSES this name")
                 continue
+            parts = m.groupdict()
             if parts["version"] != version:
                 problems.append(
                     f"{rendered}: parsed version {parts['version']!r}, expected {version!r}"
                 )
-            if parts["name"] != pulumi_plugins.FIRST_PARTY_PLUGIN:
+            if parts["name"] != first_party_plugin:
                 problems.append(
                     f"{rendered}: parsed name {parts['name']!r}, so it would NOT resolve "
-                    f"against the first-party base (expected {pulumi_plugins.FIRST_PARTY_PLUGIN!r})"
+                    f"against the first-party base (expected {first_party_plugin!r})"
                 )
-            if parts["kind"] != pulumi_plugins.FIRST_PARTY_KIND:
+            if parts["kind"] != first_party_kind:
                 problems.append(
                     f"{rendered}: parsed kind {parts['kind']!r}, expected "
-                    f"{pulumi_plugins.FIRST_PARTY_KIND!r}"
+                    f"{first_party_kind!r}"
                 )
             if (parts["os"], parts["arch"]) != (goos, goarch):
                 problems.append(

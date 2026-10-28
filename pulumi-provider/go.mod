@@ -3,6 +3,7 @@ module github.com/mattrobinsonsre/terrapod/pulumi-provider
 go 1.26.10
 
 require (
+	github.com/mattrobinsonsre/terrapod/go-terrapod v0.0.0
 	github.com/mattrobinsonsre/terrapod/provider v0.0.0
 	github.com/pulumi/pulumi-terraform-bridge/v3 v3.142.0
 )
@@ -80,7 +81,7 @@ require (
 	github.com/go-git/gcfg/v2 v2.0.2 // indirect
 	github.com/go-git/go-billy/v6 v6.0.0-beta.1 // indirect
 	github.com/go-git/go-git/v6 v6.0.0-beta.1 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
@@ -129,7 +130,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
-	github.com/mattrobinsonsre/terrapod/go-terrapod v0.0.0 // indirect
 	github.com/mitchellh/cli v1.1.5 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

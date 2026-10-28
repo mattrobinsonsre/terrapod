@@ -257,6 +257,14 @@ jobs:
       - name: (docs-audit) Every Go module declares the same toolchain
         run: python3 scripts/docs-audit/check_go_directives.py
 
+      # Needs only PyYAML, installed above: the parser's regex is extracted from
+      # `pulumi_plugins.py` by `ast` rather than imported, because importing it
+      # drags in `settings` and so SQLAlchemy and the rest of the API closure --
+      # which this job does not install, and which is exactly how the first
+      # version of this step failed in CI while passing locally.
+      - name: (docs-audit) The Pulumi plugin name the cache parses is the one published
+        run: python3 scripts/docs-audit/check_pulumi_plugin_naming.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
@@ -294,16 +302,6 @@ jobs:
           PYTHONPATH: services
         run: python3 scripts/check-platform-tool-artifacts.py
 
-      # Deliberately HERE rather than with its docs-audit siblings above, and
-      # the reason is the install two steps up: this gate feeds the goreleaser
-      # archive template to the cache's REAL parser rather than re-implementing
-      # the regex, so it imports `terrapod.services.package_cache` and needs
-      # pydantic and structlog. Run alongside the others it would fail on the
-      # import, not on its property.
-      - name: (docs-audit) The Pulumi plugin name the cache parses is the one published
-        env:
-          PYTHONPATH: services
-        run: python3 scripts/docs-audit/check_pulumi_plugin_naming.py
 
   # ── Helm Lint ──────────────────────────────────────────
       - run: pip install pyyaml ijson pytest
