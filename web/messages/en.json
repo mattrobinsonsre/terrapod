@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "What this catalog item provisions…",
       "enabled": "Enabled (visible in the browse catalog)",
+      "selfContained": "Self-contained root archive",
+      "selfContainedHint": "Use the uploaded module archive as the workspace root configuration.",
+      "restrictBackends": "Restrict execution backends",
+      "backendRangesHint": "Select supported backends and enter PEP 440 version ranges (for example >=1.12,<2).",
+      "backendRange": "{backend} version range",
       "providerTemplates": "Provider templates",
+      "templatesRemoved": "Saving removes existing provider-template associations.",
+      "templatesUnavailable": "Provider templates are not used with self-contained items.",
       "noProviderTemplates": "No provider templates defined.",
       "restrictPools": "Restrict to specific agent pools",
       "noAgentPools": "No agent pools available.",
@@ -1496,6 +1503,7 @@
       "actions": "Actions"
     },
     "badge": {
+      "selfContained": "self-contained",
       "enabled": "enabled",
       "disabled": "disabled"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Catalog item deleted"
     },
     "errors": {
+      "backendRequired": "Select at least one execution backend.",
+      "backendRangeRequired": "Enter a version range for every selected backend.",
       "load": "Failed to load catalog items",
       "save": "Failed to save catalog item",
       "createStatus": "Failed to create catalog item ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Delete the catalog record without destroying its infrastructure (discouraged)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version} needs reconfiguration before it can run.",
+      "updateBlockedArchive": "Version {version} cannot run because its archive is unavailable or invalid. Ask the catalog owner to fix it.",
+      "updateBlockedRuntime": "Version {version} cannot run with this workspace''s backend and version. Select a compatible runtime through the API, then reconfigure.",
+      "removedInputs": "No longer used by this version",
+      "removedHint": "These inputs will be removed when you queue this reconfiguration. Review the new fields before continuing.",
       "title": "Reconfigure {name}",
       "description": "Update inputs and/or version, then queue a run.",
       "currentOption": "{version} (current)",

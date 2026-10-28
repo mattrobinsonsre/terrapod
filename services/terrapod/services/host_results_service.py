@@ -32,6 +32,7 @@ import json
 import os
 import shutil
 import tempfile
+from collections import OrderedDict
 from typing import Any
 
 from sqlalchemy import select
@@ -53,6 +54,9 @@ ROW_KINDS = ("failed", "unreachable")
 #: caps only what Postgres holds, and the cap being hit is logged rather than
 #: silent.
 MAX_EVENT_ROWS = 2000
+
+# Keep a bounded number of spool files open even for a large inventory.
+MAX_OPEN_PARTITION_FILES = 64
 
 #: `msg` is for a reader to recognise the failure, not to hold the payload --
 #: that stays in the stream, or in the sidecar when it is large.
@@ -151,16 +155,27 @@ class _Partitioner:
         self._run_id = run_id
         self._dir = tempfile.mkdtemp(prefix="tp-hostevents-", dir=_resolve_tmpdir())
         self._handles: dict[str, Any] = {}
+        self._open_handles: OrderedDict[str, Any] = OrderedDict()
 
     def add(self, host: str, raw: bytes) -> None:
         handle = self._handles.get(host)
-        if handle is None:
+        if handle is None or handle.closed:
+            if len(self._open_handles) >= MAX_OPEN_PARTITION_FILES:
+                _, oldest = self._open_handles.popitem(last=False)
+                oldest.close()
             # One file per host, named by ordinal rather than by hostname: a
             # host name is not a safe filename, and the mapping is held in the
             # dict rather than recovered from the directory.
-            path = os.path.join(self._dir, f"{len(self._handles)}.jsonl")
-            handle = open(path, "wb")  # noqa: SIM115 -- closed in `flush`
+            path = (
+                handle.name
+                if handle is not None
+                else os.path.join(self._dir, f"{len(self._handles)}.jsonl")
+            )
+            handle = open(path, "ab" if handle is not None else "wb")  # noqa: SIM115 -- closed on eviction or cleanup
             self._handles[host] = handle
+            self._open_handles[host] = handle
+        else:
+            self._open_handles.move_to_end(host)
         handle.write(raw)
         if not raw.endswith(b"\n"):
             handle.write(b"\n")
@@ -169,8 +184,10 @@ class _Partitioner:
         """Upload one object per host. Returns how many were written."""
         storage = get_storage()
         written = 0
-        for host, handle in self._handles.items():
+        for handle in self._open_handles.values():
             handle.close()
+        self._open_handles.clear()
+        for host, handle in self._handles.items():
             key = host_events_host_key(self._workspace_id, self._run_id, host)
             try:
                 with open(handle.name, "rb") as fh:
@@ -198,6 +215,7 @@ class _Partitioner:
         for handle in self._handles.values():
             if not handle.closed:
                 handle.close()
+        self._open_handles.clear()
         shutil.rmtree(self._dir, ignore_errors=True)
 
 
@@ -282,7 +300,7 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     events: list[RunHostEvent] = []
     malformed = 0
     truncated = False
-    # The partitioner owns a temp directory and one open handle per host, so
+    # The partitioner owns a temp directory and a bounded set of open handles, so
     # its lifetime is a `with` rather than a `try` around `flush` alone. That
     # arrangement was the defect CodeQL's py/file-not-closed pointed at: the
     # handles are opened in the streaming loop below, and the `finally` began

@@ -86,8 +86,13 @@ export default function ProviderTemplatesPage() {
     setError(''); setSuccess('')
   }
 
-  function startEdit(t: ProviderTemplate) {
-    const a = t.attributes
+  async function startEdit(t: ProviderTemplate) {
+    setError(''); setSuccess('')
+    const res = await apiFetch(`/api/terrapod/v1/provider-templates/${t.id}?include-sensitive-values=true`).catch(() => null)
+    if (!res?.ok) { setError(tr('errors.load')); return }
+    const data = await res.json().catch(() => null)
+    if (!data?.data?.attributes) { setError(tr('errors.load')); return }
+    const a = data.data.attributes as ProviderTemplate['attributes']
     setEditId(t.id)
     setF({
       name: a.name,
@@ -97,7 +102,6 @@ export default function ProviderTemplatesPage() {
       labels: a.labels || {},
     })
     setShowForm(true)
-    setError(''); setSuccess('')
   }
 
   async function handleSubmit(e: React.FormEvent) {

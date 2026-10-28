@@ -1471,7 +1471,14 @@
       "descriptionLabel": "תיאור",
       "descriptionPlaceholder": "מה פריט קטלוג זה מקצה…",
       "enabled": "מופעל (נראה בקטלוג העיון)",
+      "selfContained": "ארכיון שורש עצמאי",
+      "selfContainedHint": "השתמש בארכיון המודול שהועלה כתצורת השורש של סביבת העבודה.",
+      "restrictBackends": "הגבלת מנועי ביצוע",
+      "backendRangesHint": "בחר מנועים נתמכים והזן טווחי גרסאות PEP 440 (למשל >=1.12,<2).",
+      "backendRange": "טווח גרסאות של {backend}",
       "providerTemplates": "תבניות ספק",
+      "templatesRemoved": "שמירה מסירה שיוכים קיימים לתבניות ספק.",
+      "templatesUnavailable": "אין שימוש בתבניות ספק עבור פריטים עצמאיים.",
       "noProviderTemplates": "לא הוגדרו תבניות ספק.",
       "restrictPools": "הגבלה למאגרי סוכנים מסוימים",
       "noAgentPools": "אין מאגרי סוכנים זמינים.",
@@ -1496,6 +1503,7 @@
       "actions": "פעולות"
     },
     "badge": {
+      "selfContained": "עצמאי",
       "enabled": "מופעל",
       "disabled": "מושבת"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "פריט הקטלוג נמחק"
     },
     "errors": {
+      "backendRequired": "בחר לפחות מנוע ביצוע אחד.",
+      "backendRangeRequired": "הזן טווח גרסאות עבור כל מנוע שנבחר.",
       "load": "טעינת פריטי הקטלוג נכשלה",
       "save": "שמירת פריט הקטלוג נכשלה",
       "createStatus": "יצירת פריט הקטלוג נכשלה ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "מחיקת רשומת הקטלוג מבלי להשמיד את התשתית שלה (לא מומלץ)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "יש להגדיר מחדש את גרסה {version} לפני שניתן להפעיל אותה.",
+      "updateBlockedArchive": "לא ניתן להפעיל את גרסה {version} כי הארכיון שלה אינו זמין או אינו תקין. יש לפנות לבעלי הקטלוג לתיקון.",
+      "updateBlockedRuntime": "לא ניתן להפעיל את גרסה {version} עם מנוע הביצוע והגרסה של סביבת עבודה זו. יש לבחור גרסה תואמת דרך ה-API ואז להגדיר מחדש.",
+      "removedInputs": "אינם בשימוש עוד בגרסה זו",
+      "removedHint": "קלטים אלה יוסרו כאשר תוסיף את ההגדרה מחדש לתור. יש לבדוק את השדות החדשים לפני שממשיכים.",
       "title": "הגדרה מחדש של {name}",
       "description": "עדכנו קלטים ו/או גרסה, ואז הכניסו ריצה לתור.",
       "currentOption": "{version} (נוכחית)",

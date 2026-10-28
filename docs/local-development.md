@@ -16,6 +16,7 @@ running pods.
 | Docker | Container runtime | [docker.com](https://www.docker.com/) |
 | A local Kubernetes cluster | Run the stack | Rancher Desktop, Docker Desktop (K8s enabled), minikube, kind, OrbStack, or colima |
 | Tilt | Local dev orchestration | `brew install tilt` |
+| Go, GPG, ZIP tools, and local Git tags | Build and sign the local Terrapod provider | Go version in `provider/go.mod`; `gpg`, `zip`, `unzip`, `sha256sum`; fetch tags after cloning |
 | mkcert | Local TLS certificate | `brew install mkcert` |
 | tofu (recommended) or terraform | Exercise the CLI flows | [opentofu.org](https://opentofu.org/) |
 
@@ -45,6 +46,58 @@ This creates the `terrapod` namespace, generates the TLS cert, deploys
 PostgreSQL and Redis in-cluster, builds the API/web images, runs the Alembic
 migrations, bootstraps the admin user, and deploys the API, web UI, and runner
 listener. Watch progress in the Tilt UI at <http://localhost:10352>.
+
+Tilt also runs `provider/GNUmakefile` against the current Go source and signs
+a Linux provider ZIP. The `-dev.<number>` version is based on the latest fetched
+Git version tag and source content (override the tag with
+`TERRAPOD_DEV_PROVIDER_TAG=v1.9.0 make dev`). The persistent dev-only GPG home
+lives at `~/.local/share/terrapod/certs/provider-gnupg/`, separate from the
+local TLS cert and key in the same parent directory. An existing signing key
+in `provider/.dev-build/gnupg/` is moved there after its public key is checked;
+it is never silently replaced. The exported public key and immutable signed
+artifacts stay in the ignored `provider/.dev-build/`; `current-version`
+records the version just built. That directory is also excluded from Docker
+build contexts. Tilt copies only the signed ZIP, checksums, signature, and
+public key into the filesystem cache PVC using a short-lived helper pod (not
+an API upload), then starts the API with that version and mounts the public
+key. The private key never enters the cluster. After a successful signed build,
+Tilt generates `provider/.dev-build/terrapod_self_contained-test/main.tf` from
+the checked-in self-contained example, stamping it with the exact version in
+`provider/.dev-build/current-version`. Upload the generated directory as a new
+module version when testing; it is never uploaded automatically. The checked-in
+source remains unpinned. OpenTofu selects prerelease providers only with an
+**exact** constraint, so uploading the unpinned source will not install Tilt's
+`-dev.<number>` provider. Publish a new module version after a provider rebuild;
+editing a local file does not change an already-uploaded archive.
+
+Create a module slot in the private registry, then upload the generated directory
+(not `provider/examples/modules/terrapod_self_contained/`) with
+[`terrapod-publish module`](registry-publishing.md#publishing-a-module):
+
+```sh
+terrapod-publish module \
+  --host terrapod.local \
+  --name terrapod_self_contained \
+  --provider terrapod \
+  --version 0.1.0 \
+  --source provider/.dev-build/terrapod_self_contained-test
+```
+
+Use the name and provider of your existing module slot and an unused module
+version each time the dev provider changes; the module version is separate from
+the pinned provider version. Authenticate with a token that has registry `write`
+on that slot; see the [publisher's authentication instructions](registry-publishing.md#auth-resolution).
+The signed provider artifacts are staged by Tilt and do not need a separate
+module upload.
+
+In this local profile the listener waits for the web service and sends its API
+requests through the in-cluster BFF. Runner Jobs use the same URL to redirect
+`terrapod.local` CLI provider-registry requests. The local profile also sets
+`TERRAPOD_ALLOW_INSECURE_TRANSPORT=1` on runner Jobs so the Terrapod provider
+can call that HTTP BFF; this sends its bearer token in cleartext inside the
+dev cluster and must not be copied to production. The CLI registry host override
+already accepts HTTP; the environment variable applies to the provider's own
+API calls, not to provider installation.
 
 Tear it down with `make dev-down`.
 
@@ -104,8 +157,10 @@ and rewrites image references to `k3d-tp-registry:5111` (how the **node**
 resolves the same registry). Nothing here applies on any other context, so a
 Docker/Rancher/minikube setup is untouched.
 
-kind shares the two-store problem but not the fix: `kind load docker-image` is
-reliable, so use that rather than a registry.
+On `kind-kind`, Tilt loads the runner Job image into the kind node after each
+local build with `kind load docker-image terrapod-runner:local --name kind`.
+Tilt delivers the other images automatically; no manual import is needed to
+run catalog or workspace jobs.
 
 ## When the container store fills up
 

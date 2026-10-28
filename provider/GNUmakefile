@@ -7,9 +7,14 @@ OS_ARCH  ?= $(shell go env GOOS)_$(shell go env GOARCH)
 
 default: build
 
+# Only provider sources determine the dev version; unrelated dirty files must not change its bytes.
 .PHONY: build
 build:
-	go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY)
+	go build -buildvcs=false -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY)
+
+.PHONY: dev-package
+dev-package:
+	bash ./dev-package.sh build "$(BASE_VERSION)"
 
 .PHONY: install
 install: build

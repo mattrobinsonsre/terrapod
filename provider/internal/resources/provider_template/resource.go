@@ -33,6 +33,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -178,6 +179,11 @@ func (r *providerTemplateResource) Create(ctx context.Context, req resource.Crea
 		resp.Diagnostics.AddError("Failed to create provider template", err.Error())
 		return
 	}
+	pt, err = r.readAuthoring(ctx, pt.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read created provider template", err.Error())
+		return
+	}
 
 	resp.Diagnostics.Append(readProviderTemplateIntoModel(ctx, pt, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -190,7 +196,7 @@ func (r *providerTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	pt, err := r.tc.GetProviderTemplate(ctx, state.ID.ValueString())
+	pt, err := r.readAuthoring(ctx, state.ID.ValueString())
 	if err != nil {
 		if terrapod.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -228,6 +234,11 @@ func (r *providerTemplateResource) Update(ctx context.Context, req resource.Upda
 		resp.Diagnostics.AddError("Failed to update provider template", err.Error())
 		return
 	}
+	pt, err = r.readAuthoring(ctx, pt.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read updated provider template", err.Error())
+		return
+	}
 
 	resp.Diagnostics.Append(readProviderTemplateIntoModel(ctx, pt, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -248,6 +259,27 @@ func (r *providerTemplateResource) Delete(ctx context.Context, req resource.Dele
 
 func (r *providerTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func (r *providerTemplateResource) readAuthoring(ctx context.Context, id string) (*terrapod.ProviderTemplate, error) {
+	// The ordinary SDK read masks the body and defaults; state needs both.
+	data, err := r.tc.Get(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id)+"?include-sensitive-values=true")
+	if err != nil {
+		return nil, err
+	}
+	res, err := terrapod.ParseResource(data)
+	if err != nil {
+		return nil, err
+	}
+	attrs := map[string]any{}
+	for key, raw := range res.Attributes {
+		var value any
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, fmt.Errorf("parse provider template attribute %q: %w", key, err)
+		}
+		attrs[key] = value
+	}
+	return &terrapod.ProviderTemplate{ID: res.ID, Attributes: attrs, CreatedAt: attrString(attrs, "created-at"), UpdatedAt: attrString(attrs, "updated-at")}, nil
 }
 
 // buildProviderTemplateAttrs converts the Terraform model into JSON:API

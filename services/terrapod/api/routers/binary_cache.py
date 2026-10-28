@@ -31,6 +31,7 @@ from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.config import WarmBinaryEntry, WarmProviderEntry, settings
 from terrapod.db.session import get_db
+from terrapod.http_retry import exception_diagnostic, redact_urls
 from terrapod.logging_config import get_logger
 from terrapod.services.binary_cache_service import (
     get_or_cache_binary,
@@ -125,12 +126,14 @@ async def available_versions(
     try:
         versions = await list_available_versions(tool)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=redact_urls(str(e))
+        ) from e
     except Exception as e:
-        logger.error("Failed to fetch versions", tool=tool, error=str(e))
+        logger.error("Failed to fetch versions", tool=tool, error=exception_diagnostic(e))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch versions for {tool}: {e}",
+            detail=f"Failed to fetch versions for {tool}: {exception_diagnostic(e)}",
         ) from e
 
     return JSONResponse(content={"data": versions})
@@ -166,9 +169,13 @@ async def download_binary(
         url = await get_or_cache_binary(db, storage, tool, resolved, os, arch)
     except CacheOnlyError as e:
         # Sealed mode + cache miss — genuinely not available; don't fetch upstream.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=redact_urls(str(e))
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=redact_urls(str(e))
+        ) from e
     except Exception as e:
         logger.error(
             "Failed to fetch binary",
@@ -176,11 +183,11 @@ async def download_binary(
             version=version,
             os=os,
             arch=arch,
-            error=str(e),
+            error=exception_diagnostic(e),
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch {tool} {version}: {e}",
+            detail=f"Failed to fetch {tool} {version}: {exception_diagnostic(e)}",
         ) from e
 
     await db.commit()
@@ -208,13 +215,17 @@ async def get_binary_sha256sums(
         resolved = await resolve_version(tool, version)
         manifest, _sig = await get_or_cache_sums(storage, tool, resolved)
     except CacheOnlyError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=redact_urls(str(e))
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=redact_urls(str(e))
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to obtain SHA256SUMS for {tool} {version}: {e}",
+            detail=f"Failed to obtain SHA256SUMS for {tool} {version}: {exception_diagnostic(e)}",
         ) from e
     return Response(content=manifest, media_type="text/plain")
 
@@ -235,13 +246,17 @@ async def get_binary_sha256sums_sig(
         resolved = await resolve_version(tool, version)
         _manifest, sig = await get_or_cache_sums(storage, tool, resolved)
     except CacheOnlyError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=redact_urls(str(e))
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=redact_urls(str(e))
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to obtain SHA256SUMS signature for {tool} {version}: {e}",
+            detail=f"Failed to obtain SHA256SUMS signature for {tool} {version}: {exception_diagnostic(e)}",
         ) from e
     return Response(content=sig, media_type="application/pgp-signature")
 
@@ -296,13 +311,17 @@ async def warm_binary_endpoint(
         url = await warm_binary(db, storage, body.tool, body.version, body.os, body.arch)
     except CacheOnlyError as e:
         # Sealed mode can't fetch upstream — warming must run before sealing.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=redact_urls(str(e))
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=redact_urls(str(e))
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to warm binary: {e}",
+            detail=f"Failed to warm binary {body.tool} {body.version}: {exception_diagnostic(e)}",
         ) from e
 
     await db.commit()
@@ -348,7 +367,7 @@ async def warm_bulk_endpoint(
             "succeeded": summary.succeeded,
             "failed": summary.failed,
             "results": [
-                {"kind": r.kind, "ref": r.ref, "ok": r.ok, "error": r.error}
+                {"kind": r.kind, "ref": r.ref, "ok": r.ok, "error": redact_urls(r.error)}
                 for r in summary.results
             ],
         },

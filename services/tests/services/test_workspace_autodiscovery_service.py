@@ -676,6 +676,7 @@ class TestEveryWorkspaceSettingIsTemplatedOrLedgered:
         "catalog_item_id": "catalog provenance; a rule never creates a catalog workspace",
         "catalog_version_pin": "catalog provenance",
         "catalog_input_values": "catalog provenance",
+        "catalog_update_block": "catalog publish outcome; a rule never creates a catalog workspace",
     }
 
     def test_every_workspace_setting_is_templated_or_written_down(self):

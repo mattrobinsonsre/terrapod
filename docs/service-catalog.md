@@ -4,6 +4,8 @@ The Service Catalog turns blessed entries in your [private module registry](regi
 
 The catalog is built on infrastructure Terrapod already has — the module registry, agent-mode workspaces, the module→workspace impact link, and label-based RBAC — so it is a thin, opinionated layer rather than a parallel system.
 
+**During a mixed-version API upgrade**, an older replica may still serve the previous read/download behavior. Treat these boundaries as effective only once every API replica has been updated.
+
 ## When you'd want this
 
 - A platform team maintains a set of golden modules (a VPC module, a managed-database module, an application-stack module) and wants application teams to consume them without learning terraform.
@@ -19,8 +21,8 @@ The catalog is built on infrastructure Terrapod already has — the module regis
 
 A **catalog item** is a blessed designation over one registry module — it does not copy or fork the module. It records:
 
-- which module it wraps (`module-id`),
-- which **provider templates** render its provider configuration,
+- which registry module it uses (`module-id`), and whether it uses the default wrapper or a self-contained root archive (`self-contained`),
+- which **provider templates** render its provider configuration (wrapper items only),
 - which **agent pools** an instance may bind to (optionally restricted),
 - a curated set of **variable options** (defaults, descriptions, sensitivity, enum choices) layered over the module's own variables,
 - a **version policy** (float, or a default pin),
@@ -28,7 +30,7 @@ A **catalog item** is a blessed designation over one registry module — it does
 
 ## What provisioning produces
 
-Provisioning a catalog item creates an ordinary **agent-mode, non-VCS workspace** — the same kind of workspace you'd get from the API — whose configuration is a **server-generated wrapper** around the registry module. The user never sees or edits HCL.
+Provisioning a catalog item creates an ordinary **agent-mode, non-VCS workspace** — the same kind of workspace you'd get from the API. By default its configuration is a **server-generated wrapper** around the registry module. The user never sees or edits HCL.
 
 The generated configuration is a small, predictable set of files:
 
@@ -63,6 +65,16 @@ output "vpc_id" { value = module.this.vpc_id }
 The inputs the user supplied on the provision form become the workspace's **Terraform variables** (`category = terraform`). Sensitive inputs are stored as sensitive variables. The workspace is marked **catalog-managed** by its `catalog_item_id` — that flag is what activates the guardrails described below.
 
 Because the wrapper is generated server-side and the workspace is agent-mode + non-VCS, runs execute on your agent pools exactly like any other agent run: a plan, an approval (or auto-apply), and an apply.
+
+### Self-contained root archives
+
+With `self-contained: true`, the selected uploaded registry version is instead the workspace's **root configuration**. There is no generated `main.tf` module call or provider-template `providers.tf`; declare providers and their inputs in the root archive. Self-contained items cannot reference provider templates. Declare supported `tofu` and/or `terraform` binaries and their version ranges with `execution-backend-constraints` (PEP 440 specifiers such as `>=1.12,<2`; omit an unsupported backend). The supplied catalog inputs are still delivered as workspace variables through the runner's `terrapod.auto.tfvars`, not embedded in the archive. Configure the mode and supported backends in `/admin/catalog`, through the API, or with `terrapod_catalog_item` in the OpenTofu (or Terraform) provider. Changing modes is refused while an item has active instances. The provision UI does not yet offer a runtime selector: when the deployment default is not allowed by an item's constraints, select a compatible backend and engine version through the API.
+
+The API checks the archive before queueing a run. It must contain a root-level `.tf` file; malformed HCL, missing archives, path traversal, duplicate paths, symlinks, special entries, root override files, and files that could substitute local state or override catalog inputs are refused. Root-level `.tf.json` is not yet supported: the catalog cannot discover its variables, so an archive containing one is refused rather than provisioned with a partial form. An input marked sensitive in the catalog options must also declare `sensitive = true` in the root HCL: a workspace variable's sensitive flag alone cannot make OpenTofu or Terraform mask a root variable. Downloads are limited to 256 MiB compressed, 1 GiB of declared file contents, 1 MiB of root HCL, and 10,000 archive entries. Invalid archives return a descriptive `422` or `413`, and no run is queued.
+
+An archive can declare its own backend or `cloud` block: during agent execution the runner's local-backend override takes precedence, and state is transferred through Terrapod artifacts. Do **not** add a Terrapod remote backend to the archive. The runner checks the effective backend after init and stops the run if another later-sorting override wins.
+
+The root archive remains the registry module's raw source. Module downloads and the registry module interface use **module registry `read`**, not catalog `read`, and do not scrub embedded credentials. Anyone who can read the module through the registry can inspect its archive; module authors are responsible for keeping secrets out of it. A human downloading a self-contained root through a workspace configuration version needs **both** workspace `config:read` and originating module `registry:read`. Ticket minting and each side of a diff use the same gate (see [Configuration Versions](api-reference.md#configuration-versions)). Runner-scoped downloads of the exact run archive are not subject to this human gate.
 
 ## Enabling the catalog
 
@@ -114,12 +126,12 @@ The effect: you can't bypass the catalog by editing the instance workspace's var
 
 ### Config clamp — the catalog owns the configuration
 
-Because the catalog generates the wrapper, an instance must not accept a configuration from anywhere else:
+Because the catalog owns the wrapper or root archive, an instance must not accept a configuration from anywhere else:
 
 - A direct **configuration-version upload** to a catalog-managed workspace is rejected with `409`.
 - A **run that pins a custom configuration version** on a catalog-managed workspace is rejected with `409`.
 
-Configuration changes flow through **reconfigure** (below), which regenerates the wrapper. Manage instances through the catalog surface, not the workspace run/config API.
+Configuration changes flow through **reconfigure** (below), which regenerates the wrapper or snapshots the selected root archive. Manage instances through the catalog surface, not the workspace run/config API.
 
 ## Provider templates
 
@@ -159,6 +171,8 @@ with `parameters`:
 When an item references this template, `aws_region` and `aws_role_arn` are surfaced as fields on the provision form, and the provided values are injected as Terraform variables that the rendered `providers.tf` reads via `var.*`.
 
 > **No server-side interpolation.** The server does not substitute values into the template body — it renders the static `body` verbatim and lets terraform/tofu resolve `var.*` at plan time from the workspace's variables. Parameters become real Terraform variables; the provider body references them. This keeps the rendering simple and auditable, and means a sensitive parameter is protected by the same variable encryption-at-rest as any other sensitive variable.
+
+Ordinary provider-template list/show responses (including for platform admins and auditors) return `body: null`; provider HCL can contain inlined secrets regardless of parameter flags. Sensitive parameters retain only `name`, `type`, `required` and `sensitive`, not their default, choices or description. A platform admin editing a template explicitly requests `GET /api/v1/provider-templates/{id}?include-sensitive-values=true` to see the complete authoring configuration. The list has no reveal mode.
 
 A catalog item lists the templates it uses in `provider-template-ids`. Each one's `parameters` are merged into the provision form alongside the module's own inputs.
 
@@ -300,12 +314,41 @@ Neither is new to the Ansible half, but both are explicit grants and both are ea
 - **Catalog access.** `catalog_permission` defaults to `none`, and the catalog has **no `everyone` floor**, so enabling the catalog grants nobody anything until a role carries catalog `use` and is assigned. See [Granting catalog access](#granting-catalog-access).
 - **A pool to run on.** Every instance is agent-mode, so the provisioner needs pool `write` on a pool the item allows. See [Agent pools](#agent-pools).
 
+### Self-contained Ansible roots
+
+The Ansible-first example above describes a **wrapper item**, which copies the playbook subtree alongside generated HCL. A self-contained item instead snapshots the entire module root as the configuration version, so its Ansible subtree is already present at `ansible-directory`; there is no generated wrapper or separate provider-template file. The same `configure-enabled`, `default-playbook` and `default-limit` settings govern the resulting workspace.
+
+### Read boundaries for catalog inputs
+
+Ordinary item list/show reads, **even as platform admin**, omit **all authored** `default` and `options` values, not just those currently marked sensitive: a different version pin can change an input's sensitivity. They expose only the option's `name`, `hidden`, `sensitive`, `description`, `type` and `required` fields when present, never unknown nested metadata. Create/update responses are redacted too. Only a platform admin explicitly requesting `GET /api/v1/catalog-items/{id}?include-sensitive-values=true` receives the full authoring options. Catalog `admin`, item ownership and catalog `read` do **not** grant this opt-in. Invalid query values are rejected, and non-admin opt-ins return `403`. The platform admin UI and the `terrapod_catalog_item` / `terrapod_provider_template` resources use explicit show reads when editing or refreshing; ordinary SDK reads stay redacted. List and write responses are not authoring reads.
+
+Unlike the item list/show, the selected-version `/form` can return non-sensitive defaults and choices for the version it actually resolved. It omits hidden fields and removes the description, default and choices for sensitive fields; `/interface` masks those properties on sensitive or hidden inputs too. This applies to wrapper and self-contained items alike, including module-declared sensitivity. Catalog instance `input-values` returns only inputs that can be verified non-sensitive and non-hidden against the relevant stored variables and item/archive definition; when an older snapshot cannot be classified safely, it is withheld rather than exposed. Workspace variable reads show non-sensitive static native inputs when the catalog item has not changed since the instance was created; sensitive inputs and hidden defaults stay masked, including hidden values stored without a sensitive flag. If the item was edited since instance creation, or its last catalog configuration cannot be verified, all static native input values remain masked, even after reconfigure: without historical hidden-input metadata an item edit cannot prove an old fixed value was not reused. Masked inputs do not expose a version ID. A reconfigure that changes an input from sensitive to non-sensitive requires a new value different from the old secret. These read guards do not change the values delivered to runs.
+
 ## Version model
 
 A catalog item wraps a registry module, and registry modules are versioned. The catalog supports two version strategies:
 
 - **Float (unpinned).** The instance tracks the latest published module version. This is wired through the standard **module→workspace impact link** plus the registry's **publish triggers**: when a new module version is published, linked instances get a fresh run automatically — the same mechanism documented in [Registry](registry.md) (module impact analysis). With `auto-apply` on, the instance updates itself to the new version with no human in the loop.
 - **Explicit pin.** An instance can carry a `catalog_version_pin` that holds it at a specific module version regardless of new publishes. The catalog item defines a `default_version_pin` that new instances inherit; leave it unset for float.
+
+`GET /api/v1/catalog-items/{id}/form` and `/interface` default to the item's default version; use `?version-pin=latest` to see the newest uploaded version or `?version-pin=1.2.3` to inspect a specific uploaded version. An unavailable explicitly requested version is a `422`, not an empty form. An omitted `version-pin` on provision inherits and stores the item's default; an explicit `null` selects latest and stores a floating pin. Reconfigure reuses the instance's saved non-sensitive inputs only when `input-values` is omitted, keeping matching names and dropping names removed by the selected version. New required inputs still need values, and explicitly submitted unknown names still fail.
+
+The catalog page fetches the form for the selected version when provisioning or reconfiguring. Reconfigure shows saved inputs that the selected version no longer accepts separately, then sends only the displayed fields when the user queues the run. Removed workspace variables are left untouched until that explicit reconfigure; new required fields must be filled in before submission. The reconfigure auto-apply checkbox defaults off so the resulting plan can be reviewed.
+
+For self-contained items, both read endpoints stream and parse the selected archive rather than relying on a possibly stale registry interface. This also works when registry interface extraction is disabled. A missing or invalid archive is an error rather than a misleading empty form. Each read fetches the archive; clients that fetch both endpoints will fetch it twice until the UI reuses one result.
+Only one self-contained archive read is staged at a time across API replicas. A concurrent request receives a retryable `503` rather than filling the API scratch volume. Reads do not cache version-named archives: VCS tags can be moved, so each admitted request checks the currently stored bytes.
+
+**Upgrade behavior for existing instances:** a stored null `catalog_version_pin` now means latest, including on reconfigure when the item has a default pin. Previously, such an instance could silently resolve the item default instead. Review instances with a null pin under a default-pinned item before reconfiguring them; pass an explicit version if they should remain pinned. Sensitive inputs are write-only, not present in the saved input snapshot. Re-enter a required sensitive input with no default; an optional sensitive input with a stored default may be left blank so that default is applied again. A blank field does not recover the previous secret.
+
+Floating self-contained instances create a new configuration version from the newest uploaded root archive when a module version is published. Before queueing an apply-capable `module-publish` run, Terrapod checks the new interface against the stored workspace variables. A removed input, missing required input, invalid option or changed sensitivity **blocks the update**; no variables are changed and no run is queued. The instance list and reconfigure panel show the blocked version. Reconfigure explicitly against that version to review and remove old inputs, fill new ones, and queue a run. A missing or invalid archive is shown separately; the catalog owner must fix the publish before the instance can adopt it. A compatible publish clears a previous block; a successful reconfigure does too. Pinned instances and wrapper items otherwise retain their existing publish behavior. The publish run inherits the instance's auto-apply setting, so floating with auto-apply enabled can still roll out automatically when the inputs are compatible.
+
+When an item changes its backend constraints, linked instances whose stored backend or version no longer matches cannot run module publish or PR plans on that runtime. A publish block with reason `runtime` stays visible until the instance is reconfigured with a compatible backend and exact version through the API; the provision UI does not yet offer that runtime picker. This check also applies to pinned instances and constrained wrapper items.
+
+For a VCS-connected module, a pull request plans its scoped candidate archive as a **speculative root configuration version** on each linked self-contained instance (whether the instance is pinned or floating). The workspace's stored inputs are left unchanged; missing, removed, changed-sensitivity or mismatched hidden inputs **block the speculative plan before it is queued** and produce a failed per-instance PR check. A malformed or unsafe archive is likewise not queued. The existing `allow_fork_pr_plans` workspace setting still gates fork PRs **before** their code can run with workspace credentials; a workspace that has not opted in gets no fork plan. Wrapper consumers keep using their own configuration with the module override. PR plans are plan-only and can never be applied; an accepted version is adopted by a later publish run or explicit reconfigure. The module PR's single comment still includes the rich per-workspace run, gate and AI details, but its rows and runs are scoped to that module, not another module with the same PR number.
+
+An invalid PR archive's failed check is retried on the next module-impact poll after a transient VCS error, without requeueing runs already created for that SHA. On GitLab, module-impact checks now use the per-workspace name `terrapod/<workspace>` for both valid plans and invalid archives; update any required-status rules still naming the former shared `terrapod` check. The module PR comment chooses the newest **poller-created** head, so retrying an older SHA cannot restore its comment rows; historical module-test runs without a durable module ID are not reattributed to a replacement module with the same coordinates. Retention keeps each non-VCS workspace's latest usable, non-speculative configuration version even after many PR plans, and does not delete an override archive while another run still references it.
+
+Archive provenance is recorded when each new configuration version is created; the migration does **not** scan or rewrite historical CVs. Unknown older catalog and module-test archives are denied to human archive readers rather than guessed from the caller-supplied `source`. During a mixed-version upgrade, an older replica's known ordinary `source` on a **non-catalog** workspace can still be downloaded directly and can mint a standard `cv` browser ticket even with stored unknown provenance; the same unknown row on a catalog-managed workspace is denied. A deleted originating module also denies protected archive reads. CV metadata still requires workspace `config:read` but does not reveal archive provenance. Ordinary wrappers with no provider templates need only `config:read` for human archive access. A wrapper with provider templates contains verbatim provider HCL, which may inline secrets: its archive download, ticket mint and both diff sides require **workspace `config:read` and effective platform `admin`** for humans, not catalog `admin` or module `registry:read`. Its ticket carries a distinct signed scope, so an older ordinary CV ticket cannot open it. An authorized ticket stays a bearer capability until expiry (at most 30 minutes), even after a grant is revoked.
 
 > **Float + auto-apply is a deliberate "brave" choice for production.** It means publishing a new module version can roll out to every floating instance automatically. The provision UI warns when you select it. For production fleets, prefer an explicit pin (or float with auto-apply *off*, so a human confirms each version bump). For ephemeral or dev environments, float-and-auto-apply is a convenient way to keep everything on the latest module.
 
@@ -319,8 +362,8 @@ provision ──▶ reconfigure ──▶ ... ──▶ destroy ──▶ archiv
  + first run   + new run               on successful apply: workspace archived
 ```
 
-- **Provision** creates the catalog-managed workspace, materialises the supplied inputs as variables, generates the wrapper, and queues the first run. Source: `catalog`.
-- **Reconfigure** updates an instance's inputs and/or its version pin, regenerates the wrapper, and queues a new run. Source: `catalog`. This is the only supported way to change a catalog instance's configuration (the config clamp blocks the alternatives).
+- **Provision** creates the catalog-managed workspace, materialises the supplied inputs as variables, generates the wrapper or snapshots the root archive, and queues the first run. Source: `catalog`.
+- **Reconfigure** updates an instance's inputs and/or its version pin, regenerates the wrapper or snapshots the selected root archive, and queues a new run. Source: `catalog`. This is the only supported way to change a catalog instance's configuration (the config clamp blocks the alternatives).
 - **Destroy** queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successful apply** of that destroy run, the workspace is **archived** — a soft delete: the workspace and its **state are retained** (for audit and possible recovery), but the instance is removed from the active catalog view. Nothing is hard-deleted automatically.
 
 ### Destroy, not delete — a catalog instance is never silently orphaned
@@ -349,17 +392,17 @@ The combination lets a platform team say "VPC instances run only on the `network
 |---|---|---|
 | `/catalog` | catalog `read`+ | Browse available items (filtered to what your role matches). |
 | `/catalog/{id}` | catalog `read`/`use` | Item detail: the provision wizard (form fields resolved from inputs + provider-template parameters) and the list of existing instances. |
-| `/admin/catalog` | platform `admin` | Manage catalog items: bless a module, set provider templates, agent-pool allowlist, variable options, version policy, enable/disable. |
+| `/admin/catalog` | platform `admin` | Manage catalog items: bless a module, choose generated-wrapper or self-contained root mode, set supported backends and version ranges, provider templates (wrappers only), agent-pool allowlist, variable options, version policy, enable/disable. |
 | `/admin/provider-templates` | platform `admin` | CRUD provider templates (name, provider-type, HCL body, parameters). |
 
-The provision wizard renders one field per resolved input — the module's variables (as curated by the item's `variable-options`) plus every parameter from the item's provider templates — and shows the version policy with the float/auto-apply warning where applicable.
+The provision wizard renders one field per resolved input — the module's variables (as curated by the item's `variable-options`) plus every parameter from the item's provider templates — and shows the version policy with the float/auto-apply warning where applicable. Both Provision and Reconfigure label sensitive fields and accept their values through password inputs. Reconfigure pre-fills current non-sensitive static inputs from workspace variables when the caller has `var:read`, falling back to safely classified catalog-instance inputs otherwise. Sensitive inputs remain empty and must be re-entered when queuing a reconfiguration; their saved values are never sent to the browser.
 
 ## Managing the catalog as code (Terraform provider)
 
 The catalog is fully manageable through [`terraform-provider-terrapod`](https://github.com/mattrobinsonsre/terrapod), so a platform team can keep the catalog itself under GitOps and even drive provisioning declaratively:
 
 - `terrapod_provider_template` — a parameterised provider config.
-- `terrapod_catalog_item` — a blessed module designation (module reference, provider templates, pool allowlist, variable options, version policy).
+- `terrapod_catalog_item` — a blessed module designation (module reference, self-contained mode and backend constraints, provider templates for wrappers, pool allowlist, variable options, version policy).
 - `terrapod_catalog_instance` — a provisioned instance (inputs, agent pool, version pin, auto-apply). Managing instances this way gives you declarative create/reconfigure/destroy with the same lifecycle as the UI.
 - `terrapod_catalog_instances` (data source) — enumerate instances of an item.
 

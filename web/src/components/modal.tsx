@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 
 /**
  * Accessible modal dialog primitive.
@@ -33,6 +33,7 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  const closeOnEscape = useEffectEvent(onClose)
 
   useEffect(() => {
     if (!open) return
@@ -44,7 +45,7 @@ export function Modal({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        closeOnEscape()
         return
       }
       if (e.key !== 'Tab' || !panel) return
@@ -66,7 +67,7 @@ export function Modal({
       document.removeEventListener('keydown', onKeyDown)
       restoreRef.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 

@@ -39,6 +39,10 @@ api:
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
 
+  # Dev-only provider registry version override; leave empty in production.
+  # Changes the API pod template's TERRAPOD_VERSION without changing the image tag.
+  devProviderVersion: ""
+
   # Override the container command (e.g., for hot reload in dev):
   # command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
   command: []

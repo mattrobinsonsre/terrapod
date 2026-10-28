@@ -1935,7 +1935,7 @@ async def transition_run(
         await _enqueue_vcs_status(run, target_status)
 
     # Enqueue module test status when a module-test run reaches a meaningful state
-    if run.source == "module-test" and run.module_overrides:
+    if run.source == "module-test" and (run.module_impact_module_id or run.module_overrides):
         await _enqueue_module_test_status(run, target_status)
 
     # Enqueue drift status update when a drift detection run reaches a terminal state.
@@ -3653,11 +3653,20 @@ async def create_configuration_version(
     source: str = "tfe-api",
     auto_queue_runs: bool = True,
     speculative: bool = False,
+    *,
+    archive_provenance: str = "unknown",
+    archive_module_id: uuid.UUID | None = None,
 ) -> ConfigurationVersion:
-    """Create a configuration version."""
+    """Create a CV; trusted producers classify bytes independently of `source`."""
+    if archive_provenance not in ("unknown", "unprotected", "protected", "admin-only"):
+        raise ValueError("Invalid configuration archive provenance")
+    if (archive_provenance == "protected") != isinstance(archive_module_id, uuid.UUID):
+        raise ValueError("Protected archives require exactly one originating module UUID")
     cv = ConfigurationVersion(
         workspace_id=workspace_id,
         source=source,
+        archive_provenance=archive_provenance,
+        archive_module_id=archive_module_id,
         status="pending",
         auto_queue_runs=auto_queue_runs,
         speculative=speculative,

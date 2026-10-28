@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "What this catalog item provisions…",
       "enabled": "Enabled (visible in th'' browse catalog)",
+      "selfContained": "Self-contained root archive, arrr",
+      "selfContainedHint": "Use th'' uploaded module archive as th'' workspace root configuration, matey.",
+      "restrictBackends": "Restrict execution backends, arrr",
+      "backendRangesHint": "Pick supported backends an'' enter PEP 440 version ranges (fer example >=1.12,<2).",
+      "backendRange": "{backend} version range, matey",
       "providerTemplates": "Provider templates",
+      "templatesRemoved": "Savin'' sends existin'' provider-template ties t'' Davy Jones.",
+      "templatesUnavailable": "Provider templates be no use fer self-contained items, matey.",
       "noProviderTemplates": "Nay provider templates defined.",
       "restrictPools": "Restrict t'' specific agent pools",
       "noAgentPools": "Nay agent pools available.",
@@ -1496,6 +1503,7 @@
       "actions": "Actions"
     },
     "badge": {
+      "selfContained": "self-contained, arrr",
       "enabled": "enabled",
       "disabled": "disabled"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Catalog item sent t'' Davy Jones"
     },
     "errors": {
+      "backendRequired": "Pick at least one execution backend, matey.",
+      "backendRangeRequired": "Enter a version range fer every chosen backend, arrr.",
       "load": "Failed t'' load catalog items",
       "save": "Failed t'' save catalog item",
       "createStatus": "Failed t'' create catalog item ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Send th'' catalog record t'' Davy Jones without destroyin'' its infrastructure (discouraged)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version} needs refittin' afore she can sail.",
+      "updateBlockedArchive": "Version {version} can't sail: her archive be missin' or broken. Ask the catalog captain to mend it.",
+      "updateBlockedRuntime": "Version {version} can''t sail with this workspace''s engine and version. Pick a fitting runtime through the API, then rig her anew.",
+      "removedInputs": "No longer aboard this version",
+      "removedHint": "These inputs walk the plank when ye queue this reconfiguration. Spy the new fields afore ye sail on.",
       "title": "Reconfigure {name}",
       "description": "Update inputs an''/or version, then queue a run.",
       "currentOption": "{version} (current)",

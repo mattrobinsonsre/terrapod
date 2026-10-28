@@ -1471,7 +1471,14 @@
       "descriptionLabel": "描述",
       "descriptionPlaceholder": "此目录项预配的内容…",
       "enabled": "已启用（在浏览目录中可见）",
+      "selfContained": "自包含根目录归档",
+      "selfContainedHint": "将上传的模块归档用作工作区的根配置。",
+      "restrictBackends": "限制执行后端",
+      "backendRangesHint": "选择支持的后端并输入 PEP 440 版本范围（例如 >=1.12,<2）。",
+      "backendRange": "{backend} 版本范围",
       "providerTemplates": "提供程序模板",
+      "templatesRemoved": "保存会移除现有的提供程序模板关联。",
+      "templatesUnavailable": "自包含项目不使用提供程序模板。",
       "noProviderTemplates": "未定义任何提供程序模板。",
       "restrictPools": "限制为特定的代理池",
       "noAgentPools": "无可用的代理池。",
@@ -1496,6 +1503,7 @@
       "actions": "操作"
     },
     "badge": {
+      "selfContained": "自包含",
       "enabled": "已启用",
       "disabled": "已禁用"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "已删除目录项"
     },
     "errors": {
+      "backendRequired": "请至少选择一个执行后端。",
+      "backendRangeRequired": "请为每个选定的后端输入版本范围。",
       "load": "加载目录项失败",
       "save": "保存目录项失败",
       "createStatus": "创建目录项失败（{status}）",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "删除目录记录而不销毁其基础设施（不建议）"
     },
     "reconfigure": {
+      "updateBlockedInputs": "版本 {version} 需要重新配置后才能运行。",
+      "updateBlockedArchive": "版本 {version} 的归档不可用或无效，无法运行。请联系目录负责人修复。",
+      "updateBlockedRuntime": "版本 {version} 与此工作区的执行后端和版本不兼容。请通过 API 选择兼容版本，然后重新配置。",
+      "removedInputs": "此版本不再使用",
+      "removedHint": "将此重新配置加入队列时会移除这些输入。继续前请检查新字段。",
       "title": "重新配置 {name}",
       "description": "更新输入和/或版本，然后排队一次运行。",
       "currentOption": "{version}（当前）",

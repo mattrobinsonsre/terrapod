@@ -17,7 +17,7 @@ Endpoints:
 """
 
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
@@ -35,6 +35,8 @@ from terrapod.api.prefixes import is_tfe_path
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
+    CatalogItem,
+    ConfigurationVersion,
     Variable,
     VariableSet,
     VariableSetVariable,
@@ -419,7 +421,13 @@ def _is_tfe(request: Request | None) -> bool:
     return is_tfe_path(request.url.path)
 
 
-def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
+def _var_json(
+    var: Variable,
+    *,
+    tfe_surface: bool = True,
+    catalog_managed: bool = False,
+    catalog_hidden: set[str] | None = None,
+) -> dict:
     """Serialize a Variable to TFE V2 JSON:API format.
 
     ``tfe_surface`` picks which name the stored category goes out under: the
@@ -428,6 +436,14 @@ def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
     compatibility break; the native surface says `native`. Defaults to the
     compatible name, so a caller that forgets cannot break a CLI (#1898).
     """
+    # None means the catalog definition cannot be tied to this instance's
+    # original hidden inputs; do not guess which inputs were hidden then.
+    mask_catalog_value = (
+        catalog_managed
+        and var.category in (variable_service.NATIVE_CATEGORY, "terraform")
+        and var.value_source == "static"
+        and (var.sensitive or catalog_hidden is None or var.key in catalog_hidden)
+    )
     return {
         "id": f"var-{var.id}",
         "type": "vars",
@@ -438,8 +454,8 @@ def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
             # at is resolved at run time and never persisted, returned or logged
             # (#1439). Masking the reference would make the variable unreadable
             # without hiding anything that is actually sensitive.
-            "value": _visible_value(var),
-            "sensitive": var.sensitive,
+            "value": None if mask_catalog_value else _visible_value(var),
+            "sensitive": True if mask_catalog_value else var.sensitive,
             "apply-only": var.apply_only,
             "configure-only": var.configure_only,
             "category": variable_service.wire_category(var.category, tfe_surface=tfe_surface),
@@ -448,7 +464,7 @@ def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
             "hcl": var.structured,
             "value-source": var.value_source,
             "description": var.description,
-            "version-id": var.version_id,
+            "version-id": None if mask_catalog_value else var.version_id,
             "created-at": _rfc3339(var.created_at),
             "updated-at": _rfc3339(var.updated_at),
         },
@@ -505,6 +521,44 @@ def _structured_from(attrs: dict, *, default: bool | None = None) -> bool | None
     return default
 
 
+async def _catalog_hidden_inputs(db: AsyncSession, ws: Workspace) -> set[str] | None:
+    item = await db.get(CatalogItem, ws.catalog_item_id)
+    if item is None:
+        return None
+    result = await db.execute(
+        select(ConfigurationVersion.created_at)
+        .where(
+            ConfigurationVersion.workspace_id == ws.id,
+            ConfigurationVersion.source == "catalog",
+            ConfigurationVersion.status == "uploaded",
+            ConfigurationVersion.speculative.is_(False),
+        )
+        .order_by(ConfigurationVersion.created_at.desc(), ConfigurationVersion.id.desc())
+        .limit(1)
+    )
+    snapshot_at = result.scalar_one_or_none()
+    if (
+        not isinstance(snapshot_at, datetime)
+        or snapshot_at.tzinfo is None
+        or not isinstance(ws.created_at, datetime)
+        or ws.created_at.tzinfo is None
+        or not isinstance(item.updated_at, datetime)
+        or item.updated_at.tzinfo is None
+        or item.updated_at > ws.created_at
+        or item.updated_at > snapshot_at
+    ):
+        return None
+    options = item.variable_options or []
+    if not isinstance(options, list) or any(
+        not isinstance(option, dict)
+        or not isinstance(option.get("name"), str)
+        or not isinstance(option.get("hidden", False), bool)
+        for option in options
+    ):
+        return None
+    return {option["name"] for option in options if option.get("hidden")}
+
+
 @dual_router.get("/workspaces/{workspace_id}/vars")
 async def list_workspace_vars(
     workspace_id: str = Path(...),
@@ -520,7 +574,14 @@ async def list_workspace_vars(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace"
         )
     variables = await variable_service.list_variables(db, ws.id)
-    items = [_var_json(v, tfe_surface=_is_tfe(request)) for v in variables]
+    catalog_managed = ws.catalog_item_id is not None
+    hidden = await _catalog_hidden_inputs(db, ws) if catalog_managed else None
+    items = [
+        _var_json(
+            v, tfe_surface=_is_tfe(request), catalog_managed=catalog_managed, catalog_hidden=hidden
+        )
+        for v in variables
+    ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
 
@@ -596,8 +657,17 @@ async def create_workspace_var(
 
     await publish_workspace_event(str(ws.id), "workspace_variable_change")
 
+    catalog_managed = ws.catalog_item_id is not None
     return JSONResponse(
-        content={"data": _var_json(var, tfe_surface=_is_tfe(request))}, status_code=201
+        content={
+            "data": _var_json(
+                var,
+                tfe_surface=_is_tfe(request),
+                catalog_managed=catalog_managed,
+                catalog_hidden=await _catalog_hidden_inputs(db, ws) if catalog_managed else None,
+            )
+        },
+        status_code=201,
     )
 
 
@@ -685,7 +755,17 @@ async def update_workspace_var(
 
     await publish_workspace_event(str(ws.id), "workspace_variable_change")
 
-    return JSONResponse(content={"data": _var_json(var, tfe_surface=_is_tfe(request))})
+    catalog_managed = ws.catalog_item_id is not None
+    return JSONResponse(
+        content={
+            "data": _var_json(
+                var,
+                tfe_surface=_is_tfe(request),
+                catalog_managed=catalog_managed,
+                catalog_hidden=await _catalog_hidden_inputs(db, ws) if catalog_managed else None,
+            )
+        }
+    )
 
 
 @dual_router.delete("/workspaces/{workspace_id}/vars/{var_id}", status_code=204)

@@ -41,6 +41,9 @@ type CatalogItem struct {
 type CatalogInstance struct {
 	ID         string
 	Attributes map[string]any
+	// UpdateBlock records the version and non-sensitive reason when a floating
+	// self-contained publish could not safely queue a run. Nil means no block.
+	UpdateBlock map[string]string
 }
 
 // CatalogRunRef is the minimal run reference returned by lifecycle actions
@@ -66,7 +69,8 @@ func (c *Client) CreateProviderTemplate(ctx context.Context, attrs map[string]an
 	return parseProviderTemplate(data)
 }
 
-// GetProviderTemplate reads a provider template by id.
+// GetProviderTemplate reads the redacted provider template by id. Platform-admin
+// authoring callers can use Get with ?include-sensitive-values=true.
 func (c *Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error) {
 	data, err := c.Get(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id))
 	if err != nil {
@@ -126,7 +130,8 @@ func (c *Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*
 	return parseCatalogItem(data)
 }
 
-// GetCatalogItem reads a catalog item by id (requires catalog read).
+// GetCatalogItem reads a redacted catalog item by id (requires catalog read).
+// Platform-admin authoring callers can use Get with ?include-sensitive-values=true.
 func (c *Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error) {
 	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id))
 	if err != nil {
@@ -422,7 +427,11 @@ func parseCatalogItem(body []byte) (*CatalogItem, error) {
 }
 
 func catalogInstanceFromResource(res *Resource) *CatalogInstance {
-	return &CatalogInstance{ID: res.ID, Attributes: attrsToMap(res)}
+	instance := &CatalogInstance{ID: res.ID, Attributes: attrsToMap(res)}
+	if raw := res.Attributes["catalog-update-block"]; len(raw) > 0 && string(raw) != "null" {
+		_ = json.Unmarshal(raw, &instance.UpdateBlock)
+	}
+	return instance
 }
 
 func parseCatalogInstance(body []byte) (*CatalogInstance, error) {

@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Beskrivning",
       "descriptionPlaceholder": "Vad detta katalogobjekt provisionerar…",
       "enabled": "Aktiverad (synlig i katalogbläddringen)",
+      "selfContained": "Fristående rotarkiv",
+      "selfContainedHint": "Använd det uppladdade modularkivet som arbetsytans rotkonfiguration.",
+      "restrictBackends": "Begränsa exekveringsmotorer",
+      "backendRangesHint": "Välj motorer som stöds och ange PEP 440-versionsintervall (till exempel >=1.12,<2).",
+      "backendRange": "Versionsintervall för {backend}",
       "providerTemplates": "Provider-mallar",
+      "templatesRemoved": "När du sparar tas befintliga kopplingar till providermallar bort.",
+      "templatesUnavailable": "Providermallar används inte med fristående objekt.",
       "noProviderTemplates": "Inga provider-mallar definierade.",
       "restrictPools": "Begränsa till specifika agentpooler",
       "noAgentPools": "Inga agentpooler tillgängliga.",
@@ -1496,6 +1503,7 @@
       "actions": "Åtgärder"
     },
     "badge": {
+      "selfContained": "fristående",
       "enabled": "aktiverad",
       "disabled": "inaktiverad"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Katalogobjekt borttaget"
     },
     "errors": {
+      "backendRequired": "Välj minst en exekveringsmotor.",
+      "backendRangeRequired": "Ange ett versionsintervall för varje vald motor.",
       "load": "Det gick inte att läsa in katalogobjekt",
       "save": "Det gick inte att spara katalogobjektet",
       "createStatus": "Det gick inte att skapa katalogobjektet ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Ta bort katalogposten utan att förstöra dess infrastruktur (avrådes)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version} behöver konfigureras om innan den kan köras.",
+      "updateBlockedArchive": "Version {version} kan inte köras eftersom arkivet saknas eller är ogiltigt. Be katalogägaren rätta till det.",
+      "updateBlockedRuntime": "Version {version} kan inte köras med den här arbetsytans backend och version. Välj en kompatibel version via API:et och konfigurera om.",
+      "removedInputs": "Används inte längre av den här versionen",
+      "removedHint": "Dessa indata tas bort när du köar omkonfigureringen. Granska de nya fälten innan du fortsätter.",
       "title": "Omkonfigurera {name}",
       "description": "Uppdatera indata och/eller version, och köa sedan en körning.",
       "currentOption": "{version} (aktuell)",

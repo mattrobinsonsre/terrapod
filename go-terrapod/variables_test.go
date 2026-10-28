@@ -27,7 +27,7 @@ func newVarFixture(t *testing.T) (*Client, *httptest.Server, *[]byte) {
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/vars"):
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"var-a","type":"vars","attributes":{"key":"region","value":"eu-west-1","category":"terraform"}},
-			  {"id":"var-b","type":"vars","attributes":{"key":"db_password","value":"","category":"terraform","sensitive":true}}
+			  {"id":"var-b","type":"vars","attributes":{"key":"db_password","value":null,"category":"terraform","sensitive":true}}
 			]}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"var-a","type":"vars","attributes":{"key":"region","value":"us-east-1","category":"terraform"}}}`))
@@ -160,6 +160,9 @@ func TestListVariables(t *testing.T) {
 	}
 	if !vars[1].Sensitive {
 		t.Error("sensitive flag not preserved")
+	}
+	if vars[0].Value != "eu-west-1" || vars[1].Value != "" {
+		t.Errorf("visible and masked values: %+v", vars)
 	}
 }
 

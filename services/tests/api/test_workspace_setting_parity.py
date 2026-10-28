@@ -98,6 +98,7 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
     "catalog_item_id": "provenance — marks the workspace catalog-managed and clamps its RBAC",
     "catalog_version_pin": "owned by the catalog service's reconfigure path",
     "catalog_input_values": "owned by the catalog service's reconfigure path",
+    "catalog_update_block": "catalog publish outcome, not an operator-settable workspace setting",
 }
 
 #: Genuine settings bulk update cannot reach yet — a debt, not an exemption.

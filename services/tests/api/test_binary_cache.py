@@ -10,17 +10,21 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from httpx import ASGITransport, AsyncClient
+import pytest
+from httpx import ASGITransport, AsyncClient, HTTPStatusError, Request, Response
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.config import settings
 from terrapod.db.session import get_db
+from terrapod.services.cache_errors import CacheOnlyError, UpstreamArtifactMissing
+from terrapod.services.cache_warm_service import WarmResult, WarmSummary
 from terrapod.storage import get_storage
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 _DL = "/api/terrapod/v1/binary-cache/terraform/1.9.0/linux/amd64"
+_INDEX_URL = "https://user:password@mirror.example/index.json?token=index-secret"
 
 
 def _user(email="admin@example.com", roles=None):
@@ -506,3 +510,136 @@ class TestPlatformToolDownload:
             )
         assert resp.status_code == 400
         assert "publishes no static asset" in resp.text
+
+
+@pytest.mark.parametrize(
+    ("path", "service", "method", "tool"),
+    [
+        (
+            "/api/terrapod/v1/binary-cache/versions?tool=tofu",
+            "list_available_versions",
+            "get",
+            "tofu",
+        ),
+        (_DL, "resolve_version", "get", "terraform"),
+        ("/api/terrapod/v1/binary-cache/tofu/1.9.0/sha256sums", "get_or_cache_sums", "get", "tofu"),
+        (
+            "/api/terrapod/v1/binary-cache/tofu/1.9.0/sha256sums.sig",
+            "get_or_cache_sums",
+            "get",
+            "tofu",
+        ),
+        ("/api/terrapod/v1/admin/binary-cache/warm", "warm_binary", "post", "terraform"),
+    ],
+)
+async def test_upstream_status_error_never_discloses_index_url(path, service, method, tool):
+    request = Request("GET", _INDEX_URL)
+    response = Response(503, request=request)
+    failure = HTTPStatusError(f"index {_INDEX_URL} failed", request=request, response=response)
+    app = _make_app(_user())
+    with (
+        patch(
+            f"terrapod.api.routers.binary_cache.{service}", new_callable=AsyncMock
+        ) as mock_service,
+        patch("terrapod.api.routers.binary_cache.logger.error") as error_log,
+    ):
+        mock_service.side_effect = failure
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            if method == "post":
+                result = await client.post(
+                    path, json={"tool": tool, "version": "1.9.0"}, headers=_AUTH
+                )
+            else:
+                result = await client.get(path, headers=_AUTH)
+
+    assert result.status_code == 502
+    detail = result.json()["detail"]
+    assert tool in detail
+    assert "HTTPStatusError" in detail
+    assert "503" in detail
+    assert _INDEX_URL not in result.text
+    assert "password" not in result.text
+    assert "index-secret" not in result.text
+    assert _INDEX_URL not in str(error_log.call_args_list)
+    assert "password" not in str(error_log.call_args_list)
+    assert "index-secret" not in str(error_log.call_args_list)
+
+
+async def test_missing_binary_error_redacts_index_url_but_keeps_platform_and_status():
+    app = _make_app(_user(roles=["everyone"]))
+    with patch(
+        "terrapod.api.routers.binary_cache.get_or_cache_binary", new_callable=AsyncMock
+    ) as mock_get:
+        mock_get.side_effect = UpstreamArtifactMissing(
+            f"terraform 1.9.0 publishes no artifact for linux/amd64: {_INDEX_URL} returned 404"
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            result = await client.get(_DL, headers=_AUTH)
+
+    assert result.status_code == 400
+    assert "terraform 1.9.0 publishes no artifact for linux/amd64" in result.json()["detail"]
+    assert "404" in result.json()["detail"]
+    assert "[redacted URL]" in result.json()["detail"]
+    assert "password" not in result.text
+    assert "index-secret" not in result.text
+
+
+@pytest.mark.parametrize(
+    ("service", "path", "failure", "expected_status"),
+    [
+        (
+            "list_available_versions",
+            "/api/terrapod/v1/binary-cache/versions?tool=tofu",
+            ValueError(f"Invalid tofu index {_INDEX_URL}"),
+            400,
+        ),
+        (
+            "resolve_version",
+            _DL,
+            CacheOnlyError(f"No cached terraform version; source {_INDEX_URL}"),
+            404,
+        ),
+    ],
+)
+async def test_expected_error_redacts_index_url_without_changing_status(
+    service, path, failure, expected_status
+):
+    app = _make_app(_user(roles=["everyone"]))
+    with patch(f"terrapod.api.routers.binary_cache.{service}", new_callable=AsyncMock) as mock:
+        mock.side_effect = failure
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            result = await client.get(path, headers=_AUTH)
+
+    assert result.status_code == expected_status
+    assert "[redacted URL]" in result.json()["detail"]
+    assert "password" not in result.text
+    assert "index-secret" not in result.text
+
+
+async def test_bulk_warm_redacts_index_url_in_partial_failure():
+    app = _make_app(_user())
+    with patch(
+        "terrapod.api.routers.binary_cache.warm_from_manifest", new_callable=AsyncMock
+    ) as mock_warm:
+        mock_warm.return_value = WarmSummary(
+            results=[
+                WarmResult(
+                    "binary",
+                    "tofu 1.9.0 linux/amd64",
+                    ok=False,
+                    error=f"upstream {_INDEX_URL} returned 503",
+                )
+            ]
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            result = await client.post(
+                "/api/terrapod/v1/admin/binary-cache/warm-bulk",
+                json={"binaries": [{"tool": "tofu", "version": "1.9.0"}]},
+                headers=_AUTH,
+            )
+
+    assert result.status_code == 200
+    assert result.json()["failed"] == 1
+    assert result.json()["results"][0]["error"] == "upstream [redacted URL] returned 503"
+    assert "password" not in result.text
+    assert "index-secret" not in result.text

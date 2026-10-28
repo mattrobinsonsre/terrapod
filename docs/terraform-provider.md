@@ -39,7 +39,10 @@ that engine's workspaces — narrow with it before feeding the list to anything
 that assumes one engine),
 `terrapod_workspace_cost`, `terrapod_architecture_critique`,
 `terrapod_agent_pool`, `terrapod_role`, `terrapod_user`,
-`terrapod_vcs_connection`, `terrapod_catalog_instances`,
+`terrapod_vcs_connection`, `terrapod_catalog_instances`
+(each entry, and the `terrapod_catalog_instance` resource, exposes computed
+`update_block_version` / `update_block_reason` when a floating self-contained
+publish cannot safely queue a run),
 `terrapod_catalog_item_interface` (the inputs and outputs of the module version
 a catalog item resolves to, with a computed `interface_error` that is non-null
 when the module could not be parsed), `terrapod_module_autodiscovery_rule_repositories`
@@ -98,6 +101,46 @@ output "app_monthly_cost" {
   value = data.terrapod_workspace_cost.app.total_max
 }
 ```
+
+### Catalog item execution modes
+
+`terrapod_catalog_item` defaults to a generated wrapper around its registry
+module. Set `self_contained = true` to use the uploaded module archive as the
+root configuration instead. Self-contained items require a non-empty
+`execution_backend_constraints` map with `tofu` and/or `terraform` version
+ranges and cannot use `provider_template_ids`:
+
+```hcl
+resource "terrapod_catalog_item" "network" {
+  name           = "network"
+  module_id      = terrapod_registry_module.network.id
+  self_contained = true
+  execution_backend_constraints = {
+    tofu = ">=1.8,<2"
+  }
+}
+```
+
+For a wrapper item, omit both attributes. To switch an existing item back to
+the wrapper mode, set `self_contained = false` and remove the constraints
+attribute (the provider sends JSON `null` on update); an empty map is not valid.
+The API refuses mode changes while active instances exist. Version ranges use
+the API's version-specifier syntax, not Terraform's `~>` syntax.
+
+`terrapod_catalog_item` and `terrapod_provider_template` require a **platform
+admin** identity. Ordinary item list/show GETs omit **all authored defaults
+and choices**, not just sensitive ones, since changing the module version pin
+can change input sensitivity. Ordinary template GETs hide the HCL body and
+sensitive parameter details. Their resource read/refresh paths explicitly
+call the individual show GET with `?include-sensitive-values=true` to retain
+authored variable options, parameter defaults and template HCL in state.
+Neither catalog `admin` nor ownership grants this opt-in. The regular SDK
+`GetCatalogItem` / `GetProviderTemplate` and list methods remain redacted; a
+selected-version form and the interface data source can return non-sensitive
+defaults, not sensitive ones. Treat provider state containing authoring values
+as sensitive: use a protected state backend and keep embedded secrets out of
+registry modules. A catalog item's `sensitive` option for a self-contained
+root input also requires `sensitive = true` in that archive's HCL.
 
 Under the hood the provider is a thin, typed wrapper over the canonical Go SDK
 [`go-terrapod`](../go-terrapod): the SDK owns every API call shape, and the

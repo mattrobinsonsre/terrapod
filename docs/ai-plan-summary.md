@@ -237,8 +237,10 @@ api:
 Each workspace has two opt-in fields:
 
 - `ai_summary_mode` — one of `default` (follow the deployment-wide
-  switch), `enabled` (always summarise this workspace), or `disabled`
-  (never summarise this workspace, regardless of global setting).
+  switch), `enabled` (request summaries when globally enabled), or `disabled`
+  (skip ordinary summaries on this workspace, regardless of global setting).
+  A mandatory AI policy gate still requests a verdict and may produce a
+  summary, even when this field is `disabled`.
 - `ai_summary_context` — free text up to 4000 characters, appended to
   the prompt as workspace-specific facts. Use this to surface
   blast-radius warnings ("destroying the KMS key in this workspace
@@ -313,6 +315,11 @@ over a pre-existing condition it does not alter stops you fixing anything.
 
 `advisory` never delays: the run reaches `planned` without waiting for the
 model, and the verdict is recorded when it arrives.
+
+This is true of **both** workspace switches: a mandatory gate ignores
+`ai_policy_mode: disabled` and `ai_summary_mode: disabled`. The latter is a
+summary opt-out, not permission for a workspace to bypass a fleet-wide
+mandatory decision; the model can still receive that run's inputs.
 
 `mandatory` has to wait, and that is the one way this gate differs from the
 other two. OPA and the security scan run on the **runner**, which posts their
@@ -443,7 +450,7 @@ mixed input/output cost). Input-side cost is bounded by
 
 ## Skipping and overrides
 
-A plan **does NOT** get a summary when:
+A plan ordinarily **does not** get a summary when:
 
 - The feature is globally disabled (`ai_summary.enabled: false`)
 - The workspace's `ai_summary_mode` is `disabled`
@@ -451,7 +458,7 @@ A plan **does NOT** get a summary when:
 - The plan has no JSON output (older runs, or runner upload failed)
 
 In every case, run lifecycle is unaffected — the feature is best-effort
-and never blocks plan or apply — **provided the policy gate is off**. With `ai_summary.policy.enabled` and `enforcement_level: mandatory`, a skipped or errored summary is not a shrug: the gate fails closed and the run is held. Read the gate section above before turning the feature on in a deployment that gates.
+and never blocks plan or apply — **provided the policy gate is off**. With `ai_summary.policy.enabled` and `enforcement_level: mandatory`, a workspace summary opt-out does not prevent the model call for the gate, and a skipped or errored verdict is not a shrug: the gate fails closed and the run is held. Read the gate section above before turning the feature on in a deployment that gates.
 
 ## What gets sent to the model
 
@@ -511,6 +518,22 @@ the bulk of the request):
   the `submit_plan_summary` tool exactly once with your structured
   answer."
 
+**Enabling AI is consent to send source-derived content to the configured
+model**, including self-contained catalog root archives when they are the run's
+configuration version. Before sending, Terrapod strips state snapshots and
+structurally marked plan secrets, then redacts known sensitive-variable and
+plan-marked literal values from the plan, logs, source context and diff. That
+is not a guarantee against credentials hard-coded in source or values it
+cannot identify as sensitive. **Even a known sensitive literal shorter than
+eight characters is not redacted from free text** (`CODE_CONTEXT`, `CODE_DIFF`
+and logs): the literal matcher has an eight-character minimum to avoid masking
+ordinary words. Structural plan markers do not have this minimum. Such short
+values can still reach the configured model when they appear in free text.
+Keep secrets out of module archives, or use a model endpoint you trust with
+their source; a mandatory AI policy gate can still send the prompt even when
+the workspace opts out of summaries. Raw registry downloads use registry
+permissions, not this model-input redaction.
+
 **Follow-up turns** (chat) — appended AFTER the cacheable prefix:
 - The assistant's initial structured summary as plain text (just
   the `description` — risk factors are NOT replayed in chat
@@ -530,15 +553,11 @@ the bulk of the request):
   import `StateVersion` or any state-key helper. The same invariant
   holds on the chat path: it reuses the same `_gather_inputs` +
   `render_prompt` flow.
-- **Sensitive workspace variables.** Workspace variables and
-  variable-set variables are injected at runtime into the runner
-  Job; the summariser code path never reads from the `variables`
-  table. `sensitive=True` values are also masked in API responses
-  and not stored in plaintext logs.
-- **Secrets in any other table.** The summariser only touches
-  `runs`, `workspaces`, `plan_summaries`, `plan_summary_messages`,
-  and object storage at `config/*` (CV tarball) + `plans/*` (plan
-  log / plan JSON / plan-artifacts).
+- **Sensitive workspace variable values as model fields.** Workspace and
+  variable-set values are delivered to runner Jobs, not added as prompt
+  fields. The summariser *does* resolve sensitive variables server-side to
+  scrub known literals from the model inputs; it does not send that list to
+  the model. This does not detect arbitrary secrets committed in HCL.
 - **API tokens, runner tokens, session tokens.** None of the auth
   surfaces feed the summariser inputs.
 
@@ -546,6 +565,14 @@ If you customise the prompt via `prompt_prefix`, `prompt_suffix`,
 `fleet_context`, or per-workspace `ai_summary_context`, anything
 you put in those fields **does** reach the model. Don't paste
 secrets into them.
+
+The canonical summary and chat thread are stored once in the deployment's
+`ai_summary.summary_language`. When a reader asks for another supported
+`?locale=`, the translated summary, risk-factor prose and chat text are
+generated by a **model call** and cached for display; the source-language
+summary prose goes to the model again for translation. Translation is
+best-effort: failure or budget exhaustion serves the canonical text. Locale
+translation does not turn on source summarisation when AI is disabled.
 
 ## How it works under the hood
 

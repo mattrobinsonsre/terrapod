@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "Bu katalog öğesinin neyi hazırladığı…",
       "enabled": "Etkin (göz atma kataloğunda görünür)",
+      "selfContained": "Kendi kendine yeterli kök arşiv",
+      "selfContainedHint": "Yüklenen modül arşivini çalışma alanının kök yapılandırması olarak kullanın.",
+      "restrictBackends": "Yürütme altyapılarını kısıtla",
+      "backendRangesHint": "Desteklenen altyapıları seçin ve PEP 440 sürüm aralıklarını girin (örneğin >=1.12,<2).",
+      "backendRange": "{backend} sürüm aralığı",
       "providerTemplates": "Sağlayıcı şablonları",
+      "templatesRemoved": "Kaydetmek, mevcut sağlayıcı şablonu ilişkilerini kaldırır.",
+      "templatesUnavailable": "Sağlayıcı şablonları kendi kendine yeterli öğelerle kullanılmaz.",
       "noProviderTemplates": "Tanımlı sağlayıcı şablonu yok.",
       "restrictPools": "Belirli agent havuzlarıyla sınırla",
       "noAgentPools": "Kullanılabilir agent havuzu yok.",
@@ -1496,6 +1503,7 @@
       "actions": "Eylemler"
     },
     "badge": {
+      "selfContained": "kendi kendine yeterli",
       "enabled": "etkin",
       "disabled": "devre dışı"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Katalog öğesi silindi"
     },
     "errors": {
+      "backendRequired": "En az bir yürütme altyapısı seçin.",
+      "backendRangeRequired": "Seçilen her altyapı için bir sürüm aralığı girin.",
       "load": "Katalog öğeleri yüklenemedi",
       "save": "Katalog öğesi kaydedilemedi",
       "createStatus": "Katalog öğesi oluşturulamadı ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Altyapısını yok etmeden katalog kaydını sil (önerilmez)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "{version} sürümü çalışmadan önce yeniden yapılandırılmalıdır.",
+      "updateBlockedArchive": "{version} sürümü, arşivi kullanılamadığı veya geçersiz olduğu için çalışamaz. Katalog sahibinden düzeltmesini isteyin.",
+      "updateBlockedRuntime": "{version} sürümü bu çalışma alanının arka ucu ve sürümüyle çalışamaz. API üzerinden uyumlu bir sürüm seçip yeniden yapılandırın.",
+      "removedInputs": "Bu sürümde artık kullanılmıyor",
+      "removedHint": "Bu girdiler yeniden yapılandırma kuyruğa alındığında kaldırılacak. Devam etmeden önce yeni alanları gözden geçirin.",
       "title": "{name} yeniden yapılandır",
       "description": "Girdileri ve/veya sürümü güncelleyin, ardından bir çalıştırma sıraya alın.",
       "currentOption": "{version} (geçerli)",

@@ -1471,7 +1471,14 @@
       "descriptionLabel": "D35cr1p710n",
       "descriptionPlaceholder": "Wh47 7h15 c474l0g 173m pr0v1510n5…",
       "enabled": "3n4bl3d (v151bl3 1n 7h3 br0w53 c474l0g)",
+      "selfContained": "53lf-c0n741n3d r007 4rch1v3",
+      "selfContainedHint": "U53 7h3 upl04d3d m0dul3 4rch1v3 45 7h3 w0rk5p4c3 r007 c0nf1g.",
+      "restrictBackends": "R357r1c7 3x3cu710n b4ck3nd5",
+      "backendRangesHint": "53l3c7 5upp0r73d b4ck3nd5 4nd 3n73r PEP 440 v3r510n r4ng35 (3.g. >=1.12,<2).",
+      "backendRange": "{backend} v3r510n r4ng3",
       "providerTemplates": "Pr0v1d3r 73mpl4735",
+      "templatesRemoved": "54v1ng r3m0v35 3x1571ng pr0v1d3r-73mpl473 l1nk5.",
+      "templatesUnavailable": "Pr0v1d3r 73mpl4735 4r3 n07 u53d w17h 53lf-c0n741n3d 173m5.",
       "noProviderTemplates": "N0 pr0v1d3r 73mpl4735 d3f1n3d.",
       "restrictPools": "R357r1c7 70 5p3c1f1c 4g3n7 p00l5",
       "noAgentPools": "N0 4g3n7 p00l5 4v41l4bl3.",
@@ -1496,6 +1503,7 @@
       "actions": "4c710n5"
     },
     "badge": {
+      "selfContained": "53lf-c0n741n3d",
       "enabled": "3n4bl3d",
       "disabled": "d154bl3d"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "C474l0g 173m d3l373d"
     },
     "errors": {
+      "backendRequired": "53l3c7 47 l3457 0n3 3x3cu710n b4ck3nd.",
+      "backendRangeRequired": "3n73r 4 v3r510n r4ng3 f0r 3v3ry 53l3c73d b4ck3nd.",
       "load": "F41l3d 70 l04d c474l0g 173m5",
       "save": "F41l3d 70 54v3 c474l0g 173m",
       "createStatus": "F41l3d 70 cr3473 c474l0g 173m ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "D3l373 7h3 c474l0g r3c0rd w17h0u7 d357r0y1ng 175 1nfr457ruc7ur3 (d15c0ur4g3d)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "V3r510n {version} n33d5 r3c0nf1gur4710n b3f0r3 17 c4n run.",
+      "updateBlockedArchive": "V3r510n {version} c4nn07 run b3c4u53 175 4rch1v3 15 m1551ng 0r 1nv4l1d. 45k 7h3 c474l0g 0wn3r 70 f1x 17.",
+      "updateBlockedRuntime": "V3r510n {version} c4nn07 run w17h 7h15 w0rk5p4c3 b4ck3nd 4nd v3r510n. Ch0053 4 c0mp471bl3 run71m3 v14 7h3 API, 7h3n r3c0nf1gur3.",
+      "removedInputs": "N0 l0ng3r u53d by 7h15 v3r510n",
+      "removedHint": "7h353 1npu75 w1ll b3 r3m0v3d wh3n y0u qu3u3 7h15 r3c0nf1gur4710n. R3v13w 7h3 n3w f13ld5 b3f0r3 c0n71nu1ng.",
       "title": "R3c0nf1gur3 {name}",
       "description": "Upd473 1npu75 4nd/0r v3r510n, 7h3n qu3u3 4 run.",
       "currentOption": "{version} (curr3n7)",

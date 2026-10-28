@@ -32,6 +32,7 @@ response was received.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections.abc import Callable
 
@@ -51,6 +52,21 @@ _CONNECT_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 DEFAULT_RETRIES = 3
 DEFAULT_BASE_DELAY = 1.0
 DEFAULT_MAX_DELAY = 8.0
+
+_URL_IN_ERROR = re.compile(r'https?://[^\s<>"]+', re.IGNORECASE)
+
+
+def redact_urls(message: str) -> str:
+    """Remove upstream URLs from error text (paths and query strings may contain credentials)."""
+    return _URL_IN_ERROR.sub("[redacted URL]", message)
+
+
+def exception_diagnostic(exc: Exception) -> str:
+    """Keep the failure class and upstream status, never an untrusted exception message."""
+    diagnostic = type(exc).__name__
+    if isinstance(exc, httpx.HTTPStatusError):
+        diagnostic += f" (upstream HTTP {exc.response.status_code})"
+    return diagnostic
 
 
 def _is_idempotent(method: str, idempotent: bool | None) -> bool:
@@ -119,10 +135,9 @@ def request_with_retry(
                 logger.warning(
                     "http retry after transport error",
                     method=method,
-                    url=str(url),
                     attempt=attempt + 1,
                     retries=retries,
-                    err=str(exc),
+                    err=exception_diagnostic(exc),
                 )
                 time.sleep(_backoff_seconds(attempt, base_delay, max_delay))
                 continue
@@ -135,7 +150,6 @@ def request_with_retry(
             logger.warning(
                 "http retry after 5xx",
                 method=method,
-                url=str(url),
                 attempt=attempt + 1,
                 retries=retries,
                 status=resp.status_code,
@@ -182,10 +196,9 @@ async def arequest_with_retry(
                 logger.warning(
                     "http retry after transport error",
                     method=method,
-                    url=str(url),
                     attempt=attempt + 1,
                     retries=retries,
-                    err=str(exc),
+                    err=exception_diagnostic(exc),
                 )
                 await asyncio.sleep(_backoff_seconds(attempt, base_delay, max_delay))
                 continue
@@ -198,7 +211,6 @@ async def arequest_with_retry(
             logger.warning(
                 "http retry after 5xx",
                 method=method,
-                url=str(url),
                 attempt=attempt + 1,
                 retries=retries,
                 status=resp.status_code,

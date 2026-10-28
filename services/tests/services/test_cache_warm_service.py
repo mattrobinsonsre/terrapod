@@ -3,6 +3,7 @@ declarative manifest (startup trigger) and the bulk-warm admin endpoint."""
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from terrapod.config import WarmBinaryEntry, WarmPlatform, WarmProviderEntry
@@ -84,6 +85,59 @@ class TestWarmFromManifest:
         assert db.rollback.await_count == 1
         assert db.commit.await_count == 1
 
+    @pytest.mark.parametrize("kind", ["binary", "provider"])
+    async def test_bulk_warm_failure_log_does_not_expose_upstream_credentials(self, kind):
+        url = "https://user:password@mirror.example/index.json?token=index-secret"
+        request = httpx.Request("GET", url)
+        response = httpx.Response(503, request=request)
+        failure = httpx.HTTPStatusError(
+            f"upstream {url} returned 503", request=request, response=response
+        )
+        db, storage = _db(), AsyncMock()
+        if kind == "binary":
+            binaries = [
+                WarmBinaryEntry(
+                    tool="tofu",
+                    version="1.9.0",
+                    platforms=[WarmPlatform(os="linux", arch="amd64")],
+                )
+            ]
+            providers = []
+            service = cache_warm_service.binary_cache_service
+            method = "warm_binary"
+            ref = "tofu 1.9.0 linux/amd64"
+        else:
+            binaries = []
+            providers = [
+                WarmProviderEntry(
+                    source="registry.terraform.io/hashicorp/aws",
+                    version="5.60.0",
+                    platforms=[WarmPlatform(os="linux", arch="amd64")],
+                )
+            ]
+            service = cache_warm_service.provider_cache_service
+            method = "fetch_and_cache_single_platform"
+            ref = "registry.terraform.io/hashicorp/aws 5.60.0 linux/amd64"
+
+        with (
+            patch.object(service, method, new_callable=AsyncMock, side_effect=failure),
+            patch.object(cache_warm_service.logger, "warning") as warning,
+        ):
+            summary = await warm_from_manifest(
+                db, storage, binaries, providers, include_platform_tools=False
+            )
+
+        assert summary.failed == summary.total == 1
+        assert summary.results[0].ref == ref
+        assert summary.results[0].error == str(failure)
+        db.rollback.assert_awaited_once()
+        db.commit.assert_not_awaited()
+        warning.assert_called_once_with(
+            f"Failed to warm {kind}", ref=ref, error="HTTPStatusError (upstream HTTP 503)"
+        )
+        assert "password" not in str(warning.call_args)
+        assert "index-secret" not in str(warning.call_args)
+
     async def test_provider_uses_default_platforms_and_coordinates(self):
         db, storage = _db(), AsyncMock()
         with patch.object(
@@ -97,6 +151,7 @@ class TestWarmFromManifest:
                 storage,
                 [],
                 [WarmProviderEntry(source="registry.terraform.io/hashicorp/aws", version="5.60.0")],
+                include_platform_tools=False,
             )
         # Default provider platforms = 2 (linux/amd64 + linux/arm64).
         assert mock_fetch.await_count == 2

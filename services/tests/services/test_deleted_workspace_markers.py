@@ -272,6 +272,7 @@ class TestMarkerContents:
             "catalog_item_id",
             "catalog_version_pin",
             "catalog_input_values",
+            "catalog_update_block",  # Catalog publish outcome, not restorable configuration.
         }
 
         ws = MagicMock()

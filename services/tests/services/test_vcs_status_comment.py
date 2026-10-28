@@ -1490,7 +1490,12 @@ class TestAModulePrAlsoGetsOneComment:
             # Once per consuming workspace, as the module-impact path calls it.
             for _ in range(2):
                 await mod.refresh_module_pr_comment(
-                    MagicMock(), h.conn, "org/module", 42, [uuid.uuid4(), uuid.uuid4()]
+                    MagicMock(),
+                    h.conn,
+                    "org/module",
+                    42,
+                    [uuid.uuid4(), uuid.uuid4()],
+                    uuid.uuid4(),
                 )
 
         assert len(h.gh.created) == 1, h.gh.created
@@ -1509,7 +1514,7 @@ class TestAModulePrAlsoGetsOneComment:
                 patch.object(mod, "_collect_module_rows", new=AsyncMock(return_value=[]))
             )
             await mod.refresh_module_pr_comment(
-                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()]
+                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()], uuid.uuid4()
             )
         assert h.gh.created == []
 
@@ -1522,7 +1527,7 @@ class TestAModulePrAlsoGetsOneComment:
             mod, "_collect_module_rows", new=AsyncMock(side_effect=RuntimeError("nope"))
         ):
             await mod.refresh_module_pr_comment(
-                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()]
+                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()], uuid.uuid4()
             )
 
     @pytest.mark.asyncio
@@ -1531,13 +1536,11 @@ class TestAModulePrAlsoGetsOneComment:
 
         db = MagicMock()
         db.execute = AsyncMock(side_effect=AssertionError("must not query"))
-        assert await _collect_module_rows(db, [], 42) == []
+        assert await _collect_module_rows(db, [], 42, uuid.uuid4()) == []
 
     @pytest.mark.asyncio
-    async def test_the_query_is_scoped_to_module_test_runs(self):
-        """PR numbers are per-repository and nothing on a run records which
-        repository its number came from, so without the source filter a
-        workspace's own PR #7 would appear on a module's PR #7.
+    async def test_the_query_is_scoped_to_module_test_runs_and_module_id(self):
+        """Two modules can share the same consumer and PR number, with different SHAs.
 
         Asserted against the compiled statement: a fake that returns rows
         regardless of the query would pass with the filter removed.
@@ -1548,14 +1551,162 @@ class TestAModulePrAlsoGetsOneComment:
 
         async def _execute(stmt):
             seen["sql"] = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            seen["params"] = stmt.compile().params
+            seen["where"] = str(stmt.whereclause)
             result = MagicMock()
             result.all = MagicMock(return_value=[])
             return result
 
         db = MagicMock()
         db.execute = AsyncMock(side_effect=_execute)
-        await _collect_module_rows(db, [uuid.uuid4()], 42)
+        module_id = uuid.uuid4()
+        await _collect_module_rows(db, [uuid.uuid4()], 42, module_id)
 
         sql = seen["sql"]
         assert "module-test" in sql, sql
         assert "42" in sql, sql
+        assert module_id in seen["params"].values()
+        assert "runs.module_impact_module_id" in seen["where"], sql
+        assert "runs.created_by" in seen["where"], sql
+        assert "module-impact-analysis" in seen["params"].values()
+
+    async def test_retry_of_old_head_does_not_replace_new_module_pr_comment(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        module_id = uuid.uuid4()
+        ws = SimpleNamespace(id=uuid.uuid4(), name="consumer")
+        head_a, head_b = "a" * 40, "b" * 40
+        runs = []
+        for created_at, created_by, sha in (
+            (1, "module-impact-analysis", head_a),
+            (2, "module-impact-analysis", head_b),
+            (3, "user@example.com", head_a),
+            (4, "user@example.com", head_b),
+        ):
+            runs.append(
+                SimpleNamespace(
+                    id=uuid.uuid4(),
+                    workspace_id=ws.id,
+                    created_at=created_at,
+                    created_by=created_by,
+                    vcs_commit_sha=sha,
+                    resource_additions=created_at,
+                )
+            )
+        visible_runs = runs[:2]
+        db = MagicMock()
+
+        async def execute(stmt):
+            # Model the DB applying the creator predicate and creation-time sort.
+            where = str(stmt.whereclause)
+            params = stmt.compile().params.values()
+            selected = (
+                [run for run in visible_runs if run.created_by == "module-impact-analysis"]
+                if "runs.created_by" in where and "module-impact-analysis" in params
+                else visible_runs
+            )
+            return _FakeResult(
+                [(run, ws) for run in sorted(selected, key=lambda r: r.created_at, reverse=True)]
+            )
+
+        db.execute = AsyncMock(side_effect=execute)
+        h = _CommentHarness()
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            stack.enter_context(
+                patch.object(
+                    mod,
+                    "_row_for",
+                    new=AsyncMock(
+                        side_effect=lambda _db, _ws, run: _row(
+                            workspace_name=_ws.name, plan_summary=f"+{run.resource_additions}"
+                        )
+                    ),
+                )
+            )
+            await mod.refresh_module_pr_comment(
+                db, h.conn, "org/module", 42, [ws.id], module_id, head_b
+            )
+            assert len(h.gh.created) == 1
+            assert "| +2 |" in h.gh.posted[0]["body"]
+
+            visible_runs.append(runs[2])  # Retry head A after B's comment is posted.
+            await mod.refresh_module_pr_comment(
+                db, h.conn, "org/module", 42, [ws.id], module_id, head_a
+            )
+            assert not h.gh.updated, "a late completion for head A rewrote head B"
+            assert "| +2 |" in h.gh.posted[0]["body"]
+
+            visible_runs.append(runs[3])  # Even a same-head retry is not the PR row.
+            await mod.refresh_module_pr_comment(db, h.conn, "org/module", 42, [ws.id], module_id)
+            assert len(h.gh.updated) == 1
+            assert "| +2 |" in h.gh.posted[0]["body"]
+            assert "| +4 |" not in h.gh.posted[0]["body"]
+
+    async def test_two_modules_same_workspace_and_pr_number_keep_separate_rows_after_retention(
+        self,
+    ):
+        from terrapod.services import vcs_status_comment as mod
+
+        ws = SimpleNamespace(id=uuid.uuid4(), name="consumer")
+        first_id, second_id = uuid.uuid4(), uuid.uuid4()
+        runs = [
+            SimpleNamespace(
+                module_impact_module_id=module_id,
+                vcs_commit_sha=sha,
+                module_overrides=None,
+                workspace_id=ws.id,
+            )
+            for module_id, sha in ((first_id, "a" * 40), (second_id, "b" * 40))
+        ]
+        db = MagicMock()
+
+        async def execute(stmt):
+            # Stand in for the DB applying the query, not an unconditional mock
+            # result: removing the module-id predicate would mix the two rows.
+            where = str(stmt.whereclause)
+            params = stmt.compile().params.values()
+            selected = (
+                [run for run in runs if run.module_impact_module_id in params]
+                if "runs.module_impact_module_id" in where
+                else runs
+            )
+            return _FakeResult([(run, ws) for run in selected])
+
+        db.execute = AsyncMock(side_effect=execute)
+        with patch.object(
+            mod, "_row_for", new=AsyncMock(side_effect=lambda _db, _ws, run: run.vcs_commit_sha)
+        ):
+            first = await mod._collect_module_rows(db, [ws.id], 7, first_id)
+            second = await mod._collect_module_rows(db, [ws.id], 7, second_id)
+        assert first == ["a" * 40]
+        assert second == ["b" * 40]
+
+    async def test_new_pr_revision_does_not_include_or_restore_old_workspace_rows(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        module_id = uuid.uuid4()
+        newest = SimpleNamespace(workspace_id=uuid.uuid4(), vcs_commit_sha="b" * 40)
+        old = SimpleNamespace(workspace_id=uuid.uuid4(), vcs_commit_sha="a" * 40)
+        db = MagicMock()
+        db.execute = AsyncMock(
+            return_value=_FakeResult(
+                [
+                    (newest, SimpleNamespace(id=newest.workspace_id, name="current")),
+                    (old, SimpleNamespace(id=old.workspace_id, name="stale")),
+                ]
+            )
+        )
+        with patch.object(
+            mod, "_row_for", new=AsyncMock(side_effect=lambda _db, ws, _run: ws.name)
+        ):
+            assert await mod._collect_module_rows(
+                db, [newest.workspace_id, old.workspace_id], 7, module_id, newest.vcs_commit_sha
+            ) == ["current"]
+            assert (
+                await mod._collect_module_rows(
+                    db, [newest.workspace_id, old.workspace_id], 7, module_id, old.vcs_commit_sha
+                )
+                == []
+            )

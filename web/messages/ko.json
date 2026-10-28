@@ -1471,7 +1471,14 @@
       "descriptionLabel": "설명",
       "descriptionPlaceholder": "이 카탈로그 항목이 프로비저닝하는 것…",
       "enabled": "사용 (카탈로그 탐색에 표시됨)",
+      "selfContained": "독립형 루트 아카이브",
+      "selfContainedHint": "업로드한 모듈 아카이브를 작업 공간의 루트 구성으로 사용합니다.",
+      "restrictBackends": "실행 백엔드 제한",
+      "backendRangesHint": "지원되는 백엔드를 선택하고 PEP 440 버전 범위를 입력하세요(예: >=1.12,<2).",
+      "backendRange": "{backend} 버전 범위",
       "providerTemplates": "프로바이더 템플릿",
+      "templatesRemoved": "저장하면 기존 프로바이더 템플릿 연결이 제거됩니다.",
+      "templatesUnavailable": "독립형 항목에는 프로바이더 템플릿을 사용하지 않습니다.",
       "noProviderTemplates": "정의된 프로바이더 템플릿이 없습니다.",
       "restrictPools": "특정 에이전트 풀로 제한",
       "noAgentPools": "사용 가능한 에이전트 풀이 없습니다.",
@@ -1496,6 +1503,7 @@
       "actions": "작업"
     },
     "badge": {
+      "selfContained": "독립형",
       "enabled": "사용",
       "disabled": "사용 안 함"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "카탈로그 항목 삭제됨"
     },
     "errors": {
+      "backendRequired": "실행 백엔드를 하나 이상 선택하세요.",
+      "backendRangeRequired": "선택한 모든 백엔드의 버전 범위를 입력하세요.",
       "load": "카탈로그 항목을 불러오지 못했습니다",
       "save": "카탈로그 항목을 저장하지 못했습니다",
       "createStatus": "카탈로그 항목을 생성하지 못했습니다 ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "인프라를 삭제하지 않고 카탈로그 레코드를 삭제합니다(권장하지 않음)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "버전 {version}을 실행하려면 재구성이 필요합니다.",
+      "updateBlockedArchive": "버전 {version}의 아카이브를 사용할 수 없거나 유효하지 않아 실행할 수 없습니다. 카탈로그 관리자에게 수정을 요청하세요.",
+      "updateBlockedRuntime": "버전 {version}은 이 워크스페이스의 실행 백엔드와 버전에서 실행할 수 없습니다. API에서 호환 버전을 선택한 후 다시 구성하세요.",
+      "removedInputs": "이 버전에서 더 이상 사용되지 않음",
+      "removedHint": "재구성을 대기열에 추가하면 이 입력값이 제거됩니다. 계속하기 전에 새 필드를 검토하세요.",
       "title": "{name} 재구성",
       "description": "입력 및/또는 버전을 업데이트한 다음 실행을 대기열에 넣습니다.",
       "currentOption": "{version} (현재)",

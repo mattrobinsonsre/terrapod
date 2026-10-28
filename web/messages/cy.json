@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Disgrifiad",
       "descriptionPlaceholder": "Beth mae'r eitem catalog hon yn ei ddarparu…",
       "enabled": "Wedi'i alluogi (yn weladwy yn y catalog pori)",
+      "selfContained": "Archif gwraidd hunangynhwysol",
+      "selfContainedHint": "Defnyddiwch archif y modiwl a uwchlwythwyd fel cyfluniad gwraidd y gweithle.",
+      "restrictBackends": "Cyfyngu ar beiriannau gweithredu",
+      "backendRangesHint": "Dewiswch beiriannau a gefnogir a rhowch ystodau fersiynau PEP 440 (er enghraifft >=1.12,<2).",
+      "backendRange": "Ystod fersiynau {backend}",
       "providerTemplates": "Templedi darparwr",
+      "templatesRemoved": "Mae cadw yn dileu cysylltiadau presennol â thempledi darparwr.",
+      "templatesUnavailable": "Ni ddefnyddir templedi darparwr gydag eitemau hunangynhwysol.",
       "noProviderTemplates": "Dim templedi darparwr wedi'u diffinio.",
       "restrictPools": "Cyfyngu i byllau asiantau penodol",
       "noAgentPools": "Dim pyllau asiantau ar gael.",
@@ -1496,6 +1503,7 @@
       "actions": "Gweithredoedd"
     },
     "badge": {
+      "selfContained": "hunangynhwysol",
       "enabled": "wedi'i alluogi",
       "disabled": "wedi'i analluogi"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Dilëwyd yr eitem catalog"
     },
     "errors": {
+      "backendRequired": "Dewiswch o leiaf un peiriant gweithredu.",
+      "backendRangeRequired": "Rhowch ystod fersiynau ar gyfer pob peiriant a ddewiswyd.",
       "load": "Methwyd llwytho'r eitemau catalog",
       "save": "Methwyd cadw'r eitem catalog",
       "createStatus": "Methwyd creu'r eitem catalog ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Dileu'r cofnod catalog heb ddinistrio ei seilwaith (nid argymhellir)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Mae angen ailffurfweddu fersiwn {version} cyn iddi allu rhedeg.",
+      "updateBlockedArchive": "Ni all fersiwn {version} redeg gan nad yw ei harchif ar gael neu ei bod yn annilys. Gofynnwch i berchennog y catalog ei chywiro.",
+      "updateBlockedRuntime": "Ni all fersiwn {version} redeg gyda chefnlen a fersiwn y gweithle hwn. Dewiswch fersiwn gydnaws drwy''r API ac ailffurfweddwch.",
+      "removedInputs": "Nid ydynt yn cael eu defnyddio gan y fersiwn hon mwyach",
+      "removedHint": "Caiff y mewnbynnau hyn eu tynnu pan fyddwch yn rhoi'r ailgyfluniad hwn yn y ciw. Adolygwch y meysydd newydd cyn parhau.",
       "title": "Ailffurfweddu {name}",
       "description": "Diweddarwch fewnbynnau a/neu fersiwn, yna ciwiwch rediad.",
       "currentOption": "{version} (cyfredol)",

@@ -253,6 +253,7 @@ async def _create_drift_run_vcs(
         source="drift-detection",
         auto_queue_runs=False,
         speculative=False,
+        archive_provenance="unprotected",
     )
     await db.flush()
 

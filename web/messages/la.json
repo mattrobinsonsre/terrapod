@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Descriptio",
       "descriptionPlaceholder": "Quid haec res catalogi provideat…",
       "enabled": "Activata (visibilis in catalogo explorando)",
+      "selfContained": "Archivum radicis per se completum",
+      "selfContainedHint": "Archivum moduli immissum pro configuratione radicis spatii operis utere.",
+      "restrictBackends": "Machinas exsecutionis restringere",
+      "backendRangesHint": "Machinas sustentatas elige et intervalla versionum PEP 440 inscribe (exempli gratia >=1.12,<2).",
+      "backendRange": "Intervallum versionum {backend}",
       "providerTemplates": "Exempla providers",
+      "templatesRemoved": "Servatio nexus exstantes cum exemplis providers tollit.",
+      "templatesUnavailable": "Exempla providers cum rebus per se completis non adhibentur.",
       "noProviderTemplates": "Nulla exempla providers definita.",
       "restrictPools": "Restringe ad certos agent pools",
       "noAgentPools": "Nulli agent pools praesto.",
@@ -1496,6 +1503,7 @@
       "actions": "Actiones"
     },
     "badge": {
+      "selfContained": "per se completum",
       "enabled": "activata",
       "disabled": "deactivata"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Res catalogi deleta"
     },
     "errors": {
+      "backendRequired": "Elige saltem unam machinam exsecutionis.",
+      "backendRangeRequired": "Intervallum versionum pro qualibet machina electa inscribe.",
       "load": "Res catalogi onerari non potuerunt",
       "save": "Res catalogi servari non potuit",
       "createStatus": "Res catalogi creari non potuit ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Recordum catalogi delere sine infrastructura eius destruenda (dissuasum)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Versio {version} reconfiguranda est antequam exsequi possit.",
+      "updateBlockedArchive": "Versio {version} exsequi non potest quia archivum deest aut invalidum est. Dominum catalogi roga ut corrigat.",
+      "updateBlockedRuntime": "Versio {version} cum instrumento et versione huius spatii operis exsequi non potest. Versionem congruentem per API elige et iterum configura.",
+      "removedInputs": "Ab hac versione non amplius adhibentur",
+      "removedHint": "Hi valores inputi removebuntur cum hanc reconfigurationem in ordinem mittes. Campos novos antequam pergis inspice.",
       "title": "{name} reconfigurare",
       "description": "Renova ingressus et/vel versionem, deinde exsecutionem in ordinem pone.",
       "currentOption": "{version} (praesens)",

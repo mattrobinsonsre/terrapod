@@ -7,6 +7,14 @@ api:
   # Hot reload for local dev
   command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-graceful-shutdown", "5"]
 
+  # The public signing key is staged in the existing filesystem storage PVC
+  # before the API starts; mount the file read-only at the provider's key path.
+  extraVolumeMounts:
+    - name: storage
+      mountPath: /app/signing-key.asc
+      subPath: cache/provider/terrapod/dev-signing-key.asc
+      readOnly: true
+
   # Local-only: inject AWS creds for the in-development AI plan-summary
   # feature (#401). The k8s Secret is created out-of-band via kubectl;
   # both the user and the inline policy auto-expire on 2026-06-08T23:59:59Z
@@ -98,9 +106,9 @@ api:
     # hand-created `terrapod-slack` K8s Secret (see docs/slack-integration.md);
     # Socket Mode means no ingress/tunnel is needed for the dev loop.
     slack:
-      enabled: true
+      enabled: false
       socket_mode: true
-      existingSecret: terrapod-slack
+      existingSecret: ""
     # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
     # full bootstrap → renew → rotate loop is observable in a few minutes
     # instead of an hour. Production stays at the 1h default.
@@ -165,6 +173,8 @@ api:
 
 # Web UI (Next.js dev server in K8s)
 web:
+  service:
+    type: NodePort
   enabled: true
   replicas: 1
   pdb:
@@ -267,6 +277,14 @@ storage:
 
 # Runner image for local dev (built locally)
 runners:
+  # Route listener and runner API calls, including tofu's provider registry
+  # discovery override, through the in-cluster web BFF.
+  serverUrl: "http://terrapod-web.terrapod.svc.cluster.local:3000"
+  # Dev-only: the Terrapod provider needs to call that HTTP BFF with its API
+  # token. This opt-in does not control tofu's HTTP registry host override.
+  extraEnv:
+    - name: TERRAPOD_ALLOW_INSECURE_TRANSPORT
+      value: "1"
   image:
     repository: terrapod-runner
     tag: local

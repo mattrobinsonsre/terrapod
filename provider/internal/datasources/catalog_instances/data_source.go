@@ -29,10 +29,12 @@ type catalogInstancesModel struct {
 }
 
 type catalogInstanceEntry struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	AgentPoolID types.String `tfsdk:"agent_pool_id"`
-	VersionPin  types.String `tfsdk:"version_pin"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	AgentPoolID        types.String `tfsdk:"agent_pool_id"`
+	VersionPin         types.String `tfsdk:"version_pin"`
+	UpdateBlockVersion types.String `tfsdk:"update_block_version"`
+	UpdateBlockReason  types.String `tfsdk:"update_block_reason"`
 }
 
 // NewDataSource returns a new catalog instances data source.
@@ -61,10 +63,12 @@ func (d *catalogInstancesDataSource) Schema(_ context.Context, _ datasource.Sche
 				Description: "The matching provisioned instances.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id":            schema.StringAttribute{Computed: true, Description: "Instance (workspace) ID."},
-						"name":          schema.StringAttribute{Computed: true, Description: "Instance name."},
-						"agent_pool_id": schema.StringAttribute{Computed: true, Description: "Agent pool the instance runs on."},
-						"version_pin":   schema.StringAttribute{Computed: true, Description: "Module version pin."},
+						"id":                   schema.StringAttribute{Computed: true, Description: "Instance (workspace) ID."},
+						"name":                 schema.StringAttribute{Computed: true, Description: "Instance name."},
+						"agent_pool_id":        schema.StringAttribute{Computed: true, Description: "Agent pool the instance runs on."},
+						"version_pin":          schema.StringAttribute{Computed: true, Description: "Module version pin."},
+						"update_block_version": schema.StringAttribute{Computed: true, Description: "Version whose publish requires attention; null when no update is blocked."},
+						"update_block_reason":  schema.StringAttribute{Computed: true, Description: "Non-sensitive reason code for a blocked catalog publish."},
 					},
 				},
 			},
@@ -115,11 +119,17 @@ func (d *catalogInstancesDataSource) Read(ctx context.Context, req datasource.Re
 			continue
 		}
 		config.Instances = append(config.Instances, catalogInstanceEntry{
-			ID:          types.StringValue(inst.ID),
-			Name:        types.StringValue(name),
-			AgentPoolID: types.StringValue(attrString(inst.Attributes, "agent-pool-id")),
-			VersionPin:  types.StringValue(attrString(inst.Attributes, "catalog-version-pin")),
+			ID:                 types.StringValue(inst.ID),
+			Name:               types.StringValue(name),
+			AgentPoolID:        types.StringValue(attrString(inst.Attributes, "agent-pool-id")),
+			VersionPin:         types.StringValue(attrString(inst.Attributes, "catalog-version-pin")),
+			UpdateBlockVersion: types.StringNull(),
+			UpdateBlockReason:  types.StringNull(),
 		})
+		if inst.UpdateBlock != nil {
+			config.Instances[len(config.Instances)-1].UpdateBlockVersion = types.StringValue(inst.UpdateBlock["version"])
+			config.Instances[len(config.Instances)-1].UpdateBlockReason = types.StringValue(inst.UpdateBlock["reason"])
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)

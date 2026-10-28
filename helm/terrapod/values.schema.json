@@ -44,6 +44,9 @@
         "image": {
           "$ref": "#/$defs/imageSpec"
         },
+        "devProviderVersion": {
+          "type": "string"
+        },
         "command": {
           "type": "array",
           "items": {

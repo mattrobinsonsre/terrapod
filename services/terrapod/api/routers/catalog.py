@@ -29,8 +29,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+import anyio
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from redis.exceptions import LockError, RedisError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,13 +54,16 @@ from terrapod.config import settings
 from terrapod.db.models import (
     AgentPool,
     CatalogItem,
+    ConfigurationVersion,
     ProviderTemplate,
     RegistryModule,
     Run,
+    Variable,
     Workspace,
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 from terrapod.services import catalog_service, pool_set, run_service
 from terrapod.services.catalog_rbac_service import (
     resolve_catalog_capabilities_for,
@@ -66,6 +72,7 @@ from terrapod.services.catalog_service import CatalogError
 from terrapod.services.pool_rbac_service import (
     resolve_pool_capabilities_for,
 )
+from terrapod.storage.keys import module_tarball_key
 
 router = APIRouter(tags=["catalog"])
 logger = get_logger(__name__)
@@ -90,15 +97,41 @@ def _now() -> datetime:
 # ── Serializers ────────────────────────────────────────────────────────
 
 
-def _template_json(t: ProviderTemplate) -> dict:
+def _template_json(t: ProviderTemplate, *, include_sensitive_values: bool = False) -> dict:
+    parameters = (
+        list(t.parameters or [])
+        if include_sensitive_values
+        else [
+            (
+                {k: p[k] for k in ("name", "type", "required", "sensitive") if k in p}
+                if p.get("sensitive")
+                else {
+                    k: p[k]
+                    for k in (
+                        "name",
+                        "type",
+                        "description",
+                        "required",
+                        "sensitive",
+                        "default",
+                        "options",
+                    )
+                    if k in p
+                }
+            )
+            for p in (t.parameters or [])
+        ]
+    )
     return {
         "id": str(t.id),
         "type": "provider-templates",
         "attributes": {
             "name": t.name,
             "provider-type": t.provider_type,
-            "body": t.body,
-            "parameters": list(t.parameters or []),
+            # Arbitrary provider HCL can inline credentials independently of
+            # parameter flags; an ordinary read cannot prove its body safe.
+            "body": t.body if include_sensitive_values else None,
+            "parameters": parameters,
             "labels": dict(t.labels or {}),
             "owner-email": t.owner_email or "",
             "created-at": _rfc3339(t.created_at),
@@ -108,8 +141,25 @@ def _template_json(t: ProviderTemplate) -> dict:
     }
 
 
-def _item_json(item: CatalogItem) -> dict:
+def _item_json(
+    item: CatalogItem,
+    *,
+    include_sensitive_values: bool = False,
+) -> dict:
     module = item.module
+    options = (
+        list(item.variable_options or [])
+        if include_sensitive_values
+        else [
+            # Unknown metadata may contain nested defaults or choices.
+            {
+                k: opt[k]
+                for k in ("name", "hidden", "sensitive", "description", "type", "required")
+                if k in opt
+            }
+            for opt in (item.variable_options or [])
+        ]
+    )
     return {
         "id": str(item.id),
         "type": "catalog-items",
@@ -118,6 +168,8 @@ def _item_json(item: CatalogItem) -> dict:
             "display-name": item.display_name or "",
             "description": item.description or "",
             "enabled": item.enabled,
+            "self-contained": item.self_contained,
+            "execution-backend-constraints": item.execution_backend_constraints,
             "module-id": str(item.module_id),
             "module-name": module.name if module else "",
             "module-provider": module.provider if module else "",
@@ -128,7 +180,7 @@ def _item_json(item: CatalogItem) -> dict:
                 if item.allowed_agent_pool_ids is not None
                 else None
             ),
-            "variable-options": list(item.variable_options or []),
+            "variable-options": options,
             # The Ansible half this item provisions (#2019). `configure-enabled`
             # says WHETHER and `ansible-directory` says WHERE; the path does not
             # carry "off" in its emptiness, because #1966 corrected exactly that
@@ -146,6 +198,19 @@ def _item_json(item: CatalogItem) -> dict:
     }
 
 
+def _authoring_read_allowed(user: AuthenticatedUser, requested: str | None) -> bool:
+    if requested not in (None, "true", "false"):
+        raise HTTPException(
+            status_code=422, detail="include-sensitive-values must be true or false"
+        )
+    include_sensitive_values = requested == "true"
+    if include_sensitive_values and "admin" not in effective_platform_roles(user):
+        raise HTTPException(
+            status_code=403, detail="Requires platform admin to include sensitive values"
+        )
+    return include_sensitive_values
+
+
 def _instance_json(ws: Workspace) -> dict:
     return {
         "id": str(ws.id),
@@ -154,6 +219,7 @@ def _instance_json(ws: Workspace) -> dict:
             "name": ws.name,
             "catalog-item-id": str(ws.catalog_item_id) if ws.catalog_item_id else None,
             "catalog-version-pin": ws.catalog_version_pin,
+            "catalog-update-block": ws.catalog_update_block,
             "agent-pool-id": (
                 f"apool-{_ws_pools[0]}" if (_ws_pools := pool_set.workspace_pool_ids(ws)) else None
             ),
@@ -220,6 +286,8 @@ def _coerce_template(attrs: dict, *, on_create: bool) -> dict:
                 raise HTTPException(
                     status_code=422, detail="each parameter must be an object with a name"
                 )
+            if "sensitive" in p and not isinstance(p["sensitive"], bool):
+                raise HTTPException(status_code=422, detail="parameter sensitive must be a boolean")
         out["parameters"] = params
     if "labels" in attrs:
         out["labels"] = validate_labels(attrs["labels"] or {})
@@ -272,16 +340,18 @@ async def create_provider_template(
 @router.get("/provider-templates/{template_id}")
 async def show_provider_template(
     template_id: str = Path(...),
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
+    reveal = _authoring_read_allowed(user, request.query_params.get("include-sensitive-values"))
     t = await catalog_service.get_provider_template(
         db, parse_id(template_id, detail="provider template not found")
     )
     if t is None:
         raise HTTPException(status_code=404, detail="provider template not found")
-    return JSONResponse(content={"data": _template_json(t)})
+    return JSONResponse(content={"data": _template_json(t, include_sensitive_values=reveal)})
 
 
 @router.patch("/provider-templates/{template_id}")
@@ -369,6 +439,32 @@ async def _coerce_item(
         out["description"] = str(attrs["description"] or "")
     if "enabled" in attrs:
         out["enabled"] = bool(attrs["enabled"])
+    if "self-contained" in attrs:
+        if not isinstance(attrs["self-contained"], bool):
+            raise HTTPException(status_code=422, detail="self-contained must be a boolean")
+        out["self_contained"] = attrs["self-contained"]
+    if "execution-backend-constraints" in attrs:
+        constraints = attrs["execution-backend-constraints"]
+        if constraints is not None:
+            if not isinstance(constraints, dict) or not constraints:
+                raise HTTPException(
+                    status_code=422,
+                    detail="execution-backend-constraints must be a non-empty object or null",
+                )
+            for backend, spec in constraints.items():
+                if backend not in ("tofu", "terraform") or not isinstance(spec, str):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="execution-backend-constraints must map tofu/terraform to version ranges",
+                    )
+                try:
+                    SpecifierSet(spec)
+                except InvalidSpecifier as e:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Invalid version constraint for {backend}: {spec}",
+                    ) from e
+        out["execution_backend_constraints"] = constraints
     if "default-version-pin" in attrs:
         pin = attrs["default-version-pin"]
         out["default_version_pin"] = str(pin) if pin else None
@@ -429,6 +525,11 @@ async def _coerce_item(
                 raise HTTPException(
                     status_code=422,
                     detail=f"variable-options[{i}].hidden must be a boolean",
+                )
+            if "sensitive" in opt and not isinstance(opt["sensitive"], bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"variable-options[{i}].sensitive must be a boolean",
                 )
             # A hidden input is removed from the form, so it MUST carry a fixed
             # default — otherwise it can neither be supplied nor wired and a
@@ -553,6 +654,14 @@ async def create_catalog_item(
 ) -> JSONResponse:
     attrs = body.get("data", {}).get("attributes", {})
     fields = await _coerce_item(db, attrs, on_create=True)
+    if fields.get("self_contained", False) and fields.get("provider_template_ids"):
+        raise HTTPException(
+            status_code=422, detail="self-contained catalog items cannot use provider templates"
+        )
+    if fields.get("self_contained", False) and not fields.get("execution_backend_constraints"):
+        raise HTTPException(
+            status_code=422, detail="self-contained items require execution-backend-constraints"
+        )
     item = CatalogItem(
         id=uuid.uuid4(),
         module_id=fields["module_id"],
@@ -560,6 +669,8 @@ async def create_catalog_item(
         display_name=fields.get("display_name", ""),
         description=fields.get("description", ""),
         enabled=fields.get("enabled", True),
+        self_contained=fields.get("self_contained", False),
+        execution_backend_constraints=fields.get("execution_backend_constraints"),
         default_version_pin=fields.get("default_version_pin"),
         provider_template_ids=fields.get("provider_template_ids", []),
         allowed_agent_pool_ids=fields.get("allowed_agent_pool_ids"),
@@ -602,15 +713,105 @@ async def _load_item_for_read(
     return item
 
 
+def _form_version_pin(request: Request, item: CatalogItem) -> tuple[str | None, bool]:
+    """Absent selects the item default; explicit latest bypasses that pin."""
+    selected = request.query_params.get("version-pin")
+    if selected is None:
+        return item.default_version_pin, False
+    if selected == "latest":
+        return None, True
+    if not selected.strip():
+        raise HTTPException(status_code=422, detail="version-pin must not be empty")
+    return selected, True
+
+
+async def _catalog_version_interface(item: CatalogItem, mv) -> dict:
+    """Read root inputs from the archive that provision would run, not cached metadata."""
+    if not item.self_contained:
+        return {
+            "inputs": mv.inputs if mv else None,
+            "outputs": mv.outputs if mv else None,
+            "error": mv.interface_error if mv else None,
+        }
+    if mv is None or item.module is None:
+        raise HTTPException(
+            status_code=422, detail="self-contained item has no uploaded module archive"
+        )
+
+    from terrapod.storage import get_storage
+
+    try:
+        lock = get_redis_client().lock(
+            "tp:catalog:root_interface_read", timeout=120, blocking_timeout=0.25
+        )
+        if not await lock.acquire():
+            raise HTTPException(
+                status_code=503,
+                detail="Catalog archive reads are busy; retry shortly",
+                headers={"Retry-After": "1"},
+            )
+    except (RedisError, RuntimeError) as e:
+        raise HTTPException(status_code=503, detail="Catalog archive reads are unavailable") from e
+
+    async def renew_lock() -> None:
+        while True:
+            await anyio.sleep(30)
+            await lock.extend(120, replace_ttl=True)
+
+    try:
+        # Shield the scoped worker: cancellation must not release the permit
+        # while a background thread is still parsing an archive.
+        with anyio.CancelScope(shield=True):
+            error = None
+            interface = None
+            async with anyio.create_task_group() as tasks:
+                tasks.start_soon(renew_lock)
+                try:
+                    try:
+                        path, interface = await catalog_service._stage_root_archive(
+                            get_storage(),
+                            module_tarball_key(
+                                item.module.namespace,
+                                item.module.name,
+                                item.module.provider,
+                                mv.version,
+                            ),
+                        )
+                    except CatalogError as e:
+                        error = e
+                    else:
+                        await catalog_service._remove_root_archive(path)
+                finally:
+                    tasks.cancel_scope.cancel()
+            if error is not None:
+                raise HTTPException(status_code=error.status_code, detail=str(error)) from error
+            return interface
+    finally:
+        with anyio.CancelScope(shield=True):
+            try:
+                await lock.release()
+            except (LockError, RedisError):
+                logger.error("Could not release catalog archive read permit", exc_info=True)
+
+
 @router.get("/catalog-items/{item_id}")
 async def show_catalog_item(
     item_id: str = Path(...),
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
+    reveal = _authoring_read_allowed(user, request.query_params.get("include-sensitive-values"))
     item = await _load_item_for_read(db, user, item_id)
-    return JSONResponse(content={"data": _item_json(item)})
+    return JSONResponse(
+        content={
+            "data": _item_json(
+                item,
+                include_sensitive_values=reveal,
+            )
+        }
+    )
 
 
 @router.patch("/catalog-items/{item_id}")
@@ -627,7 +828,25 @@ async def update_catalog_item(
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
     attrs = body.get("data", {}).get("attributes", {})
-    for k, v in (await _coerce_item(db, attrs, on_create=False, current=item)).items():
+    fields = await _coerce_item(db, attrs, on_create=False, current=item)
+    if fields.get("self_contained", item.self_contained) and fields.get(
+        "provider_template_ids", item.provider_template_ids
+    ):
+        raise HTTPException(
+            status_code=422, detail="self-contained catalog items cannot use provider templates"
+        )
+    if fields.get("self_contained", item.self_contained) and not fields.get(
+        "execution_backend_constraints", item.execution_backend_constraints
+    ):
+        raise HTTPException(
+            status_code=422, detail="self-contained items require execution-backend-constraints"
+        )
+    if "self_contained" in fields and fields["self_contained"] != item.self_contained:
+        if await catalog_service.list_instances(db, item.id, active_only=True):
+            raise HTTPException(
+                status_code=409, detail="cannot change catalog item mode while instances are active"
+            )
+    for k, v in fields.items():
         setattr(item, k, v)
     item.updated_at = _now()
     try:
@@ -668,21 +887,36 @@ async def delete_catalog_item(
 @router.get("/catalog-items/{item_id}/form")
 async def get_catalog_item_form(
     item_id: str = Path(...),
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Derive the provision form (fields the user fills) for a catalog item."""
     item = await _load_item_for_read(db, user, item_id)
-    pin = item.default_version_pin
+    pin, selected = _form_version_pin(request, item)
     mv = await catalog_service._resolve_module_version(db, item.module_id, pin)
-    module_inputs = (mv.inputs if mv else None) or []
+    if selected and mv is None:
+        raise HTTPException(status_code=422, detail="selected module version is not uploaded")
+    interface = await _catalog_version_interface(item, mv)
+    module_inputs = interface["inputs"] or []
     templates = []
     for tid in item.provider_template_ids or []:
         t = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
         if t is not None:
             templates.append(t)
     fields = catalog_service.derive_form(item, module_inputs, templates)
+    sensitive_options = {
+        opt.get("name")
+        for opt in item.variable_options or []
+        if opt.get("sensitive") or opt.get("hidden")
+    }
+    fields = [
+        {**field, "sensitive": True, "description": "", "default": None, "options": None}
+        if field["sensitive"] or field["name"] in sensitive_options
+        else field
+        for field in fields
+    ]
     return JSONResponse(
         content={
             "data": {
@@ -694,7 +928,7 @@ async def get_catalog_item_form(
                     # Why the module's interface could not be read (#1707). A
                     # form with no fields is otherwise indistinguishable from a
                     # module that genuinely declares no variables.
-                    "interface-error": mv.interface_error if mv else None,
+                    "interface-error": interface["error"],
                 },
             }
         }
@@ -704,21 +938,33 @@ async def get_catalog_item_form(
 @router.get("/catalog-items/{item_id}/interface")
 async def get_catalog_item_interface(
     item_id: str = Path(...),
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """The linked module version's inputs and outputs (#1585).
-
-    Derived, not stored: the interface the module registry extracted for the
-    version this item resolves to — its pin, or the latest uploaded version —
-    in the same shape as the module interface endpoint. `/form` is the curated
-    provision view of the inputs; this is the module's own surface, and the only
-    place its outputs are readable. All three attributes are null while the
-    module has no uploaded version.
-    """
+    """The selected version's inputs and outputs, from the root archive when self-contained."""
     item = await _load_item_for_read(db, user, item_id)
-    mv = await catalog_service._resolve_module_version(db, item.module_id, item.default_version_pin)
+    pin, selected = _form_version_pin(request, item)
+    mv = await catalog_service._resolve_module_version(db, item.module_id, pin)
+    if selected and mv is None:
+        raise HTTPException(status_code=422, detail="selected module version is not uploaded")
+    interface = await _catalog_version_interface(item, mv)
+    sensitive_options = {
+        opt.get("name")
+        for opt in item.variable_options or []
+        if opt.get("sensitive") or opt.get("hidden")
+    }
+    public_inputs = (
+        [
+            {**inp, "sensitive": True, "description": "", "default": None, "options": None}
+            if inp.get("sensitive") or inp.get("name") in sensitive_options
+            else dict(inp)
+            for inp in interface["inputs"] or []
+        ]
+        if interface["inputs"] is not None
+        else None
+    )
     return JSONResponse(
         content={
             "data": {
@@ -726,9 +972,9 @@ async def get_catalog_item_interface(
                 "id": str(item.id),
                 "attributes": {
                     "resolved-version": mv.version if mv else None,
-                    "inputs": mv.inputs if mv else None,
-                    "outputs": mv.outputs if mv else None,
-                    "interface-error": mv.interface_error if mv else None,
+                    "inputs": public_inputs,
+                    "outputs": interface["outputs"],
+                    "interface-error": interface["error"],
                 },
             }
         }
@@ -811,8 +1057,12 @@ async def provision_catalog_item(
     input_values = attrs.get("input-values", {})
     if not isinstance(input_values, dict):
         raise HTTPException(status_code=422, detail="input-values must be an object")
-    version_pin = attrs.get("version-pin")
+    version_pin = attrs.get("version-pin", item.default_version_pin)
     version_pin = str(version_pin) if version_pin else None
+    backend = attrs.get("execution-backend")
+    engine_version = attrs.get("engine-version")
+    if engine_version is not None and (not isinstance(engine_version, str) or not engine_version):
+        raise HTTPException(status_code=422, detail="engine-version must be a non-empty string")
     auto_apply = bool(attrs.get("auto-apply", False))
     labels = validate_labels(attrs.get("labels", {}) or {})
 
@@ -827,6 +1077,8 @@ async def provision_catalog_item(
             version_pin=version_pin,
             auto_apply=auto_apply,
             labels=labels,
+            execution_backend=backend,
+            engine_version=engine_version,
         )
     except CatalogError as e:
         await db.rollback()
@@ -926,7 +1178,120 @@ async def show_catalog_instance(
 ) -> JSONResponse:
     ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_READ)
     attrs = _instance_json(ws)["attributes"]
-    attrs["input-values"] = dict(ws.catalog_input_values or {})
+    item = await db.get(CatalogItem, ws.catalog_item_id)
+    if item is None:
+        raise HTTPException(status_code=409, detail="catalog item no longer exists")
+    safe_keys: set[str] = set()
+    # Each successful materialisation uploads a catalog CV after refreshing the
+    # saved inputs. Older snapshots without one cannot be classified safely.
+    cv_result = await db.execute(
+        select(ConfigurationVersion.created_at)
+        .where(
+            ConfigurationVersion.workspace_id == ws.id,
+            ConfigurationVersion.source == "catalog",
+            ConfigurationVersion.status == "uploaded",
+            ConfigurationVersion.speculative.is_(False),
+        )
+        .order_by(ConfigurationVersion.created_at.desc(), ConfigurationVersion.id.desc())
+        .limit(1)
+    )
+    snapshot_at = cv_result.scalar_one_or_none()
+    if (
+        isinstance(snapshot_at, datetime)
+        and snapshot_at.tzinfo is not None
+        and isinstance(item.updated_at, datetime)
+        and item.updated_at.tzinfo is not None
+        and item.updated_at <= snapshot_at
+    ):
+        unsafe_keys = {
+            opt.get("name")
+            for opt in item.variable_options or []
+            if opt.get("hidden") or opt.get("sensitive")
+        }
+        template_names: set[str] = set()
+        templates_current = not (item.self_contained and item.provider_template_ids)
+        for tid in item.provider_template_ids or []:
+            try:
+                template = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
+            except (ValueError, TypeError):
+                template = None
+            if (
+                template is None
+                or not isinstance(template.updated_at, datetime)
+                or template.updated_at.tzinfo is None
+                or template.updated_at > snapshot_at
+            ):
+                templates_current = False
+                break
+            for param in template.parameters or []:
+                if (
+                    not isinstance(param, dict)
+                    or not isinstance(param.get("name"), str)
+                    or not param["name"].strip()
+                    or not isinstance(param.get("sensitive", False), bool)
+                ):
+                    templates_current = False
+                    break
+                template_names.add(param["name"])
+                if param.get("sensitive"):
+                    unsafe_keys.add(param["name"])
+            if not templates_current:
+                break
+
+        if templates_current:
+            # The variable service stores the former "terraform" category as "native".
+            result = await db.execute(
+                select(Variable.key, Variable.sensitive, Variable.value_source).where(
+                    Variable.workspace_id == ws.id, Variable.category.in_(("native", "terraform"))
+                )
+            )
+            for key, sensitive, source in result.all():
+                if sensitive is False and source == "static":
+                    safe_keys.add(key)
+                else:
+                    unsafe_keys.add(key)
+            safe_keys.difference_update(unsafe_keys)
+
+            # A floating root may have changed versions since the snapshot.
+            # Pinned roots use the actual archive; wrappers use registry metadata.
+            if safe_keys and (not item.self_contained or ws.catalog_version_pin):
+                mv = await catalog_service._resolve_module_version(
+                    db, item.module_id, ws.catalog_version_pin
+                )
+                if (
+                    mv is not None
+                    and isinstance(mv.updated_at, datetime)
+                    and mv.updated_at.tzinfo is not None
+                    and mv.updated_at <= snapshot_at
+                ):
+                    if item.self_contained:
+                        try:
+                            interface = await _catalog_version_interface(item, mv)
+                        except HTTPException:
+                            interface = None
+                    else:
+                        interface = {"inputs": mv.inputs, "error": mv.interface_error}
+                    if interface and not interface["error"] and interface["inputs"] is not None:
+                        classified: dict[str, bool] = {}
+                        for inp in interface["inputs"]:
+                            if inp.get("name"):
+                                name = inp["name"]
+                                classified[name] = (
+                                    classified.get(name, True) and inp.get("sensitive") is False
+                                )
+                        safe_keys.intersection_update(classified.keys() | template_names)
+                        safe_keys.difference_update(
+                            name for name, is_safe in classified.items() if not is_safe
+                        )
+                    else:
+                        safe_keys.clear()
+                else:
+                    safe_keys.clear()
+            else:
+                safe_keys.clear()
+    attrs["input-values"] = {
+        key: value for key, value in (ws.catalog_input_values or {}).items() if key in safe_keys
+    }
     return JSONResponse(
         content={
             "data": {
@@ -954,6 +1319,7 @@ async def reconfigure_catalog_instance(
     ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_USE, active_only=True)
     attrs = body.get("data", {}).get("attributes", {})
     input_values = attrs.get("input-values")
+    input_values_implicit = input_values is None
     if input_values is None:
         input_values = dict(ws.catalog_input_values or {})
     if not isinstance(input_values, dict):
@@ -965,6 +1331,10 @@ async def reconfigure_catalog_instance(
     else:
         version_pin = ws.catalog_version_pin
     auto_apply = bool(attrs.get("auto-apply", False))
+    backend = attrs.get("execution-backend")
+    engine_version = attrs.get("engine-version")
+    if engine_version is not None and (not isinstance(engine_version, str) or not engine_version):
+        raise HTTPException(status_code=422, detail="engine-version must be a non-empty string")
 
     try:
         run = await catalog_service.reconfigure_instance(
@@ -972,8 +1342,11 @@ async def reconfigure_catalog_instance(
             user_email=user.email,
             ws=ws,
             input_values=input_values,
+            input_values_implicit=input_values_implicit,
             version_pin=version_pin,
             auto_apply=auto_apply,
+            execution_backend=backend,
+            engine_version=engine_version,
         )
     except CatalogError as e:
         await db.rollback()

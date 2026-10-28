@@ -2,10 +2,11 @@
 derivation, wrapper-config generation, and the provision orchestration.
 
 Provisioning a catalog item creates an **ordinary agent-mode, non-VCS
-workspace** whose configuration is a server-generated wrapper that calls the
-blessed registry module:
+workspace**. Wrapper items generate a root that calls the blessed registry
+module; self-contained items use the versioned module archive as the root.
+The wrapper contains:
 
-    variable "<input>" { type = <type> }          # one per supplied input
+    variable "<input>" {}                         # one per supplied input
     module "this" {
       source  = "<host>/<ns>/<name>/<provider>"
       version = "<pin>"                            # omitted when floating
@@ -14,13 +15,15 @@ blessed registry module:
     # providers.tf — each provider template body, verbatim (references var.*)
     output "<name>" { value = module.this.<name> } # re-export
 
-The wrapper is the *code* (uploaded as a ConfigurationVersion, value-free); the
+The archive is the *code* (uploaded as a ConfigurationVersion); the
 supplied input values are the *data* — every input, sensitive or not, becomes an
 ordinary workspace Terraform variable, which the runner renders into
 ``terrapod.auto.tfvars`` and delivers via the per-run vars Secret (no plaintext
 in the Job spec, #540). No server-side interpolation — params are plain Terraform
 variables. The workspace is marked catalog-managed (``catalog_item_id``), which
 makes the RBAC clamp and config-managed guardrails apply.
+Provider-template bodies are copied verbatim and may contain inline credentials;
+wrappers containing them are admin-only configuration archives.
 """
 
 import asyncio
@@ -31,8 +34,11 @@ import posixpath
 import tarfile
 import tempfile
 import uuid
+import zlib
 from datetime import UTC, datetime
 
+from packaging.specifiers import SpecifierSet
+from packaging.version import InvalidVersion, Version
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,7 +52,9 @@ from terrapod.db.models import (
     Workspace,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import pool_set, run_service, variable_service
+from terrapod.services import binary_cache_service, pool_set, run_service, variable_service
+from terrapod.storage.keys import module_tarball_key
+from terrapod.storage.protocol import ObjectNotFoundError, ObjectStore
 
 logger = get_logger(__name__)
 
@@ -105,6 +113,73 @@ async def _resolve_module_version(
     return result.scalar_one_or_none()
 
 
+async def _select_runtime(
+    db: AsyncSession, item: CatalogItem, backend: str, requested: str
+) -> tuple[str, str]:
+    """Choose an offered exact binary version before queueing a catalog run."""
+    if backend not in ("tofu", "terraform"):
+        raise CatalogError("execution-backend must be 'tofu' or 'terraform'")
+    constraints = item.execution_backend_constraints
+    if constraints is None:
+        if item.self_contained:
+            raise CatalogError("Self-contained items require execution-backend-constraints")
+    elif backend not in constraints:
+        raise CatalogError(f"Execution backend {backend} is not supported by this catalog item")
+
+    spec = SpecifierSet(constraints[backend] if constraints else "")
+    try:
+        if settings.registry.cache_only:
+            versions = await binary_cache_service._cached_versions(db, backend, os_="linux")
+        else:
+            versions = await binary_cache_service.list_available_versions(backend)
+    except Exception as e:
+        logger.warning(
+            "Catalog version lookup failed", backend=backend, error_type=type(e).__name__
+        )
+        raise CatalogError(
+            f"Could not check available {backend} versions; retry shortly", 503
+        ) from e
+
+    for version in versions:
+        # The binary cache includes major.minor shortcuts; pin a real release.
+        if version.count(".") < 2 or not binary_cache_service._is_version_allowed(
+            version, settings.registry.binary_cache.allow_prerelease
+        ):
+            continue
+        try:
+            parsed = Version(version)
+        except InvalidVersion:
+            continue
+        if (
+            requested
+            and requested != "latest"
+            and not (version == requested or version.startswith(f"{requested}."))
+        ):
+            continue
+        if spec.contains(parsed, prereleases=True):
+            return backend, version
+
+    raise CatalogError(
+        f"No available {backend} version matches {requested or 'latest'} "
+        f"and the catalog item's constraint {str(spec) or '(any)'}"
+    )
+
+
+def runtime_matches_item(item: CatalogItem, ws: Workspace) -> bool:
+    """Check a stored runtime without silently selecting a replacement."""
+    constraints = item.execution_backend_constraints
+    if constraints is None:
+        return not item.self_contained
+    spec = constraints.get(ws.execution_backend)
+    version = ws.engine_version
+    if not spec or not isinstance(version, str) or version.count(".") < 2:
+        return False
+    try:
+        return SpecifierSet(spec).contains(Version(version), prereleases=True)
+    except (InvalidVersion, ValueError):
+        return False
+
+
 # ── Provision-form derivation ──────────────────────────────────────────
 
 
@@ -153,14 +228,15 @@ def derive_form(
         ov = overrides.get(name, {})
         if ov.get("hidden"):
             continue
+        default = ov.get("default", inp.get("default"))
         fields.append(
             {
                 "name": name,
                 "type": inp.get("type", "string"),
                 "description": inp.get("description", ""),
-                "required": bool(inp.get("required", False)),
-                "sensitive": bool(inp.get("sensitive", False)),
-                "default": ov.get("default", inp.get("default")),
+                "required": bool(inp.get("required", False)) and default is None,
+                "sensitive": bool(inp.get("sensitive") or ov.get("sensitive")),
+                "default": default,
                 "options": ov.get("options"),
                 "source": "module",
             }
@@ -176,7 +252,7 @@ def derive_form(
                     "name": name,
                     "type": param.get("type", "string"),
                     "description": param.get("description", ""),
-                    "required": bool(param.get("required", False)),
+                    "required": bool(param.get("required", False)) and param.get("default") is None,
                     "sensitive": bool(param.get("sensitive", False)),
                     "default": param.get("default"),
                     "options": param.get("options"),
@@ -209,8 +285,7 @@ def render_wrapper_hcl(
     Wrapper root variables are declared **untyped** (`variable "x" {}`) — the
     module interface's `type` string is not reliably valid HCL for complex
     types (objects/tuples), and the module enforces its own types anyway. The
-    config version is purely **structural** (variable decls + the module call +
-    providers + output re-export); it bakes in **no values**. Every input value
+    config version does not bake in **input values**. Every input value
     — sensitive and not — is supplied as an ordinary workspace **terraform
     variable**, which the runner renders into `terrapod.auto.tfvars` (honouring
     `structured`) and delivers via the per-run vars Secret (#540). Those values flow
@@ -246,9 +321,8 @@ def render_wrapper_hcl(
 
     files = {"main.tf": "\n".join(lines)}
 
-    # No values are baked into the config version — every input is supplied as a
-    # workspace terraform variable (rendered into terrapod.auto.tfvars by the
-    # runner, #540), so the wrapper CV stays purely structural and reusable.
+    # Input values are not baked into the config version; provider-template
+    # bodies, however, are included verbatim and may contain inline literals.
 
     # providers.tf — each provider template body verbatim (references var.*).
     if provider_templates:
@@ -470,6 +544,123 @@ def _unlink_quietly(path: str) -> None:
         pass
 
 
+_MAX_ROOT_ARCHIVE_BYTES = 256 * 1024 * 1024
+_MAX_ROOT_CONTENT_BYTES = 1024 * 1024 * 1024
+_MAX_ROOT_HCL_BYTES = 1024 * 1024
+_MAX_ROOT_MEMBERS = 10_000
+
+
+async def _remove_root_archive(path: str) -> None:
+    """A scratch-file cleanup failure must not replace the run's result or error."""
+    try:
+        await asyncio.to_thread(os.unlink, path)
+    except OSError:
+        logger.warning("Could not remove staged catalog archive", path=path, exc_info=True)
+
+
+def _validate_root_archive(path: str, ansible_directory: str | None = None) -> None:
+    """Validate a root archive and, when requested, its Ansible subtree."""
+    seen: set[str] = set()
+    member_count = 0
+    total = 0
+    root_hcl_bytes = 0
+    root_tf = False
+    ansible_files = False
+    try:
+        with tarfile.open(path, "r:gz") as tar:
+            for member in tar:
+                member_count += 1
+                if member_count > _MAX_ROOT_MEMBERS:
+                    raise CatalogError("Root archive has too many entries", 413)
+                name = member.name
+                if name in (".", "./") and member.isdir():
+                    continue
+                parts = [part for part in name.split("/") if part not in ("", ".")]
+                if (
+                    name.startswith("/")
+                    or "\\" in name
+                    or any(ord(char) < 32 or ord(char) == 127 for char in name)
+                    or not parts
+                    or ".." in parts
+                ):
+                    raise CatalogError("Root archive contains an unsafe path")
+                normalized = "/".join(parts)
+                if normalized in seen:
+                    raise CatalogError("Root archive contains duplicate paths")
+                seen.add(normalized)
+                if not (member.isfile() or member.isdir()):
+                    raise CatalogError("Root archive contains links or unsupported entries")
+                if ".terraform" in parts or parts[-1].endswith((".tfstate", ".tfstate.backup")):
+                    raise CatalogError("Root archive contains local Terraform state")
+                if len(parts) == 1 and (
+                    normalized
+                    in (
+                        "zzzz_terrapod_backend_override.tf",
+                        "override.tf",
+                        "terraform.tfvars",
+                        "terraform.tfvars.json",
+                        "terrapod.auto.tfvars",
+                    )
+                    or normalized.endswith("_override.tf")
+                    or normalized.endswith((".auto.tfvars", ".auto.tfvars.json"))
+                ):
+                    raise CatalogError("Root archive conflicts with catalog-managed files")
+                if member.isfile():
+                    if ansible_directory and normalized.startswith(f"{ansible_directory}/"):
+                        ansible_files = True
+                    if len(parts) == 1 and normalized.endswith(".tf.json"):
+                        raise CatalogError(
+                            "Root .tf.json files are not supported by catalog input discovery"
+                        )
+                    total += member.size
+                    if total > _MAX_ROOT_CONTENT_BYTES:
+                        raise CatalogError("Root archive contents exceed the size limit", 413)
+                    if len(parts) == 1 and normalized.endswith(".tf"):
+                        root_hcl_bytes += member.size
+                        if root_hcl_bytes > _MAX_ROOT_HCL_BYTES:
+                            raise CatalogError("Root HCL exceeds the size limit", 413)
+                        root_tf = True
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as e:
+        raise CatalogError("Root archive is not a readable tar.gz") from e
+    if not root_tf:
+        raise CatalogError("Root archive has no .tf files at its root")
+    if ansible_directory and not ansible_files:
+        raise CatalogError(
+            f"the catalog item's ansible-directory {ansible_directory!r} holds no files"
+        )
+
+
+async def _stage_root_archive(storage: ObjectStore, key: str, ansible_directory: str | None = None):
+    """Stream and check a registry or PR archive on the API's ephemeral PVC."""
+    from terrapod.api.upload_stream import resolve_ephemeral_tmpdir
+    from terrapod.services.module_hcl_parser import extract_module_interface_result_from_file
+
+    fd, path = await asyncio.to_thread(
+        tempfile.mkstemp, suffix=".catalog.tar.gz", dir=resolve_ephemeral_tmpdir()
+    )
+    dest = await asyncio.to_thread(os.fdopen, fd, "wb")
+    try:
+        try:
+            size = 0
+            async for chunk in storage.get_stream(key):
+                size += len(chunk)
+                if size > _MAX_ROOT_ARCHIVE_BYTES:
+                    raise CatalogError("Root archive exceeds the compressed size limit", 413)
+                await asyncio.to_thread(dest.write, chunk)
+        finally:
+            await asyncio.to_thread(dest.close)
+        await asyncio.to_thread(_validate_root_archive, path, ansible_directory)
+        interface = await asyncio.to_thread(extract_module_interface_result_from_file, path)
+        if interface["error"]:
+            raise CatalogError(f"Root archive interface could not be read: {interface['error']}")
+        return path, interface
+    except BaseException as e:
+        await _remove_root_archive(path)
+        if isinstance(e, ObjectNotFoundError):
+            raise CatalogError("Selected module version has no stored archive") from e
+        raise
+
+
 # ── Provision orchestration ────────────────────────────────────────────
 
 
@@ -507,6 +698,7 @@ def _resolve_inputs(
     """
     form = derive_form(item, module_inputs, templates)
     field_types = {f["name"]: f["type"] for f in form}
+    sensitive_names: set[str] = {f["name"] for f in form if f["sensitive"]}
 
     # Collect fixed (hidden) overrides not present in the form.
     overrides = _option_overrides(item)
@@ -517,6 +709,8 @@ def _resolve_inputs(
         if iname and ov.get("hidden") and ov.get("default") is not None:
             hidden_values[iname] = ov["default"]
             field_types.setdefault(iname, inp.get("type", "string"))
+            if inp.get("sensitive") or ov.get("sensitive"):
+                sensitive_names.add(iname)
 
     # Validate required fields are supplied.
     missing = [
@@ -524,7 +718,10 @@ def _resolve_inputs(
         for f in form
         if f["required"]
         and f["default"] is None
-        and not str(input_values.get(f["name"], "")).strip()
+        and (
+            input_values.get(f["name"]) is None
+            or (isinstance(input_values[f["name"]], str) and not input_values[f["name"]].strip())
+        )
     ]
     if missing:
         raise CatalogError(f"Missing required input(s): {', '.join(sorted(missing))}")
@@ -561,15 +758,12 @@ def _resolve_inputs(
     # fail at plan. Form-supplied values already arrive correctly typed (JSON
     # request body), so they pass through unchanged.
     effective: dict[str, object] = {}
-    sensitive_names: set[str] = set()
     for f in form:
         fname = f["name"]
         if fname in input_values and str(input_values[fname]).strip() != "":
             effective[fname] = input_values[fname]
         elif f["default"] is not None:
             effective[fname] = _coerce_default(f["default"])
-        if f["sensitive"]:
-            sensitive_names.add(fname)
     effective.update(hidden_values)
 
     return sorted(effective.keys()), effective, sensitive_names, field_types
@@ -585,8 +779,9 @@ async def _materialise(
     auto_apply: bool,
     message: str,
     user_email: str,
+    input_values_implicit: bool = False,
 ):
-    """Render + upload the wrapper config, replace the workspace's variables, and
+    """Upload catalog config, replace the workspace's variables, and
     queue a run. Shared by provision (create) and reconfigure (update).
 
     Returns the queued ``Run``. The caller owns the commit.
@@ -594,142 +789,177 @@ async def _materialise(
     module: RegistryModule = item.module
     if module is None:
         raise CatalogError("Catalog item has no backing module", status_code=409)
-
-    # Resolve the version (pin > item default > floating-latest).
-    pin = version_pin or item.default_version_pin
+    # Callers distinguish an omitted pin (item default on provision) from an
+    # explicit null (float). A stored null always means latest.
+    pin = version_pin
     mv = await _resolve_module_version(db, module.id, pin)
     if pin and mv is None:
         raise CatalogError(f"Module {module.name} has no uploaded version {pin}", status_code=422)
-    resolved_version = mv.version if mv else None
     module_inputs = (mv.inputs if mv else None) or []
     module_outputs = (mv.outputs if mv else None) or []
 
-    templates: list[ProviderTemplate] = []
-    for tid in item.provider_template_ids or []:
-        t = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
-        if t is not None:
-            templates.append(t)
-
-    wired_inputs, effective, sensitive_names, _field_types = _resolve_inputs(
-        item, module_inputs, templates, input_values
-    )
-
-    # Only module inputs are passed into the module block; provider-template
-    # params are referenced by the provider bodies, not the module.
-    module_input_names = {i.get("name") for i in module_inputs if i.get("name")}
-    module_wired = sorted(n for n in effective if n in module_input_names)
-
-    # Snapshot only the NON-sensitive resolved inputs onto the workspace for the
-    # instance API to return. Sensitive inputs are write-only (like TFE sensitive
-    # variables) — they live only in the (encrypted-at-rest) workspace variables,
-    # never in this plaintext JSONB column.
-    nonsensitive_values = {k: v for k, v in effective.items() if k not in sensitive_names}
-    ws.catalog_input_values = dict(nonsensitive_values)
-
-    # Replace the workspace's variables — a catalog workspace's variable set is
-    # wholly catalog-managed (the RBAC clamp blocks user var edits), so a full
-    # replace keeps it in lockstep with the wrapper config. EVERY input —
-    # sensitive and not — is stored as a workspace terraform variable; the runner
-    # delivers them all via the per-run vars Secret (rendered into
-    # terrapod.auto.tfvars), never plaintext in the Job spec (#540). Non-string
-    # values (lists/objects/numbers/bools) carry structured=true so they render as raw
-    # HCL — json.dumps emits valid HCL for these; strings render quoted.
-    for existing_var in await variable_service.list_variables(db, ws.id):
-        await variable_service.delete_variable(db, existing_var)
-    for vname in sorted(effective):
-        var_value, structured = _input_var_repr(effective[vname])
-        await variable_service.create_variable(
-            db,
-            workspace_id=ws.id,
-            key=vname,
-            value=var_value,
-            category="terraform",
-            structured=structured,
-            sensitive=vname in sensitive_names,
-        )
-
-    # Generate + upload the wrapper config version.
-    files = render_wrapper_hcl(
-        module,
-        resolved_version,
-        var_decls=wired_inputs,
-        module_wired=module_wired,
-        sensitive_names=sensitive_names,
-        module_outputs=module_outputs,
-        provider_templates=templates,
-    )
-    # The Ansible half (#2019). Copied out of the module into this very
-    # configuration version, because the configure Job re-fetches the CV and
-    # never runs `init` -- see `ansible_files_from_module`.
-    #
-    # Gated on `configure_enabled` ALONE, never on the path being non-empty:
-    # the boolean says whether and the path says where, so an item with a path
-    # and the switch off provisions no configure, which is what it asked for --
-    # and an item with the switch ON and no path is incoherent rather than a
-    # no-op, so it must reach `_require_subdirectory` and be refused. Gating on
-    # both would skip the block instead, leaving a workspace whose Ansible root
-    # is the configuration version's root, where only the generated wrapper
-    # lives: a configure that fails at run time for want of a playbook.
-    #
-    # The same cross-field shape as #1966's `validate_operations`, which takes
-    # the RESULTING values rather than the submitted ones.
-    cv_files: dict[str, str | bytes] = dict(files)
-    if item.configure_enabled:
-        if resolved_version is None:
-            raise CatalogError(
-                f"Module {module.name} has no uploaded version to copy the catalog "
-                f"item's ansible-directory {item.ansible_directory!r} from",
-                status_code=422,
-            )
-        _require_subdirectory(item.ansible_directory)
-        ansible_files = await ansible_files_from_module(
-            namespace=module.namespace,
-            name=module.name,
-            provider=module.provider,
-            version=resolved_version,
-            subdir=item.ansible_directory,
-        )
-        # No collision check, and that is a measured absence rather than an
-        # oversight: every copied member keeps its `<ansible_directory>/...`
-        # path while the generated wrapper's files are always at the root, so a
-        # module shipping `ansible/main.tf` lands at `ansible/main.tf` and
-        # cannot shadow the root module. The root form that COULD collide is
-        # refused above, by `_require_subdirectory`. A check here would be a
-        # gate that cannot fire -- which this codebase has shipped before and
-        # which reads as protection while protecting nothing.
-        cv_files.update(ansible_files)
-
-    _apply_ansible_settings(ws, item)
-
-    tarball = await asyncio.to_thread(_build_tarball, cv_files)
-
-    cv = await run_service.create_configuration_version(
-        db, workspace_id=ws.id, source="catalog", auto_queue_runs=False
-    )
-    await db.flush()
+    from terrapod.api.upload_stream import file_chunks
     from terrapod.storage import get_storage
     from terrapod.storage.keys import config_version_key
 
-    storage = get_storage()
-    key = config_version_key(str(ws.id), str(cv.id))
-    await storage.put_stream(key, _single_chunk(tarball), content_type="application/gzip")
-    await run_service.mark_configuration_uploaded(db, cv)
+    root_path = None
+    if item.self_contained:
+        if mv is None:
+            raise CatalogError("Self-contained catalog item has no uploaded module version")
+        if item.provider_template_ids:
+            raise CatalogError("Self-contained catalog items cannot use provider templates")
+        if item.configure_enabled:
+            _require_subdirectory(item.ansible_directory)
+        storage = get_storage()
+        root_path, interface = await _stage_root_archive(
+            storage,
+            module_tarball_key(module.namespace, module.name, module.provider, mv.version),
+            item.ansible_directory if item.configure_enabled else None,
+        )
+        module_inputs = interface["inputs"]
+        module_outputs = interface["outputs"]
 
     try:
-        run = await run_service.create_run(
-            db,
-            workspace=ws,
-            message=message,
-            auto_apply=auto_apply,
-            plan_only=False,
-            source="catalog",
-            configuration_version_id=cv.id,
-            created_by=user_email,
+        if root_path is not None:
+            overrides = _option_overrides(item)
+            for inp in module_inputs:
+                name = inp.get("name")
+                if name and overrides.get(name, {}).get("sensitive") and not inp.get("sensitive"):
+                    raise CatalogError(
+                        f"Root input {name} must declare sensitive = true in its module archive"
+                    )
+        templates: list[ProviderTemplate] = []
+        for tid in item.provider_template_ids or []:
+            t = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
+            if t is not None:
+                templates.append(t)
+
+        if input_values_implicit:
+            # Saved inputs can name variables removed in a newer module version.
+            # Explicitly supplied unknown inputs still fail validation below.
+            names = {field["name"] for field in derive_form(item, module_inputs, templates)}
+            input_values = {name: value for name, value in input_values.items() if name in names}
+
+        wired_inputs, effective, sensitive_names, _field_types = _resolve_inputs(
+            item, module_inputs, templates, input_values
         )
-    except run_service.PlanApplyNotEnabled as exc:
-        raise CatalogError(str(exc), status_code=422) from exc
-    await run_service.queue_run(db, run)
-    return run
+        existing_vars = await variable_service.list_variables(db, ws.id)
+        for old_var in existing_vars:
+            if (
+                old_var.category not in ("native", "terraform")
+                or old_var.value_source != "static"
+                or not old_var.sensitive
+                or old_var.key not in effective
+                or old_var.key in sensitive_names
+            ):
+                continue
+            replacement, _ = _input_var_repr(effective[old_var.key])
+            supplied = input_values.get(old_var.key)
+            if (
+                input_values_implicit
+                or supplied is None
+                or (isinstance(supplied, str) and not supplied.strip())
+                or replacement == old_var.value
+            ):
+                raise CatalogError(
+                    f"Input {old_var.key} requires a new value before it can become non-sensitive"
+                )
+
+        # Only module inputs are passed into the wrapper's module block.
+        module_input_names = {i.get("name") for i in module_inputs if i.get("name")}
+        module_wired = sorted(n for n in effective if n in module_input_names)
+
+        # Only NON-sensitive resolved inputs go into the API-visible snapshot.
+        ws.catalog_input_values = {k: v for k, v in effective.items() if k not in sensitive_names}
+
+        # Values stay in workspace variables, not in either config archive.
+        for existing_var in existing_vars:
+            await variable_service.delete_variable(db, existing_var)
+        for vname in sorted(effective):
+            var_value, structured = _input_var_repr(effective[vname])
+            await variable_service.create_variable(
+                db,
+                workspace_id=ws.id,
+                key=vname,
+                value=var_value,
+                category="terraform",
+                structured=structured,
+                sensitive=vname in sensitive_names,
+            )
+
+        if root_path is None:
+            files = render_wrapper_hcl(
+                module,
+                pin,
+                var_decls=wired_inputs,
+                module_wired=module_wired,
+                sensitive_names=sensitive_names,
+                module_outputs=module_outputs,
+                provider_templates=templates,
+            )
+            cv_files: dict[str, str | bytes] = dict(files)
+            if item.configure_enabled:
+                if mv is None:
+                    raise CatalogError(
+                        f"Module {module.name} has no uploaded version to copy the catalog "
+                        f"item's ansible-directory {item.ansible_directory!r} from",
+                        status_code=422,
+                    )
+                _require_subdirectory(item.ansible_directory)
+                cv_files.update(
+                    await ansible_files_from_module(
+                        namespace=module.namespace,
+                        name=module.name,
+                        provider=module.provider,
+                        version=mv.version,
+                        subdir=item.ansible_directory,
+                    )
+                )
+            tarball = await asyncio.to_thread(_build_tarball, cv_files)
+            chunks = _single_chunk(tarball)
+        else:
+            chunks = file_chunks(root_path)
+
+        _apply_ansible_settings(ws, item)
+        cv = await run_service.create_configuration_version(
+            db,
+            workspace_id=ws.id,
+            source="catalog",
+            auto_queue_runs=False,
+            archive_provenance=(
+                "protected"
+                if root_path is not None
+                else "admin-only"
+                if templates
+                else "unprotected"
+            ),
+            archive_module_id=module.id if root_path is not None else None,
+        )
+        await db.flush()
+        key = config_version_key(str(ws.id), str(cv.id))
+        storage = get_storage()
+        await storage.put_stream(key, chunks, content_type="application/gzip")
+        await run_service.mark_configuration_uploaded(db, cv)
+
+        try:
+            run = await run_service.create_run(
+                db,
+                workspace=ws,
+                message=message,
+                auto_apply=auto_apply,
+                plan_only=False,
+                source="catalog",
+                configuration_version_id=cv.id,
+                created_by=user_email,
+            )
+        except run_service.PlanApplyNotEnabled as exc:
+            raise CatalogError(str(exc), status_code=422) from exc
+        await run_service.queue_run(db, run)
+        ws.catalog_update_block = None
+        return run
+    finally:
+        if root_path is not None:
+            await _remove_root_archive(root_path)
 
 
 async def provision_instance(
@@ -743,6 +973,8 @@ async def provision_instance(
     version_pin: str | None,
     auto_apply: bool,
     labels: dict,
+    execution_backend: str | None = None,
+    engine_version: str | None = None,
 ) -> Workspace:
     """Create a catalog-managed workspace from a catalog item and queue its run.
 
@@ -753,6 +985,15 @@ async def provision_instance(
     module: RegistryModule = item.module
     if module is None:
         raise CatalogError("Catalog item has no backing module", status_code=409)
+
+    backend = execution_backend or settings.default_execution_backend
+    requested = engine_version or (
+        settings.default_terraform_version
+        if backend == settings.default_execution_backend
+        else "latest"
+    )
+    if item.execution_backend_constraints is not None or execution_backend or engine_version:
+        backend, requested = await _select_runtime(db, item, backend, requested)
 
     # Workspace name uniqueness.
     existing = await db.execute(select(Workspace).where(Workspace.name == name))
@@ -772,8 +1013,8 @@ async def provision_instance(
         # modes, so the pair is always one of the two flat ones.
         auto_apply=auto_apply,
         auto_apply_mode="always" if auto_apply else "never",
-        execution_backend=settings.default_execution_backend,
-        engine_version=settings.default_terraform_version,
+        execution_backend=backend,
+        engine_version=requested,
         labels=labels or {},
         owner_email=user_email,
         catalog_item_id=item.id,
@@ -818,6 +1059,9 @@ async def reconfigure_instance(
     input_values: dict,
     version_pin: str | None,
     auto_apply: bool,
+    execution_backend: str | None = None,
+    engine_version: str | None = None,
+    input_values_implicit: bool = False,
 ):
     """Update a catalog instance's inputs and/or version pin, then queue a run.
 
@@ -831,6 +1075,16 @@ async def reconfigure_instance(
     item = await db.get(CatalogItem, ws.catalog_item_id)
     if item is None:
         raise CatalogError("Catalog item no longer exists", status_code=409)
+
+    backend = execution_backend or ws.execution_backend
+    requested = engine_version or (
+        ws.engine_version if backend == ws.execution_backend else "latest"
+    )
+    if item.execution_backend_constraints is not None or execution_backend or engine_version:
+        backend, requested = await _select_runtime(db, item, backend, requested)
+
+    ws.execution_backend = backend
+    ws.engine_version = requested
 
     ws.catalog_version_pin = version_pin
     # Both columns, always — see the construction above (#1301).
@@ -847,6 +1101,7 @@ async def reconfigure_instance(
         auto_apply=auto_apply,
         message=f"Catalog reconfigure: {item.name}",
         user_email=user_email,
+        input_values_implicit=input_values_implicit,
     )
     logger.info(
         "catalog.reconfigured",

@@ -1471,7 +1471,14 @@
       "descriptionLabel": "説明",
       "descriptionPlaceholder": "このカタログ項目がプロビジョニングする内容…",
       "enabled": "有効（参照用カタログに表示）",
+      "selfContained": "自己完結型ルートアーカイブ",
+      "selfContainedHint": "アップロードしたモジュールアーカイブをワークスペースのルート構成として使用します。",
+      "restrictBackends": "実行バックエンドを制限",
+      "backendRangesHint": "対応するバックエンドを選択し、PEP 440 のバージョン範囲を入力してください（例: >=1.12,<2）。",
+      "backendRange": "{backend} のバージョン範囲",
       "providerTemplates": "プロバイダーテンプレート",
+      "templatesRemoved": "保存すると、既存のプロバイダーテンプレートとの関連付けが削除されます。",
+      "templatesUnavailable": "自己完結型の項目ではプロバイダーテンプレートを使用しません。",
       "noProviderTemplates": "定義されたプロバイダーテンプレートはありません。",
       "restrictPools": "特定のエージェントプールに制限",
       "noAgentPools": "利用可能なエージェントプールはありません。",
@@ -1496,6 +1503,7 @@
       "actions": "操作"
     },
     "badge": {
+      "selfContained": "自己完結型",
       "enabled": "有効",
       "disabled": "無効"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "カタログ項目を削除しました"
     },
     "errors": {
+      "backendRequired": "実行バックエンドを少なくとも 1 つ選択してください。",
+      "backendRangeRequired": "選択した各バックエンドのバージョン範囲を入力してください。",
       "load": "カタログ項目の読み込みに失敗しました",
       "save": "カタログ項目の保存に失敗しました",
       "createStatus": "カタログ項目の作成に失敗しました（{status}）",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "インフラを破棄せずにカタログレコードを削除します（非推奨）"
     },
     "reconfigure": {
+      "updateBlockedInputs": "バージョン {version} を実行するには再構成が必要です。",
+      "updateBlockedArchive": "バージョン {version} のアーカイブが利用できないか無効なため、実行できません。カタログの管理者に修正を依頼してください。",
+      "updateBlockedRuntime": "バージョン {version} はこのワークスペースの実行バックエンドとバージョンでは実行できません。API で互換性のあるバージョンを選択して再構成してください。",
+      "removedInputs": "このバージョンでは使用されません",
+      "removedHint": "この入力は再構成をキューに入れると削除されます。続行する前に新しい項目を確認してください。",
       "title": "{name} を再構成",
       "description": "入力やバージョンを更新してから実行をキューに追加します。",
       "currentOption": "{version}（現在）",

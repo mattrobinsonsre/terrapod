@@ -131,7 +131,7 @@ spec:
               protocol: TCP
           env:
             - name: TERRAPOD_VERSION
-              value: {{ .Chart.AppVersion | quote }}
+              value: {{ .Values.api.devProviderVersion | default .Chart.AppVersion | quote }}
             - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
               valueFrom:
                 secretKeyRef:

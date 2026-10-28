@@ -29,17 +29,18 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.capability_access import resolve_capability_or_authenticate
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
 from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls, download_tickets
 from terrapod.auth.capabilities import has_capability
-from terrapod.db.models import ConfigurationVersion, Run, Workspace
+from terrapod.db.models import ConfigurationVersion, RegistryModule, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import cv_diff_service, run_service
+from terrapod.services.registry_rbac_service import resolve_registry_capabilities_for
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
@@ -56,6 +57,8 @@ router = APIRouter(tags=["configuration-versions"])
 extensions_router = APIRouter(tags=["configuration-version-extensions"])
 
 logger = get_logger(__name__)
+
+_LEGACY_ORDINARY_SOURCES = frozenset({"tfe-api", "cli", "vcs", "drift-detection"})
 
 # TFE convention. CV lists can include the run that consumed them; we
 # don't yet — but pagination defaults match what go-tfe expects.
@@ -138,6 +141,51 @@ async def _get_workspace(
     return await load_workspace_scoped(workspace_id, db, request=request)
 
 
+def _effective_archive_provenance(cv: ConfigurationVersion, ws: Workspace) -> str:
+    # An older API replica writes the new column's DB default during an upgrade.
+    # None of these producers copies registry or provider-template bytes into a
+    # catalog workspace; catalog and module-test sources remain fail-closed.
+    if (
+        cv.archive_provenance == "unknown"
+        and cv.archive_module_id is None
+        and ws.catalog_item_id is None
+        and cv.source in _LEGACY_ORDINARY_SOURCES
+    ):
+        return "unprotected"
+    return cv.archive_provenance
+
+
+async def _require_archive_read(
+    db: AsyncSession, user: AuthenticatedUser, cv: ConfigurationVersion
+) -> str:
+    """Authorize human access to archive bytes, not just CV metadata."""
+    ws = await db.get(Workspace, cv.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_READ):
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+
+    provenance = _effective_archive_provenance(cv, ws)
+    if provenance == "unprotected" and cv.archive_module_id is None:
+        return provenance
+    if provenance == "admin-only" and cv.archive_module_id is None:
+        if "admin" not in effective_platform_roles(user):
+            raise HTTPException(status_code=404, detail="Configuration version not found")
+        return provenance
+    if provenance != "protected" or not isinstance(cv.archive_module_id, uuid.UUID):
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+    module = await db.get(RegistryModule, cv.archive_module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+    registry_caps = await resolve_registry_capabilities_for(
+        db, user, module.name, module.labels or {}, module.owner_email
+    )
+    if not has_capability(registry_caps, cap.REGISTRY_READ):
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+    return provenance
+
+
 @router.post("/workspaces/{workspace_id}/configuration-versions", status_code=201)
 async def create_configuration_version(
     request: Request,
@@ -173,6 +221,9 @@ async def create_configuration_version(
         source=attrs.get("source", "tfe-api"),
         auto_queue_runs=attrs.get("auto-queue-runs", True),
         speculative=attrs.get("speculative", False),
+        # This route accepts bytes uploaded by its caller, never a registry copy.
+        # `source` above is caller-supplied and must not decide provenance.
+        archive_provenance="unprotected",
     )
     await db.commit()
     await db.refresh(cv)
@@ -191,6 +242,11 @@ async def show_configuration_version(
     cv_uuid = parse_id(cv_id, "cv-", detail="Configuration version not found")
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
+        raise HTTPException(status_code=404, detail="Configuration version not found")
+    ws = await db.get(Workspace, cv.workspace_id)
+    if ws is None or not has_capability(
+        await resolve_workspace_capabilities_for(db, user, ws), cap.CONFIG_READ
+    ):
         raise HTTPException(status_code=404, detail="Configuration version not found")
     return JSONResponse(content=_cv_json(cv, request))
 
@@ -280,14 +336,7 @@ async def download_configuration_version(
             detail=f"Configuration version is in status {cv.status!r}, not yet uploaded",
         )
 
-    # RBAC via the workspace this CV belongs to.
-    ws = await db.get(Workspace, cv.workspace_id)
-    if ws is None:
-        # Workspace deleted out from under us — treat as gone.
-        raise HTTPException(status_code=404, detail="Configuration version not found")
-    caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.CONFIG_READ):
-        raise HTTPException(status_code=404, detail="Configuration version not found")
+    await _require_archive_read(db, user, cv)
 
     storage = get_storage()
     key = config_version_key(str(cv.workspace_id), str(cv.id))
@@ -339,12 +388,7 @@ async def mint_download_ticket(
             detail=f"Configuration version is in status {cv.status!r}, not yet uploaded",
         )
 
-    ws = await db.get(Workspace, cv.workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Configuration version not found")
-    caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.CONFIG_READ):
-        raise HTTPException(status_code=404, detail="Configuration version not found")
+    provenance = await _require_archive_read(db, user, cv)
 
     attrs = (body or {}).get("data", {}).get("attributes", {}) if body else {}
     requested_ttl = attrs.get("ttl-seconds", download_tickets.DEFAULT_TTL_SECONDS)
@@ -354,7 +398,11 @@ async def mint_download_ticket(
         requested_ttl = download_tickets.DEFAULT_TTL_SECONDS
 
     ticket = download_tickets.mint_ticket(
-        resource_kind="cv",
+        resource_kind={
+            "protected": download_tickets.PROTECTED_CV_KIND,
+            "admin-only": download_tickets.ADMIN_ONLY_CV_KIND,
+            "unprotected": "cv",
+        }[provenance],
         resource_id=str(cv.id),
         user_email=user.email,
         ttl_seconds=requested_ttl,
@@ -399,7 +447,11 @@ async def download_by_ticket(
     (default 5 min, max 30 min) so leaked URLs have minimal blast radius.
     """
     payload = download_tickets.verify_ticket(ticket)
-    if payload is None or payload.resource_kind != "cv":
+    if payload is None or payload.resource_kind not in (
+        "cv",
+        download_tickets.PROTECTED_CV_KIND,
+        download_tickets.ADMIN_ONLY_CV_KIND,
+    ):
         raise HTTPException(status_code=401, detail="Invalid or expired download ticket")
 
     try:
@@ -417,6 +469,24 @@ async def download_by_ticket(
         raise HTTPException(status_code=410, detail="Configuration version no longer exists")
     if cv.status != "uploaded":
         raise HTTPException(status_code=410, detail="Configuration version not uploaded")
+
+    ws = await db.get(Workspace, cv.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=410, detail="Configuration version no longer exists")
+    provenance = _effective_archive_provenance(cv, ws)
+    if provenance == "unprotected" and cv.archive_module_id is None:
+        if payload.resource_kind != "cv":
+            raise HTTPException(status_code=401, detail="Invalid download ticket")
+    elif provenance == "protected" and isinstance(cv.archive_module_id, uuid.UUID):
+        if payload.resource_kind != download_tickets.PROTECTED_CV_KIND:
+            raise HTTPException(status_code=401, detail="Invalid download ticket")
+        if await db.get(RegistryModule, cv.archive_module_id) is None:
+            raise HTTPException(status_code=410, detail="Originating module no longer exists")
+    elif provenance == "admin-only" and cv.archive_module_id is None:
+        if payload.resource_kind != download_tickets.ADMIN_ONLY_CV_KIND:
+            raise HTTPException(status_code=401, detail="Invalid download ticket")
+    else:
+        raise HTTPException(status_code=401, detail="Invalid download ticket")
 
     storage = get_storage()
     key = config_version_key(str(cv.workspace_id), str(cv.id))
@@ -485,12 +555,8 @@ async def diff_configuration_versions(
             detail="Both configuration versions must belong to the same workspace",
         )
 
-    ws = await db.get(Workspace, from_cv.workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Configuration version not found")
-    caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.CONFIG_READ):
-        raise HTTPException(status_code=404, detail="Configuration version not found")
+    await _require_archive_read(db, user, from_cv)
+    await _require_archive_read(db, user, to_cv)
 
     if from_cv.status != "uploaded" or to_cv.status != "uploaded":
         raise HTTPException(

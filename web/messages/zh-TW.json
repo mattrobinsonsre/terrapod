@@ -1471,7 +1471,14 @@
       "descriptionLabel": "描述",
       "descriptionPlaceholder": "此目錄項預配的內容…",
       "enabled": "已啟用（在瀏覽目錄中可見）",
+      "selfContained": "自包含根目錄封存檔",
+      "selfContainedHint": "將上傳的模組封存檔作為工作區的根設定。",
+      "restrictBackends": "限制執行後端",
+      "backendRangesHint": "選擇支援的後端並輸入 PEP 440 版本範圍（例如 >=1.12,<2）。",
+      "backendRange": "{backend} 版本範圍",
       "providerTemplates": "提供者模板",
+      "templatesRemoved": "儲存會移除現有的提供者模板關聯。",
+      "templatesUnavailable": "自包含項目不使用提供者模板。",
       "noProviderTemplates": "未定義任何提供者模板。",
       "restrictPools": "限制為特定的代理池",
       "noAgentPools": "無可用的代理池。",
@@ -1496,6 +1503,7 @@
       "actions": "操作"
     },
     "badge": {
+      "selfContained": "自包含",
       "enabled": "已啟用",
       "disabled": "已停用"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "已刪除目錄項"
     },
     "errors": {
+      "backendRequired": "請至少選擇一個執行後端。",
+      "backendRangeRequired": "請為每個選定的後端輸入版本範圍。",
       "load": "載入目錄項失敗",
       "save": "儲存目錄項失敗",
       "createStatus": "建立目錄項失敗（{status}）",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "刪除目錄記錄而不銷毀其基礎設施（不建議）"
     },
     "reconfigure": {
+      "updateBlockedInputs": "版本 {version} 需要重新設定後才能執行。",
+      "updateBlockedArchive": "版本 {version} 的封存檔無法使用或無效，無法執行。請聯絡目錄負責人修正。",
+      "updateBlockedRuntime": "版本 {version} 與此工作區的執行後端和版本不相容。請透過 API 選擇相容版本，然後重新設定。",
+      "removedInputs": "此版本不再使用",
+      "removedHint": "將此重新設定加入佇列時會移除這些輸入。繼續前請檢查新欄位。",
       "title": "重新配置 {name}",
       "description": "更新輸入和/或版本，然後排隊一次執行。",
       "currentOption": "{version}（當前）",

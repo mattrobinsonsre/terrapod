@@ -132,21 +132,24 @@ class TestTheSweepsThemselvesLeaveTheFinishedPlanAlone:
         cancelled the finished analysis on every consumer of a merged module."""
         from unittest.mock import MagicMock
 
+        module_id = uuid.uuid4()
         ws_id, ids = await _seed(
             {
                 "label": "finished",
                 "status": "planned",
                 "plan_only": True,
                 "source": "module-test",
+                "module_impact_module_id": module_id,
             },
             {
                 "label": "running",
                 "status": "planning",
                 "plan_only": True,
                 "source": "module-test",
+                "module_impact_module_id": module_id,
             },
         )
-        module = MagicMock(name="m", workspace_links=[MagicMock(workspace_id=ws_id)])
+        module = MagicMock(name="m", id=module_id, workspace_links=[MagicMock(workspace_id=ws_id)])
 
         async with get_db_session() as db:
             await _cancel_stale_module_runs(db, module, PR)

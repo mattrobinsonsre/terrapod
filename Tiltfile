@@ -19,8 +19,8 @@ allow_k8s_contexts([
 # delivered. Rancher Desktop shared one store via cri-dockerd and needed none of
 # this; it was the outlier, and on this workstation it is gone.
 #
-# Only applied on the k3d context, so a Docker/Rancher/minikube setup is
-# untouched and keeps working exactly as before.
+# k3d uses a registry; kind imports the runner Job image after its local build.
+# Docker/Rancher/minikube setups are untouched.
 #
 # Delivered through a local registry rather than `k3d image import`, measured on
 # a 775 MB image after a one-line source change:
@@ -34,6 +34,7 @@ allow_k8s_contexts([
 # The one-off cluster/registry setup this expects is NOT created automatically —
 # see "Nested clusters (k3d / kind)" in docs/local-development.md.
 _k3d = k8s_context().startswith('k3d-')
+_kind = k8s_context() == 'kind-kind'
 if _k3d:
     # Tilt pushes to localhost:5111 from the host; the cluster pulls the
     # rewritten name, which is how the NODE resolves the same registry.
@@ -51,8 +52,10 @@ _scale = config.parse().get('scale', False)
 if _scale:
     warn('SCALE profile ON: values-scale.yaml layered — HA/autoscaling for load testing.')
 
+# Tilt evaluates this file during `down` too; teardown must not run setup work.
 # Ensure namespace exists
-local('kubectl create namespace terrapod --dry-run=client -o yaml | kubectl apply -f -')
+if config.tilt_subcommand != 'down':
+    local('kubectl create namespace terrapod --dry-run=client -o yaml | kubectl apply -f -')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Local TLS Certificates (mkcert)
@@ -64,12 +67,12 @@ local_resource(
 CERT_DIR="$HOME/.local/share/terrapod/certs"
 NAMESPACE="terrapod"
 
-if ! command -v mkcert &> /dev/null; then
-    echo "ERROR: mkcert is not installed. Run: brew install mkcert && mkcert -install"
+if command -v mkcert &> /dev/null; then
+    mkcert -install 2>/dev/null
+elif [ ! -s "$CERT_DIR/cert.pem" ] || [ ! -s "$CERT_DIR/key.pem" ]; then
+    echo "ERROR: mkcert is required to generate local TLS certificates."
     exit 1
 fi
-
-mkcert -install 2>/dev/null
 
 mkdir -p "$CERT_DIR"
 
@@ -117,26 +120,22 @@ fi
 # reruns it (below) so query source edits are picked up without a Tilt restart.
 QUERY_BUILD = (
     'mkdir -p docker/query-bin && ' +
-    'docker run --rm -v "$PWD/query":/src -w /src golang:1.26 ' +
-    'go build -trimpath -o terrapod-query-bin ./cmd/terrapod-query && ' +
-    'mv query/terrapod-query-bin docker/query-bin/terrapod-query'
+    'docker run --rm -v "$PWD/query":/src:ro -v "$PWD/docker/query-bin":/out ' +
+    '-w /src golang:1.26.10 go build -trimpath -o /out/terrapod-query ./cmd/terrapod-query'
 )
-local(QUERY_BUILD, quiet=True)
+if config.tilt_subcommand != 'down':
+    local(QUERY_BUILD, quiet=True)
 
-# terrapod-ee-agent (#2154) is baked into the runner image the same way, and for
-# the same reason: CI's build-ee-agent job produces it, so locally we compile it
-# in a container rather than requiring a host Go toolchain.
-#
-# CGO off is not an optimisation. The binary is copied out of the runner image
-# into an arbitrary execution-environment container whose libc we do not choose,
-# so it must not link one.
+# The agent is copied from the runner image into execution environments, so
+# build it without a libc dependency before building the runner image.
 EE_AGENT_BUILD = (
     'mkdir -p docker/ee-agent-bin && ' +
-    'docker run --rm -e CGO_ENABLED=0 -v "$PWD/ee-agent":/src -w /src golang:1.26 ' +
-    'go build -trimpath -o terrapod-ee-agent-bin . && ' +
-    'mv ee-agent/terrapod-ee-agent-bin docker/ee-agent-bin/terrapod-ee-agent'
+    'docker run --rm -e CGO_ENABLED=0 -v "$PWD/ee-agent":/src:ro ' +
+    '-v "$PWD/docker/ee-agent-bin":/out -w /src golang:1.26.10 ' +
+    'go build -trimpath -o /out/terrapod-ee-agent .'
 )
-local(EE_AGENT_BUILD, quiet=True)
+if config.tilt_subcommand != 'down':
+    local(EE_AGENT_BUILD, quiet=True)
 
 # API Server (Python)
 docker_build(
@@ -179,8 +178,8 @@ docker_build(
 # Built as a local_resource (not docker_build) because the runner image is
 # referenced in the runners.yaml ConfigMap, not in a pod spec — so Tilt does not
 # track it and `default_registry` above does NOT apply to it. It therefore has to
-# push itself, or runner Jobs fail ErrImageNeverPull: the k3d node's image store
-# is separate from podman's, and nothing crosses between them by itself.
+# deliver itself, or runner Jobs fail ErrImageNeverPull: nested clusters have
+# separate image stores, and nothing crosses between them by itself.
 #
 # The helm `set` block at the bottom of this file points the runner image at
 # k3d-tp-registry:5111, which is how the NODE resolves the registry; the push
@@ -191,21 +190,19 @@ _RUNNER_TAG = 'localhost:5111/terrapod-runner:local' if _k3d else 'terrapod-runn
 _RUNNER_BUILD = ' && docker build -f docker/Dockerfile.runner -t ' + _RUNNER_TAG + ' .'
 if _k3d:
     _RUNNER_BUILD = _RUNNER_BUILD + ' && docker push ' + _RUNNER_TAG
+elif _kind:
+    _RUNNER_BUILD = _RUNNER_BUILD + ' && kind load docker-image ' + _RUNNER_TAG + ' --name kind'
 
 local_resource(
     'build-runner-image',
-    # On k3d the runner image must be pushed: it is referenced from the
-    # runners.yaml ConfigMap rather than a pod spec, so Tilt does not track it
-    # and `default_registry` does not apply. Elsewhere a plain local build is
-    # all that is needed, exactly as before.
+    # The runner is referenced from runners.yaml rather than a pod spec, so
+    # Tilt cannot deliver it automatically. Push on k3d, import on kind; other
+    # local clusters retain the existing plain build.
     cmd=QUERY_BUILD + ' && ' + EE_AGENT_BUILD + _RUNNER_BUILD,
     deps=[
         'docker/Dockerfile.runner',
         'query/cmd',
         'query/internal',
-        # The agent ships in this image, so an edit to it must rebuild here —
-        # otherwise the runner carries a stale agent and `kubectl exec` would
-        # show the fix present while the behaviour is the old one.
         'ee-agent',
         # Both: the requirements file is what the image installs, so it is the
         # one that changes the image, and without it a regenerated lock would
@@ -237,6 +234,42 @@ local_resource(
         'services/terrapod/services/cost',
         'services/terrapod/services/inventory_render.py',
         'services/terrapod/services/ansible_auth.py',
+    ],
+    labels=['build'],
+)
+
+# Build and sign the local provider plugin. Registry staging and runner-side
+# installation are separate; watching .dev-build would rebuild in a loop.
+_PROVIDER_TAG = os.getenv('TERRAPOD_DEV_PROVIDER_TAG', '')
+if not _PROVIDER_TAG:
+    _PROVIDER_TAGS = str(local("git tag --list 'v[0-9]*' --sort=-version:refname")).strip()
+    if not _PROVIDER_TAGS:
+        fail('No local version tags found; fetch tags or set TERRAPOD_DEV_PROVIDER_TAG')
+    _PROVIDER_TAG = _PROVIDER_TAGS.split('\n')[0]
+if not _PROVIDER_TAG.startswith('v'):
+    fail('TERRAPOD_DEV_PROVIDER_TAG must be a version tag such as v1.9.0')
+watch_file('provider/GNUmakefile')
+watch_file('provider/dev-package.sh')
+watch_file('provider/main.go')
+watch_file('provider/internal')
+watch_file('go-terrapod')
+_PROVIDER_VERSION = str(local('bash provider/dev-package.sh version ' + shlex.quote(_PROVIDER_TAG[1:]))).strip()
+# Helm must render the SAME completed artifact version; local_resource builds run
+# after rendering, so prime the package here before declaring the API Deployment.
+if config.tilt_subcommand != 'down':
+    local('make -C provider dev-package BASE_VERSION=' + shlex.quote(_PROVIDER_TAG[1:]), quiet=True)
+local_resource(
+    'build-provider-binary',
+    cmd='make -C provider dev-package BASE_VERSION=' + shlex.quote(_PROVIDER_TAG[1:]),
+    deps=[
+        'provider/GNUmakefile',
+        'provider/dev-package.sh',
+        'provider/go.mod',
+        'provider/go.sum',
+        'provider/main.go',
+        'provider/internal',
+        'go-terrapod',
+        'provider/examples/modules/terrapod_self_contained/main.tf',
     ],
     labels=['build'],
 )
@@ -375,6 +408,7 @@ k8s_yaml(helm(
     namespace='terrapod',
     values=_values,
     set=[
+        'api.devProviderVersion=' + _PROVIDER_VERSION,
         'api.image.repository=terrapod-api',
         'api.image.tag=latest',
         'api.image.pullPolicy=Never',
@@ -429,11 +463,21 @@ k8s_resource(
     resource_deps=['terrapod-migrations-1'],
 )
 
+local_resource(
+    'seed-dev-provider-cache',
+    cmd='bash scripts/dev-provider-stage.sh ' + shlex.quote(_PROVIDER_VERSION),
+    deps=['scripts/dev-provider-stage.sh'],
+    # Tilt groups the chart's PVC into uncategorized. Wait for that YAML to be
+    # applied before the helper pod tries to mount terrapod-storage.
+    resource_deps=['build-provider-binary', 'uncategorized'],
+    labels=['setup'],
+)
+
 # API Server (accessed via Ingress at https://terrapod.local)
 k8s_resource(
     'terrapod-api',
     labels=['backend'],
-    resource_deps=['terrapod-postgresql', 'terrapod-migrations-1', 'setup-certificates'],
+    resource_deps=['terrapod-postgresql', 'terrapod-migrations-1', 'setup-certificates', 'seed-dev-provider-cache'],
 )
 
 # The SSH target fixture (#2318). Depends on the keypair resource, because the
@@ -463,7 +507,7 @@ k8s_resource(
 k8s_resource(
     'terrapod-listener',
     labels=['backend'],
-    resource_deps=['terrapod-bootstrap-1', 'terrapod-api'],
+    resource_deps=['terrapod-bootstrap-1', 'terrapod-api', 'terrapod-web'],
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

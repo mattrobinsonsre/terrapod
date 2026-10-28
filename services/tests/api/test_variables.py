@@ -32,6 +32,8 @@ def _mock_workspace(ws_id=None):
     ws.id = ws_id or uuid.uuid4()
     ws.name = "test-ws"
     ws.execution_backend = "tofu"
+    ws.catalog_item_id = None
+    ws.created_at = datetime(2026, 1, 2, tzinfo=UTC)
     ws.vcs_last_polled_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
@@ -73,6 +75,9 @@ def _make_app(user, mock_db=None):
         app.dependency_overrides[require_admin] = lambda: user
     if mock_db is None:
         mock_db = AsyncMock()
+        mock_db.add = MagicMock()  # AsyncSession.add is synchronous.
+        mock_db.execute.return_value = MagicMock()  # Result.scalar_one_or_none is synchronous.
+        mock_db.get.return_value = None
     app.dependency_overrides[get_db] = lambda: mock_db
     return app, mock_db
 
@@ -142,6 +147,292 @@ class TestListVariables:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/vars", headers=_AUTH)
         assert resp.status_code == 403
+
+
+@pytest.mark.usefixtures("_no_boot")
+class TestCatalogWorkspaceVariableValues:
+    @pytest.mark.parametrize("prefix", ["/api/tfe/v2", "/api/v2", "/api/v1", "/api/terrapod/v1"])
+    async def test_current_visible_catalog_inputs_use_stored_sensitivity(self, prefix):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()
+        ordinary = _mock_var(key="terrapod_hostname", value="https://example.com", ws_id=ws.id)
+        ordinary.category = "native"
+        token = _mock_var(key="terrapod_token", value="secret-token", sensitive=True, ws_id=ws.id)
+        token.category = "native"
+        hidden = _mock_var(key="fixed", value="admin-only", ws_id=ws.id)
+        hidden.category = "native"
+        item = MagicMock(
+            variable_options=[{"name": "fixed", "hidden": True, "default": "admin-only"}],
+            updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        app, db = _make_app(_user())
+        db.get.return_value = item
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = datetime(2026, 1, 2, tzinfo=UTC)
+        db.execute.return_value = cv_result
+        with (
+            patch("terrapod.api.routers.variables._get_workspace", AsyncMock(return_value=ws)),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("read")),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.list_variables",
+                AsyncMock(return_value=[ordinary, token, hidden]),
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"{prefix}/workspaces/ws-{ws.id}/vars", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        attrs = {row["attributes"]["key"]: row["attributes"] for row in resp.json()["data"]}
+        assert resp.json()["meta"]["pagination"]["total-count"] == 3
+        assert attrs["terrapod_hostname"]["value"] == "https://example.com"
+        assert attrs["terrapod_hostname"]["sensitive"] is False
+        assert attrs["terrapod_hostname"]["version-id"] == "abc123"
+        for key in ("terrapod_token", "fixed"):
+            assert attrs[key]["value"] is None
+            assert attrs[key]["sensitive"] is True
+            assert attrs[key]["version-id"] is None
+        assert "secret-token" not in resp.text
+        assert "admin-only" not in resp.text
+
+    async def test_catalog_item_edit_never_declassifies_a_prior_hidden_value(self):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()
+        var = _mock_var(key="formerly_hidden", value="admin-only", ws_id=ws.id)
+        item = MagicMock(variable_options=[], updated_at=datetime(2026, 1, 3, tzinfo=UTC))
+        app, db = _make_app(_user())
+        db.get.return_value = item
+        cv_result = MagicMock()
+        # Even a later successful reconfigure cannot prove the old value was not
+        # the fixed default when this instance was first created.
+        cv_result.scalar_one_or_none.return_value = datetime(2026, 1, 4, tzinfo=UTC)
+        db.execute.return_value = cv_result
+        with (
+            patch("terrapod.api.routers.variables._get_workspace", AsyncMock(return_value=ws)),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("read")),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.list_variables",
+                AsyncMock(return_value=[var]),
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}/vars", headers=_AUTH)
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"][0]["attributes"]
+        assert attrs["value"] is None
+        assert attrs["sensitive"] is True
+        assert attrs["version-id"] is None
+        assert "admin-only" not in resp.text
+
+    @pytest.mark.parametrize(
+        ("prefix", "category", "wire_category"),
+        [
+            ("/api/tfe/v2", "native", "terraform"),
+            ("/api/v2", "terraform", "terraform"),
+            ("/api/v1", "native", "native"),
+            ("/api/terrapod/v1", "terraform", "terraform"),
+        ],
+    )
+    async def test_unclassifiable_catalog_value_not_returned_on_list(
+        self, prefix, category, wire_category
+    ):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()
+        var = _mock_var(key="hidden_input", value="old-secret", ws_id=ws.id)
+        var.category = category
+        app, _ = _make_app(_user())
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("read"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.list_variables",
+                new_callable=AsyncMock,
+                return_value=[var],
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"{prefix}/workspaces/ws-{ws.id}/vars", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["meta"]["pagination"]["total-count"] == 1
+        attrs = resp.json()["data"][0]["attributes"]
+        assert attrs["value"] is None
+        assert attrs["sensitive"] is True
+        assert attrs["version-id"] is None
+        assert attrs["category"] == wire_category
+        assert var.value == "old-secret"
+        assert var.sensitive is False
+        assert var.version_id == "abc123"
+
+    @pytest.mark.parametrize(
+        ("catalog_managed", "category", "source", "sensitive", "expected"),
+        [
+            (False, "native", "static", False, "plain-value"),
+            (False, "native", "static", True, None),
+            (True, "env", "static", False, "plain-value"),
+            (True, "native", "vault", True, "plain-value"),
+            (True, "terraform", "vault", True, "plain-value"),
+            (True, "native", "static", True, None),
+        ],
+    )
+    async def test_other_values_keep_their_existing_visibility(
+        self, catalog_managed, category, source, sensitive, expected
+    ):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4() if catalog_managed else None
+        var = _mock_var(value="plain-value", sensitive=sensitive, ws_id=ws.id)
+        var.category = category
+        var.value_source = source
+        app, _ = _make_app(_user())
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("read"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.list_variables",
+                new_callable=AsyncMock,
+                return_value=[var],
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}/vars", headers=_AUTH)
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"][0]["attributes"]
+        assert attrs["value"] == expected
+        assert attrs["sensitive"] is sensitive
+        assert attrs["version-id"] == (
+            None if catalog_managed and source == "static" and category == "native" else "abc123"
+        )
+
+    @pytest.mark.parametrize("method", ["post", "patch"])
+    async def test_unclassifiable_catalog_value_not_echoed_on_workspace_variable_write(
+        self, method
+    ):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()
+        var = _mock_var(key="hidden_input", value="old-secret", ws_id=ws.id)
+        var.category = "native"
+        app, _ = _make_app(_user(roles=["admin"]))
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("admin"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.get_variable",
+                new_callable=AsyncMock,
+                return_value=var,
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.create_variable",
+                new_callable=AsyncMock,
+                return_value=var,
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.update_variable",
+                new_callable=AsyncMock,
+                return_value=var,
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                if method == "post":
+                    resp = await c.post(
+                        f"/api/v1/workspaces/ws-{ws.id}/vars",
+                        json={
+                            "data": {"attributes": {"key": "hidden_input", "value": "old-secret"}}
+                        },
+                        headers=_AUTH,
+                    )
+                else:
+                    resp = await c.patch(
+                        f"/api/v1/workspaces/ws-{ws.id}/vars/var-{var.id}",
+                        json={"data": {"attributes": {"description": "updated"}}},
+                        headers=_AUTH,
+                    )
+        assert resp.status_code == (201 if method == "post" else 200), resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["value"] is None
+        assert attrs["sensitive"] is True
+        assert attrs["version-id"] is None
+        assert var.value == "old-secret"
+        assert var.sensitive is False
+        assert var.version_id == "abc123"
+
+    @pytest.mark.parametrize("method", ["post", "patch"])
+    async def test_catalog_non_sensitive_write_response_shows_value(self, method):
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()
+        var = _mock_var(key="terrapod_hostname", value="https://example.com", ws_id=ws.id)
+        var.category = "native"
+        item = MagicMock(variable_options=[], updated_at=datetime(2026, 1, 1, tzinfo=UTC))
+        app, db = _make_app(_user(roles=["admin"]))
+        db.get.return_value = item
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = datetime(2026, 1, 2, tzinfo=UTC)
+        db.execute.return_value = cv_result
+        with (
+            patch("terrapod.api.routers.variables._get_workspace", AsyncMock(return_value=ws)),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("admin")),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.get_variable",
+                AsyncMock(return_value=var),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.create_variable",
+                AsyncMock(return_value=var),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.update_variable",
+                AsyncMock(return_value=var),
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                if method == "post":
+                    resp = await c.post(
+                        f"/api/v1/workspaces/ws-{ws.id}/vars",
+                        json={"data": {"attributes": {"key": var.key, "value": var.value}}},
+                        headers=_AUTH,
+                    )
+                else:
+                    resp = await c.patch(
+                        f"/api/v1/workspaces/ws-{ws.id}/vars/var-{var.id}",
+                        json={"data": {"attributes": {"description": "updated"}}},
+                        headers=_AUTH,
+                    )
+        assert resp.status_code == (201 if method == "post" else 200), resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["value"] == "https://example.com"
+        assert attrs["sensitive"] is False
+        assert attrs["version-id"] == "abc123"
 
 
 # ── Create Variable ────────────────────────────────────────────────────

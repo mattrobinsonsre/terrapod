@@ -585,6 +585,28 @@ Whenever a VCS-triggered run changes state (queued, planning, planned, applied, 
 - **PR/MR comments** are updated in place -- **one comment per PR**, with a row per affected workspace, not a new comment on every status change or push
 - Clicking the status link or comment link navigates directly to the run page in Terrapod
 
+For **module-impact PR plans**, the status context on GitHub and GitLab is
+`terrapod/<workspace>`, including failed checks for invalid candidate archives.
+Self-contained catalog consumers also get a failed per-workspace check rather
+than a queued plan when the candidate has missing/removed inputs, changed
+sensitivity, or a hidden input that no longer matches its fixed default. No
+instance inputs are changed by a PR. A module PR's **single** comment still
+contains per-workspace plan summaries, cost, enforcing gate verdicts and any
+ready AI narrative in each workspace's collapsed block. Its rows and
+deduplication are scoped by the originating **module ID**, so runs for a
+different module with the same PR number cannot appear in this comment or
+silently suppress this module's plan. The comment uses the newest
+**poller-created** head; retrying an older run cannot put an old SHA's rows
+back into the comment. Older module-test runs without a durable module ID are
+not attributed to a replacement module with the same coordinates.
+
+GitLab previously used the shared `terrapod` name for module-impact run
+statuses. Update any GitLab required-status rules that still require that name;
+otherwise a valid new plan cannot satisfy the old rule. An invalid archive has
+no run to link to. A transient failure to post that check leaves the SHA
+eligible for the next module-impact poll without duplicating runs that already
+queued for that PR revision.
+
 ### Configuration
 
 Set `external_url` so that commit status links point to your Terrapod UI:

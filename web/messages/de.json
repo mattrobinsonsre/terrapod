@@ -1471,7 +1471,14 @@
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Was dieser Dienstleistungskatalog-Eintrag bereitstellt…",
       "enabled": "Aktiviert (im Durchsuchen-Dienstleistungskatalog sichtbar)",
+      "selfContained": "Eigenständiges Root-Archiv",
+      "selfContainedHint": "Das hochgeladene Modularchiv als Root-Konfiguration des Workspace verwenden.",
+      "restrictBackends": "Ausführungs-Backends einschränken",
+      "backendRangesHint": "Unterstützte Backends auswählen und PEP-440-Versionsbereiche eingeben (z. B. >=1.12,<2).",
+      "backendRange": "Versionsbereich für {backend}",
       "providerTemplates": "Anbietervorlagen",
+      "templatesRemoved": "Beim Speichern werden bestehende Zuordnungen zu Anbietervorlagen entfernt.",
+      "templatesUnavailable": "Anbietervorlagen werden für eigenständige Einträge nicht verwendet.",
       "noProviderTemplates": "Keine Anbietervorlagen definiert.",
       "restrictPools": "Auf bestimmte Agent-Pools beschränken",
       "noAgentPools": "Keine Agent-Pools verfügbar.",
@@ -1496,6 +1503,7 @@
       "actions": "Aktionen"
     },
     "badge": {
+      "selfContained": "eigenständig",
       "enabled": "aktiviert",
       "disabled": "deaktiviert"
     },
@@ -1508,6 +1516,8 @@
       "deleted": "Dienstleistungskatalog-Eintrag gelöscht"
     },
     "errors": {
+      "backendRequired": "Wählen Sie mindestens ein Ausführungs-Backend aus.",
+      "backendRangeRequired": "Geben Sie für jedes ausgewählte Backend einen Versionsbereich ein.",
       "load": "Dienstleistungskatalog-Einträge konnten nicht geladen werden",
       "save": "Dienstleistungskatalog-Eintrag konnte nicht gespeichert werden",
       "createStatus": "Dienstleistungskatalog-Eintrag konnte nicht erstellt werden ({status})",
@@ -1877,6 +1887,11 @@
       "orphanTitle": "Den Dienstleistungskatalog-Eintrag löschen, ohne die zugehörige Infrastruktur zu zerstören (nicht empfohlen)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version} muss neu konfiguriert werden, bevor sie ausgeführt werden kann.",
+      "updateBlockedArchive": "Version {version} kann nicht ausgeführt werden: Das Archiv fehlt oder ist ungültig. Bitten Sie den Katalogverantwortlichen um Korrektur.",
+      "updateBlockedRuntime": "Version {version} kann mit dem Backend und der Version dieses Workspaces nicht ausgeführt werden. Wählen Sie über die API eine kompatible Laufzeit und konfigurieren Sie neu.",
+      "removedInputs": "Von dieser Version nicht mehr verwendet",
+      "removedHint": "Diese Eingaben werden entfernt, wenn Sie diese Neukonfiguration einreihen. Prüfen Sie vor dem Fortfahren die neuen Felder.",
       "title": "{name} neu konfigurieren",
       "description": "Aktualisieren Sie die Eingaben und/oder die Version und stellen Sie dann einen Lauf in die Warteschlange.",
       "currentOption": "{version} (aktuell)",

@@ -6,21 +6,28 @@ Registered with the distributed scheduler as:
 
 When a PR is opened against a module's VCS repo, override tarballs are uploaded to
 object storage and speculative plan-only runs are queued on all linked workspaces.
-The runner's terraform init transparently receives the PR branch tarball via the
-module download endpoint override mechanism.
+Wrapper consumers receive the PR tarball via the module download override;
+self-contained catalog instances instead plan a speculative root config version
+containing that tarball.
 
 When a new module version is published (tag-based or manual upload), standard runs
 are queued on all linked workspaces to apply the updated module.
 """
 
 import asyncio
+import json
+import tarfile
 import uuid
+import zlib
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from terrapod.api.upload_stream import file_chunks
 from terrapod.db.models import (
+    CatalogItem,
     ModuleWorkspaceLink,
     RegistryModule,
     Run,
@@ -30,10 +37,12 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import (
+    catalog_service,
     github_service,
     gitlab_service,
     run_links,
     run_service,
+    variable_service,
     vcs_rate_limit,
     vcs_status_comment,
 )
@@ -41,7 +50,8 @@ from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.module_subdirectory import scope_archive_to_subdirectory
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
-from terrapod.storage.keys import config_version_key, module_override_key
+from terrapod.storage.keys import config_version_key, module_override_key, module_tarball_key
+from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
@@ -217,8 +227,11 @@ async def _poll_module_prs(
 
         # New or updated PR — create speculative runs
         try:
-            await _create_module_test_runs(db, storage, module, conn, owner, repo, pr)
-            pr_shas[pr_num_str] = pr.head_sha
+            status_complete = await _create_module_test_runs(
+                db, storage, module, conn, owner, repo, pr
+            )
+            if status_complete:
+                pr_shas[pr_num_str] = pr.head_sha
             # Commit after each PR so runs + module_overrides are visible to
             # listeners immediately when the SSE event fires (flush alone keeps
             # data in the uncommitted transaction, invisible to other sessions).
@@ -241,29 +254,19 @@ async def _cancel_stale_module_runs(
     module: RegistryModule,
     pr_number: int,
 ) -> None:
-    """Cancel the module-test runs a closed/merged PR should take with it.
-
-    `pr_closure_cancels_sql`, not the complement of `TERMINAL_STATES` (#2173),
-    and this sweep was the worse of the two: every run it touches is created
-    `plan_only=True`, and a plan-only run finishes in `planned` and stays there.
-    `planned` is not terminal, so the complement cancelled the finished
-    module-impact plan on every consumer the moment the module PR merged --
-    which is precisely the blast-radius analysis somebody merged the PR to act
-    on. A run still planning is a different matter and is still cancelled.
-    """
+    """Cancel only module-test runs still in progress for a closed PR."""
     for link in module.workspace_links:
         result = await db.execute(
             select(Run).where(
                 Run.workspace_id == link.workspace_id,
                 Run.source == "module-test",
+                Run.module_impact_module_id == module.id,
                 Run.vcs_pull_request_number == pr_number,
                 run_service.pr_closure_cancels_sql(Run),
             )
         )
         for stale_run in result.scalars().all():
             try:
-                # `force` and the reason — see the sibling sweep in
-                # `vcs_poller._reconcile_closed_pr_sessions` for why each.
                 await run_service.cancel_run(
                     db,
                     stale_run,
@@ -351,6 +354,7 @@ async def _fetch_workspace_config(
         source="module-test",
         auto_queue_runs=False,
         speculative=speculative,
+        archive_provenance="unprotected",
     )
     await db.flush()
 
@@ -361,6 +365,177 @@ async def _fetch_workspace_config(
     return cv.id
 
 
+async def _create_root_pr_configuration(
+    db: AsyncSession,
+    storage: ObjectStore,
+    ws: Workspace,
+    override_key: str,
+    staged_path: str | None,
+    module_id: uuid.UUID,
+) -> tuple[uuid.UUID, str]:
+    """Validate the PR root once, then upload a speculative CV for this instance."""
+    owns_path = staged_path is None
+    if staged_path is None:
+        staged_path, _ = await catalog_service._stage_root_archive(storage, override_key)
+    try:
+        cv = await run_service.create_configuration_version(
+            db,
+            workspace_id=ws.id,
+            source="module-test",
+            auto_queue_runs=False,
+            speculative=True,
+            archive_provenance="protected",
+            archive_module_id=module_id,
+        )
+        await db.flush()
+        await storage.put_stream(
+            config_version_key(str(ws.id), str(cv.id)),
+            file_chunks(staged_path),
+            content_type="application/gzip",
+        )
+        await run_service.mark_configuration_uploaded(db, cv)
+        return cv.id, staged_path
+    except BaseException:
+        if owns_path:
+            await catalog_service._remove_root_archive(staged_path)
+        raise
+
+
+async def _validate_root_instance_inputs(
+    db: AsyncSession, item: CatalogItem, ws: Workspace, interface: dict
+) -> None:
+    """Check stored instance inputs against the candidate root before it can run."""
+    inputs = interface["inputs"]
+    fields = catalog_service.derive_form(item, inputs, [])
+    names = {inp["name"] for inp in inputs if inp.get("name")}
+    variables = {
+        var.key: var
+        for var in await variable_service.list_variables(db, ws.id)
+        if var.category in ("native", "terraform")
+    }
+    removed = variables.keys() - names
+    if removed:
+        raise catalog_service.CatalogError(f"Removed input(s): {', '.join(sorted(removed))}")
+    overrides = catalog_service._option_overrides(item)
+    for inp in inputs:
+        name = inp.get("name")
+        var = variables.get(name)
+        if name and overrides.get(name, {}).get("sensitive") and not inp.get("sensitive"):
+            raise catalog_service.CatalogError(
+                f"Root input {name} must declare sensitive = true in its module archive"
+            )
+        if var is not None and bool(var.sensitive) != bool(
+            inp.get("sensitive") or overrides.get(name, {}).get("sensitive")
+        ):
+            raise catalog_service.CatalogError(f"Input {name} must be reconfigured for sensitivity")
+        override = overrides.get(name, {})
+        if not override.get("hidden") or override.get("default") is None:
+            continue
+        expected, structured = catalog_service._input_var_repr(override["default"])
+        if var is None or var.structured != structured or var.value != expected:
+            raise catalog_service.CatalogError(f"Hidden input {name} must be reconfigured")
+    input_values = {}
+    for field in fields:
+        var = variables.get(field["name"])
+        if var is None:
+            continue
+        try:
+            input_values[field["name"]] = json.loads(var.value) if var.structured else var.value
+        except (ValueError, TypeError) as e:
+            raise catalog_service.CatalogError(f"Input {field['name']} must be reconfigured") from e
+    catalog_service._resolve_inputs(item, inputs, [], input_values)
+    required = {
+        inp["name"]
+        for inp in inputs
+        if inp.get("name") and inp.get("required") and inp.get("default") is None
+    }
+    missing = required - variables.keys()
+    if missing:
+        raise catalog_service.CatalogError(
+            f"Missing required input(s): {', '.join(sorted(missing))}"
+        )
+
+
+async def _post_unusable_module_pr_status(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    pr: PullRequest,
+    ws: Workspace,
+    description: str,
+) -> bool:
+    """Report an unusable candidate; retry transient failures on the next poll."""
+    try:
+        if conn.provider == "gitlab":
+            await gitlab_service.create_commit_status(
+                conn,
+                owner,
+                repo,
+                pr.head_sha,
+                state="failed",
+                description=description,
+                context=f"terrapod/{ws.name}",
+            )
+        else:
+            await github_service.create_commit_status(
+                conn,
+                owner,
+                repo,
+                pr.head_sha,
+                state="failure",
+                description=description,
+                context=f"terrapod/{ws.name}",
+            )
+    except httpx.HTTPStatusError as e:
+        logger.warning("Failed to post invalid module PR status", exc_info=True)
+        return 400 <= e.response.status_code < 500  # A definitive 4xx cannot be retried.
+    except Exception:
+        logger.warning("Failed to post invalid module PR status", exc_info=True)
+        return False
+    return True
+
+
+async def _queue_module_pr_run(
+    db: AsyncSession,
+    module: RegistryModule,
+    ws: Workspace,
+    pr: PullRequest,
+    cv_id: uuid.UUID,
+    overrides: dict[str, str],
+) -> Run | None:
+    """Queue a plan-only run and retain its module PR status attribution."""
+    try:
+        run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=f"Module impact: PR #{pr.number} on {module.name}/{module.provider} — {pr.title}",
+            source="module-test",
+            plan_only=True,
+            configuration_version_id=cv_id,
+            created_by="module-impact-analysis",
+        )
+    except run_service.PlanApplyNotEnabled:
+        return None
+    # Overrides can be cleared by blob retention; attribution must survive them.
+    run.module_overrides = overrides
+    run.module_impact_module_id = module.id
+    run.vcs_commit_sha = pr.head_sha
+    run.vcs_branch = pr.head_ref
+    run.vcs_pull_request_number = pr.number
+    await db.flush()
+
+    run = await run_service.queue_run(db, run)
+    logger.info(
+        "Module-test run created",
+        run_id=str(run.id),
+        module=f"{module.name}/{module.provider}",
+        workspace=ws.name,
+        pr_number=pr.number,
+        head_sha=pr.head_sha[:8],
+    )
+    return run
+
+
 async def _create_module_test_runs(
     db: AsyncSession,
     storage,  # type: ignore[no-untyped-def]
@@ -369,7 +544,7 @@ async def _create_module_test_runs(
     owner: str,
     repo: str,
     pr: PullRequest,
-) -> None:
+) -> bool:
     """Download PR archive, upload override tarball, and create speculative runs."""
     # A module PR from a fork reaches further than a workspace PR does: it
     # creates a plan on every workspace that consumes the module, each with its
@@ -386,7 +561,7 @@ async def _create_module_test_runs(
             pr_number=pr.number,
             head_sha=pr.head_sha,
         )
-        return
+        return True
 
     # Download archive from PR head
     try:
@@ -398,26 +573,37 @@ async def _create_module_test_runs(
             pr_number=pr.number,
             exc_info=True,
         )
-        return
+        return False
 
     # Strip top-level directory wrapper from VCS archive before storing
-    archive_bytes = await strip_archive_top_level_dir_async(archive_bytes)
+    try:
+        archive_bytes = await strip_archive_top_level_dir_async(archive_bytes)
 
-    # A submodule (#1583) is tested as it is published: its own subdirectory,
-    # re-rooted — not the whole repository.
-    if module.subdirectory:
-        scoped = await asyncio.to_thread(
-            scope_archive_to_subdirectory, archive_bytes, module.subdirectory
-        )
-        if scoped is None:
-            logger.info(
-                "Module PR has nothing under the module's subdirectory; no impact runs",
-                module=module.name,
-                pr_number=pr.number,
-                subdirectory=module.subdirectory,
+        # A submodule (#1583) is tested as it is published: its own subdirectory,
+        # re-rooted — not the whole repository.
+        if module.subdirectory:
+            scoped = await asyncio.to_thread(
+                scope_archive_to_subdirectory, archive_bytes, module.subdirectory
             )
-            return
-        archive_bytes = scoped
+            if scoped is None:
+                logger.info(
+                    "Module PR has nothing under the module's subdirectory; no impact runs",
+                    module=module.name,
+                    pr_number=pr.number,
+                    subdirectory=module.subdirectory,
+                )
+                return True
+            archive_bytes = scoped
+    except (tarfile.TarError, EOFError, OSError, zlib.error):
+        logger.warning("Cannot repack module PR archive", module=module.name, exc_info=True)
+        posted = True
+        for link in module.workspace_links:
+            ws = link.workspace
+            if ws is not None and (not pr.from_fork or ws.allow_fork_pr_plans):
+                posted &= await _post_unusable_module_pr_status(
+                    conn, owner, repo, pr, ws, "Module PR archive cannot be tested"
+                )
+        return posted
 
     # Upload override tarball (keyed by commit SHA for reuse across workspaces/retries)
     override_key = module_override_key(pr.head_sha, module.namespace, module.name, module.provider)
@@ -433,8 +619,10 @@ async def _create_module_test_runs(
             select(Run).where(
                 Run.workspace_id == link.workspace_id,
                 Run.source == "module-test",
+                Run.module_impact_module_id == module.id,
                 Run.vcs_pull_request_number == pr.number,
                 Run.status.notin_(run_service.TERMINAL_STATES),
+                Run.vcs_commit_sha.is_distinct_from(pr.head_sha),
             )
         )
         for stale_run in result.scalars().all():
@@ -443,68 +631,117 @@ async def _create_module_test_runs(
             except Exception:
                 pass
 
-    # Create speculative plan-only runs on each linked workspace
-    for link in module.workspace_links:
-        ws = link.workspace
-        if ws is None:
-            continue
+    root_path = None
+    root_interface = None
+    root_error = False
+    queued_any = False
+    status_complete = True
+    try:
+        # Create speculative plan-only runs on each linked workspace.
+        for link in module.workspace_links:
+            ws = link.workspace
+            if ws is None:
+                continue
 
-        # Per-workspace, because the setting is per-workspace: one consumer
-        # opting in to fork PRs does not volunteer the others' credentials.
-        if pr.from_fork and not ws.allow_fork_pr_plans:
-            logger.info(
-                "module_impact.fork_pr_skipped_for_workspace",
-                workspace=ws.name,
-                module=module.name,
-                pr_number=pr.number,
+            # Per-workspace, because the setting is per-workspace: one consumer
+            # opting in to fork PRs does not volunteer the others' credentials.
+            if pr.from_fork and not ws.allow_fork_pr_plans:
+                logger.info(
+                    "module_impact.fork_pr_skipped_for_workspace",
+                    workspace=ws.name,
+                    module=module.name,
+                    pr_number=pr.number,
+                )
+                continue
+
+            existing = await db.execute(
+                select(Run.id)
+                .where(
+                    Run.workspace_id == ws.id,
+                    Run.source == "module-test",
+                    Run.status != "canceled",
+                    Run.module_impact_module_id == module.id,
+                    Run.vcs_pull_request_number == pr.number,
+                    Run.vcs_commit_sha == pr.head_sha,
+                )
+                .limit(1)
             )
-            continue
+            if existing.scalar_one_or_none() is not None:
+                continue
 
-        # Fetch the workspace's own VCS code so the runner has configuration
-        cv_id = await _fetch_workspace_config(db, ws, storage, speculative=True)
-        if cv_id is None:
-            logger.warning(
-                "Skipping module-test run — could not fetch workspace config",
-                workspace=ws.name,
-                module=module.name,
-            )
-            continue
+            item = await db.get(CatalogItem, ws.catalog_item_id) if ws.catalog_item_id else None
+            if item is not None and not catalog_service.runtime_matches_item(item, ws):
+                logger.info(
+                    "Skipping module-test run — catalog runtime is no longer allowed",
+                    workspace=ws.name,
+                )
+                continue
+            if item is not None and item.self_contained and item.module_id == module.id:
+                if not root_error:
+                    try:
+                        if root_path is None:
+                            root_path, root_interface = await catalog_service._stage_root_archive(
+                                storage, override_key
+                            )
+                        await _validate_root_instance_inputs(db, item, ws, root_interface)
+                        cv_id, root_path = await _create_root_pr_configuration(
+                            db, storage, ws, override_key, root_path, module.id
+                        )
+                    except catalog_service.CatalogError:
+                        if root_path is None:
+                            root_error = True
+                        logger.warning(
+                            "Skipping self-contained module PR plan: invalid candidate or inputs",
+                            module=module.name,
+                            pr_number=pr.number,
+                        )
+                        status_complete &= await _post_unusable_module_pr_status(
+                            conn, owner, repo, pr, ws, "Module PR candidate cannot be tested"
+                        )
+                        continue
+                else:
+                    status_complete &= await _post_unusable_module_pr_status(
+                        conn, owner, repo, pr, ws, "Module PR candidate cannot be tested"
+                    )
+                    continue
+            else:
+                # Wrapper consumers still use their own configuration plus
+                # the registry module override at init.
+                cv_id = await _fetch_workspace_config(db, ws, storage, speculative=True)
+            if cv_id is None:
+                logger.warning(
+                    "Skipping module-test run — could not fetch workspace config",
+                    workspace=ws.name,
+                    module=module.name,
+                )
+                continue
 
-        try:
-            run = await run_service.create_run(
-                db,
-                workspace=ws,
-                message=f"Module impact: PR #{pr.number} on {module.name}/{module.provider} — {pr.title}",
-                source="module-test",
-                plan_only=True,
-                configuration_version_id=cv_id,
-                created_by="module-impact-analysis",
-            )
-            run.module_overrides = overrides
-            run.vcs_commit_sha = pr.head_sha
-            run.vcs_branch = pr.head_ref
-            run.vcs_pull_request_number = pr.number
-        except run_service.PlanApplyNotEnabled:
-            logger.info(
-                "Skipping module-test run — workspace declares no plan/apply operation",
-                workspace=ws.name,
-            )
-            continue
-        await db.flush()
-
-        run = await run_service.queue_run(db, run)
-
-        logger.info(
-            "Module-test run created",
-            run_id=str(run.id),
-            module=f"{module.name}/{module.provider}",
-            workspace=ws.name,
-            pr_number=pr.number,
-            head_sha=pr.head_sha[:8],
-        )
-
-        # Enqueue VCS commit status for the module repo
-        await _enqueue_module_vcs_status(run, module, "pending")
+            run = await _queue_module_pr_run(db, module, ws, pr, cv_id, overrides)
+            if run is None:
+                logger.info(
+                    "Skipping module-test run — workspace declares no plan/apply operation",
+                    workspace=ws.name,
+                )
+                continue
+            queued_any = True
+            await _enqueue_module_vcs_status(run, module, "pending")
+    finally:
+        if root_path is not None:
+            await catalog_service._remove_root_archive(root_path)
+        if not queued_any:
+            # Override keys are shared by SHA. Do not delete one another PR's
+            # run still uses, but leave no orphan when validation refused every run.
+            try:
+                referenced = await db.execute(
+                    select(Run.id)
+                    .where(Run.module_overrides[module_coord].astext == override_key)
+                    .limit(1)
+                )
+                if referenced.scalar_one_or_none() is None:
+                    await storage.delete(override_key)
+            except Exception:
+                logger.warning("Failed to clean up unused module PR archive", exc_info=True)
+    return status_complete
 
 
 # ---------------------------------------------------------------------------
@@ -540,8 +777,73 @@ async def trigger_linked_workspace_runs(
         if ws is None:
             continue
 
-        # Fetch workspace VCS code so the runner has configuration
-        cv_id = await _fetch_workspace_config(db, ws, storage)
+        run_version = version
+        item = await db.get(CatalogItem, ws.catalog_item_id) if ws.catalog_item_id else None
+        if item is not None and not catalog_service.runtime_matches_item(item, ws):
+            ws.catalog_update_block = {
+                "version": ws.catalog_version_pin or version,
+                "reason": "runtime",
+            }
+            logger.info(
+                "Skipping module-publish run — catalog runtime is no longer allowed",
+                workspace=ws.name,
+            )
+            continue
+        if (
+            item is not None
+            and item.self_contained
+            and item.module_id == module.id
+            and ws.catalog_version_pin is None
+        ):
+            path = None
+            try:
+                selected = await catalog_service._resolve_module_version(db, module.id, None)
+                if selected is None:
+                    raise catalog_service.CatalogError("No uploaded module version is available")
+                run_version = selected.version
+                path, interface = await catalog_service._stage_root_archive(
+                    storage,
+                    module_tarball_key(
+                        module.namespace, module.name, module.provider, selected.version
+                    ),
+                    item.ansible_directory if item.configure_enabled else None,
+                )
+                await _validate_root_instance_inputs(db, item, ws, interface)
+
+                cv = await run_service.create_configuration_version(
+                    db,
+                    workspace_id=ws.id,
+                    source="module-publish",
+                    auto_queue_runs=False,
+                    archive_provenance="protected",
+                    archive_module_id=module.id,
+                )
+                await db.flush()
+                await storage.put_stream(
+                    config_version_key(str(ws.id), str(cv.id)),
+                    file_chunks(path),
+                    content_type="application/gzip",
+                )
+                await run_service.mark_configuration_uploaded(db, cv)
+                cv_id = cv.id
+            except catalog_service.CatalogError as e:
+                ws.catalog_update_block = {
+                    "version": run_version,
+                    "reason": "inputs" if path is not None else "archive",
+                }
+                logger.warning(
+                    "Skipping self-contained catalog publish run; reconfigure instance",
+                    workspace=ws.name,
+                    version=version,
+                    reason=str(e),
+                )
+                continue
+            finally:
+                if path is not None:
+                    await catalog_service._remove_root_archive(path)
+        else:
+            # Wrapper and pinned instances retain their existing publish behavior.
+            cv_id = await _fetch_workspace_config(db, ws, storage)
         if cv_id is None:
             logger.warning(
                 "Skipping module-publish run — could not fetch workspace config",
@@ -554,7 +856,7 @@ async def trigger_linked_workspace_runs(
             run = await run_service.create_run(
                 db,
                 workspace=ws,
-                message=f"Module {module.name}/{module.provider} v{version} published",
+                message=f"Module {module.name}/{module.provider} v{run_version} published",
                 source="module-publish",
                 plan_only=False,
                 configuration_version_id=cv_id,
@@ -571,6 +873,11 @@ async def trigger_linked_workspace_runs(
         await db.flush()
 
         run = await run_service.queue_run(db, run)
+        if item is not None and (
+            (item.self_contained and ws.catalog_version_pin is None)
+            or (ws.catalog_update_block or {}).get("reason") == "runtime"
+        ):
+            ws.catalog_update_block = None
         runs.append(run)
 
         logger.info(
@@ -607,39 +914,20 @@ async def handle_module_test_completed(payload: dict) -> None:
         if run is None or run.source not in ("module-test",):
             return
 
-        if not run.module_overrides or not run.vcs_commit_sha:
+        if not run.vcs_commit_sha:
             return
 
-        # Find the module from the override keys
-        module = await _resolve_module_from_overrides(db, run.module_overrides)
+        # A legacy override records only a coordinate; after deletion, that
+        # coordinate can belong to another module and must not route a status.
+        if not run.module_impact_module_id:
+            return
+        module = await db.get(RegistryModule, run.module_impact_module_id)
         if module is None:
             return
 
         await _post_module_vcs_status(
             db, run, module, target_status, payload_has_changes=payload_has_changes
         )
-
-
-async def _resolve_module_from_overrides(
-    db: AsyncSession,
-    overrides: dict,
-) -> RegistryModule | None:
-    """Resolve the RegistryModule from a module_overrides dict."""
-    for coord in overrides:
-        parts = coord.split("/")
-        if len(parts) == 3:
-            namespace, name, provider = parts
-            result = await db.execute(
-                select(RegistryModule).where(
-                    RegistryModule.namespace == namespace,
-                    RegistryModule.name == name,
-                    RegistryModule.provider == provider,
-                )
-            )
-            module = result.scalars().first()
-            if module:
-                return module
-    return None
 
 
 async def _enqueue_module_vcs_status(
@@ -724,6 +1012,7 @@ async def _post_module_vcs_status(
                 state=gitlab_state,
                 description=description,
                 target_url=target_url,
+                context=context,
             )
         else:
             await github_service.create_commit_status(
@@ -764,4 +1053,6 @@ async def _post_module_vcs_status(
             f"{owner}/{repo}",
             run.vcs_pull_request_number,
             list(link_rows.scalars().all()),
+            module.id,
+            run.vcs_commit_sha,
         )
