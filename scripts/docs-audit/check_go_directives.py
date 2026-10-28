@@ -30,6 +30,8 @@ import pathlib
 import re
 import sys
 
+import yaml
+
 #: Directories that hold go.mod files which are not ours. `.claude/worktrees/`
 #: carries a full checkout per past agent run -- a root-level walk returns
 #: hundreds of lines of which nine matter -- and `.conformance/` vendors a
@@ -40,7 +42,38 @@ EXCLUDED = (".claude", ".conformance", "node_modules", ".git")
 #: A floor, so a walk that stopped matching fails instead of passing on nothing.
 #: Nine modules today; this is deliberately below that rather than equal to it,
 #: because adding a module is routine and should not fail this gate.
+#:
+#: That slack is right HERE and wrong in two other places, which is the whole of
+#: the third clause below: this gate asks "do the modules agree", so a tenth one
+#: arriving is not a defect. `ci.yml`'s two floors answer "is every module
+#: analysed", where slack is exactly the hole.
 MIN_MODULES = 7
+
+#: The `ci.yml` jobs whose module floor must EQUAL the live module count.
+#:
+#: Both derive their module list from the tree and then refuse to proceed if the
+#: count looks wrong -- and in both, that floor is the only thing standing between
+#: "the finder stopped matching" and a green run over a fraction of the Go code.
+#: CodeQL's Go extractor sees only what the build compiles, so a module left out
+#: of the loop is unanalysed with no signal at all; `host-checks`' own
+#: `(go-audit)` step is the same shape, and its history is the argument -- it used
+#: a hand-kept six-name list, which is how `loadtest` came to have never been
+#: audited.
+#:
+#: These are JOB ids, not the step labels. The second floor lives in a step called
+#: `(go-audit) Audit every Go module`, and reading that label as the job name is
+#: what put the wrong id in #2275 -- the recorded "a CI job's display name is not
+#: its YAML id" trap, arriving through a step.
+#:
+#: Both sat at 7 against nine modules (#2275), so either could have silently lost
+#: two. A new module failing this clause is the POINT: it names the sites to
+#: update rather than leaving them to be found by a scanner's silence.
+COVERAGE_FLOOR_JOBS = ("codeql", "host-checks")
+
+#: The floor comparison inside those jobs' shell. Scoped to the `mods` array
+#: rather than any `-lt`, so an unrelated numeric test in the same block is not
+#: mistaken for a module floor.
+_FLOOR = re.compile(r"\$\{#mods\[@\]\}\"?\s*-lt\s+(\d+)")
 
 _GO_DIRECTIVE = re.compile(r"^go\s+(\S+)\s*$", re.MULTILINE)
 
@@ -60,6 +93,42 @@ def directive(path: pathlib.Path) -> str | None:
     """The `go` directive, or None when the file does not declare one."""
     m = _GO_DIRECTIVE.search(path.read_text())
     return m.group(1) if m else None
+
+
+def coverage_floors(root: pathlib.Path) -> tuple[dict[str, int], list[str]]:
+    """Each coverage job's module floor, read out of `ci.yml`.
+
+    Parsed as YAML rather than grepped, because a floor is only meaningful
+    attributed to its JOB -- the same `-lt N` text elsewhere in the workflow is a
+    different claim, and this clause is about exactly the two jobs whose floor is
+    a coverage gate.
+
+    A named job that is absent, or declares no floor, or declares more than one,
+    is reported as a PROBLEM rather than skipped: a construction this cannot read
+    is one it cannot vouch for, and silently passing over it is how the floors
+    came to be stale in the first place.
+    """
+    workflow = root / ".github" / "workflows" / "ci.yml"
+    if not workflow.is_file():
+        return {}, [f"{workflow} is missing"]
+
+    jobs = (yaml.safe_load(workflow.read_text()) or {}).get("jobs") or {}
+    floors: dict[str, int] = {}
+    problems: list[str] = []
+    for job in COVERAGE_FLOOR_JOBS:
+        spec = jobs.get(job)
+        if spec is None:
+            problems.append(f"ci.yml declares no job named {job!r}")
+            continue
+        # `str()` because YAML types a bare `run: true` as a boolean, and a gate
+        # that dies on ordinary input reports CI as unwell rather than its property.
+        shell = "\n".join(str(step.get("run", "")) for step in (spec.get("steps") or []))
+        hits = _FLOOR.findall(shell)
+        if len(hits) != 1:
+            problems.append(f"job {job!r} declares {len(hits)} module floors, expected exactly 1")
+            continue
+        floors[job] = int(hits[0])
+    return floors, problems
 
 
 def main() -> int:
@@ -144,8 +213,45 @@ def main() -> int:
             print(f"  {u}", file=sys.stderr)
         return 1
 
-    print(f"OK: all {len(mods)} Go modules declare `go {version}`, and both "
-          f"AGENTS.md and llms.txt name every one")
+    # Third clause: the two coverage floors in `ci.yml` equal the module count.
+    floors, problems = coverage_floors(root)
+    if problems:
+        print(
+            "FAIL: a `ci.yml` module floor could not be read, so this clause cannot\n"
+            "vouch for it. A renamed job or a rewritten loop must update\n"
+            "COVERAGE_FLOOR_JOBS, not be passed over in silence.\n",
+            file=sys.stderr,
+        )
+        for p in problems:
+            print(f"  {p}", file=sys.stderr)
+        return 1
+
+    wrong = {job: n for job, n in floors.items() if n != len(mods)}
+    if wrong:
+        print(
+            f"FAIL: {len(mods)} Go modules are in the tree, and a `ci.yml` coverage\n"
+            "floor disagrees. That floor is the only thing that fails when the module\n"
+            "finder stops matching, so a floor BELOW the real count lets the job\n"
+            "analyse a fraction and report success.\n",
+            file=sys.stderr,
+        )
+        for job, n in sorted(wrong.items()):
+            direction = "below" if n < len(mods) else "above"
+            print(
+                f"  job {job}: floor is {n}, {direction} the {len(mods)} modules in the tree",
+                file=sys.stderr,
+            )
+        print(
+            f"\nSet each to {len(mods)}, or name the modules the job deliberately skips.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(
+        f"OK: all {len(mods)} Go modules declare `go {version}`, both AGENTS.md "
+        f"and llms.txt name every one, and both ci.yml coverage floors are "
+        f"{len(mods)}"
+    )
     return 0
 
 

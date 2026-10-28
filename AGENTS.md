@@ -1115,6 +1115,22 @@ users, which is the right audience. **On a public repository, Actions logs and
 artifacts are world-readable too** — which is why the Semgrep step emits SARIF
 and is never uploaded as an artifact.
 
+Two consequences of that split are worth stating, because both read as gaps:
+
+- **The execution-environment images are scanned, and their findings do not reach
+  code scanning at all.** They go through the same normaliser into their own issue
+  family, so the Trivy tool page is not a complete picture of what we scan. That is
+  deliberate: an EE for an old ansible-core line is unpatchable by construction once
+  its interpreter is end-of-life, so the accepted-risk register is the venue that can
+  actually dispose of such a finding, and SARIF would add alerts nobody can action.
+- **A code-scanning alert is per-ref, and a suppression is part of the tree.** The
+  re-scan scans a release tag's own source with today's rules, so a `# nosemgrep`
+  comment added to `main` after that tag was cut is not there to be honoured: the
+  finding is reported, and stays open against that tag, until the suppression is
+  carried to the release branch. Querying the alerts without a `ref` answers for the
+  default branch instead and reads as zero, which is how a true per-tag count comes
+  to look spurious. Pass `-f ref=refs/tags/vX.Y.Z` when asking what a release has.
+
 ## A security fix never costs a supported line its functionality (hard requirement)
 
 A fix shipped to a supported release line closes the hole **without removing
