@@ -3189,3 +3189,175 @@ the leak was a database copy, API tokens if it was a backup — and check
 `audit_logs` for `oidc` activity you cannot account for. A minted token does not
 appear there once it leaves Terrapod, so the cloud's own logs (CloudTrail, Entra
 sign-in logs, GCP audit logs) are the authority on what it was used for.
+
+---
+
+## A configure never started: the execution environment did not become ready
+
+A configure runs the playbook in an **execution environment** — a container image
+carrying one `ansible-core` line — started as a sidecar beside the orchestrator.
+If that image cannot be pulled, or its startup probe never passes, the Job's own
+counters still call the pod "active", so without the dedicated check below the run
+would hang to the one-hour stale timeout and report nothing actionable.
+
+### Symptoms
+
+- A configure sits in `configuring` and produces no task output.
+- The run errors with one of:
+  - `<image> did not become ready within <N>s — … Its startup probe asserts ansible-playbook, ansible-galaxy, ssh and git are on PATH; an image missing one never passes. Raise runners.eeStartupTimeoutSeconds if the image is simply slow to pull.`
+  - `The runner pod could not start: … Check that <image> exists, that its reference is correct, and that the cluster can pull it (imagePullSecrets for a private registry).`
+- The message **names the image**, which is the point: the reference comes from a
+  workspace setting or an operator's own registry, so "a pod is Pending" would not
+  be actionable.
+
+### Diagnosis
+
+1. **Read which of the two messages it is.** "Did not become ready" means the pod
+   started and the probe did not pass — an image problem or a slow pull. "Could not
+   start" is terminal: the init container never ran at all, which is almost always
+   the pull.
+2. **Decide whether the image is yours or ours.** A workspace naming an
+   `ansible-version` gets a Terrapod-published image; one naming an
+   `ansible-execution-environment` label gets whatever the operator mapped that
+   label to in `api.config.ansible.execution_environments`. An operator-supplied
+   image is trusted code and is **not** covered by the release re-scan.
+3. **For a pull failure**, confirm the cluster can reach the registry and that
+   `imagePullSecrets` is set for a private one — it is pod-level, so it covers the
+   sidecar as well as the runner.
+4. **For a probe failure**, run the image's contract by hand: the probe asserts
+   `ansible-playbook`, `ansible-galaxy`, `ssh` and `git` are on `PATH`, and that
+   `ansible` is runnable **as the image's own uid**. An image that works as root
+   and not as its runtime user fails here.
+5. **Rule out slowness before changing the image.** A large environment landing on
+   a cold node legitimately takes time; that is what the timeout is for.
+
+### Resolution
+
+- **Slow pull:** raise `runners.eeStartupTimeoutSeconds`.
+- **Wrong reference:** correct the workspace's `ansible-version`, or the label
+  mapping in `api.config.ansible.execution_environments`.
+- **Private registry:** set `imagePullSecrets`.
+- **Operator-supplied image missing a binary:** add it, or switch the workspace to
+  a published line while the image is fixed.
+
+### Verification
+
+- A new configure leaves `configuring` and produces task output.
+- The run's Hosts tab appears, which it only does once there are host results.
+
+---
+
+## A configure reports hosts as "not reached"
+
+**This is not a host that passed, and it is the most important thing to read
+correctly on the Hosts tab.**
+
+### Symptoms
+
+- The Hosts tab shows one or more hosts as **not reached**, with **empty**
+  counters rather than zeros.
+- The `PLAY RECAP` in the log names **fewer hosts** than the inventory does.
+
+### Diagnosis
+
+Ansible reports only the hosts it got to. Under `serial:` with
+`any_errors_fatal:`, a failure in the first batch ends the play and the hosts in
+every later batch appear in **no event and in no recap at all**. Terrapod
+therefore builds the table as the union of what Ansible reported and what the
+run's own resolved inventory named, and shows the difference as "not reached" —
+with empty counters deliberately, because zero is a measurement and this is the
+absence of one.
+
+Without that, a run that aborted after one host of fifty would read as a clean
+one-host success.
+
+1. **Find the real failure**, which is in an *earlier* batch — the first host with
+   `failed`, not the ones that were never attempted.
+2. **Distinguish unreachable from failed**, because they mean different things: a
+   host Ansible could not connect to is `unreachable`, a host whose task failed is
+   `failed`, and `ignore_unreachable` applies only to the first.
+
+### Resolution
+
+Fix the earlier failure, then re-run against the **outstanding hosts only** (next
+entry) rather than against the whole inventory.
+
+### Verification
+
+- The re-run's recap names the hosts that were previously not reached.
+- No host remains in the "not reached" state.
+
+---
+
+## A configure failed partway: retrying only the outstanding hosts
+
+### Symptoms
+
+- A configure ended `errored` or was cancelled, with some hosts done and some not.
+- Re-running the whole inventory would redo work that already succeeded.
+
+### Diagnosis
+
+Because the outcome is per host, so is the retry. Terrapod records which hosts are
+outstanding — those the run targeted and did not complete, which includes hosts
+that were never reached as well as hosts that failed. A **cancelled** configure is
+a partial configure and retries the same way: on cancellation Ansible is signalled
+**once**, stops at the task it is on, and the run reports that it was interrupted
+rather than that the playbook failed.
+
+### Resolution
+
+Retry with `only-outstanding-hosts`:
+
+```sh
+curl -X POST ".../api/v1/runs/{id}/actions/retry" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -d '{"only-outstanding-hosts": true}'
+```
+
+**A run with nothing outstanding is refused rather than quietly re-run**, so a
+retry cannot silently become "do it all again".
+
+### Verification
+
+- The retry's targeted set is the outstanding hosts, not the whole inventory.
+- The Hosts tab for the retry shows no host in the "not reached" state.
+
+---
+
+## A configure was refused before it started
+
+### Symptoms
+
+One of:
+
+- `409` — `this workspace is locked, so it will not be configured — a configure changes real hosts, and the lock means nothing touches this workspace. Unlock it to configure.`
+- `409` — another run is already in flight on this workspace.
+- `422` — the workspace does not have `configure-enabled` set.
+- `422`/`503` — the inventory could not be resolved, naming the offending file.
+
+### Diagnosis
+
+1. **A locked workspace refuses a configure outright**, at creation rather than at
+   the dispatcher, so the caller is told immediately instead of watching a run
+   stall. The lock is the manual/CLI state lock.
+2. **One mutating run at a time, per workspace.** A configure holds the
+   workspace's mutating slot exactly as an apply does, and vice versa.
+3. **`configure-enabled` is off by default.** A workspace that has never been
+   turned on has nothing to refuse politely — turn it on first.
+4. **An unresolvable inventory refuses the run rather than dispatching a Job that
+   would fail inside the phase.** The message names the file. A frequent cause is a
+   playbook sitting inside the configure root with no `inventory-paths` set, so the
+   whole directory is read as inventory and the playbook is parsed as one.
+
+### Resolution
+
+- Unlock the workspace, or wait for the in-flight run.
+- Set `configure-enabled`.
+- Set `inventory-paths` explicitly, or move the inventory into a subdirectory of
+  the configure root.
+
+### Verification
+
+- The create call returns `201` and the run reaches `configuring`.
