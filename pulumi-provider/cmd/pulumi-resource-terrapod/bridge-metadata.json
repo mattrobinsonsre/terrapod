@@ -1,0 +1,41 @@
+{
+    "default-resource-schema-fixups": {
+        "resources": {
+            "terrapod_agent_pool": {},
+            "terrapod_agent_pool_token": {},
+            "terrapod_autodiscovery_rule": {},
+            "terrapod_catalog_instance": {},
+            "terrapod_catalog_item": {},
+            "terrapod_execution_hook": {},
+            "terrapod_execution_hook_workspace": {},
+            "terrapod_gpg_key": {},
+            "terrapod_inventory_global_var": {},
+            "terrapod_inventory_group": {},
+            "terrapod_inventory_group_child": {},
+            "terrapod_inventory_group_var": {},
+            "terrapod_inventory_host": {},
+            "terrapod_inventory_host_group": {},
+            "terrapod_inventory_host_var": {},
+            "terrapod_module_autodiscovery_rule": {},
+            "terrapod_module_workspace_link": {},
+            "terrapod_notification_configuration": {},
+            "terrapod_policy": {},
+            "terrapod_policy_set": {},
+            "terrapod_provider_template": {},
+            "terrapod_registry_module": {},
+            "terrapod_registry_provider": {},
+            "terrapod_remote_state_consumer": {},
+            "terrapod_role": {},
+            "terrapod_role_assignment": {},
+            "terrapod_run_task": {},
+            "terrapod_run_trigger": {},
+            "terrapod_user": {},
+            "terrapod_variable": {},
+            "terrapod_variable_set": {},
+            "terrapod_variable_set_variable": {},
+            "terrapod_variable_set_workspace": {},
+            "terrapod_vcs_connection": {},
+            "terrapod_workspace": {}
+        }
+    }
+}

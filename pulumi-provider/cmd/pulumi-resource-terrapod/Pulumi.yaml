@@ -1,0 +1,3 @@
+name: terrapod
+description: A Pulumi resource provider for terrapod.
+language: schema
