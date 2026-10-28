@@ -50,7 +50,7 @@ import stat
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NamedTuple
 
 import structlog
 import yaml
@@ -147,6 +147,112 @@ _YAML_SUFFIXES = (".yml", ".yaml")
 #: declared group set a reader is comparing against. The same two names
 #: `inventory_resolution.DERIVED_GROUPS` refuses at the write.
 _DERIVED = frozenset({"all", "ungrouped"})
+
+
+#: The declared rows are always rendered into this file inside the scratch
+#: directory and always appended to the `-i` list. ONE producer: the writer and
+#: the refusal's renderer both read it, and a second copy of the literal is how
+#: the refusal comes to name a file that is not there.
+_PLATFORM_SOURCE_NAME = "platform.yml"
+
+#: What chose the repository's `-i` arguments, in the operator's words. Derived
+#: from `_inventory_sources`' three tiers rather than restated, and
+#: `test_inventory_source_refusal.py` asserts every tier it can return has an
+#: entry -- a tier with no account would render as a bare KeyError inside a
+#: refusal, which is the one place that must not fail.
+_TIER_ACCOUNT = {
+    "declared": "the inventory paths declared on the workspace",
+    "ansible_cfg": "the `inventory` key in the repository's own ansible.cfg",
+    "config_root": (
+        "the config directory itself, because the workspace declares no inventory "
+        "paths and the repository's ansible.cfg names none"
+    ),
+}
+
+#: Only the third tier needs this, and only the third tier gets it. The first two
+#: are an explicit choice somebody made, so naming the sources is enough; the
+#: third is the DEFAULT, which is why its failure arrives on a workspace nobody
+#: has configured and with no thread to pull (#2265).
+_CONFIG_ROOT_REMEDY = (
+    " Every file in that directory is read as an inventory source, so a playbook "
+    "or any other non-inventory YAML sitting beside the inventory fails the parse. "
+    "Exclude that file with `ignore_patterns` under `[inventory]` in the "
+    "repository's own ansible.cfg -- the values are REGULAR EXPRESSIONS, not globs "
+    "-- or narrow what is read with an `inventory` key in that same file, or with "
+    "`inventory-paths` on the workspace, whose entries are relative to the config "
+    "directory."
+)
+
+
+class _InventorySources(NamedTuple):
+    """The repository's `-i` arguments and enough to explain them in a refusal.
+
+    `root` and `config_directory` exist only for rendering: the paths are
+    absolute under a scratch directory, so showing them raw leaks a tempdir and
+    names nothing the operator can find in their repository.
+    """
+
+    paths: list[Path]
+    tier: Literal["declared", "ansible_cfg", "config_root"]
+    root: Path
+    config_directory: str
+
+
+def _repo_relative(source: Path, prov: _InventorySources) -> str:
+    """A source as the operator would recognise it, relative to the repository."""
+    try:
+        rel = source.resolve().relative_to(prov.root.resolve())
+    except ValueError:
+        # Not under the config root at all -- show what we actually passed
+        # rather than inventing a repository path for it.
+        return str(source)
+    parts = [part for part in (prov.config_directory.strip("/"), str(rel)) if part and part != "."]
+    return "/".join(parts) or "the repository root"
+
+
+def _refusal_lead(
+    returncode: int,
+    sources: list[Path],
+    scratch: Path,
+    prov: _InventorySources | None,
+) -> str:
+    """What we asked ansible to read and why, so its own text is the detail.
+
+    ansible has no idea it is being driven by a platform that chose those `-i`
+    arguments on the operator's behalf, so its parser error names no file and
+    offers no thread to pull. The sibling refusal in `_inventory_sources` -- the
+    one for a declared path that does not exist -- already names the entry and
+    the consequence; the asymmetry between the two was the whole of #2265, and
+    the tier that is the DEFAULT was the one failing illegibly.
+
+    **It does NOT pre-scan the directory to name the offending file, and that is
+    a decision rather than an omission.** The `plugin:` pre-scan already walks
+    the tree, so there is somewhere to put one -- but deciding "this YAML is not
+    an inventory" re-implements a judgement ansible makes, and being wrong in the
+    permissive direction resolves a partial host set, which is the failure every
+    refusal on this path exists to prevent. Naming the sources and the tier needs
+    no such judgement. Recorded here rather than only on the issue, because a
+    closed issue is where a deliberate decision goes to be re-derived.
+    """
+    repo_sources = [s for s in sources if s != scratch / _PLATFORM_SOURCE_NAME]
+    if prov is None or not repo_sources:
+        return (
+            f"ansible-inventory failed (exit {returncode}) over the workspace's own "
+            f"declared inventory rows."
+        )
+    named = ", ".join(repr(_repo_relative(s, prov)) for s in repo_sources)
+    # Two sentences rather than one: the tier account is itself a clause with a
+    # `because` in it, so hanging the declared-rows note off the end of it
+    # garden-paths -- "...ansible.cfg names none, plus the workspace's own
+    # declared inventory rows" reads as part of the reason.
+    lead = (
+        f"ansible-inventory failed (exit {returncode}) over {named}, plus the "
+        f"workspace's own declared inventory rows. Those came from "
+        f"{_TIER_ACCOUNT[prov.tier]}."
+    )
+    if prov.tier == "config_root":
+        lead += _CONFIG_ROOT_REMEDY
+    return lead
 
 
 class InventoryResolutionFailed(RuntimeError):
@@ -339,6 +445,7 @@ async def run_ansible_inventory(
     scratch: Path,
     limit: str | None = None,
     cwd: Path | None = None,
+    provenance: _InventorySources | None = None,
 ) -> dict[str, Any]:
     """`ansible-inventory --list` over `sources`, in `-i` order.
 
@@ -379,9 +486,8 @@ async def run_ansible_inventory(
 
     if proc.returncode != 0:
         detail = err.decode(errors="replace").strip()[-1200:]
-        raise InventoryResolutionFailed(
-            f"ansible-inventory failed (exit {proc.returncode}): {detail}"
-        )
+        lead = _refusal_lead(proc.returncode, sources, scratch, provenance)
+        raise InventoryResolutionFailed(f"{lead} ansible said: {detail}")
 
     try:
         return json.loads(out)
@@ -819,8 +925,13 @@ def _operator_inventory_paths(root: Path) -> list[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def _inventory_sources(ws, root: Path) -> list[Path]:
-    """The `-i` arguments for a git source, in precedence order.
+def _inventory_sources(ws, root: Path) -> _InventorySources:
+    """The `-i` arguments for a git source, in precedence order, and WHY.
+
+    The tier is returned rather than merely used, because the refusal that
+    reports a failed parse is raised in `run_ansible_inventory`, far from here,
+    and ansible's own text names neither the file nor the reason it was read
+    (#2265). A tier nobody carries is a tier nobody can explain.
 
     Three tiers, and the order is the point:
 
@@ -842,9 +953,12 @@ def _inventory_sources(ws, root: Path) -> list[Path]:
     inventory, which is the failure mode this whole issue exists to remove.
     """
     declared = [e.strip() for e in (ws.inventory_paths or []) if e and e.strip()]
-    entries = declared or _operator_inventory_paths(root)
+    operator = [] if declared else _operator_inventory_paths(root)
+    entries = declared or operator
+    tier = "declared" if declared else ("ansible_cfg" if operator else "config_root")
+    config_directory = ws.config_directory or ""
     if not entries:
-        return [root]
+        return _InventorySources([root], "config_root", root, config_directory)
 
     resolved: list[Path] = []
     for entry in entries:
@@ -862,7 +976,7 @@ def _inventory_sources(ws, root: Path) -> list[Path]:
                 f"partial inventory rather than failing"
             )
         resolved.append(candidate)
-    return resolved
+    return _InventorySources(resolved, tier, root, config_directory)
 
 
 async def _resolve_uncached(
@@ -895,16 +1009,23 @@ async def _resolve_uncached(
         # to be the config root (#1929).
         cwd: Path | None = None
 
+        # Carried so a refusal can say WHICH sources were read and what chose
+        # them. None when no repository takes part, which is a real case: a
+        # workspace with no binding resolves its declared rows alone.
+        provenance: _InventorySources | None = None
+
         # The CV first: a run resolves against the commit it is running, and
         # only a read with no run falls back to the branch head.
         if config_version_id is not None:
             config_root = await _config_root_from_cv(ws, config_version_id, workdir)
             cwd = config_root
-            sources.extend(_inventory_sources(ws, config_root))
+            provenance = _inventory_sources(ws, config_root)
+            sources.extend(provenance.paths)
         elif git_sha:
             config_root = await _fetch_vcs_source(db, ws, git_sha, workdir)
             cwd = config_root
-            sources.extend(_inventory_sources(ws, config_root))
+            provenance = _inventory_sources(ws, config_root)
+            sources.extend(provenance.paths)
 
         # The declared rows always take part (#2256). `_declared_sources` renders
         # `all:` even with none declared and ansible resolves that to no hosts, so
@@ -912,11 +1033,13 @@ async def _resolve_uncached(
         # defined empty result from the same path as everything else rather than
         # from a special case.
         rendered = await _declared_sources(db, workspace_id)
-        platform_file = workdir / "platform.yml"
+        platform_file = workdir / _PLATFORM_SOURCE_NAME
         await asyncio.to_thread(platform_file.write_text, rendered)
         sources.append(platform_file)
 
-        document = await run_ansible_inventory(sources, scratch=workdir, limit=limit, cwd=cwd)
+        document = await run_ansible_inventory(
+            sources, scratch=workdir, limit=limit, cwd=cwd, provenance=provenance
+        )
         return normalise(document)
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
