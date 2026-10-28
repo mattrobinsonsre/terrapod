@@ -32,6 +32,17 @@ ECOSYSTEM = "pulumi"
 #: `pulumi-%s-%s-v%s-%s-%s.tar.gz` in the binary. The name may contain hyphens
 #: (`aws-native`), so it is non-greedy up to the `-v<digit>` that starts the
 #: version; OS and architecture are plain tokens at the end.
+#: Terrapod's own bridged Pulumi provider (#1987). A deployment cannot rename
+#: it -- the name is baked into the plugin binary and into every program that
+#: declares the provider -- so it is a constant rather than a config key, and
+#: only WHERE it is published is operator-settable.
+FIRST_PARTY_PLUGIN = "terrapod"
+
+#: Matched alongside the name so a hypothetical `pulumi-language-terrapod` or
+#: `pulumi-converter-terrapod` does not silently resolve against the release
+#: base for an asset that was never published there.
+FIRST_PARTY_KIND = "resource"
+
 _FILENAME = re.compile(
     r"^pulumi-(?P<kind>[a-z]+)-(?P<name>[a-z0-9][a-z0-9._-]*?)"
     r"-v(?P<version>[0-9][A-Za-z0-9._+-]*)"
@@ -54,6 +65,10 @@ def upstream_base() -> str:
     return settings.registry.package_cache.pulumi.upstream.rstrip("/")
 
 
+def first_party_base() -> str:
+    return settings.registry.package_cache.pulumi.first_party_url.rstrip("/")
+
+
 def artifact_for(filename: str, parts: dict[str, str]) -> Artifact:
     """Turn a parsed filename into something the substrate can fetch.
 
@@ -67,12 +82,27 @@ def artifact_for(filename: str, parts: dict[str, str]) -> Artifact:
     """
     plugin = f"pulumi-{parts['kind']}-{parts['name']}"
     rebuilt = f"{plugin}-v{parts['version']}-{parts['os']}-{parts['arch']}.tar.gz"
+
+    # Terrapod's OWN plugin is not published where Pulumi's are (#1987), so it
+    # resolves against its own base. `upstream` keeps meaning what it means for
+    # every Pulumi-published plugin -- overriding it wholesale to reach ours
+    # would send every other plugin to a host that does not have it.
+    #
+    # The version is a path segment rather than part of the filename, because a
+    # GitHub release asset lives under its tag. That is the same shape
+    # `registry.platform_tools.pulumi_mirror_url` already assembles for the
+    # Pulumi CLI itself, so this is the established pattern rather than a new one.
+    if parts["name"] == FIRST_PARTY_PLUGIN and parts["kind"] == FIRST_PARTY_KIND:
+        upstream_url = f"{first_party_base()}/v{parts['version']}/{rebuilt}"
+    else:
+        upstream_url = f"{upstream_base()}/{rebuilt}"
+
     return Artifact(
         ecosystem=ECOSYSTEM,
         name=plugin,
         version=parts["version"],
         filename=rebuilt,
-        upstream_url=f"{upstream_base()}/{rebuilt}",
+        upstream_url=upstream_url,
         # Upstream publishes no digest alongside the tarball, so there is none
         # to record. The CLI verifies the plugin by unpacking and running it,
         # which is a weaker guarantee than pip's or npm's and worth being plain

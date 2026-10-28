@@ -641,6 +641,12 @@ api:
         pulumi:
           enabled: true
           upstream: https://get.pulumi.com/releases/plugins
+          # Where Terrapod's OWN bridged Pulumi provider plugin is published
+          # (#1987). Separate from `upstream` on purpose: that is where PULUMI's
+          # plugins come from, and pointing it here would send every other
+          # plugin to a host that does not have it. Assets live under their
+          # release tag, so the version is a path segment.
+          first_party_url: https://github.com/mattrobinsonsre/terrapod/releases/download
         # Go module proxy. Pulumi-only (Go SDK programs), so it disappears with
         # engines.pulumi.enabled: false. Point the toolchain at it with GOPROXY.
         go:

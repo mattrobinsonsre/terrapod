@@ -2106,6 +2106,10 @@
                     "upstream": {
                       "type": "string",
                       "format": "uri"
+                    },
+                    "first_party_url": {
+                      "type": "string",
+                      "format": "uri"
                     }
                   }
                 },

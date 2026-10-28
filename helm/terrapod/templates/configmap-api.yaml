@@ -328,6 +328,14 @@ data:
         pulumi:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- /* Guarded, unlike `upstream`: this key HAS a code default, so
+                 rendering it unconditionally would write "" for an operator
+                 whose values omit it, overriding that default with an empty
+                 base. `upstream` is required in the model, so it cannot be
+                 omitted in the first place. */}}
+          {{- with .first_party_url }}
+          first_party_url: {{ . | quote }}
+          {{- end }}
         {{- end }}
         {{- with .go }}
         go:

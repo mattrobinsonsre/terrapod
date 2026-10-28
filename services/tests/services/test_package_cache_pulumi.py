@@ -134,3 +134,91 @@ class TestTheUpstreamURLIsRebuilt:
         name = "pulumi-resource-random-v4.16.3-linux-amd64.tar.gz"
         artifact = pulumi_plugins.artifact_for(name, pulumi_plugins.parse_filename(name))
         assert artifact.digest == ""
+
+
+class TestTerrapodsOwnPluginResolvesSomewhereElse:
+    """Terrapod publishes a Pulumi plugin of its own (#1987), and it is not
+    published where Pulumi's are.
+
+    The proxy has ONE `upstream`, deliberately -- the client names a package and
+    Terrapod decides where packages come from, so that single value is the whole
+    request-forgery surface. Our own plugin therefore cannot arrive through it,
+    and the alternatives are worse than a second base: overriding `upstream`
+    wholesale would send every Pulumi-published plugin to a host that does not
+    have it, and pointing the CLI straight at a release URL would make an
+    air-gapped install reach upstream, which is the thing the proxy exists to
+    prevent.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _first_party(self):
+        before = settings.registry.package_cache.pulumi.first_party_url
+        settings.registry.package_cache.pulumi.first_party_url = (
+            "https://github.com/mattrobinsonsre/terrapod/releases/download"
+        )
+        yield
+        settings.registry.package_cache.pulumi.first_party_url = before
+
+    def test_it_resolves_against_the_first_party_base(self) -> None:
+        name = "pulumi-resource-terrapod-v1.2.3-linux-amd64.tar.gz"
+        artifact = pulumi_plugins.artifact_for(name, pulumi_plugins.parse_filename(name))
+        assert artifact.upstream_url == (
+            "https://github.com/mattrobinsonsre/terrapod/releases/download"
+            "/v1.2.3/pulumi-resource-terrapod-v1.2.3-linux-amd64.tar.gz"
+        )
+
+    def test_the_version_is_a_PATH_SEGMENT_not_part_of_the_filename(self) -> None:
+        """A GitHub release asset lives under its tag, so the base cannot be
+        flat the way `upstream` is. Same shape as the `pulumi_mirror_url` the
+        binary cache already assembles for the Pulumi CLI itself."""
+        name = "pulumi-resource-terrapod-v9.9.9-darwin-arm64.tar.gz"
+        url = pulumi_plugins.artifact_for(name, pulumi_plugins.parse_filename(name)).upstream_url
+        assert "/v9.9.9/" in url, url
+        assert url.endswith("/pulumi-resource-terrapod-v9.9.9-darwin-arm64.tar.gz")
+
+    def test_EVERY_OTHER_PLUGIN_still_goes_to_the_pulumi_upstream(self) -> None:
+        """The half that makes the first one mean something.
+
+        Asserting only that our plugin reaches the release base would pass just
+        as well if the branch had captured every plugin -- which is the damaging
+        direction, because it would send `random` and `aws` to a host that has
+        never published them.
+        """
+        for plugin in ("random", "aws", "aws-native", "terrapod-something-else"):
+            name = f"pulumi-resource-{plugin}-v1.0.0-linux-amd64.tar.gz"
+            url = pulumi_plugins.artifact_for(
+                name, pulumi_plugins.parse_filename(name)
+            ).upstream_url
+            assert url.startswith("https://get.pulumi.com/releases/plugins/"), (plugin, url)
+
+    def test_a_NON_RESOURCE_plugin_of_the_same_name_is_not_diverted(self) -> None:
+        """`kind` is matched as well as the name, so a hypothetical
+        `pulumi-language-terrapod` does not resolve against a release base that
+        has no such asset -- which would 404 while naming our own release, the
+        most confusing possible failure."""
+        name = "pulumi-language-terrapod-v1.2.3-linux-amd64.tar.gz"
+        url = pulumi_plugins.artifact_for(name, pulumi_plugins.parse_filename(name)).upstream_url
+        assert url.startswith("https://get.pulumi.com/releases/plugins/"), url
+
+    def test_an_internal_mirror_is_honoured_for_it_too(self) -> None:
+        """A restricted-network install mirrors our release like any other
+        artifact, so this base is operator-settable for the same reason
+        `upstream` is."""
+        settings.registry.package_cache.pulumi.first_party_url = "https://mirror.internal/tp"
+        name = "pulumi-resource-terrapod-v1.2.3-linux-amd64.tar.gz"
+        url = pulumi_plugins.artifact_for(name, pulumi_plugins.parse_filename(name)).upstream_url
+        assert (
+            url
+            == "https://mirror.internal/tp/v1.2.3/pulumi-resource-terrapod-v1.2.3-linux-amd64.tar.gz"
+        )
+
+    def test_the_rebuilt_filename_is_still_the_parsed_one(self) -> None:
+        """The module's own invariant, asserted on the new branch as well: the
+        URL is rebuilt from PARSED parts, so a filename that survived the
+        pattern cannot smuggle a path into the request. A traversal attempt
+        should not parse at all, and if it ever did it must not reach the
+        release base verbatim."""
+        assert (
+            pulumi_plugins.parse_filename("pulumi-resource-terrapod-v1.2.3-../../etc-passwd.tar.gz")
+            is None
+        )

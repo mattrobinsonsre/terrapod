@@ -245,6 +245,7 @@
   "api.config.registry.package_cache.nuget.enabled",
   "api.config.registry.package_cache.nuget.upstream",
   "api.config.registry.package_cache.pulumi.enabled",
+  "api.config.registry.package_cache.pulumi.first_party_url",
   "api.config.registry.package_cache.pulumi.upstream",
   "api.config.registry.package_cache.pypi.enabled",
   "api.config.registry.package_cache.pypi.upstream",
