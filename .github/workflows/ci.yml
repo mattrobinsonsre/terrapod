@@ -29,7 +29,13 @@ on:
     # `sha-` manifest, `images_exist` is false, and a tag on that commit
     # rebuilds and re-tests from scratch as it used to.
     branches: [main, 'release/**']
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    # Both forms, because a pre-release tag matched NEITHER until #2277: these
+    # patterns are full-match, so `v2.0.0-alpha.1` fell through and the push
+    # started no pipeline AND no failure -- nothing published, nothing to clean
+    # up, and no signal that anything had gone wrong.
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
   pull_request:
     # Release branches too, not just main. A release line is where patches and
     # release-targeted features land, and those are the changes people are
@@ -121,7 +127,18 @@ jobs:
           is_pr=false
           version=""
 
-          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          # MUST admit the same tag shapes as `on.push.tags` above. They are
+          # written in two different languages -- an Actions filter pattern and a
+          # bash regex -- so nothing makes them agree except this comment and the
+          # gate that runs both over the same fixtures
+          # (scripts/docs-audit/check_release_tag_triggers.py).
+          #
+          # Divergence fails SILENTLY and in the worst direction: a tag the filter
+          # admits but this rejects starts a pipeline with `is_tag=false`, so every
+          # release job is skipped, nothing is published, nothing fails, and
+          # `Cleanup Tag` never fires -- leaving a tag that looks released and is
+          # not. The optional group is semver's pre-release suffix (#2277).
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             is_tag=true
             version="${GITHUB_REF#refs/tags/}"
           fi
@@ -249,6 +266,14 @@ jobs:
       # so following them is accepted and then silently does nothing.
       - name: (docs-audit) A machine credential's key is described with its mechanism
         run: python3 scripts/docs-audit/check_credential_key_prose.py
+
+      # Both halves of this one fail SILENTLY, which is the whole reason it is
+      # gated: a tag pattern that stops matching starts no pipeline and reports
+      # nothing, and a `--prerelease` flag reintroduced anywhere would decline the
+      # Latest badge without erroring, so the alpha would quietly stop being what
+      # the repo front page points at.
+      - name: (docs-audit) The release trigger admits a pre-release, and lets it hold the badge
+        run: python3 scripts/docs-audit/check_release_tag_triggers.py
 
       # The `go-modules` job below reads its toolchain from ONE module's
       # directive, and its own comment said the modules "are kept in step by
@@ -4245,6 +4270,13 @@ jobs:
             echo "Release $version already exists; skipping create"
             exit 0
           fi
+          # NOT created with `--prerelease`, deliberately: GitHub refuses the
+          # "Latest" badge to a release flagged as a pre-release, so the flag and
+          # the badge cannot both be had. A pre-release is the newest thing we
+          # have published while it is current, and the repo front page should
+          # say so rather than pointing at the previous stable line -- so the
+          # badge wins and the version string carries the warning instead.
+          # `release-finalize` sets the flag explicitly false for the same reason.
           gh release create "$version" \
             --title "$version (in progress)" \
             --notes "Release in progress — assets are being attached by parallel CI jobs."
@@ -4296,10 +4328,23 @@ jobs:
       # gated run. An actor with packages:write can push an image, but cannot
       # make Fulcio issue a certificate naming this workflow.
       #
-      # The identity is pinned to THIS repository's ci.yml on `main` or on a
-      # version tag — the only two refs that can legitimately build a manifest
-      # (PRs are excluded from create-manifests, and `release/**` only ever runs
-      # on pull_request). Hardcoded rather than built from `github.repository`,
+      # The identity is pinned to THIS repository's ci.yml on `main`, on a
+      # release branch, or on a version tag — the three refs that can legitimately
+      # build a manifest (PRs are excluded from create-manifests by its
+      # `is_pr != 'true'` gate).
+      #
+      # It said "the only TWO refs ... and `release/**` only ever runs on
+      # pull_request" until #2277, and that stopped being true at #2185, which put
+      # `release/**` on `on.push` so a release branch builds its images at merge.
+      # Nothing caught it because neither supported release line carries this step
+      # — it would first have fired on the first tag of the first release branch
+      # cut from this workflow, failing `release-images` and so letting
+      # `Cleanup Tag` delete a tag whose release was otherwise complete.
+      #
+      # The tag alternative admits a pre-release suffix for the same reason the
+      # trigger and `is_tag` do (#2277).
+      #
+      # Hardcoded rather than built from `github.repository`,
       # for the same reason REGISTRY is: it is a trust anchor, and a trust anchor
       # read from the environment it is anchoring is not one. Move it with
       # REGISTRY if this ever lives somewhere else.
@@ -4310,7 +4355,7 @@ jobs:
         id: digests
         env:
           COSIGN_OIDC_ISSUER: https://token.actions.githubusercontent.com
-          COSIGN_IDENTITY_RE: ^https://github\.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+          COSIGN_IDENTITY_RE: ^https://github\.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/(heads/main|heads/release/v[0-9]+\.[0-9]+|tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
           : > "$RUNNER_TEMP/digests.txt"
@@ -4984,7 +5029,24 @@ jobs:
             {
               gh api "/repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[].tag_name'
               echo "$version"
-            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+            # The optional group admits a pre-release (`v2.0.0-alpha.1`), which
+            # is what lets one hold the badge while it is the newest thing
+            # published. Both ends stay anchored: that is what keeps the Checkov
+            # builder's non-`v` releases out of the comparison, which is the job
+            # the anchors were doing all along.
+            #
+            # `sed 's/-/~/'` on the FIRST dash is what makes `sort -V` agree with
+            # semver, and it is not cosmetic. `sort -V` is Debian version
+            # ordering, where a pre-release suffix sorts AFTER the release it
+            # precedes -- measured identically under GNU coreutils 9.12 and BSD
+            # sort, so it is not a platform quirk. Without the transform
+            # `v2.0.0-alpha.1` beats `v2.0.0`, and the alpha would keep the badge
+            # for ever once 2.0.0 shipped. `~` is the one character that sorts
+            # before nothing, so the substitution restores exactly semver's rule;
+            # it exists only inside this pipeline and never reaches a tag, which
+            # matters because `~` is neither valid semver nor a valid Docker tag.
+            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+              | sed 's/-/~/' | sort -V | tail -1 | sed 's/~/-/'
           )
           echo "::notice::newest released version is $highest (compared against every release, not a window)"
           if [ "$highest" = "$version" ]; then
@@ -4994,11 +5056,19 @@ jobs:
             echo "::notice::$version is not the newest release ($highest is) — not taking the 'Latest' badge"
           fi
 
-          # GoReleaser already created the release with provider binaries.
+          # `release-create` made the empty Release and the append-mode goreleaser
+          # runs have uploaded their binaries into it -- goreleaser does not create
+          # it, which every `.goreleaser.yml` says in as many words (`mode: append`).
           # Update title/notes and upload remaining assets.
+          # `--prerelease=false` unconditionally, and set rather than omitted so
+          # a re-run converges instead of inheriting whatever the Release already
+          # had. A pre-release is published under the badge on purpose (see
+          # `release-create`); flagging it would silently decline the badge, and
+          # the decline is invisible -- `gh release edit` exits 0 either way.
           gh release edit "$version" \
             --title "$version" \
             --latest="$latest" \
+            --prerelease=false \
             --notes-file /tmp/release-notes.md
 
           # Declining the badge is NOT the same as handing it to someone else.
@@ -5022,6 +5092,19 @@ jobs:
             # a deleted tag is not.
             gh release edit "$highest" --latest=true \
               || echo "::warning::could not re-elect $highest as latest; $version may hold the badge — fix with: gh release edit $highest --latest=true"
+          fi
+
+          # Read the badge back rather than trusting the edit. GitHub documents
+          # that a release flagged as a pre-release cannot be set as latest, and
+          # `gh release edit` exits 0 whether or not the badge actually moved --
+          # so an absent signal would read as a passing one, which is how #1374
+          # went unnoticed in the first place. One call, and it turns a
+          # documented constraint into a checked one on every release.
+          actual=$(gh api "/repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null || echo "<unreadable>")
+          if [ "$actual" = "$highest" ]; then
+            echo "::notice::Latest badge verified: $actual"
+          else
+            echo "::warning::Latest badge is $actual, expected $highest — fix with: gh release edit $highest --latest=true"
           fi
 
           gh release upload "$version" \
