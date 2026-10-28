@@ -125,6 +125,9 @@ class TestLoading:
         to be refused at the door rather than reported anywhere later. Only an
         operator-supplied key can be this small; ours is 2048 by construction.
         """
+        # A deliberately weak key, generated so the validator can be seen to
+        # refuse it. It signs nothing and leaves no test.
+        # nosemgrep: python.cryptography.security.insufficient-rsa-key-size.insufficient-rsa-key-size
         weak = rsa.generate_private_key(public_exponent=65537, key_size=1024)
         with pytest.raises(ValueError, match="at least 2048 bits"):
             oidc_signing.load_private_key(oidc_signing.serialize_private_key(weak))
@@ -365,6 +368,9 @@ class TestTheOverlappingSuppliedKey:
     def test_an_unusable_NEXT_key_fails_startup_and_is_named_as_such(self, key):
         """The message has to name the second setting, or the operator edits the
         wrong Secret -- and at that point both are in play."""
+        # A deliberately weak key, generated so the validator can be seen to
+        # refuse it. It signs nothing and leaves no test.
+        # nosemgrep: python.cryptography.security.insufficient-rsa-key-size.insufficient-rsa-key-size
         weak = rsa.generate_private_key(public_exponent=65537, key_size=1024)
         a, b = self._configure(
             oidc_signing.serialize_private_key(key),
