@@ -1,0 +1,64 @@
+version: 2
+
+# The Pulumi plugin's filename is a PROTOCOL, not a preference.
+#
+# `pulumi_plugins.py` PARSES it -- `pulumi-<kind>-<name>-v<version>-<os>-<arch>.tar.gz`
+# -- rather than interpolating it, because it is client input on the way to both
+# an upstream URL and a storage key. So the archive name here is matched by that
+# regex on the way back in, and a cosmetic change to it breaks every plugin
+# download through the cache. `services/tests/services/test_package_cache_pulumi.py`
+# asserts the pairing from the parsing side.
+project_name: pulumi-resource-terrapod
+
+builds:
+  - env:
+        - CGO_ENABLED=0
+    main: ./cmd/pulumi-resource-terrapod
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X main.version={{ .Version }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Pulumi resolves the plugin by looking for a binary of exactly this name
+    # inside the archive, so unlike the Terraform provider it carries NO version
+    # suffix -- the version is in the archive name instead.
+    binary: pulumi-resource-terrapod
+
+archives:
+  - formats: [tar.gz]
+    name_template: "pulumi-resource-terrapod-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    # The binary ALONE. GoReleaser otherwise adds README and LICENSE, and the
+    # Pulumi CLI expects to find the plugin at the archive root -- extra members
+    # are at best noise and at worst a resolution failure.
+    files: []
+    wrap_in_directory: false
+
+checksum:
+  name_template: "pulumi-resource-terrapod_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  # Pre-created by `release-create`, like the provider and migrate runs, so
+  # several goreleaser runs can upload to one Release in parallel.
+  mode: append
+
+changelog:
+  disable: true
