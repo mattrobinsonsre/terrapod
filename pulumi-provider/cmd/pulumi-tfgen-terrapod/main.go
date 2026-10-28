@@ -19,7 +19,7 @@ import (
 // Semver, unlike the Terraform provider's `dev`: the bridge validates this and
 // refuses to generate anything for a version it cannot parse, so a non-semver
 // default would fail at the first invocation rather than at release time.
-var version = "0.0.0-dev"
+var version = terrapod.SourceBuildVersion
 
 func main() {
 	pftfgen.Main(terrapod.Namespace, terrapod.Provider(version))

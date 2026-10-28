@@ -57,15 +57,47 @@ var mpl20 = tfbridge.MPL20LicenseType
 // mapping total and mechanical.
 const mainModule = "index"
 
+// : The version both commands default to for a source build.
+//
+// : It is SEMVER rather than the Terraform provider's bare `dev`, because the
+// : bridge VALIDATES this value and refuses to serve or generate anything for a
+// : version it cannot parse. That forces the split in `sdkVersion` below.
+const SourceBuildVersion = "0.0.0-dev"
+
+// sdkVersion translates the bridge's version into the one go-terrapod wants.
+//
+// Two consumers, two requirements, and they conflict for a source build:
+//
+//   - the BRIDGE needs semver and rejects anything else, so a source build is
+//     `0.0.0-dev`;
+//   - `go-terrapod`'s `VersionCheck` skips the SDK-vs-API compatibility probe
+//     ONLY for the literal `dev` or an empty string. Hand it `0.0.0-dev` and it
+//     performs a real comparison against the API's version and reports a
+//     mismatch -- so a locally built plugin would fail with a version error that
+//     has nothing to do with Pulumi, which is precisely the local-development
+//     case the Terraform provider's own `New` docstring protects by passing
+//     `dev`.
+//
+// So a source build tells the SDK `dev` and a release build tells it the real
+// version, which is what makes the compatibility check fire for operators and
+// stay out of the way during development.
+func sdkVersion(version string) string {
+	if version == SourceBuildVersion || version == "" {
+		return "dev"
+	}
+	return version
+}
+
 // Provider returns the bridged provider definition.
 //
-// `version` is threaded into the Terraform provider, which assigns it to
-// `terrapod.SDKVersion` -- go-terrapod sends that as the tool argument to its
-// API version check, so a Pulumi run identifies itself as the Pulumi provider
-// rather than impersonating the Terraform one.
+// `version` is the Pulumi package version. It reaches the Terraform provider as
+// `sdkVersion(version)`, which assigns `terrapod.SDKVersion` -- go-terrapod
+// sends that as the tool argument to its API version check, so a Pulumi run
+// identifies itself as the Pulumi provider rather than impersonating the
+// Terraform one.
 func Provider(version string) tfbridge.ProviderInfo {
 	info := tfbridge.ProviderInfo{
-		P:    pftfbridge.ShimProvider(tfprovider.New(version)()),
+		P:    pftfbridge.ShimProvider(tfprovider.New(sdkVersion(version))()),
 		Name: Namespace,
 
 		DisplayName: "Terrapod",

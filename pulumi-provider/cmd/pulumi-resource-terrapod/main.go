@@ -27,7 +27,7 @@ var schema []byte
 
 // Set via ldflags at build time. Semver, because the bridge validates it and
 // refuses to serve a version it cannot parse.
-var version = "0.0.0-dev"
+var version = terrapod.SourceBuildVersion
 
 func main() {
 	pftfbridge.Main(
