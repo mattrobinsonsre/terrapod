@@ -43,7 +43,10 @@ from terrapod.services.notification_service import STATUS_TO_TRIGGER
 # already imports this module, so catching it costs them no new import. The
 # rule itself lives next to `validate_operations` in `workspace_settings`,
 # because that is where the declaration it enforces is validated on write.
-from terrapod.services.workspace_settings import PlanApplyNotEnabled  # noqa: F401
+from terrapod.services.workspace_settings import (
+    PlanApplyNotEnabled,  # noqa: F401
+    WorkspaceLocked,  # noqa: F401
+)
 
 logger = get_logger(__name__)
 
@@ -430,6 +433,34 @@ _PRE_PLAN_SCAN_LIMIT = 50
 # listener has not yet transitioned it to `applying` and launched
 # the Job (that's atomic in claim_next_run).
 PRE_EXECUTION_STATES = frozenset({"pending", "queued", "planning", "planned", "confirmed"})
+
+#: The statuses in which a run holds its workspace's single mutating slot.
+#:
+#: ONE producer for two readers that have to agree: the dispatcher gate in
+#: `claim_next_run`, which decides whether a queued run may START, and
+#: `_apply_slot_holder`, which a saved-plan run consults at confirm time
+#: because it deliberately skipped that gate in order to plan immediately
+#: (#1903). They were written separately and agreed only by a docstring
+#: asserting that they did -- a ledger with nothing checking it, which is how
+#: the omission below survived.
+#:
+#: `configuring` is here per #1975, and its absence was silent in exactly one
+#: direction. A standalone configure is `queued` with `plan_only` refused on
+#: it (#2131), so it already met this gate and waited for an apply. Nothing
+#: made the converse true: a configure mutates real hosts for as long as the
+#: playbook runs, and an apply would start straight underneath one that was
+#: part-way through a fleet.
+#:
+#: `planned` holds the slot as firmly as `applying` -- confirming it is one
+#: click away -- and terminal states hold nothing.
+#:
+#: NOT to be merged with `inventory_auto_configure._CONFIGURE_IN_FLIGHT`,
+#: which answers a different question ("is an auto-configure already on its
+#: way for this workspace") and therefore counts `pending` while deliberately
+#: excluding `planned`.
+MUTATING_SLOT_STATES = frozenset(
+    {"planning", "planned", "confirmed", "applying", "configuring", "canceling"}
+)
 
 #: Sources whose runs Terrapod RECORDS but does not EXECUTE (#1563).
 #:
@@ -1419,6 +1450,15 @@ async def create_run(
         workspace,
         is_configure=is_configure,
         configure_after_apply=configure_after_apply,
+    )
+
+    # The manual padlock, enforced at the same chokepoint and for the same
+    # reason (#1975). The dispatcher already refuses to START a queued run on a
+    # locked workspace; this makes a configure say so at the point of asking
+    # rather than handing back a run that silently never runs.
+    workspace_settings.refuse_configure_on_locked_workspace(
+        workspace,
+        is_configure=is_configure,
     )
 
     # An explicit `auto_apply` argument (the CLI/API asking for a specific
@@ -2825,7 +2865,7 @@ async def _apply_slot_holder(db: AsyncSession, run: Run) -> Run | None:
             other.plan_only.is_(False),
             other.is_drift_detection.is_(False),
             _not_deferred_saved_plan(other),
-            other.status.in_(["planning", "planned", "confirmed", "applying", "canceling"]),
+            other.status.in_(list(MUTATING_SLOT_STATES)),
         )
         .limit(1)
     )
@@ -2865,8 +2905,8 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
         if holder is not None:
             raise ValueError(
                 f"another run ({str(holder.id)[:8]}, {holder.status}) is already "
-                "applying or awaiting confirmation on this workspace — a saved plan "
-                "can only be applied when the workspace is free"
+                "in flight on this workspace — a saved plan can only be applied "
+                "when the workspace is free"
             )
     # Staleness guards (#646 expiry, #647 state drift): a plan that no longer
     # reflects the current state, or has aged past the workspace TTL, must not be
@@ -3492,7 +3532,7 @@ async def claim_next_run(
                     # Once confirmed its status leaves the pre-confirm set and
                     # it counts here like any other apply.
                     _not_deferred_saved_plan(other),
-                    other.status.in_(["planning", "planned", "confirmed", "applying", "canceling"]),
+                    other.status.in_(list(MUTATING_SLOT_STATES)),
                 )
                 .exists()
             )
