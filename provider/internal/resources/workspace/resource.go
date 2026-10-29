@@ -743,6 +743,22 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"dynamic_inventory_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether ansible's `auto` inventory plugin — a **declared plugin config**, a YAML file with a top-level `plugin:` key — may run, and it runs **on the runner**. **Defaults to false.** The API never executes a plugin in either state; what this decides is what becomes of such a source when an inventory is resolved.\n\nOff, a plugin source is **refused by name** rather than resolving partially — a short host set read as the truth is the failure the inventory surface exists to prevent. On, the API **skips** it and says so per source, and the **runner re-resolves the inventory and is authoritative** for the hosts a configure reaches.\n\nSeparate from `inventory_scripts_enabled` so declared plugin configs can be permitted without also permitting arbitrary executables.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"inventory_scripts_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether ansible's `script` inventory plugin — an **executable inventory script** — may run, and it runs **on the runner**. **Defaults to false**, and the API never executes one in either state.\n\nOff, a script source is **refused by name** rather than resolving partially. On, the API **skips** it and the **runner re-resolves and is authoritative**.\n\nThe stricter half of the pair, and separate from `dynamic_inventory_enabled` for that reason: a declared plugin config names a collection that can be pinned and installed, a script names nothing — so an operator can take declared configs without permitting arbitrary executables.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"config_directory": schema.StringAttribute{
 				MarkdownDescription: "Repository-root-relative directory the ansible " +
 					"configure operation runs in: its fetch scope and the working " +
@@ -1504,6 +1520,18 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
+	// #2033's pair. Pointers for the same reason as the booleans above: a
+	// plain bool would make "I did not say" and "refuse these sources" the
+	// same request, so an omitted attribute would keep resetting a
+	// workspace an operator had deliberately permitted.
+	if !m.DynamicInventoryEnabled.IsNull() && !m.DynamicInventoryEnabled.IsUnknown() {
+		v := m.DynamicInventoryEnabled.ValueBool()
+		req.DynamicInventoryEnabled = &v
+	}
+	if !m.InventoryScriptsEnabled.IsNull() && !m.InventoryScriptsEnabled.IsUnknown() {
+		v := m.InventoryScriptsEnabled.ValueBool()
+		req.InventoryScriptsEnabled = &v
+	}
 	// #1929's remaining four.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
 		// A non-nil empty slice, not nil: an empty list is how the operator
@@ -1729,6 +1757,18 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ConfigureAllHosts.IsNull() && !m.ConfigureAllHosts.IsUnknown() {
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
+	}
+	// #2033's pair. Pointers for the same reason as the booleans above: a
+	// plain bool would make "I did not say" and "refuse these sources" the
+	// same request, so an omitted attribute would keep resetting a
+	// workspace an operator had deliberately permitted.
+	if !m.DynamicInventoryEnabled.IsNull() && !m.DynamicInventoryEnabled.IsUnknown() {
+		v := m.DynamicInventoryEnabled.ValueBool()
+		req.DynamicInventoryEnabled = &v
+	}
+	if !m.InventoryScriptsEnabled.IsNull() && !m.InventoryScriptsEnabled.IsUnknown() {
+		v := m.InventoryScriptsEnabled.ValueBool()
+		req.InventoryScriptsEnabled = &v
 	}
 	// #1929's remaining four.
 	if !m.InventoryPaths.IsNull() && !m.InventoryPaths.IsUnknown() {
@@ -1958,6 +1998,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.AutoConfigureEnabled = types.BoolValue(ws.AutoConfigureEnabled)
 	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
 	m.ConfigureAllHosts = types.BoolValue(ws.ConfigureAllHosts)
+	// #2033's pair, same shape: Optional+Computed over a non-nullable
+	// column the SDK holds as a plain bool, so a false survives the round
+	// trip and a null read-back is never the right answer.
+	m.DynamicInventoryEnabled = types.BoolValue(ws.DynamicInventoryEnabled)
+	m.InventoryScriptsEnabled = types.BoolValue(ws.InventoryScriptsEnabled)
 
 	// #1929's remaining four, read side.
 	//

@@ -108,6 +108,7 @@ data terrapod_workspace.drift_ignore_rules required=false optional=false compute
 data terrapod_workspace.drift_last_checked_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.dynamic_inventory_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ee_resource_cpu required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ee_resource_memory required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.engine required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -116,6 +117,7 @@ data terrapod_workspace.execution_backend required=false optional=false computed
 data terrapod_workspace.execution_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.inventory_paths required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_workspace.inventory_scripts_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.lifecycle_state required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -577,6 +579,7 @@ resource terrapod_workspace.drift_ignore_rules required=false optional=true comp
 resource terrapod_workspace.drift_last_checked_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.dynamic_inventory_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ee_resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ee_resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.engine required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -585,6 +588,7 @@ resource terrapod_workspace.execution_backend required=false optional=true compu
 resource terrapod_workspace.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.inventory_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
+resource terrapod_workspace.inventory_scripts_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.lifecycle_state required=false optional=false computed=true sensitive=false type=basetypes.StringType

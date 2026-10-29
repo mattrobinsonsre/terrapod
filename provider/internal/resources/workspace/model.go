@@ -109,6 +109,18 @@ type workspaceModel struct {
 	AutoConfigureEnabled types.Bool `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply  types.Bool `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts    types.Bool `tfsdk:"configure_all_hosts"`
+	// Whether ansible's inventory PLUGINS may run, and they run ON THE
+	// RUNNER only (#2033). Both default false on the server, and the API
+	// never executes a plugin or a script in either state -- so neither
+	// widens what the API does. What they decide is what becomes of such a
+	// source when an inventory is resolved: refused by name, or skipped for
+	// the runner to resolve and be authoritative about.
+	//
+	// Two booleans rather than one because a declared plugin config names a
+	// collection that can be pinned and installed while a script names
+	// nothing, so an operator can take the first without the second.
+	DynamicInventoryEnabled types.Bool `tfsdk:"dynamic_inventory_enabled"`
+	InventoryScriptsEnabled types.Bool `tfsdk:"inventory_scripts_enabled"`
 	// The ansible configure operation's roots and run defaults (#1929).
 	//
 	// ConfigDirectory is Optional+Computed with UseStateForUnknown, exactly
