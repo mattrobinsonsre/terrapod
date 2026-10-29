@@ -488,6 +488,10 @@ def _add_execution_environment(
         [
             {"name": "TP_EE_ENDPOINT", "value": _EE_ENDPOINT},
             {"name": "TP_EE_IMAGE", "value": ee_image},
+            # The EE's own HOME, so a phase that writes something the EE must
+            # read back -- a pip cache, a `.netrc` -- derives the path from the
+            # Job's volume layout rather than hardcoding a second copy of it.
+            {"name": "TP_EE_HOME", "value": _EE_HOME},
             {"name": "TP_EE_COLLECTIONS_DIR", "value": _EE_COLLECTIONS_DIR},
             {"name": "TP_EE_ROLES_DIR", "value": _EE_ROLES_DIR},
             {"name": "TP_EE_INVENTORY_DIR", "value": _EE_INVENTORY_DIR},

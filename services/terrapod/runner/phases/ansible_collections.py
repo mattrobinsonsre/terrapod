@@ -91,6 +91,19 @@ SERVER_NAME = "terrapod"
 _DEFAULT_COLLECTIONS_DIR = "/tp/collections"
 _DEFAULT_ROLES_DIR = "/tp/roles"
 
+#: The execution environment's own HOME, which is NOT this process's. From
+#: `TP_EE_HOME`, set by the Job beside the other `TP_EE_*` paths, so it stays a
+#: property of the Job's volume layout rather than something a phase decides.
+#:
+#: Two things live here and both have to be where the EE will look: pip's
+#: `.netrc`, and ansible's `~/.ansible` (which is why no `ANSIBLE_HOME` is set
+#: at all -- see `galaxy_env`).
+_DEFAULT_EE_HOME = "/tp/home"
+
+#: The name a collection declares its Python dependencies in. ansible-builder
+#: reads the same file, so this is the ecosystem's convention rather than ours.
+PYTHON_REQUIREMENTS = "requirements.txt"
+
 
 def collections_dir() -> Path:
     """Where collections are installed to, and where ansible is told to look.
@@ -150,6 +163,67 @@ def galaxy_server_url(api_url: str) -> str:
     never served.
     """
     return f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/galaxy/"
+
+
+def ee_home() -> Path:
+    """The execution environment's HOME, from the Job."""
+    return Path(os.environ.get("TP_EE_HOME") or _DEFAULT_EE_HOME)
+
+
+def python_requirements_files(config_dir: Path) -> list[Path]:
+    """Every `requirements.txt` the install should satisfy, installed-first.
+
+    Two sources, and the order is the precedence pip applies -- later wins a
+    conflicting pin, the same relationship `--force` expresses for collections:
+
+    * **each installed collection's own**, under
+      `<collections>/ansible_collections/<ns>/<name>/requirements.txt`.
+      `ansible-galaxy` installs a collection's CONTENT and not its Python
+      dependencies -- `amazon.aws` ships one naming `boto3` and `botocore` -- so
+      without this a collection installs cleanly and then fails at the first task
+      or inventory-plugin load with an import error naming the SDK.
+    * **the operator's own**, beside the `requirements.yml` they already declare,
+      for a dependency no collection names: a `uri` task needing a client, or a
+      filter plugin of their own. No new column, and the file sits where the
+      Galaxy requirements already do.
+
+    Sorted within the collection pass so a fleet installs in a stable order --
+    two collections pinning the same package differently is the operator's to
+    resolve, and an order that varies per run would make it intermittent.
+    """
+    files = sorted((collections_dir() / "ansible_collections").glob(f"*/*/{PYTHON_REQUIREMENTS}"))
+    declared = config_dir / PYTHON_REQUIREMENTS
+    if declared.is_file():
+        files.append(declared)
+    return files
+
+
+def pip_env(api_url: str) -> dict[str, str]:
+    """pip settings for the EXECUTION ENVIRONMENT's pip.
+
+    Built on `pulumi_deps.pip_env` rather than beside it, because that function
+    carries the trap worth having exactly one copy of: **pip silently IGNORES a
+    plain-HTTP index unless the host is named in `PIP_TRUSTED_HOST`** -- it does
+    not fail, and the install then dies with "No matching distribution found"
+    for a package the proxy was serving perfectly well. The runner reaches the
+    API on the in-cluster URL, which is http by default.
+
+    One value differs, and it is the same mistake this issue was about: that
+    function's `PIP_CACHE_DIR` is `/tmp/pip-cache`, correct for the orchestrator
+    whose `/tmp` is a writable emptyDir, and the EE's READ-ONLY ROOT. So the
+    cache goes on the shared volume, where the wheels -- the biggest thing pip
+    writes -- are also visible to whoever is debugging the run.
+    """
+    from terrapod.runner.phases import pulumi_deps
+
+    env = dict(pulumi_deps.pip_env(api_url))
+    env["PIP_CACHE_DIR"] = str(ee_home() / ".cache" / "pip")
+    # `--user` needs no `PYTHONPATH`: the user site is on `sys.path` by default
+    # and HOME is on the writable shared volume. Measured in the published image
+    # with a read-only root -- site.ENABLE_USER_SITE is True and the install
+    # lands in `<HOME>/.local/lib/pythonX.Y/site-packages`.
+    env["PIP_USER"] = "1"
+    return env
 
 
 def requirements_files(config_dir: Path) -> list[Path]:
@@ -290,6 +364,93 @@ def _run_install(
         )
 
 
+def _pip_is_available(env: dict[str, str], cwd: Path, log_file: str | None) -> bool:
+    """Whether this execution environment has a usable pip.
+
+    PROBED rather than inferred, and that is deliberate (user's call, #2305):
+    pip is **not** part of the custom-EE contract, so an operator-supplied image
+    may legitimately not have one, and requiring it at the startup probe would
+    fail an image that conforms today. A probe also answers the question that
+    matters -- "can pip run here" -- rather than the one a string match on the
+    agent's refusal would answer, which is "did this particular message appear".
+    """
+    result = ee_client.run("pip", ["--version"], cwd=str(cwd), env=env, log_file=log_file)
+    return not result.error and result.rc == 0
+
+
+def install_python_requirements(
+    cfg,  # RunnerConfig
+    config_dir: Path,
+    *,
+    log_file: str | None = None,
+) -> None:
+    """Install the Python dependencies the installed collections declare (#2305).
+
+    `ansible-galaxy` installs a collection's content and not its Python
+    requirements, so without this `amazon.aws` installs cleanly and then fails at
+    the first task -- or, for a dynamic inventory, at plugin load -- with an
+    import error naming boto3. The interpreter that must import them is the EE's,
+    which is why the install runs there rather than in the orchestrator.
+
+    **Through Terrapod's PyPI pull-through cache**, which is what makes this work
+    in a sealed deployment at all, with the credential in a `.netrc` in the EE's
+    own HOME rather than in the index URL -- pip prints its index, and the run's
+    log is streamed to the API and the UI.
+
+    **A missing pip is skipped, a failed install is fatal.** The first is the
+    user's call and the reason is the custom-EE contract. The second is because a
+    missing SDK fails the run anyway, later and less legibly: a partial configure
+    against real hosts is the outcome worth refusing a runner slot over.
+
+    A no-op when nothing declares a `requirements.txt`, which is the common case.
+    """
+    from terrapod.runner.phases import pulumi_deps
+
+    files = python_requirements_files(config_dir)
+    if not files:
+        logger.info(
+            "no collection declares Python requirements; nothing to install",
+            config_directory=str(config_dir),
+            looked_for=PYTHON_REQUIREMENTS,
+        )
+        return
+
+    env = pip_env(cfg.api_url)
+    pulumi_deps.write_netrc(cfg.api_url, cfg.auth_token, home=ee_home())
+
+    if not _pip_is_available(env, config_dir, log_file):
+        logger.warning(
+            "this execution environment has no usable pip, so the Python "
+            "requirements these collections declare were NOT installed; a task or "
+            "inventory plugin needing one will fail with an import error. Add pip "
+            "to the image, or install the dependencies into it directly",
+            requirements=[str(f) for f in files],
+        )
+        return
+
+    for path in files:
+        logger.info("installing Python requirements", requirements=str(path))
+        result = ee_client.run(
+            "pip",
+            ["install", "--no-input", "--disable-pip-version-check", "-r", str(path)],
+            cwd=str(config_dir),
+            env=env,
+            log_file=log_file,
+        )
+        if result.error:
+            raise CollectionInstallError(
+                f"the execution environment could not run pip to install {path}: {result.error}",
+                exit_code=result.rc,
+            )
+        if result.rc != 0:
+            raise CollectionInstallError(
+                f"installing the Python requirements in {path} failed; pip's own output "
+                f"is in the run log. A collection declaring a dependency Terrapod cannot "
+                f"install is a configure that would fail at its first task instead",
+                exit_code=result.rc,
+            )
+
+
 def requirement_arguments(declared: list[str]) -> list[str]:
     """The workspace's declared collections as `ansible-galaxy` arguments.
 
@@ -335,10 +496,17 @@ def install(
 
     if not files and not declared:
         logger.info(
-            "no roles or collections declared; nothing to install",
+            "no roles or collections declared",
             config_directory=str(config_dir),
             looked_for=list(REQUIREMENTS_PATHS),
         )
+        # Not a bare return: an operator may declare a `requirements.txt` and no
+        # Galaxy requirements at all -- a `uri` task needing a client, a filter
+        # plugin of their own -- and returning here would install nothing while
+        # the file sat there looking honoured. There are no collection-declared
+        # requirements to find in this branch, by construction, so the only file
+        # this can pick up is theirs.
+        install_python_requirements(cfg, config_dir, log_file=log_file)
         return
 
     if len(files) > 1:
@@ -403,3 +571,8 @@ def install(
             log_file=log_file,
             what="the collections declared on the workspace",
         )
+
+    # LAST, because it reads the installed tree: a collection's own
+    # `requirements.txt` only exists once the collection is on disk, so this
+    # cannot be folded into either pass above (#2305).
+    install_python_requirements(cfg, config_dir, log_file=log_file)

@@ -244,3 +244,42 @@ func TestFakeAnsibleIsActuallyBeingUsed(t *testing.T) {
 		t.Fatalf("the fake was not what ran: %q", out.String())
 	}
 }
+
+// TestTheAllowlistIsExactlyThese pins the membership in BOTH directions, because
+// a gate written for one direction is blind to the other (#2305).
+//
+// Too narrow is the loud failure: drop `pip` and collection installs break again,
+// which is what this file's sibling fix was for. Too WIDE fails nothing today and
+// is the one that matters — `python`, or any shell, turns this into the generic
+// exec endpoint the allowlist's own comment refuses to be, and nothing would
+// notice until somebody went looking.
+func TestTheAllowlistIsExactlyThese(t *testing.T) {
+	want := map[string]bool{
+		"ansible":           true,
+		"ansible-playbook":  true,
+		"ansible-galaxy":    true,
+		"ansible-inventory": true,
+		"ansible-config":    true,
+		"ansible-vault":     true,
+		"pip":               true,
+	}
+	for name := range want {
+		if !allowed[name] {
+			t.Errorf("%q is no longer allowed; the orchestrator drives it", name)
+		}
+	}
+	for name := range allowed {
+		if !want[name] {
+			t.Errorf("%q was added to the allowlist without a test saying why", name)
+		}
+	}
+	// Named rather than left to the set comparison: these are the ones whose
+	// addition would make the agent a remote shell, so they are worth failing on
+	// by name rather than as "an unexpected key".
+	for _, shellish := range []string{"python", "python3", "sh", "bash", "env", "pip3"} {
+		if allowed[shellish] {
+			t.Errorf("%q is allowed, which makes this a generic exec endpoint -- "+
+				"the one thing the allowlist exists not to be", shellish)
+		}
+	}
+}

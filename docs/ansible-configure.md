@@ -721,6 +721,7 @@ the local case. That is why the fix is a volume rather than a variable.
 
 | What you see | Why |
 |---|---|
+| `ModuleNotFoundError` at the first task, naming an SDK | the collection declares it in a `requirements.txt` and this execution environment has no pip, so the install was skipped — the run log carries the warning and names the files. See [a collection's own Python dependencies](package-cache.md#a-collections-own-python-dependencies) |
 | 422 naming `configure-enabled` | the workspace declares no configure operation |
 | 422 about a speculative configuration version | a configure cannot run an unmerged branch's playbook against real hosts |
 | 403 naming `run:apply` | plan tier is not enough for a configure |

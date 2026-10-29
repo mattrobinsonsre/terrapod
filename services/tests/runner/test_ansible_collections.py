@@ -44,6 +44,10 @@ def _ee_install_dirs(tmp_path_factory, monkeypatch):
     base = tmp_path_factory.mktemp("ee-dirs")
     monkeypatch.setenv("TP_EE_COLLECTIONS_DIR", str(base / "collections"))
     monkeypatch.setenv("TP_EE_ROLES_DIR", str(base / "roles"))
+    # And the EE's HOME, for the same reason: the Python-requirements install
+    # writes pip's credential there, so without this it fails on a read-only
+    # `/tp` rather than on whatever the test is about (#2305).
+    monkeypatch.setenv("TP_EE_HOME", str(base / "home"))
 
 
 def _cfg(api_url: str = API, token: str = TOKEN):
@@ -443,3 +447,199 @@ class TestRealAnsibleGalaxyHonoursTheEnvironment:
         out = proc.stdout + proc.stderr
         assert "127.0.0.2" not in out, out
         assert "127.0.0.1:9" in out, out
+
+
+class TestThePythonRequirementsOfInstalledCollections:
+    """A collection's Python dependencies, installed through the cache (#2305).
+
+    `ansible-galaxy` installs a collection's CONTENT and not its Python
+    requirements, so `amazon.aws` installs cleanly and then fails at the first
+    task -- or, for a dynamic inventory, at plugin load -- with an import error
+    naming boto3. Nothing in the tree installed them, and nothing pointed the
+    execution environment's pip at Terrapod's pull-through cache, so a sealed
+    deployment could not have satisfied one even by hand.
+
+    These drive `install_python_requirements` through `ee_client.run`, which is
+    the boundary: the interpreter that must import the package is the EE's, so
+    an install in the orchestrator would succeed and change nothing.
+    """
+
+    def _collection(self, ns: str, name: str, body: str = "boto3>=1.38\n") -> Path:
+        d = ac.collections_dir() / "ansible_collections" / ns / name
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / ac.PYTHON_REQUIREMENTS
+        f.write_text(body)
+        return f
+
+    def _pip_argvs(self, run) -> list[list[str]]:
+        return [[c.args[0], *c.args[1]] for c in run.call_args_list if c.args[0] == "pip"]
+
+    # -- which files are installed, and in what order ----------------------
+
+    def test_each_installed_collection_contributes_its_own(self, tmp_path: Path) -> None:
+        a = self._collection("amazon", "aws")
+        b = self._collection("community", "general", "netaddr\n")
+        assert ac.python_requirements_files(tmp_path) == sorted([a, b])
+
+    def test_the_operators_own_file_is_installed_last(self, tmp_path: Path) -> None:
+        """Last because pip's later install wins a conflicting pin, which is the
+        same relationship `--force` expresses for the workspace's collections."""
+        self._collection("amazon", "aws")
+        declared = tmp_path / ac.PYTHON_REQUIREMENTS
+        declared.write_text("requests\n")
+        assert ac.python_requirements_files(tmp_path)[-1] == declared
+
+    def test_the_collection_pass_is_sorted(self, tmp_path: Path) -> None:
+        """Two collections pinning one package differently is the operator's to
+        resolve; an order that varied per run would make it intermittent."""
+        self._collection("zz", "last")
+        self._collection("aa", "first")
+        found = ac.python_requirements_files(tmp_path)
+        assert [p.parent.parent.name for p in found] == ["aa", "zz"]
+
+    def test_a_requirements_txt_that_is_a_directory_is_not_a_file(self, tmp_path: Path) -> None:
+        (tmp_path / ac.PYTHON_REQUIREMENTS).mkdir()
+        assert ac.python_requirements_files(tmp_path) == []
+
+    def test_nothing_declared_runs_no_pip_at_all(self, tmp_path: Path) -> None:
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install_python_requirements(_cfg(), tmp_path)
+        assert self._pip_argvs(run) == []
+
+    # -- how pip is configured ---------------------------------------------
+
+    def test_the_cache_is_on_the_shared_volume_and_not_tmp(self) -> None:
+        """`/tmp` is the ORCHESTRATOR's writable emptyDir and the EE's read-only
+        root -- the same mistake this issue is about, one directory over."""
+        env = ac.pip_env(API)
+        assert env["PIP_CACHE_DIR"] == str(ac.ee_home() / ".cache" / "pip")
+        assert "/tmp" not in env["PIP_CACHE_DIR"]
+
+    def test_the_index_is_terrapods_pull_through_cache(self) -> None:
+        from terrapod.runner.phases import pulumi_deps
+
+        assert ac.pip_env(API)["PIP_INDEX_URL"] == pulumi_deps.pip_index_url(API)
+
+    def test_a_plain_http_api_is_named_as_trusted(self) -> None:
+        """pip does not FAIL on an untrusted plain-HTTP index, it ignores it --
+        and then reports "No matching distribution found" for a package the
+        proxy was serving. Inherited from the shared helper, asserted here
+        because this is the caller whose API URL is http in-cluster."""
+        assert ac.pip_env("http://terrapod-api:8000")["PIP_TRUSTED_HOST"] == "terrapod-api"
+        assert "PIP_TRUSTED_HOST" not in ac.pip_env("https://terrapod.test")
+
+    def test_the_install_is_user_scoped(self) -> None:
+        """The EE's root filesystem is read-only, so site-packages cannot be
+        written. `--user` needs no PYTHONPATH: the user site is on `sys.path`
+        already and HOME is on the writable shared volume."""
+        assert ac.pip_env(API)["PIP_USER"] == "1"
+
+    def test_the_credential_goes_in_the_execution_environments_home(self, tmp_path: Path) -> None:
+        """Not this process's HOME: pip runs in the other container, so a file
+        in the orchestrator's home is one the EE never looks at -- and the
+        failure is silent, because pip without a credential simply 401s."""
+        self._collection("amazon", "aws")
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install_python_requirements(_cfg(), tmp_path)
+        netrc = ac.ee_home() / ".netrc"
+        assert netrc.is_file()
+        assert TOKEN in netrc.read_text()
+        assert netrc.stat().st_mode & 0o777 == 0o600
+
+    def test_the_token_is_not_on_the_argv(self, tmp_path: Path) -> None:
+        self._collection("amazon", "aws")
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install_python_requirements(_cfg(), tmp_path)
+        for argv in self._pip_argvs(run):
+            assert TOKEN not in " ".join(argv), argv
+
+    # -- a missing pip is skipped; a failure is fatal ----------------------
+
+    def test_a_missing_pip_is_skipped_rather_than_fatal(self, tmp_path: Path) -> None:
+        """pip is NOT part of the custom-EE contract, so an operator-supplied
+        image may legitimately not have one and requiring it at the startup
+        probe would fail an image that conforms today (user's call, #2305)."""
+        f = self._collection("amazon", "aws")
+        calls: list[list[str]] = []
+
+        def _run(binary, args, **kw):
+            calls.append([binary, *args])
+            if args[:1] == ["--version"]:
+                return SimpleNamespace(rc=127, error="pip: not found")
+            return SimpleNamespace(rc=0, error="")
+
+        with patch.object(ac.ee_client, "run", side_effect=_run):
+            ac.install_python_requirements(_cfg(), tmp_path)  # does not raise
+        assert calls == [["pip", "--version"]], calls
+        assert str(f) not in " ".join(c for argv in calls for c in argv)
+
+    def test_a_failing_install_is_fatal_and_carries_the_exit_code(self, tmp_path: Path) -> None:
+        """A missing SDK fails the run anyway, later and less legibly: a partial
+        configure against real hosts is the outcome worth refusing over."""
+        f = self._collection("amazon", "aws")
+
+        def _run(binary, args, **kw):
+            if args[:1] == ["--version"]:
+                return SimpleNamespace(rc=0, error="")
+            return SimpleNamespace(rc=2, error="")
+
+        with patch.object(ac.ee_client, "run", side_effect=_run):
+            with pytest.raises(ac.CollectionInstallError) as e:
+                ac.install_python_requirements(_cfg(), tmp_path)
+        assert str(f) in str(e.value)
+        assert e.value.exit_code == 2
+
+    def test_an_agent_error_is_fatal_and_names_it(self, tmp_path: Path) -> None:
+        """`error` is the agent failing to run the child at all, which is a
+        different thing from the child exiting non-zero."""
+        self._collection("amazon", "aws")
+
+        def _run(binary, args, **kw):
+            if args[:1] == ["--version"]:
+                return SimpleNamespace(rc=0, error="")
+            return SimpleNamespace(rc=1, error="the sidecar is gone")
+
+        with patch.object(ac.ee_client, "run", side_effect=_run):
+            with pytest.raises(ac.CollectionInstallError) as e:
+                ac.install_python_requirements(_cfg(), tmp_path)
+        assert "the sidecar is gone" in str(e.value)
+
+    # -- the call site -----------------------------------------------------
+
+    def test_install_satisfies_them_after_the_collections_are_on_disk(self, tmp_path: Path) -> None:
+        """It READS the installed tree, so it cannot be folded into either
+        Galaxy pass: a collection's own `requirements.txt` exists only once the
+        collection is there."""
+        (tmp_path / "requirements.yml").write_text("collections:\n  - name: a.b\n")
+        order: list[str] = []
+
+        def _run(binary, args, **kw):
+            order.append(f"{binary} {args[0] if args else ''}")
+            if binary == "ansible-galaxy":
+                # Only now does the tree a collection's file would be found in
+                # exist, which is the whole reason for the ordering.
+                self._collection("amazon", "aws")
+            return SimpleNamespace(rc=0, error="")
+
+        with patch.object(ac.ee_client, "run", side_effect=_run):
+            ac.install(_cfg(), tmp_path)
+        assert order[-1] == "pip install", order
+        assert order.index("pip --version") > order.index("ansible-galaxy collection"), order
+
+    def test_the_operators_file_is_installed_with_no_galaxy_requirements_at_all(
+        self, tmp_path: Path
+    ) -> None:
+        """An operator may declare a `requirements.txt` and no Galaxy
+        requirements -- a `uri` task needing a client, a filter plugin of their
+        own -- and an early return would install nothing while the file sat
+        there looking honoured."""
+        (tmp_path / ac.PYTHON_REQUIREMENTS).write_text("requests\n")
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
+        argvs = self._pip_argvs(run)
+        assert ["pip", "install"] == argvs[-1][:2], argvs
+        assert str(tmp_path / ac.PYTHON_REQUIREMENTS) in argvs[-1]
