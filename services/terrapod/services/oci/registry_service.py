@@ -9,13 +9,32 @@ every blob lookup goes through the repository link table. Skipping that would
 let anyone who learns a digest pull private layers by inventing a repository
 name they do have access to.
 
-Reads touch ``last_accessed_at``, because ``artifact_retention_service`` reaps
-cache entries on *access* rather than write time — deliberately, since expiring
-a heavily used artifact merely for being old evicts it and immediately re-fetches
-it. Without the touch, a constantly pulled image would look untouched and be
-reaped on schedule. Note the volume differs from the other caches: they are read
-a few times per run, where a blob is read once per layer per pull, so this is a
-place to look first if write load ever becomes a question.
+**A manifest read touches ``last_accessed_at``; a blob read does not** (#2178),
+and the asymmetry is the collector's design rather than an oversight.
+
+``gc.py`` draws the line: *eviction* is reclaiming space, keyed on last use and
+driven by capacity, and *"if capacity ever has to be managed, the unit is the
+**image**: drop a manifest"*. So a manifest's last use is the state such an
+eviction would read, and one ``UPDATE`` per pull is a reasonable price for having
+it when that arrives.
+
+For a blob the same document forbids the only use the timestamp could have:
+*"A layer lives exactly as long as some manifest references it, and nothing else
+may enter into that. Not its age, not when it was last served […] Evicting layers
+by age or by use would break registered images, which is corruption rather than
+eviction."* A blob is shared by construction — the base image everything is built
+on is the hottest object in the store and also the one most likely to be reachable
+from an image nobody has pulled this month.
+
+So the blob touch was a committed write per layer per pull, on the read path of a
+cache whose reason to exist is serving reads in restricted networks, for a value
+nothing could ever legitimately read. It is gone.
+
+This docstring previously named ``artifact_retention_service`` as the reaper that
+needed the touch. That service queries ``CachedProviderPackage``, ``CachedBinary``
+and ``CachedPackageFile``, and the string ``oci`` does not appear in it — so the
+justification described a mechanism that has never applied to these rows. Both
+columns keep their insert default, so nothing migrates either way.
 """
 
 from __future__ import annotations
@@ -42,10 +61,14 @@ NON_DISTRIBUTABLE_MEDIA_TYPES = frozenset(
 
 
 def _touch(entity):
-    """Mark an entity as accessed, so retention sees it as live.
+    """Mark a MANIFEST as accessed, for a future image-level capacity eviction.
 
     Returns its argument so call sites stay one line. A no-op on ``None``,
     which keeps every caller from having to guard.
+
+    Deliberately not called for blobs — see the module docstring. ``gc.py``
+    rules out ever evicting a layer by use, so touching one is a write per layer
+    per pull for a value nothing may read (#2178).
     """
     if entity is not None:
         entity.last_accessed_at = datetime.now(UTC)
@@ -93,13 +116,18 @@ async def get_repository_blob(
 
     The join is the access check, not an optimisation. A blob row exists once
     any repository holds it; serving it requires an edge from *this* one.
+
+    Does NOT touch ``last_accessed_at``, and must not: ``gc.py`` reclaims a layer
+    only when no manifest references it, explicitly never by age or by use, so the
+    timestamp has no reader and this is the hottest read path in the registry
+    (#2178).
     """
     result = await db.execute(
         select(OCIBlob)
         .join(OCIRepositoryBlob, OCIRepositoryBlob.blob_id == OCIBlob.id)
         .where(OCIRepositoryBlob.repository_id == repository.id, OCIBlob.digest == digest)
     )
-    return _touch(result.scalar_one_or_none())
+    return result.scalar_one_or_none()
 
 
 async def list_tags(
