@@ -80,8 +80,8 @@ func TestTheAnsibleAttributesTakeThisResourcesOwnRequiredness(t *testing.T) {
 	//     it; the concrete read-back is the other half, pinned below.
 	//
 	// The three Optional-only strings keep their shape and their defect, which is
-	// pre-existing and tracked separately. Matching them here would have been
-	// local consistency bought with a seventh instance.
+	// pre-existing and tracked in #2307. Matching them here would have been local
+	// consistency bought with a seventh instance.
 	wantString := shape{false, true, true}
 	for _, name := range []string{"ansible_directory", "default_playbook", "default_limit"} {
 		if got := of(name); got != wantString {
