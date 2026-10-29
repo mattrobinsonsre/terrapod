@@ -545,6 +545,11 @@ No `depends_on` is needed or wanted. The reference to `private_ip` is the
 dependency, and it is the reason the inventory cannot be written before the host
 it describes exists.
 
+A module shaped like this — inventory-declaring Terraform at its root, a playbook
+in a subdirectory — is what a **catalog item** can hand a consuming team with no
+HCL to write at all. See [Provisioning an Ansible-first
+workspace](service-catalog.md#provisioning-an-ansible-first-workspace).
+
 ---
 
 ## Nothing here is read-only
@@ -565,6 +570,11 @@ the ones an operator already knows:
 So a hand edit is not forbidden, it is simply not durable against a configuration
 that owns the row. A row nothing declares — a group an operator added in the UI, a
 variable set through the API — is as permanent as any other.
+
+That is also why the inventory is the one write a **catalog-managed** workspace
+does not clamp away: curating a row is legitimate, and the revert is the engine's
+own semantics rather than a platform refusal. See [The inventory stays
+writable](service-catalog.md#the-inventory-stays-writable--and-a-hand-edit-does-not-survive-the-next-apply).
 
 ---
 
@@ -840,6 +850,7 @@ that keeps a workspace's effective cloud-identity audiences off its resource.
 - [Encryption at rest](encryption-at-rest.md) — what the variable columns are covered by
 - [Language package proxies](package-cache.md#a-collections-own-python-dependencies) — how a collection's own Python dependencies reach a sealed deployment, which is what a dynamic inventory plugin needs
 - [Runners](runners.md) — the Job a configure will run in
+- [Service Catalog](service-catalog.md#provisioning-an-ansible-first-workspace) — provisioning a workspace whose inventory a blessed module declares
 - Original feature requests:
   <https://github.com/mattrobinsonsre/terrapod/issues/1967> (the inventory),
   <https://github.com/mattrobinsonsre/terrapod/issues/1968> (declaring it as code)

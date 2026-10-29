@@ -23,7 +23,8 @@ A **catalog item** is a blessed designation over one registry module — it does
 - which **provider templates** render its provider configuration,
 - which **agent pools** an instance may bind to (optionally restricted),
 - a curated set of **variable options** (defaults, descriptions, sensitivity, enum choices) layered over the module's own variables,
-- a **version policy** (float, or a default pin).
+- a **version policy** (float, or a default pin),
+- optionally, the **Ansible half** it provisions — whether the instance has a configure operation, which subdirectory of the module holds the playbook, and the default playbook and limit (see [Provisioning an Ansible-first workspace](#provisioning-an-ansible-first-workspace)).
 
 ## What provisioning produces
 
@@ -105,7 +106,9 @@ A workspace created by the catalog is **catalog-managed**, and the catalog owns 
 
 ### RBAC clamp — instances are read-mostly
 
-On a catalog-managed workspace, **non-platform-admin grants are clamped to `read`**. Whatever a user's owner / label / `everyone` grant would normally give them on this workspace (write, admin) is capped at read. The user who provisioned the instance gets **read** on the resulting workspace — they manage it through the catalog, not through the workspace settings API. Platform admins are not clamped.
+On a catalog-managed workspace, **non-platform-admin grants are clamped to `read`**, with one exemption. Whatever a user's owner / label / `everyone` grant would normally give them on this workspace (write, admin) is capped at read: the user who provisioned the instance gets **read**, and manages it through the catalog rather than through the workspace settings API. Platform admins are not clamped.
+
+The exemption is **`inventory:write`**, so that an [Ansible-first instance](#provisioning-an-ansible-first-workspace) can have its inventory curated by the person who provisioned it — a host the module's data source does not find, a group that only means something to an operator. Everything else a write grant would carry, the variables and the configuration included, is still clamped away, and a row the module declares is still reverted by the next apply. Both of those are covered in [The inventory stays writable](#the-inventory-stays-writable--and-a-hand-edit-does-not-survive-the-next-apply).
 
 The effect: you can't bypass the catalog by editing the instance workspace's variables or VCS settings directly, and you can't elevate yourself to admin on it via a label trick. The catalog surface (`use` permission) is the management path; the workspace surface is observe-only for everyone except platform admins.
 
@@ -181,6 +184,121 @@ Each overlay object keys off the module input `name` and supports:
 | `sensitive` | Mark the input sensitive (masked input field; stored as a sensitive workspace variable, write-only). |
 
 This is how a catalog author pins certain module variables: mark them `hidden` with a fixed `default` and the consumer provisions without ever touching them. Validation runs at item create/update — a malformed overlay, a non-list `options`, or `hidden` without `default` is rejected with `422`.
+
+## Provisioning an Ansible-first workspace
+
+A catalog item can provision a workspace that is **primarily Ansible**, carrying only as much Terraform as it takes to declare the inventory the playbook then runs against. The consuming team fills in the same provision form; what they get is a workspace with a [configure operation](ansible-configure.md) already declared, an inventory the apply wrote, and a playbook that came out of the blessed module.
+
+Four attributes on the catalog item say so — `configure-enabled`, `ansible-directory`, `default-playbook`, `default-limit`. Each is templated onto the provisioned workspace exactly as `execution-mode` and the engine version already are: nothing else in the catalog is aware of Ansible, and an item that sets none of them provisions what it provisioned before.
+
+| Item attribute | Default | What it does |
+|---|---|---|
+| `configure-enabled` | `false` | Whether the provisioned workspace **has** a configure operation. This is the declaration; the other three mean nothing without it. |
+| `ansible-directory` | `""` | The **subdirectory of the module** whose files are copied into the generated configuration version. It becomes the provisioned workspace's `config-directory`. Required when `configure-enabled` is on. |
+| `default-playbook` | `""` | Templated onto the workspace's `default-playbook` — the playbook a configure runs when the run names none. |
+| `default-limit` | `""` | Templated onto the workspace's `default-limit` — the blast radius. **Empty means every host in the inventory**; see [`default-limit` is the blast radius](ansible-configure.md#default-limit-is-the-blast-radius-and-empty-means-everything). |
+
+Turning `configure-enabled` off again on the item is a real instruction, not a no-op: the next reconfigure clears all four on the instance, so the workspace is left with the operation **gone** rather than with a stale `config-directory` and a playbook it no longer carries.
+
+Set them on the item through the **catalog-item API** — the `attributes` block of `POST`/`PATCH /api/v1/catalog-items`, alongside `module-id` and `variable-options` — or declaratively on the `terrapod_catalog_item` resource, whose attributes are the same names in snake_case. Keeping the catalog [as code](#managing-the-catalog-as-code-terraform-provider) therefore covers the Ansible half like the rest of the item:
+
+```hcl
+resource "terrapod_catalog_item" "app_stack" {
+  name      = "app-stack"
+  module_id = terrapod_registry_module.app_stack.id
+
+  configure_enabled = true
+  ansible_directory = "ansible"    # a subdirectory of the MODULE
+  default_playbook  = "site.yml"   # relative to ansible_directory
+  default_limit     = "canary"     # empty would mean every host
+}
+```
+
+### What the module has to ship
+
+Two halves, in one module version.
+
+- **Terraform at the module root that declares the inventory.** The hosts the apply creates become `terrapod_inventory_host` rows in that same apply, so the inventory describes the machines that now exist, and the ordering is implicit rather than declared. See [Declaring hosts alongside the infrastructure](ansible-inventory.md#declaring-hosts-alongside-the-infrastructure).
+- **A subdirectory holding the Ansible half** — the playbook, your own `ansible.cfg`, `group_vars`, roles. That is the directory `ansible-directory` names.
+
+```
+modules/app-stack/
+├── main.tf              # the instances, plus terrapod_inventory_host/_group/_host_var
+├── versions.tf          # required_providers — the module's own; see below
+├── outputs.tf
+└── ansible/             # ← ansible-directory = "ansible"
+    ├── ansible.cfg      # yours, read as-is
+    ├── site.yml         # ← default-playbook = "site.yml"
+    ├── group_vars/
+    │   └── all.yml
+    └── roles/
+```
+
+**The module declares its own `required_providers`.** The generated wrapper emits none — it is the module call, one root `variable` per input, the provider template bodies and the output re-exports, and nothing else — so the `terrapod` provider has to be required by the module itself:
+
+```hcl
+# versions.tf, inside the module
+terraform {
+  required_providers {
+    terrapod = {
+      source = "terrapod.example.com/default/terrapod"
+    }
+  }
+}
+```
+
+The `source` is your own instance's hostname, and **there is nothing to publish**: every Terrapod instance serves its own copy of the provider over the standard provider-registry protocol, fetching it on first request and caching it in object storage. See [Distribution & signing](terraform-provider.md#distribution--signing). Two things follow from that:
+
+- The version list serves the **running platform version**, so a `version` constraint on that block has to admit it. Omitting the constraint is the simplest thing that keeps working across a Terrapod upgrade.
+- In a **sealed (`registry.cache_only`) deployment** nothing is fetched on demand, so the platform provider has to be warmed into the cache before a run needs it, like any other artifact. See [Sealed (cache-only) mode](runbooks.md#sealed-cache-only-mode--runs-failing-with-cache-miss-404).
+
+Inside the run the provider needs no configuration at all — `provider "terrapod" {}` is the whole block, and no inventory resource needs a `workspace_id`, because the runner exports the run's own workspace and the provider defaults from it. See [`provider "terrapod" {}` needs nothing in it](ansible-inventory.md#provider-terrapod--needs-nothing-in-it).
+
+### The playbook is copied out of the module, not referenced
+
+With `configure-enabled` on, provisioning reads the resolved module version's tarball, takes every file under `ansible-directory`, and writes them into the **generated configuration version** alongside `main.tf`. Each file keeps the path it has in the module, so `ansible/site.yml` lands at `ansible/site.yml` — and the workspace's `config-directory` is therefore just `ansible-directory`, with nothing to translate.
+
+**It is copied because a composite run is two runner Jobs.** The apply runs in one and the configure in another; the configure Job re-fetches the configuration version and never runs `terraform init`, so `.terraform/modules/` does not exist in it. A `config-directory` pointing into the init'd module directory would pass every validator — the path checks refuse traversal, leading and trailing slashes and stray whitespace, and such a path has none of those — and then fail at run time against a directory nothing created. Copying is what puts the Ansible half in the Job that runs it.
+
+Two consequences worth knowing:
+
+- **The Ansible half is versioned with the module**, and it moves when the configuration version is regenerated — which is **provision and reconfigure, and only those**. Bumping an instance's version pin brings the new playbook with it, because a reconfigure re-copies. A publish-triggered run on a [floating](#version-model) instance does **not**: it re-runs the configuration version the instance already has, so a newly published playbook reaches it at its next reconfigure. There is still no second artifact to keep in step — the playbook and the Terraform that declares its inventory are one module version.
+- **Only regular files are copied.** A symlink, a hard link or a device entry under `ansible-directory` is dropped rather than followed: this repacks into a tarball a runner extracts, and a link is how a tar carries a path out of its own tree. If a playbook tree symlinks `group_vars/all` at a shared file elsewhere in the repository, the copy will not carry it — commit the real file under `ansible-directory`.
+
+### The inventory stays writable — and a hand edit does not survive the next apply
+
+The [RBAC clamp](#rbac-clamp--instances-are-read-mostly) caps every non-platform-admin grant on a catalog instance at read, with **one exemption: `inventory:write`**. So the person who provisioned the instance can declare and edit inventory rows — a host the module's data source does not find, a group that only means something to an operator — through the API, the UI's per-row inventory view, the MCP tools or the provider, while their access to the instance's variables and configuration stays read-only.
+
+**The cost, stated here rather than left to be discovered: the module declares the rows, so a hand-edited row is reverted by the next apply.** That is OpenTofu's (or Terraform's) own semantics rather than a catalog rule — the configuration is the desired state — and it is exactly what an inventory-declaring module does outside the catalog too. See [Nothing here is read-only](ansible-inventory.md#nothing-here-is-read-only). A row the module does **not** declare is as durable as any other; it is only the declared ones that come back.
+
+Variables and the configuration stay clamped to read deliberately. The catalog generates the wrapper and replaces the variable set on every reconfigure, so a write over either would be an affordance for an edit the next reconfigure silently discards. The inventory is different in kind: it is the part of such a workspace that a person legitimately curates.
+
+### Starting the configure
+
+Provisioning **declares** the operation. It sets no trigger: `configure-after-apply` and `auto-configure-enabled` stay off on a provisioned instance, exactly as they do on any newly created workspace. So the first run is an ordinary apply, which creates the machines and writes the inventory, and nothing configures yet.
+
+Starting a configure needs `run:apply` on the workspace, and the clamp removes that for everyone except a platform admin. On a catalog instance, then, a configure is started by a platform admin — either run by run, or once and for all by turning `configure-after-apply` on for that instance, after which every apply configures. The catalog templates only the four attributes above, so a trigger set that way is **not** reverted by a later reconfigure.
+
+[Running a Configure](ansible-configure.md) covers everything from there: the triggers, the debounce, the narrowing to the hosts an inventory change actually affected, the per-host report and the log.
+
+### Refusals
+
+All `422`, and each aimed at the thing that is wrong rather than at the symptom it would otherwise produce:
+
+| When | What is refused |
+|---|---|
+| Saving the item | `configure-enabled` on with no `ansible-directory`. The switch says whether and the path says where; on with nowhere to look is incoherent rather than a no-op — it would provision a workspace whose Ansible root is the configuration version's root, where only the generated wrapper lives. |
+| Saving the item | An `ansible-directory` or `default-playbook` carrying a leading or trailing slash, a `..` segment, or leading/trailing whitespace. Refused rather than normalised, because the value round-trips through a Terraform provider and storing a different one than you sent is what fails an apply with *"Provider produced inconsistent result after apply"*. |
+| Provisioning / reconfiguring | An `ansible-directory` of `"."` — the module's **root**. Copying the module root over the generated wrapper is the one case in which a copied file could shadow `main.tf`, so the form is refused outright. (`""` and a trailing slash are caught earlier, by the two rows above; `"."` passes both of those checks, so it is refused here.) |
+| Provisioning / reconfiguring | An `ansible-directory` the resolved module version does not contain. The message names the directory **and what that module version's top level does hold**, so a typo or a renamed subtree is obvious from the error rather than from a run that fails later. |
+| Provisioning / reconfiguring | `configure-enabled` on an item whose module has no uploaded version to copy from. |
+
+### Before a team can use this
+
+Neither is new to the Ansible half, but both are explicit grants and both are easy to miss:
+
+- **Catalog access.** `catalog_permission` defaults to `none`, and the catalog has **no `everyone` floor**, so enabling the catalog grants nobody anything until a role carries catalog `use` and is assigned. See [Granting catalog access](#granting-catalog-access).
+- **A pool to run on.** Every instance is agent-mode, so the provisioner needs pool `write` on a pool the item allows. See [Agent pools](#agent-pools).
 
 ## Version model
 
@@ -282,7 +400,7 @@ Runs created by the catalog carry distinct sources: **`catalog`** for provision 
 
 ### Confirming a non-auto-apply run
 
-Provision, reconfigure, and destroy accept `auto-apply`. When it is **false**, the resulting run stops at **`planned`** and waits for a human. Because the catalog-managed-workspace clamp grants the provisioner only **read** on the underlying workspace, the run can't be confirmed through the normal workspace run API — instead use the catalog surface:
+Provision, reconfigure, and destroy accept `auto-apply`. When it is **false**, the resulting run stops at **`planned`** and waits for a human. Because the catalog-managed-workspace clamp grants the provisioner only **read** on the underlying workspace (plus `inventory:write`, which does not include `run:apply`), the run can't be confirmed through the normal workspace run API — instead use the catalog surface:
 
 - `POST /catalog-instances/{wsId}/confirm` — apply the pending planned run (catalog `use`).
 - `POST /catalog-instances/{wsId}/discard` — discard it (catalog `use`).
@@ -294,5 +412,7 @@ Both act **only** on a catalog-initiated, apply-capable planned run (`source` �
 - [Registry](registry.md) — the private module registry the catalog blesses, plus module impact analysis (the float/publish-trigger mechanism).
 - [RBAC](rbac.md) — the permission model the `catalog_permission` axis extends.
 - [Agent Pools](runners.md) — the execution backing for every instance.
+- [Running a Configure](ansible-configure.md) — what happens once an Ansible-first instance has a configure to run: the triggers, the per-host report, the log.
+- [Ansible inventory](ansible-inventory.md) — the structures an inventory-declaring module writes, and what ownership of a row means.
 - [API Reference](api-reference.md#service-catalog) — full endpoint shapes.
 - Original feature request: <https://github.com/mattrobinsonsre/terrapod/issues/535>
