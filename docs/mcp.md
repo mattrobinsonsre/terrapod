@@ -238,7 +238,7 @@ Ansible is the ordinary default rather than a problem, and
 
 ### Service catalog (gated) — publish items and provision from them
 
-The [service catalog](service-catalog.md) as its three objects: **provider
+The [service catalog](service-catalog.md) has its three objects: **provider
 templates** (the parameterised `provider` blocks an administrator writes once),
 **catalog items** (a blessed designation over a registry module, narrowing it to
 a pinned version, permitted agent pools and a curated input form), and
