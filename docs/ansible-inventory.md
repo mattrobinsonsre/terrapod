@@ -838,7 +838,7 @@ that keeps a workspace's effective cloud-identity audiences off its resource.
 - [RBAC capabilities](rbac-capabilities.md) — the full gate → capability table
 - [VCS integration](vcs-integration.md) — the connections a VCS source is bound through
 - [Encryption at rest](encryption-at-rest.md) — what the variable columns are covered by
-- [Language package proxies](package-cache.md) — how a collection's own Python dependencies reach a sealed deployment
+- [Language package proxies](package-cache.md#a-collections-own-python-dependencies) — how a collection's own Python dependencies reach a sealed deployment, which is what a dynamic inventory plugin needs
 - [Runners](runners.md) — the Job a configure will run in
 - Original feature requests:
   <https://github.com/mattrobinsonsre/terrapod/issues/1967> (the inventory),

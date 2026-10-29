@@ -21,6 +21,22 @@ import (
 // enforced at install time (measured — a collection declaring ">=2.20.0"
 // installs on 2.16.19 at exit 0 with no warning), so installing with one core
 // and running with another produces a set that fails mid-play.
+// pip is here for the same reason as ansible-galaxy, one step along: a
+// collection's content is installed by ansible-galaxy and its PYTHON
+// DEPENDENCIES are not — `amazon.aws` ships a requirements.txt naming boto3 and
+// botocore — so a collection installs cleanly and then fails at the first task
+// or inventory-plugin load with an import error naming the SDK. The interpreter
+// that must import them is this container's, so the install has to happen here.
+//
+// It concedes nothing the playbook does not already have. The threat the
+// allowlist guards is the operator's own playbook reaching this loopback
+// endpoint and asking for something; a playbook can already `ansible.builtin.pip`
+// in this very container, so permitting pip adds no capability to it.
+//
+// `python` is deliberately NOT here, and the distinction is the whole of the
+// comment above: `python -c` IS the generic exec endpoint this refuses to be,
+// where pip's argv names packages. So the install runs `pip`, resolved by
+// LookPath, rather than the more idiomatic `python -m pip`.
 var allowed = map[string]bool{
 	"ansible":           true,
 	"ansible-playbook":  true,
@@ -28,6 +44,7 @@ var allowed = map[string]bool{
 	"ansible-inventory": true,
 	"ansible-config":    true,
 	"ansible-vault":     true,
+	"pip":               true,
 }
 
 // childGrace is how long a cancelled or terminating child gets after SIGINT

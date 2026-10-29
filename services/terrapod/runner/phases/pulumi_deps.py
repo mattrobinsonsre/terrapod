@@ -286,16 +286,27 @@ def pip_index_url(api_url: str) -> str:
     return f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/pypi/simple"
 
 
-def write_netrc(api_url: str, token: str) -> Path:
+def write_netrc(api_url: str, token: str, *, home: Path | None = None) -> Path:
     """The pip credential, in $HOME rather than in a URL or an argv.
 
     $HOME is one of the three writable mounts, and pip reads `.netrc` for an
     index it is about to fetch from. The machine is the host alone -- netrc has
     no notion of a path -- which is why this is written for the API's host and
     nothing else.
+
+    `home` names a DIFFERENT home than this process's, which the collection
+    install needs (#2305): pip runs in the execution-environment container, so
+    the file has to be where THAT process will look for it. Defaulting to this
+    process's `$HOME` keeps every existing caller unchanged -- and getting it
+    wrong is silent, because pip without a credential simply 401s and reports
+    "No matching distribution found" for a package the proxy was serving.
     """
     host = urllib.parse.urlparse(api_url).hostname or ""
-    path = Path(os.environ.get("HOME", "/home/runner")) / ".netrc"
+    # One writer for both homes: the mode and the body are the whole security
+    # property here, so a second copy is a second thing to drift.
+    target = home if home is not None else Path(os.environ.get("HOME", "/home/runner"))
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / ".netrc"
     path.write_text(f"machine {host}\n  login x\n  password {token}\n", encoding="utf-8")
     path.chmod(0o600)
     return path

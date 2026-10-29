@@ -521,6 +521,10 @@
                   "value": "ghcr.io/x/terrapod-ee:2.21"
                 },
                 {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
+                },
+                {
                   "name": "TP_EE_COLLECTIONS_DIR",
                   "value": "/tp/collections"
                 },
@@ -932,6 +936,10 @@
                 {
                   "name": "TP_EE_IMAGE",
                   "value": "ghcr.io/x/terrapod-ee:2.21"
+                },
+                {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
                 },
                 {
                   "name": "TP_EE_COLLECTIONS_DIR",
@@ -1382,6 +1390,10 @@
                 {
                   "name": "TP_EE_IMAGE",
                   "value": "ghcr.io/x/terrapod-ee:2.16"
+                },
+                {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
                 },
                 {
                   "name": "TP_EE_COLLECTIONS_DIR",
@@ -2385,6 +2397,10 @@
                   "value": "ghcr.io/x/terrapod-ee:2.21"
                 },
                 {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
+                },
+                {
                   "name": "TP_EE_COLLECTIONS_DIR",
                   "value": "/tp/collections"
                 },
@@ -3069,6 +3085,10 @@
                   "value": "ghcr.io/x/terrapod-ee:2.21"
                 },
                 {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
+                },
+                {
                   "name": "TP_EE_COLLECTIONS_DIR",
                   "value": "/tp/collections"
                 },
@@ -3663,6 +3683,10 @@
                 {
                   "name": "TP_EE_IMAGE",
                   "value": "ghcr.io/x/terrapod-ee:2.21"
+                },
+                {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
                 },
                 {
                   "name": "TP_EE_COLLECTIONS_DIR",
@@ -4268,6 +4292,10 @@
                 {
                   "name": "TP_EE_IMAGE",
                   "value": "ghcr.io/x/terrapod-ee:2.21"
+                },
+                {
+                  "name": "TP_EE_HOME",
+                  "value": "/tp/home"
                 },
                 {
                   "name": "TP_EE_COLLECTIONS_DIR",

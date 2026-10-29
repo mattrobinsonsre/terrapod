@@ -204,6 +204,43 @@ Terrapod does not serve. It reaches upstream directly where there is a route out
 and fails where there is not, so a sealed deployment should use a git source or
 vendor the role into a collection.
 
+### A collection's own Python dependencies
+
+`ansible-galaxy` installs a collection's **content** and not the Python packages
+it needs. `amazon.aws` ships a `requirements.txt` naming `boto3` and `botocore`,
+and installing the collection does nothing about those — so it installs cleanly
+and then fails at the first task, or at plugin load for a dynamic inventory, with
+an import error naming the SDK.
+
+A configure installs them through the PyPI proxy above, from two places, in this
+order:
+
+1. **each installed collection's own** `requirements.txt`, found under
+   `ansible_collections/<namespace>/<name>/` once the collection is on disk;
+2. **yours**, a `requirements.txt` beside the `requirements.yml` you already
+   declare, for a package no collection names — a client a `uri` task needs, or a
+   filter plugin of your own.
+
+A later install wins a conflicting pin, so your file is the one that decides. Two
+collections pinning the same package differently is yours to resolve, and the
+order within step 1 is sorted so it will not vary between runs.
+
+The install runs **inside the execution environment**, because that is the
+interpreter which has to import the package, and `--user` into its home on the
+shared volume, because its root filesystem is read-only. The proxy credential goes
+in a `.netrc` there rather than into the index URL: pip prints its index, and a
+run's log is streamed to the API and the UI.
+
+**A failed install fails the configure.** A missing SDK fails the run anyway — at
+the first task, against real hosts, half way through — so refusing it up front is
+the better outcome.
+
+**An execution environment with no pip is skipped, with a warning naming the files
+it did not install.** pip is not part of the contract an image must satisfy, so an
+operator-supplied image that conforms today may legitimately not carry one;
+Terrapod's own images do. If you [supply your own](runners.md#choosing-an-execution-environment)
+and want this, add pip to it or install the dependencies into the image directly.
+
 ### Declaring collections on the workspace
 
 A workspace can declare collections itself, through `ansible-collections` on the
