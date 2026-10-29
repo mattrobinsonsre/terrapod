@@ -1271,6 +1271,43 @@ class CatalogItem(Base):
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
+    # --- the Ansible half, templated onto the provisioned workspace (#2019) ---
+    #
+    # An item may provision a workspace that is primarily Ansible, carrying only
+    # as much Terraform as it takes to declare the inventory. These three are
+    # workspace-settings templating, exactly like `execution_mode` and
+    # `engine_version` already are: nothing in the catalog is aware of Ansible,
+    # and an item that sets none of them provisions what it provisions today.
+    #
+    # `configure_enabled` says WHETHER and `ansible_directory` says WHERE, and
+    # that separation is deliberate rather than tidy. #1929 shipped
+    # `config_directory` nullable with `None` meaning "no configure operation",
+    # and #1966 corrected it precisely because that "made one field answer two
+    # questions". Carrying "no configure" in this path's nullability would
+    # reintroduce it one table over.
+    configure_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    #: The subtree COPIED OUT OF THE MODULE into the generated configuration
+    #: version, and the `config_directory` the provisioned workspace gets.
+    #:
+    #: It is copied rather than referenced, and that is forced rather than
+    #: chosen. A composite run is **two runner Jobs** (`job_entrypoint`: "the
+    #: composite case ... is two runner Jobs driven by one Run, not one Job
+    #: doing both"), so the configure Job re-fetches the configuration version
+    #: and never runs `init` -- `.terraform/modules/this/` does not exist in it.
+    #: Pointing a `config_directory` there passes every validator and fails at
+    #: run time on a directory that was never created.
+    ansible_directory: Mapped[str] = mapped_column(
+        String(255), nullable=False, server_default="", default=""
+    )
+    default_playbook: Mapped[str] = mapped_column(
+        String(255), nullable=False, server_default="", default=""
+    )
+    default_limit: Mapped[str] = mapped_column(
+        String(255), nullable=False, server_default="", default=""
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
