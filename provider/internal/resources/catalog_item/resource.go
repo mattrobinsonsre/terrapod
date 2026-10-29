@@ -25,9 +25,9 @@
 //	    array of objects, kept as a JSON string to track the open-ended server
 //	    contract)
 //	"configure-enabled"      -> configure_enabled       (bool, optional+computed)
-//	"ansible-directory"      -> ansible_directory       (string, optional)
-//	"default-playbook"       -> default_playbook        (string, optional)
-//	"default-limit"          -> default_limit           (string, optional)
+//	"ansible-directory"      -> ansible_directory       (string, optional+computed)
+//	"default-playbook"       -> default_playbook        (string, optional+computed)
+//	"default-limit"          -> default_limit           (string, optional+computed)
 //	"labels"                 -> labels                  (map[string]string, optional)
 //
 // Read-only:
@@ -237,18 +237,30 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"configure Job never runs init, so the module's own checkout does not " +
 					"exist in it.",
 				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"default_playbook": schema.StringAttribute{
 				Description: "Playbook templated onto the provisioned workspace, relative to " +
 					"`ansible_directory` — which becomes that workspace's Ansible root. " +
 					"Written without a leading or trailing slash.",
 				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"default_limit": schema.StringAttribute{
 				Description: "Ansible `--limit` templated onto the provisioned workspace. " +
 					"Stored byte for byte, so leading or trailing whitespace is refused " +
 					"rather than trimmed.",
 				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 
 			"labels": schema.MapAttribute{
@@ -536,9 +548,21 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 	} else {
 		m.ConfigureEnabled = types.BoolNull()
 	}
-	m.AnsibleDirectory = optString(ci.Attributes, "ansible-directory")
-	m.DefaultPlaybook = optString(ci.Attributes, "default-playbook")
-	m.DefaultLimit = optString(ci.Attributes, "default-limit")
+	// CONCRETE, not optString. These three are Optional+Computed, so an omitted
+	// one plans as unknown and any concrete result satisfies it -- while an
+	// EXPLICIT "" must read back as "" or the apply fails "Provider produced
+	// inconsistent result after apply". optString collapses "" to null, which is
+	// correct for this resource's Optional-only strings and wrong for these.
+	//
+	// Not local tidiness: `default_playbook` and `default_limit` are the SAME
+	// attribute names on `terrapod_workspace`, where they are Optional+Computed
+	// with a concrete read-back. One name behaving two ways across two resources
+	// is worse than two helpers in one file, and the Optional-only shape ships
+	// the "inconsistent result" defect this provider has already closed six
+	// times (#684, #732, #1634, #1748, #1771, #2110).
+	m.AnsibleDirectory = types.StringValue(attrString(ci.Attributes, "ansible-directory"))
+	m.DefaultPlaybook = types.StringValue(attrString(ci.Attributes, "default-playbook"))
+	m.DefaultLimit = types.StringValue(attrString(ci.Attributes, "default-limit"))
 
 	labels := attrStringMap(ci.Attributes, "labels")
 	if len(labels) > 0 {

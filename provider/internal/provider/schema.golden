@@ -258,11 +258,11 @@ resource terrapod_catalog_instance.labels required=false optional=true computed=
 resource terrapod_catalog_instance.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.version_pin required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.allowed_agent_pool_ids required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
-resource terrapod_catalog_item.ansible_directory required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.ansible_directory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_catalog_item.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.default_limit required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.default_playbook required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.default_limit required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.default_playbook required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.default_version_pin required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.display_name required=false optional=true computed=false sensitive=false type=basetypes.StringType

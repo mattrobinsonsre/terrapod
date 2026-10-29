@@ -52,26 +52,41 @@ func TestTheAnsibleAttributesTakeThisResourcesOwnRequiredness(t *testing.T) {
 	}
 
 	boolSibling := of("enabled")
-	stringSibling := of("display_name")
 
-	// Guard the derivation itself: if a sibling ever stops being the thing this
-	// test reasons from, the comparisons below would silently assert the wrong
-	// convention rather than failing.
+	// Guard the derivation itself: if the sibling ever stops being the thing
+	// this test reasons from, the comparison below would silently assert the
+	// wrong convention rather than failing.
 	if boolSibling != (shape{false, true, true}) {
 		t.Fatalf("`enabled` is %+v, not Optional+Computed — this test derives the "+
 			"bool convention from it, so re-derive before trusting the rest", boolSibling)
 	}
-	if stringSibling != (shape{false, true, false}) {
-		t.Fatalf("`display_name` is %+v, not Optional-only — this test derives the "+
-			"string convention from it, so re-derive before trusting the rest", stringSibling)
-	}
-
 	if got := of("configure_enabled"); got != boolSibling {
 		t.Errorf("configure_enabled is %+v, want %+v to match `enabled`", got, boolSibling)
 	}
+
+	// The three strings are Optional+COMPUTED, which DIVERGES from this
+	// resource's own Optional-only strings (`display_name`, `description`,
+	// `default_version_pin`). That is deliberate and it is the cross-product
+	// convention winning over the local one, for two reasons:
+	//
+	//  1. `default_playbook` and `default_limit` are the SAME attribute names on
+	//     `terrapod_workspace`, where they are Optional+Computed. One name
+	//     behaving two ways across two resources is worse for a practitioner
+	//     than two shapes inside one file.
+	//  2. Optional-only plus this file's `optString` read-back ships the
+	//     "Provider produced inconsistent result after apply" defect on an
+	//     explicit `= ""` — the class this provider has already closed six times
+	//     (#684, #732, #1634, #1748, #1771, #2110). Computed alone does not fix
+	//     it; the concrete read-back is the other half, pinned below.
+	//
+	// The three Optional-only strings keep their shape and their defect, which is
+	// pre-existing and tracked separately. Matching them here would have been
+	// local consistency bought with a seventh instance.
+	wantString := shape{false, true, true}
 	for _, name := range []string{"ansible_directory", "default_playbook", "default_limit"} {
-		if got := of(name); got != stringSibling {
-			t.Errorf("%s is %+v, want %+v to match `display_name`", name, got, stringSibling)
+		if got := of(name); got != wantString {
+			t.Errorf("%s is %+v, want %+v (Optional+Computed, as on terrapod_workspace)",
+				name, got, wantString)
 		}
 	}
 
@@ -235,10 +250,16 @@ func TestTheAnsibleHalfRoundTripsUnchanged(t *testing.T) {
 	}
 }
 
-func TestTheReadBackMapsTheServersEmptyStringToNull(t *testing.T) {
-	// The server always sends these three and sends "" when unset, so this is
-	// what makes Optional-only correct: a configuration that omits the
-	// attribute plans null, and null is what comes back.
+func TestTheReadBackKeepsTheServersEmptyStringConcrete(t *testing.T) {
+	// The inverse of what an Optional-only read-back would do, and the half of
+	// the fix that Computed alone does not provide.
+	//
+	// The server always sends these three and sends "" when unset. Because they
+	// are Optional+Computed, an omitted attribute plans as UNKNOWN and any
+	// concrete result satisfies it -- so "" is safe here. An EXPLICIT `= ""` in
+	// the configuration plans as "", and collapsing that to null is precisely
+	// what fails an apply with "Provider produced inconsistent result after
+	// apply": the class closed six times on this provider already.
 	var m catalogItemModel
 	item := &terrapod.CatalogItem{ID: "c0ffee", Attributes: map[string]any{
 		"name":              "x",
@@ -258,10 +279,59 @@ func TestTheReadBackMapsTheServersEmptyStringToNull(t *testing.T) {
 		{"default_playbook", m.DefaultPlaybook},
 		{"default_limit", m.DefaultLimit},
 	} {
-		if !got.val.IsNull() {
-			t.Errorf("%s = %#v, want null — a config that omits it plans null, and a "+
-				"concrete \"\" here fails the apply as an inconsistent result", got.name, got.val)
+		if got.val.IsNull() {
+			t.Errorf("%s read back as null; an explicit `= \"\"` must survive the "+
+				"round trip or the apply fails as an inconsistent result", got.name)
 		}
+		if got.val.ValueString() != "" {
+			t.Errorf("%s = %q, want \"\"", got.name, got.val.ValueString())
+		}
+	}
+}
+
+func TestTheThreeStringsRoundTripAnExplicitEmptyString(t *testing.T) {
+	// The defect itself, end to end: config "" -> wire "" -> state "".
+	//
+	// This is the test the Optional-only shape could not pass, and it is why
+	// these three diverge from this resource's other strings. It drives the
+	// write leg and the read leg together, because the defect lives in their
+	// disagreement rather than in either one.
+	m := catalogItemModel{
+		Name:             types.StringValue("x"),
+		ModuleID:         types.StringValue("m"),
+		ConfigureEnabled: types.BoolValue(false),
+		AnsibleDirectory: types.StringValue(""),
+		DefaultPlaybook:  types.StringValue(""),
+		DefaultLimit:     types.StringValue(""),
+	}
+	attrs, d := buildCatalogItemAttrs(&m)
+	if d.HasError() {
+		t.Fatalf("buildCatalogItemAttrs: %v", d)
+	}
+	for _, key := range []string{"ansible-directory", "default-playbook", "default-limit"} {
+		v, ok := attrs[key]
+		if !ok {
+			t.Fatalf("%s was not sent; an explicit \"\" must reach the wire", key)
+		}
+		if v != "" {
+			t.Errorf("%s sent as %#v, want \"\"", key, v)
+		}
+	}
+
+	var back catalogItemModel
+	item := &terrapod.CatalogItem{ID: "c0ffee", Attributes: map[string]any{
+		"name": "x", "module-id": "m",
+		"ansible-directory": "", "default-playbook": "", "default-limit": "",
+	}}
+	if d := readCatalogItemIntoModel(context.Background(), item, &back); d.HasError() {
+		t.Fatalf("readCatalogItemIntoModel: %v", d)
+	}
+	if back.AnsibleDirectory != m.AnsibleDirectory ||
+		back.DefaultPlaybook != m.DefaultPlaybook ||
+		back.DefaultLimit != m.DefaultLimit {
+		t.Errorf("the round trip changed the value: planned %v/%v/%v, got %v/%v/%v",
+			m.AnsibleDirectory, m.DefaultPlaybook, m.DefaultLimit,
+			back.AnsibleDirectory, back.DefaultPlaybook, back.DefaultLimit)
 	}
 }
 

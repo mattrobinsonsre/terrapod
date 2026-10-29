@@ -402,7 +402,7 @@ materialises will have — with two independent booleans:
 Omit both and you get today's behaviour — a plan/apply workspace with no Ansible
 — which is why adding these attributes drifts nothing on an existing
 configuration. `terrapod_catalog_item` carries `configure_enabled` as well, with
-a different companion attribute and the opposite pair rule; see
+a different companion attribute and a different pair rule; see
 [On `terrapod_catalog_item`](#on-terrapod_catalog_item) below.
 
 **Setting both to `false` is refused by the API with a 422**, so it fails at
@@ -463,7 +463,7 @@ four are templated onto every workspace provisioned from the item:
 | `default_playbook` | `""` | its `default_playbook`, relative to `ansible_directory` |
 | `default_limit` | `""` | its `default_limit` |
 
-**The pair rule here is the other way round from the workspace's.**
+**The pair rule here is a different rule, not the workspace's inverted.**
 `configure_enabled = true` with an empty `ansible_directory` is refused — by the
 provider at plan time where the configuration says so outright, and by the API at
 apply time in every other case — because a configure rooted at the configuration
