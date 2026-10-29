@@ -764,9 +764,9 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.21.3"
-        trivy_version: "0.76.0"
-        checkov_version: "3.3.29"
+        opa_version: "1.21.4"
+        trivy_version: "0.76.1"
+        checkov_version: "3.3.30"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         # Checkov comes from TERRAPOD's releases, not Checkov's, and that is

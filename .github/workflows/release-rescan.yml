@@ -93,7 +93,40 @@ jobs:
                       latest[key] = (patch, line.strip())
               n = int(os.environ.get("INPUT_MINORS") or 2)
               ordered = sorted(latest, reverse=True)[:n]
-              tags = [latest[k][1] for k in ordered]
+
+              # Plus any line held in support beyond that version-relative
+              # window, which a COUNT cannot express. The support set is the
+              # newest minor, the one before it, AND any held line: at 2.0.0
+              # that is 2.0 + 1.11 and the count already covers it, but at
+              # 2.1.0 it is 2.1 + 2.0 + 1.11, and at 2.2.0 it is 2.2 + 2.1 +
+              # 1.11. The held line does not move as 2.x advances, which is
+              # precisely what a position cannot express -- raising `minors`
+              # defers the drop by exactly one release and then drops it again.
+              #
+              # An entry is honoured for as long as it is PRESENT and does NOT
+              # expire on a date. Retiring a held line is a deliberate human
+              # act -- deleting the entry -- because a line that left support
+              # because a date passed, with nobody deciding to drop it, is the
+              # failure this mechanism exists to prevent. `earliest_retirement`
+              # is a floor on when that act may happen, checked by the gate,
+              # and is deliberately not read here: nothing about it changes
+              # what gets scanned.
+              try:
+                  with open("extended-support.json") as fh:
+                      policy = json.load(fh)
+              except FileNotFoundError:
+                  policy = {}
+              for entry in policy.get("extended_support", []):
+                  line = str(entry.get("line", ""))
+                  if not re.fullmatch(r"\d+\.\d+", line):
+                      continue
+                  key = tuple(int(g) for g in line.split("."))
+                  # A line with no published release contributes nothing rather
+                  # than producing a tag that does not exist.
+                  if key in latest and key not in ordered:
+                      ordered.append(key)
+
+              tags = [latest[k][1] for k in sorted(ordered, reverse=True)]
 
           print(f"tags={json.dumps(tags)}")
           print(f"list={' '.join(tags)}")

@@ -12,9 +12,10 @@ collaboration, governance, state-management, and UI layer around `terraform` or
 OpenTofu (`tofu`) as pluggable execution backends, and runs **Pulumi** programs
 and **Ansible** playbooks through that same model. It is **not** a fork of any
 engine — it orchestrates them. Deployed via a Helm chart on
-Kubernetes. License: MPL-2.0. Stable, on the **1.x** line — see
-[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for the current
-version.
+Kubernetes. License: MPL-2.0. The stable line is **1.x**; **2.0 is in
+pre-release**, so the newest published release may be a `2.0.0-alpha`. See
+[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for what is
+current and [Upgrading to 2.0](upgrading-to-2.0.md) for what changes.
 
 ## Is Terrapod free / open source? Will it always be?
 
@@ -107,12 +108,22 @@ list of what the API reaches and how to redirect each one.
 
 ## Is Terrapod production-ready / stable?
 
-Yes — Terrapod passed **1.0** and is on the 1.x line, with a SemVer compatibility
-contract enforced in CI across every public surface (API, wire protocol, config,
-Helm values, DB schema, SDK, provider). A minor never breaks any of them. See
-[Versioning & support](versioning-and-support.md), and
-[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for the current
-version.
+Yes — Terrapod passed **1.0**, and the stable line is 1.x, with a SemVer
+compatibility contract enforced in CI across every public surface (API, wire
+protocol, config, Helm values, DB schema, SDK, provider). A minor never breaks
+any of them.
+
+**2.0 is in pre-release.** A `2.0.0-alpha` is published for people who want to
+try it and is **not** recommended for production: it is where the breaking
+changes land, and a pre-release carries no promise that the next one keeps its
+shape. Run the newest **1.x** release in production until 2.0 reaches a stable
+tag. Because GitHub picks "Latest" by publish time, an alpha can hold that badge
+while 1.x remains the production line — so read the version, not the badge.
+
+See [Versioning & support](versioning-and-support.md),
+[Upgrading to 2.0](upgrading-to-2.0.md), and
+[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for what is
+current.
 
 ## Do I need Kubernetes to run Terrapod? Isn't that a heavy requirement?
 

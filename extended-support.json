@@ -1,0 +1,11 @@
+{
+  "_comment": "Release lines held in support BEYOND the version-relative window SECURITY.md states. THE one place that says so: release-rescan.yml's `discover` job reads it to decide what it still scans, the docs describe it, and scripts/docs-audit/check_extended_support.py holds all three to each other. An entry is honoured for as long as it is here and does NOT expire on a date -- retiring a held line is a deliberate human act, done by deleting the entry, because a line that vanished from support because a date passed is the thing this exists to prevent. `earliest_retirement` is a FLOOR, not a deadline: the commitment is that the line keeps its support until at least that date, so the entry must not be removed before it. A line with no published release contributes nothing. Keys beginning with an underscore are ignored.",
+  "_example": {
+    "line": "1.11",
+    "held_since": "2026-10-29",
+    "earliest_retirement": "2027-01-21",
+    "reason": "the last 1.x line, held past the version-relative window so an estate on 1.x has an unhurried path onto 2.x",
+    "announced_in": "v2.0.0"
+  },
+  "extended_support": []
+}

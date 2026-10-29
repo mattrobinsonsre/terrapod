@@ -134,8 +134,8 @@ api:
   config:
     registry:
       platform_tools:
-        checkov_version: "3.3.29"
-        trivy_version: "0.76.0"
+        checkov_version: "3.3.30"
+        trivy_version: "0.76.1"
 ```
 
 Only the engine a run actually selects is fetched — a Checkov workspace never

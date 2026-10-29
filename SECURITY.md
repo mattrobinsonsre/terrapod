@@ -6,8 +6,30 @@
 |---------|-----------|
 | Latest release | Yes |
 | Previous minor | Security fixes, and obvious bug fixes |
+| A line named in [`extended-support.json`](extended-support.json) | Security fixes, and obvious bug fixes, for as long as it is listed |
 
 We recommend always running the latest release.
+
+The first two rows are **version-relative**, so a line leaves support when newer
+ones ship rather than on a date. That is the right default and it has one bad
+edge: across a MAJOR boundary every line of the old major would drop the moment
+the new one had two minors, with no announcement and nothing to notice it.
+
+The third row exists for that case. A held line stays supported **while 2.x
+advances past it**:
+
+| after | supported |
+|---|---|
+| 2.0.0 | 2.0.x, 1.11.x |
+| 2.1.0 | 2.1.x, 2.0.x, 1.11.x |
+| 2.2.0 | 2.2.x, 2.1.x, 1.11.x |
+
+**A held line does not stop being supported because a date passed.** Retiring it
+is a deliberate decision, taken by deleting its entry, and the
+`earliest_retirement` date recorded beside it is a **floor** on when that may
+happen — the commitment is at least twelve weeks — rather than a deadline on
+which support lapses. `extended-support.json` is the only place a held line is
+named, and the scheduled re-scan reads it to decide what it still scans.
 
 ## Reporting a Vulnerability
 

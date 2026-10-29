@@ -49,11 +49,23 @@ WORKFLOW = pathlib.Path(".github/workflows/ci.yml")
 #: Tags that MUST trigger the release pipeline. One stable, one pre-release in
 #: the form settled on in #2277, and one with a two-digit minor so a pattern
 #: narrowed to single digits is caught.
-MUST_MATCH = ("v1.11.1", "v2.0.0-alpha.1", "v2.10.0-rc.2")
+MUST_MATCH = ("v1.11.1", "v2.0.0-alpha.1", "v3.0.0-rc.2")
 
 #: Tags that must NOT, so a pattern widened into a catch-all fails here rather
 #: than by publishing something from a stray tag.
-MUST_NOT_MATCH = ("latest", "v1.2", "checkov-3.2.481", "nightly-2026-10-28")
+#: `v2.1.0-alpha.1` and `v2.0.1-rc.1` are here because a pre-release is for a
+#: MAJOR only. Admitting one would let it publish and take the "Latest" badge
+#: off a stable release, since this workflow deliberately does not flag a
+#: pre-release and the badge therefore follows publish order.
+MUST_NOT_MATCH = (
+    "latest",
+    "v1.2",
+    "checkov-3.2.481",
+    "nightly-2026-10-28",
+    "v2.1.0-alpha.1",
+    "v2.0.1-rc.1",
+    "v2.10.0-rc.2",
+)
 
 #: The jobs that create and then finalise the GitHub Release.
 RELEASE_JOBS = ("release-create", "release-finalize")
@@ -93,6 +105,13 @@ ELECTIONS = (
         [_CHECKOV, "v1.11.2"],
         "v1.11.2",
         "a lone stable release is still elected over the Checkov tags",
+    ),
+    (
+        [_CHECKOV, "v1.11.2", "v2.0.0", "v2.1.0-alpha.1"],
+        "v2.0.0",
+        "a MINOR pre-release cannot take the badge from a stable major -- the tag "
+        "filter refuses it so no such release can exist, and this is the second "
+        "layer: were one somehow published, the election still would not elect it",
     ),
 )
 
@@ -196,32 +215,45 @@ def extract_cosign_identity(text: str) -> str:
     return m.group(1)
 
 
-def extract_is_tag_regex(shell: str) -> str:
-    """Pull the `is_tag` bash regex out of the `prepare` job, verbatim.
+def extract_is_tag_regex(shell: str) -> list[str]:
+    """Pull the `is_tag` bash regex(es) out of the `prepare` job, verbatim.
 
     `on.push.tags` decides whether a pipeline STARTS; this decides whether that
     pipeline is a release. They are written in different languages and nothing
     makes them agree, so a tag admitted by one and rejected by the other starts
     a build that publishes nothing and fails nowhere -- the worst shape, because
     `Cleanup Tag` never fires and the tag survives looking released.
+
+    Returns a LIST because the test is a disjunction: a pre-release suffix is
+    admitted on a MAJOR only (`vN.0.0-...`), which one pattern with an optional
+    suffix cannot express. Every alternative inside the one `[[ ]]` is returned
+    and `is_tag` re-joins them with `||`, so the shape being checked stays the
+    shape the workflow runs rather than a reconstruction of it.
     """
-    m = re.search(r'\[\[\s*"\$GITHUB_REF"\s*=~\s*(\S+)\s*\]\]', shell)
-    if not m:
+    block = re.search(r"\[\[(.+?)\]\]", shell, re.S)
+    if not block:
         raise LookupError(
             "cannot locate the `is_tag` test in the `prepare` job. If it was "
             "restructured, teach this extractor the new shape -- do NOT "
             "reimplement the regex here."
         )
-    return m.group(1)
+    found = re.findall(r'"\$GITHUB_REF"\s*=~\s*(\S+)', block.group(1))
+    if not found:
+        raise LookupError(
+            'the `is_tag` test matches no `"$GITHUB_REF" =~ <regex>` comparison. '
+            "Teach this extractor the new shape -- do NOT reimplement the regex here."
+        )
+    return found
 
 
-def is_tag(regex: str, tag: str) -> bool:
+def is_tag(regexes: list[str], tag: str) -> bool:
     """Run the extracted test in bash, exactly as the workflow does."""
+    test = " || ".join(f'[[ "$1" =~ {r} ]]' for r in regexes)
     proc = subprocess.run(
         [
             "bash",
             "-c",
-            f'if [[ "$1" =~ {regex} ]]; then exit 0; else exit 1; fi',
+            f"if {test}; then exit 0; else exit 1; fi",
             "_",
             f"refs/tags/{tag}",
         ],
@@ -327,9 +359,23 @@ def main() -> int:
                     "release that first uses it fails verification and Cleanup Tag deletes "
                     "the tag"
                 )
-        for ref in ("refs/heads/feature/x", "refs/pull/123/merge", "refs/tags/latest"):
+        # Both directions, and the second is DERIVED rather than listed. The
+        # anchor must admit every ref that can build -- too narrow and the
+        # release that first uses it fails verification -- and no more. A
+        # mutation widening it back to `vN.N.N(-suffix)?` was NOT caught while
+        # this loop held three hand-written refs, because widening still admits
+        # every builder: the gate only ever asked the first question. Anything
+        # the tag filter refuses must be refused here too, or the anchor is
+        # already permitting a ref a later widening of the filter would let
+        # sign, which is one layer of defence gone before anyone notices.
+        refused = ["refs/heads/feature/x", "refs/pull/123/merge"]
+        refused += [f"refs/tags/{t}" for t in MUST_NOT_MATCH]
+        for ref in refused:
             if identity.match(prefix + ref):
-                problems.append(f"COSIGN_IDENTITY_RE accepts {ref} -- the trust anchor has widened")
+                problems.append(
+                    f"COSIGN_IDENTITY_RE accepts {ref}, which cannot build a manifest -- "
+                    "the trust anchor is wider than the refs that can sign"
+                )
     except (LookupError, re.error) as exc:
         problems.append(str(exc))
 

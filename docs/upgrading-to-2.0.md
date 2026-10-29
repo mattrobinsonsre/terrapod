@@ -293,6 +293,54 @@ run is still stored as `planning`.
 
 See [post-plan-decisions.md](post-plan-decisions.md).
 
+### `PolicyEvaluation` becomes `PolicyCheck` in the Go SDK
+
+**Affects:** Go code importing `go-terrapod` that reads a run's policy results.
+Nothing else — no API route is removed, the HTTP surface gains rather than
+loses, and neither the `tofu`/`terraform` CLI nor the Terraform provider is
+affected.
+
+The SDK reported one `PolicyEvaluation` per policy **set** evaluated. It now
+reports one `PolicyCheck` per **gate** per run, in the Terraform Enterprise
+shape the CLI reads — one for the OPA policy sets (`Scope` `organization`) and
+one for the security scan (`Scope` `workspace`), each present only when that
+gate recorded something. The per-set rows did not disappear; they moved to where
+a caller wanting that level of detail now asks.
+
+| removed | use instead |
+|---|---|
+| `ListRunPolicyEvaluations(ctx, runID)` | `ListRunPolicyChecks(ctx, runID)` |
+| `type PolicyEvaluation` | `type PolicyCheck` — `Status`, `Scope`, `IsOverridable`, `CanOverride`, and the `Passed` / `SoftFailed` / `AdvisoryFailed` counts |
+| `(*PolicyEvaluation) IsBlocking()` | `check.Status == terrapod.PolicyCheckSoftFailed` |
+| `PolicySetID`, `PolicySetName`, `EnforcementLevel`, `Outcome`, `OverriddenBy`, `OverriddenAt` | the same six fields on `PolicyEvaluationDetail`, via `RunComplianceReport.PolicyEvaluations` |
+| `Result map[string]any` (the raw OPA result) | **no typed equivalent.** `GetPolicyCheckOutput(ctx, checkID)` returns the same information as plain text, per policy set and per policy |
+
+**The `IsBlocking` replacement is exact, not approximate.** The old method
+returned true when an evaluation was `mandatory`, had outcome `failed` or
+`errored`, and had not been overridden. The server now applies that identical
+predicate across a run's evaluations and reports `soft_failed` when any of them
+matches, so one status read replaces a loop. Once such a check is overridden the
+status becomes `overridden`, which the old field combination expressed as
+`OverriddenBy` being set.
+
+Three methods are **new** rather than renamed: `GetPolicyCheck`,
+`GetPolicyCheckOutput` and `OverridePolicyCheck` — the last being how a caller
+clears a held run, which previously had no SDK route at all.
+
+**What you must do before upgrading:**
+
+1. Replace `ListRunPolicyEvaluations` with `ListRunPolicyChecks`, and any
+   `IsBlocking()` loop with the single `Status` comparison above.
+2. If you read `PolicySetName` or `EnforcementLevel` per set, move that read to
+   `RunComplianceReport.PolicyEvaluations`; it is a batched call, so fetching a
+   report is cheaper than the per-run listing it replaces.
+3. If you parsed `Result` to find which policy denied, read
+   `GetPolicyCheckOutput` instead and expect text rather than a map. There is no
+   typed form of the raw OPA result, deliberately — its shape is OPA's and not
+   ours to freeze in an SDK contract.
+
+See [policies.md](policies.md).
+
 ### A column is renamed, so the API rollout has a brief window of errors
 
 **Affects:** every deployment, but only for the length of one rolling upgrade, and
