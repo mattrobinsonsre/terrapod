@@ -509,12 +509,30 @@ class TestThePythonRequirementsOfInstalledCollections:
 
     # -- how pip is configured ---------------------------------------------
 
-    def test_the_cache_is_on_the_shared_volume_and_not_tmp(self) -> None:
-        """`/tmp` is the ORCHESTRATOR's writable emptyDir and the EE's read-only
-        root -- the same mistake this issue is about, one directory over."""
-        env = ac.pip_env(API)
-        assert env["PIP_CACHE_DIR"] == str(ac.ee_home() / ".cache" / "pip")
-        assert "/tmp" not in env["PIP_CACHE_DIR"]
+    def test_the_cache_follows_the_execution_environments_home(self) -> None:
+        """Wherever the Job says HOME is, that is where the cache goes."""
+        assert ac.pip_env(API)["PIP_CACHE_DIR"] == str(ac.ee_home() / ".cache" / "pip")
+
+    def test_the_cache_is_not_the_orchestrators_tmp(self, monkeypatch) -> None:
+        """`/tmp` is the ORCHESTRATOR's writable emptyDir and the EE's READ-ONLY
+        ROOT -- the same mistake this issue is about, one directory over. So the
+        value must differ from the shared helper's, which is correct for the
+        orchestrator and would fail on the first wheel written here.
+
+        It deletes `TP_EE_HOME` to assert the PRODUCTION default rather than the
+        path the fixture injects. The first version of this test asserted
+        `"/tmp" not in ...` against the injected home and passed locally for an
+        accidental reason -- macOS puts `tmp_path_factory` under
+        `/private/var/folders`, a Linux runner puts it under `/tmp`, so it was
+        green here and red in CI while saying nothing either way.
+        """
+        from terrapod.runner.phases import pulumi_deps
+
+        monkeypatch.delenv("TP_EE_HOME", raising=False)
+        mine = ac.pip_env(API)["PIP_CACHE_DIR"]
+        assert mine == f"{ac._DEFAULT_EE_HOME}/.cache/pip"
+        assert not mine.startswith("/tmp")
+        assert mine != pulumi_deps.pip_env(API)["PIP_CACHE_DIR"]
 
     def test_the_index_is_terrapods_pull_through_cache(self) -> None:
         from terrapod.runner.phases import pulumi_deps
