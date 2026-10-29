@@ -1274,7 +1274,7 @@ class CatalogItem(Base):
     # --- the Ansible half, templated onto the provisioned workspace (#2019) ---
     #
     # An item may provision a workspace that is primarily Ansible, carrying only
-    # as much Terraform as it takes to declare the inventory. These three are
+    # as much Terraform as it takes to declare the inventory. These four are
     # workspace-settings templating, exactly like `execution_mode` and
     # `engine_version` already are: nothing in the catalog is aware of Ansible,
     # and an item that sets none of them provisions what it provisions today.
