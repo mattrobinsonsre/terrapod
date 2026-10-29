@@ -110,6 +110,12 @@ class _Workspace:
         self.ansible_version = ""
         self.vcs_connection_id = uuid.uuid4()
         self.vcs_repo_url = "https://github.com/owner/repo"
+        # Set explicitly, both off, which is the default (#2033). A fake that
+        # omits them does not fail loudly on the attribute: these reach a
+        # `bool(...)`, so an auto-attribute would read as TRUE and quietly put
+        # every one of these tests on the dynamic path.
+        self.dynamic_inventory_enabled = False
+        self.inventory_scripts_enabled = False
 
 
 class _Run:
@@ -265,9 +271,19 @@ class TestTheRunPathNeverFetches:
             return ws
 
         async def _declared(db, workspace_id):
-            return "all:\n  hosts: {}\n"
+            # The renderer's keyword arguments, which is what `_declared_document`
+            # answers (#2033): the render happens inside `_resolve_uncached` so the
+            # run handoff can carry the same values without a second query pass or
+            # a second shape.
+            return {
+                "hosts": [],
+                "groups": [],
+                "memberships": [],
+                "children": [],
+                "global_vars": {},
+            }
 
-        monkeypatch.setattr(inventory_resolve, "_declared_sources", _declared, raising=True)
+        monkeypatch.setattr(inventory_resolve, "_declared_document", _declared, raising=True)
         import terrapod.services.inventory_service as inv_service
 
         monkeypatch.setattr(inv_service, "get_inventory_workspace", _ws, raising=True)
@@ -292,9 +308,19 @@ class TestTheRunPathNeverFetches:
             return ws
 
         async def _declared(db, workspace_id):
-            return "all:\n  hosts:\n    declared1:\n      ansible_host: 10.0.0.9\n"
+            # The renderer's keyword arguments, which is what `_declared_document`
+            # answers (#2033): the render happens inside `_resolve_uncached` so the
+            # run handoff can carry the same values without a second query pass or
+            # a second shape.
+            return {
+                "hosts": [("declared1", {"ansible_host": "10.0.0.9"})],
+                "groups": [],
+                "memberships": [],
+                "children": [],
+                "global_vars": {},
+            }
 
-        monkeypatch.setattr(inventory_resolve, "_declared_sources", _declared)
+        monkeypatch.setattr(inventory_resolve, "_declared_document", _declared)
         import terrapod.services.inventory_service as inv_service
 
         monkeypatch.setattr(inv_service, "get_inventory_workspace", _ws)
@@ -319,9 +345,19 @@ class TestTheRunPathNeverFetches:
             return ws
 
         async def _declared(db, workspace_id):
-            return "all:\n  hosts:\n    only_declared:\n"
+            # The renderer's keyword arguments, which is what `_declared_document`
+            # answers (#2033): the render happens inside `_resolve_uncached` so the
+            # run handoff can carry the same values without a second query pass or
+            # a second shape.
+            return {
+                "hosts": [("only_declared", {})],
+                "groups": [],
+                "memberships": [],
+                "children": [],
+                "global_vars": {},
+            }
 
-        monkeypatch.setattr(inventory_resolve, "_declared_sources", _declared)
+        monkeypatch.setattr(inventory_resolve, "_declared_document", _declared)
         import terrapod.services.inventory_service as inv_service
 
         monkeypatch.setattr(inv_service, "get_inventory_workspace", _ws)

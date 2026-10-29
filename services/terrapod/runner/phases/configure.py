@@ -40,6 +40,7 @@ terminal mapping is #1973's.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
 
 import structlog
@@ -140,19 +141,29 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     return env
 
 
-def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
+def argv(cfg: RunnerConfig, *, inventory: Sequence[Path]) -> list[str]:
     """`ansible-playbook`'s arguments for this run.
 
     Built here and not inline so it can be asserted on directly.
 
-    **Exactly ONE `-i`, and it is the run's resolved artifact** -- never the
-    workspace's `inventory_paths`. Those name the sources the API merged when it
-    resolved this run's inventory at creation (#2021), so passing them here
-    would have ansible re-read the repository's own inventory alongside the
-    merged result: the same hosts from two sources, and variable precedence
-    decided by the order they happened to be listed in rather than by what the
-    operator declared. The artifact is the answer; re-deriving it is how the
-    runner and the API come to disagree about what a configure targeted.
+    **Normally exactly ONE `-i`, and it is the run's resolved artifact** --
+    never the workspace's `inventory_paths`. Those name the sources the API
+    merged when it resolved this run's inventory at creation (#2021), so passing
+    them here would have ansible re-read the repository's own inventory
+    alongside the merged result: the same hosts from two sources, and variable
+    precedence decided by the order they happened to be listed in rather than by
+    what the operator declared. The artifact is the answer; re-deriving it is how
+    the runner and the API come to disagree about what a configure targeted.
+
+    **The exception is a workspace that resolves dynamic sources here** (#2033),
+    where the list is the repository's own sources in the operator's order
+    followed by the declared rows. That is not a relaxation of the paragraph
+    above: in that case the API did NOT merge the repository, so there is no
+    merged result to be read twice, and the whole repository being re-read in one
+    place is what keeps the operator's `-i` ordering theirs.
+    `configure_inventory.materialise` decides which case this is; the order it
+    returns is the order passed, so this builds the flags and makes no
+    precedence decision of its own.
 
     `--limit` IS passed, because the artifact is written unlimited -- run
     creation calls `write_run_artifact(db, run)` with no limit, so the narrowing
@@ -163,7 +174,9 @@ def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
             "this run is a configure but names no playbook, and the workspace has "
             "no `default_playbook` to fall back to"
         )
-    out: list[str] = ["-i", str(inventory)]
+    out: list[str] = []
+    for source in inventory:
+        out += ["-i", str(source)]
     if cfg.ansible_limit:
         out += ["--limit", cfg.ansible_limit]
     out.append(cfg.playbook)
@@ -174,7 +187,7 @@ def run(
     cfg: RunnerConfig,
     *,
     work_dir: Path,
-    inventory: Path,
+    inventory: Sequence[Path],
     log_file: str | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> int:
@@ -184,10 +197,10 @@ def run(
         cfg: the run's configuration. `config_directory`, `playbook` and
             and the resolved inventory are the configure-specific parts.
         work_dir: the fetched tree's root. `config_directory` is relative to it.
-        inventory: the materialised resolved inventory, from
-            `configure_inventory.materialise`. Passed in rather than fetched
-            here so the download is a separate, separately-failing step: an
-            inventory that cannot be read is not a playbook that failed.
+        inventory: the `-i` list, from `configure_inventory.materialise`.
+            Passed in rather than fetched here so the download is a separate,
+            separately-failing step: an inventory that cannot be read is not a
+            playbook that failed.
         log_file: appended with the combined output for upload as the run log.
         extra_env: environment the credential phase returned (#1933) -- today
             `ANSIBLE_VAULT_IDENTITY_LIST`. It travels as an ARGUMENT and not
@@ -223,7 +236,7 @@ def run(
         "configure starting",
         playbook=cfg.playbook,
         limit=cfg.ansible_limit or None,
-        inventory=str(inventory),
+        inventory=[str(source) for source in inventory],
         cwd=str(cwd),
     )
     # `_forced_env` LAST, so the non-negotiables outrank anything a credential

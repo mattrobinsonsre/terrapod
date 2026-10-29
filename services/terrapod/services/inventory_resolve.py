@@ -241,6 +241,38 @@ class _InventorySources(NamedTuple):
     config_directory: str
 
 
+def _handoff_path(source: Path, prov: _InventorySources) -> str:
+    """A source as a path the RUNNER can resolve against the fetched tree (#2033).
+
+    Repo-relative and POSIX, so the runner joins it to the tree it already has
+    rather than being handed a scratch directory that no longer exists.
+
+    Deliberately NOT `_repo_relative`, which is for a refusal message and
+    answers `"the repository root"` for a source that is the root itself and the
+    raw absolute path for one outside it. Both are the right thing to show a
+    human and neither is a path: handed to the runner, the first names nothing
+    and the second names a deleted tempdir, and either way ansible resolves one
+    source fewer than the operator declared -- a short host set, reported as
+    success, which is the failure this whole handoff exists to prevent. So this
+    raises instead.
+    """
+    try:
+        rel = source.resolve().relative_to(prov.root.resolve())
+    except ValueError as exc:
+        raise InventoryResolutionFailed(
+            f"inventory source {source} is not under the configuration root, so it "
+            "cannot be named to the runner as a path in the fetched tree"
+        ) from exc
+    parts = [part for part in (prov.config_directory.strip("/"), rel.as_posix()) if part != "."]
+    joined = "/".join(part for part in parts if part)
+    if not joined:
+        raise InventoryResolutionFailed(
+            "an inventory source resolved to the repository root itself, which is "
+            "a directory the runner cannot be told to read as one source"
+        )
+    return joined
+
+
 def _repo_relative(source: Path, prov: _InventorySources) -> str:
     """A source as the operator would recognise it, relative to the repository."""
     try:
@@ -739,6 +771,15 @@ def normalise(document: dict[str, Any]) -> dict[str, Any]:
 #: "I cannot tell" has to read differently from "nothing was skipped".
 SKIPPED_KEY = "skipped_sources"
 
+#: Ordered repo-relative paths of every inventory source the operator's
+#: configuration names, present on a RUN's artifact only when the resolution is
+#: partial. See `_with_handoff`.
+HANDOFF_SOURCES_KEY = "sources"
+
+#: The declared rows alone, as an `all:`-rooted inventory document. Present with
+#: `HANDOFF_SOURCES_KEY` and for the same reason.
+HANDOFF_DECLARED_KEY = "declared"
+
 
 def _with_skipped(document: dict[str, Any], skipped: list[SkippedSource]) -> dict[str, Any]:
     """Attach the skipped-source record to a resolved document (#2033).
@@ -761,6 +802,45 @@ def _with_skipped(document: dict[str, Any], skipped: list[SkippedSource]) -> dic
         **document,
         SKIPPED_KEY: [s._asdict() for s in skipped],
         "partial": bool(skipped),
+    }
+
+
+def _with_handoff(
+    document: dict[str, Any],
+    *,
+    sources: list[str],
+    declared: dict[str, Any],
+) -> dict[str, Any]:
+    """Attach what the runner needs to resolve the sources we would not (#2033).
+
+    **Only on a partial resolution, and only for a run.** A faithful resolution
+    is the whole answer, and the configure phase's own docstring says why it must
+    not re-read the repository alongside it: the same hosts arriving from two
+    sources, with variable precedence decided by `-i` order rather than by what
+    the operator declared. These two keys are the narrow exception, and their
+    absence is what tells the phase it is in the ordinary case.
+
+    `sources` is **every** source the operator's configuration names, not only
+    the skipped ones, and that is the point rather than an oversight. Ansible's
+    `-i` order is precedence order, and within an inventory directory the
+    operator chooses it by filename -- the real-world arrangement is a `hosts.d`
+    of numerically-prefixed files. Handing the runner only the dynamic ones would
+    have it merge them at whatever position they happened to land relative to a
+    separately-rendered static half, so a `30_aws.yml` would outrank or be
+    outranked by a `20_static.yml` according to our list-building rather than
+    their numbering. Re-read whole, their order is theirs.
+
+    `declared` goes LAST on the runner, after every repository source, because
+    the platform source wins a conflicting variable -- the same relationship a
+    Terraform variable has to a default written into the configuration. It is the
+    built document rather than rendered text so the runner serialises it with the
+    renderer both sides already share, and so the credential phase can substitute
+    a `${terrapod:...}` placeholder in it exactly as it does in the merged case.
+    """
+    return {
+        **document,
+        HANDOFF_SOURCES_KEY: sources,
+        HANDOFF_DECLARED_KEY: declared,
     }
 
 
@@ -859,6 +939,17 @@ def make_tempdir() -> str:
 
 async def _declared_sources(db, workspace_id: uuid.UUID) -> str:
     """The declared rows, rendered to one inventory YAML."""
+    return render_inventory_yaml(**await _declared_document(db, workspace_id))
+
+
+async def _declared_document(db, workspace_id: uuid.UUID) -> dict[str, Any]:
+    """The declared rows as the renderer's keyword arguments.
+
+    Split out from the render so the run handoff can carry the same values
+    through `HANDOFF_DECLARED_KEY` without a second query pass and without a
+    second shape -- the runner builds its document from these with the module
+    both sides import, so the two cannot drift.
+    """
     from terrapod.services import inventory_service as inv
 
     hosts = await inv.list_hosts(db, workspace_id)
@@ -889,13 +980,13 @@ async def _declared_sources(db, workspace_id: uuid.UUID) -> str:
         and link.child_group_id in group_name
     ]
 
-    return render_inventory_yaml(
-        hosts=[(h.name, host_vars.get(h.id, {})) for h in hosts],
-        groups=[(g.name, group_vars.get(g.id, {})) for g in groups],
-        memberships=memberships,
-        children=children,
-        global_vars={v.key: _coerce(v) for v in await inv.list_global_vars(db, workspace_id)},
-    )
+    return {
+        "hosts": [(h.name, host_vars.get(h.id, {})) for h in hosts],
+        "groups": [(g.name, group_vars.get(g.id, {})) for g in groups],
+        "memberships": memberships,
+        "children": children,
+        "global_vars": {v.key: _coerce(v) for v in await inv.list_global_vars(db, workspace_id)},
+    }
 
 
 def _coerce(var) -> Any:  # type: ignore[no-untyped-def]
@@ -1010,6 +1101,10 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
         git_sha="",
         limit=limit,
         config_version_id=cv_id,
+        # The run path alone asks for the handoff: a read has nobody to hand it
+        # to, and putting it in the Redis-cached document would publish a tree
+        # layout to every reader of the view for no consumer's benefit.
+        handoff=True,
     )
 
 
@@ -1181,6 +1276,7 @@ async def _resolve_uncached(
     git_sha: str,
     limit: str | None,
     config_version_id: uuid.UUID | None = None,
+    handoff: bool = False,
 ) -> dict[str, Any]:
     """Render, materialise, run ansible, read the output. One scratch directory.
 
@@ -1244,15 +1340,22 @@ async def _resolve_uncached(
         # a workspace that has declared nothing and bound no repository gets its
         # defined empty result from the same path as everything else rather than
         # from a special case.
-        rendered = await _declared_sources(db, workspace_id)
+        declared = await _declared_document(db, workspace_id)
         platform_file = workdir / _PLATFORM_SOURCE_NAME
-        await asyncio.to_thread(platform_file.write_text, rendered)
+        await asyncio.to_thread(platform_file.write_text, render_inventory_yaml(**declared))
         sources.append(platform_file)
 
         document = await run_ansible_inventory(
             sources, scratch=workdir, limit=limit, cwd=cwd, provenance=provenance
         )
-        return _with_skipped(normalise(document), skipped)
+        resolved = _with_skipped(normalise(document), skipped)
+        if handoff and skipped and provenance is not None:
+            resolved = _with_handoff(
+                resolved,
+                sources=[_handoff_path(s, provenance) for s in provenance.paths],
+                declared=build_inventory_document(**declared),
+            )
+        return resolved
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
 
