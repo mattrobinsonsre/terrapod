@@ -4,7 +4,7 @@
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/mattrobinsonsre/terrapod?sort=semver&include_prereleases&label=release)](https://github.com/mattrobinsonsre/terrapod/releases/latest)
 
-**A free, open-source, self-hosted alternative to Terraform Enterprise and Terraform Cloud (HCP Terraform)** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. Not a fork of either engine; it orchestrates them.
+**A free, open-source, self-hosted alternative to Terraform Enterprise and Terraform Cloud (HCP Terraform)** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt — which also runs **Pulumi** programs and **Ansible** playbooks through that same workspace, RBAC, policy and audit model. Not a fork of any engine; it orchestrates them.
 
 - **Point your existing `cloud` block at it.** Terrapod implements the slice of the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) that `terraform` and `tofu` actually consume — the `cloud`/`remote` backend protocol, as the CLI speaks it via [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) — so CLI runs and CI/CD usually move across with zero code changes. That slice is the compatibility target: everything beyond it is Terrapod's own API rather than a reimplementation of the full TFE V2 surface.
 - **Your state and secrets never leave your boundary.** Versioned remote state in your Postgres and object store, cloud credentials via Kubernetes workload identity — nothing long-lived, nothing vendor-held.

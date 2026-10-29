@@ -1,8 +1,8 @@
 # Pulumi provider (`pulumi-resource-terrapod`)
 
 Manage Terrapod itself from a Pulumi program — the same objects the
-[Terraform provider](terraform-provider.md) manages, reached from TypeScript,
-Python, Go or C#.
+[Terraform provider](terraform-provider.md) manages, in whichever language that
+program is written in.
 
 > **Verified so far:** SDK generation and a compiling resource declaration in
 > **TypeScript**, and SDK generation in **Go**. The generated Go SDK does not
