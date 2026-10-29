@@ -206,10 +206,11 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		// Resource sizing (#2154). Absent from this tool until #2154, so an
 		// agent could read a workspace's sizing with terrapod_workspace_get and
-		// not change it. That asymmetry is now closed for everything except
-		// the four #2174 reserves as judgements, named in the block below --
-		// a count is not restated here, because a number in prose has no gate
-		// behind it and this comment carried a stale one.
+		// not change it. That asymmetry is now closed for EVERY settable
+		// workspace attribute -- see the block below for why the four that
+		// were held back are no longer held back. A count is not restated
+		// here, because a number in prose has no gate behind it and this
+		// comment carried a stale one.
 		//
 		// The two PAIRS are deliberately separate, because the two containers
 		// of a configure Job do different work: the orchestrator runs tofu
@@ -243,24 +244,47 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// worth closing -- a tool surface that reports a setting it cannot set
 		// invites an agent to describe a change it is unable to make.
 		//
-		// FOUR are deliberately still absent and stay in the gate's debt ledger
-		// with their own reason: debug_mode arms a pod that holds the run's
-		// credentials and keeps it alive for inspection, auto_merge and
-		// auto_merge_strategy merge pull requests, and
-		// security_scan_enforcement is a governance gate. Each reaches outside
-		// the workspace's own configuration, so whether an agent should hold it
-		// is a decision to argue on #2174 rather than an omission to fix here.
+		// The FOUR held back as judgements now ship too, and how that
+		// reasoning was wrong is worth recording, because it was wrong in one
+		// specific way: every reason given was a property of the SETTING --
+		// debug_mode arms a credential-holding pod, auto_merge reaches the
+		// repository, security_scan_enforcement is a governance gate -- and
+		// not one was a property of the CALLER.
+		//
+		// This server is not an authorization boundary. It carries the user's
+		// own token and the API applies RBAC identically whatever the client
+		// is, so a user RBAC permits reaches all four through curl, the
+		// provider or the UI, and a user RBAC forbids is refused at every
+		// door. Withholding a property therefore protected nobody. What it
+		// did do is let an agent READ a setting it could not SET, which is
+		// precisely the asymmetry this whole block exists to close.
+		//
+		// The measurement that settles it, had anyone drawn the conclusion:
+		// this same server already ships terrapod_policy_check_override,
+		// terrapod_run_security_scan_override and
+		// terrapod_run_ai_policy_override, every one annotated destructive. An
+		// agent could already defeat a MANDATORY policy check on a blocked run
+		// while being unable to edit that workspace's scan setting.
+		//
+		// So risk is signalled by ANNOTATION -- mutating, destructive -- never
+		// by absence. A reason that would apply equally to the UI, the provider
+		// and the API is an argument about the FEATURE and belongs on the
+		// feature, not a reason to omit it from one client.
 		//
 		// Pointers where the zero value is a real request (a false, a 0, an
 		// empty channel name); plain strings and slices where "" and nil mean
 		// "leave the stored value alone", matching the fields above.
+		AutoMerge                     *bool    `json:"auto_merge,omitempty" jsonschema:"merge the pull request once every workspace it affects has reached its required state. It fires through the VCS provider's own merge API, so the effect is on the REPOSITORY rather than on this workspace. Available in both vcs_workflow modes and most useful with apply_then_merge. Omit to leave the stored value alone"`
+		AutoMergeStrategy             string   `json:"auto_merge_strategy,omitempty" jsonschema:"how auto_merge merges: merge, squash or rebase. Only meaningful with auto_merge true. Omit to leave the stored value alone"`
+		DebugMode                     *bool    `json:"debug_mode,omitempty" jsonschema:"hold this workspace's FAILED runner pods open for inspection rather than letting them be cleaned up. The pod keeps the run's auth token and its decrypted tfvars for that window, so this trades an exposure window for debuggability; how long the window lasts is the deployment's call (runners.debugLingerSeconds), not the workspace's. Omit to leave the stored value alone"`
 		DriftDetectionEnabled         *bool    `json:"drift_detection_enabled,omitempty" jsonschema:"whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone"`
 		DriftDetectionIntervalSeconds *int64   `json:"drift_detection_interval_seconds,omitempty" jsonschema:"how often a drift check runs, in seconds; 86400 (daily) by default. Only meaningful with drift_detection_enabled true. Omit to leave the stored value alone"`
 		DriftIgnoreRules              []string `json:"drift_ignore_rules,omitempty" jsonschema:"resource addresses or attribute paths whose drift is not reported -- for the perpetual phantom diffs a provider produces on write-only attributes. Pass an empty list to remove every rule; omitting the field leaves the stored list alone"`
 		Parallelism                   int64    `json:"parallelism,omitempty" jsonschema:"the engine's -parallelism for this workspace's runs; 10 by default, which is the engine's own. Lower it for a provider that rate-limits; raising it rarely helps and can trip API quotas. Omit to leave the stored value alone"`
 		PlanExpirySeconds             *int64   `json:"plan_expiry_seconds,omitempty" jsonschema:"how long an apply-capable plan may wait for confirmation before it is expired; unset means never, which is the default. It does NOT expire speculative plans. Omit to leave the stored value alone"`
+		SecurityScanEnforcement       string   `json:"security_scan_enforcement,omitempty" jsonschema:"what a security-scan finding DOES: off (do not scan at all), advisory (report and let the run continue) or enforced (hold the apply until the finding is overridden). Distinct from security_scan_severity_threshold, which decides what is REPORTED rather than what blocks. A workspace whose engine produces no Terraform plan JSON -- a pulumi one -- accepts only off, because a scanner has nothing to read there. Omit to leave the stored value alone"`
 		SecurityScanEngine            string   `json:"security_scan_engine,omitempty" jsonschema:"which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone"`
-		SecurityScanSeverityThreshold string   `json:"security_scan_severity_threshold,omitempty" jsonschema:"the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone"`
+		SecurityScanSeverityThreshold string   `json:"security_scan_severity_threshold,omitempty" jsonschema:"the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- security_scan_enforcement is the separate setting that decides that. Omit to leave the stored value alone"`
 		SecurityScanSkipRules         []string `json:"security_scan_skip_rules,omitempty" jsonschema:"scanner rule ids this workspace does not report, as the scanner itself names them (e.g. CKV_AWS_18). Pass an empty list to remove every skip; omitting the field leaves the stored list alone"`
 		SlackChannel                  *string  `json:"slack_channel,omitempty" jsonschema:"the Slack channel this workspace's run notifications go to, overriding the deployment default. Pass an EMPTY STRING to drop back to the default; omitting the field leaves the stored value alone"`
 		TerragruntEnabled             *bool    `json:"terragrunt_enabled,omitempty" jsonschema:"run this workspace through terragrunt rather than the engine binary directly. Omit to leave the stored value alone"`
@@ -333,9 +357,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AIPolicyMode:     in.AIPolicyMode,
 			AISummaryMode:    in.AISummaryMode,
 			AISummaryContext: in.AISummaryContext,
-			// #2174's fourteen. The SDK already carried every one of these --
-			// the gap was only ever this tool -- so each is a straight pass
-			// through, typed to the SDK's own int64 so nothing needs converting.
+			// #2174's eighteen -- the fourteen it called wire plumbing plus the
+			// four it had reserved as judgements. The SDK already carried every
+			// one of these; the gap was only ever this tool, so each is a
+			// straight pass through, typed to the SDK's own int64 so nothing
+			// needs converting.
+			AutoMerge:                     in.AutoMerge,
+			AutoMergeStrategy:             in.AutoMergeStrategy,
+			DebugMode:                     in.DebugMode,
+			SecurityScanEnforcement:       in.SecurityScanEnforcement,
 			DriftDetectionEnabled:         in.DriftDetectionEnabled,
 			DriftDetectionIntervalSeconds: in.DriftDetectionIntervalSeconds,
 			DriftIgnoreRules:              in.DriftIgnoreRules,

@@ -175,13 +175,23 @@ API, the
 or the UI; use the tool for the single-row case, where a value is simply not
 wanted on plans, or not on applies either.
 
-**Four workspace attributes are deliberately not settable through MCP**, and their
-absence is a decision rather than an oversight: `debug-mode` arms a pod that holds
-the run's credentials and keeps it alive for inspection, `auto-merge` and
-`auto-merge-strategy` merge pull requests, and `security-scan-enforcement` is a
-governance gate. Each reaches outside the workspace's own configuration. They are
-readable with `terrapod_workspace_get` and settable through the API, the Terraform
-provider and the UI; whether an agent should hold them is argued on #2174.
+**Every settable workspace attribute is reachable from `terrapod_workspace_update`**,
+and that is deliberate rather than incidental. Four of them — `debug-mode`,
+`auto-merge`, `auto-merge-strategy` and `security-scan-enforcement` — were once
+withheld on the grounds that an agent flipping them has consequences beyond the
+workspace's own configuration. That reasoning does not survive the architecture:
+this server is **not an authorization boundary**. It carries your own token and
+the API applies RBAC identically whatever the client is, so anything your role
+permits you reach through `curl`, the Terraform provider or the UI regardless, and
+anything it forbids is refused at every door alike. Withholding a property
+protected nobody — it only let an agent read a setting it could not set, which is
+an invitation to describe a change it cannot make.
+
+Risk is therefore signalled by **annotation** — `readOnly`, `mutating`,
+`destructive` — never by absence, and a client that respects those annotations is
+what puts a human in front of a consequential call. If a setting should not be
+flipped by anyone, that is a question about the setting, and the answer belongs in
+RBAC or in the feature rather than in which clients can see it.
 
 ### Ground (read-only) — write correct config against *your* estate
 

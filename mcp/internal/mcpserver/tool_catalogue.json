@@ -1567,6 +1567,17 @@
             "boolean"
           ]
         },
+        "auto_merge": {
+          "description": "merge the pull request once every workspace it affects has reached its required state. It fires through the VCS provider's own merge API, so the effect is on the REPOSITORY rather than on this workspace. Available in both vcs_workflow modes and most useful with apply_then_merge. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "auto_merge_strategy": {
+          "description": "how auto_merge merges: merge, squash or rebase. Only meaningful with auto_merge true. Omit to leave the stored value alone",
+          "type": "string"
+        },
         "config_directory": {
           "description": "the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories",
           "type": [
@@ -1590,6 +1601,13 @@
         },
         "configure_enabled": {
           "description": "turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "debug_mode": {
+          "description": "hold this workspace's FAILED runner pods open for inspection rather than letting them be cleaned up. The pod keeps the run's auth token and its decrypted tfvars for that window, so this trades an exposure window for debuggability; how long the window lasts is the deployment's call (runners.debugLingerSeconds), not the workspace's. Omit to leave the stored value alone",
           "type": [
             "null",
             "boolean"
@@ -1720,12 +1738,16 @@
           "description": "memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu",
           "type": "string"
         },
+        "security_scan_enforcement": {
+          "description": "what a security-scan finding DOES: off (do not scan at all), advisory (report and let the run continue) or enforced (hold the apply until the finding is overridden). Distinct from security_scan_severity_threshold, which decides what is REPORTED rather than what blocks. A workspace whose engine produces no Terraform plan JSON -- a pulumi one -- accepts only off, because a scanner has nothing to read there. Omit to leave the stored value alone",
+          "type": "string"
+        },
         "security_scan_engine": {
           "description": "which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone",
           "type": "string"
         },
         "security_scan_severity_threshold": {
-          "description": "the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone",
+          "description": "the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- security_scan_enforcement is the separate setting that decides that. Omit to leave the stored value alone",
           "type": "string"
         },
         "security_scan_skip_rules": {
