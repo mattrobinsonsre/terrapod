@@ -11,6 +11,30 @@ from terrapod.api.rate_limit import RateLimitMiddleware, _get_client_ip, _is_aut
 from terrapod.auth.runner_tokens import generate_runner_token
 
 
+def _without_window(key: str) -> str:
+    """A rate-limit key with its trailing window id dropped.
+
+    The limiter addresses a bucket as `tp:ratelimit:<tier>:<identity>:<window>`
+    with `window_id = int(time.time()) // 60`, so two requests either side of a
+    minute boundary carry different windows while addressing the same bucket.
+
+    Every "these two requests share a bucket" test below issues two sequential
+    requests, so comparing whole keys made all four a flake on the second hand.
+    It fired on `main` (run 40937448723, 2026-10-29) as a one-digit difference in
+    the window with the identity hash byte-identical -- which is the proof that
+    the window, not the bucketing, was what moved.
+
+    Freezing the clock would preserve whole-key equality, but a boundary is
+    intrinsic to a window of any size, so no width makes the comparison safe. The
+    identity is the property these tests assert; the window is merely which
+    minute the clock was in, derived the same way for every caller. A key that is
+    not window-suffixed fails rather than comparing equal by accident.
+    """
+    head, sep, window = key.rpartition(":")
+    assert sep and head and window.isdigit(), f"not a window-suffixed key: {key!r}"
+    return head
+
+
 class TestHelpers:
     def test_is_auth_path(self):
         assert _is_auth_path("/api/terrapod/v1/auth/login") is True
@@ -344,8 +368,9 @@ class TestCredentialBucketing:
             for c in mock_redis.pipeline.return_value.incr.call_args_list
             if ":churn:" not in c.args[0]
         ]
-        # Same token → same bucket (minus the time-window suffix, which is equal here).
-        assert keys[0] == keys[1]
+        # Same token -> same bucket. The window suffix is dropped rather than
+        # assumed equal: see _without_window.
+        assert _without_window(keys[0]) == _without_window(keys[1]), keys
 
 
 class TestForwardedForIsOnlyBelievedFromATrustedProxy:
@@ -467,7 +492,7 @@ class TestTheLoginTierIsKeyedOnTheSourceAlone:
 
         keys = self._bucket_keys(mock_redis)
         assert len(keys) == 2
-        assert keys[0] == keys[1], (
+        assert _without_window(keys[0]) == _without_window(keys[1]), (
             "a different bearer per attempt minted a different login bucket, so the "
             f"login limit never applies: {keys}"
         )
@@ -486,7 +511,7 @@ class TestTheLoginTierIsKeyedOnTheSourceAlone:
         client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer ANY"})
 
         keys = self._bucket_keys(mock_redis)
-        assert keys[0] == keys[1], keys
+        assert _without_window(keys[0]) == _without_window(keys[1]), keys
 
     def test_the_authenticated_tier_still_buckets_per_credential(self):
         """The #1075 fix must survive: this narrows the login tier only."""
@@ -654,7 +679,7 @@ class TestCapabilityBucketing:
         client.get("/api/v2/applies/run-SAME/log")
         client.get("/api/v2/applies/run-SAME/log")
         keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
-        assert keys[0] == keys[1]
+        assert _without_window(keys[0]) == _without_window(keys[1]), keys
 
     def test_capability_tier_uses_authenticated_limit(self):
         # The capability reader gets the generous authenticated limit, not the
