@@ -79,10 +79,7 @@ def load(directory: pathlib.Path) -> dict[str, list[dict]]:
 # Prose kept out of the list literals below: a wrapped string sitting next to a
 # comma-separated sibling is indistinguishable from a missing comma, both to a
 # reader and to static analysis (CodeQL py/implicit-string-concatenation-in-list).
-_RAISED_BY = (
-    "raised automatically by the release re-scan "
-    "(`.github/workflows/release-rescan.yml`)."
-)
+_RAISED_BY = "raised automatically by the release re-scan (`.github/workflows/release-rescan.yml`)."
 _DRAFT_NOTE = (
     "This is a **draft**, and it stays one. Publishing a repository advisory is "
     "irreversible — GitHub refuses to close a published advisory — so this is "
@@ -181,9 +178,7 @@ def main() -> int:
 
     _, existing = _request("GET", f"{API}/repos/{repo}/security-advisories?per_page=100", token)
     drafts = {
-        a["summary"]: a
-        for a in (existing or [])
-        if a.get("state") == "draft" and a.get("summary")
+        a["summary"]: a for a in (existing or []) if a.get("state") == "draft" and a.get("summary")
     }
 
     urls: dict[str, str] = {}
@@ -198,9 +193,8 @@ def main() -> int:
             "description": describe(release, findings, code),
             # A package entry is required even when only code findings exist,
             # so name the release itself rather than inventing a package.
-            "vulnerabilities": vulnerabilities(findings) or [
-                {"package": {"ecosystem": "other", "name": f"terrapod {release}"}}
-            ],
+            "vulnerabilities": vulnerabilities(findings)
+            or [{"package": {"ecosystem": "other", "name": f"terrapod {release}"}}],
             "severity": "high",
         }
         if summary in drafts:
@@ -210,9 +204,7 @@ def main() -> int:
             )
             print(f"{release}: refreshed draft {ghsa}")
         else:
-            _, adv = _request(
-                "POST", f"{API}/repos/{repo}/security-advisories", token, payload
-            )
+            _, adv = _request("POST", f"{API}/repos/{repo}/security-advisories", token, payload)
             print(f"{release}: created draft {adv.get('ghsa_id')}")
         urls[release] = adv.get("html_url", "")
 

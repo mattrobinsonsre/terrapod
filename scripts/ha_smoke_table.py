@@ -95,8 +95,9 @@ def scale(ns: str, replicas: int) -> None:
         _k("-n", ns, "rollout", "status", f"deploy/{REL[ns]}-api", "--timeout=180s")
     else:
         for _ in range(30):
-            if not _k("-n", ns, "get", "pod", "-l",
-                      "app.kubernetes.io/component=api", "-o", "name").strip():
+            if not _k(
+                "-n", ns, "get", "pod", "-l", "app.kubernetes.io/component=api", "-o", "name"
+            ).strip():
                 return
             time.sleep(2)
 
@@ -109,9 +110,23 @@ def _helm(ns: str, *overrides: str, timeout: str = "8m") -> None:
     had failed — which is no use at 03:00 or in a table run.
     """
     out = subprocess.run(
-        ["helm", "--kube-context", CTX, "upgrade", REL[ns], "helm/terrapod",
-         "-n", ns, "-f", f"helm/terrapod/values-ha-{ns[-1]}.yaml",
-         *overrides, "--reuse-values", "--wait", "--timeout", timeout],
+        [
+            "helm",
+            "--kube-context",
+            CTX,
+            "upgrade",
+            REL[ns],
+            "helm/terrapod",
+            "-n",
+            ns,
+            "-f",
+            f"helm/terrapod/values-ha-{ns[-1]}.yaml",
+            *overrides,
+            "--reuse-values",
+            "--wait",
+            "--timeout",
+            timeout,
+        ],
         capture_output=True,
         text=True,
         check=False,  # deliberate -- see the docstring: helm's own stderr is the error
@@ -146,8 +161,14 @@ def set_role_and_listener(ns: str, *, role: str, api_url: str) -> None:
     and on this single-node cluster the outgoing one has to finish terminating
     before the new one can schedule. Hence the longer timeout.
     """
-    _helm(ns, "--set", f"api.config.ha.role={role}", "--set", f"listener.apiUrl={api_url}",
-          timeout="10m")
+    _helm(
+        ns,
+        "--set",
+        f"api.config.ha.role={role}",
+        "--set",
+        f"listener.apiUrl={api_url}",
+        timeout="10m",
+    )
 
 
 def record(row: str, name: str, verdict: str, detail: str = "") -> None:
@@ -175,8 +196,11 @@ def sees_ws(name: str) -> str:
 def row_2_deltas(stamp: str) -> None:
     name = f"ha-delta-{stamp}"
     make_ws(NS_A, name)
-    record("2", "Change settings on A → delta replication",
-           "PASS" if poll(NS_B, sees_ws(name)) else "FAIL")
+    record(
+        "2",
+        "Change settings on A → delta replication",
+        "PASS" if poll(NS_B, sees_ws(name)) else "FAIL",
+    )
 
 
 def row_1_backfill(stamp: str) -> None:
@@ -184,11 +208,17 @@ def row_1_backfill(stamp: str) -> None:
     name = f"ha-backfill-{stamp}"
     make_ws(NS_A, name)
     poll(NS_B, sees_ws(name))
-    run(NS_B, "await db.execute(delete(m.Workspace))\n"
-              "await db.execute(delete(m.ReplicationCursor))\n"
-              "await db.commit()")
-    record("1", "Bring up B against a populated A → backfill from empty",
-           "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL")
+    run(
+        NS_B,
+        "await db.execute(delete(m.Workspace))\n"
+        "await db.execute(delete(m.ReplicationCursor))\n"
+        "await db.commit()",
+    )
+    record(
+        "1",
+        "Bring up B against a populated A → backfill from empty",
+        "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL",
+    )
 
 
 def row_3_brief_outage(stamp: str) -> None:
@@ -196,8 +226,11 @@ def row_3_brief_outage(stamp: str) -> None:
     scale(NS_B, 0)
     make_ws(NS_A, name)
     scale(NS_B, 1)
-    record("3", "B down briefly, then back → catch-up inside retention",
-           "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL")
+    record(
+        "3",
+        "B down briefly, then back → catch-up inside retention",
+        "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL",
+    )
 
 
 def row_4_past_retention(stamp: str) -> None:
@@ -206,14 +239,20 @@ def row_4_past_retention(stamp: str) -> None:
     name = f"ha-stale-{stamp}"
     scale(NS_B, 0)
     make_ws(NS_A, name)
-    run(NS_A, "newest = await db.scalar(select(func.max(m.ReplicationEvent.id)))\n"
-              "await db.execute(delete(m.ReplicationEvent)"
-              ".where(m.ReplicationEvent.id < newest))\n"
-              "await db.commit()\n"
-              "print('purged below', newest)")
+    run(
+        NS_A,
+        "newest = await db.scalar(select(func.max(m.ReplicationEvent.id)))\n"
+        "await db.execute(delete(m.ReplicationEvent)"
+        ".where(m.ReplicationEvent.id < newest))\n"
+        "await db.commit()\n"
+        "print('purged below', newest)",
+    )
     scale(NS_B, 1)
-    record("4", "B down past retention → automatic fallback to backfill",
-           "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL")
+    record(
+        "4",
+        "B down past retention → automatic fallback to backfill",
+        "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL",
+    )
 
 
 def row_5_peer_outage(stamp: str) -> None:
@@ -224,9 +263,12 @@ def row_5_peer_outage(stamp: str) -> None:
         wrote = "OK" in run(NS_A, sees_ws(name), check=False)
     finally:
         scale(NS_B, 1)
-    record("5", "Kill B entirely; write on A → a peer outage never blocks the leader",
-           "PASS" if wrote else "FAIL",
-           "" if wrote else "the leader refused a write while its peer was down")
+    record(
+        "5",
+        "Kill B entirely; write on A → a peer outage never blocks the leader",
+        "PASS" if wrote else "FAIL",
+        "" if wrote else "the leader refused a write while its peer was down",
+    )
 
 
 def row_8_follower_inert(stamp: str) -> None:
@@ -235,19 +277,33 @@ def row_8_follower_inert(stamp: str) -> None:
     A token minted on the leader replicates, so it is genuinely valid on the
     follower; the refusal must come from leadership, not from auth.
     """
-    token = run(NS_A, """
+    token = (
+        run(
+            NS_A,
+            """
 from terrapod.auth import api_tokens
 raw = await api_tokens.create_api_token(
     db, bound_to='admin', created_by='admin', kind='interactive',
     identity_provider='local', lifespan_hours=2)
 await db.commit()
 print('TOKEN', raw[1])
-""").split("TOKEN ")[-1].strip()
+""",
+        )
+        .split("TOKEN ")[-1]
+        .strip()
+    )
 
-    if not poll(NS_B, "n = await db.scalar(select(func.count()).select_from(m.APIToken))\n"
-                      "print('OK' if n else 'no')"):
-        record("8", "Follower is inert at the write layer", "FAIL",
-               "the token never replicated, so the refusal could not be attributed")
+    if not poll(
+        NS_B,
+        "n = await db.scalar(select(func.count()).select_from(m.APIToken))\n"
+        "print('OK' if n else 'no')",
+    ):
+        record(
+            "8",
+            "Follower is inert at the write layer",
+            "FAIL",
+            "the token never replicated, so the refusal could not be attributed",
+        )
         return
 
     body = f"""
@@ -265,9 +321,12 @@ print('STATUS', r.status_code, r.text[:300])
     status = out.split("STATUS ")[-1].split()[0]
     created = "OK" in run(NS_B, sees_ws(f"ha-inert-{stamp}"), check=False)
     ok = status not in ("200", "201") and not created
-    record("8", "Follower refuses a write through the real API path",
-           "PASS" if ok else "FAIL",
-           f"HTTP {status}" + (", and the row was NOT created" if ok else ", but the write LANDED"))
+    record(
+        "8",
+        "Follower refuses a write through the real API path",
+        "PASS" if ok else "FAIL",
+        f"HTTP {status}" + (", and the row was NOT created" if ok else ", but the write LANDED"),
+    )
 
 
 def row_11_sensitive(stamp: str) -> None:
@@ -275,14 +334,17 @@ def row_11_sensitive(stamp: str) -> None:
     the round trip, not just the ciphertext, is what has to survive."""
     ws = f"ha-sens-{stamp}"
     secret = f"s3cr3t-{stamp}"
-    run(NS_A, f"""
+    run(
+        NS_A,
+        f"""
 ws = m.Workspace(name='{ws}')
 db.add(ws)
 await db.flush()
 db.add(m.Variable(workspace_id=ws.id, key='tok', value='{secret}',
                   category='terraform', sensitive=True))
 await db.commit()
-""")
+""",
+    )
     body = f"""
 ws = await db.scalar(select(m.Workspace).where(m.Workspace.name == '{ws}'))
 if ws is None:
@@ -291,23 +353,34 @@ else:
     v = await db.scalar(select(m.Variable).where(m.Variable.workspace_id == ws.id))
     print('OK' if v is not None and v.value == '{secret}' else 'no')
 """
-    record("11", "Sensitive variable round-trips decrypt-on-send / re-encrypt-on-receive",
-           "PASS" if poll(NS_B, body) else "FAIL")
+    record(
+        "11",
+        "Sensitive variable round-trips decrypt-on-send / re-encrypt-on-receive",
+        "PASS" if poll(NS_B, body) else "FAIL",
+    )
 
 
 def row_12_token(stamp: str) -> None:
-    ok = poll(NS_B, "n = await db.scalar(select(func.count()).select_from(m.APIToken))\n"
-                    "print('OK' if n else 'no')")
-    record("12", "A terraform login token works against the promoted node",
-           "PASS" if ok else "FAIL",
-           "verified as replication of the token; the HTTP use is row 8's path")
+    ok = poll(
+        NS_B,
+        "n = await db.scalar(select(func.count()).select_from(m.APIToken))\n"
+        "print('OK' if n else 'no')",
+    )
+    record(
+        "12",
+        "A terraform login token works against the promoted node",
+        "PASS" if ok else "FAIL",
+        "verified as replication of the token; the HTTP use is row 8's path",
+    )
 
 
 def row_14_stale_runs(stamp: str) -> None:
     """The most dangerous path in the design: a promoted node holding frozen run
     rows must ERROR them, not let an unbounded periodic task act on them."""
     ws = f"ha-staleruns-{stamp}"
-    run(NS_B, f"""
+    run(
+        NS_B,
+        f"""
 ws = m.Workspace(name='{ws}')
 db.add(ws)
 await db.flush()
@@ -315,18 +388,27 @@ db.add(m.Run(workspace_id=ws.id, status='planning', message='frozen',
              source='autodiscovery-lifecycle', is_destroy=True))
 await db.commit()
 print('seeded')
-""")
-    out = run(NS_B, """
+""",
+    )
+    out = run(
+        NS_B,
+        """
 from terrapod.services import ha_role
 await ha_role._retire_runs_on_role_change(previous='follower', role='leader')
 await db.commit()
 rows = (await db.execute(select(m.Run.status))).scalars().all()
 print('STATUSES', sorted(set(rows)))
-""")
-    left_running = "planning" in out.split("STATUSES")[-1] or "applying" in out.split("STATUSES")[-1]
-    record("14", "Promotion errors stale runs instead of queuing destroys",
-           "FAIL" if left_running else "PASS",
-           out.split("STATUSES")[-1].strip())
+""",
+    )
+    left_running = (
+        "planning" in out.split("STATUSES")[-1] or "applying" in out.split("STATUSES")[-1]
+    )
+    record(
+        "14",
+        "Promotion errors stale runs instead of queuing destroys",
+        "FAIL" if left_running else "PASS",
+        out.split("STATUSES")[-1].strip(),
+    )
 
 
 def row_6_planned_failover(stamp: str) -> None:
@@ -335,8 +417,7 @@ def row_6_planned_failover(stamp: str) -> None:
     set_role(NS_A, "follower")
     make_ws(NS_B, name)
     ok = poll(NS_A, sees_ws(name), tries=30)
-    record("6", "Quiesce A, move the name → B leads (planned failover)",
-           "PASS" if ok else "FAIL")
+    record("6", "Quiesce A, move the name → B leads (planned failover)", "PASS" if ok else "FAIL")
 
 
 def row_7_unplanned_failover(stamp: str) -> None:
@@ -349,8 +430,7 @@ def row_7_unplanned_failover(stamp: str) -> None:
         ok = "OK" in run(NS_B, sees_ws(name), check=False)
     finally:
         scale(NS_A, 1)
-    record("7", "Kill A, move the name → unplanned failover",
-           "PASS" if ok else "FAIL")
+    record("7", "Kill A, move the name → unplanned failover", "PASS" if ok else "FAIL")
 
 
 def reset_roles() -> None:
@@ -363,8 +443,11 @@ def restore(stamp: str) -> None:
     reset_roles()
     name = f"ha-failback-{stamp}"
     make_ws(NS_A, name)
-    record("6b", "Fail back to A and re-converge",
-           "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL")
+    record(
+        "6b",
+        "Fail back to A and re-converge",
+        "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL",
+    )
 
 
 def _listener_names(ns: str) -> list[str]:
@@ -411,11 +494,21 @@ def _delete_pinned_jobs() -> None:
     cutover.
     """
     for ns in (NS_A, NS_B):
-        names = _k("-n", ns, "get", "job", "-o",
-                   "jsonpath={.items[*].metadata.name}", check=False).split()
+        names = _k(
+            "-n", ns, "get", "job", "-o", "jsonpath={.items[*].metadata.name}", check=False
+        ).split()
         for name in names:
-            pending = _k("-n", ns, "get", "pod", "--selector", f"job-name={name}",
-                         "-o", "jsonpath={.items[*].status.phase}", check=False)
+            pending = _k(
+                "-n",
+                ns,
+                "get",
+                "pod",
+                "--selector",
+                f"job-name={name}",
+                "-o",
+                "jsonpath={.items[*].status.phase}",
+                check=False,
+            )
             if "Pending" in pending:
                 _k("-n", ns, "delete", "job", name, "--ignore-not-found", check=False)
 
@@ -463,13 +556,19 @@ row = await db.scalar(select(m.Run).join(m.Workspace)
 print('OK' if row is not None and row.status == 'planning' and row.job_name else 'no')
 """
     if not poll(NS_A, claimed, tries=15, delay=2.0):
-        record("9", "Cut over mid-run", "FAIL",
-               "no listener claimed the run, so there was nothing in flight to cut over")
+        record(
+            "9",
+            "Cut over mid-run",
+            "FAIL",
+            "no listener claimed the run, so there was nothing in flight to cut over",
+        )
         return
 
     set_role(NS_A, "follower")
 
-    verdict = run(NS_A, f"""
+    verdict = run(
+        NS_A,
+        f"""
 row = await db.scalar(select(m.Run).join(m.Workspace)
                       .where(m.Workspace.name == '{ws}')
                       .order_by(m.Run.created_at.desc()).limit(1))
@@ -479,7 +578,8 @@ print('VERDICT', json.dumps({{
     'by_role_change': 'role changed' in (row.error_message or ''),
     'workspace_locked': bool(wsrow.locked),
 }}))
-""")
+""",
+    )
     state = json.loads(verdict.split("VERDICT ")[-1].splitlines()[0])
     retired = state["status"] == "errored" and state["by_role_change"]
 
@@ -490,7 +590,9 @@ print('VERDICT', json.dumps({{
     # fleet is the per-node-fleet cutover step, not a workaround.
     set_role(NS_B, "leader")
     poll(NS_B, sees_ws(ws), tries=30)
-    run(NS_B, f"""
+    run(
+        NS_B,
+        f"""
 wsrow = await db.scalar(select(m.Workspace).where(m.Workspace.name == '{ws}'))
 wsrow.resource_cpu = '1'
 ids = [str(p.id) for p in (await db.execute(select(m.AgentPool))).scalars().all()]
@@ -500,23 +602,37 @@ run_row = await run_service.create_run(db, wsrow, message='row 9 requeue')
 await run_service.queue_run(db, run_row)
 await db.commit()
 print('REQUEUED', run_row.id)
-""", check=False)
-    requeued = poll(NS_B, f"""
+""",
+        check=False,
+    )
+    requeued = poll(
+        NS_B,
+        f"""
 row = await db.scalar(select(m.Run).join(m.Workspace)
                       .where(m.Workspace.name == '{ws}', m.Run.message == 'row 9 requeue')
                       .order_by(m.Run.created_at.desc()).limit(1))
 print('OK' if row is not None and row.status in ('planning', 'planned', 'errored') else 'no')
-""", tries=20, delay=3.0)
+""",
+        tries=20,
+        delay=3.0,
+    )
 
     _delete_pinned_jobs()
 
     ok = retired and not state["workspace_locked"] and requeued
-    record("9", "Cut over mid-run", "PASS" if ok else "FAIL",
-           f"in-flight run → {state['status']}"
-           + (" by the role change" if state["by_role_change"] else " by something else")
-           + (", workspace not locked" if not state["workspace_locked"] else ", WORKSPACE LEFT LOCKED")
-           + (", re-queue dispatched on the promoted node" if requeued
-              else ", RE-QUEUE NEVER DISPATCHED"))
+    record(
+        "9",
+        "Cut over mid-run",
+        "PASS" if ok else "FAIL",
+        f"in-flight run → {state['status']}"
+        + (" by the role change" if state["by_role_change"] else " by something else")
+        + (", workspace not locked" if not state["workspace_locked"] else ", WORKSPACE LEFT LOCKED")
+        + (
+            ", re-queue dispatched on the promoted node"
+            if requeued
+            else ", RE-QUEUE NEVER DISPATCHED"
+        ),
+    )
 
 
 _SHARED_SVC = "terrapod-shared-api"
@@ -541,7 +657,10 @@ spec:
 """
     subprocess.run(
         ["kubectl", "--context", CTX, "apply", "-f", "-"],
-        input=manifest, text=True, check=True, capture_output=True,
+        input=manifest,
+        text=True,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -559,14 +678,21 @@ def row_10_listener_topologies(stamp: str) -> None:
     reset_roles()
     per_node = _listener_names(NS_A)
     if not per_node:
-        record("10", "Cut over with each listener topology", "FAIL",
-               "node A's own fleet is not registered, so neither topology can be judged")
+        record(
+            "10",
+            "Cut over with each listener topology",
+            "FAIL",
+            "node A's own fleet is not registered, so neither topology can be judged",
+        )
         return
 
-    before = run(NS_B, """
+    before = run(
+        NS_B,
+        """
 tok = await db.scalar(select(m.AgentPoolToken).order_by(m.AgentPoolToken.created_at))
 print('USES', tok.use_count if tok else -1)
-""")
+""",
+    )
     uses_before = int(before.split("USES ")[-1].splitlines()[0])
 
     # Establish the shared-fleet topology *before* the cutover, because that is
@@ -594,10 +720,13 @@ print('USES', tok.use_count if tok else -1)
                 break
             time.sleep(6)
 
-        after = run(NS_B, """
+        after = run(
+            NS_B,
+            """
 tok = await db.scalar(select(m.AgentPoolToken).order_by(m.AgentPoolToken.created_at))
 print('USES', tok.use_count if tok else -1)
-""")
+""",
+        )
         uses_after = int(after.split("USES ")[-1].splitlines()[0])
     finally:
         # Undo only what this row changed. The roles are put back by main(),
@@ -607,10 +736,14 @@ print('USES', tok.use_count if tok else -1)
         _point_shared_name_at(NS_A)
 
     ok = rejoined and uses_after > uses_before
-    record("10", "Cut over with each listener topology", "PASS" if ok else "FAIL",
-           "per-node fleet claimed row 9's run; shared fleet "
-           + ("re-joined the promoted node unattended" if rejoined else "NEVER RE-JOINED")
-           + f", token use_count {uses_before}→{uses_after}")
+    record(
+        "10",
+        "Cut over with each listener topology",
+        "PASS" if ok else "FAIL",
+        "per-node fleet claimed row 9's run; shared fleet "
+        + ("re-joined the promoted node unattended" if rejoined else "NEVER RE-JOINED")
+        + f", token use_count {uses_before}→{uses_after}",
+    )
 
 
 _PUBLIC_HOST = "terrapod.example.com"
@@ -621,7 +754,9 @@ _MODULE = ("default", "hagate", "null")
 def _publish_module(ns: str, version: str = "1.0.0") -> bool:
     """Publish a tiny module version on this node: rows plus tarball."""
     namespace, name, provider = _MODULE
-    out = run(ns, f"""
+    out = run(
+        ns,
+        f"""
 import io, tarfile
 from terrapod.storage import init_storage, get_storage
 from terrapod.storage.keys import module_tarball_key
@@ -653,7 +788,9 @@ await get_storage().put(
 ver.upload_status = 'uploaded'
 await db.commit()
 print('PUBLISHED', mod.id)
-""", check=False)
+""",
+        check=False,
+    )
     return "PUBLISHED" in out
 
 
@@ -676,11 +813,17 @@ def row_13_install_from_promoted(stamp: str) -> None:
     reset_roles()
     namespace, name, provider = _MODULE
     if not _publish_module(NS_A):
-        record("13", "terraform init against a private module on the promoted node",
-               "FAIL", "could not publish the module on node A")
+        record(
+            "13",
+            "terraform init against a private module on the promoted node",
+            "FAIL",
+            "could not publish the module on node A",
+        )
         return
 
-    replicated = poll(NS_B, f"""
+    replicated = poll(
+        NS_B,
+        f"""
 mod = await db.scalar(select(m.RegistryModule).where(m.RegistryModule.name == '{name}'))
 if mod is None:
     print('no')
@@ -689,10 +832,16 @@ else:
         m.RegistryModuleVersion.module_id == mod.id,
         m.RegistryModuleVersion.upload_status == 'uploaded'))
     print('OK' if v else 'no')
-""", tries=30)
+""",
+        tries=30,
+    )
     if not replicated:
-        record("13", "terraform init against a private module on the promoted node",
-               "FAIL", "the module never replicated to B, so the install could not be attempted")
+        record(
+            "13",
+            "terraform init against a private module on the promoted node",
+            "FAIL",
+            "the module never replicated to B, so the install could not be attempted",
+        )
         return
 
     # Promote B and consume the module from it. The blob has to be there too —
@@ -704,9 +853,11 @@ else:
         f'module "m" {{\n'
         f'  source  = "{_PUBLIC_HOST}/{namespace}/{name}/{provider}"\n'
         f'  version = "1.0.0"\n'
-        f'}}\n'
+        f"}}\n"
     )
-    started = run(NS_B, f"""
+    started = run(
+        NS_B,
+        f"""
 import io, tarfile
 from terrapod.storage import init_storage, get_storage
 from terrapod.storage.keys import config_version_key
@@ -731,26 +882,41 @@ run_row = await run_service.create_run(db, ws, message='row 13',
 await run_service.queue_run(db, run_row)
 await db.commit()
 print('QUEUED', run_row.id)
-""", check=False)
+""",
+        check=False,
+    )
     if "QUEUED" not in started:
-        record("13", "terraform init against a private module on the promoted node",
-               "FAIL", "could not queue the run on the promoted node")
+        record(
+            "13",
+            "terraform init against a private module on the promoted node",
+            "FAIL",
+            "could not queue the run on the promoted node",
+        )
         return
 
-    settled = poll(NS_B, f"""
+    settled = poll(
+        NS_B,
+        f"""
 row = await db.scalar(select(m.Run).join(m.Workspace)
                       .where(m.Workspace.name == '{ws}')
                       .order_by(m.Run.created_at.desc()).limit(1))
 print('OK' if row is not None and row.status in ('planned', 'errored') else 'no')
-""", tries=40, delay=6.0)
+""",
+        tries=40,
+        delay=6.0,
+    )
 
-    verdict = run(NS_B, f"""
+    verdict = run(
+        NS_B,
+        f"""
 row = await db.scalar(select(m.Run).join(m.Workspace)
                       .where(m.Workspace.name == '{ws}')
                       .order_by(m.Run.created_at.desc()).limit(1))
 print('VERDICT', json.dumps({{'status': row.status if row else 'missing',
                              'error': (row.error_message or '')[:200] if row else ''}}))
-""", check=False)
+""",
+        check=False,
+    )
     try:
         state = json.loads(verdict.split("VERDICT ")[-1].splitlines()[0])
     except (ValueError, IndexError):
@@ -761,11 +927,14 @@ print('VERDICT', json.dumps({{'status': row.status if row else 'missing',
     # it proves the install; anything else is reported with the run's own error
     # rather than guessed at.
     ok = settled and state["status"] == "planned"
-    record("13", "terraform init against a private module on the promoted node",
-           "PASS" if ok else "FAIL",
-           f"run {state['status']} on the promoted node"
-           + (f" — {state['error']}" if state["error"] else "")
-           + ("" if settled else " (never reached a terminal state)"))
+    record(
+        "13",
+        "terraform init against a private module on the promoted node",
+        "PASS" if ok else "FAIL",
+        f"run {state['status']} on the promoted node"
+        + (f" — {state['error']}" if state["error"] else "")
+        + ("" if settled else " (never reached a terminal state)"),
+    )
 
 
 # Every row, in the order the table runs them. Named so a single row can be

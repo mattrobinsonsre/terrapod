@@ -129,9 +129,7 @@ def _tracked() -> list[str]:
     ).stdout.split()
     mine = pathlib.Path(__file__).resolve()
     return [
-        f
-        for f in out
-        if (f.endswith(SUFFIXES) or f == "llms.txt") and (ROOT / f).resolve() != mine
+        f for f in out if (f.endswith(SUFFIXES) or f == "llms.txt") and (ROOT / f).resolve() != mine
     ]
 
 
@@ -151,9 +149,7 @@ def _mechanism_pattern() -> re.Pattern[str]:
         )
         raise SystemExit(1)
     # The mechanism may be stated as the placeholder itself, or in words.
-    return re.compile(
-        r"\$\{terrapod:|credential's \*{0,2}name|credential's NAME", re.IGNORECASE
-    )
+    return re.compile(r"\$\{terrapod:|credential's \*{0,2}name|credential's NAME", re.IGNORECASE)
 
 
 def main() -> int:
@@ -179,9 +175,7 @@ def main() -> int:
             sites += 1
             if mechanism.search(para):
                 continue
-            line = next(
-                (ln for ln in para.splitlines() if SUBJECT.search(ln)), para[:120]
-            )
+            line = next((ln for ln in para.splitlines() if SUBJECT.search(ln)), para[:120])
             problems.append(
                 f"{rel}: describes a machine credential's `key` without the mechanism "
                 f"(the ${{terrapod:<name>.<field>}} placeholder, or that `key` is the "
@@ -239,9 +233,7 @@ def main() -> int:
         )
         return 1
 
-    print(
-        f"OK — {sites} sites describe a machine credential's `key`, all with the mechanism"
-    )
+    print(f"OK — {sites} sites describe a machine credential's `key`, all with the mechanism")
     return 0
 
 

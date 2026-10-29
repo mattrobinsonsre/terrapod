@@ -60,9 +60,7 @@ def _build_module() -> None:
 
     STATE["mod"] = mod.encode()
     STATE["zip"] = buf.getvalue()
-    STATE["info"] = json.dumps(
-        {"Version": VERSION, "Time": "2026-01-01T00:00:00Z"}
-    ).encode()
+    STATE["info"] = json.dumps({"Version": VERSION, "Time": "2026-01-01T00:00:00Z"}).encode()
     STATE["list"] = f"{VERSION}\n".encode()
 
 
@@ -116,12 +114,8 @@ def main() -> int:
     time.sleep(0.3)
 
     work = pathlib.Path(tempfile.mkdtemp(prefix="goproxy-capture-"))
-    (work / "go.mod").write_text(
-        f"module consumer\n\ngo 1.21\n\nrequire {MODULE} {VERSION}\n"
-    )
-    (work / "main.go").write_text(
-        f'package main\n\nimport _ "{MODULE}"\n\nfunc main() {{}}\n'
-    )
+    (work / "go.mod").write_text(f"module consumer\n\ngo 1.21\n\nrequire {MODULE} {VERSION}\n")
+    (work / "main.go").write_text(f'package main\n\nimport _ "{MODULE}"\n\nfunc main() {{}}\n')
 
     env = {
         **os.environ,

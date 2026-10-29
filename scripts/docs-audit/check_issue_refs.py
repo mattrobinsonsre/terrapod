@@ -56,7 +56,10 @@ def refs() -> dict[int, list[str]]:
     out: dict[int, list[str]] = {}
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     for f in files:
         p = ROOT / f

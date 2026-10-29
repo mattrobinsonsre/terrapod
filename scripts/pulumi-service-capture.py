@@ -87,9 +87,7 @@ def _stack_route(method: str, key: str, tail: str):
     # The service is the stack's secrets provider in httpstate mode.
     if tail == "encrypt":
         return 200, {
-            "ciphertext": base64.b64encode(
-                b"enc:" + BODY.get("plaintext", "").encode()
-            ).decode()
+            "ciphertext": base64.b64encode(b"enc:" + BODY.get("plaintext", "").encode()).decode()
         }
     if tail == "decrypt":
         raw = base64.b64decode(BODY.get("ciphertext", "")).decode("utf-8", "replace")
@@ -102,10 +100,7 @@ def _stack_route(method: str, key: str, tail: str):
             ]
         }
 
-    if (
-        tail in ("preview", "update", "refresh", "destroy", "import")
-        and method == "POST"
-    ):
+    if tail in ("preview", "update", "refresh", "destroy", "import") and method == "POST":
         return 200, {"updateID": "u1", "requiredPolicies": []}
 
     seg = tail.split("/")
@@ -302,9 +297,7 @@ def main() -> int:
     work = pathlib.Path(tempfile.mkdtemp(prefix="pulumi-svc-capture-"))
     proj = work / "proj"
     proj.mkdir()
-    (proj / "Pulumi.yaml").write_text(
-        "name: proj\nruntime: python\ndescription: capture\n"
-    )
+    (proj / "Pulumi.yaml").write_text("name: proj\nruntime: python\ndescription: capture\n")
     (proj / "__main__.py").write_text(PROGRAM)
     (work / "run.sh").write_text(SCRIPT)
 
@@ -354,9 +347,7 @@ def main() -> int:
         print(f"  {method:6s} {path:56s} x{d['n']:<3} auth={auth:13s} enc={enc}")
 
     shutil.rmtree(work, ignore_errors=True)
-    print(
-        f"\nEvery path sits under {PREFIX}: this surface need not be at the host root."
-    )
+    print(f"\nEvery path sits under {PREFIX}: this surface need not be at the host root.")
     print("Compare against docs/pulumi-cli-surface.md; update it if the CLI has moved.")
     return 0 if LOG else 1
 

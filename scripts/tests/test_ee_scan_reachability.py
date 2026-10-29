@@ -43,10 +43,14 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 
 def _trivy(*vulns: dict) -> dict:
     """A Trivy image report, shaped as the real scanner emits it."""
-    return {"Results": [{"Type": "python-pkg", "Class": "lang-pkgs", "Vulnerabilities": list(vulns)}]}
+    return {
+        "Results": [{"Type": "python-pkg", "Class": "lang-pkgs", "Vulnerabilities": list(vulns)}]
+    }
 
 
-def _v(pkg: str, installed: str, fixed: str, *, path: str | None = None, bomref: str | None = None) -> dict:
+def _v(
+    pkg: str, installed: str, fixed: str, *, path: str | None = None, bomref: str | None = None
+) -> dict:
     ident: dict = {"PURL": f"pkg:pypi/{pkg}@{installed}"}
     if bomref:
         ident["BOMRef"] = bomref
@@ -70,16 +74,22 @@ class TestWhatARebuildCanClear:
     def test_a_fix_in_the_images_own_line_is_still_reported(self):
         """The direction that matters most: the filter must not swallow real work."""
         ok, why = normalise.reachable(
-            {"package": "ansible-core", "fixed": "2.17.6, 2.16.13",
-             "path": f"{SITE}/ansible_core-2.16.10.dist-info/METADATA"},
+            {
+                "package": "ansible-core",
+                "fixed": "2.17.6, 2.16.13",
+                "path": f"{SITE}/ansible_core-2.16.10.dist-info/METADATA",
+            },
             "ee-2.16",
         )
         assert ok, why
 
     def test_a_fix_only_in_a_later_line_is_not(self):
         ok, why = normalise.reachable(
-            {"package": "ansible-core", "fixed": "2.17.6, 2.16.13",
-             "path": f"{SITE}/ansible_core-2.12.10.dist-info/METADATA"},
+            {
+                "package": "ansible-core",
+                "fixed": "2.17.6, 2.16.13",
+                "path": f"{SITE}/ansible_core-2.12.10.dist-info/METADATA",
+            },
             "ee-2.12",
         )
         assert not ok
@@ -89,8 +99,11 @@ class TestWhatARebuildCanClear:
         """The platform's pre-release policy refuses these by default, so offering
         one as the fix would recommend something it would not install."""
         ok, why = normalise.reachable(
-            {"package": "ansible-core", "fixed": "2.16.19rc1, 2.18.18rc1",
-             "path": f"{SITE}/ansible_core-2.16.10.dist-info/METADATA"},
+            {
+                "package": "ansible-core",
+                "fixed": "2.16.19rc1, 2.18.18rc1",
+                "path": f"{SITE}/ansible_core-2.16.10.dist-info/METADATA",
+            },
             "ee-2.16",
         )
         assert not ok
@@ -100,12 +113,19 @@ class TestWhatARebuildCanClear:
         """Asserted as a PAIR. Either case alone passes under a filter that keys on
         the package name, which is exactly the ledger this avoids."""
         real, _ = normalise.reachable(
-            {"package": "wheel", "fixed": "0.46.2", "path": f"{SITE}/wheel-0.45.1.dist-info/METADATA"},
+            {
+                "package": "wheel",
+                "fixed": "0.46.2",
+                "path": f"{SITE}/wheel-0.45.1.dist-info/METADATA",
+            },
             "ee-2.12",
         )
         vendored, why = normalise.reachable(
-            {"package": "wheel", "fixed": "0.46.2",
-             "path": f"{SITE}/setuptools/_vendor/wheel-0.45.1.dist-info/METADATA"},
+            {
+                "package": "wheel",
+                "fixed": "0.46.2",
+                "path": f"{SITE}/setuptools/_vendor/wheel-0.45.1.dist-info/METADATA",
+            },
             "ee-2.12",
         )
         assert real, "the distribution the build installs must stay reportable"
@@ -123,7 +143,9 @@ class TestWhatARebuildCanClear:
         """Fails open on purpose. A finding we cannot classify is one a maintainer
         should see; silently dropping it would make this filter the new way a real
         finding goes missing."""
-        ok, why = normalise.reachable({"package": "cryptography", "fixed": "44.0.1", "path": ""}, "ee-2.12")
+        ok, why = normalise.reachable(
+            {"package": "cryptography", "fixed": "44.0.1", "path": ""}, "ee-2.12"
+        )
         assert ok, why
 
 
@@ -131,7 +153,12 @@ class TestTheClassificationRidesOnTrivysOwnFields:
     def test_from_trivy_carries_the_path_and_the_sbom_marker(self):
         out = normalise.from_trivy(
             _trivy(
-                _v("jaraco.context", "5.3.0", "6.1.0", path=f"{SITE}/setuptools/_vendor/jaraco.context-5.3.0.dist-info/METADATA"),
+                _v(
+                    "jaraco.context",
+                    "5.3.0",
+                    "6.1.0",
+                    path=f"{SITE}/setuptools/_vendor/jaraco.context-5.3.0.dist-info/METADATA",
+                ),
                 _v("certifi", "2026.6.17", "2026.10.19", bomref="pkg:pypi/certifi@2026.6.17"),
             ),
             "ee-2.12",
@@ -147,12 +174,31 @@ class TestTheClassificationRidesOnTrivysOwnFields:
         """The regression, with the exact shapes the real scan produced."""
         out = normalise.from_trivy(
             _trivy(
-                _v("ansible-core", "2.12.10", "2.17.6, 2.16.13", path=f"{SITE}/ansible_core-2.12.10.dist-info/METADATA"),
-                _v("ansible-core", "2.12.10", "2.16.19rc1, 2.18.18rc1, 2.19.11rc1, 2.20.7rc1, 2.21.1rc1",
-                   path=f"{SITE}/ansible_core-2.12.10.dist-info/METADATA"),
+                _v(
+                    "ansible-core",
+                    "2.12.10",
+                    "2.17.6, 2.16.13",
+                    path=f"{SITE}/ansible_core-2.12.10.dist-info/METADATA",
+                ),
+                _v(
+                    "ansible-core",
+                    "2.12.10",
+                    "2.16.19rc1, 2.18.18rc1, 2.19.11rc1, 2.20.7rc1, 2.21.1rc1",
+                    path=f"{SITE}/ansible_core-2.12.10.dist-info/METADATA",
+                ),
                 _v("certifi", "2026.6.17", "2026.10.19", bomref="pkg:pypi/certifi@2026.6.17"),
-                _v("jaraco.context", "5.3.0", "6.1.0", path=f"{SITE}/setuptools/_vendor/jaraco.context-5.3.0.dist-info/METADATA"),
-                _v("wheel", "0.45.1", "0.46.2", path=f"{SITE}/setuptools/_vendor/wheel-0.45.1.dist-info/METADATA"),
+                _v(
+                    "jaraco.context",
+                    "5.3.0",
+                    "6.1.0",
+                    path=f"{SITE}/setuptools/_vendor/jaraco.context-5.3.0.dist-info/METADATA",
+                ),
+                _v(
+                    "wheel",
+                    "0.45.1",
+                    "0.46.2",
+                    path=f"{SITE}/setuptools/_vendor/wheel-0.45.1.dist-info/METADATA",
+                ),
             ),
             "ee-2.12",
         )
@@ -168,9 +214,7 @@ class TestTheClassificationRidesOnTrivysOwnFields:
         """
         text = (REPO / "docker" / "Dockerfile.ee").read_text()
         pinned = [
-            line.strip()
-            for line in text.splitlines()
-            if "pip install" in line and "==" in line
+            line.strip() for line in text.splitlines() if "pip install" in line and "==" in line
         ]
         assert len(pinned) == 1, f"expected exactly one pinned install, got {pinned}"
         assert f'"{normalise.LINE_PINNED}==' in pinned[0], (
@@ -184,25 +228,54 @@ class TestTheReportersDropWhatCannotBeCleared:
         d = tmp_path / "eescan-2.12-amd64"
         d.mkdir(parents=True, exist_ok=True)
         (d / "finding.json").write_text(
-            json.dumps({"release": "ee-2.12", "source": "ee:2.12 (amd64)",
-                        "kind": "dependency", "findings": findings})
+            json.dumps(
+                {
+                    "release": "ee-2.12",
+                    "source": "ee:2.12 (amd64)",
+                    "kind": "dependency",
+                    "findings": findings,
+                }
+            )
         )
         return tmp_path
 
     def test_the_issue_reports_nothing_when_nothing_is_clearable(self, tmp_path):
-        root = self._report(tmp_path, [
-            {"id": "CVE-A", "package": "ansible-core", "severity": "HIGH", "reachable": False,
-             "unreachable": "fixed only outside the 2.12 line"},
-        ])
+        root = self._report(
+            tmp_path,
+            [
+                {
+                    "id": "CVE-A",
+                    "package": "ansible-core",
+                    "severity": "HIGH",
+                    "reachable": False,
+                    "unreachable": "fixed only outside the 2.12 line",
+                },
+            ],
+        )
         assert ee_scan_report.by_line(ee_scan_report.load(root)) == {}
 
     def test_a_clearable_one_alongside_them_is_still_reported(self, tmp_path):
         """Both directions: the filter must not hide a real finding that shares a
         report with unreachable ones."""
-        root = self._report(tmp_path, [
-            {"id": "CVE-A", "package": "ansible-core", "severity": "HIGH", "reachable": False, "unreachable": "x"},
-            {"id": "CVE-B", "package": "cryptography", "severity": "HIGH", "reachable": True, "unreachable": ""},
-        ])
+        root = self._report(
+            tmp_path,
+            [
+                {
+                    "id": "CVE-A",
+                    "package": "ansible-core",
+                    "severity": "HIGH",
+                    "reachable": False,
+                    "unreachable": "x",
+                },
+                {
+                    "id": "CVE-B",
+                    "package": "cryptography",
+                    "severity": "HIGH",
+                    "reachable": True,
+                    "unreachable": "",
+                },
+            ],
+        )
         assert ee_scan_report.by_line(ee_scan_report.load(root)) == {"2.12": {"CVE-B"}}
 
     def test_a_finding_with_no_reachable_field_is_reported(self, tmp_path):
@@ -216,17 +289,41 @@ class TestTheReportersDropWhatCannotBeCleared:
         """`load` keeps the release key with an empty list, and `main` skips a
         release with no findings (`if not findings: continue`) -- so the property
         to assert is that the line has nothing to record, not the dict's shape."""
-        root = self._report(tmp_path, [
-            {"id": "CVE-A", "package": "wheel", "severity": "HIGH", "reachable": False, "unreachable": "vendored"},
-        ])
+        root = self._report(
+            tmp_path,
+            [
+                {
+                    "id": "CVE-A",
+                    "package": "wheel",
+                    "severity": "HIGH",
+                    "reachable": False,
+                    "unreachable": "vendored",
+                },
+            ],
+        )
         loaded = advisory.load(root)
         assert loaded.get("ee-2.12") == [], loaded
         assert not any(loaded.values()), "no release has anything to put in an advisory"
 
     def test_the_advisory_still_records_a_clearable_one(self, tmp_path):
-        root = self._report(tmp_path, [
-            {"id": "CVE-A", "package": "wheel", "severity": "HIGH", "reachable": False, "unreachable": "vendored"},
-            {"id": "CVE-B", "package": "cryptography", "severity": "HIGH", "reachable": True, "unreachable": ""},
-        ])
+        root = self._report(
+            tmp_path,
+            [
+                {
+                    "id": "CVE-A",
+                    "package": "wheel",
+                    "severity": "HIGH",
+                    "reachable": False,
+                    "unreachable": "vendored",
+                },
+                {
+                    "id": "CVE-B",
+                    "package": "cryptography",
+                    "severity": "HIGH",
+                    "reachable": True,
+                    "unreachable": "",
+                },
+            ],
+        )
         loaded = advisory.load(root)
         assert sorted(f["id"] for f in loaded["ee-2.12"]) == ["CVE-B"]

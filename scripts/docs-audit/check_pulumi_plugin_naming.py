@@ -171,8 +171,7 @@ def main() -> int:
                 )
             if parts["kind"] != first_party_kind:
                 problems.append(
-                    f"{rendered}: parsed kind {parts['kind']!r}, expected "
-                    f"{first_party_kind!r}"
+                    f"{rendered}: parsed kind {parts['kind']!r}, expected {first_party_kind!r}"
                 )
             if (parts["os"], parts["arch"]) != (goos, goarch):
                 problems.append(

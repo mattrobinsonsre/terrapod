@@ -41,7 +41,10 @@ def sentences(text: str):
 def main() -> int:
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
 
     flagged = []
@@ -65,8 +68,10 @@ def main() -> int:
 
     print(f"  {len(files)} docs scanned for absence-framing near a peer's name")
     if flagged:
-        print(f"\n  {len(flagged)} sentence(s) for human review "
-              f"(not a failure — check each reads as a boundary, not a put-down):\n")
+        print(
+            f"\n  {len(flagged)} sentence(s) for human review "
+            f"(not a failure — check each reads as a boundary, not a put-down):\n"
+        )
         for f, i, s in flagged:
             print(f"    {f}:{i}\n      {s}")
     else:

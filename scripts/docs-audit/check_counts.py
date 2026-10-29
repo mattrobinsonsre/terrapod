@@ -101,7 +101,10 @@ def main() -> int:
 
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
 
     problems, seen = [], 0
@@ -111,13 +114,13 @@ def main() -> int:
                 for m in pat.finditer(line):
                     seen += 1
                     if int(m.group(1)) != expected:
-                        problems.append(
-                            f"{f}:{i}: says {m.group(1)} {name}, code has {expected}"
-                        )
+                        problems.append(f"{f}:{i}: says {m.group(1)} {name}, code has {expected}")
 
     print(f"  ground truth: {caps} capabilities over {kinds} resource kinds")
-    print(f"  ground truth: {res} resources, {ds} data sources, "
-          f"{real_locales} languages, {tools} MCP tools")
+    print(
+        f"  ground truth: {res} resources, {ds} data sources, "
+        f"{real_locales} languages, {tools} MCP tools"
+    )
     print(f"  {seen} countable claim(s) checked across {len(files)} docs")
     if problems:
         print(f"\nFAIL — {len(problems)} count(s) disagree with the code:\n")

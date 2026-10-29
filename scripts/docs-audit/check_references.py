@@ -29,9 +29,13 @@ MAKE = re.compile(r"`make\s+([a-z][a-z0-9-]{2,})`")
 # A backticked dotted path that looks like a Helm value: at least two segments,
 # lowercase/underscore, no spaces. Anchored on the roots the chart actually has
 # so that arbitrary dotted prose is not dragged in.
-HELM = re.compile(r"`((?:api\.config|api|web|listener|runners|registry|storage|postgresql|redis|ingress|webhookIngress)\.[a-zA-Z0-9_.]+)`")
+HELM = re.compile(
+    r"`((?:api\.config|api|web|listener|runners|registry|storage|postgresql|redis|ingress|webhookIngress)\.[a-zA-Z0-9_.]+)`"
+)
 # Repo-relative paths in backticks: must contain a slash and look like a file.
-REPO_PATH = re.compile(r"`((?:services|web|helm|docs|scripts|provider|go-terrapod|migrate|publish|query|mcp|e2e|alembic|docker|pentest|loadtest|pricegen)/[A-Za-z0-9_./-]+)`")
+REPO_PATH = re.compile(
+    r"`((?:services|web|helm|docs|scripts|provider|go-terrapod|migrate|publish|query|mcp|e2e|alembic|docker|pentest|loadtest|pricegen)/[A-Za-z0-9_./-]+)`"
+)
 
 
 # Keys whose children are operator-supplied, so an unknown leaf is data rather
@@ -50,10 +54,24 @@ HISTORICAL_DOCS = {
 }
 
 FREEFORM = {
-    "annotations", "labels", "podAnnotations", "podLabels", "selectorLabels",
-    "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints",
-    "podSecurityContext", "securityContext", "resources", "extraEnv",
-    "extraVolumes", "extraVolumeMounts", "oidc", "saml", "claims_to_roles",
+    "annotations",
+    "labels",
+    "podAnnotations",
+    "podLabels",
+    "selectorLabels",
+    "nodeSelector",
+    "tolerations",
+    "affinity",
+    "topologySpreadConstraints",
+    "podSecurityContext",
+    "securityContext",
+    "resources",
+    "extraEnv",
+    "extraVolumes",
+    "extraVolumeMounts",
+    "oidc",
+    "saml",
+    "claims_to_roles",
 }
 
 
@@ -138,7 +156,10 @@ def main() -> int:
     hkeys = helm_keys() | schema_keys() | template_keys()
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
 
     problems: list[str] = []
@@ -146,8 +167,10 @@ def main() -> int:
 
     for f in files:
         visible = list(outside_fences(ROOT / f))
-        window = {ln: " ".join(t for _, t in visible[max(0, i - 1) : i + 2])
-                  for i, (ln, _) in enumerate(visible)}
+        window = {
+            ln: " ".join(t for _, t in visible[max(0, i - 1) : i + 2])
+            for i, (ln, _) in enumerate(visible)
+        }
         for lineno, line in visible:
             for t in MAKE.findall(line):
                 counts["make"] += 1
@@ -179,14 +202,17 @@ def main() -> int:
                 problems.append(f"{f}:{lineno}: `{k}` — not a key in values.yaml")
             for p in REPO_PATH.findall(line):
                 counts["path"] += 1
-                if re.search(r"must \*?\*?not\*?\*? exist|does not exist|absence of",
-                             window[lineno], re.I):
+                if re.search(
+                    r"must \*?\*?not\*?\*? exist|does not exist|absence of", window[lineno], re.I
+                ):
                     continue
                 if not (ROOT / p).exists():
                     problems.append(f"{f}:{lineno}: `{p}` — no such file or directory")
 
-    print(f"  checked: {counts['make']} make targets, {counts['helm']} helm values, "
-          f"{counts['path']} repo paths")
+    print(
+        f"  checked: {counts['make']} make targets, {counts['helm']} helm values, "
+        f"{counts['path']} repo paths"
+    )
     if problems:
         print(f"\nFAIL — {len(problems)} reference(s) do not resolve:\n")
         for p in problems:

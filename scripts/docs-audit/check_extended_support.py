@@ -207,7 +207,9 @@ if "extended_support" in src:
     baseline = run_discover(src, {"extended_support": []})
     scenarios += 1
     if baseline != ["v2.1.0", "v2.0.3"]:
-        problems.append(f"with no held line, discover should pick the newest 2 minors; got {baseline}")
+        problems.append(
+            f"with no held line, discover should pick the newest 2 minors; got {baseline}"
+        )
 
     held = run_discover(src, entry("1.11"))
     scenarios += 1
@@ -232,12 +234,16 @@ if "extended_support" in src:
     unreleased = run_discover(src, entry("1.5"))
     scenarios += 1
     if unreleased != baseline:
-        problems.append(f"a line with no published release must contribute nothing; got {unreleased}")
+        problems.append(
+            f"a line with no published release must contribute nothing; got {unreleased}"
+        )
 
     already = run_discover(src, entry("2.0"))
     scenarios += 1
     if already != baseline:
-        problems.append(f"an entry already inside the newest minors must not be duplicated; got {already}")
+        problems.append(
+            f"an entry already inside the newest minors must not be duplicated; got {already}"
+        )
 
     malformed = run_discover(src, entry("1"))
     scenarios += 1
@@ -255,10 +261,20 @@ if "extended_support" in src:
         src,
         {
             "extended_support": [
-                {"line": "1.11", "held_since": LONG_PAST, "earliest_retirement": FUTURE,
-                 "reason": "f", "announced_in": "v2.0.0"},
-                {"line": "1.10", "held_since": LONG_PAST, "earliest_retirement": FUTURE,
-                 "reason": "f", "announced_in": "v2.0.0"},
+                {
+                    "line": "1.11",
+                    "held_since": LONG_PAST,
+                    "earliest_retirement": FUTURE,
+                    "reason": "f",
+                    "announced_in": "v2.0.0",
+                },
+                {
+                    "line": "1.10",
+                    "held_since": LONG_PAST,
+                    "earliest_retirement": FUTURE,
+                    "reason": "f",
+                    "announced_in": "v2.0.0",
+                },
             ]
         },
     )

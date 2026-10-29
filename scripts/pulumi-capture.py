@@ -148,9 +148,7 @@ def main() -> int:
             print(f"  ! {line}")
     shutil.rmtree(work, ignore_errors=True)
 
-    print(
-        "\nCompare against docs/pulumi-cli-surface.md; update it if the client has moved."
-    )
+    print("\nCompare against docs/pulumi-cli-surface.md; update it if the client has moved.")
     return 0 if LOG else 1
 
 
