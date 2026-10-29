@@ -12,6 +12,7 @@ level → capability mapping) rather than compared against a resolver oracle.
 No DB — roles are passed via ``preloaded_roles`` (the resolvers skip the query).
 """
 
+import pathlib
 from types import SimpleNamespace
 
 import pytest
@@ -134,7 +135,103 @@ async def test_owner_gets_admin_equiv_and_catalog_clamp():
         preloaded_roles=[],
         is_catalog_managed=True,
     )
-    assert clamped == cap.axis_read_caps("workspace")
+    # Read floor PLUS `inventory:write` (#2019). The clamp's reason is unchanged
+    # and still holds for everything else -- a catalog workspace's configuration
+    # and variables are catalog-managed, so a write over either is an affordance
+    # for an edit the next reconfigure discards. The inventory is the one part a
+    # person legitimately curates on such a workspace, and withholding it made
+    # the per-row inventory UI unreachable on exactly the workspaces the feature
+    # creates, for the person who created them.
+    assert clamped == cap.axis_read_caps("workspace") | {cap.INVENTORY_WRITE}
+
+
+class TestTheCatalogClampIsSurgical:
+    """#2019 exempts `inventory:write` from the clamp, and nothing else.
+
+    Every test here needs the CONTRAST: a test asserting only that
+    `inventory:write` survives cannot distinguish a surgical exemption from a
+    clamp that stopped clamping, which is the failure that matters.
+    """
+
+    async def _clamped(self):
+        return await cr.resolve_capabilities(
+            None,
+            "o@x",
+            [],
+            "w1",
+            {},
+            "o@x",
+            axis="workspace",
+            preloaded_roles=[],
+            is_catalog_managed=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_provisioner_may_write_the_inventory(self):
+        assert cap.INVENTORY_WRITE in await self._clamped()
+
+    @pytest.mark.asyncio
+    async def test_and_still_may_not_write_the_variables_or_the_config(self):
+        """The two the clamp exists for: `_materialise` replaces the variable set
+        outright and `config_versions` refuses an operator-supplied CV, so a
+        write over either edits something the next reconfigure discards."""
+        caps = await self._clamped()
+        assert cap.VAR_WRITE not in caps
+        assert cap.CONFIG_UPLOAD not in caps
+        assert cap.WORKSPACE_SETTINGS not in caps
+
+    @pytest.mark.asyncio
+    async def test_exactly_one_capability_is_added(self):
+        """Derived, so a second exemption has to justify itself in the set
+        beside the clamp rather than widen a comparison mid-resolver."""
+        caps = await self._clamped()
+        assert caps - cap.axis_read_caps("workspace") == {cap.INVENTORY_WRITE}
+
+    def test_the_rule_has_ONE_producer(self):
+        """The clamp was written twice and diverged, which is why it is a shared
+        function now (#2019).
+
+        `capability_resolver` enforces and `role_reach_service` answers "what can
+        this role actually do here" for the UI, and each had its own
+        `caps & axis_read_caps(axis)`. Exempting a capability in one left the
+        other reporting it clamped away: the API granting a write the view said
+        was withheld, which is worse than either answer alone.
+
+        Derived from the source rather than from a list of the two modules, so a
+        THIRD copy fails here rather than being found by its divergence.
+        """
+        import re
+
+        root = pathlib.Path(cr.__file__).resolve().parent.parent
+        offenders = []
+        for path in sorted(root.rglob("*.py")):
+            if path.name == "capabilities.py":
+                continue  # the producer itself
+            src = path.read_text(encoding="utf-8")
+            for line in src.splitlines():
+                if re.search(r"&\s*cap(?:abilities)?\.axis_read_caps\(", line):
+                    offenders.append(f"{path.name}: {line.strip()}")
+        assert not offenders, (
+            "the catalog clamp is being computed outside "
+            "`capabilities.clamp_for_catalog_workspace`:\n  " + "\n  ".join(offenders)
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_two_surfaces_agree(self):
+        """Not a restatement of the above: that one asserts nobody re-derives the
+        rule, this one asserts the shared answer is the one both give."""
+        enforced = await self._clamped()
+        reached = cap.clamp_for_catalog_workspace(cap.axis_all_caps("workspace"), "workspace")
+        assert enforced == reached
+
+    @pytest.mark.asyncio
+    async def test_a_non_catalog_workspace_is_unaffected(self):
+        """The owner of an ordinary workspace still gets the whole axis -- the
+        exemption must not be a widening of what the clamp applies to."""
+        caps = await cr.resolve_capabilities(
+            None, "o@x", [], "w1", {}, "o@x", axis="workspace", preloaded_roles=[]
+        )
+        assert caps == cap.axis_all_caps("workspace")
 
 
 async def test_everyone_floor_and_no_catalog_floor():

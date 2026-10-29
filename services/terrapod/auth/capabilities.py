@@ -362,6 +362,40 @@ def axis_read_caps(axis: str) -> frozenset[str]:
     return AXIS_LEVEL_MAPS[axis].get("read", frozenset())
 
 
+#: The capabilities a catalog-managed workspace does NOT clamp to read (#2019).
+#:
+#: A SET rather than a single name, so the next exemption has to justify itself
+#: here, beside the clamp it is an exception to, rather than widen a comparison
+#: somewhere in a resolver.
+CATALOG_CLAMP_EXEMPT = frozenset({INVENTORY_WRITE})
+
+
+def clamp_for_catalog_workspace(caps: frozenset[str] | set[str], axis: str) -> frozenset[str]:
+    """The catalog-managed read floor, with `inventory:write` exempt (#2019).
+
+    **One producer, because this rule was written twice and diverged.** The
+    enforcement resolver and `role_reach_service` -- which answers "what can
+    this role actually do here" for the UI -- each had their own `caps &
+    axis_read_caps(axis)`. Exempting a capability in one left the other
+    reporting it clamped away, so the API would grant a write the view said was
+    withheld, which is worse than either answer alone.
+
+    Why the clamp exists at all: a catalog workspace's CONFIGURATION and
+    VARIABLES are catalog-managed -- the wrapper config version is generated,
+    `config_versions` refuses an operator-supplied one, and `_materialise`
+    replaces the variable set outright -- so a write over either is an
+    affordance for an edit the next reconfigure silently discards.
+
+    Why the inventory is exempt: an item that provisions the Ansible half exists
+    so somebody can configure the hosts it declared, and the inventory is the
+    one part of such a workspace a person legitimately curates. The accepted
+    cost is that the module declares the rows, so a hand-edited row IS reverted
+    at the next apply -- a property of declaring infrastructure, stated plainly
+    in the docs rather than left to be discovered.
+    """
+    return frozenset(caps) & (axis_read_caps(axis) | CATALOG_CLAMP_EXEMPT)
+
+
 def axis_all_caps(axis: str) -> frozenset[str]:
     """Every capability the axis can grant (its top preset)."""
     levels = AXIS_LEVEL_MAPS[axis]

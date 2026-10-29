@@ -200,9 +200,31 @@ async def resolve_capabilities(
     if axis != "catalog" and apply_everyone_floor and resource_labels.get("access") == "everyone":
         caps |= read_caps
 
-    # 7. catalog-managed workspace clamp → read floor for all non-admin grants.
+    # 7. catalog-managed workspace clamp → read floor for all non-admin grants,
+    #    EXCEPT the inventory (#2019).
+    #
+    #    The clamp exists because a catalog workspace's CONFIGURATION and its
+    #    VARIABLES are wholly catalog-managed: the wrapper config version is
+    #    generated, `config_versions` refuses an operator-supplied one, and
+    #    `_materialise` replaces the variable set outright. A write capability
+    #    over either would be an affordance for an edit the next reconfigure
+    #    silently discards, so the floor stays for everything else.
+    #
+    #    The inventory is different in kind rather than in degree. An item that
+    #    provisions the Ansible half exists so somebody can run a configure
+    #    against the hosts it declared, and the inventory is the one part of
+    #    such a workspace a person legitimately curates -- a host the module's
+    #    data source does not find, a group that only makes sense to an
+    #    operator. Withholding it also made the per-row inventory UI (#1969)
+    #    unreachable on exactly the workspaces this feature creates, for the
+    #    person who created them.
+    #
+    #    The accepted cost, which `docs/service-catalog.md` states plainly
+    #    rather than leaving to be discovered: the module declares the rows, so
+    #    a hand-edited row IS reverted at the next apply. That is a property of
+    #    declaring infrastructure, not a defect of the grant.
     if axis == "workspace" and is_catalog_managed:
-        caps &= read_caps
+        caps = cap.clamp_for_catalog_workspace(caps, axis)
 
     return frozenset(caps)
 
