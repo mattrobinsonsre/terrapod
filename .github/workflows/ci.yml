@@ -3106,13 +3106,89 @@ jobs:
         # timeout-minutes — only `always()`/`cancelled()` do. A hung boot is
         # exactly the case we most want diagnostics for, and it is the case
         # this condition used to skip.
+        #
+        # Ordered by how far the boot got, because the earlier a failure is the
+        # less of this cluster exists to ask (#2293). It used to run three
+        # commands: a bare `get pods,jobs`, and logs from the listener and runner
+        # Deployments. On the commonest failure — the install never completing —
+        # that reported three pod STATUSES with no reason for any of them, plus
+        # two commands that cannot succeed, because at pre-install time neither
+        # Deployment exists yet. `Pending` is a scheduling decision the scheduler
+        # will state and `ContainerCreating` for five minutes has an event
+        # attached; both were available and neither was captured, so every
+        # occurrence cost a diagnostic cycle and the cheap conclusion was
+        # "re-run it" — which is how a real regression gets waved through as a
+        # flake.
+        #
+        # Every probe is guarded and grouped: one that cannot answer must not
+        # hide the ones that can, and the first question is whether the
+        # apiserver is answering at all.
         if: failure() || cancelled()
         timeout-minutes: 3
         run: |
           ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
-          kubectl --context "$ctx" -n terrapod-eval get pods,jobs || true
-          kubectl --context "$ctx" -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
-          kubectl --context "$ctx" -n terrapod-eval logs -l app.kubernetes.io/name=terrapod-runner --tail=120 --prefix || true
+          k="kubectl --context $ctx --request-timeout=15s"
+
+          echo "::group::is the apiserver answering?"
+          # First, because when the answer is no everything below is noise and
+          # the container logs at the bottom are the only thing worth reading.
+          $k version || true
+          $k get --raw /readyz || echo "!! /readyz did not answer — treat the cluster itself as the suspect"
+          echo "::endgroup::"
+
+          echo "::group::nodes"
+          # Disk pressure on the runner has produced this job's failure shape
+          # before, and it is invisible in a pod listing.
+          $k get nodes -o wide || true
+          $k describe nodes | sed -n '/^Conditions:/,/^Addresses:/p' || true
+          echo "::endgroup::"
+
+          echo "::group::pods and jobs"
+          $k -n terrapod-eval get pods,jobs -o wide || true
+          echo "::endgroup::"
+
+          echo "::group::events, oldest first"
+          # Where FailedScheduling, FailedMount and image-pull reasons live. This
+          # is the single most useful thing the step was missing.
+          $k -n terrapod-eval get events --sort-by=.lastTimestamp || true
+          echo "::endgroup::"
+
+          echo "::group::why each pod is in the state it is"
+          # Every pod rather than only the not-Ready ones: the namespace holds a
+          # handful, one call describes them all, and a filter is one more thing
+          # that can exclude the pod that mattered.
+          $k -n terrapod-eval describe pods || true
+          echo "::endgroup::"
+
+          echo "::group::application logs, if the install got that far"
+          # GUARDED. Before the install completes these do not exist, and two
+          # guaranteed errors pad a real failure with noise of their own — which
+          # is what made the old output read as though nothing could be learned.
+          if $k -n terrapod-eval get deploy/terrapod-listener >/dev/null 2>&1; then
+            $k -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
+          else
+            echo "(no listener Deployment yet — the install did not get this far)"
+          fi
+          if [ -n "$($k -n terrapod-eval get pods -l app.kubernetes.io/name=terrapod-runner -o name 2>/dev/null)" ]; then
+            $k -n terrapod-eval logs -l app.kubernetes.io/name=terrapod-runner --tail=120 --prefix || true
+          else
+            echo "(no runner pod has been created)"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::cluster container logs"
+          # The fallback for the case the apiserver is the thing that is down, in
+          # which case everything above reported nothing. Derived from `docker
+          # ps` rather than hardcoding both tools' naming conventions
+          # (`k3d-terrapod-eval-server-0` against `terrapod-eval-control-plane`),
+          # so a container neither convention predicts is still shown.
+          docker ps -a --filter name=terrapod-eval --format '{{.Names}}' \
+            | while IFS= read -r c; do
+                [ -n "$c" ] || continue
+                echo "--- $c"
+                docker logs --tail=50 "$c" 2>&1 || true
+              done
+          echo "::endgroup::"
       - name: Teardown
         # `k3d cluster delete` has hung for 23 minutes here, consuming the rest
         # of the job budget and turning "one step failed" into "the whole job
