@@ -1478,7 +1478,16 @@
       "anyPool": "可使用任意代理池。",
       "labels": "標籤",
       "variableOptions": "變數選項（高階，JSON）",
-      "variableOptionsHint": "按輸入的覆蓋項（選項、隱藏、預設值）。若不使用，請保留為 <code>[]</code>。"
+      "variableOptionsHint": "按輸入的覆蓋項（選項、隱藏、預設值）。若不使用，請保留為 <code>[]</code>。",
+      "ansibleHeading": "Ansible 設定",
+      "ansibleDirectory": "Ansible 設定目錄",
+      "defaultPlaybook": "預設 playbook",
+      "defaultPlaybookHint": "當執行本身未指定時，設定作業所執行的 playbook。相對於設定目錄。",
+      "defaultLimit": "預設 limit",
+      "defaultLimitHint": "設定作業的預設 --limit 模式。留空則以整份清冊為目標。",
+      "configureEnabled": "預配設定作業",
+      "configureEnabledHint": "預設關閉，除非你開啟。此項目預配的工作區隨後會在計畫與套用之外取得一個設定作業。",
+      "ansibleDirectoryHint": "模組中存放劇本的子目錄。Terrapod 會將其複製到產生的設定版本中，並成為所預配工作區的 Ansible 設定目錄。相對於模組根目錄，開頭與結尾都不要加斜線。"
     },
     "table": {
       "name": "名稱",
@@ -1506,7 +1515,8 @@
       "delete": "刪除目錄項失敗",
       "deleteConflict": "無法刪除：此目錄項存在已預配的執行個體。",
       "varOptsInvalidJson": "變數選項必須是有效的 JSON（陣列）。",
-      "varOptsNotArray": "變數選項必須是 JSON 陣列。"
+      "varOptsNotArray": "變數選項必須是 JSON 陣列。",
+      "configureNeedsDirectory": "預配設定作業需要一個 Ansible 設定目錄。請指定模組中存放劇本的子目錄。"
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "無可用的目錄項。",
     "card": {
       "pinned": "已固定 {version}",
-      "latest": "最新"
+      "latest": "最新",
+      "configure": "Ansible 設定"
     },
     "errors": {
       "loadItems": "載入目錄項失敗"
@@ -1820,7 +1831,11 @@
       "module": "模組：",
       "resolvedVersion": "已解析版本：",
       "latest": "最新",
-      "disabled": "已停用"
+      "disabled": "已停用",
+      "configureBadge": "Ansible 設定",
+      "configureDirectory": "目錄：",
+      "configurePlaybook": "playbook：",
+      "configureLimit": "limit："
     },
     "pending": {
       "banner": "<strong>{name}</strong> 的執行已計畫完成，正在等待審查。確認以應用，或丟棄。",

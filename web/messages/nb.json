@@ -1478,7 +1478,16 @@
       "anyPool": "Hvilken som helst agentpulje kan brukes.",
       "labels": "Etiketter",
       "variableOptions": "Variabelalternativer (avansert, JSON)",
-      "variableOptionsHint": "Overstyringer per inndata (alternativer, skjult, standard). La stå som <code>[]</code> hvis ubrukt."
+      "variableOptionsHint": "Overstyringer per inndata (alternativer, skjult, standard). La stå som <code>[]</code> hvis ubrukt.",
+      "ansibleHeading": "Ansible-konfigurasjon",
+      "ansibleDirectory": "Ansible-konfigurasjonsmappe",
+      "defaultPlaybook": "Standard-playbook",
+      "defaultPlaybookHint": "Playbooken en konfigurasjonsoperasjon kjører når kjøringen selv ikke navngir noen. Relativt til konfigurasjonsmappen.",
+      "defaultLimit": "Standardgrense",
+      "defaultLimitHint": "Standardmønsteret for --limit ved en konfigurasjonsoperasjon. La det stå tomt for å treffe hele inventaret.",
+      "configureEnabled": "Klargjør en konfigurasjonsoperasjon",
+      "configureEnabledHint": "Av med mindre du slår det på. Arbeidsområdet dette elementet klargjør får da en konfigurasjonsoperasjon ved siden av planen og apply.",
+      "ansibleDirectoryHint": "Underkatalogen i modulen som inneholder playbooken. Terrapod kopierer den til den genererte konfigurasjonsversjonen, og den blir Ansible-konfigurasjonskatalogen til det klargjorte arbeidsområdet. Relativt til modulens rot, uten skråstrek i starten eller slutten."
     },
     "table": {
       "name": "Navn",
@@ -1506,7 +1515,8 @@
       "delete": "Kunne ikke slette katalogelement",
       "deleteConflict": "Kan ikke slette: dette katalogelementet har klargjorte instanser.",
       "varOptsInvalidJson": "Variabelalternativer må være gyldig JSON (en matrise).",
-      "varOptsNotArray": "Variabelalternativer må være en JSON-matrise."
+      "varOptsNotArray": "Variabelalternativer må være en JSON-matrise.",
+      "configureNeedsDirectory": "Det kreves en Ansible-konfigurasjonskatalog for å klargjøre en konfigurasjonsoperasjon. Angi underkatalogen i modulen som inneholder playbooken."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Ingen katalogelementer tilgjengelig.",
     "card": {
       "pinned": "festet {version}",
-      "latest": "nyeste"
+      "latest": "nyeste",
+      "configure": "Ansible-konfigurasjon"
     },
     "errors": {
       "loadItems": "Kunne ikke laste katalogelementer"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Løst versjon:",
       "latest": "nyeste",
-      "disabled": "deaktivert"
+      "disabled": "deaktivert",
+      "configureBadge": "Ansible-konfigurasjon",
+      "configureDirectory": "Katalog:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Grense:"
     },
     "pending": {
       "banner": "Kjøringen for <strong>{name}</strong> er planlagt og venter på gjennomgang. Bekreft for å anvende, eller forkast.",

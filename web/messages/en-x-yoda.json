@@ -1478,7 +1478,16 @@
       "anyPool": "Any agent pool, used it may be.",
       "labels": "Labels",
       "variableOptions": "options, Variable (advanced, JSON)",
-      "variableOptionsHint": "Per-input overrides, these are (options, hidden, default). If unused, as <code>[]</code> leave it."
+      "variableOptionsHint": "Per-input overrides, these are (options, hidden, default). If unused, as <code>[]</code> leave it.",
+      "ansibleHeading": "configure, Ansible",
+      "ansibleDirectory": "directory, Ansible config",
+      "defaultPlaybook": "playbook, Default",
+      "defaultPlaybookHint": "When the run itself names none, the playbook a configure runs, this is. To the config directory, relative.",
+      "defaultLimit": "limit, Default",
+      "defaultLimitHint": "For a configure, the default --limit pattern this is. The whole inventory to target, empty leave it.",
+      "configureEnabled": "A configure operation, provision",
+      "configureEnabledHint": "Off it is, unless you turn it on. A configure operation alongside its plan and apply, the workspace this item provisions then gets.",
+      "ansibleDirectoryHint": "The subdirectory of the module that holds the playbook, this is. Into the generated configuration version, Terrapod copies it, and the provisioned workspace's Ansible config directory it becomes. Relative to the module root it is, with no leading or trailing slash."
     },
     "table": {
       "name": "Name",
@@ -1506,7 +1515,8 @@
       "delete": "Delete the catalog item, it did not",
       "deleteConflict": "Delete, cannot: provisioned instances, this catalog item has.",
       "varOptsInvalidJson": "Valid JSON (an array), variable options must be.",
-      "varOptsNotArray": "A JSON array, variable options must be."
+      "varOptsNotArray": "A JSON array, variable options must be.",
+      "configureNeedsDirectory": "To provision a configure operation, an Ansible config directory is required. The subdirectory of the module that holds the playbook, name it."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "No catalog items available, there are.",
     "card": {
       "pinned": "pinned {version}",
-      "latest": "latest"
+      "latest": "latest",
+      "configure": "configure, Ansible"
     },
     "errors": {
       "loadItems": "Load the catalog items, it did not"
@@ -1820,7 +1831,11 @@
       "module": "Module:",
       "resolvedVersion": "version, Resolved:",
       "latest": "latest",
-      "disabled": "disabled"
+      "disabled": "disabled",
+      "configureBadge": "configure, Ansible",
+      "configureDirectory": "Directory:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "For <strong>{name}</strong>, the run planned it is and for review waiting. To apply, confirm, or discard.",

@@ -1478,7 +1478,16 @@
       "anyPool": "Lze použít libovolný fond agentů.",
       "labels": "Štítky",
       "variableOptions": "Možnosti proměnných (pokročilé, JSON)",
-      "variableOptionsHint": "Přepisy pro jednotlivé vstupy (options, hidden, default). Ponechte jako <code>[]</code>, pokud se nepoužívá."
+      "variableOptionsHint": "Přepisy pro jednotlivé vstupy (options, hidden, default). Ponechte jako <code>[]</code>, pokud se nepoužívá.",
+      "ansibleHeading": "Konfigurace Ansible",
+      "ansibleDirectory": "Konfigurační adresář Ansible",
+      "defaultPlaybook": "Výchozí playbook",
+      "defaultPlaybookHint": "Playbook, který konfigurační operace spustí, když jej samotný běh neuvede. Relativně ke konfiguračnímu adresáři.",
+      "defaultLimit": "Výchozí limit",
+      "defaultLimitHint": "Výchozí vzor --limit pro konfigurační operaci. Nechte prázdné pro zasažení celého inventáře.",
+      "configureEnabled": "Zřídit operaci konfigurace",
+      "configureEnabledHint": "Vypnuto, dokud to nezapnete. Pracovní prostor, který tato položka zřizuje, pak získá vedle plánu a apply také operaci konfigurace.",
+      "ansibleDirectoryHint": "Podadresář modulu, který obsahuje playbook. Terrapod jej zkopíruje do vygenerované verze konfigurace a stane se adresářem konfigurace Ansible zřízeného pracovního prostoru. Relativně ke kořenovému adresáři modulu, bez lomítka na začátku ani na konci."
     },
     "table": {
       "name": "Název",
@@ -1506,7 +1515,8 @@
       "delete": "Nepodařilo se smazat položku katalogu",
       "deleteConflict": "Nelze smazat: tato položka katalogu má zřízené instance.",
       "varOptsInvalidJson": "Možnosti proměnných musí být platný JSON (pole).",
-      "varOptsNotArray": "Možnosti proměnných musí být JSON pole."
+      "varOptsNotArray": "Možnosti proměnných musí být JSON pole.",
+      "configureNeedsDirectory": "Zřízení operace konfigurace vyžaduje adresář konfigurace Ansible. Zadejte podadresář modulu, který obsahuje playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Nejsou k dispozici žádné položky katalogu.",
     "card": {
       "pinned": "připnuto {version}",
-      "latest": "nejnovější"
+      "latest": "nejnovější",
+      "configure": "Konfigurace Ansible"
     },
     "errors": {
       "loadItems": "Nepodařilo se načíst položky katalogu"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Vyřešená verze:",
       "latest": "nejnovější",
-      "disabled": "zakázáno"
+      "disabled": "zakázáno",
+      "configureBadge": "Konfigurace Ansible",
+      "configureDirectory": "Adresář:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "Běh pro <strong>{name}</strong> je naplánován a čeká na kontrolu. Potvrďte pro aplikaci, nebo zahoďte.",

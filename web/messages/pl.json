@@ -1478,7 +1478,16 @@
       "anyPool": "Można użyć dowolnej puli agentów.",
       "labels": "Etykiety",
       "variableOptions": "Opcje zmiennych (zaawansowane, JSON)",
-      "variableOptionsHint": "Nadpisania dla poszczególnych wejść (opcje, ukryte, domyślne). Pozostaw jako <code>[]</code>, jeśli nieużywane."
+      "variableOptionsHint": "Nadpisania dla poszczególnych wejść (opcje, ukryte, domyślne). Pozostaw jako <code>[]</code>, jeśli nieużywane.",
+      "ansibleHeading": "Konfiguracja Ansible",
+      "ansibleDirectory": "Katalog konfiguracji Ansible",
+      "defaultPlaybook": "Domyślny playbook",
+      "defaultPlaybookHint": "Playbook, który uruchamia operacja konfiguracji, gdy samo uruchomienie żadnego nie wskazuje. Względem katalogu konfiguracji.",
+      "defaultLimit": "Domyślny limit",
+      "defaultLimitHint": "Domyślny wzorzec --limit dla operacji konfiguracji. Pozostaw puste, aby objąć cały inwentarz.",
+      "configureEnabled": "Udostępnij operację konfiguracji",
+      "configureEnabledHint": "Wyłączone, dopóki tego nie włączysz. Obszar roboczy udostępniany przez ten element otrzyma wtedy operację konfiguracji obok planu i apply.",
+      "ansibleDirectoryHint": "Podkatalog modułu zawierający playbook. Terrapod kopiuje go do wygenerowanej wersji konfiguracji i staje się on katalogiem konfiguracji Ansible udostępnionego obszaru roboczego. Względem katalogu głównego modułu, bez ukośnika na początku ani na końcu."
     },
     "table": {
       "name": "Nazwa",
@@ -1506,7 +1515,8 @@
       "delete": "Nie udało się usunąć pozycji katalogu",
       "deleteConflict": "Nie można usunąć: ta pozycja katalogu ma udostępnione instancje.",
       "varOptsInvalidJson": "Opcje zmiennych muszą być poprawnym JSON (tablicą).",
-      "varOptsNotArray": "Opcje zmiennych muszą być tablicą JSON."
+      "varOptsNotArray": "Opcje zmiennych muszą być tablicą JSON.",
+      "configureNeedsDirectory": "Udostępnienie operacji konfiguracji wymaga katalogu konfiguracji Ansible. Podaj podkatalog modułu zawierający playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Brak dostępnych pozycji katalogu.",
     "card": {
       "pinned": "przypięto {version}",
-      "latest": "najnowsza"
+      "latest": "najnowsza",
+      "configure": "Konfiguracja Ansible"
     },
     "errors": {
       "loadItems": "Nie udało się wczytać pozycji katalogu"
@@ -1820,7 +1831,11 @@
       "module": "Moduł:",
       "resolvedVersion": "Rozwiązana wersja:",
       "latest": "najnowsza",
-      "disabled": "wyłączona"
+      "disabled": "wyłączona",
+      "configureBadge": "Konfiguracja Ansible",
+      "configureDirectory": "Katalog:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "Przebieg dla <strong>{name}</strong> jest zaplanowany i oczekuje na przegląd. Potwierdź, aby zastosować, lub odrzuć.",

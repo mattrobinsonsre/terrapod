@@ -32,6 +32,15 @@ interface CatalogItem {
     'module-provider': string
     'default-version-pin': string | null
     'allowed-agent-pool-ids': string[] | null
+    // Read-only here (#2019): the item admin owns these, and this page shows
+    // them so whoever is about to provision can see that the workspace they get
+    // carries a configure operation, and where its playbook lives. `default-limit`
+    // is deliberately shown too -- it narrows which hosts a configure reaches,
+    // which is not something to discover after the first run.
+    'configure-enabled': boolean
+    'ansible-directory': string
+    'default-playbook': string
+    'default-limit': string
   }
 }
 
@@ -542,6 +551,41 @@ export default function CatalogItemPage() {
               <span className="text-slate-500">{t('info.resolvedVersion')} </span>
               <span className="text-slate-200">{form?.['resolved-version'] || t('info.latest')}</span>
             </div>
+            {/* The Ansible half, read-only (#2019). Gated on `configure-enabled`
+              * ALONE: an item may carry a stored directory while the operation is
+              * off, so the path is not what says "on" -- reading the directory's
+              * emptiness as the switch is the mistake #1966 corrected on the
+              * workspace's own `config-directory`.
+              *
+              * The badge carries WHETHER and the pairs carry WHERE, which is why
+              * the badge is not conditional on a directory being set: an item
+              * whose directory is somehow absent still provisions a configure,
+              * and saying so is more use than showing nothing. The playbook and
+              * limit pairs are each optional because either may legitimately be
+              * empty -- no default playbook, or the whole inventory. */}
+            {a['configure-enabled'] && (
+              <>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-900/50 text-sky-300">{t('info.configureBadge')}</span>
+                {a['ansible-directory'] && (
+                  <div className="min-w-0">
+                    <span className="text-slate-500">{t('info.configureDirectory')} </span>
+                    <span className="text-slate-200 font-mono text-xs break-all">{a['ansible-directory']}</span>
+                  </div>
+                )}
+                {a['default-playbook'] && (
+                  <div className="min-w-0">
+                    <span className="text-slate-500">{t('info.configurePlaybook')} </span>
+                    <span className="text-slate-200 font-mono text-xs break-all">{a['default-playbook']}</span>
+                  </div>
+                )}
+                {a['default-limit'] && (
+                  <div className="min-w-0">
+                    <span className="text-slate-500">{t('info.configureLimit')} </span>
+                    <span className="text-slate-200 font-mono text-xs break-all">{a['default-limit']}</span>
+                  </div>
+                )}
+              </>
+            )}
             {!a.enabled && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('info.disabled')}</span>
             )}

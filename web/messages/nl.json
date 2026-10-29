@@ -1478,7 +1478,16 @@
       "anyPool": "Elke agent-pool mag worden gebruikt.",
       "labels": "Labels",
       "variableOptions": "Variabeleopties (geavanceerd, JSON)",
-      "variableOptionsHint": "Overschrijvingen per input (opties, verborgen, standaard). Laat <code>[]</code> staan indien niet gebruikt."
+      "variableOptionsHint": "Overschrijvingen per input (opties, verborgen, standaard). Laat <code>[]</code> staan indien niet gebruikt.",
+      "ansibleHeading": "Ansible-configure",
+      "ansibleDirectory": "Ansible-configuratiemap",
+      "defaultPlaybook": "Standaard-playbook",
+      "defaultPlaybookHint": "Het playbook dat een configure-operatie uitvoert wanneer de run zelf er geen noemt. Relatief ten opzichte van de configuratiemap.",
+      "defaultLimit": "Standaardlimiet",
+      "defaultLimitHint": "Het standaardpatroon voor --limit bij een configure-operatie. Laat leeg om de hele inventaris te raken.",
+      "configureEnabled": "Een configure-bewerking provisioneren",
+      "configureEnabledHint": "Uit tenzij je het aanzet. De workspace die dit item provisioneert krijgt dan een configure-bewerking naast de plan en de apply.",
+      "ansibleDirectoryHint": "De submap van de module die het playbook bevat. Terrapod kopieert deze naar de gegenereerde configuratieversie, en het wordt de Ansible-configuratiemap van de geprovisioneerde workspace. Relatief ten opzichte van de modulewortel, zonder slash aan het begin of eind."
     },
     "table": {
       "name": "Naam",
@@ -1506,7 +1515,8 @@
       "delete": "Kan catalogusitem niet verwijderen",
       "deleteConflict": "Kan niet verwijderen: dit catalogusitem heeft geprovisioneerde instanties.",
       "varOptsInvalidJson": "Variabeleopties moeten geldige JSON zijn (een array).",
-      "varOptsNotArray": "Variabeleopties moeten een JSON-array zijn."
+      "varOptsNotArray": "Variabeleopties moeten een JSON-array zijn.",
+      "configureNeedsDirectory": "Een Ansible-configuratiemap is vereist om een configure-bewerking te provisioneren. Noem de submap van de module die het playbook bevat."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Geen catalogusitems beschikbaar.",
     "card": {
       "pinned": "vastgepind {version}",
-      "latest": "nieuwste"
+      "latest": "nieuwste",
+      "configure": "Ansible-configure"
     },
     "errors": {
       "loadItems": "Kan catalogusitems niet laden"
@@ -1820,7 +1831,11 @@
       "module": "Module:",
       "resolvedVersion": "Opgeloste versie:",
       "latest": "nieuwste",
-      "disabled": "uitgeschakeld"
+      "disabled": "uitgeschakeld",
+      "configureBadge": "Ansible-configure",
+      "configureDirectory": "Map:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limiet:"
     },
     "pending": {
       "banner": "De uitvoering voor <strong>{name}</strong> is gepland en wacht op beoordeling. Bevestig om toe te passen, of verwerp.",

@@ -1478,7 +1478,16 @@
       "anyPool": "Quilibet agent pool usurpari potest.",
       "labels": "Tituli",
       "variableOptions": "Optiones variabilium (provectum, JSON)",
-      "variableOptionsHint": "Substitutiones per-ingressum (optiones, hidden, default). Relinque ut <code>[]</code> si non usurpatae."
+      "variableOptionsHint": "Substitutiones per-ingressum (optiones, hidden, default). Relinque ut <code>[]</code> si non usurpatae.",
+      "ansibleHeading": "Configuratio Ansible",
+      "ansibleDirectory": "Directorium configurationis Ansible",
+      "defaultPlaybook": "Libellus ludendi praedefinitus",
+      "defaultPlaybookHint": "Libellus ludendi quem operatio configurandi exsequitur cum cursus ipse nullum nominat. Relative ad directorium configurationis.",
+      "defaultLimit": "Limes praedefinitus",
+      "defaultLimitHint": "Exemplar --limit praedefinitum operationis configurandi. Vacuum relinque ut totum inventarium petatur.",
+      "configureEnabled": "Operationem configurationis providere",
+      "configureEnabledHint": "Exstinctum nisi id accendis. Locus operis quem hoc elementum providet tunc operationem configurationis praeter consilium et applicationem accipit.",
+      "ansibleDirectoryHint": "Subdirectorium moduli quod libellum ludendi continet. Terrapod id in versionem configurationis generatam transcribit, et fit directorium configurationis Ansible loci operis provisi. Ad radicem moduli relatum, sine virgula praeposita vel postposita."
     },
     "table": {
       "name": "Nomen",
@@ -1506,7 +1515,8 @@
       "delete": "Res catalogi deleri non potuit",
       "deleteConflict": "Deleri non potest: haec res catalogi instantias provisas habet.",
       "varOptsInvalidJson": "Optiones variabilium JSON validum esse debent (ordo).",
-      "varOptsNotArray": "Optiones variabilium ordo JSON esse debent."
+      "varOptsNotArray": "Optiones variabilium ordo JSON esse debent.",
+      "configureNeedsDirectory": "Directorium configurationis Ansible requiritur ad operationem configurationis providendam. Nomina subdirectorium moduli quod libellum ludendi continet."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Nullae res catalogi praesto.",
     "card": {
       "pinned": "fixata {version}",
-      "latest": "novissima"
+      "latest": "novissima",
+      "configure": "Configuratio Ansible"
     },
     "errors": {
       "loadItems": "Res catalogi onerari non potuerunt"
@@ -1820,7 +1831,11 @@
       "module": "Modulus:",
       "resolvedVersion": "Versio resoluta:",
       "latest": "novissima",
-      "disabled": "deactivata"
+      "disabled": "deactivata",
+      "configureBadge": "Configuratio Ansible",
+      "configureDirectory": "Directorium:",
+      "configurePlaybook": "Libellus ludendi:",
+      "configureLimit": "Limes:"
     },
     "pending": {
       "banner": "Exsecutio pro <strong>{name}</strong> consilio facta est et recognitionem exspectat. Confirma ut applices, aut reice.",
