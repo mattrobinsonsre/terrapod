@@ -1142,6 +1142,24 @@
             "string"
           ]
         },
+        "auto_merge": {
+          "description": "merge the pull request once every workspace it affects has reached its required state. It fires through the VCS provider's own merge API, so the effect is on the REPOSITORY rather than on this workspace. Available in both vcs_workflow modes and most useful with apply_then_merge. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "auto_merge_strategy": {
+          "description": "how auto_merge merges: merge, squash or rebase. Only meaningful with auto_merge true. Omit to leave the stored value alone",
+          "type": "string"
+        },
+        "debug_mode": {
+          "description": "hold this workspace's FAILED runner pods open for inspection rather than letting them be cleaned up. The pod keeps the run's auth token and its decrypted tfvars for that window, so this trades an exposure window for debuggability; how long the window lasts is the deployment's call (runners.debugLingerSeconds), not the workspace's. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "drift_detection_enabled": {
           "description": "whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone",
           "type": [
@@ -1211,6 +1229,10 @@
         },
         "resource_memory": {
           "description": "memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu",
+          "type": "string"
+        },
+        "security_scan_enforcement": {
+          "description": "what a security-scan finding DOES: off (do not scan at all), advisory (report and let the run continue) or enforced (hold the apply until the finding is overridden). Distinct from security_scan_severity_threshold, which decides what is REPORTED rather than what blocks. Omit to leave the stored value alone",
           "type": "string"
         },
         "security_scan_engine": {

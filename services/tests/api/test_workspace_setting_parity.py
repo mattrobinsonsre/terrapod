@@ -268,27 +268,34 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
     },
 }
 
-#: `debug-mode` arms a pod that holds the run's credentials and keeps it alive
-#: for inspection; `auto-merge` and its strategy merge pull requests;
-#: `security-scan-enforcement` is a governance gate. Each may still belong on
-#: the tool surface -- the point is that it is a DECISION rather than an
-#: omission, which is why it carries its own reason and not the generic one.
-JUDGEMENT_REASON = (
-    "#2174 -- a genuine judgement, to be argued there: an agent flipping this "
-    "has consequences beyond the workspace's own configuration"
-)
-
-#: UNANSWERED rather than answered-no, which is why these are here and not in
-#: `_SURFACE_EXEMPT` above. The wire half of #2174 is closed on this line: the
-#: eighteen attributes that were missing merely because MCP had no parity gate
-#: are wired, so nothing is left in this ledger that only needs doing.
+#: Genuine gaps -- a debt, not a decision, and kept in a SEPARATE ledger from
+#: `_SURFACE_EXEMPT` so a real gap cannot hide behind the word "exempt".
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
-    "MCP workspace tools": {
-        "debug-mode": JUDGEMENT_REASON,
-        "auto-merge": JUDGEMENT_REASON,
-        "auto-merge-strategy": JUDGEMENT_REASON,
-        "security-scan-enforcement": JUDGEMENT_REASON,
-    },
+    # EMPTY, which is where a debt ledger is supposed to end up.
+    #
+    # It held the four #2174 called genuine judgements -- `debug-mode`,
+    # `auto-merge`, `auto-merge-strategy`, `security-scan-enforcement` -- and the
+    # reasons were all of the same wrong shape: each was a property of the
+    # SETTING (it arms a credential-holding pod, it merges pull requests, it is a
+    # governance gate) and none was a property of the CALLER.
+    #
+    # The MCP server is not an authorization boundary. It carries the user's own
+    # token and the API applies RBAC identically whatever the client is, so a
+    # user RBAC permits reaches all four through curl, the provider or the UI,
+    # and a user RBAC forbids is refused at every door. Withholding a property
+    # protected nobody, while leaving an agent able to READ a setting it could
+    # not SET -- the asymmetry this gate exists to catch. So the ledger was
+    # recording a defect rather than a decision.
+    #
+    # The test when a future entry is proposed: is the reason about the CALLER?
+    # A reason that would apply equally to the UI, the provider and the API is an
+    # argument about the feature and belongs on the feature. There is
+    # deliberately no generic reason string left in this module -- an unused
+    # reason is an invitation to file something here without deciding anything.
+    #
+    # Settled on main in #2288 and carried here as the minimal change for this
+    # line, not as a cherry-pick: main's `workspaceUpdateIn` has diverged, so
+    # picking it would drag features onto a release branch.
 }
 
 

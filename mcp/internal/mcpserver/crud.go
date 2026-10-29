@@ -95,12 +95,31 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// parity gate, so it drifted. A tool surface that reports a setting it
 		// cannot set invites an agent to describe a change it is unable to make.
 		//
-		// FOUR of this line's 22 stay absent and keep their own reason in the
-		// gate's debt ledger: debug_mode arms a pod that holds the run's
-		// credentials and keeps it alive for inspection, auto_merge and
-		// auto_merge_strategy merge pull requests, security_scan_enforcement is a
-		// governance gate. Each reaches outside the workspace's own configuration,
-		// so whether an agent should hold it is a decision, not an omission.
+		// The FOUR this line held back now ship too, and how that reasoning was
+		// wrong is worth recording: every reason given was a property of the
+		// SETTING -- debug_mode arms a credential-holding pod, auto_merge reaches
+		// the repository, security_scan_enforcement is a governance gate -- and
+		// not one was a property of the CALLER.
+		//
+		// This server is not an authorization boundary. It carries the user's own
+		// token and the API applies RBAC identically whatever the client is, so a
+		// user RBAC permits reaches all four through curl, the provider or the UI,
+		// and a user RBAC forbids is refused at every door. Withholding a property
+		// protected nobody; it only let an agent READ a setting it could not SET,
+		// which is the asymmetry this block exists to close.
+		//
+		// The measurement that settles it: this same server already ships
+		// terrapod_policy_check_override, terrapod_run_security_scan_override and
+		// terrapod_run_ai_policy_override, every one annotated destructive. An
+		// agent could already defeat a MANDATORY policy check on a blocked run
+		// while being unable to edit that workspace's scan setting.
+		//
+		// So risk is signalled by ANNOTATION, never by absence. Carried from main
+		// (#2288) as the minimal change for this line rather than as a
+		// cherry-pick: main's struct has diverged (ansible, EE sizing,
+		// engine_version), so picking it would drag features onto a release
+		// branch. The field list is this line's own, for the same reason the
+		// eighteen above were.
 		//
 		// This list is NOT main's: parallelism is not an attribute on this line at
 		// all, and the AI and resource-sizing keys below reached MCP on main only.
@@ -110,12 +129,16 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AIPolicyMode                  string   `json:"ai_policy_mode,omitempty" jsonschema:"this workspace's override for the AI POLICY GATE -- whether a run's plan is reviewed by a model before it may apply: enabled, disabled or inherit. inherit defers to the deployment setting, which is the default and is NOT the same as disabled. Omit to leave the stored value alone. Distinct from ai_summary_mode: the gate can BLOCK a run, the summary only describes one"`
 		AISummaryMode                 string   `json:"ai_summary_mode,omitempty" jsonschema:"this workspace's override for AI PLAN SUMMARIES -- prose describing what a plan will do, which blocks nothing: enabled, disabled or inherit. inherit defers to the deployment setting. Omit to leave the stored value alone"`
 		AISummaryContext              *string  `json:"ai_summary_context,omitempty" jsonschema:"workspace-specific facts given to the model on top of the deployment's own context -- what this estate is for, naming conventions, which resources are load-bearing. Prose, not configuration: it changes what a summary SAYS, never what a run does. Capped at 4000 characters. Omitting the field leaves the stored value alone; pass an EMPTY STRING to clear it. A pointer, unlike the two modes above, because there an empty string means leave-alone while here it is a real value meaning clear-what-is-stored"`
+		AutoMerge                     *bool    `json:"auto_merge,omitempty" jsonschema:"merge the pull request once every workspace it affects has reached its required state. It fires through the VCS provider's own merge API, so the effect is on the REPOSITORY rather than on this workspace. Available in both vcs_workflow modes and most useful with apply_then_merge. Omit to leave the stored value alone"`
+		AutoMergeStrategy             string   `json:"auto_merge_strategy,omitempty" jsonschema:"how auto_merge merges: merge, squash or rebase. Only meaningful with auto_merge true. Omit to leave the stored value alone"`
+		DebugMode                     *bool    `json:"debug_mode,omitempty" jsonschema:"hold this workspace's FAILED runner pods open for inspection rather than letting them be cleaned up. The pod keeps the run's auth token and its decrypted tfvars for that window, so this trades an exposure window for debuggability; how long the window lasts is the deployment's call (runners.debugLingerSeconds), not the workspace's. Omit to leave the stored value alone"`
 		DriftDetectionEnabled         *bool    `json:"drift_detection_enabled,omitempty" jsonschema:"whether Terrapod plans this workspace on a schedule to detect drift -- infrastructure that no longer matches the recorded state. A drift run is plan-only and never applies. Omit to leave the stored value alone"`
 		DriftDetectionIntervalSeconds *int64   `json:"drift_detection_interval_seconds,omitempty" jsonschema:"how often a drift check runs, in seconds; 86400 (daily) by default. Only meaningful with drift_detection_enabled true. Omit to leave the stored value alone"`
 		DriftIgnoreRules              []string `json:"drift_ignore_rules,omitempty" jsonschema:"resource addresses or attribute paths whose drift is not reported -- for the perpetual phantom diffs a provider produces on write-only attributes. Pass an empty list to remove every rule; omitting the field leaves the stored list alone"`
 		PlanExpirySeconds             *int64   `json:"plan_expiry_seconds,omitempty" jsonschema:"how long an apply-capable plan may wait for confirmation before it is expired; unset means never, which is the default. It does NOT expire speculative plans. Omit to leave the stored value alone"`
 		ResourceCPU                   string   `json:"resource_cpu,omitempty" jsonschema:"CPU request for this workspace's runner Jobs, as a Kubernetes quantity: a whole number of CPUs (1, 4) or millicores (500m). The LIMIT is twice this, computed automatically. Decimals (0.5) and decimal SI suffixes are refused (422), because the limit is 2x the request and those forms cannot be doubled. Omit to leave the stored value alone"`
 		ResourceMemory                string   `json:"resource_memory,omitempty" jsonschema:"memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu"`
+		SecurityScanEnforcement       string   `json:"security_scan_enforcement,omitempty" jsonschema:"what a security-scan finding DOES: off (do not scan at all), advisory (report and let the run continue) or enforced (hold the apply until the finding is overridden). Distinct from security_scan_severity_threshold, which decides what is REPORTED rather than what blocks. Omit to leave the stored value alone"`
 		SecurityScanEngine            string   `json:"security_scan_engine,omitempty" jsonschema:"which scanner reviews a plan: checkov or trivy. Omit to leave the stored value alone"`
 		SecurityScanSeverityThreshold string   `json:"security_scan_severity_threshold,omitempty" jsonschema:"the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone"`
 		SecurityScanSkipRules         []string `json:"security_scan_skip_rules,omitempty" jsonschema:"scanner rule ids this workspace does not report, as the scanner itself names them (e.g. CKV_AWS_18). Pass an empty list to remove every skip; omitting the field leaves the stored list alone"`
@@ -154,6 +177,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AIPolicyMode:                  in.AIPolicyMode,
 			AISummaryMode:                 in.AISummaryMode,
 			AISummaryContext:              in.AISummaryContext,
+			AutoMerge:                     in.AutoMerge,
+			AutoMergeStrategy:             in.AutoMergeStrategy,
+			DebugMode:                     in.DebugMode,
+			SecurityScanEnforcement:       in.SecurityScanEnforcement,
 			DriftDetectionEnabled:         in.DriftDetectionEnabled,
 			DriftDetectionIntervalSeconds: in.DriftDetectionIntervalSeconds,
 			DriftIgnoreRules:              in.DriftIgnoreRules,
