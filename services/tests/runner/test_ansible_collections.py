@@ -68,6 +68,18 @@ class TestTheServerURL:
         assert TOKEN not in ac.galaxy_server_url(API)
 
 
+#: Exactly what `galaxy_env` may hand the execution environment (#2305). Named
+#: here rather than derived from the function, so a key added there fails a test
+#: rather than being blessed by the gate meant to bound it.
+_ALLOWED_KEYS = {
+    "ANSIBLE_GALAXY_SERVER_LIST",
+    f"ANSIBLE_GALAXY_SERVER_{ac.SERVER_NAME.upper()}_URL",
+    f"ANSIBLE_GALAXY_SERVER_{ac.SERVER_NAME.upper()}_TOKEN",
+    "ANSIBLE_COLLECTIONS_PATH",
+    "ANSIBLE_ROLES_PATH",
+}
+
+
 class TestTheEnvironment:
     def test_the_server_is_named_and_pointed_at_us(self) -> None:
         env = ac.galaxy_env(API, TOKEN, base={})
@@ -91,14 +103,39 @@ class TestTheEnvironment:
         assert "ANSIBLE_GALAXY_SERVER_EVIL_URL" not in env
         assert "ANSIBLE_GALAXY_SERVER_EVIL_TOKEN" not in env
 
-    def test_the_operators_other_ansible_settings_SURVIVE(self) -> None:
-        """The inventory resolver strips the whole `ANSIBLE_*` prefix, and that is
-        right in the API pod where no operator-supplied environment exists. On a
-        runner it is where a workspace's own environment variables arrive, so
-        blanket-stripping would silently discard what the operator set."""
-        env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_FORKS": "25", "ANSIBLE_STRATEGY": "free"})
-        assert env["ANSIBLE_FORKS"] == "25"
-        assert env["ANSIBLE_STRATEGY"] == "free"
+    def test_nothing_else_from_this_process_crosses_into_the_EE(self) -> None:
+        """Supersedes `test_the_operators_other_ansible_settings_SURVIVE` (#2305).
+
+        **Half of that test's reason still holds and half of it was wrong.** It
+        argued that blanket-stripping would discard what the operator set, which
+        is true of the API pod's resolver and false here: a workspace's own
+        environment variables arrive in the ORCHESTRATOR, and this env is handed
+        to the EE, a different container with a different filesystem. So
+        forwarding them was not preserving the operator's settings -- for the
+        galaxy install it was shipping one container's paths into another's, and
+        `configure._forced_env` strips every inherited `ANSIBLE_*` before the
+        playbook runs anyway, so these never reached ansible by this route.
+
+        What it cost: `HOME=/home/runner` overrode the EE's own `HOME=/tp/home`,
+        and `ansible-galaxy` exited 1 with ENOENT because the EE has no such
+        directory (its passwd home is `/home/ansible`).
+        """
+        leaky = {
+            "ANSIBLE_FORKS": "25",
+            "ANSIBLE_STRATEGY": "free",
+            "HOME": "/home/runner",
+            "TMPDIR": "/tmp",
+            "ANSIBLE_LOCAL_TEMP": "/tmp/ansible-local",
+        }
+        assert set(ac.galaxy_env(API, TOKEN, base=leaky)) == _ALLOWED_KEYS
+
+    def test_the_allow_list_is_exactly_these_keys(self) -> None:
+        """A floor AND a membership assertion, because a set-iterating gate also
+        passes when the set merely SHRINKS. The two search paths are the only
+        values read off the caller's environment; everything else is ours."""
+        env = ac.galaxy_env(API, TOKEN, base={})
+        assert set(env) == _ALLOWED_KEYS
+        assert len(_ALLOWED_KEYS) == 5
 
     def test_a_vendored_collections_path_is_kept_after_ours(self) -> None:
         """A repository that vendors collections sets this itself; discarding it
@@ -107,9 +144,32 @@ class TestTheEnvironment:
         env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_COLLECTIONS_PATH": "/repo/collections"})
         assert env["ANSIBLE_COLLECTIONS_PATH"] == f"{ac.collections_dir()}:/repo/collections"
 
-    def test_an_operators_ansible_home_wins(self) -> None:
-        env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_HOME": "/repo/.ansible"})
-        assert env["ANSIBLE_HOME"] == "/repo/.ansible"
+    def test_no_ansible_home_is_set_at_all(self) -> None:
+        """Supersedes `test_a_writable_home_is_supplied_when_they_set_none` and
+        `test_an_operators_ansible_home_wins` (#2305).
+
+        The old default was `/tmp/ansible-home`: the orchestrator's writable
+        `tmp` emptyDir, and the EE's **read-only root**. Measured against the
+        published image with a read-only root and the Job's own env:
+
+            ANSIBLE_HOME=/tmp/ansible-home   rc=1  `[Errno 30] Read-only file
+                                                    system: /tmp/ansible-home`
+            ANSIBLE_HOME unset               rc=0  cache at
+                                                    /tp/home/.ansible/galaxy_cache
+
+        So no collection could be installed at all. `ANSIBLE_LOCAL_TEMP` does
+        not rescue it -- the Job already points that at the shared volume and
+        galaxy still fails, because what it needs is `ANSIBLE_HOME/galaxy_cache`.
+
+        Setting nothing is the fix: ansible derives it from `~`, and the EE's own
+        `HOME` is on the shared volume. The operator-wins half of the superseded
+        test described a capability that did not exist end to end either, since
+        `configure._forced_env` strips an inherited `ANSIBLE_HOME` regardless.
+        """
+        assert "ANSIBLE_HOME" not in ac.galaxy_env(API, TOKEN, base={})
+        assert "ANSIBLE_HOME" not in ac.galaxy_env(
+            API, TOKEN, base={"ANSIBLE_HOME": "/repo/.ansible"}
+        )
 
     def test_a_vendored_roles_path_is_kept_after_ours(self) -> None:
         env = ac.galaxy_env(API, TOKEN, base={"ANSIBLE_ROLES_PATH": "/repo/roles"})
@@ -119,9 +179,20 @@ class TestTheEnvironment:
         env = ac.galaxy_env(API, TOKEN, base={})
         assert env["ANSIBLE_ROLES_PATH"] != env["ANSIBLE_COLLECTIONS_PATH"]
 
-    def test_a_writable_home_is_supplied_when_they_set_none(self) -> None:
-        """The root filesystem is read-only."""
-        assert ac.galaxy_env(API, TOKEN, base={})["ANSIBLE_HOME"] == "/tmp/ansible-home"
+    def test_no_value_names_a_path_outside_the_shared_volume(self) -> None:
+        """The property both defects violated, stated once.
+
+        Every path this env names has to exist in the EE, and the only paths that
+        do are on the shared volume -- or the operator's own, which they chose
+        and which is theirs to get right.
+        """
+        env = ac.galaxy_env(API, TOKEN, base={})
+        for key, value in env.items():
+            if value.startswith("/"):
+                assert value.startswith(str(ac.collections_dir().parent)), (
+                    f"{key}={value} names a path outside the shared volume, so it is "
+                    "this process's filesystem rather than the execution environment's"
+                )
 
 
 class TestWhichRequirementsAreInstalled:

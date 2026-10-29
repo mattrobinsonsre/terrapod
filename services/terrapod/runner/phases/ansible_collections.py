@@ -177,10 +177,27 @@ def galaxy_env(api_url: str, token: str, *, base: dict[str, str] | None = None) 
     """
     source = dict(os.environ if base is None else base)
 
-    # Replaced, not merged -- see the module docstring. Scoped to the galaxy
-    # server keys, because every other `ANSIBLE_*` on a runner may be the
-    # operator's own, delivered as a workspace environment variable.
-    inherited = {k: v for k, v in source.items() if not k.startswith("ANSIBLE_GALAXY_SERVER")}
+    # AN ALLOW-LIST, not a filtered copy of this process's environment, and the
+    # difference is two measured failures rather than tidiness (#2305).
+    #
+    # `ee_client.run`'s env is ADDED to the execution environment's own -- the
+    # agent runs `scrubbed(os.Environ(), req.Env, ...)` -- so anything returned
+    # here OVERRIDES what the Job set for that container. This function runs in
+    # the ORCHESTRATOR, whose filesystem is not the EE's, so forwarding its
+    # environment wholesale forwarded paths that do not exist over there.
+    # Measured against the published EE image with a read-only root:
+    #
+    #     HOME=/home/runner   (the orchestrator's, forwarded)  rc=1, ENOENT
+    #     HOME=/tp/home       (the EE's own, from the Job)      rc=0
+    #
+    # A deny-list of the path-shaped names found so far would fix those two and
+    # leave the next one to be found the same way, because the set of variables
+    # naming a path is unbounded -- which is the argument the module docstring
+    # already makes for replacing the galaxy server keys rather than merging
+    # them. So: name what the EE needs to learn from here, and let its own
+    # environment supply `HOME`, `TMPDIR` and the ansible temp paths, which the
+    # Job already sets correctly for it. `configure._forced_env` takes the same
+    # position from the other direction, stripping every inherited `ANSIBLE_*`.
     upper = SERVER_NAME.upper()
 
     # Ours FIRST, theirs kept after it: a repository that vendors collections
@@ -197,18 +214,29 @@ def galaxy_env(api_url: str, token: str, *, base: dict[str, str] | None = None) 
     if existing_roles := source.get("ANSIBLE_ROLES_PATH", "").strip():
         roles_path = f"{roles_path}:{existing_roles}"
 
-    env = {
-        **inherited,
+    # The two search paths are the allow-list's only members: both are read off
+    # `source` above so a repository vendoring its own collections or roles keeps
+    # working, which is why they are forwarded explicitly rather than dropped
+    # with the rest (user's call, #2305).
+    #
+    # **There is deliberately no `ANSIBLE_HOME`.** It used to default to
+    # `/tmp/ansible-home`, which is the ORCHESTRATOR's writable `tmp` emptyDir
+    # and the EE's READ-ONLY ROOT -- so `ansible-galaxy` exited 1 with
+    # `Unable to create local directories b'/tmp/ansible-home/galaxy_cache':
+    # [Errno 30] Read-only file system`, and no collection could be installed at
+    # all. `ANSIBLE_LOCAL_TEMP` does not rescue it: the Job already points that
+    # at the shared volume and galaxy still fails, because what it needs is
+    # `ANSIBLE_HOME/galaxy_cache`. Setting nothing is what works -- measured
+    # rc=0 with the cache landing at `/tp/home/.ansible/galaxy_cache` -- because
+    # ansible derives it from `~`, and the EE's own `HOME` is on the shared
+    # volume. One fewer path to keep in step with the Job's volume layout.
+    return {
         "ANSIBLE_GALAXY_SERVER_LIST": SERVER_NAME,
         f"ANSIBLE_GALAXY_SERVER_{upper}_URL": galaxy_server_url(api_url),
         f"ANSIBLE_GALAXY_SERVER_{upper}_TOKEN": token,
         "ANSIBLE_COLLECTIONS_PATH": search_path,
         "ANSIBLE_ROLES_PATH": roles_path,
     }
-    # The root filesystem is read-only, so ansible needs somewhere to write --
-    # but only if the operator has not already said where.
-    env.setdefault("ANSIBLE_HOME", "/tmp/ansible-home")
-    return env
 
 
 def _run_install(
