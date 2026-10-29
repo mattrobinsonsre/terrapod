@@ -244,6 +244,19 @@ that surfaces the changed thing has been carried along with it.
   A new capability an agent should be able to observe or drive is not complete
   until it has a tool. Its tools inherit the API's RBAC (they act as the user's
   `tofu login` identity), so no tool may widen access beyond what the API grants.
+    And the converse, which is the half that gets missed: **the MCP server is not
+    an authorization boundary, so completeness of the surface it wraps is the
+    DEFAULT and a missing property is not a control.** It carries the user's own
+    token and the API applies the same RBAC it applies to the UI, the provider and
+    `curl`, so withholding an attribute from a tool protects nobody: whoever RBAC
+    permits reaches it through another door, and whoever RBAC forbids is refused
+    whichever door they use. What an omission *does* achieve is an asymmetry — an
+    agent that can **read** a setting and not **set** it, which invites it to
+    describe a change it cannot make. Risk is communicated by **annotation**
+    (`destructive`, `mutating`, `readOnly`), never by absence. So a reason to leave
+    something off a tool has to be a property of the CALLER; a reason that is a
+    property of the SETTING ("this one is consequential") applies equally to every
+    other client and is therefore an argument about the feature, not about MCP.
 
 The workflow when extending the API:
 
