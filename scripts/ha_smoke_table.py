@@ -30,7 +30,10 @@ results: list[tuple[str, str, str, str]] = []
 
 def _k(*args: str, check: bool = True) -> str:
     out = subprocess.run(
-        ["kubectl", "--context", CTX, *args], capture_output=True, text=True
+        ["kubectl", "--context", CTX, *args],
+        capture_output=True,
+        text=True,
+        check=False,  # NOT this function's `check` -- that is applied below
     )
     if check and out.returncode != 0:
         raise RuntimeError(f"kubectl {' '.join(args)} failed:\n{_trim(out.stderr)}")
@@ -109,7 +112,9 @@ def _helm(ns: str, *overrides: str, timeout: str = "8m") -> None:
         ["helm", "--kube-context", CTX, "upgrade", REL[ns], "helm/terrapod",
          "-n", ns, "-f", f"helm/terrapod/values-ha-{ns[-1]}.yaml",
          *overrides, "--reuse-values", "--wait", "--timeout", timeout],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
+        check=False,  # deliberate -- see the docstring: helm's own stderr is the error
     )
     if out.returncode != 0:
         raise RuntimeError(f"helm upgrade {REL[ns]} failed:\n{_trim(out.stderr or out.stdout)}")

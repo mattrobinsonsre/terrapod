@@ -260,6 +260,7 @@ def is_tag(regexes: list[str], tag: str) -> bool:
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,  # exit 1 means "the regex did not match", not an error
     )
     if proc.returncode not in (0, 1):
         raise RuntimeError(f"the extracted `is_tag` test errored: {proc.stderr.strip()}")
@@ -273,6 +274,7 @@ def elect(pipeline: str, tags: list[str]) -> str:
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,  # the returncode is inspected below, to report stderr
     )
     if proc.returncode != 0:
         raise RuntimeError(

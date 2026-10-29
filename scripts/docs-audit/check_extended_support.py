@@ -115,7 +115,12 @@ def run_discover(src: str, policy: dict, *, explicit: str = "", minors: str = "2
         (Path(d) / "discover.py").write_text(src)
         env = {**os.environ, "INPUT_TAGS": explicit, "INPUT_MINORS": minors}
         out = subprocess.run(
-            [sys.executable, "-I", "discover.py"], cwd=d, env=env, capture_output=True, text=True
+            [sys.executable, "-I", "discover.py"],
+            cwd=d,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,  # the returncode is inspected below, to report stderr
         )
         if out.returncode != 0:
             raise SystemExit(f"FAIL: the extracted discover block errored:\n{out.stderr}")
