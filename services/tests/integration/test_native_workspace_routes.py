@@ -129,6 +129,16 @@ class TestTheNativeSurfaceServesEveryEngine:
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-limit": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        # Whether the repository's dynamic inventory sources are resolved on the
+        # runner (#2033). Native-only for the same two reasons as the roots: both
+        # govern an Ansible inventory resolution, and no `terraform`/`tofu`/`tfci`
+        # invocation reads either.
+        "dynamic-inventory-enabled": (
+            "an Ansible concept; the TFE surface serves Terraform alone (#2033)"
+        ),
+        "inventory-scripts-enabled": (
+            "an Ansible concept; the TFE surface serves Terraform alone (#2033)"
+        ),
     }
 
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):

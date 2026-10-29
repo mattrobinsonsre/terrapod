@@ -85,6 +85,11 @@ class TestAutodiscoveryRule:
             inventory_paths=[],
             default_playbook="",
             default_limit="",
+            # #2033's pair. Set explicitly, both off, because these reach a
+            # `bool(...)`: an auto-attribute on a MagicMock would read as TRUE,
+            # and on a SimpleNamespace it raises -- which is how this failed.
+            dynamic_inventory_enabled=False,
+            inventory_scripts_enabled=False,
             resource_cpu="1",
             parallelism=10,
             resource_memory="2Gi",
