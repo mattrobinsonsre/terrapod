@@ -86,6 +86,8 @@ _FIELD_MAP: dict[str, str] = {
     # is what this surface exists to avoid.
     "auto-configure-enabled": "auto_configure_enabled",
     "configure-all-hosts": "configure_all_hosts",
+    "dynamic-inventory-enabled": "dynamic_inventory_enabled",
+    "inventory-scripts-enabled": "inventory_scripts_enabled",
     "configure-after-apply": "configure_after_apply",
     # The Ansible roots and run defaults (#1929). `config-directory` is an
     # ordinary path, `""` meaning the configuration version's root.
@@ -417,6 +419,12 @@ _SETTING_RULES: dict[str, Any] = {
     "plan-apply-enabled": lambda v: workspace_settings.validate_bool(v, "plan-apply-enabled"),
     "configure-enabled": lambda v: workspace_settings.validate_bool(v, "configure-enabled"),
     "configure-all-hosts": lambda v: workspace_settings.validate_bool(v, "configure-all-hosts"),
+    "dynamic-inventory-enabled": lambda v: workspace_settings.validate_bool(
+        v, "dynamic-inventory-enabled"
+    ),
+    "inventory-scripts-enabled": lambda v: workspace_settings.validate_bool(
+        v, "inventory-scripts-enabled"
+    ),
     "auto-configure-enabled": lambda v: workspace_settings.validate_bool(
         v, "auto-configure-enabled"
     ),

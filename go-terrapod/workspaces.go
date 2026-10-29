@@ -152,6 +152,21 @@ type Workspace struct {
 	// This flag is the override and it WIDENS. That direction is deliberate:
 	// a flag someone forgets leaves them configuring more, not less.
 	ConfigureAllHosts bool `json:"configure-all-hosts"`
+	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin -- a
+	// declared plugin config, a YAML file with a top-level `plugin:` key -- ON
+	// THE RUNNER (#2033). The API never runs one in either state.
+	//
+	// Off, a plugin source is REFUSED BY NAME rather than resolving partially,
+	// because a short host set read as the truth is the failure the inventory
+	// surface exists to prevent. On, the API SKIPS it and says so per source,
+	// and the runner re-resolves and is authoritative.
+	DynamicInventoryEnabled bool `json:"dynamic-inventory-enabled"`
+	// InventoryScriptsEnabled permits ansible's `script` plugin -- an
+	// EXECUTABLE inventory script -- on the runner (#2033). Separate from
+	// DynamicInventoryEnabled so an operator can take declared plugin configs
+	// without also permitting arbitrary executables: a declared config names a
+	// collection that can be pinned and installed, a script names nothing.
+	InventoryScriptsEnabled bool `json:"inventory-scripts-enabled"`
 	// ConfigDirectory is the directory the ansible configure operation runs in
 	// (#1929), relative to the configuration version's root: its fetch scope
 	// and the resolver's and executor's working directory.
@@ -394,6 +409,13 @@ type CreateWorkspaceRequest struct {
 	// inventory change affected (#2229). A POINTER for the reason the pair
 	// above gives; the server-side default is FALSE, which narrows.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin on the
+	// runner for the new workspace (#2033). A POINTER for the reason the pair
+	// above gives; the server-side default is FALSE, which refuses.
+	DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
+	// InventoryScriptsEnabled permits ansible's `script` plugin -- executable
+	// inventory scripts -- on the runner (#2033). Server-side default FALSE.
+	InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 	// ConfigDirectory says where the ansible configure operation is rooted
 	// (#1929), relative to the configuration version's root. It does NOT turn
 	// the operation on -- ConfigureEnabled does (#1966).
@@ -555,6 +577,12 @@ type UpdateWorkspaceRequest struct {
 	// ConfigureAllHosts turns the narrowing off or back on (#2229). A POINTER
 	// so nil leaves the stored value alone.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// DynamicInventoryEnabled turns the `auto` inventory plugin on or off for
+	// this workspace's runs (#2033). A POINTER so nil leaves it alone.
+	DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
+	// InventoryScriptsEnabled turns executable inventory scripts on or off
+	// (#2033). A POINTER so nil leaves it alone.
+	InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 	// ConfigDirectory moves where the ansible configure operation is rooted
 	// (#1929). Still a POINTER here, and for a different reason from the two
 	// fields above: a PATCH needs to distinguish "leave it alone" from "set it
@@ -924,6 +952,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
 	}
+	if req.DynamicInventoryEnabled != nil {
+		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
+	}
+	if req.InventoryScriptsEnabled != nil {
+		attrs["inventory-scripts-enabled"] = *req.InventoryScriptsEnabled
+	}
 	if req.ConfigDirectory != "" {
 		attrs["config-directory"] = req.ConfigDirectory
 	}
@@ -1103,6 +1137,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
+	}
+	if req.DynamicInventoryEnabled != nil {
+		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
+	}
+	if req.InventoryScriptsEnabled != nil {
+		attrs["inventory-scripts-enabled"] = *req.InventoryScriptsEnabled
 	}
 	// A pointer so that `&""` can root the operation at the configuration
 	// version's root while nil leaves the stored value alone. There is no null
@@ -1304,6 +1344,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
 		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
 		ConfigureAllHosts:             GetBoolAttr(res, "configure-all-hosts"),
+		DynamicInventoryEnabled:       GetBoolAttr(res, "dynamic-inventory-enabled"),
+		InventoryScriptsEnabled:       GetBoolAttr(res, "inventory-scripts-enabled"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),

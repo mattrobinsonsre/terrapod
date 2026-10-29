@@ -507,6 +507,42 @@ class Workspace(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
+    #: Permit ansible's `auto` inventory plugin -- a declared plugin config, a
+    #: YAML file carrying a top-level `plugin:` key -- ON THE RUNNER (#2033).
+    #:
+    #: **The API never runs one, in either state.** #1970's measured objection
+    #: was entirely about WHERE the code runs: an inventory plugin is arbitrary
+    #: code, and the API pod's environment holds the database URL, the token
+    #: signing key, the KEK, the Redis URL and the pod's cloud identity. A runner
+    #: Job has none of those, and it already executes the operator's playbook,
+    #: which is strictly more powerful. So permitting one THERE concedes nothing
+    #: that running the playbook has not already conceded.
+    #:
+    #: Off means a plugin source is REFUSED BY NAME rather than resolving
+    #: partially -- a short host set read as the truth is the failure this whole
+    #: surface exists to prevent. On means the API SKIPS it and says so per
+    #: source, and the runner re-resolves and is authoritative.
+    dynamic_inventory_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
+    #: Permit ansible's `script` inventory plugin -- an EXECUTABLE inventory
+    #: script -- on the runner (#2033). Separate from `dynamic_inventory_enabled`
+    #: deliberately, so an operator can take declared plugins without also
+    #: permitting arbitrary executables.
+    #:
+    #: A declared plugin config is inspectable: it names a collection we can pin
+    #: and install, and its `plugin:` key is what the API detects. A script has
+    #: none of that -- no config to read, nothing to pin -- so the two are not
+    #: one decision even though #1970's argument covers both.
+    #:
+    #: On the runner the ENVIRONMENT is the only control: `_safe_extract` uses
+    #: `set_attrs=True`, so a committed executable arrives executable and the
+    #: API-side exec-bit strip never reaches it. Measured.
+    inventory_scripts_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
     #: The inventory equality token the last auto-configure was created for
     #: (#2224). Server-managed, and never a setting: an operator sets
     #: `auto_configure_enabled`; this is how the platform remembers what it has
@@ -1940,6 +1976,16 @@ class AutodiscoveryRule(Base):
     configure_after_apply: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false", default=False
     )
+
+    #: Templated onto the workspaces this rule materialises, like every other
+    #: setting here. Both default off, so a rule that says nothing creates
+    #: workspaces that refuse plugin sources -- the safe direction (#2033).
+    dynamic_inventory_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    inventory_scripts_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
     config_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -3035,6 +3081,17 @@ class Run(Base):
     #: an apply, then a configure. Without the distinction the plan tuple's
     #: `is_configure IS false` clause means a composite can never plan at all.
     configure_after_apply: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
+    #: Snapshotted from the workspace at run creation, like `ee_image` and the
+    #: resource requests: it is what THIS run was dispatched with, and it has to
+    #: stay answerable after the workspace setting moves. The runner composes its
+    #: `ANSIBLE_INVENTORY_ENABLED` from these two (#2033).
+    dynamic_inventory_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    inventory_scripts_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false", default=False
     )
     #: The playbook THIS run executes, relative to the workspace's
