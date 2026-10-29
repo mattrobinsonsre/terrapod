@@ -28,6 +28,14 @@ interface CatalogItem {
     'provider-template-ids': string[]
     'allowed-agent-pool-ids': string[] | null
     'variable-options': unknown[]
+    // The Ansible half this item provisions (#2019). `configure-enabled` says
+    // WHETHER and `ansible-directory` says WHERE -- an empty path is not "off",
+    // which is the distinction #1966 corrected on the workspace's own
+    // `config-directory`, so the two are independent here too.
+    'configure-enabled': boolean
+    'ansible-directory': string
+    'default-playbook': string
+    'default-limit': string
     labels: Record<string, string>
     'owner-email': string
   }
@@ -58,6 +66,10 @@ const EMPTY_FORM = {
   providerTemplateIds: [] as string[],
   // null sentinel: "any pool". An empty array means "explicitly none allowed".
   allowedPoolIds: null as string[] | null,
+  configureEnabled: false,
+  ansibleDirectory: '',
+  defaultPlaybook: '',
+  defaultLimit: '',
   labels: {} as Record<string, string>,
   variableOptionsJson: '[]',
 }
@@ -144,6 +156,13 @@ export default function AdminCatalogPage() {
       defaultVersionPin: a['default-version-pin'] || '',
       providerTemplateIds: a['provider-template-ids'] || [],
       allowedPoolIds: a['allowed-agent-pool-ids'],
+      configureEnabled: a['configure-enabled'] ?? false,
+      // `?? ''` and not `|| ''`: the server stores these byte for byte and
+      // refuses rather than normalising, so the form must round-trip what is
+      // stored without substituting anything of its own.
+      ansibleDirectory: a['ansible-directory'] ?? '',
+      defaultPlaybook: a['default-playbook'] ?? '',
+      defaultLimit: a['default-limit'] ?? '',
       labels: a.labels || {},
       variableOptionsJson: JSON.stringify(a['variable-options'] || [], null, 2),
     })
@@ -170,6 +189,20 @@ export default function AdminCatalogPage() {
         throw new Error(t('errors.varOptsNotArray'))
       }
 
+      // The server's cross-field refusal, surfaced before the round trip: a
+      // configure with no directory would provision a workspace whose Ansible
+      // root is the configuration version's root, where only the generated
+      // wrapper lives. The directory input also carries `required`, so this is
+      // the backstop for a submit that reaches here anyway.
+      //
+      // Compared against '' rather than trimmed, deliberately. A whitespace-only
+      // directory is a value the server refuses on its own terms, with a message
+      // naming the rule -- trimming here would decide the question with worse
+      // information and hide a refusal the operator needs to read.
+      if (f.configureEnabled && f.ansibleDirectory === '') {
+        throw new Error(t('errors.configureNeedsDirectory'))
+      }
+
       const attrs: Record<string, unknown> = {
         'display-name': f.displayName,
         description: f.description,
@@ -178,6 +211,14 @@ export default function AdminCatalogPage() {
         'provider-template-ids': f.providerTemplateIds,
         'allowed-agent-pool-ids': restrictPools ? (f.allowedPoolIds ?? []) : null,
         'variable-options': variableOptions,
+        // Sent verbatim -- no trim, no case fold. The server validates and
+        // stores byte for byte because a Terraform provider writes the response
+        // back into state, and a value altered in flight fails the apply with
+        // "Provider produced inconsistent result after apply".
+        'configure-enabled': f.configureEnabled,
+        'ansible-directory': f.ansibleDirectory,
+        'default-playbook': f.defaultPlaybook,
+        'default-limit': f.defaultLimit,
         labels: f.labels,
       }
       if (!editing) {
@@ -379,6 +420,66 @@ export default function AdminCatalogPage() {
                     )
                   ) : (
                     <p className="text-xs text-slate-500">{t('form.anyPool')}</p>
+                  )}
+                </div>
+
+                {/* The Ansible half this item provisions (#2019).
+                  *
+                  * A plain <div> with a heading rather than a <fieldset>: every
+                  * other group in this form is one, and a fieldset defaults to
+                  * `min-inline-size: min-content`, which refuses to shrink and
+                  * is the single CSS line behind a phone-width overflow this
+                  * repo has shipped before. Nothing here needs the grouping
+                  * semantics enough to take that on.
+                  *
+                  * The three inputs appear only once the checkbox is on -- the
+                  * `restrictPools` pattern above -- because most catalog items
+                  * provision no configure at all and the fields would be noise
+                  * on every one of them. Their values are still SENT while
+                  * hidden, which is the point of `configure-enabled` and
+                  * `ansible-directory` being independent: the path does not mean
+                  * "off", so turning the operation off keeps the directory and
+                  * turning it back on restores it rather than asking twice.
+                  */}
+                <div className="border-t border-slate-700/50 pt-4">
+                  <h3 className="text-sm font-medium text-slate-300 mb-2">{t('form.ansibleHeading')}</h3>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={f.configureEnabled}
+                      onChange={(e) => setF({ ...f, configureEnabled: e.target.checked })}
+                      className="mt-0.5 rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                    <span className="text-sm text-slate-300">{t('form.configureEnabled')}</span>
+                  </label>
+                  <p className="mt-1 text-xs text-slate-500">{t('form.configureEnabledHint')}</p>
+
+                  {f.configureEnabled && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="min-w-0 sm:col-span-2">
+                        <label htmlFor="cat-ansible-dir" className="block text-sm font-medium text-slate-300 mb-1">
+                          {t('form.ansibleDirectory')}<span className="text-red-400 ms-0.5">*</span>
+                        </label>
+                        <input id="cat-ansible-dir" type="text" value={f.ansibleDirectory}
+                          onChange={(e) => setF({ ...f, ansibleDirectory: e.target.value })} required
+                          placeholder="ansible" // i18n-ignore: an example path, not UX copy
+                          className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                        <p className="mt-1 text-xs text-slate-500">{t('form.ansibleDirectoryHint')}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <label htmlFor="cat-playbook" className="block text-sm font-medium text-slate-300 mb-1">{t('form.defaultPlaybook')}</label>
+                        <input id="cat-playbook" type="text" value={f.defaultPlaybook}
+                          onChange={(e) => setF({ ...f, defaultPlaybook: e.target.value })}
+                          placeholder="site.yml" // i18n-ignore: an example filename, not UX copy
+                          className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                        <p className="mt-1 text-xs text-slate-500">{t('form.defaultPlaybookHint')}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <label htmlFor="cat-limit" className="block text-sm font-medium text-slate-300 mb-1">{t('form.defaultLimit')}</label>
+                        <input id="cat-limit" type="text" value={f.defaultLimit}
+                          onChange={(e) => setF({ ...f, defaultLimit: e.target.value })}
+                          placeholder="webservers" // i18n-ignore: an example host pattern, not UX copy
+                          className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                        <p className="mt-1 text-xs text-slate-500">{t('form.defaultLimitHint')}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 

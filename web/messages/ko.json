@@ -1478,7 +1478,16 @@
       "anyPool": "모든 에이전트 풀을 사용할 수 있습니다.",
       "labels": "라벨",
       "variableOptions": "변수 옵션 (고급, JSON)",
-      "variableOptionsHint": "입력별 재정의(options, hidden, default)입니다. 사용하지 않으면 <code>[]</code>로 두세요."
+      "variableOptionsHint": "입력별 재정의(options, hidden, default)입니다. 사용하지 않으면 <code>[]</code>로 두세요.",
+      "ansibleHeading": "Ansible 구성",
+      "ansibleDirectory": "Ansible 구성 디렉터리",
+      "defaultPlaybook": "기본 플레이북",
+      "defaultPlaybookHint": "실행 자체가 플레이북을 지정하지 않을 때 구성 작업이 실행하는 플레이북입니다. 구성 디렉터리 기준 상대 경로입니다.",
+      "defaultLimit": "기본 limit",
+      "defaultLimitHint": "구성 작업의 기본 --limit 패턴입니다. 비워 두면 전체 인벤토리를 대상으로 합니다.",
+      "configureEnabled": "구성 작업 프로비저닝",
+      "configureEnabledHint": "켜지 않으면 꺼져 있습니다. 이 항목이 프로비저닝하는 워크스페이스는 플랜과 어플라이에 더해 구성 작업을 갖게 됩니다.",
+      "ansibleDirectoryHint": "플레이북이 있는 모듈의 하위 디렉터리입니다. Terrapod가 이를 생성된 구성 버전으로 복사하며, 프로비저닝된 워크스페이스의 Ansible 구성 디렉터리가 됩니다. 모듈 루트를 기준으로 하는 상대 경로이며, 앞이나 뒤에 슬래시를 넣지 않습니다."
     },
     "table": {
       "name": "이름",
@@ -1506,7 +1515,8 @@
       "delete": "카탈로그 항목을 삭제하지 못했습니다",
       "deleteConflict": "삭제할 수 없습니다: 이 카탈로그 항목에 프로비저닝된 인스턴스가 있습니다.",
       "varOptsInvalidJson": "변수 옵션은 유효한 JSON(배열)이어야 합니다.",
-      "varOptsNotArray": "변수 옵션은 JSON 배열이어야 합니다."
+      "varOptsNotArray": "변수 옵션은 JSON 배열이어야 합니다.",
+      "configureNeedsDirectory": "구성 작업을 프로비저닝하려면 Ansible 구성 디렉터리가 필요합니다. 플레이북이 있는 모듈의 하위 디렉터리를 지정하세요."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "사용 가능한 카탈로그 항목이 없습니다.",
     "card": {
       "pinned": "{version} 고정됨",
-      "latest": "최신"
+      "latest": "최신",
+      "configure": "Ansible 구성"
     },
     "errors": {
       "loadItems": "카탈로그 항목을 불러오지 못했습니다"
@@ -1820,7 +1831,11 @@
       "module": "모듈:",
       "resolvedVersion": "확인된 버전:",
       "latest": "최신",
-      "disabled": "사용 안 함"
+      "disabled": "사용 안 함",
+      "configureBadge": "Ansible 구성",
+      "configureDirectory": "디렉터리:",
+      "configurePlaybook": "플레이북:",
+      "configureLimit": "limit:"
     },
     "pending": {
       "banner": "<strong>{name}</strong>의 실행이 계획되어 검토를 기다리고 있습니다. 적용하려면 확인하거나 폐기하세요.",

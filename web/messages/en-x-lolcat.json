@@ -1478,7 +1478,16 @@
       "anyPool": "Any agent pool mayd be used.",
       "labels": "Labulz",
       "variableOptions": "Variable opshuns (advancd, JSON)",
-      "variableOptionsHint": "Per-input overridez (opshuns, hidden, default). Leev az <code>[]</code> if unused."
+      "variableOptionsHint": "Per-input overridez (opshuns, hidden, default). Leev az <code>[]</code> if unused.",
+      "ansibleHeading": "Ansibul Konfigur",
+      "ansibleDirectory": "Ansibul Konfig Direktoree",
+      "defaultPlaybook": "Defawlt Playbook",
+      "defaultPlaybookHint": "Teh playbook wot a konfigur runz when teh run itself namez noen. Relativ ta teh konfig direktoree.",
+      "defaultLimit": "Defawlt Limit",
+      "defaultLimitHint": "Teh defawlt --limit pattern for a konfigur. Leev it empteh an it getz teh whole inventoree. srsly",
+      "configureEnabled": "Provishun a configur operashun",
+      "configureEnabledHint": "Off unlss u turn it on. Teh werkspace dis item provishuns den getz a configur operashun alongsied itz plan an apply.",
+      "ansibleDirectoryHint": "Teh subdirectoree ov teh modul wot holdz teh playbook. Terrapod copeez it intoo teh generated configurashun vershun, an it becomez teh provishuned werkspace's Ansibul config directoree. Relativ ta teh modul root, wif no leedin or trailin slash."
     },
     "table": {
       "name": "Naym",
@@ -1506,7 +1515,8 @@
       "delete": "Faild ta delete catalog item",
       "deleteConflict": "Cannot delete: dis catalog item haz provishuned instancez.",
       "varOptsInvalidJson": "Variable opshuns must be valid JSON (an array).",
-      "varOptsNotArray": "Variable opshuns must be a JSON array."
+      "varOptsNotArray": "Variable opshuns must be a JSON array.",
+      "configureNeedsDirectory": "An Ansibul config directoree is requyred ta provishun a configur operashun. Naim teh subdirectoree ov teh modul wot holdz teh playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "No catalog itemz availabul.",
     "card": {
       "pinned": "pinnd {version}",
-      "latest": "latest"
+      "latest": "latest",
+      "configure": "Ansibul Konfigur"
     },
     "errors": {
       "loadItems": "Faild ta load catalog items"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Resolvd vershun:",
       "latest": "latest",
-      "disabled": "disabld"
+      "disabled": "disabld",
+      "configureBadge": "Ansibul Konfigur",
+      "configureDirectory": "Directree:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "Teh run fer <strong>{name}</strong> iz plannd an waitin fer review. Confirm ta apply, or discard.",

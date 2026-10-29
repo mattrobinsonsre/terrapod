@@ -1478,7 +1478,16 @@
       "anyPool": "Enhver agentpulje kan bruges.",
       "labels": "Labels",
       "variableOptions": "Variabelindstillinger (avanceret, JSON)",
-      "variableOptionsHint": "Tilsidesættelser pr. input (options, hidden, default). Lad stå som <code>[]</code>, hvis den ikke bruges."
+      "variableOptionsHint": "Tilsidesættelser pr. input (options, hidden, default). Lad stå som <code>[]</code>, hvis den ikke bruges.",
+      "ansibleHeading": "Ansible-konfiguration",
+      "ansibleDirectory": "Ansible-konfigurationsmappe",
+      "defaultPlaybook": "Standard-playbook",
+      "defaultPlaybookHint": "Den playbook, en konfigurationshandling kører, når kørslen selv ikke nævner nogen. Relativt til konfigurationsmappen.",
+      "defaultLimit": "Standardgrænse",
+      "defaultLimitHint": "Standardmønsteret for --limit ved en konfigurationshandling. Lad det stå tomt for at ramme hele inventaret.",
+      "configureEnabled": "Klargør en konfigurationshandling",
+      "configureEnabledHint": "Slået fra, medmindre du slår det til. Arbejdsområdet, som dette element klargør, får derefter en konfigurationshandling ved siden af sin plan og apply.",
+      "ansibleDirectoryHint": "Undermappen i modulet, der indeholder playbooken. Terrapod kopierer den til den genererede konfigurationsversion, og den bliver Ansible-konfigurationsmappen for det klargjorte arbejdsområde. Relativt til modulets rod, uden skråstreg i starten eller slutningen."
     },
     "table": {
       "name": "Navn",
@@ -1506,7 +1515,8 @@
       "delete": "Kunne ikke slette katalogelement",
       "deleteConflict": "Kan ikke slette: dette katalogelement har klargjorte instanser.",
       "varOptsInvalidJson": "Variabelindstillinger skal være gyldig JSON (et array).",
-      "varOptsNotArray": "Variabelindstillinger skal være et JSON-array."
+      "varOptsNotArray": "Variabelindstillinger skal være et JSON-array.",
+      "configureNeedsDirectory": "Der kræves en Ansible-konfigurationsmappe for at klargøre en konfigurationshandling. Angiv undermappen i modulet, der indeholder playbooken."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Ingen katalogelementer tilgængelige.",
     "card": {
       "pinned": "fastlåst {version}",
-      "latest": "seneste"
+      "latest": "seneste",
+      "configure": "Ansible-konfiguration"
     },
     "errors": {
       "loadItems": "Kunne ikke indlæse katalogelementer"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Løst version:",
       "latest": "seneste",
-      "disabled": "deaktiveret"
+      "disabled": "deaktiveret",
+      "configureBadge": "Ansible-konfiguration",
+      "configureDirectory": "Mappe:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Grænse:"
     },
     "pending": {
       "banner": "Kørslen for <strong>{name}</strong> er planlagt og afventer gennemgang. Bekræft for at anvende, eller kassér.",

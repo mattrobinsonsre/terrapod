@@ -1478,7 +1478,16 @@
       "anyPool": "Mitä tahansa agenttipoolia voidaan käyttää.",
       "labels": "Tunnisteet",
       "variableOptions": "Muuttujavaihtoehdot (edistynyt, JSON)",
-      "variableOptionsHint": "Syötekohtaiset ohitukset (vaihtoehdot, piilotettu, oletus). Jätä muotoon <code>[]</code>, jos ei käytössä."
+      "variableOptionsHint": "Syötekohtaiset ohitukset (vaihtoehdot, piilotettu, oletus). Jätä muotoon <code>[]</code>, jos ei käytössä.",
+      "ansibleHeading": "Ansible-määritys",
+      "ansibleDirectory": "Ansible-asetushakemisto",
+      "defaultPlaybook": "Oletusplaybook",
+      "defaultPlaybookHint": "Playbook, jonka määritystoiminto suorittaa, kun ajo itse ei nimeä mitään. Suhteessa asetushakemistoon.",
+      "defaultLimit": "Oletusrajaus",
+      "defaultLimitHint": "Määritystoiminnon oletusarvoinen --limit-kuvio. Jätä tyhjäksi kohdistaaksesi koko inventaarioon.",
+      "configureEnabled": "Valmistele määritystoiminto",
+      "configureEnabledHint": "Pois päältä, ellet ota sitä käyttöön. Tämän kohteen valmistelema työtila saa tällöin määritystoiminnon planin ja applyn rinnalle.",
+      "ansibleDirectoryHint": "Moduulin alihakemisto, jossa playbook sijaitsee. Terrapod kopioi sen luotuun määritysversioon, ja siitä tulee valmistellun työtilan Ansible-määrityshakemisto. Suhteessa moduulin juureen, ilman kauttaviivaa alussa tai lopussa."
     },
     "table": {
       "name": "Nimi",
@@ -1506,7 +1515,8 @@
       "delete": "Luettelokohteen poistaminen epäonnistui",
       "deleteConflict": "Ei voi poistaa: tällä luettelokohteella on valmisteltuja instansseja.",
       "varOptsInvalidJson": "Muuttujavaihtoehtojen on oltava kelvollista JSONia (taulukko).",
-      "varOptsNotArray": "Muuttujavaihtoehtojen on oltava JSON-taulukko."
+      "varOptsNotArray": "Muuttujavaihtoehtojen on oltava JSON-taulukko.",
+      "configureNeedsDirectory": "Määritystoiminnon valmistelu vaatii Ansible-määrityshakemiston. Anna moduulin alihakemisto, jossa playbook sijaitsee."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Ei saatavilla olevia luettelokohteita.",
     "card": {
       "pinned": "kiinnitetty {version}",
-      "latest": "uusin"
+      "latest": "uusin",
+      "configure": "Ansible-määritys"
     },
     "errors": {
       "loadItems": "Luettelokohteiden lataaminen epäonnistui"
@@ -1820,7 +1831,11 @@
       "module": "Moduuli:",
       "resolvedVersion": "Ratkaistu versio:",
       "latest": "uusin",
-      "disabled": "poissa käytöstä"
+      "disabled": "poissa käytöstä",
+      "configureBadge": "Ansible-määritys",
+      "configureDirectory": "Hakemisto:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Rajaus:"
     },
     "pending": {
       "banner": "Kohteen <strong>{name}</strong> ajo on suunniteltu ja odottaa tarkastelua. Vahvista ottaaksesi käyttöön, tai hylkää.",

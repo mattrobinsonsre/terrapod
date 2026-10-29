@@ -1478,7 +1478,16 @@
       "anyPool": "Qualquer agent pool pode ser usado.",
       "labels": "Etiquetas",
       "variableOptions": "Opções de variável (avançado, JSON)",
-      "variableOptionsHint": "Substituições por entrada (options, hidden, default). Deixe como <code>[]</code> se não for usado."
+      "variableOptionsHint": "Substituições por entrada (options, hidden, default). Deixe como <code>[]</code> se não for usado.",
+      "ansibleHeading": "Configuração do Ansible",
+      "ansibleDirectory": "Diretório de configuração do Ansible",
+      "defaultPlaybook": "Playbook predefinido",
+      "defaultPlaybookHint": "O playbook que uma operação de configuração executa quando a execução não indica nenhum. Relativamente ao diretório de configuração.",
+      "defaultLimit": "Limite predefinido",
+      "defaultLimitHint": "O padrão --limit predefinido para uma operação de configuração. Deixe vazio para abranger todo o inventário.",
+      "configureEnabled": "Aprovisionar uma operação de configuração",
+      "configureEnabledHint": "Desativado a menos que o ative. O workspace que este item aprovisiona passa então a ter uma operação de configuração além do plan e do apply.",
+      "ansibleDirectoryHint": "O subdiretório do módulo que contém o playbook. O Terrapod copia-o para a versão de configuração gerada e torna-se o diretório de configuração do Ansible do workspace aprovisionado. Relativo à raiz do módulo, sem barra no início ou no fim."
     },
     "table": {
       "name": "Nome",
@@ -1506,7 +1515,8 @@
       "delete": "Falha ao eliminar o item de catálogo",
       "deleteConflict": "Não é possível eliminar: este item de catálogo tem instâncias aprovisionadas.",
       "varOptsInvalidJson": "As opções de variável devem ser JSON válido (um array).",
-      "varOptsNotArray": "As opções de variável devem ser um array JSON."
+      "varOptsNotArray": "As opções de variável devem ser um array JSON.",
+      "configureNeedsDirectory": "É necessário um diretório de configuração do Ansible para aprovisionar uma operação de configuração. Indique o subdiretório do módulo que contém o playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Nenhum item de catálogo disponível.",
     "card": {
       "pinned": "fixado {version}",
-      "latest": "mais recente"
+      "latest": "mais recente",
+      "configure": "Configuração do Ansible"
     },
     "errors": {
       "loadItems": "Falha ao carregar os itens de catálogo"
@@ -1820,7 +1831,11 @@
       "module": "Módulo:",
       "resolvedVersion": "Versão resolvida:",
       "latest": "mais recente",
-      "disabled": "desativado"
+      "disabled": "desativado",
+      "configureBadge": "Configuração do Ansible",
+      "configureDirectory": "Diretório:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limite:"
     },
     "pending": {
       "banner": "A execução de <strong>{name}</strong> está planeada e a aguardar revisão. Confirme para aplicar, ou descarte.",

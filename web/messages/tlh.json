@@ -1478,7 +1478,16 @@
       "anyPool": "Duy bIQ'a' vay' lo'laH.",
       "labels": "permey",
       "variableOptions": "choHlaH wIvmey (Dun, JSON)",
-      "variableOptionsHint": "'el Hoch DIvI'mey (wIvmey, So', motlh). lo'be'lu'chugh <code>[]</code> pol."
+      "variableOptionsHint": "'el Hoch DIvI'mey (wIvmey, So', motlh). lo'be'lu'chugh <code>[]</code> pol.",
+      "ansibleHeading": "Ansible Qum",
+      "ansibleDirectory": "Ansible Qum tetlh",
+      "defaultPlaybook": "Qu'' paq motlh",
+      "defaultPlaybookHint": "nab pagh pongbogh ghorgh, Qum Qu'' qaStaHvIS Qu'' paq lo''lu''. Qum tetlh-vo''.",
+      "defaultLimit": "veH motlh",
+      "defaultLimitHint": "Qum Qu''vaD --limit tem motlh. Hoch ghom tetlh DaHechchugh, chImmoH.",
+      "configureEnabled": "Qum Qu' cha'moH",
+      "configureEnabledHint": "chu'lu'be'chugh, chu'Ha'. Qumwo' cha'moHbogh De'vam Qum Qu' Suq, nab 'ej apply tlhej.",
+      "ansibleDirectoryHint": "Qu' paq ngaSbogh Segh tetlh puS. Qum mI' chenmoHlu'bogh ghItlhqa' Terrapod, 'ej Qumwo' cha'moHlu'bogh Ansible Qum tetlh moj. Segh Hal Dajatlh; mungDaq pagh mevDaq pagh vIl."
     },
     "table": {
       "name": "pong",
@@ -1506,7 +1515,8 @@
       "delete": "tetlh Doch Qaw'meH lujpu'",
       "deleteConflict": "Qaw'laHbe': tetlh Doch vam cha'moHlu'pu'bogh Dochmey ghaj.",
       "varOptsInvalidJson": "choHlaH wIvmey teH JSON taHnIS (chetvI').",
-      "varOptsNotArray": "choHlaH wIvmey JSON chetvI' taHnIS."
+      "varOptsNotArray": "choHlaH wIvmey JSON chetvI' taHnIS.",
+      "configureNeedsDirectory": "Qum Qu' cha'moHmeH Ansible Qum tetlh poQlu'. Qu' paq ngaSbogh Segh tetlh yIpong."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "tetlh Doch Hutlh.",
     "card": {
       "pinned": "ngaQmoHlu' {version}",
-      "latest": "ram"
+      "latest": "ram",
+      "configure": "Ansible Qum"
     },
     "errors": {
       "loadItems": "tetlh Dochmey ghelmeH lujpu'"
@@ -1820,7 +1831,11 @@
       "module": "Segh:",
       "resolvedVersion": "wIvlu'pu'bogh mI':",
       "latest": "ram",
-      "disabled": "chu'Ha'lu'pu'"
+      "disabled": "chu'Ha'lu'pu'",
+      "configureBadge": "Ansible Qum",
+      "configureDirectory": "tetlh:",
+      "configurePlaybook": "Qu'' paq:",
+      "configureLimit": "veH:"
     },
     "pending": {
       "banner": "<strong>{name}</strong> Sar nabpu' 'ej laDmeH loStaH. lo'meH tob, joq woD.",

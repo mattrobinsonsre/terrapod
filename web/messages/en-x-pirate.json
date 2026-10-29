@@ -1478,7 +1478,16 @@
       "anyPool": "Any agent pool may be used.",
       "labels": "Labels",
       "variableOptions": "Variable options (advanced, JSON)",
-      "variableOptionsHint": "Per-input overrides (options, hidden, default). Leave as <code>[]</code> if unused."
+      "variableOptionsHint": "Per-input overrides (options, hidden, default). Leave as <code>[]</code> if unused.",
+      "ansibleHeading": "Ansible riggin''",
+      "ansibleDirectory": "Ansible chart locker",
+      "defaultPlaybook": "Standin'' playbook",
+      "defaultPlaybookHint": "Th'' playbook a riggin'' order sails when th'' voyage itself names none. Reckoned from th'' chart locker.",
+      "defaultLimit": "Standin'' limit",
+      "defaultLimitHint": "Th'' standin'' --limit pattern fer a riggin'' order. Leave it empty an'' she''ll take th'' whole manifest, arr.",
+      "configureEnabled": "Provision a configure operation, ye scurvy dog",
+      "configureEnabledHint": "Off she be, unless ye turn her on. Th'' work-deck this here item provisions then gets herself a configure operation alongside her plan an'' apply.",
+      "ansibleDirectoryHint": "Th'' subdirectory o'' th'' module wot holds th'' playbook. Terrapod copies her into th'' generated configuration version, an'' she becomes th'' provisioned work-deck''s Ansible config directory. Reckoned from th'' module root, wi'' no leadin'' nor trailin'' slash."
     },
     "table": {
       "name": "Name",
@@ -1506,7 +1515,8 @@
       "delete": "Failed t'' send catalog item t'' Davy Jones",
       "deleteConflict": "Cannot send t'' Davy Jones: this catalog item has provisioned instances.",
       "varOptsInvalidJson": "Variable options must be valid JSON (an array).",
-      "varOptsNotArray": "Variable options must be a JSON array."
+      "varOptsNotArray": "Variable options must be a JSON array.",
+      "configureNeedsDirectory": "An Ansible config directory be required t'' provision a configure operation. Name th'' subdirectory o'' th'' module wot holds th'' playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Nay catalog items available.",
     "card": {
       "pinned": "pinned {version}",
-      "latest": "latest"
+      "latest": "latest",
+      "configure": "Ansible riggin''"
     },
     "errors": {
       "loadItems": "Failed t'' load catalog items"
@@ -1820,7 +1831,11 @@
       "module": "Module:",
       "resolvedVersion": "Resolved version:",
       "latest": "latest",
-      "disabled": "disabled"
+      "disabled": "disabled",
+      "configureBadge": "Ansible riggin''",
+      "configureDirectory": "Directory:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "Th'' run fer <strong>{name}</strong> be planned an'' waitin'' fer review. Confirm t'' apply, or discard.",

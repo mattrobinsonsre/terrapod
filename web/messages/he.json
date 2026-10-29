@@ -1478,7 +1478,16 @@
       "anyPool": "ניתן להשתמש בכל מאגר סוכנים.",
       "labels": "תוויות",
       "variableOptions": "אפשרויות משתנים (מתקדם, JSON)",
-      "variableOptionsHint": "עקיפות לכל קלט (options, hidden, default). השאירו כ-<code>[]</code> אם לא בשימוש."
+      "variableOptionsHint": "עקיפות לכל קלט (options, hidden, default). השאירו כ-<code>[]</code> אם לא בשימוש.",
+      "ansibleHeading": "תצורת Ansible",
+      "ansibleDirectory": "ספריית התצורה של Ansible",
+      "defaultPlaybook": "ספר הרצה כברירת מחדל",
+      "defaultPlaybookHint": "ספר ההרצה שפעולת תצורה מריצה כאשר ההרצה עצמה אינה מציינת אחד. ביחס לספריית התצורה.",
+      "defaultLimit": "מגבלה כברירת מחדל",
+      "defaultLimitHint": "תבנית --limit שהיא ברירת המחדל לפעולת תצורה. השאר ריק כדי לכוון אל המלאי כולו.",
+      "configureEnabled": "הקצאת פעולת תצורה",
+      "configureEnabledHint": "כבוי אלא אם תפעיל זאת. סביבת העבודה שפריט זה מקצה תקבל אז פעולת תצורה לצד התכנון וההחלה.",
+      "ansibleDirectoryHint": "תיקיית המשנה של המודול שבה נמצא ספר ההרצה. Terrapod מעתיק אותה לגרסת התצורה שנוצרה, והיא הופכת לספריית תצורת Ansible של סביבת העבודה שהוקצתה. ביחס לשורש המודול, בלי לוכסן בהתחלה או בסוף."
     },
     "table": {
       "name": "שם",
@@ -1506,7 +1515,8 @@
       "delete": "מחיקת פריט הקטלוג נכשלה",
       "deleteConflict": "לא ניתן למחוק: לפריט קטלוג זה יש מופעים שהוקצו.",
       "varOptsInvalidJson": "אפשרויות המשתנים חייבות להיות JSON תקין (מערך).",
-      "varOptsNotArray": "אפשרויות המשתנים חייבות להיות מערך JSON."
+      "varOptsNotArray": "אפשרויות המשתנים חייבות להיות מערך JSON.",
+      "configureNeedsDirectory": "נדרשת ספריית תצורת Ansible כדי להקצות פעולת תצורה. ציין את תיקיית המשנה של המודול שבה נמצא ספר ההרצה."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "אין פריטי קטלוג זמינים.",
     "card": {
       "pinned": "מוצמד ל-{version}",
-      "latest": "האחרון"
+      "latest": "האחרון",
+      "configure": "תצורת Ansible"
     },
     "errors": {
       "loadItems": "טעינת פריטי הקטלוג נכשלה"
@@ -1820,7 +1831,11 @@
       "module": "מודול:",
       "resolvedVersion": "גרסה שנפתרה:",
       "latest": "האחרונה",
-      "disabled": "מושבת"
+      "disabled": "מושבת",
+      "configureBadge": "תצורת Ansible",
+      "configureDirectory": "ספרייה:",
+      "configurePlaybook": "ספר הרצה:",
+      "configureLimit": "מגבלה:"
     },
     "pending": {
       "banner": "הריצה עבור <strong>{name}</strong> תוכננה וממתינה לבדיקה. אשרו כדי להחיל, או בטלו.",

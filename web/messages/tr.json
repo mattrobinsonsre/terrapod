@@ -1478,7 +1478,16 @@
       "anyPool": "Herhangi bir agent havuzu kullanılabilir.",
       "labels": "Etiketler",
       "variableOptions": "Değişken seçenekleri (gelişmiş, JSON)",
-      "variableOptionsHint": "Girdi başına geçersiz kılmalar (seçenekler, gizli, varsayılan). Kullanılmıyorsa <code>[]</code> olarak bırakın."
+      "variableOptionsHint": "Girdi başına geçersiz kılmalar (seçenekler, gizli, varsayılan). Kullanılmıyorsa <code>[]</code> olarak bırakın.",
+      "ansibleHeading": "Ansible yapılandırması",
+      "ansibleDirectory": "Ansible yapılandırma dizini",
+      "defaultPlaybook": "Varsayılan playbook",
+      "defaultPlaybookHint": "Çalıştırmanın kendisi hiçbirini adlandırmadığında bir yapılandırma işleminin çalıştırdığı playbook. Yapılandırma dizinine göreli.",
+      "defaultLimit": "Varsayılan limit",
+      "defaultLimitHint": "Bir yapılandırma işlemi için varsayılan --limit deseni. Tüm envanteri hedeflemek için boş bırakın.",
+      "configureEnabled": "Bir yapılandırma işlemi hazırla",
+      "configureEnabledHint": "Açmadığınız sürece kapalıdır. Bu ögenin hazırladığı çalışma alanı, plan ve apply'ın yanı sıra bir yapılandırma işlemi de alır.",
+      "ansibleDirectoryHint": "Playbook'u barındıran modül alt dizini. Terrapod bunu üretilen yapılandırma sürümüne kopyalar ve hazırlanan çalışma alanının Ansible yapılandırma dizini olur. Modül köküne göre belirtilir; başta veya sonda eğik çizgi olmaz."
     },
     "table": {
       "name": "Ad",
@@ -1506,7 +1515,8 @@
       "delete": "Katalog öğesi silinemedi",
       "deleteConflict": "Silinemez: bu katalog öğesinin hazırlanmış örnekleri var.",
       "varOptsInvalidJson": "Değişken seçenekleri geçerli JSON (bir dizi) olmalıdır.",
-      "varOptsNotArray": "Değişken seçenekleri bir JSON dizisi olmalıdır."
+      "varOptsNotArray": "Değişken seçenekleri bir JSON dizisi olmalıdır.",
+      "configureNeedsDirectory": "Bir yapılandırma işlemi hazırlamak için Ansible yapılandırma dizini gereklidir. Playbook'u barındıran modül alt dizinini belirtin."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Kullanılabilir katalog öğesi yok.",
     "card": {
       "pinned": "sabitlendi {version}",
-      "latest": "en son"
+      "latest": "en son",
+      "configure": "Ansible yapılandırması"
     },
     "errors": {
       "loadItems": "Katalog öğeleri yüklenemedi"
@@ -1820,7 +1831,11 @@
       "module": "Modül:",
       "resolvedVersion": "Çözümlenen sürüm:",
       "latest": "en son",
-      "disabled": "devre dışı"
+      "disabled": "devre dışı",
+      "configureBadge": "Ansible yapılandırması",
+      "configureDirectory": "Dizin:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "<strong>{name}</strong> için çalıştırma planlandı ve inceleme bekliyor. Uygulamak için onaylayın veya iptal edin.",

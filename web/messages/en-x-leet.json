@@ -1478,7 +1478,16 @@
       "anyPool": "4ny 4g3n7 p00l m4y b3 u53d.",
       "labels": "L4b3l5",
       "variableOptions": "V4r14bl3 0p710n5 (4dv4nc3d, J50N)",
-      "variableOptionsHint": "P3r-1npu7 0v3rr1d35 (0p710n5, h1dd3n, d3f4ul7). L34v3 45 <code>[]</code> 1f unu53d."
+      "variableOptionsHint": "P3r-1npu7 0v3rr1d35 (0p710n5, h1dd3n, d3f4ul7). L34v3 45 <code>[]</code> 1f unu53d.",
+      "ansibleHeading": "4n51bl3 c0nf1gur3",
+      "ansibleDirectory": "4n51bl3 c0nf1g d1r3c70ry",
+      "defaultPlaybook": "D3f4ul7 pl4yb00k",
+      "defaultPlaybookHint": "7h3 pl4yb00k 4 c0nf1gur3 run5 wh3n 7h3 run 1753lf n4m35 n0n3. R3l471v3 70 7h3 c0nf1g d1r3c70ry.",
+      "defaultLimit": "D3f4ul7 l1m17",
+      "defaultLimitHint": "7h3 d3f4ul7 --l1m17 p4773rn f0r 4 c0nf1gur3. L34v3 17 3mp7y 70 74rg37 7h3 wh0l3 1nv3n70ry.",
+      "configureEnabled": "Pr0v1510n 4 c0nf1gur3 0p3r4710n",
+      "configureEnabledHint": "0ff unl355 y0u 7urn 17 0n. 7h3 w0rk5p4c3 7h15 173m pr0v1510n5 7h3n g375 4 c0nf1gur3 0p3r4710n 4l0ng51d3 175 pl4n 4nd 4pply.",
+      "ansibleDirectoryHint": "7h3 5ubd1r3c70ry 0f 7h3 m0dul3 7h47 h0ld5 7h3 pl4yb00k. 73rr4p0d c0p135 17 1n70 7h3 g3n3r473d c0nf1gur4710n v3r510n, 4nd 17 b3c0m35 7h3 pr0v1510n3d w0rk5p4c3'5 4n51bl3 c0nf1g d1r3c70ry. R3l471v3 70 7h3 m0dul3 r007, w17h n0 l34d1ng 0r 7r41l1ng 5l45h."
     },
     "table": {
       "name": "N4m3",
@@ -1506,7 +1515,8 @@
       "delete": "F41l3d 70 d3l373 c474l0g 173m",
       "deleteConflict": "C4nn07 d3l373: 7h15 c474l0g 173m h45 pr0v1510n3d 1n574nc35.",
       "varOptsInvalidJson": "V4r14bl3 0p710n5 mu57 b3 v4l1d J50N (4n 4rr4y).",
-      "varOptsNotArray": "V4r14bl3 0p710n5 mu57 b3 4 J50N 4rr4y."
+      "varOptsNotArray": "V4r14bl3 0p710n5 mu57 b3 4 J50N 4rr4y.",
+      "configureNeedsDirectory": "4n 4n51bl3 c0nf1g d1r3c70ry 15 r3qu1r3d 70 pr0v1510n 4 c0nf1gur3 0p3r4710n. N4m3 7h3 5ubd1r3c70ry 0f 7h3 m0dul3 7h47 h0ld5 7h3 pl4yb00k."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "N0 c474l0g 173m5 4v41l4bl3.",
     "card": {
       "pinned": "p1nn3d {version}",
-      "latest": "l47357"
+      "latest": "l47357",
+      "configure": "4n51bl3 c0nf1gur3"
     },
     "errors": {
       "loadItems": "F41l3d 70 l04d c474l0g 173m5"
@@ -1820,7 +1831,11 @@
       "module": "M0dul3:",
       "resolvedVersion": "R350lv3d v3r510n:",
       "latest": "l47357",
-      "disabled": "d154bl3d"
+      "disabled": "d154bl3d",
+      "configureBadge": "4n51bl3 c0nf1gur3",
+      "configureDirectory": "D1r3c70ry:",
+      "configurePlaybook": "Pl4yb00k:",
+      "configureLimit": "L1m17:"
     },
     "pending": {
       "banner": "7h3 run f0r <strong>{name}</strong> 15 pl4nn3d 4nd w4171ng f0r r3v13w. C0nf1rm 70 4pply, 0r d15c4rd.",

@@ -1478,7 +1478,16 @@
       "anyPool": "Gellir defnyddio unrhyw bwll asiantau.",
       "labels": "Labeli",
       "variableOptions": "Opsiynau newidynnau (uwch, JSON)",
-      "variableOptionsHint": "Diystyriadau fesul-mewnbwn (opsiynau, cudd, rhagosodedig). Gadewch fel <code>[]</code> os na chaiff ei ddefnyddio."
+      "variableOptionsHint": "Diystyriadau fesul-mewnbwn (opsiynau, cudd, rhagosodedig). Gadewch fel <code>[]</code> os na chaiff ei ddefnyddio.",
+      "ansibleHeading": "Cyflunio Ansible",
+      "ansibleDirectory": "Cyfeiriadur cyfluniad Ansible",
+      "defaultPlaybook": "Llyfr chwarae rhagosodedig",
+      "defaultPlaybookHint": "Y llyfr chwarae y mae gweithrediad cyflunio yn ei redeg pan nad yw'r rhediad ei hun yn enwi un. Yn gymharol i'r cyfeiriadur cyfluniad.",
+      "defaultLimit": "Terfyn rhagosodedig",
+      "defaultLimitHint": "Y patrwm --limit rhagosodedig ar gyfer gweithrediad cyflunio. Gadewch yn wag i dargedu'r rhestr eiddo gyfan.",
+      "configureEnabled": "Darparu gweithrediad cyflunio",
+      "configureEnabledHint": "Wedi'i ddiffodd nes i chi ei droi ymlaen. Bydd y weithfan y mae'r eitem hon yn ei darparu wedyn yn cael gweithrediad cyflunio ochr yn ochr â'i chynllun a'i gweithredu.",
+      "ansibleDirectoryHint": "Yr is-gyfeiriadur o'r modiwl sy'n cynnwys y llyfr chwarae. Mae Terrapod yn ei gopïo i'r fersiwn cyfluniad a gynhyrchir, ac mae'n dod yn gyfeiriadur cyfluniad Ansible y weithfan a ddarperir. Yn gymharol i wraidd y modiwl, heb slaes ar y dechrau nac ar y diwedd."
     },
     "table": {
       "name": "Enw",
@@ -1506,7 +1515,8 @@
       "delete": "Methwyd dileu'r eitem catalog",
       "deleteConflict": "Ni ellir dileu: mae gan yr eitem catalog hon achosion a ddarparwyd.",
       "varOptsInvalidJson": "Rhaid i'r opsiynau newidynnau fod yn JSON dilys (arae).",
-      "varOptsNotArray": "Rhaid i'r opsiynau newidynnau fod yn arae JSON."
+      "varOptsNotArray": "Rhaid i'r opsiynau newidynnau fod yn arae JSON.",
+      "configureNeedsDirectory": "Mae angen cyfeiriadur cyfluniad Ansible i ddarparu gweithrediad cyflunio. Enwch yr is-gyfeiriadur o'r modiwl sy'n cynnwys y llyfr chwarae."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Dim eitemau catalog ar gael.",
     "card": {
       "pinned": "pinnwyd {version}",
-      "latest": "diweddaraf"
+      "latest": "diweddaraf",
+      "configure": "Cyflunio Ansible"
     },
     "errors": {
       "loadItems": "Methwyd llwytho'r eitemau catalog"
@@ -1820,7 +1831,11 @@
       "module": "Modiwl:",
       "resolvedVersion": "Fersiwn a ddatryswyd:",
       "latest": "diweddaraf",
-      "disabled": "wedi'i analluogi"
+      "disabled": "wedi'i analluogi",
+      "configureBadge": "Cyflunio Ansible",
+      "configureDirectory": "Cyfeiriadur:",
+      "configurePlaybook": "Llyfr chwarae:",
+      "configureLimit": "Terfyn:"
     },
     "pending": {
       "banner": "Mae'r rhediad ar gyfer <strong>{name}</strong> wedi'i gynllunio ac yn aros am adolygiad. Cadarnhewch i'w weithredu, neu ei daflu.",
