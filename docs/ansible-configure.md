@@ -164,6 +164,7 @@ scope — what reaches it is `hosts: webservers`, not a variable.
 
 | reason | why |
 |---|---|
+| the resolution is *partial* | the workspace resolves dynamic inventory sources on the runner, so a diff cannot see every host — checked **before** the override below, because an operator reading the log needs to be told about the resolution they cannot trust rather than about their own setting |
 | `configure-all-hosts` is set | the operator's override |
 | there is no baseline | the first configure, or the last one failed — hosts may be unconfigured for reasons no diff can see |
 | the Ansible code under `config-directory` changed | new code has to reach every host |

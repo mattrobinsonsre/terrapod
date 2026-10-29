@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible marklar marklar",
       "eeMemoryRequest": "Ansible marklar marklar",
       "terragruntEnabled": "Marklar",
-      "terragruntVersion": "Marklar marklar"
+      "terragruntVersion": "Marklar marklar",
+      "dynamicInventoryEnabled": "Dynamic marklar marklars",
+      "dynamicInventoryEnabledHint": "Permit declared marklar marklars — a YAML marklar carrying a top-level plugin marklar — when the marklar resolves the marklar. Terrapod itself never runs one, in either marklar. While this is off, a marklar marklar is refused by marklar rather than resolving to a partial marklar marklar; while it is on, the marklar shown here is explicitly partial per marklar and the marklar the marklar resolves is the authoritative one.",
+      "inventoryScriptsEnabled": "Marklar marklars",
+      "inventoryScriptsEnabledHint": "Permit executable marklar marklars when the marklar resolves the marklar. Separate from dynamic marklar marklars so that declared plugin marklars, which name a marklar and can be read before they run, can be allowed without also allowing arbitrary marklars."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Which marklars, marklars or marklars to reach. Empty means every marklar in the marklar.",
       "typeConfigure": "configure",
       "typeConfigureHint": "Runs the marklar against the marklar. No marklar and no marklar.",
-      "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar."
+      "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar.",
+      "queueConfigureConfirmDynamic": "This marklar resolves marklar marklars on the marklar, so the marklars it will reach are not known until the marklar starts."
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

@@ -201,6 +201,65 @@ class _Partitioner:
         shutil.rmtree(self._dir, ignore_errors=True)
 
 
+#: How far into the stream `reported_inventory_hosts` reads before giving up.
+#:
+#: The record is the third line of a well-formed stream -- `playbook_start`,
+#: `play_start`, `inventory` -- so a bound makes the read O(1) rather than
+#: proportional to a fleet's worth of task results. Generous rather than tight
+#: because the cost of being wrong is asymmetric: too tight and the denominator
+#: silently reverts to the artifact's short host set, which is the failure the
+#: record exists to prevent. The miss is logged either way.
+_INVENTORY_RECORD_SCAN_LINES = 100
+
+
+async def reported_inventory_hosts(run: Run) -> set[str]:
+    """The inventory host set the EE's own callback reported, or an empty set (#2033).
+
+    Read from the HEAD of the uploaded event stream rather than from a column or
+    a dedicated endpoint, because the stream already travels and the record is
+    its third line. One owner of the stream's format, which is this module.
+
+    It matters only for a workspace that resolves dynamic inventory sources on
+    the runner: the API's artifact then lists what the API could read, so the
+    hosts a cloud plugin discovered are absent from it. Where the API resolved
+    everything, this agrees with the artifact and adds nothing.
+
+    Empty for every ordinary reason -- no stream yet, a Job that died before
+    uploading, an older runner image whose callback does not emit the record, a
+    callback that could not reach the inventory. The caller unions rather than
+    replaces, so an empty answer costs nothing and a short answer cannot shrink
+    the denominator.
+    """
+    key = host_events_key(str(run.workspace_id), str(run.id))
+    seen = 0
+    try:
+        async for raw in _lines(key):
+            if not raw.strip():
+                continue
+            seen += 1
+            if seen > _INVENTORY_RECORD_SCAN_LINES:
+                break
+            try:
+                record = json.loads(raw)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if not isinstance(record, dict) or record.get("kind") != "inventory":
+                continue
+            hosts = record.get("hosts")
+            if isinstance(hosts, list):
+                return {str(h) for h in hosts if h}
+            return set()
+    except Exception:  # noqa: BLE001 - any storage error degrades to "not reported"
+        return set()
+    if seen:
+        logger.info(
+            "no inventory record in the head of the event stream",
+            run_id=str(run.id),
+            scanned=min(seen, _INVENTORY_RECORD_SCAN_LINES),
+        )
+    return set()
+
+
 async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     """Read the run's uploaded event stream into rows. Returns (hosts, events).
 

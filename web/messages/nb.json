@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU-forespørsel",
       "eeMemoryRequest": "Ansible minneforespørsel",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt-versjon"
+      "terragruntVersion": "Terragrunt-versjon",
+      "dynamicInventoryEnabled": "Dynamiske inventar-plugins",
+      "dynamicInventoryEnabledHint": "Tillater deklarerte inventar-plugins — en YAML-kilde med en plugin-nøkkel på øverste nivå — når runneren løser opp inventaret. Terrapod kjører aldri et selv, i ingen av de to tilstandene. Så lenge dette er av, avvises en pluginkilde ved navn i stedet for å løses opp til et ufullstendig vertssett; så lenge det er på, er inventaret som vises her uttrykkelig ufullstendig per kilde, og settet runneren løser opp er det som gjelder.",
+      "inventoryScriptsEnabled": "Inventar-skript",
+      "inventoryScriptsEnabledHint": "Tillater kjørbare inventar-skript når runneren løser opp inventaret. Holdt atskilt fra dynamiske inventar-plugins, slik at deklarerte pluginkonfigurasjoner, som navngir en collection og kan leses før de kjører, kan tillates uten også å tillate vilkårlige kjørbare filer."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Hvilke verter, grupper eller mønstre som skal nås. Tomt betyr hver vert i inventaret.",
       "typeConfigure": "konfigurer",
       "typeConfigureHint": "Kjører playbooken mot inventaret. Ingen plan og ingen anvendelse.",
-      "typeConfigureAfterApplyHint": "Etter anvendelsen følger en konfigurering i samme kjøring."
+      "typeConfigureAfterApplyHint": "Etter anvendelsen følger en konfigurering i samme kjøring.",
+      "queueConfigureConfirmDynamic": "Dette arbeidsområdet løser inventarkilder på runneren, så vertene den vil nå er ikke kjent før kjøringen starter."
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

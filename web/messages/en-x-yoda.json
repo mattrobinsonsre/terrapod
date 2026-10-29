@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "request, Ansible CPU",
       "eeMemoryRequest": "request, Ansible memory",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Version, Terragrunt"
+      "terragruntVersion": "Version, Terragrunt",
+      "dynamicInventoryEnabled": "plugins, Dynamic inventory",
+      "dynamicInventoryEnabledHint": "Declared inventory plugins — a YAML source carrying a top-level plugin key — permit, when the runner resolves the inventory. One, Terrapod itself never runs, in either state. While off this is, refused by name a plugin source is, rather than resolved to a partial host set; while on it is, explicitly partial per source the inventory shown here is, and the authoritative one is the set the runner resolves.",
+      "inventoryScriptsEnabled": "scripts, Inventory",
+      "inventoryScriptsEnabledHint": "Executable inventory scripts, permit, when the runner resolves the inventory. From dynamic inventory plugins, separate it is, so that declared plugin configs — which name a collection and can be read before they run — allowed can be, without arbitrary executables also being allowed."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "To reach, which hosts, groups or patterns. Every host in the inventory, empty means.",
       "typeConfigure": "configure",
       "typeConfigureHint": "Against the inventory, runs the playbook. No plan and no apply, there is.",
-      "typeConfigureAfterApplyHint": "By a configure on this same run, the apply is followed."
+      "typeConfigureAfterApplyHint": "By a configure on this same run, the apply is followed.",
+      "queueConfigureConfirmDynamic": "On the runner, inventory sources this workspace resolves. Known, the hosts it will reach are not, until the run starts."
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

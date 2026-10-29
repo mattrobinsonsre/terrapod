@@ -140,8 +140,37 @@ _KEY_PREFIX = "tp:inv_resolved"
 _ANSIBLE_TIMEOUT_SECONDS = 120
 
 #: Inventory source files whose top-level `plugin:` key makes them a PLUGIN
-#: config rather than a static inventory. Refused -- see `_refuse_plugin_sources`.
+#: config rather than a static inventory. Settled by `_screen_config_root`.
 _YAML_SUFFIXES = (".yml", ".yaml")
+
+#: ansible's own `INVENTORY_IGNORE_EXTS` default, measured with
+#: `ansible-config dump` against core 2.18.3 rather than recalled. A file whose
+#: extension is in here is NOT an inventory source, so it is not a candidate for
+#: the executable-source screening -- a `.bak` or a `.txt` beside an inventory is
+#: scratch, not a script someone meant ansible to run.
+#:
+#: Note `.ini` and `.cfg` are in ansible's list: an `.ini`-suffixed file is not
+#: read as inventory by default even though the `ini` plugin exists. And `~` is a
+#: SUFFIX of the whole filename rather than an extension, which `Path.suffix`
+#: cannot see -- it is left here verbatim so the list matches ansible's, and the
+#: screening's `suffix` test simply never matches it. Harmless: a backup file
+#: that is also executable and also inside an inventory path is not a case worth
+#: a second code path.
+_INVENTORY_IGNORE_EXTS = (
+    ".pyc",
+    ".pyo",
+    ".swp",
+    ".bak",
+    "~",
+    ".rpm",
+    ".md",
+    ".txt",
+    ".rst",
+    ".orig",
+    ".ini",
+    ".cfg",
+    ".retry",
+)
 
 #: Groups ansible derives rather than accepts, so they are not part of the
 #: declared group set a reader is comparing against. The same two names
@@ -184,6 +213,20 @@ _CONFIG_ROOT_REMEDY = (
 )
 
 
+class _ScreenedRoot(NamedTuple):
+    """A materialised config root, plus what screening it has already had.
+
+    The two screening passes cannot both run here: the plugin pass walks the
+    whole tree, while the executable pass must be scoped to the sources ansible
+    will actually read, and that set is not known until `_inventory_sources` has
+    chosen its tier. So the first pass's findings travel with the root.
+    """
+
+    root: Path
+    skipped: list[SkippedSource]
+    executables: set[Path]
+
+
 class _InventorySources(NamedTuple):
     """The repository's `-i` arguments and enough to explain them in a refusal.
 
@@ -196,6 +239,38 @@ class _InventorySources(NamedTuple):
     tier: Literal["declared", "ansible_cfg", "config_root"]
     root: Path
     config_directory: str
+
+
+def _handoff_path(source: Path, prov: _InventorySources) -> str:
+    """A source as a path the RUNNER can resolve against the fetched tree (#2033).
+
+    Repo-relative and POSIX, so the runner joins it to the tree it already has
+    rather than being handed a scratch directory that no longer exists.
+
+    Deliberately NOT `_repo_relative`, which is for a refusal message and
+    answers `"the repository root"` for a source that is the root itself and the
+    raw absolute path for one outside it. Both are the right thing to show a
+    human and neither is a path: handed to the runner, the first names nothing
+    and the second names a deleted tempdir, and either way ansible resolves one
+    source fewer than the operator declared -- a short host set, reported as
+    success, which is the failure this whole handoff exists to prevent. So this
+    raises instead.
+    """
+    try:
+        rel = source.resolve().relative_to(prov.root.resolve())
+    except ValueError as exc:
+        raise InventoryResolutionFailed(
+            f"inventory source {source} is not under the configuration root, so it "
+            "cannot be named to the runner as a path in the fetched tree"
+        ) from exc
+    parts = [part for part in (prov.config_directory.strip("/"), rel.as_posix()) if part != "."]
+    joined = "/".join(part for part in parts if part)
+    if not joined:
+        raise InventoryResolutionFailed(
+            "an inventory source resolved to the repository root itself, which is "
+            "a directory the runner cannot be told to read as one source"
+        )
+    return joined
 
 
 def _repo_relative(source: Path, prov: _InventorySources) -> str:
@@ -308,46 +383,82 @@ def render_inventory_yaml(**kwargs: Any) -> str:
 # ── Refusing a plugin source ─────────────────────────────────────────────────
 
 
-def _refuse_plugin_sources(root: Path) -> None:
-    """Refuse any fetched YAML that is a plugin config, and strip the exec bit.
+class SkippedSource(NamedTuple):
+    """An inventory source the API declined to parse but did not refuse (#2033).
 
-    Three layers close dynamic inventory (#1970, closed NOT_PLANNED), and this
-    is the one that matters:
+    Returned rather than logged, because the whole point of the switch is that a
+    partial resolution SAYS SO per source. An unlabelled skip is the short
+    host-set failure the inventory surface exists to prevent, arriving by a new
+    door -- so this travels all the way to the response and the artifact.
+    """
+
+    path: str
+    kind: Literal["plugin", "script"]
+    plugin: str | None
+    reason: str
+
+
+#: What a plugin source is instead, named in both the refusal and the skip so
+#: an operator reads the same sentence either way.
+_DECLARE_INSTEAD = (
+    "Cloud discovery is declared instead: a Terraform data source, `for_each`, "
+    "and a `terrapod_inventory_host` per machine -- which is what a plugin gives "
+    "you, except versioned in git, reviewed in a pull request and visible in a plan."
+)
+
+
+def _screen_config_root(
+    root: Path, *, allow_plugins: bool
+) -> tuple[list[SkippedSource], set[Path]]:
+    """Walk the fetched tree: strip exec bits, and settle every plugin config.
+
+    Returns the sources skipped here, and the set of paths that WERE executable
+    before the strip -- which `_screen_inventory_sources` needs, because by then
+    the bit is gone.
+
+    Three layers close dynamic inventory in the API, permanently and whatever the
+    workspace's switches say (#1970, closed NOT_PLANNED, reaffirmed by #2033):
 
     1. **The plugin is not installed.** `ansible-core` ships no collections, so
        `amazon.aws.aws_ec2` does not exist here. Decisive but silent.
-    2. **`ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment** -- no
-       `auto`, which is the generic dispatcher that reads a file's `plugin:` key
-       and runs whatever it names, and no `script`.
-    3. **This, and it is LEGIBILITY rather than enforcement.** Measured against
-       ansible-core: its own `yaml` plugin recognises a plugin config and refuses
-       it -- "Plugin configuration YAML file, not YAML inventory" -- and the
-       forced `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED` promotes that to
-       `ERROR! Completely failed to parse inventory source`, rc=1, with nothing
-       partial returned. So ansible already fails CLOSED and layer 2's env var is
-       what makes it do so. This layer exists because ansible names the file and
-       not what to do about it: we name the plugin it asks for and say that cloud
-       discovery is declared in Terraform instead.
+    2. **`ANSIBLE_INVENTORY_ENABLED` without `auto` and without `script`**, set in
+       the ENVIRONMENT so the repository's own `ansible.cfg` cannot re-enable it.
+    3. **This, which is LEGIBILITY rather than enforcement.** Measured against
+       ansible-core 2.18.3: its own `yaml` plugin recognises a plugin config and
+       refuses it -- "Plugin configuration YAML file, not YAML inventory" -- and
+       the forced `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED` promotes that to
+       `ERROR! Completely failed to parse inventory source`, rc=1, nothing partial
+       returned. So ansible already fails CLOSED. This layer exists because
+       ansible names the file and not what to do about it.
 
-       An earlier version of this docstring claimed the `yaml` plugin would claim
-       the file and read `plugin:`/`regions:`/`filters:` as GROUP NAMES, leaving a
-       confusing parse result. That is false, and recorded here because it is the
-       kind of wrong reason that survives review: it describes a silent-misparse
-       hazard that does not exist, and so argues for this layer being load-bearing
-       when it is not.
+    **What `allow_plugins` changes is NOT the refusal -- it is that the file is
+    REMOVED from the tree.** Measured, and it is the whole mechanism: with the
+    plugin config present, resolution is rc=1 under `yaml,ini` AND under
+    `auto,yaml,ini` (the plugin is not installed, so `auto` cannot resolve it
+    either), while removing it from the tree resolves cleanly. So "skip" cannot
+    mean "stop refusing"; it has to mean "exclude". The tree is a throwaway
+    extraction under a scratch directory, so deleting from it touches nothing
+    stored.
 
-    The exec bit is stripped in the same walk. #1970 measured a static
-    `hosts.yml` beside an executable `sneaky.sh` resolving to the union of both:
-    "the exec bit is the whole decision". A production repository confirmed the
-    other half -- nineteen inventory files, none executable, which is the only
-    reason `script` being enabled there was harmless.
+    An earlier docstring here claimed the `yaml` plugin would claim the file and
+    read `plugin:`/`regions:`/`filters:` as GROUP NAMES, leaving a confusing
+    partial parse. That is false, and recorded because it is the kind of wrong
+    reason that survives review: it describes a silent-misparse hazard that does
+    not exist, and so argues for this layer being load-bearing when it is not.
     """
+    skipped: list[SkippedSource] = []
+    executables: set[Path] = set()
+
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
 
         mode = path.stat().st_mode
         if mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+            # Recorded BEFORE the strip, because the strip is what makes the
+            # information unrecoverable -- and the script screening below runs
+            # after the source set is known, by which time the bit is gone.
+            executables.add(path)
             path.chmod(mode & ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
 
         if path.suffix.lower() not in _YAML_SUFFIXES:
@@ -358,17 +469,101 @@ def _refuse_plugin_sources(root: Path) -> None:
             document = yaml.safe_load(path.read_text(errors="replace"))
         except (OSError, yaml.YAMLError):
             continue
-        if isinstance(document, dict) and "plugin" in document:
-            plugin = document.get("plugin")
+        if not (isinstance(document, dict) and "plugin" in document):
+            continue
+
+        plugin = document.get("plugin")
+        relative = str(path.relative_to(root))
+        if not allow_plugins:
             raise InventorySourceRefused(
-                f"{path.relative_to(root)} is an inventory PLUGIN configuration "
+                f"{relative} is an inventory PLUGIN configuration "
                 f"(plugin: {plugin!r}), and Terrapod does not run inventory plugins. "
-                f"Cloud discovery is declared instead: a Terraform data source, "
-                f"`for_each`, and a `terrapod_inventory_host` per machine -- which is "
-                f"what a plugin gives you, except versioned in git, reviewed in a pull "
-                f"request and visible in a plan. Remove this file from the inventory "
-                f"directory."
+                f"{_DECLARE_INSTEAD} Remove this file from the inventory directory, "
+                f"or set `dynamic-inventory-enabled` on the workspace to run it on "
+                f"the RUNNER instead -- the API never will."
             )
+        path.unlink()
+        skipped.append(
+            SkippedSource(
+                path=relative,
+                kind="plugin",
+                plugin=str(plugin) if plugin is not None else None,
+                reason=(
+                    f"an inventory plugin configuration (plugin: {plugin!r}). The API "
+                    f"never runs a plugin, so this source is not represented here; the "
+                    f"runner resolves it and its resolution is authoritative."
+                ),
+            )
+        )
+    return skipped, executables
+
+
+def _screen_inventory_sources(
+    sources: _InventorySources,
+    executables: set[Path],
+    *,
+    allow_scripts: bool,
+) -> list[SkippedSource]:
+    """Settle executable sources, scoped to what ansible will actually READ.
+
+    **Scoped deliberately, and this is the whole reason it is a second pass.**
+    The config root legitimately holds executables -- a custom module under
+    `library/`, a filter plugin, a helper script beside a playbook -- so refusing
+    every executable in the tree would break ordinary repositories. Only a file
+    ansible reads AS INVENTORY is a dynamic inventory source, and that set is not
+    known until `_inventory_sources` has chosen its tier.
+
+    Measured against ansible-core 2.18.3, with an executable script beside a
+    static `hosts.yml` in one inventory directory:
+
+        exec bit ON,  `script,yaml,ini`   rc=0, both the static and script hosts
+        exec bit ON,  `yaml,ini`          rc=1
+        exec bit OFF, `yaml,ini`          rc=1   <- the API's path before #2033
+        exec bit OFF, `script,yaml,ini`   rc=1
+
+    Two things follow. First, a committed inventory script ALREADY broke the
+    API's resolution, with ansible's own parse error rather than a named refusal
+    -- so the switch-off path is an improvement here rather than a restriction.
+    Second, the runner needs both `script` enabled AND the bit intact; it has the
+    latter because `_safe_extract` uses `set_attrs=True` on the configuration
+    version, which the API's strip above never touches.
+    """
+    if not executables:
+        return []
+
+    reading: set[Path] = set()
+    for entry in sources.paths:
+        if entry.is_file():
+            reading.add(entry)
+            continue
+        for candidate in entry.rglob("*"):
+            if candidate.is_file() and candidate.suffix.lower() not in _INVENTORY_IGNORE_EXTS:
+                reading.add(candidate)
+
+    skipped: list[SkippedSource] = []
+    for path in sorted(reading & executables):
+        relative = str(path.relative_to(sources.root))
+        if not allow_scripts:
+            raise InventorySourceRefused(
+                f"{relative} is an EXECUTABLE inventory source, and Terrapod does "
+                f"not run inventory scripts. {_DECLARE_INSTEAD} Remove it from the "
+                f"inventory path, or set `inventory-scripts-enabled` on the "
+                f"workspace to run it on the RUNNER instead -- the API never will."
+            )
+        path.unlink()
+        skipped.append(
+            SkippedSource(
+                path=relative,
+                kind="script",
+                plugin=None,
+                reason=(
+                    "an executable inventory script. The API never runs one, so this "
+                    "source is not represented here; the runner resolves it and its "
+                    "resolution is authoritative."
+                ),
+            )
+        )
+    return skipped
 
 
 # ── Running ansible ──────────────────────────────────────────────────────────
@@ -410,7 +605,7 @@ def _ansible_env(scratch: Path) -> dict[str, str]:
         #
         # Layer 2 of the plugin refusal: no `auto` (the dispatcher that runs
         # whatever a file's `plugin:` key names) and no `script` (an
-        # executable source). See `_refuse_plugin_sources`.
+        # executable source). See `_screen_config_root`.
         "ANSIBLE_INVENTORY_ENABLED": "yaml,ini",
         # A source that cannot be parsed FAILS the resolution rather than
         # silently contributing nothing (#1967). Measured as env: exit 1 on
@@ -570,6 +765,85 @@ def normalise(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+#: The key carrying what the API declined to parse. Present and EMPTY on a
+#: faithful resolution rather than absent, because absent and empty would be
+#: indistinguishable to a reader deciding whether to trust the host set -- and
+#: "I cannot tell" has to read differently from "nothing was skipped".
+SKIPPED_KEY = "skipped_sources"
+
+#: Ordered repo-relative paths of every inventory source the operator's
+#: configuration names, present on a RUN's artifact only when the resolution is
+#: partial. See `_with_handoff`.
+HANDOFF_SOURCES_KEY = "sources"
+
+#: The declared rows alone, as an `all:`-rooted inventory document. Present with
+#: `HANDOFF_SOURCES_KEY` and for the same reason.
+HANDOFF_DECLARED_KEY = "declared"
+
+
+def _with_skipped(document: dict[str, Any], skipped: list[SkippedSource]) -> dict[str, Any]:
+    """Attach the skipped-source record to a resolved document (#2033).
+
+    In the DOCUMENT rather than beside it, so it reaches every consumer without
+    five signatures changing: the Redis cache, the run artifact, the read
+    endpoint and the SDK all carry the document whole. Safe because this
+    envelope is Terrapod's own shape -- `normalise` returns exactly `hosts`,
+    `groups` and `children`, and every consumer reads those by NAME rather than
+    iterating the top level, so a fourth key cannot be mistaken for inventory
+    structure. Checked: `configure_recovery.targeted_hosts` reads
+    `document.get("hosts")`, and `render_inventory_yaml` takes the declared rows
+    as kwargs rather than this document at all.
+
+    **`partial` is derived, never stored.** A reader asking "can I trust this
+    host set" should not have to know that a non-empty list implies it, and two
+    fields that can disagree is how a stale one survives.
+    """
+    return {
+        **document,
+        SKIPPED_KEY: [s._asdict() for s in skipped],
+        "partial": bool(skipped),
+    }
+
+
+def _with_handoff(
+    document: dict[str, Any],
+    *,
+    sources: list[str],
+    declared: dict[str, Any],
+) -> dict[str, Any]:
+    """Attach what the runner needs to resolve the sources we would not (#2033).
+
+    **Only on a partial resolution, and only for a run.** A faithful resolution
+    is the whole answer, and the configure phase's own docstring says why it must
+    not re-read the repository alongside it: the same hosts arriving from two
+    sources, with variable precedence decided by `-i` order rather than by what
+    the operator declared. These two keys are the narrow exception, and their
+    absence is what tells the phase it is in the ordinary case.
+
+    `sources` is **every** source the operator's configuration names, not only
+    the skipped ones, and that is the point rather than an oversight. Ansible's
+    `-i` order is precedence order, and within an inventory directory the
+    operator chooses it by filename -- the real-world arrangement is a `hosts.d`
+    of numerically-prefixed files. Handing the runner only the dynamic ones would
+    have it merge them at whatever position they happened to land relative to a
+    separately-rendered static half, so a `30_aws.yml` would outrank or be
+    outranked by a `20_static.yml` according to our list-building rather than
+    their numbering. Re-read whole, their order is theirs.
+
+    `declared` goes LAST on the runner, after every repository source, because
+    the platform source wins a conflicting variable -- the same relationship a
+    Terraform variable has to a default written into the configuration. It is the
+    built document rather than rendered text so the runner serialises it with the
+    renderer both sides already share, and so the credential phase can substitute
+    a `${terrapod:...}` placeholder in it exactly as it does in the merged case.
+    """
+    return {
+        **document,
+        HANDOFF_SOURCES_KEY: sources,
+        HANDOFF_DECLARED_KEY: declared,
+    }
+
+
 # ── The cache key ────────────────────────────────────────────────────────────
 
 
@@ -665,6 +939,17 @@ def make_tempdir() -> str:
 
 async def _declared_sources(db, workspace_id: uuid.UUID) -> str:
     """The declared rows, rendered to one inventory YAML."""
+    return render_inventory_yaml(**await _declared_document(db, workspace_id))
+
+
+async def _declared_document(db, workspace_id: uuid.UUID) -> dict[str, Any]:
+    """The declared rows as the renderer's keyword arguments.
+
+    Split out from the render so the run handoff can carry the same values
+    through `HANDOFF_DECLARED_KEY` without a second query pass and without a
+    second shape -- the runner builds its document from these with the module
+    both sides import, so the two cannot drift.
+    """
     from terrapod.services import inventory_service as inv
 
     hosts = await inv.list_hosts(db, workspace_id)
@@ -695,13 +980,13 @@ async def _declared_sources(db, workspace_id: uuid.UUID) -> str:
         and link.child_group_id in group_name
     ]
 
-    return render_inventory_yaml(
-        hosts=[(h.name, host_vars.get(h.id, {})) for h in hosts],
-        groups=[(g.name, group_vars.get(g.id, {})) for g in groups],
-        memberships=memberships,
-        children=children,
-        global_vars={v.key: _coerce(v) for v in await inv.list_global_vars(db, workspace_id)},
-    )
+    return {
+        "hosts": [(h.name, host_vars.get(h.id, {})) for h in hosts],
+        "groups": [(g.name, group_vars.get(g.id, {})) for g in groups],
+        "memberships": memberships,
+        "children": children,
+        "global_vars": {v.key: _coerce(v) for v in await inv.list_global_vars(db, workspace_id)},
+    }
 
 
 def _coerce(var) -> Any:  # type: ignore[no-untyped-def]
@@ -816,6 +1101,10 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
         git_sha="",
         limit=limit,
         config_version_id=cv_id,
+        # The run path alone asks for the handoff: a read has nobody to hand it
+        # to, and putting it in the Redis-cached document would publish a tree
+        # layout to every reader of the view for no consumer's benefit.
+        handoff=True,
     )
 
 
@@ -987,6 +1276,7 @@ async def _resolve_uncached(
     git_sha: str,
     limit: str | None,
     config_version_id: uuid.UUID | None = None,
+    handoff: bool = False,
 ) -> dict[str, Any]:
     """Render, materialise, run ansible, read the output. One scratch directory.
 
@@ -1013,18 +1303,36 @@ async def _resolve_uncached(
         # them. None when no repository takes part, which is a real case: a
         # workspace with no binding resolves its declared rows alone.
         provenance: _InventorySources | None = None
+        # Every source the API declined to parse, travelling to the caller so a
+        # partial resolution can SAY SO per source (#2033). Empty is the normal
+        # case and means the resolution is faithful.
+        skipped: list[SkippedSource] = []
 
         # The CV first: a run resolves against the commit it is running, and
         # only a read with no run falls back to the branch head.
         if config_version_id is not None:
-            config_root = await _config_root_from_cv(ws, config_version_id, workdir)
-            cwd = config_root
-            provenance = _inventory_sources(ws, config_root)
-            sources.extend(provenance.paths)
+            screened = await _config_root_from_cv(ws, config_version_id, workdir)
         elif git_sha:
-            config_root = await _fetch_vcs_source(db, ws, git_sha, workdir)
-            cwd = config_root
-            provenance = _inventory_sources(ws, config_root)
+            screened = await _fetch_vcs_source(db, ws, git_sha, workdir)
+        else:
+            screened = None
+
+        if screened is not None:
+            cwd = screened.root
+            provenance = _inventory_sources(ws, screened.root)
+            skipped.extend(screened.skipped)
+            # The executable pass runs HERE rather than in the walk above,
+            # because only a file ansible reads as inventory is a dynamic
+            # inventory source -- the config root legitimately holds executables
+            # under `library/` and beside playbooks.
+            skipped.extend(
+                await asyncio.to_thread(
+                    _screen_inventory_sources,
+                    provenance,
+                    screened.executables,
+                    allow_scripts=bool(ws.inventory_scripts_enabled),
+                )
+            )
             sources.extend(provenance.paths)
 
         # The declared rows always take part (#2256). `_declared_sources` renders
@@ -1032,20 +1340,27 @@ async def _resolve_uncached(
         # a workspace that has declared nothing and bound no repository gets its
         # defined empty result from the same path as everything else rather than
         # from a special case.
-        rendered = await _declared_sources(db, workspace_id)
+        declared = await _declared_document(db, workspace_id)
         platform_file = workdir / _PLATFORM_SOURCE_NAME
-        await asyncio.to_thread(platform_file.write_text, rendered)
+        await asyncio.to_thread(platform_file.write_text, render_inventory_yaml(**declared))
         sources.append(platform_file)
 
         document = await run_ansible_inventory(
             sources, scratch=workdir, limit=limit, cwd=cwd, provenance=provenance
         )
-        return normalise(document)
+        resolved = _with_skipped(normalise(document), skipped)
+        if handoff and skipped and provenance is not None:
+            resolved = _with_handoff(
+                resolved,
+                sources=[_handoff_path(s, provenance) for s in provenance.paths],
+                declared=build_inventory_document(**declared),
+            )
+        return resolved
     finally:
         await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
 
 
-async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
+async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> _ScreenedRoot:
     """The repository's **config root**, fetched whole and made inert.
 
     Narrowed to `config_directory`, not to the inventory directory, and that
@@ -1062,7 +1377,7 @@ async def _fetch_vcs_source(db, ws, git_sha: str, workdir: Path) -> Path:
     narrowing, and it is the smallest subtree that is correct rather than the
     smallest one that parses.
 
-    Everything fetched goes through `_refuse_plugin_sources` before ansible sees
+    Everything fetched goes through `_screen_config_root` before ansible sees
     it: the exec bit comes off and a plugin configuration is refused by name.
     """
     from sqlalchemy import select
@@ -1125,7 +1440,9 @@ async def _config_root_from_cv(ws, config_version_id, workdir: Path) -> Path:
     )
 
 
-async def _materialise_config_root(storage_key: str, ws, workdir: Path, *, origin: str) -> Path:
+async def _materialise_config_root(
+    storage_key: str, ws, workdir: Path, *, origin: str
+) -> _ScreenedRoot:
     """Unpack a stored repository archive and make it inert.
 
     Shared by the fetch path and the CV path because the bytes are the same
@@ -1157,8 +1474,10 @@ async def _materialise_config_root(storage_key: str, ws, workdir: Path, *, origi
             f"have at that commit"
         )
 
-    await asyncio.to_thread(_refuse_plugin_sources, root)
-    return root
+    skipped, executables = await asyncio.to_thread(
+        _screen_config_root, root, allow_plugins=bool(ws.dynamic_inventory_enabled)
+    )
+    return _ScreenedRoot(root, skipped, executables)
 
 
 def _extract(tarball: str, dest: Path) -> None:

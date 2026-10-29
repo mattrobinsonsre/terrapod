@@ -28,13 +28,18 @@ variable, a group variable and a `group_vars/all` variable all come out as "thes
 hosts differ" with no cases of ours. A global change naturally returns every
 host, so the run is not narrowed -- correct, and automatic.
 
-## Four reasons to go wide, and the empty-set case
+## The reasons to go wide, and the empty-set case
 
-1. `configure_all_hosts` -- the operator's override.
-2. No baseline: the first configure ever, or the last one failed. Hosts may be
+1. The resolution is PARTIAL -- the workspace permits inventory plugins or
+   scripts on the runner (#2033), so the API's host set is missing whatever
+   those sources would have contributed. Diffing it against a baseline would
+   narrow to the statically-known hosts and silently leave the rest
+   unconfigured, which is the one direction this module must never take.
+2. `configure_all_hosts` -- the operator's override.
+3. No baseline: the first configure ever, or the last one failed. Hosts may be
    unconfigured for reasons no diff can see (#1930 owns the failure case).
-3. The ansible code under `config_directory` moved since the baseline.
-4. The group NESTING changed. A `children` edit alters what a pattern resolves
+4. The ansible code under `config_directory` moved since the baseline.
+5. The group NESTING changed. A `children` edit alters what a pattern resolves
    to without necessarily changing any host's direct membership, and computing
    the affected subtree is the DAG walk above. Rare, broad in effect, so wide.
 
@@ -92,6 +97,7 @@ def is_derived_configure(run: Run) -> bool:
 
 
 #: Why a run went wide, for the log line and for the tests to assert on.
+WIDE_PARTIAL = "the API's resolution is partial, so a diff cannot see every host"
 WIDE_OVERRIDE = "configure_all_hosts is set"
 WIDE_NO_BASELINE = "no previous successful configure to compare against"
 WIDE_CODE_CHANGED = "the ansible code changed since the last successful configure"
@@ -259,6 +265,20 @@ async def limit_for(db: AsyncSession, run: Run, ws: Workspace, *, current: dict)
             reason=reason,
         )
         return ""
+
+    # BEFORE the operator's own override, deliberately: when both hold, the
+    # partial resolution is the reason worth logging, because it is the one
+    # nobody asked for. The outcome is identical either way -- both go wide --
+    # so the ordering buys only the honesty of the recorded reason.
+    #
+    # A partial document must not be diffed at all (#2033). `changed_hosts`
+    # would compare a host set missing whatever a plugin or script source
+    # contributes against a baseline that may have held them, reporting
+    # "changed" for the static hosts alone -- so the run would narrow to those
+    # and leave the rest unconfigured. Too few is the unsafe direction here,
+    # and a `--limit` matching nothing exits 1 (measured).
+    if current.get("partial"):
+        return wide(WIDE_PARTIAL)
 
     if ws.configure_all_hosts:
         return wide(WIDE_OVERRIDE)

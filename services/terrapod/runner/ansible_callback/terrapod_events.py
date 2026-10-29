@@ -40,13 +40,31 @@ is the same promise `configure.py` makes about never replacing their
 
 ## What it can and cannot know
 
-**It cannot tell you which hosts a play targeted.** `v2_playbook_on_play_start`
+**It cannot tell you which hosts a PLAY targeted.** `v2_playbook_on_play_start`
 reports the host PATTERN (`['web:db']`), never the expansion, and it fires once
 per batch under `serial:`. Measured with `serial: 1` and `any_errors_fatal: true`
 over four hosts failing in the first batch: the PLAY RECAP lists ONE host, this
 callback hears about ONE, and `stats.processed` holds ONE. Three hosts that were
-in scope appear nowhere at all. So the denominator is the run's resolved
-inventory artifact (#2021) and nothing here can substitute for it.
+in scope appear nowhere at all.
+
+**It CAN tell you the whole inventory's host set**, which is the denominator
+those three hosts are missing from, and that is what the `inventory` record is
+(#2033). Measured on the same fixture, against ansible-core 2.18.3:
+
+| from a callback at play start | with `serial: 1`, 4 hosts |
+|---|---|
+| `play.hosts` | `['web']` -- the pattern |
+| `inventory.get_hosts(play.hosts)` | `['w1']` -- RESTRICTED to the serial batch |
+| `inventory.hosts` | `['w1','w2','w3','w4']` |
+
+`inventory.hosts` is unaffected by the batch restriction and unaffected by
+`--limit` (which lands in `_subset`, unexpanded), so it is the inventory as
+resolved, which is exactly what the run's artifact holds for a workspace whose
+inventory the API could resolve in full. It matters for the workspaces where the
+API could NOT: one that resolves dynamic sources on the runner has an artifact
+listing only what the API could read, so without this record the denominator is
+short -- and a short denominator under-reports which hosts are still outstanding,
+which is the whole failure the denominator exists to catch.
 
 **The recap cannot report unreachability.** With `ignore_unreachable: true`,
 `v2_runner_on_unreachable` fires while the summary reads `unreachable=0
@@ -126,6 +144,8 @@ class CallbackModule(CallbackBase):
         self._events = _open_append(self._path)
         self._large = None
         self._play = ""
+        #: One `inventory` record per run, not per play. See `_emit_inventory`.
+        self._reported_inventory = False
 
     # -- emission ---------------------------------------------------------
     def _write(self, handle, record: dict) -> None:
@@ -194,8 +214,34 @@ class CallbackModule(CallbackBase):
 
     def v2_playbook_on_play_start(self, play) -> None:
         self._play = play.get_name() or ""
-        # The PATTERN, not the host set: see the module docstring.
+        # The PATTERN, not the play's host set: see the module docstring.
         self._emit("play_start", play=self._play, pattern=_pattern(play))
+        self._emit_inventory(play)
+
+    def _emit_inventory(self, play) -> None:
+        """Emit the whole inventory's host set, once (#2033).
+
+        Once because it is a property of the run rather than of a play, and
+        emitting it per play would make a reader pick between copies. From the
+        first play rather than from `v2_playbook_on_start`, which has no
+        inventory to read -- a Playbook carries patterns and a loader.
+
+        Through the variable manager's `_inventory`, which is private, so every
+        step is guarded and a failure emits nothing: this is a denominator for a
+        report, and a callback that raises inside a hook turns every task into a
+        `[WARNING]: Failure using method` line and loses the operator their
+        output. An absent record is handled by the reader; a broken callback is
+        not.
+        """
+        if self._reported_inventory:
+            return
+        self._reported_inventory = True
+        try:
+            inventory = play.get_variable_manager()._inventory
+            hosts = sorted(str(name) for name in inventory.hosts)
+        except Exception:  # noqa: BLE001 - see the docstring
+            return
+        self._emit("inventory", hosts=hosts)
 
     def v2_playbook_on_task_start(self, task, is_conditional) -> None:  # noqa: ARG002
         self._emit(

@@ -45,6 +45,8 @@ type workspaceDataSourceModel struct {
 	AutoConfigureEnabled          types.Bool   `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply           types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts             types.Bool   `tfsdk:"configure_all_hosts"`
+	DynamicInventoryEnabled       types.Bool   `tfsdk:"dynamic_inventory_enabled"`
+	InventoryScriptsEnabled       types.Bool   `tfsdk:"inventory_scripts_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
@@ -136,6 +138,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"auto_configure_enabled":        computedBool("Whether a push that changes the workspace's ansible config root queues a configure. Defaults to false. The run uses `default_playbook` and `default_limit`, because a push carries no run options."),
 			"configure_all_hosts":           computedBool("Whether a derived configure — one an inventory change or an apply produced — targets every host rather than only the hosts that changed. Defaults to false, which narrows: a derived configure narrows when the ansible code under `config_directory` is unchanged since the last successful configure, and goes wide when it moved."),
 			"configure_after_apply":         computedBool("Whether an apply on this workspace is followed by a configure on the same run — which is what lets a `terraform`/`tofu` CLI apply stream the configure's logs. Defaults to false. A destroy apply never chains one."),
+			"dynamic_inventory_enabled":     computedBool("Whether ansible's `auto` inventory plugin — a declared plugin config, a YAML file with a top-level `plugin:` key — may run on the runner. Defaults to false. The API never executes a plugin in either state: off, a plugin source is refused by name rather than resolving partially; on, the API skips it and the runner re-resolves the inventory and is authoritative."),
+			"inventory_scripts_enabled":     computedBool("Whether ansible's `script` inventory plugin — an executable inventory script — may run on the runner. Defaults to false, and the API never executes one in either state. Separate from dynamic_inventory_enabled so declared plugin configs can be permitted without also permitting arbitrary executables: a declared config names a collection that can be pinned and installed, a script names nothing."),
 			"config_directory":              computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
 			"inventory_paths":               computedList("Inventory sources, each a file or a directory relative to the repository root. Ordered: the order is the precedence ansible applies."),
 			"ansible_collections": schema.ListNestedAttribute{
@@ -335,6 +339,19 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.ConfigureAllHosts = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "configure-all-hosts"); v != nil {
 		m.ConfigureAllHosts = types.BoolValue(*v)
+	}
+	// #2033's pair. Both default FALSE, so a plain GetBoolAttr would answer
+	// correctly for an absent key; the pointer form is here to state that
+	// default at the read site, as the four above do, rather than leave it
+	// implied by Go's zero value. /api/tfe/v2 serialises neither attribute,
+	// and false -- refuse -- is the right answer when one is absent.
+	m.DynamicInventoryEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "dynamic-inventory-enabled"); v != nil {
+		m.DynamicInventoryEnabled = types.BoolValue(*v)
+	}
+	m.InventoryScriptsEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "inventory-scripts-enabled"); v != nil {
+		m.InventoryScriptsEnabled = types.BoolValue(*v)
 	}
 	// #1929's remaining four. `config-directory` is an ordinary non-nullable
 	// path now (#1966), so it reads as a plain string and NOT through

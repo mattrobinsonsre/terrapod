@@ -37,7 +37,7 @@ from terrapod.services.inventory_resolve import (
     CACHE_TTL_SECONDS,
     InventorySourceRefused,
     _ansible_env,
-    _refuse_plugin_sources,
+    _screen_config_root,
     cache_key,
     normalise,
     render_inventory_yaml,
@@ -380,10 +380,15 @@ class TestTheRenderedYamlShape:
 class TestThePluginRefusal:
     """Layer 3 of the dynamic-inventory ban (#1970, closed NOT_PLANNED).
 
-    Disabling a plugin does not make its file inert -- it makes it GARBAGE
-    INPUT. A `*.aws_ec2.yml` ends in `.yml`, so the `yaml` plugin claims it
-    whatever is inside and then reads `plugin:`, `regions:` and `filters:` as
-    group names. An operator would get a confusing parse rather than an answer.
+    Legibility rather than enforcement: measured against ansible-core 2.18.3,
+    its own `yaml` plugin recognises a plugin configuration and refuses it, and
+    the forced `ANY_UNPARSED_IS_FAILED` promotes that to a failed resolution. So
+    ansible already fails closed; this layer exists because ansible names the
+    file and not what to do about it.
+
+    `allow_plugins` is the per-workspace switch (#2033), and what it changes is
+    NOT the refusal -- it is that the file leaves the tree. Both directions are
+    driven here, because the switch is only meaningful as the difference.
     """
 
     def test_a_plugin_config_is_refused_by_name(self, tmp_path):
@@ -391,7 +396,7 @@ class TestThePluginRefusal:
         source.write_text("plugin: amazon.aws.aws_ec2\nregions:\n  - eu-west-1\n")
 
         with pytest.raises(InventorySourceRefused) as exc:
-            _refuse_plugin_sources(tmp_path)
+            _screen_config_root(tmp_path, allow_plugins=False)
 
         message = str(exc.value)
         assert "20_cloud.aws_ec2.yml" in message, "the refusal must name the file"
@@ -399,9 +404,31 @@ class TestThePluginRefusal:
         # And where to go instead, or the refusal just moves the dead end.
         assert "data source" in message and "for_each" in message
 
+    def test_with_the_switch_on_it_is_skipped_and_removed(self, tmp_path):
+        """Skipped means EXCLUDED, not "parsed anyway" (#2033).
+
+        Measured: with the plugin config present, resolution is rc=1 under
+        `yaml,ini` AND under `auto,yaml,ini`, because the collection is not
+        installed here either way. Only removing it from the tree resolves. So
+        the switch cannot mean "stop refusing"; the file has to go.
+        """
+        source = tmp_path / "20_cloud.aws_ec2.yml"
+        source.write_text("plugin: amazon.aws.aws_ec2\n")
+
+        skipped, _executables = _screen_config_root(tmp_path, allow_plugins=True)
+
+        assert not source.exists(), (
+            "the plugin config is still in the tree, so this resolution will fail "
+            "rather than skip -- the whole mechanism is exclusion"
+        )
+        assert [(s.kind, s.plugin) for s in skipped] == [("plugin", "amazon.aws.aws_ec2")]
+        assert "20_cloud.aws_ec2.yml" in skipped[0].path
+        assert skipped[0].reason, "a skip with no reason is an unlabelled short host set"
+
     def test_a_static_inventory_beside_it_is_untouched(self, tmp_path):
         (tmp_path / "10_static.yml").write_text("all:\n  hosts:\n    web-1:\n")
-        _refuse_plugin_sources(tmp_path)  # must not raise
+        skipped, _ = _screen_config_root(tmp_path, allow_plugins=False)  # must not raise
+        assert skipped == []
 
     def test_the_exec_bit_comes_off_everything(self, tmp_path):
         """#1970: a static `hosts.yml` beside an executable `sneaky.sh` resolved
@@ -411,10 +438,30 @@ class TestThePluginRefusal:
         script.chmod(0o755)
         assert script.stat().st_mode & stat.S_IXUSR
 
-        _refuse_plugin_sources(tmp_path)
+        _skipped, executables = _screen_config_root(tmp_path, allow_plugins=False)
 
         mode = script.stat().st_mode
         assert not mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        assert script in executables, (
+            "the bit is stripped here and the source screening runs later, so a file "
+            "that WAS executable is unrecoverable unless it is recorded now"
+        )
+
+    def test_the_exec_bit_comes_off_even_with_scripts_enabled(self, tmp_path):
+        """The switch is the RUNNER's; the API strips regardless (#2033).
+
+        `_screen_config_root` takes no `allow_scripts`, and that is the property:
+        the API never runs an inventory script whatever the workspace says,
+        because the objection was always about where the code runs -- and the
+        API pod's environment holds the database URL and the KEK.
+        """
+        script = tmp_path / "hosts.sh"
+        script.write_text("#!/bin/sh\necho '{}'\n")
+        script.chmod(0o755)
+
+        _screen_config_root(tmp_path, allow_plugins=True)
+
+        assert not script.stat().st_mode & stat.S_IXUSR
 
     def test_a_nested_plugin_config_is_found_too(self, tmp_path):
         """A directory is read recursively, so the walk has to be."""
@@ -422,14 +469,15 @@ class TestThePluginRefusal:
         nested.mkdir(parents=True)
         (nested / "ec2.yml").write_text("plugin: amazon.aws.aws_ec2\n")
         with pytest.raises(InventorySourceRefused):
-            _refuse_plugin_sources(tmp_path)
+            _screen_config_root(tmp_path, allow_plugins=False)
 
     def test_a_yaml_file_that_is_not_a_mapping_is_left_alone(self, tmp_path):
         """An INI inventory, a list, a stray document -- not our business to
         refuse, and ansible reports what it makes of them."""
         (tmp_path / "list.yml").write_text("- one\n- two\n")
         (tmp_path / "junk.yml").write_text(": : :\n")
-        _refuse_plugin_sources(tmp_path)  # must not raise
+        skipped, _ = _screen_config_root(tmp_path, allow_plugins=False)  # must not raise
+        assert skipped == []
 
 
 class TestTheResolutionEnvironment:
@@ -575,9 +623,9 @@ class TestEveryMaterialisedSourceIsScanned:
         """Every call in `_materialise_config_root`, as (callee, unparsed args).
 
         Read from the AST rather than by searching the text, which matters more
-        than it looks: `_refuse_plugin_sources` is NAMED IN THE DOCSTRING above
-        the code, so a substring search finds the prose first. An earlier version
-        of this gate did exactly that and failed against correct code.
+        than it looks: `_screen_config_root` is NAMED IN THE DOCSTRING above the
+        code, so a substring search finds the prose first. An earlier version of
+        this gate did exactly that and failed against correct code.
         """
         import ast
         import inspect
@@ -598,10 +646,10 @@ class TestEveryMaterialisedSourceIsScanned:
         scans = [
             args
             for callee, args in self._calls()
-            if callee.endswith("to_thread") and "_refuse_plugin_sources" in args
+            if callee.endswith("to_thread") and "_screen_config_root" in args
         ]
         assert scans, (
-            "`_materialise_config_root` does not call `_refuse_plugin_sources`, so a "
-            "fetched repository reaches ansible unscanned and a plugin config in it is "
-            "no longer named and refused"
+            "`_materialise_config_root` does not call `_screen_config_root`, so a "
+            "fetched repository reaches ansible unscanned: a plugin config in it is "
+            "no longer named and refused, and no exec bit is stripped"
         )

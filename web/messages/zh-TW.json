@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU 請求",
       "eeMemoryRequest": "Ansible 記憶體請求",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt 版本"
+      "terragruntVersion": "Terragrunt 版本",
+      "dynamicInventoryEnabled": "動態清單外掛",
+      "dynamicInventoryEnabledHint": "允許 runner 解析清單時使用已宣告的清單外掛，也就是帶有頂層 plugin 鍵的 YAML 來源。Terrapod 本身在兩種狀態下都不會執行外掛。關閉時，外掛來源會被指名拒絕，而不是解析成不完整的主機集合；開啟時，此處顯示的清單會按來源明確標示為不完整，由 runner 解析出的集合才是權威結果。",
+      "inventoryScriptsEnabled": "清單指令碼",
+      "inventoryScriptsEnabledHint": "允許 runner 解析清單時使用可執行的清單指令碼。與動態清單外掛分開設定，這樣便可只允許已宣告的外掛設定——它們指明了一個集合，且在執行前可以讀取——而不必同時允許任意可執行檔。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "要觸及哪些主機、主機組或模式。留空表示清冊中的每一台主機。",
       "typeConfigure": "設定",
       "typeConfigureHint": "針對清冊執行該 playbook。既沒有計畫，也沒有套用。",
-      "typeConfigureAfterApplyHint": "在這同一次執行中，套用之後緊接一次設定。"
+      "typeConfigureAfterApplyHint": "在這同一次執行中，套用之後緊接一次設定。",
+      "queueConfigureConfirmDynamic": "此工作區在執行器上解析清單來源，因此在執行開始之前無法得知它將觸及哪些主機。"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

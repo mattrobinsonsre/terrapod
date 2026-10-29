@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU 请求",
       "eeMemoryRequest": "Ansible 内存请求",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt 版本"
+      "terragruntVersion": "Terragrunt 版本",
+      "dynamicInventoryEnabled": "动态清单插件",
+      "dynamicInventoryEnabledHint": "允许 runner 解析清单时使用已声明的清单插件，即带有顶层 plugin 键的 YAML 源。Terrapod 自身在两种状态下都不会运行插件。关闭时，插件源会被按名称拒绝，而不是解析成不完整的主机集合；开启时，此处显示的清单会按来源明确标注为不完整，由 runner 解析出的集合才是权威结果。",
+      "inventoryScriptsEnabled": "清单脚本",
+      "inventoryScriptsEnabledHint": "允许 runner 解析清单时使用可执行的清单脚本。与动态清单插件分开设置，这样就可以只允许已声明的插件配置——它们指明了一个集合，并且在运行前可以读取——而不必同时允许任意可执行文件。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "要触及哪些主机、主机组或模式。留空表示清单中的每一台主机。",
       "typeConfigure": "配置",
       "typeConfigureHint": "针对清单执行该 playbook。既没有计划，也没有应用。",
-      "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。"
+      "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。",
+      "queueConfigureConfirmDynamic": "此工作区在运行器上解析清单源，因此在运行开始之前无法得知它将触及哪些主机。"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

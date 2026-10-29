@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Richiesta CPU Ansible",
       "eeMemoryRequest": "Richiesta memoria Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Versione di Terragrunt"
+      "terragruntVersion": "Versione di Terragrunt",
+      "dynamicInventoryEnabled": "Plugin di inventario dinamico",
+      "dynamicInventoryEnabledHint": "Consente i plugin di inventario dichiarati — una sorgente YAML con una chiave plugin di primo livello — quando il runner risolve l''inventario. Terrapod non ne esegue mai uno direttamente, in nessuno dei due stati. Finché questa opzione è disattivata, una sorgente plugin viene rifiutata per nome anziché risolversi in un insieme di host parziale; finché è attiva, l''inventario mostrato qui è esplicitamente parziale per sorgente, e l''insieme risolto dal runner è quello che fa fede.",
+      "inventoryScriptsEnabled": "Script di inventario",
+      "inventoryScriptsEnabledHint": "Consente gli script di inventario eseguibili quando il runner risolve l''inventario. Separato dai plugin di inventario dinamico, in modo che le configurazioni di plugin dichiarate, che nominano una collection e possono essere lette prima di essere eseguite, possano essere consentite senza consentire anche eseguibili arbitrari."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Quali host, gruppi o pattern raggiungere. Vuoto significa ogni host dell''inventario.",
       "typeConfigure": "configurazione",
       "typeConfigureHint": "Esegue il playbook sull''inventario. Nessun plan e nessun apply.",
-      "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione."
+      "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione.",
+      "queueConfigureConfirmDynamic": "Questo workspace risolve le fonti di inventario sul runner, quindi gli host che raggiungerà non sono noti fino all''avvio dell''esecuzione."
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

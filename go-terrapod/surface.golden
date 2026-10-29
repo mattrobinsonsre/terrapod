@@ -391,6 +391,7 @@ field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omit
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field CreateWorkspaceRequest.DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
 field CreateWorkspaceRequest.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
 field CreateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
@@ -398,6 +399,7 @@ field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempt
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field CreateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
+field CreateWorkspaceRequest.InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
 field CreateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
@@ -1268,12 +1270,14 @@ field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omi
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field UpdateWorkspaceRequest.DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
 field UpdateWorkspaceRequest.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field UpdateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
+field UpdateWorkspaceRequest.InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
 field UpdateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
@@ -1485,6 +1489,7 @@ field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
 field Workspace.DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty"`
 field Workspace.DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
 field Workspace.DriftStatus string `json:"drift-status,omitempty"`
+field Workspace.DynamicInventoryEnabled bool `json:"dynamic-inventory-enabled"`
 field Workspace.EEResourceCPU string `json:"ee-resource-cpu,omitempty"`
 field Workspace.EEResourceMemory string `json:"ee-resource-memory,omitempty"`
 field Workspace.Engine string `json:"engine,omitempty"`
@@ -1493,6 +1498,7 @@ field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
 field Workspace.ID string `json:"id"`
 field Workspace.InventoryPaths []string `json:"inventory-paths,omitempty"`
+field Workspace.InventoryScriptsEnabled bool `json:"inventory-scripts-enabled"`
 field Workspace.Labels map[string]string `json:"labels,omitempty"`
 field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`

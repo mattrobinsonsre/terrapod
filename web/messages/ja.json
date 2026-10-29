@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "AnsibleのCPUリクエスト",
       "eeMemoryRequest": "Ansibleのメモリリクエスト",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt バージョン"
+      "terragruntVersion": "Terragrunt バージョン",
+      "dynamicInventoryEnabled": "動的インベントリプラグイン",
+      "dynamicInventoryEnabledHint": "ランナーがインベントリを解決するときに、宣言されたインベントリプラグイン（トップレベルの plugin キーを持つ YAML ソース）を許可します。Terrapod 自身はどちらの状態でもプラグインを実行しません。オフのあいだ、プラグインソースは部分的なホスト集合に解決されるのではなく、名前を挙げて拒否されます。オンのあいだ、ここに表示されるインベントリはソースごとに明示的に部分的なものとなり、ランナーが解決した集合が正となります。",
+      "inventoryScriptsEnabled": "インベントリスクリプト",
+      "inventoryScriptsEnabledHint": "ランナーがインベントリを解決するときに、実行可能なインベントリスクリプトを許可します。動的インベントリプラグインとは別にしてあるため、コレクションを指定でき実行前に内容を読める宣言済みのプラグイン設定だけを許可し、任意の実行ファイルは許可しないという選択ができます。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "対象とするホスト、グループ、またはパターンを指定します。空欄の場合はインベントリ内のすべてのホストが対象になります。",
       "typeConfigure": "構成",
       "typeConfigureHint": "インベントリに対してプレイブックを実行します。プランも適用もありません。",
-      "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。"
+      "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。",
+      "queueConfigureConfirmDynamic": "このワークスペースはインベントリソースをランナー上で解決するため、到達するホストは実行が開始されるまで分かりません。"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

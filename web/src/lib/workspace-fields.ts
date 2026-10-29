@@ -252,6 +252,22 @@ export const FIELDS: readonly FieldSpec[] = [
     dependsOn: 'configure-enabled',
     summary: 'count',
   },
+  // Which inventory SOURCES under those paths ansible may resolve (#2033).
+  // Two switches rather than one, because a declared plugin config names a
+  // collection that can be pinned and inspected while a script names nothing,
+  // so permitting the first is not permitting the second.
+  {
+    attr: 'dynamic-inventory-enabled',
+    id: 'ws-dynamic-inventory-enabled',
+    group: 'ansible',
+    dependsOn: 'configure-enabled',
+  },
+  {
+    attr: 'inventory-scripts-enabled',
+    id: 'ws-inventory-scripts-enabled',
+    group: 'ansible',
+    dependsOn: 'configure-enabled',
+  },
   { attr: 'ansible-version', id: 'ws-ansible-version', group: 'ansible', dependsOn: 'configure-enabled' },
   {
     attr: 'ansible-execution-environment',
@@ -572,6 +588,8 @@ export const LABEL_KEY: Record<string, string> = {
   'default-playbook': 'fields.defaultPlaybook',
   'default-limit': 'fields.defaultLimit',
   'inventory-paths': 'fields.inventoryPaths',
+  'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabled',
+  'inventory-scripts-enabled': 'fields.inventoryScriptsEnabled',
   'ansible-version': 'fields.ansibleVersion',
   'ansible-execution-environment': 'fields.ansibleExecutionEnvironment',
   'ansible-collections': 'fields.ansibleCollections',

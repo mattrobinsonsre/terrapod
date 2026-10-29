@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU-aanvraag",
       "eeMemoryRequest": "Ansible geheugenaanvraag",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt-versie"
+      "terragruntVersion": "Terragrunt-versie",
+      "dynamicInventoryEnabled": "Dynamische inventaris-plug-ins",
+      "dynamicInventoryEnabledHint": "Staat gedeclareerde inventaris-plug-ins toe — een YAML-bron met een plugin-sleutel op het hoogste niveau — wanneer de runner de inventaris oplost. Terrapod voert er zelf nooit een uit, in geen van beide standen. Zolang dit uit staat, wordt een plug-inbron bij naam geweigerd in plaats van tot een onvolledige hostlijst op te lossen; zolang het aan staat, is de hier weergegeven inventaris per bron uitdrukkelijk onvolledig, en is de door de runner opgeloste verzameling bepalend.",
+      "inventoryScriptsEnabled": "Inventaris-scripts",
+      "inventoryScriptsEnabledHint": "Staat uitvoerbare inventaris-scripts toe wanneer de runner de inventaris oplost. Gescheiden van dynamische inventaris-plug-ins, zodat gedeclareerde plug-inconfiguraties, die een collection benoemen en vóór uitvoering gelezen kunnen worden, toegestaan kunnen worden zonder ook willekeurige uitvoerbare bestanden toe te staan."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Welke hosts, groepen of patronen bereikt moeten worden. Leeg betekent elke host in de inventaris.",
       "typeConfigure": "configureren",
       "typeConfigureHint": "Voert het playbook uit tegen de inventaris. Geen plan en geen apply.",
-      "typeConfigureAfterApplyHint": "Na de apply volgt het configureren in dezelfde run."
+      "typeConfigureAfterApplyHint": "Na de apply volgt het configureren in dezelfde run.",
+      "queueConfigureConfirmDynamic": "Deze workspace lost inventarisbronnen op de runner op, dus de hosts die worden bereikt zijn pas bekend wanneer de run start."
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",

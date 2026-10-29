@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Requisição de CPU do Ansible",
       "eeMemoryRequest": "Requisição de memória do Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Versão do Terragrunt"
+      "terragruntVersion": "Versão do Terragrunt",
+      "dynamicInventoryEnabled": "Plugins de inventário dinâmico",
+      "dynamicInventoryEnabledHint": "Permite plugins de inventário declarados — uma fonte YAML com uma chave plugin de primeiro nível — quando o runner resolve o inventário. O próprio Terrapod nunca executa nenhum, em nenhum dos dois estados. Enquanto isto estiver desligado, uma fonte de plugin é recusada pelo nome em vez de resolver para um conjunto de hosts parcial; enquanto estiver ligado, o inventário mostrado aqui é explicitamente parcial por fonte, e o conjunto que o runner resolve é o que vale.",
+      "inventoryScriptsEnabled": "Scripts de inventário",
+      "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plugins de inventário dinâmico para que configurações de plugin declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Quais hosts, grupos ou padrões alcançar. Vazio significa todos os hosts do inventário.",
       "typeConfigure": "configuração",
       "typeConfigureHint": "Executa o playbook contra o inventário. Sem plan e sem apply.",
-      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução."
+      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução.",
+      "queueConfigureConfirmDynamic": "Este workspace resolve as fontes de inventário no runner, portanto os hosts que ele alcançará só são conhecidos quando a execução inicia."
     },
     "state": {
       "deleteConfirm": "Excluir a versão de estado #{serial}? Isso não pode ser desfeito.",

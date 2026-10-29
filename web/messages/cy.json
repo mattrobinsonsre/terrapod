@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Cais CPU Ansible",
       "eeMemoryRequest": "Cais cof Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Fersiwn Terragrunt"
+      "terragruntVersion": "Fersiwn Terragrunt",
+      "dynamicInventoryEnabled": "Ategion rhestr eiddo ddynamig",
+      "dynamicInventoryEnabledHint": "Caniatáu ategion rhestr eiddo a ddatganwyd — ffynhonnell YAML sy''n cario allwedd plugin ar y lefel uchaf — pan fydd y rhedwr yn datrys y rhestr eiddo. Nid yw Terrapod ei hun byth yn rhedeg un, yn y naill gyflwr na''r llall. Pan fydd hwn i ffwrdd, caiff ffynhonnell ategyn ei gwrthod wrth ei henw yn lle datrys i set gwesteiwyr anghyflawn; pan fydd ymlaen, mae''r rhestr eiddo a ddangosir yma yn anghyflawn yn benodol fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
+      "inventoryScriptsEnabled": "Sgriptiau rhestr eiddo",
+      "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Pa westeiwyr, grwpiau neu batrymau i'w cyrraedd. Mae gwag yn golygu pob gwesteiwr yn y rhestr eiddo.",
       "typeConfigure": "cyflunio",
       "typeConfigureHint": "Yn rhedeg y llyfr chwarae yn erbyn y rhestr eiddo. Dim cynllun a dim gweithredu.",
-      "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn."
+      "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn.",
+      "queueConfigureConfirmDynamic": "Mae'r gweithle hwn yn datrys ffynonellau rhestr eiddo ar y rhedwr, felly nid yw'r gwesteiwyr y bydd yn eu cyrraedd yn hysbys hyd nes i'r rhediad ddechrau."
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

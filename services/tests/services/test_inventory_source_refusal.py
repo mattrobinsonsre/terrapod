@@ -110,16 +110,34 @@ def driven(monkeypatch, repo: Path):
     """
 
     async def _fake_fetch(db, ws, git_sha, workdir):
-        return repo
+        # A `_ScreenedRoot`, not a bare `Path`, and the distinction is load-bearing
+        # rather than pedantic: `Path.root` EXISTS and is the string `"/"`, so a
+        # fake returning a path makes `screened.root` silently `"/"` and the
+        # failure arrives as `TypeError: unsupported operand type(s) for /: 'str'
+        # and 'str'` from inside the tier chooser, naming nothing about the fake.
+        return ir._ScreenedRoot(root=repo, skipped=[], executables=set())
 
     async def _fake_declared(db, workspace_id):
-        return "all:\n  hosts: {}\n"
+        return {
+            "hosts": [],
+            "groups": [],
+            "memberships": [],
+            "children": [],
+            "global_vars": {},
+        }
 
     monkeypatch.setattr(ir, "_fetch_vcs_source", _fake_fetch)
-    monkeypatch.setattr(ir, "_declared_sources", _fake_declared)
+    monkeypatch.setattr(ir, "_declared_document", _fake_declared)
 
     async def _drive(inventory_paths: list[str]):
-        ws = SimpleNamespace(inventory_paths=inventory_paths, config_directory="ansible")
+        ws = SimpleNamespace(
+            inventory_paths=inventory_paths,
+            config_directory="ansible",
+            # Both switches off, which is the default and the only state this
+            # file's subject -- a refusal message -- is about (#2033).
+            dynamic_inventory_enabled=False,
+            inventory_scripts_enabled=False,
+        )
         return await ir._resolve_uncached(None, uuid.uuid4(), ws=ws, git_sha="deadbeef", limit=None)
 
     return _drive

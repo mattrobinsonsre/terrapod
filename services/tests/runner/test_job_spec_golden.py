@@ -77,6 +77,28 @@ SCENARIOS: dict[str, dict] = {
         "phase": "apply",
         "ansible_collections": ["community.general:9.2.0", "acme.internal"],
     },
+    # #2033's two switches, and SEPARATELY rather than one both-on scenario.
+    # They are independent columns that compose one env value, so a scenario
+    # with both on cannot distinguish "each contributes its own token" from
+    # "either one turns both on" -- and the second is exactly the copy-paste a
+    # pair of adjacent booleans invites. Each is emitted only when ON, so every
+    # other scenario pins the absence.
+    "dynamic-inventory": {
+        "phase": "configure",
+        "dynamic_inventory_enabled": True,
+        "config_directory": "ansible",
+    },
+    "inventory-scripts": {
+        "phase": "configure",
+        "inventory_scripts_enabled": True,
+        "config_directory": "ansible",
+    },
+    "dynamic-inventory-and-scripts": {
+        "phase": "configure",
+        "dynamic_inventory_enabled": True,
+        "inventory_scripts_enabled": True,
+        "config_directory": "ansible",
+    },
     # Both phases, because TERRAPOD_WORKSPACE must be exported in plan AND
     # apply -- the provider reads inventory in one and writes it in the other
     # (#2036). The empty case is covered by every other scenario.

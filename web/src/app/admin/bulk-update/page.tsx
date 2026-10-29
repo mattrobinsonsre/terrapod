@@ -136,6 +136,12 @@ export default function BulkUpdatePage() {
   const [uAutoConfigureEnabled, setUAutoConfigureEnabled] = useState('')
   const [uConfigureAfterApply, setUConfigureAfterApply] = useState('')
   const [uConfigureAllHosts, setUConfigureAllHosts] = useState('')
+  // Which inventory SOURCES ansible may resolve on the runner (#2033). Both
+  // opt-in, both inert without `configure-enabled`, and both fleet-settable
+  // for the same reason the triggers above are: an operator adopting a
+  // dynamic inventory does it across the workspaces that should have it.
+  const [uDynamicInventoryEnabled, setUDynamicInventoryEnabled] = useState('')
+  const [uInventoryScriptsEnabled, setUInventoryScriptsEnabled] = useState('')
   // BOTH explicitly false is the only combination that can never succeed for
   // any matched workspace, so it is the only one blocked here. Turning just
   // plan/apply off is legitimate for a set that has configure on, and the
@@ -286,6 +292,10 @@ export default function BulkUpdatePage() {
     if (uAutoConfigureEnabled) u['auto-configure-enabled'] = uAutoConfigureEnabled === 'true'
     if (uConfigureAfterApply) u['configure-after-apply'] = uConfigureAfterApply === 'true'
     if (uConfigureAllHosts) u['configure-all-hosts'] = uConfigureAllHosts === 'true'
+    if (uDynamicInventoryEnabled)
+      u['dynamic-inventory-enabled'] = uDynamicInventoryEnabled === 'true'
+    if (uInventoryScriptsEnabled)
+      u['inventory-scripts-enabled'] = uInventoryScriptsEnabled === 'true'
     // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
     // value here (the configuration version's root), so the checkbox is what
     // says whether to write this at all. Never `null`: an explicit null on
@@ -1216,6 +1226,50 @@ export default function BulkUpdatePage() {
                   className={inputCls}
                 />
               )}
+            </div>
+            {/* Which inventory sources ansible may resolve on the runner
+                (#2033). Terrapod itself never runs either kind, in either
+                state -- these say what the RUNNER is permitted to resolve. */}
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* min-w-0: a grid item has min-width:auto, so a select whose
+                  longest option is a long translated string can push the row
+                  past the viewport however w-full the control is. */}
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-dynamic-inventory-enabled">
+                  {tWs('fields.dynamicInventoryEnabled')}
+                </label>
+                <select
+                  id="bu-dynamic-inventory-enabled"
+                  value={uDynamicInventoryEnabled}
+                  onChange={(e) => setUDynamicInventoryEnabled(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.dynamicInventoryEnabledHint')}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-inventory-scripts-enabled">
+                  {tWs('fields.inventoryScriptsEnabled')}
+                </label>
+                <select
+                  id="bu-inventory-scripts-enabled"
+                  value={uInventoryScriptsEnabled}
+                  onChange={(e) => setUInventoryScriptsEnabled(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.inventoryScriptsEnabledHint')}
+                </p>
+              </div>
             </div>
           </div>
 

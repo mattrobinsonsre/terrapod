@@ -48,6 +48,11 @@ logger = structlog.get_logger(__name__)
 #: The name the rendered file is given.
 RENDERED_NAME = "terrapod-resolved-inventory.yml"
 
+#: The name the declared rows are given when they travel on their own, which is
+#: the dynamic handoff (#2033). A distinct name rather than reusing the one
+#: above, so a log line or a `ps` naming either says which case this run is in.
+DECLARED_NAME = "terrapod-declared-inventory.yml"
+
 #: Where it is written. On the volume the EE SHARES with the orchestrator, which
 #: is not a detail: ansible runs in the EE, and the EE mounts only this volume
 #: and the workspace -- so a file written to the orchestrator's own `/tmp`, which
@@ -138,6 +143,20 @@ def document_to_source(document: dict[str, Any], *, resolved: dict[str, str] | N
     # variable, a group variable, or inside a longer string such as
     # `ansible_ssh_common_args="-o IdentityFile=${terrapod:web.private_key}"`,
     # which is how a real estate expresses a per-group key.
+    return built_to_source(built, resolved=resolved)
+
+
+def built_to_source(built: dict[str, Any], *, resolved: dict[str, str] | None = None) -> str:
+    """An already-built inventory document as the bytes to write.
+
+    Split from `document_to_source` because the dynamic handoff carries the
+    declared rows ALREADY built (#2033): the API ran them through the same
+    `build_inventory_document`, so re-deriving the structure here would be a
+    second producer of the thing the shared module exists to have one of.
+    Substitution and the unresolved refusal apply identically -- a
+    `${terrapod:...}` in a declared variable is a credential reference wherever
+    the merge happened.
+    """
     built = substitute(built, resolved or {})
     _refuse_unresolved(built)
     # JSON, not YAML, and that is not a shortcut: **JSON is valid YAML**, and
@@ -176,17 +195,112 @@ def _refuse_unresolved(built: dict[str, Any]) -> None:
     )
 
 
+def _handoff_sources(
+    document: dict[str, Any],
+    *,
+    work_dir: Path,
+    target: Path,
+    resolved: dict[str, str] | None,
+) -> list[Path] | None:
+    """The `-i` list for a run whose inventory the API could only partly resolve.
+
+    `None` when the artifact carries no handoff, which is the ordinary case and
+    the only one before #2033: the API resolved everything, so the merged
+    document is the whole answer and re-reading the repository alongside it is
+    the defect `argv`'s docstring describes.
+
+    When it does, the API declined to parse one or more sources -- an executable
+    inventory script, or a plugin configuration whose `plugin:` key names a
+    cloud discovery plugin -- and this workspace has opted into having them
+    resolved HERE, where the code runs in an ephemeral Job with no database URL
+    and no KEK rather than in the API pod. So the repository's own sources are
+    read by ansible in the execution environment, in the operator's own order,
+    and the declared rows are appended last because the platform source wins a
+    conflicting variable.
+
+    **The merged document is deliberately NOT in the list.** Its host variables
+    are EFFECTIVE -- the API collapsed `group_vars` into them -- so appending it
+    beside a fresh read of the same repository would re-assert every repository
+    group variable at host precedence, silently outranking a value a dynamic
+    source contributed for a host both describe. The repository is read once,
+    here, and the only thing layered over it is what Terraform declared.
+
+    Raises:
+        InventoryUnavailable: a named source is not in the fetched tree. Refused
+            rather than skipped: a missing source resolves fewer hosts, and a
+            configure that reaches part of a fleet and reports success is the
+            one outcome worth refusing a runner slot over.
+    """
+    names = document.get("sources")
+    declared = document.get("declared")
+    if not names or not isinstance(declared, dict):
+        return None
+
+    sources: list[Path] = []
+    for name in names:
+        source = (work_dir / str(name)).resolve()
+        if not source.exists():
+            raise InventoryUnavailable(
+                f"this run resolves its inventory sources here, and {name!r} is not in "
+                "the fetched tree. The API named it from the same configuration version, "
+                "so it was there when the run was created -- check nothing in the "
+                "repository generates it at runtime."
+            )
+        sources.append(source)
+
+    rendered = target / DECLARED_NAME
+    _write(rendered, built_to_source(declared, resolved=resolved))
+    sources.append(rendered)
+    logger.info(
+        "inventory sources handed to the execution environment",
+        repository_sources=len(names),
+        declared=str(rendered),
+    )
+    return sources
+
+
+def _write(path: Path, text: str) -> None:
+    """Write a Terrapod-rendered inventory at the credential mode.
+
+    ALWAYS at that mode, not only when a placeholder resolved to a secret. A
+    machine credential's connection password reaches ansible as a VARIABLE --
+    there is no `ansible_password_file`, so a password can only be one -- which
+    makes any of these documents secret-bearing whenever one is declared.
+    Unconditional rather than conditional because a mode chosen by a branch is a
+    mode that can be chosen wrongly, and nothing but the EE reads these files.
+
+    `os.open` with the mode at CREATION rather than `write_text` then chmod: the
+    default would be `0644`, so a narrowed-afterwards file is readable for the
+    window in between. Measured before fixing -- the file was `0644` with the
+    password in plaintext.
+    """
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, CREDENTIAL_FILE_MODE)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
 def materialise(
     cfg: RunnerConfig,
     *,
+    work_dir: Path,
     client: Any = None,
     resolved: dict[str, str] | None = None,
-) -> Path:
-    """Fetch the run's resolved inventory and write it as a YAML source.
+) -> list[Path]:
+    """Fetch the run's resolved inventory and write the `-i` list for this run.
 
-    Returns the path to pass as the single `-i`. Raises `InventoryUnavailable`
-    if the artifact cannot be fetched, is not the document it must be, or a
-    placeholder in it cannot be resolved.
+    Returns the paths to pass as `-i`, in order. **One entry in the ordinary
+    case** -- the rendered merged artifact. Several when the artifact carries a
+    dynamic handoff (#2033): see `_handoff_sources`, which is also where the
+    reason the merged document is then excluded lives.
+
+    Raises `InventoryUnavailable` if the artifact cannot be fetched, is not the
+    document it must be, a handed-over source is not in the fetched tree, or a
+    placeholder cannot be resolved.
+
+    `work_dir` is the fetched tree's root, which repository source paths are
+    relative to. Taken as an argument rather than derived here because the
+    caller already resolved it and two derivations of the same root is how they
+    come to disagree.
 
     `resolved` carries what each `${terrapod:...}` placeholder stands for
     (#1933). Substitution happens in the RENDERED file and nowhere else -- the
@@ -239,22 +353,13 @@ def materialise(
     # `parents=True` because a runner-tier test has no Job to have created it,
     # `exist_ok` because in a Job the init container already has.
     target.mkdir(parents=True, exist_ok=True)
+
+    handed = _handoff_sources(document, work_dir=work_dir, target=target, resolved=resolved)
+    if handed is not None:
+        return handed
+
     rendered = target / RENDERED_NAME
-    # ALWAYS written at the credential mode, not only when a placeholder resolved to a
-    # secret. A machine credential's connection password reaches ansible as a
-    # VARIABLE -- there is no `ansible_password_file`, so a password can only be
-    # one -- which makes this document secret-bearing whenever one is declared.
-    # Unconditional rather than conditional because a mode chosen by a branch is
-    # a mode that can be chosen wrongly, and nothing but the EE reads this file:
-    # it is Terrapod's own render, not part of the operator's fetched tree.
-    #
-    # `os.open` with the mode at CREATION rather than `write_text` then chmod:
-    # the default would be `0644`, so a narrowed-afterwards file is readable for
-    # the window in between. Measured before fixing -- the file was `0644` with
-    # the password in plaintext.
-    fd = os.open(rendered, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, CREDENTIAL_FILE_MODE)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(document_to_source(document, resolved=resolved))
+    _write(rendered, document_to_source(document, resolved=resolved))
     logger.info(
         "resolved inventory materialised",
         run_id=cfg.run_id,
@@ -262,4 +367,4 @@ def materialise(
         hosts=len(document.get("hosts") or {}),
         groups=len(document.get("groups") or {}),
     )
-    return rendered
+    return [rendered]

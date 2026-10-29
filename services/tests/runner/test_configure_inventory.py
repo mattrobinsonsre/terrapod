@@ -30,9 +30,23 @@ from terrapod.runner.phases.configure_inventory import (
 )
 from terrapod.services.ansible_auth import placeholder_for
 
+
 #: Every shape that carries a distinct risk: a host with variables, a var-less
 #: host, a host in no group, direct membership, a declared empty group, and a
 #: parent whose ONLY members are inherited through its children.
+def _one(sources):
+    """The single `-i` path, asserting there is exactly one.
+
+    `materialise` returns a LIST because the dynamic handoff makes it one
+    (#2033). Asserting the length here rather than indexing blindly is what
+    keeps these tests about the ORDINARY case: if a change started handing over
+    sources on a document with no handoff, every one of them would fail by name
+    instead of silently testing the first of several.
+    """
+    assert len(sources) == 1, f"expected one -i, got {[str(s) for s in sources]}"
+    return sources[0]
+
+
 DOCUMENT = {
     "hosts": {
         "web1": {"ansible_host": "10.0.0.11", "role": "web"},
@@ -237,27 +251,27 @@ class TestItFailsClosed:
     """Every refusal here beats its alternative, which is a configure that
     succeeds against a host set nobody chose."""
 
-    def test_a_failed_download_raises(self, cfg, monkeypatch):
+    def test_a_failed_download_raises(self, cfg, monkeypatch, tmp_path):
         monkeypatch.setattr(
             configure_inventory,
             "download_to_file",
             lambda *a, **k: type("R", (), {"ok": False, "status": 503})(),
         )
         with pytest.raises(InventoryUnavailable) as e:
-            materialise(cfg)
+            materialise(cfg, work_dir=tmp_path)
         assert "run-1" in str(e.value)
 
-    def test_unreadable_json_raises(self, cfg, monkeypatch):
+    def test_unreadable_json_raises(self, cfg, monkeypatch, tmp_path):
         def fake(url, dest, **kwargs):
             Path(dest).write_text("<html>nope</html>")
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
         with pytest.raises(InventoryUnavailable) as e:
-            materialise(cfg)
+            materialise(cfg, work_dir=tmp_path)
         assert "readable JSON" in str(e.value)
 
-    def test_a_json_document_of_the_wrong_shape_raises(self, cfg, monkeypatch):
+    def test_a_json_document_of_the_wrong_shape_raises(self, cfg, monkeypatch, tmp_path):
         """Valid JSON that is not an inventory. Caught rather than rendered,
         because rendering it produces an empty inventory and an empty inventory
         is indistinguishable from a workspace with no hosts."""
@@ -268,10 +282,10 @@ class TestItFailsClosed:
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
         with pytest.raises(InventoryUnavailable) as e:
-            materialise(cfg)
+            materialise(cfg, work_dir=tmp_path)
         assert "not an inventory document" in str(e.value)
 
-    def test_the_run_scoped_url_and_token_are_what_it_asks_with(self, cfg, monkeypatch):
+    def test_the_run_scoped_url_and_token_are_what_it_asks_with(self, cfg, monkeypatch, tmp_path):
         seen: dict = {}
 
         def fake(url, dest, **kwargs):
@@ -281,7 +295,7 @@ class TestItFailsClosed:
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        path = materialise(cfg)
+        path = _one(materialise(cfg, work_dir=tmp_path))
         assert seen["url"].endswith("/runs/run-1/artifacts/resolved-inventory")
         assert seen["headers"] == {"Authorization": "Bearer t"}
         assert path.name == configure_inventory.RENDERED_NAME
@@ -308,7 +322,7 @@ class TestItFailsClosed:
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        path = materialise(cfg)
+        path = _one(materialise(cfg, work_dir=tmp_path))
         assert path.parent == shared, path
         assert path.is_file()
 
@@ -324,7 +338,9 @@ class TestItFailsClosed:
 
         assert configure_inventory._DEFAULT_INVENTORY_DIR == _EE_INVENTORY_DIR
 
-    def test_the_rendered_file_is_not_written_into_the_fetched_tree(self, cfg, monkeypatch):
+    def test_the_rendered_file_is_not_written_into_the_fetched_tree(
+        self, cfg, monkeypatch, tmp_path
+    ):
         """It goes in its own scratch directory.
 
         Written beside the operator's own inventory it would become a SECOND
@@ -337,7 +353,7 @@ class TestItFailsClosed:
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        path = materialise(replace(cfg, config_directory="ansible"))
+        path = _one(materialise(replace(cfg, config_directory="ansible"), work_dir=tmp_path))
         assert "ansible" not in path.parts[:-1], path
 
 
@@ -421,7 +437,9 @@ class TestTheRoundTripThroughRealAnsible:
         assert out["_meta"]["hostvars"]["web1"]["ansible_host"] == "10.0.0.11"
         assert out["_meta"]["hostvars"]["web1"]["role"] == "web"
 
-    def test_the_file_MATERIALISE_WRITES_substitutes_the_references(self, cfg, monkeypatch):
+    def test_the_file_MATERIALISE_WRITES_substitutes_the_references(
+        self, cfg, monkeypatch, tmp_path
+    ):
         """Through `materialise`, for the same reason as the test below it.
 
         Measured: dropping `resolved=` from the one `write_text` -- so the
@@ -448,7 +466,13 @@ class TestTheRoundTripThroughRealAnsible:
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        written = materialise(cfg, resolved={"web-key.private_key": "/tp/credentials/WEB"})
+        written = _one(
+            materialise(
+                cfg,
+                work_dir=tmp_path,
+                resolved={"web-key.private_key": "/tp/credentials/WEB"},
+            )
+        )
 
         # No placeholder survives into the file ansible reads...
         assert "${terrapod:" not in written.read_text()
@@ -456,7 +480,9 @@ class TestTheRoundTripThroughRealAnsible:
         hostvars = (self._list(written.read_text()).get("_meta") or {}).get("hostvars") or {}
         assert hostvars[host]["ansible_ssh_private_key_file"] == "/tp/credentials/WEB"
 
-    def test_the_file_MATERIALISE_WRITES_resolves_to_the_right_hosts(self, cfg, monkeypatch):
+    def test_the_file_MATERIALISE_WRITES_resolves_to_the_right_hosts(
+        self, cfg, monkeypatch, tmp_path
+    ):
         """Through `materialise`, not through the renderer.
 
         Every other test in this class calls `document_to_source` directly, so
@@ -471,7 +497,7 @@ class TestTheRoundTripThroughRealAnsible:
             return type("R", (), {"ok": True, "status": 200})()
 
         monkeypatch.setattr(configure_inventory, "download_to_file", fake)
-        written = materialise(cfg)
+        written = _one(materialise(cfg, work_dir=tmp_path))
 
         out = self._list(written.read_text())
         hosts = set((out.get("_meta") or {}).get("hostvars") or {})

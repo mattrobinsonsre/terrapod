@@ -40,6 +40,7 @@ terminal mapping is #1973's.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
 
 import structlog
@@ -62,7 +63,6 @@ log = structlog.get_logger(__name__)
 #: Both are measured to beat the operator's `ansible.cfg` while leaving the rest
 #: of their file in force.
 _FORCED_ENV = {
-    "ANSIBLE_INVENTORY_ENABLED": "yaml,ini",
     "ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED": "True",
     # Colour is terminal control bytes in a log nobody views in a terminal.
     "ANSIBLE_FORCE_COLOR": "0",
@@ -81,6 +81,42 @@ class ConfigureNotConfigured(RuntimeError):
     """
 
 
+def _enabled_plugins(cfg: RunnerConfig) -> str:
+    """Which ansible inventory plugins this run may use (#2033).
+
+    `yaml,ini` is the floor and is what every run got before the switches
+    existed. A workspace may add:
+
+    * `auto` -- the generic dispatcher, which reads a file's own `plugin:`
+      key and runs whatever it names;
+    * `script` -- an executable inventory source.
+
+    **Ansible's own relative order is kept** (`script` before `auto` before
+    `yaml` before `ini`, as in its documented default), because the order is
+    the order plugins are offered a file and therefore decides which one
+    claims an ambiguous name. Reordering would be a behaviour change dressed
+    as a tidy-up.
+
+    **The API never gets either**, whatever these say: it forces its own
+    `yaml,ini` and that is permanent (#1970). The switch is the runner's
+    alone, because the objection was always about WHERE the code runs -- this
+    Job has no database URL, no KEK and an ephemeral identity, and it already
+    executes the operator's playbook, which is strictly more powerful.
+
+    Measured against ansible-core 2.18.3: a `script` source needs BOTH this
+    and an intact exec bit. It has the bit because the configuration version
+    is extracted with `set_attrs=True`, which the API-side exec strip never
+    touches -- so the two halves meet only here.
+    """
+    enabled = []
+    if cfg.inventory_scripts_enabled:
+        enabled.append("script")
+    if cfg.dynamic_inventory_enabled:
+        enabled.append("auto")
+    enabled += ["yaml", "ini"]
+    return ",".join(enabled)
+
+
 def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     """The environment ansible runs under, with inherited `ANSIBLE_*` stripped.
 
@@ -91,6 +127,7 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     what we set is not the same as a bound on what reaches the process.
     """
     env = dict(_FORCED_ENV)
+    env["ANSIBLE_INVENTORY_ENABLED"] = _enabled_plugins(cfg)
     # Temp directories must be writable, which a read-only root filesystem makes
     # a live concern: ansible exits `rc 250` with "No usable temporary directory
     # found" rather than naming the cause. The Job supplies them.
@@ -104,19 +141,29 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     return env
 
 
-def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
+def argv(cfg: RunnerConfig, *, inventory: Sequence[Path]) -> list[str]:
     """`ansible-playbook`'s arguments for this run.
 
     Built here and not inline so it can be asserted on directly.
 
-    **Exactly ONE `-i`, and it is the run's resolved artifact** -- never the
-    workspace's `inventory_paths`. Those name the sources the API merged when it
-    resolved this run's inventory at creation (#2021), so passing them here
-    would have ansible re-read the repository's own inventory alongside the
-    merged result: the same hosts from two sources, and variable precedence
-    decided by the order they happened to be listed in rather than by what the
-    operator declared. The artifact is the answer; re-deriving it is how the
-    runner and the API come to disagree about what a configure targeted.
+    **Normally exactly ONE `-i`, and it is the run's resolved artifact** --
+    never the workspace's `inventory_paths`. Those name the sources the API
+    merged when it resolved this run's inventory at creation (#2021), so passing
+    them here would have ansible re-read the repository's own inventory
+    alongside the merged result: the same hosts from two sources, and variable
+    precedence decided by the order they happened to be listed in rather than by
+    what the operator declared. The artifact is the answer; re-deriving it is how
+    the runner and the API come to disagree about what a configure targeted.
+
+    **The exception is a workspace that resolves dynamic sources here** (#2033),
+    where the list is the repository's own sources in the operator's order
+    followed by the declared rows. That is not a relaxation of the paragraph
+    above: in that case the API did NOT merge the repository, so there is no
+    merged result to be read twice, and the whole repository being re-read in one
+    place is what keeps the operator's `-i` ordering theirs.
+    `configure_inventory.materialise` decides which case this is; the order it
+    returns is the order passed, so this builds the flags and makes no
+    precedence decision of its own.
 
     `--limit` IS passed, because the artifact is written unlimited -- run
     creation calls `write_run_artifact(db, run)` with no limit, so the narrowing
@@ -127,7 +174,9 @@ def argv(cfg: RunnerConfig, *, inventory: Path) -> list[str]:
             "this run is a configure but names no playbook, and the workspace has "
             "no `default_playbook` to fall back to"
         )
-    out: list[str] = ["-i", str(inventory)]
+    out: list[str] = []
+    for source in inventory:
+        out += ["-i", str(source)]
     if cfg.ansible_limit:
         out += ["--limit", cfg.ansible_limit]
     out.append(cfg.playbook)
@@ -138,7 +187,7 @@ def run(
     cfg: RunnerConfig,
     *,
     work_dir: Path,
-    inventory: Path,
+    inventory: Sequence[Path],
     log_file: str | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> int:
@@ -148,10 +197,10 @@ def run(
         cfg: the run's configuration. `config_directory`, `playbook` and
             and the resolved inventory are the configure-specific parts.
         work_dir: the fetched tree's root. `config_directory` is relative to it.
-        inventory: the materialised resolved inventory, from
-            `configure_inventory.materialise`. Passed in rather than fetched
-            here so the download is a separate, separately-failing step: an
-            inventory that cannot be read is not a playbook that failed.
+        inventory: the `-i` list, from `configure_inventory.materialise`.
+            Passed in rather than fetched here so the download is a separate,
+            separately-failing step: an inventory that cannot be read is not a
+            playbook that failed.
         log_file: appended with the combined output for upload as the run log.
         extra_env: environment the credential phase returned (#1933) -- today
             `ANSIBLE_VAULT_IDENTITY_LIST`. It travels as an ARGUMENT and not
@@ -187,7 +236,7 @@ def run(
         "configure starting",
         playbook=cfg.playbook,
         limit=cfg.ansible_limit or None,
-        inventory=str(inventory),
+        inventory=[str(source) for source in inventory],
         cwd=str(cwd),
     )
     # `_forced_env` LAST, so the non-negotiables outrank anything a credential

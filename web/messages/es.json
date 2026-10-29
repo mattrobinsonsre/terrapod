@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Solicitud de CPU de Ansible",
       "eeMemoryRequest": "Solicitud de memoria de Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Versión de Terragrunt"
+      "terragruntVersion": "Versión de Terragrunt",
+      "dynamicInventoryEnabled": "Plugins de inventario dinámico",
+      "dynamicInventoryEnabledHint": "Permite plugins de inventario declarados — una fuente YAML con una clave plugin de primer nivel — cuando el runner resuelve el inventario. Terrapod no ejecuta nunca ninguno por sí mismo, en ninguno de los dos estados. Mientras esto está desactivado, una fuente de plugin se rechaza por su nombre en lugar de resolverse en un conjunto de hosts parcial; mientras está activado, el inventario que se muestra aquí es explícitamente parcial por fuente, y el conjunto que resuelve el runner es el que manda.",
+      "inventoryScriptsEnabled": "Scripts de inventario",
+      "inventoryScriptsEnabledHint": "Permite scripts de inventario ejecutables cuando el runner resuelve el inventario. Separado de los plugins de inventario dinámico para que las configuraciones de plugin declaradas, que nombran una colección y pueden leerse antes de ejecutarse, puedan permitirse sin permitir también ejecutables arbitrarios."
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Qué hosts, grupos o patrones alcanzar. Vacío significa todos los hosts del inventario.",
       "typeConfigure": "configuración",
       "typeConfigureHint": "Ejecuta el playbook contra el inventario. Sin plan y sin apply.",
-      "typeConfigureAfterApplyHint": "Al apply le sigue una configuración en esta misma ejecución."
+      "typeConfigureAfterApplyHint": "Al apply le sigue una configuración en esta misma ejecución.",
+      "queueConfigureConfirmDynamic": "Este espacio de trabajo resuelve las fuentes de inventario en el runner, por lo que los hosts que alcanzará no se conocen hasta que la ejecución comienza."
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",

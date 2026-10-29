@@ -148,7 +148,7 @@ class TestChangedHosts:
 
 
 @pytest.mark.asyncio
-class TestTheLimitAndTheFiveWaysWide:
+class TestTheLimitAndTheSixWaysWide:
     async def _limit(self, *, ws, run, current, baseline, code_changed=False, allowed=None):
         with (
             patch.object(narrow, "load_baseline", AsyncMock(return_value=baseline)),
@@ -169,6 +169,45 @@ class TestTheLimitAndTheFiveWaysWide:
         current = _doc(hosts={"a": {"x": 2}, "b": {"x": 2}})
         base = _baseline(_doc(hosts={"a": {"x": 1}, "b": {"x": 1}}))
         assert await self._limit(ws=_ws(), run=_run(), current=current, baseline=base) == "a:b"
+
+    async def test_a_partial_resolution_goes_wide(self):
+        """#2033: a diff cannot see a host the API could not resolve.
+
+        A workspace that resolves dynamic sources on the runner has a resolution
+        listing only the sources the API could read, so diffing it against the
+        baseline emits a `--limit` naming only those -- and every host a cloud
+        plugin discovers would be left unconfigured while the run reported
+        success. Too FEW is the unsafe direction here.
+        """
+        current = _doc(hosts={"a": {"x": 2}, "b": {"x": 1}}) | {"partial": True}
+        base = _baseline(_doc(hosts={"a": {"x": 1}, "b": {"x": 1}}))
+        assert await self._limit(ws=_ws(), run=_run(), current=current, baseline=base) == ""
+
+    async def test_partial_is_checked_BEFORE_the_override(self):
+        """An ordering property, and it is the one a careless fix breaks.
+
+        Both answers are "go wide", so a test on either alone passes whichever
+        way round they sit. This pins the reason: `configure_all_hosts` is the
+        operator's choice and `partial` is a fact about the resolution, and the
+        log line an operator reads has to say which applied. Asserted through
+        the reason rather than the limit, because the limits are identical.
+        """
+        current = _doc(hosts={"a": {"x": 2}}) | {"partial": True}
+        base = _baseline(_doc(hosts={"a": {"x": 1}}))
+        with (
+            patch.object(narrow, "load_baseline", AsyncMock(return_value=base)),
+            patch.object(narrow, "_code_changed", AsyncMock(return_value=False)),
+            patch.object(narrow.logger, "info") as logged,
+        ):
+            await narrow.limit_for(
+                MagicMock(), _run(), _ws(configure_all_hosts=True), current=current
+            )
+        reasons = [c.kwargs.get("reason") for c in logged.call_args_list]
+        assert narrow.WIDE_PARTIAL in reasons, (
+            f"went wide for {reasons}, not for the partial resolution -- with both "
+            "true the operator is told about their own setting and not about the "
+            "resolution they cannot trust"
+        )
 
     async def test_the_override_goes_wide(self):
         current = _doc(hosts={"a": {"x": 2}})

@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Demande CPU Ansible",
       "eeMemoryRequest": "Demande de mémoire Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Version de Terragrunt"
+      "terragruntVersion": "Version de Terragrunt",
+      "dynamicInventoryEnabled": "Plugins d''inventaire dynamique",
+      "dynamicInventoryEnabledHint": "Autorise les plugins d''inventaire déclarés — une source YAML portant une clé plugin de premier niveau — lorsque le runner résout l''inventaire. Terrapod n''en exécute jamais lui-même, dans aucun des deux états. Tant que ceci est désactivé, une source de plugin est refusée nommément plutôt que résolue en un ensemble d''hôtes partiel ; tant que c''est activé, l''inventaire affiché ici est explicitement partiel source par source, et l''ensemble résolu par le runner fait autorité.",
+      "inventoryScriptsEnabled": "Scripts d''inventaire",
+      "inventoryScriptsEnabledHint": "Autorise les scripts d''inventaire exécutables lorsque le runner résout l''inventaire. Distinct des plugins d''inventaire dynamique afin que les configurations de plugin déclarées, qui nomment une collection et peuvent être lues avant leur exécution, puissent être autorisées sans autoriser aussi des exécutables arbitraires."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Quels hôtes, groupes ou motifs atteindre. Vide signifie chaque hôte de l''inventaire.",
       "typeConfigure": "configuration",
       "typeConfigureHint": "Exécute le playbook sur l''inventaire. Aucun plan et aucune application.",
-      "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution."
+      "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution.",
+      "queueConfigureConfirmDynamic": "Cet espace de travail résout les sources d''inventaire sur le runner, donc les hôtes qu''il atteindra ne sont pas connus avant le démarrage de l''exécution."
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

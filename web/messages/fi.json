@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansiblen CPU-pyyntö",
       "eeMemoryRequest": "Ansiblen muistipyyntö",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt-versio"
+      "terragruntVersion": "Terragrunt-versio",
+      "dynamicInventoryEnabled": "Dynaamiset inventaariolaajennukset",
+      "dynamicInventoryEnabledHint": "Sallii määritellyt inventaariolaajennukset — YAML-lähteen, jossa on ylimmän tason plugin-avain — kun suorittaja ratkaisee inventaarion. Terrapod ei koskaan suorita niitä itse, kummassakaan tilassa. Kun tämä on pois päältä, laajennuslähde hylätään nimeltä sen sijaan, että se ratkeaisi osittaiseksi konejoukoksi; kun se on päällä, tässä näytetty inventaario on nimenomaisesti osittainen lähdettä kohden, ja suorittajan ratkaisema joukko on määräävä.",
+      "inventoryScriptsEnabled": "Inventaarioskriptit",
+      "inventoryScriptsEnabledHint": "Sallii suoritettavat inventaarioskriptit, kun suorittaja ratkaisee inventaarion. Erillinen dynaamisista inventaariolaajennuksista, jotta määritellyt laajennusasetukset, jotka nimeävät kokoelman ja jotka voidaan lukea ennen suoritusta, voidaan sallia sallimatta samalla mielivaltaisia suoritettavia tiedostoja."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Mitkä isännät, ryhmät tai mallit tavoitetaan. Tyhjä tarkoittaa jokaista isäntää inventaariossa.",
       "typeConfigure": "määritys",
       "typeConfigureHint": "Ajaa playbookin inventaariota vasten. Ei suunnitelmaa eikä käyttöönottoa.",
-      "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla."
+      "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla.",
+      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy."
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

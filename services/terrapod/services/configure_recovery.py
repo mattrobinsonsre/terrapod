@@ -100,16 +100,33 @@ def host_status(row: RunHostResult) -> str:
 
 
 async def targeted_hosts(run: Run) -> set[str]:
-    """Every host the run's resolved inventory names, or an empty set.
+    """Every host the run targeted, or an empty set.
 
     The run's own artifact rather than the live inventory: it is pinned at run
     creation (and re-resolved at a composite's hand-over), so it is what this
     run actually targeted even after the estate has moved.
 
+    **Unioned with what the execution environment reported, when the artifact
+    says it is partial** (#2033). A workspace that resolves dynamic inventory
+    sources on the runner has an artifact listing only the sources the API could
+    read, so on its own it is a SHORT denominator -- and a short denominator
+    under-reports which hosts are still outstanding, which is the one thing this
+    number exists to get right. The callback inside the EE reports the inventory
+    as ansible actually resolved it; see
+    `host_results_service.reported_inventory_hosts`.
+
+    Unioned rather than preferred, deliberately. Either side can be the smaller
+    one: the artifact is short when the API skipped a source, and the report is
+    absent on an older runner image or a Job that died before uploading. A
+    union cannot shrink the denominator whichever is missing, where a preference
+    would silently take the short side on exactly the runs that most need the
+    long one.
+
     An absent or unreadable artifact yields nothing. For the per-host VIEW that
     degrades to "show what ansible reported"; here it means an EMPTY remainder,
     which is the safe direction -- see `outstanding_hosts`.
     """
+    from terrapod.services.host_results_service import reported_inventory_hosts
     from terrapod.storage import get_storage
     from terrapod.storage.keys import resolved_inventory_key
 
@@ -124,8 +141,16 @@ async def targeted_hosts(run: Run) -> set[str]:
         document = json.loads(raw)
     except ValueError:
         return set()
-    hosts = document.get("hosts") if isinstance(document, dict) else None
-    return set(hosts.keys()) if isinstance(hosts, dict) else set()
+    if not isinstance(document, dict):
+        return set()
+    hosts = document.get("hosts")
+    targeted = set(hosts.keys()) if isinstance(hosts, dict) else set()
+    # Only for a partial resolution: where the API resolved everything, the
+    # report agrees and reading the stream buys nothing but a storage call on
+    # every per-host view.
+    if document.get("partial"):
+        targeted |= await reported_inventory_hosts(run)
+    return targeted
 
 
 def outstanding_from(targeted: set[str], rows: Sequence[RunHostResult]) -> list[str]:

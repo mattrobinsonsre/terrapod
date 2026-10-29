@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "בקשת CPU של Ansible",
       "eeMemoryRequest": "בקשת זיכרון של Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "גרסת Terragrunt"
+      "terragruntVersion": "גרסת Terragrunt",
+      "dynamicInventoryEnabled": "תוספי מאגר דינמי",
+      "dynamicInventoryEnabledHint": "מתיר תוספי מאגר מוצהרים — מקור YAML הנושא מפתח plugin ברמה העליונה — כאשר המריץ פותר את המאגר. Terrapod עצמו אינו מריץ אף אחד מהם בשני המצבים. כל עוד זה כבוי, מקור תוסף נדחה בשמו במקום להיפתר לקבוצת מאחסנים חלקית; כל עוד זה דלוק, המאגר המוצג כאן חלקי במפורש לכל מקור, והקבוצה שהמריץ פותר היא הקובעת.",
+      "inventoryScriptsEnabled": "סקריפטים של מאגר",
+      "inventoryScriptsEnabledHint": "מתיר סקריפטים ברי-הרצה של מאגר כאשר המריץ פותר את המאגר. מופרד מתוספי המאגר הדינמי כדי שאפשר יהיה להתיר הגדרות תוסף מוצהרות, שמציינות אוסף ואפשר לקרוא אותן לפני ההרצה, בלי להתיר גם קובצי הרצה שרירותיים."
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "אילו מארחים, קבוצות או תבניות להגיע אליהם. ריק פירושו כל מארח במלאי.",
       "typeConfigure": "תצורה",
       "typeConfigureHint": "מריץ את ספר ההרצה מול המלאי. ללא תוכנית וללא החלה.",
-      "typeConfigureAfterApplyHint": "אחרי ההחלה באה תצורה באותה ריצה עצמה."
+      "typeConfigureAfterApplyHint": "אחרי ההחלה באה תצורה באותה ריצה עצמה.",
+      "queueConfigureConfirmDynamic": "מרחב עבודה זה מפענח מקורות מלאי על הרץ, ולכן המאחסנים שאליהם יגיע אינם ידועים עד שההרצה מתחילה."
     },
     "state": {
       "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",

@@ -547,6 +547,11 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "inventory_paths",
         "default_playbook",
         "default_limit",
+        # Whether the repository's own dynamic inventory sources are resolved on
+        # the runner (#2033). A fleet decides this once -- it is a security
+        # posture rather than a per-workspace detail -- so a rule carries both.
+        "dynamic_inventory_enabled",
+        "inventory_scripts_enabled",
         "resource_cpu",
         "resource_memory",
         # The EE sidecar's own pair (#2154). A rule that can size the

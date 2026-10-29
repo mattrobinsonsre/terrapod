@@ -1562,6 +1562,13 @@ async def create_run(
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,
         parallelism=workspace.parallelism,
+        # #2033's pair, snapshotted for the reason the neighbours are: the
+        # runner composes its `ANSIBLE_INVENTORY_ENABLED` from what the run was
+        # DISPATCHED with, so flipping the workspace setting mid-run cannot
+        # widen or narrow what an already-running Job may execute -- and the
+        # run stays answerable about what it was allowed to resolve.
+        dynamic_inventory_enabled=workspace.dynamic_inventory_enabled,
+        inventory_scripts_enabled=workspace.inventory_scripts_enabled,
         resource_memory=workspace.resource_memory,
         # The Ansible execution environment's own size (#2154), snapshotted
         # ALREADY RESOLVED: the workspace's value when it set one, otherwise the

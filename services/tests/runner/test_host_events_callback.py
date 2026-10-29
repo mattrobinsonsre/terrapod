@@ -396,3 +396,96 @@ class TestItDoesNotDisturbTheOperatorsOwnCallbacks:
             "`ansible-config dump` round trip in host_events.callback_env is no "
             "longer needed -- re-measure before simplifying it"
         )
+
+
+@needs_ansible
+class TestTheInventoryRecord:
+    """The denominator a short host set is missing from (#2033).
+
+    `v2_playbook_on_play_start` cannot report the play's host EXPANSION -- it
+    gets the pattern, and under `serial:` the inventory is restricted to the
+    batch -- which is the measurement `terrapod_events`' own docstring records.
+    What it CAN report is the whole inventory's host set, and that is what these
+    pin, because it is the number `configure_recovery.outstanding_from`
+    subtracts from. Both halves are driven here rather than described: the
+    `stats` record is deliberately asserted alongside, because the record is
+    only worth having where the recap is short.
+    """
+
+    def _drive(self, tmp_path, play: str) -> list[dict]:
+        plugins = tmp_path / "cb"
+        plugins.mkdir()
+        shutil.copyfile(_PLUGIN, plugins / "terrapod_events.py")
+        root = tmp_path / "play"
+        root.mkdir()
+        _fixture(root, play=play)
+        events = tmp_path / "events.jsonl"
+        _run(root, events, [str(plugins)])
+        return _events(events)
+
+    #: Four hosts, one batch at a time, aborting on the first failure. The
+    #: fixture's `web` group is two local hosts; a third and fourth would need
+    #: no more to make the point, and two is enough for the recap to be SHORT.
+    _SERIAL_PLAY = textwrap.dedent(
+        """
+        - hosts: web
+          serial: 1
+          any_errors_fatal: true
+          gather_facts: false
+          tasks:
+            - name: fail on the first host
+              ansible.builtin.command: /bin/false
+        """
+    ).strip()
+
+    def test_it_reports_every_host_in_the_inventory(self, tmp_path):
+        records = self._drive(tmp_path, self._SERIAL_PLAY)
+        inventory = [r for r in records if r.get("kind") == "inventory"]
+        assert inventory, (
+            "no `inventory` record, so a run whose API-side resolution was partial "
+            "has no denominator at all and every unreached host is invisible"
+        )
+        # The WHOLE inventory, including the group the play never names: it is
+        # the inventory's host set rather than the play's, which is what the
+        # artifact holds for a workspace the API could resolve in full.
+        assert inventory[0]["hosts"] == ["hdead", "web1", "web2"]
+
+    def test_the_recap_is_short_which_is_why_the_record_exists(self, tmp_path):
+        """The two together are the finding, so they are asserted together.
+
+        `serial: 1` + `any_errors_fatal` aborts after the first batch, so the
+        recap names ONE host out of the two the play targeted. A reader with
+        only the recap cannot tell the second was in scope.
+        """
+        records = self._drive(tmp_path, self._SERIAL_PLAY)
+        stats = [r for r in records if r.get("kind") == "stats"]
+        inventory = [r for r in records if r.get("kind") == "inventory"]
+        assert stats, "no stats record, so this test is not measuring what it claims"
+        assert len(stats[0]["recap"]) == 1, (
+            f"expected the recap to be short, got {sorted(stats[0]['recap'])} -- if "
+            "ansible has stopped aborting here this test is no longer about anything"
+        )
+        assert len(inventory[0]["hosts"]) == 3
+
+    def test_it_is_emitted_once_however_many_plays_there_are(self, tmp_path):
+        """A property of the run, not of a play.
+
+        Under `serial:` the hook fires per BATCH as well as per play, so a
+        per-play emit would put several copies in the stream and leave a reader
+        choosing between them.
+        """
+        records = self._drive(
+            tmp_path,
+            textwrap.dedent(
+                """
+                - hosts: web
+                  serial: 1
+                  gather_facts: false
+                  tasks: [{ansible.builtin.debug: {msg: one}}]
+                - hosts: web
+                  gather_facts: false
+                  tasks: [{ansible.builtin.debug: {msg: two}}]
+                """
+            ).strip(),
+        )
+        assert len([r for r in records if r.get("kind") == "inventory"]) == 1

@@ -119,6 +119,11 @@ interface WorkspaceAttrs {
   // the absence of a path. Optional only for an older API.
   'config-directory'?: string
   'inventory-paths'?: string[]
+  // Which inventory SOURCES ansible may resolve on the runner (#2033). The
+  // API never runs either kind, in either state. Absent from an older API,
+  // where the answer is the column default -- false.
+  'dynamic-inventory-enabled'?: boolean
+  'inventory-scripts-enabled'?: boolean
   'default-playbook'?: string
   'default-limit'?: string
   locked: boolean
@@ -513,6 +518,8 @@ function WorkspaceDetailContent() {
   // and the server's check against the merged row is still the authority.
   const editHasNoOperations = !editPlanApplyEnabled && !editConfigureEnabled
   const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
+  const [editDynamicInventoryEnabled, setEditDynamicInventoryEnabled] = useState(false)
+  const [editInventoryScriptsEnabled, setEditInventoryScriptsEnabled] = useState(false)
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
   const [editBindPlan, setEditBindPlan] = useState(false)
@@ -1379,6 +1386,8 @@ function WorkspaceDetailContent() {
     // API's missing key seeds (#1966).
     setEditConfigDir(workspace.attributes['config-directory'] ?? '')
     setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
+    setEditDynamicInventoryEnabled(workspace.attributes['dynamic-inventory-enabled'] ?? false)
+    setEditInventoryScriptsEnabled(workspace.attributes['inventory-scripts-enabled'] ?? false)
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
     setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
@@ -1468,6 +1477,8 @@ function WorkspaceDetailContent() {
               // the server refuses an empty entry, so a row left blank would
               // 422 the whole save; a kept entry is sent byte-for-byte.
               'inventory-paths': editInventoryPaths.filter((entry) => entry !== ''),
+              'dynamic-inventory-enabled': editDynamicInventoryEnabled,
+              'inventory-scripts-enabled': editInventoryScriptsEnabled,
               'default-playbook': editDefaultPlaybook,
               'default-limit': editDefaultLimit,
               'var-files': editVarFiles,
@@ -1978,11 +1989,22 @@ function WorkspaceDetailContent() {
   // services, rotate credentials and reboot machines, and unlike an apply there
   // is no plan to review first. The message names what it will reach, because
   // an empty limit means the whole inventory.
+  //
+  // And where the workspace resolves dynamic inventory sources on the runner
+  // (#2033), it says the host set is not yet KNOWN. The limit is still a
+  // pattern, but the inventory it expands against is resolved inside the Job,
+  // so neither this page nor the API can show what it will match -- and a
+  // confirm naming a reach it cannot vouch for is worse than one admitting the
+  // gap.
   async function handleQueueConfigure() {
     const reach = (configureLimit || attrs['default-limit'] || '').trim()
-    const msg = reach
-      ? t('runs.queueConfigureConfirmLimited', { limit: reach })
-      : t('runs.queueConfigureConfirmAll')
+    const dynamic =
+      attrs['dynamic-inventory-enabled'] === true || attrs['inventory-scripts-enabled'] === true
+    const msg =
+      (reach
+        ? t('runs.queueConfigureConfirmLimited', { limit: reach })
+        : t('runs.queueConfigureConfirmAll')) +
+      (dynamic ? ' ' + t('runs.queueConfigureConfirmDynamic') : '')
     if (!window.confirm(msg)) return
     setQueueingConfigure(true)
     setError('')
@@ -2578,6 +2600,8 @@ function WorkspaceDetailContent() {
         'default-playbook': editDefaultPlaybook,
         'default-limit': editDefaultLimit,
         'inventory-paths': editInventoryPaths,
+        'dynamic-inventory-enabled': editDynamicInventoryEnabled,
+        'inventory-scripts-enabled': editInventoryScriptsEnabled,
         'agent-pool-ids': editPoolIds,
         'owner-email': editOwner,
         labels: editLabels,
@@ -2602,6 +2626,8 @@ function WorkspaceDetailContent() {
     'configure-all-hosts': 'fields.configureAllHostsHint',
     'config-directory': 'fields.configDirectoryRootHint',
     'inventory-paths': 'fields.inventoryPathsHint',
+    'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabledHint',
+    'inventory-scripts-enabled': 'fields.inventoryScriptsEnabledHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
     'oidc-audiences': 'fields.oidcAudiencesHint',
@@ -2660,6 +2686,8 @@ function WorkspaceDetailContent() {
     'default-playbook': (v) => setEditDefaultPlaybook(String(v)),
     'default-limit': (v) => setEditDefaultLimit(String(v)),
     'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
+    'dynamic-inventory-enabled': (v) => setEditDynamicInventoryEnabled(Boolean(v)),
+    'inventory-scripts-enabled': (v) => setEditInventoryScriptsEnabled(Boolean(v)),
     'agent-pool-ids': (v) => setEditPoolIds(v as string[]),
     'owner-email': (v) => setEditOwner(String(v)),
     labels: (v) => setEditLabels(v as Record<string, string>),
@@ -3536,6 +3564,24 @@ function WorkspaceDetailContent() {
                       </dd>
                     )}
                   </div>
+                  {/* Which inventory sources ansible may resolve on the
+                      runner (#2033). Terrapod itself never runs either kind,
+                      in either state -- off means a plugin source is refused
+                      by name rather than resolving to a partial host set. */}
+                  <Field
+                    attr="dynamic-inventory-enabled"
+                    ctx={ansibleCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('dynamic-inventory-enabled', false)}
+                    control={settingsToggle('dynamic-inventory-enabled')}
+                  />
+                  <Field
+                    attr="inventory-scripts-enabled"
+                    ctx={ansibleCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('inventory-scripts-enabled', false)}
+                    control={settingsToggle('inventory-scripts-enabled')}
+                  />
                 </Group>
 
                 <Group id="pools" ctx={settingsCtx} title={t('groups.pools')}>

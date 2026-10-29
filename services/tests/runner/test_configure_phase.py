@@ -22,7 +22,10 @@ from terrapod.runner.phases.configure import ConfigureNotConfigured
 #: a tmp_path fixture because every assertion below is about the ARGUMENTS, and
 #: `argv` never touches the file -- `configure_inventory` owns producing it and
 #: has its own tests.
-_INV = Path("/tmp/terrapod-resolved-inventory.yml")
+#: The `-i` list `materialise` returns. A LIST because that is its shape (#2033):
+#: one entry in the ordinary case, several when the API handed the repository's
+#: own sources over for this run to resolve.
+_INV = [Path("/tmp/terrapod-resolved-inventory.yml")]
 
 
 @pytest.fixture
@@ -82,8 +85,22 @@ class TestArgv:
         earlier version of this phase did exactly that, which is why the count
         is pinned and not just the contents.
         """
-        assert configure.argv(cfg, inventory=_INV) == ["-i", str(_INV), "site.yml"]
+        assert configure.argv(cfg, inventory=_INV) == ["-i", str(_INV[0]), "site.yml"]
         assert configure.argv(cfg, inventory=_INV).count("-i") == 1
+
+    def test_several_sources_each_get_their_own_flag_in_order(self, cfg):
+        """The dynamic handoff (#2033). Order is precedence order in ansible, so
+        this must pass them in the order given and reorder nothing."""
+        handed = [Path("/tp/x/10_static.yml"), Path("/tp/x/30_aws.yml"), Path("/tp/declared.yml")]
+        assert configure.argv(cfg, inventory=handed) == [
+            "-i",
+            "/tp/x/10_static.yml",
+            "-i",
+            "/tp/x/30_aws.yml",
+            "-i",
+            "/tp/declared.yml",
+            "site.yml",
+        ]
 
     def test_the_limit_narrows_this_run_only_when_set(self, cfg):
         assert "--limit" not in configure.argv(cfg, inventory=_INV)

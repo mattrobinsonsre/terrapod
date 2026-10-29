@@ -781,6 +781,8 @@ def _workspace_json(
                 # which is exactly what it has.
                 "auto-configure-enabled": ws.auto_configure_enabled,
                 "configure-all-hosts": ws.configure_all_hosts,
+                "dynamic-inventory-enabled": ws.dynamic_inventory_enabled,
+                "inventory-scripts-enabled": ws.inventory_scripts_enabled,
                 "configure-after-apply": ws.configure_after_apply,
                 # An ordinary path, `""` meaning the configuration version's
                 # root -- `working-directory`'s shape exactly. It has no null
@@ -1007,6 +1009,8 @@ def _workspace_json(
             "configure-enabled",
             "auto-configure-enabled",
             "configure-all-hosts",
+            "dynamic-inventory-enabled",
+            "inventory-scripts-enabled",
             "configure-after-apply",
             "config-directory",
             "inventory-paths",
@@ -1645,6 +1649,26 @@ async def _create_workspace_impl(
                 )
             )
             if "configure-all-hosts" in attrs
+            else False
+        ),
+        dynamic_inventory_enabled=(
+            _422(
+                lambda: workspace_settings.validate_bool(
+                    attrs["dynamic-inventory-enabled"],
+                    "dynamic-inventory-enabled",
+                )
+            )
+            if "dynamic-inventory-enabled" in attrs
+            else False
+        ),
+        inventory_scripts_enabled=(
+            _422(
+                lambda: workspace_settings.validate_bool(
+                    attrs["inventory-scripts-enabled"],
+                    "inventory-scripts-enabled",
+                )
+            )
+            if "inventory-scripts-enabled" in attrs
             else False
         ),
         auto_configure_enabled=(
@@ -2428,6 +2452,20 @@ async def update_workspace(
             lambda: workspace_settings.validate_bool(
                 attrs["configure-all-hosts"],
                 "configure-all-hosts",
+            )
+        )
+    if "dynamic-inventory-enabled" in attrs:
+        ws.dynamic_inventory_enabled = _422(
+            lambda: workspace_settings.validate_bool(
+                attrs["dynamic-inventory-enabled"],
+                "dynamic-inventory-enabled",
+            )
+        )
+    if "inventory-scripts-enabled" in attrs:
+        ws.inventory_scripts_enabled = _422(
+            lambda: workspace_settings.validate_bool(
+                attrs["inventory-scripts-enabled"],
+                "inventory-scripts-enabled",
             )
         )
     if "auto-configure-enabled" in attrs:

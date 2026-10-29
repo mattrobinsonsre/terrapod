@@ -349,21 +349,93 @@ they do different jobs:
 2. **`ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment** — no `auto`,
    which is the generic dispatcher that reads a file's `plugin:` key and runs
    whatever it names, and no `script`, which would execute a source.
-3. **An explicit pre-scan**, which is the layer that matters. Disabling the
-   plugin does not make the file inert; it makes it **garbage input**. A file
-   named `*.aws_ec2.yml` still ends in `.yml`, so the `yaml` plugin claims it
-   whatever is inside and then treats `plugin:`, `regions:` and `filters:` as
-   **group names**. An operator would get a confusing parse result rather than an
-   answer, so the file is named and refused instead.
+3. **An explicit pre-scan**, which is **legibility rather than enforcement**.
+   Measured against ansible-core 2.18.3: its own `yaml` plugin recognises a
+   plugin configuration and refuses it — *"Plugin configuration YAML file, not
+   YAML inventory"* — and `any_unparsed_is_failed` promotes that to a failed
+   resolution with nothing partial returned. So ansible already fails closed.
+   This layer exists because ansible names the file and not what to do about it.
 
 The same pass **strips the executable bit** from everything fetched, which is the
-whole decision for a `script`-shaped source: a static file beside an executable
-one otherwise resolves to the union of both.
+whole decision for a `script`-shaped source.
 
 And `any_unparsed_is_failed = True` is set, which is the property that matters
 most: a source that cannot be read **fails the resolution** rather than silently
 contributing nothing. Without it an unreadable file is a warning, and the answer
 is a target set quietly missing whatever it held.
+
+### Resolving them on the runner instead
+
+Two per-workspace switches, **both off by default**, move each kind of source to
+the runner rather than permitting it here:
+
+| setting | what it covers |
+|---|---|
+| `dynamic-inventory-enabled` | a plugin configuration — a file with a top-level `plugin:` key |
+| `inventory-scripts-enabled` | an **executable** inventory source |
+
+**The API never runs either, whatever these say.** The objection was always about
+*where* the code runs: an inventory plugin is arbitrary code, and the API pod's
+environment holds the database URL, the token signing key and the key-encryption
+key. A runner Job holds none of those, has an identity scoped to one run, and
+already executes the operator's own playbook — which is strictly more powerful
+than the plugin it is being trusted with. So the switch moves the work to the one
+place where running it changes nothing about what an attacker could already do.
+
+Three things follow, and the first is the one to understand before turning either
+on:
+
+**The API's answer becomes partial, and says so per source.** A skipped source is
+excluded from the tree the API hands ansible — "skip" has to mean *exclude*,
+because with the file present the resolution fails whether or not the plugin is
+enabled — so the hosts it would have contributed are absent from the resolved
+view, from `GET …/resolved`, and from the run's artifact. Each one is listed
+under `skipped-sources` with its path, its kind and why, and the document carries
+`partial: true`. An unlabelled skip would be a short host set presented as a
+complete one, which is the failure this whole surface exists to prevent.
+
+**A configure stops being narrowed.** Narrowing works by diffing the resolved
+inventory against the last successful configure, and a diff cannot see a host the
+API could not resolve — so a partial resolution goes **wide**, targeting every
+host in scope. Too few is the unsafe direction: a `--limit` built from the
+visible half would leave every discovered host unconfigured while the run
+reported success.
+
+**The runner reads the repository itself.** The artifact then carries the
+repository's own inventory sources — all of them, in your order, because `-i`
+order is precedence order and within a directory you choose it by filename — and
+the declared rows travel alongside to be applied **last**, so a Terraform-declared
+variable still wins. The runner passes them to `ansible-playbook` as they are,
+with `script` and `auto` enabled for that run only.
+
+#### A committed inventory script already failed, before either switch existed
+
+Worth knowing because it makes `inventory-scripts-enabled` an improvement rather
+than a relaxation. Measured, with an executable script beside a static
+`hosts.yml` in one inventory directory:
+
+| exec bit | `ANSIBLE_INVENTORY_ENABLED` | result |
+|---|---|---|
+| on | `script,yaml,ini` | resolves, both the static and the script's hosts |
+| on | `yaml,ini` | fails |
+| off | `yaml,ini` | fails — **the API's path** |
+| off | `script,yaml,ini` | fails |
+
+So a repository carrying one could never resolve here at all; it failed with
+ansible's own parse error rather than with a refusal naming the file. With the
+switch off it is now named and refused; with it on, the runner resolves it.
+
+#### What is still outstanding, when the API's half is short
+
+A configure's "outstanding hosts" is the inventory minus what reported, and for a
+dynamic workspace the artifact alone is a short denominator. So the callback
+inside the execution environment reports the inventory **as ansible resolved it**,
+and that is unioned with the artifact — unioned rather than preferred, because
+either side can be the smaller one. Nothing here can report which hosts a *play*
+targeted: under `serial:` ansible restricts the inventory to the current batch,
+so a host that was in scope and never reached appears in no callback and in no
+`PLAY RECAP`. The inventory's host set is what it can report, and that is the
+number the remainder is subtracted from.
 
 ### Migrating a cloud inventory plugin
 

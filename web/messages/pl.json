@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Żądanie CPU dla Ansible",
       "eeMemoryRequest": "Żądanie pamięci dla Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Wersja Terragrunt"
+      "terragruntVersion": "Wersja Terragrunt",
+      "dynamicInventoryEnabled": "Dynamiczne wtyczki inwentarza",
+      "dynamicInventoryEnabledHint": "Zezwala na zadeklarowane wtyczki inwentarza — źródło YAML z kluczem plugin na najwyższym poziomie — gdy runner rozwiązuje inwentarz. Sam Terrapod nigdy żadnej nie uruchamia, w żadnym z tych dwóch stanów. Dopóki to jest wyłączone, źródło wtyczki jest odrzucane z nazwy, zamiast rozwiązywać się do niepełnego zbioru hostów; gdy jest włączone, pokazany tutaj inwentarz jest wyraźnie częściowy dla każdego źródła, a zbiór rozwiązany przez runnera jest rozstrzygający.",
+      "inventoryScriptsEnabled": "Skrypty inwentarza",
+      "inventoryScriptsEnabledHint": "Zezwala na wykonywalne skrypty inwentarza, gdy runner rozwiązuje inwentarz. Oddzielone od dynamicznych wtyczek inwentarza, aby zadeklarowane konfiguracje wtyczek, które wskazują kolekcję i można je przeczytać przed uruchomieniem, mogły być dozwolone bez dopuszczania także dowolnych plików wykonywalnych."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -2880,7 +2884,8 @@
       "configureLimitHint": "Które hosty, grupy lub wzorce objąć. Puste oznacza każdy host w inwentarzu.",
       "typeConfigure": "konfiguracja",
       "typeConfigureHint": "Uruchamia playbook na inwentarzu. Bez planu i bez zastosowania.",
-      "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu."
+      "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu.",
+      "queueConfigureConfirmDynamic": "Ta przestrzeń robocza rozwiązuje źródła inwentarza na runnerze, więc hosty, do których dotrze, nie są znane do rozpoczęcia uruchomienia."
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

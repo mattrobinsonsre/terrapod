@@ -1016,7 +1016,7 @@ def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> i
         discover_providers=False,
         token_dir=cloud_identity.ee_token_dir(),
     )
-    inventory = configure_inventory.materialise(cfg, resolved=credential_refs)
+    inventory = configure_inventory.materialise(cfg, work_dir=work_dir, resolved=credential_refs)
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
     # Capture is best-effort and says so: `deliver` returns None when the plugin
     # asset is missing from this image, which is our packaging defect rather
