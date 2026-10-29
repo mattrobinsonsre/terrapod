@@ -8,6 +8,21 @@ exactly what an upgrade guarantees.
 Terrapod follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
 for every public surface below.
 
+**Pre-releases are cut for a MAJOR only.** A `vN.0.0-alpha.1` or `vN.0.0-rc.1`
+exists so a breaking release can be tried before it is final; there is no such
+thing as a `v2.1.0-alpha` or a `v2.0.1-rc`, because a minor is additive and a
+patch is safe to take, so neither has anything to try out ahead of time. The tag
+trigger enforces this rather than trusting it — a pre-release suffix is admitted
+on `vN.0.0` only, so pushing `v2.1.0-alpha.1` starts no pipeline and publishes
+nothing.
+
+A pre-release is **not recommended for production**: it is where the breaking
+changes land, and nothing promises the next one keeps its shape. Note also that
+GitHub picks its "Latest" badge by publish time and refuses it to a release
+flagged as a pre-release, so Terrapod does not set that flag — a `vN.0.0-alpha`
+therefore *holds* the badge while it is the newest thing published. Read the
+version rather than the badge, and run the newest stable line in production.
+
 ## What each version bump means
 
 | Bump | Meaning |

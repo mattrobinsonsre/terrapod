@@ -29,13 +29,21 @@ on:
     # `sha-` manifest, `images_exist` is false, and a tag on that commit
     # rebuilds and re-tests from scratch as it used to.
     branches: [main, 'release/**']
-    # Both forms, because a pre-release tag matched NEITHER until #2277: these
+    # Two forms, because a pre-release tag matched NEITHER until #2277: these
     # patterns are full-match, so `v2.0.0-alpha.1` fell through and the push
     # started no pipeline AND no failure -- nothing published, nothing to clean
     # up, and no signal that anything had gone wrong.
+    #
+    # The second is `vN.0.0-*` and NOT `vN.N.N-*` deliberately: a pre-release is
+    # for a MAJOR only. A `v2.1.0-alpha.1` is not a thing we cut, and admitting
+    # one would let it publish and take the "Latest" badge off a stable 2.0.0 --
+    # which matters because this workflow deliberately does not flag a
+    # pre-release, so the badge follows publish order (see `release-create`).
+    # Refusing the pattern makes an accidental minor pre-release fail at the
+    # push instead, which is the loud direction.
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+      - 'v[0-9]+.0.0-*'
   pull_request:
     # Release branches too, not just main. A release line is where patches and
     # release-targeted features land, and those are the changes people are
@@ -137,8 +145,10 @@ jobs:
           # admits but this rejects starts a pipeline with `is_tag=false`, so every
           # release job is skipped, nothing is published, nothing fails, and
           # `Cleanup Tag` never fires -- leaving a tag that looks released and is
-          # not. The optional group is semver's pre-release suffix (#2277).
-          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+          # not. Two alternatives rather than one optional group, because a
+          # pre-release suffix is admitted on a MAJOR only (`vN.0.0-...`), which
+          # a single pattern with an optional suffix cannot express (#2277).
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ || "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.0\.0-[0-9A-Za-z.-]+$ ]]; then
             is_tag=true
             version="${GITHUB_REF#refs/tags/}"
           fi
@@ -4355,7 +4365,7 @@ jobs:
         id: digests
         env:
           COSIGN_OIDC_ISSUER: https://token.actions.githubusercontent.com
-          COSIGN_IDENTITY_RE: ^https://github\.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/(heads/main|heads/release/v[0-9]+\.[0-9]+|tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$
+          COSIGN_IDENTITY_RE: ^https://github\.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/(heads/main|heads/release/v[0-9]+\.[0-9]+|tags/v[0-9]+\.[0-9]+\.[0-9]+|tags/v[0-9]+\.0\.0-[0-9A-Za-z.-]+)$
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
           : > "$RUNNER_TEMP/digests.txt"
@@ -5045,7 +5055,7 @@ jobs:
             # before nothing, so the substitution restores exactly semver's rule;
             # it exists only inside this pipeline and never reaches a tag, which
             # matters because `~` is neither valid semver nor a valid Docker tag.
-            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$|^v[0-9]+\.0\.0-[0-9A-Za-z.-]+$' \
               | sed 's/-/~/' | sort -V | tail -1 | sed 's/~/-/'
           )
           echo "::notice::newest released version is $highest (compared against every release, not a window)"
