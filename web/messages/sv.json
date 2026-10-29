@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU-begäran",
       "eeMemoryRequest": "Ansible minnesbegäran",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt-version"
+      "terragruntVersion": "Terragrunt-version",
+      "dynamicInventoryEnabled": "Dynamiska inventarie-plugins",
+      "dynamicInventoryEnabledHint": "Tillåter deklarerade inventarie-plugins — en YAML-källa med en plugin-nyckel på toppnivå — när runnern löser upp inventariet. Terrapod kör aldrig något själv, i inget av de två lägena. Så länge detta är av avvisas en pluginkälla med namn i stället för att lösas upp till en ofullständig värdlista; så länge det är på är inventariet som visas här uttryckligen ofullständigt per källa, och den uppsättning runnern löser upp är den som gäller.",
+      "inventoryScriptsEnabled": "Inventarie-skript",
+      "inventoryScriptsEnabledHint": "Tillåter körbara inventarie-skript när runnern löser upp inventariet. Åtskilt från dynamiska inventarie-plugins så att deklarerade pluginkonfigurationer, som namnger en collection och kan läsas innan de körs, kan tillåtas utan att även godta godtyckliga körbara filer."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

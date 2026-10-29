@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansibul CPU requist",
       "eeMemoryRequest": "Ansibul memoreh requist",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt vershun"
+      "terragruntVersion": "Terragrunt vershun",
+      "dynamicInventoryEnabled": "Dynamik Inventoree Pluginz",
+      "dynamicInventoryEnabledHint": "Letz teh runnr uze inventoree pluginz wot r deklaird — a YAML sors wif a top-levul plugin key — when it figgerz out teh inventoree. Terrapod itself NEVR runz wun, no mattr wot. Wen dis iz off, a plugin sors getz refuzed by naym insted ov figgerin out haff teh hostz; wen itz on, teh inventoree shown heer iz offishully inkomplete per sors an teh set teh runnr figgerz out iz teh reel wun. srsly",
+      "inventoryScriptsEnabled": "Inventoree Skriptz",
+      "inventoryScriptsEnabledHint": "Letz teh runnr uze runnabul inventoree skriptz when it figgerz out teh inventoree. Kept apart from dynamik inventoree pluginz so deklaird plugin konfigz, wot naym a collekshun an can be red b4 dey run, can be allowd wifout allowin enny randum runnabul fingz too."
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

@@ -61,6 +61,12 @@ interface AutodiscoveryRule {
     'auto-configure-enabled'?: boolean
     'configure-after-apply'?: boolean
     'configure-all-hosts'?: boolean
+    // Which inventory sources ansible may resolve on the runner (#2033),
+    // templated for the same reason the triggers above are: a rule that can
+    // declare a configure operation and not say which sources it may read
+    // would leave an operator editing every materialised workspace by hand.
+    'dynamic-inventory-enabled'?: boolean
+    'inventory-scripts-enabled'?: boolean
     // An ordinary templated path, '' meaning the configuration version's root.
     // No null state: the declaration is `configure-enabled` above (#1966).
     'config-directory'?: string
@@ -174,6 +180,8 @@ export default function AutodiscoveryPage() {
   const [autoConfigureEnabled, setAutoConfigureEnabled] = useState(false)
   const [configureAfterApply, setConfigureAfterApply] = useState(false)
   const [configureAllHosts, setConfigureAllHosts] = useState(false)
+  const [dynamicInventoryEnabled, setDynamicInventoryEnabled] = useState(false)
+  const [inventoryScriptsEnabled, setInventoryScriptsEnabled] = useState(false)
   // Where the configure operation runs in each materialised workspace
   // (#1929) — a plain text box, because the path is just a path and '' is the
   // configuration version's root. #1929 had a mode select here because NULL
@@ -390,6 +398,8 @@ export default function AutodiscoveryPage() {
     setAutoConfigureEnabled(a['auto-configure-enabled'] ?? false)
     setConfigureAfterApply(a['configure-after-apply'] ?? false)
     setConfigureAllHosts(a['configure-all-hosts'] ?? false)
+    setDynamicInventoryEnabled(a['dynamic-inventory-enabled'] ?? false)
+    setInventoryScriptsEnabled(a['inventory-scripts-enabled'] ?? false)
     // `?? ''` and nothing to decide: a stored '' is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -470,6 +480,8 @@ export default function AutodiscoveryPage() {
       'auto-configure-enabled': autoConfigureEnabled,
       'configure-after-apply': configureAfterApply,
       'configure-all-hosts': configureAllHosts,
+      'dynamic-inventory-enabled': dynamicInventoryEnabled,
+      'inventory-scripts-enabled': inventoryScriptsEnabled,
       // Where the configure operation runs (#1929). Sent verbatim and never
       // null — an explicit null is a 422 naming the field (#1966) — with ''
       // meaning the configuration version's root.
@@ -1215,6 +1227,47 @@ export default function AutodiscoveryPage() {
                       title={tWs('fields.defaultLimitTitle')}
                       className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                     />
+                  </div>
+                  {/* Which inventory sources ansible may resolve on the
+                      runner (#2033). Terrapod itself never runs either kind,
+                      in either state -- these say what the RUNNER is
+                      permitted to resolve. A yes/no select rather than a
+                      tri-state one: a rule templates a concrete value onto
+                      every workspace it materialises, so there is no
+                      "leave alone" to express. */}
+                  <div className="min-w-0">
+                    <label htmlFor="ad-dynamic-inventory-enabled" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.dynamicInventoryEnabled')}
+                    </label>
+                    <select
+                      id="ad-dynamic-inventory-enabled"
+                      value={dynamicInventoryEnabled ? 'true' : 'false'}
+                      onChange={e => setDynamicInventoryEnabled(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.dynamicInventoryEnabledHint')}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor="ad-inventory-scripts-enabled" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.inventoryScriptsEnabled')}
+                    </label>
+                    <select
+                      id="ad-inventory-scripts-enabled"
+                      value={inventoryScriptsEnabled ? 'true' : 'false'}
+                      onChange={e => setInventoryScriptsEnabled(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.inventoryScriptsEnabledHint')}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3">

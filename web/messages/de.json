@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible-CPU-Anforderung",
       "eeMemoryRequest": "Ansible-Speicher-Anforderung",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt-Version"
+      "terragruntVersion": "Terragrunt-Version",
+      "dynamicInventoryEnabled": "Dynamische Inventar-Plugins",
+      "dynamicInventoryEnabledHint": "Erlaubt deklarierte Inventar-Plugins — eine YAML-Quelle mit einem plugin-Schlüssel auf oberster Ebene —, wenn der Runner das Inventar auflöst. Terrapod selbst führt in keinem der beiden Zustände eines aus. Solange dies aus ist, wird eine Plugin-Quelle namentlich abgelehnt, statt zu einer unvollständigen Hostliste aufzulösen; solange es an ist, ist das hier gezeigte Inventar je Quelle ausdrücklich unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
+      "inventoryScriptsEnabled": "Inventar-Skripte",
+      "inventoryScriptsEnabledHint": "Erlaubt ausführbare Inventar-Skripte, wenn der Runner das Inventar auflöst. Getrennt von dynamischen Inventar-Plugins, damit deklarierte Plugin-Konfigurationen, die eine Collection benennen und vor der Ausführung gelesen werden können, erlaubt werden können, ohne auch beliebige ausführbare Dateien zu erlauben."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

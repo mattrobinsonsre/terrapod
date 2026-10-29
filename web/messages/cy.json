@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Cais CPU Ansible",
       "eeMemoryRequest": "Cais cof Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Fersiwn Terragrunt"
+      "terragruntVersion": "Fersiwn Terragrunt",
+      "dynamicInventoryEnabled": "Ategion rhestr eiddo ddynamig",
+      "dynamicInventoryEnabledHint": "Caniatáu ategion rhestr eiddo a ddatganwyd — ffynhonnell YAML sy''n cario allwedd plugin ar y lefel uchaf — pan fydd y rhedwr yn datrys y rhestr eiddo. Nid yw Terrapod ei hun byth yn rhedeg un, yn y naill gyflwr na''r llall. Pan fydd hwn i ffwrdd, caiff ffynhonnell ategyn ei gwrthod wrth ei henw yn lle datrys i set gwesteiwyr anghyflawn; pan fydd ymlaen, mae''r rhestr eiddo a ddangosir yma yn anghyflawn yn benodol fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
+      "inventoryScriptsEnabled": "Sgriptiau rhestr eiddo",
+      "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

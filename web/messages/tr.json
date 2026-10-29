@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU isteği",
       "eeMemoryRequest": "Ansible bellek isteği",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt sürümü"
+      "terragruntVersion": "Terragrunt sürümü",
+      "dynamicInventoryEnabled": "Dinamik envanter eklentileri",
+      "dynamicInventoryEnabledHint": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine — üst düzey bir plugin anahtarı taşıyan bir YAML kaynağına — izin verir. Terrapod bunları hiçbir durumda kendisi çalıştırmaz. Bu kapalıyken bir eklenti kaynağı, eksik bir makine kümesine çözümlenmek yerine adıyla reddedilir; açıkken burada gösterilen envanter kaynak kaynak açıkça eksiktir ve runner''ın çözümlediği küme belirleyici olandır.",
+      "inventoryScriptsEnabled": "Envanter betikleri",
+      "inventoryScriptsEnabledHint": "Runner envanteri çözümlerken çalıştırılabilir envanter betiklerine izin verir. Dinamik envanter eklentilerinden ayrı tutulur; böylece bir koleksiyon adı veren ve çalışmadan önce okunabilen bildirilmiş eklenti yapılandırmalarına, rastgele çalıştırılabilir dosyalara da izin vermeden izin verilebilir."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

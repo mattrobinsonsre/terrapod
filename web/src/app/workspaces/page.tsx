@@ -1071,6 +1071,10 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.configDirectoryRootHint'))
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
+      case 'dynamic-inventory-enabled':
+        return hintText(tDetail('fields.dynamicInventoryEnabledHint'))
+      case 'inventory-scripts-enabled':
+        return hintText(tDetail('fields.inventoryScriptsEnabledHint'))
       case 'ansible-collections':
         return hintText(tDetail('fields.ansibleCollectionsHint'))
       case 'agent-pool-ids':
@@ -1387,6 +1391,10 @@ function WorkspacesPageInner() {
             />
           }
         />
+        {/* Which inventory sources ansible may resolve on the runner
+            (#2033). Terrapod itself never runs either kind, in either state. */}
+        <Field attr="dynamic-inventory-enabled" ctx={createCtx} kind="checkbox" />
+        <Field attr="inventory-scripts-enabled" ctx={createCtx} kind="checkbox" />
         <Field
           attr="ansible-version"
           ctx={createCtx}

@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Ansible CPU tlhob",
       "eeMemoryRequest": "Ansible qawHaq tlhob",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt mI'"
+      "terragruntVersion": "Terragrunt mI'",
+      "dynamicInventoryEnabled": "ghom tetlh chenmoHwI''mey",
+      "dynamicInventoryEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw'': YAML mung, plugin per tIn ghajbogh. cha'' Dotlhmey-vaD, Terrapod ''e'' vumbe'' net Sov. chu''be''chugh, chenmoHwI'' mung pong lajbe''lu'', ''ej hostmey puSqu'' ngu''be''lu''. chu''chugh, naDev ghom tetlh ''oH Hoch mung-vaD puSqu'' ''e'' maqlu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
+      "inventoryScriptsEnabled": "ghom tetlh ghItlhmey",
+      "inventoryScriptsEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', vumlaHbogh ghom tetlh ghItlhmey chaw''. ghom tetlh chenmoHwI''mey-vo'' pIm: ngu''lu''bogh chenmoHwI'' De'' ghomHom pong ''ej vumpa'' laDlaH, vaj bIH chaw''laH ''ej Hoch vumlaHbogh De'' chaw''be''."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

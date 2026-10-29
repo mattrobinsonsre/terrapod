@@ -2682,7 +2682,11 @@
       "eeCpuRequest": "Postulatio CPU Ansible",
       "eeMemoryRequest": "Postulatio memoriae Ansible",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Versio Terragrunt"
+      "terragruntVersion": "Versio Terragrunt",
+      "dynamicInventoryEnabled": "Interpolamenta inventarii dynamici",
+      "dynamicInventoryEnabledHint": "Interpolamenta inventarii declarata permittit — fontem YAML clavem plugin in summo gradu ferentem — cum cursor inventarium resolvit. Terrapod ipse nullum umquam exsequitur, in neutro statu. Dum hoc exstinctum est, fons interpolamenti nominatim recusatur potius quam in partem hospitum resolvitur; dum accensum est, inventarium hic ostensum per singulos fontes aperte partiale est, et copia quam cursor resolvit auctoritatem habet.",
+      "inventoryScriptsEnabled": "Scripta inventarii",
+      "inventoryScriptsEnabledHint": "Scripta inventarii exsecutabilia permittit cum cursor inventarium resolvit. Ab interpolamentis inventarii dynamici separatum est, ut configurationes interpolamenti declaratae, quae collectionem nominant et ante exsecutionem legi possunt, permitti queant sine licentia quorumlibet exsecutabilium."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
