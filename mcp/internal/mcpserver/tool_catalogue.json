@@ -1240,7 +1240,7 @@
           "type": "string"
         },
         "security_scan_severity_threshold": {
-          "description": "the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- the enforcement level is a separate setting and is deliberately not on this tool. Omit to leave the stored value alone",
+          "description": "the lowest severity a scan finding must reach to be reported: critical, high, medium or low. This is what gets REPORTED, not what blocks -- security_scan_enforcement is the separate setting that decides that. Omit to leave the stored value alone",
           "type": "string"
         },
         "security_scan_skip_rules": {
