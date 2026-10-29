@@ -303,46 +303,36 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 #: which is the failure this gate exists to prevent. Every entry names the
 #: issue that will clear it, and clearing one means wiring the setting up and
 #: deleting the line. This should end empty.
-#: Why an entry sits in `_SURFACE_DEBT` below. Two reasons, deliberately.
-#: `debug-mode` arms a pod that holds the run's credentials and keeps it alive
-#: for inspection; `auto-merge` and its strategy merge pull requests;
-#: `security-scan-enforcement` is a governance gate. Each may still belong on
-#: the tool surface -- the point is that it is a decision rather than an
-#: oversight, and it is made on the issue.
-JUDGEMENT_REASON = "#2174 — a genuine judgement, to be argued there: an agent flipping this has consequences beyond the workspace's own configuration"
-
-
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
-    # Found by MEASURING the surface rather than reading it: 21 of the then-46
-    # settable attributes were unreachable from MCP when it was first added to
-    # this gate (#2174), having drifted for as long as the gate had existed.
+    # EMPTY, which is where a debt ledger is supposed to end up, and it is worth
+    # recording how it got here because the last four entries were cleared by an
+    # argument rather than by work.
     #
-    # The WIRE half is now CLOSED. Fourteen were "nobody decided against it,
-    # MCP simply had no parity gate" and are wired; three (`ai-policy-mode` and
-    # its two siblings) went with #2175. So nothing is left in this ledger that
-    # merely needs doing, which is the state a debt ledger should reach -- and
-    # the reason the generic wire reason string is gone rather than kept for the
-    # next occupant: an unused reason is an invitation to file something under
-    # it without deciding anything.
+    # It opened at 21 of the then-46 settable attributes unreachable from MCP
+    # (#2174), found by MEASURING the surface rather than reading it, having
+    # drifted for as long as this gate had existed. Fourteen were plain wire
+    # plumbing and three (`ai-policy-mode` and its siblings) went with #2175.
     #
-    # What REMAINS is four genuine judgements, kept here rather than in the
-    # exemption ledger above because they are unanswered, not answered-no.
-    # Each reaches outside the workspace's own configuration -- `debug-mode`
-    # arms a pod that holds the run's credentials, the two `auto-merge` keys
-    # merge pull requests, `security-scan-enforcement` is a governance gate --
-    # so whether an agent should hold them is argued on #2174. Flattening these
-    # into one reason with the wire fourteen is how "we should think about this"
-    # quietly becomes "nobody got round to it".
+    # The last FOUR -- `debug-mode`, `auto-merge`, `auto-merge-strategy`,
+    # `security-scan-enforcement` -- sat here as "genuine judgements" with a
+    # reason each, and the reasons were all of the same wrong shape: each was a
+    # property of the SETTING (it arms a credential-holding pod, it merges pull
+    # requests, it is a governance gate) and none was a property of the CALLER.
+    # The MCP server is not an authorization boundary -- it carries the user's
+    # own token and the API applies RBAC identically whatever the client is --
+    # so withholding a property protected nobody, while leaving an agent able to
+    # READ a setting it could not SET. That asymmetry is the defect this gate
+    # exists to catch, so the ledger was recording one.
     #
-    # What the gate buys either way: the next setting cannot drift the same
-    # way, because it will fail here.
-    "MCP workspace tools": {
-        # The four worth arguing rather than assuming.
-        "debug-mode": JUDGEMENT_REASON,
-        "auto-merge": JUDGEMENT_REASON,
-        "auto-merge-strategy": JUDGEMENT_REASON,
-        "security-scan-enforcement": JUDGEMENT_REASON,
-    },
+    # The test when a future entry is proposed: is the reason about the CALLER?
+    # A reason that would apply equally to the UI, the provider and the API is
+    # an argument about the feature and belongs on the feature. There is
+    # deliberately no generic reason string left in this module -- an unused
+    # reason is an invitation to file something here without deciding anything.
+    #
+    # What the gate buys now that this is empty: every settable attribute is
+    # checked against every surface with nothing excused, so the next setting
+    # cannot drift the way these did.
 }
 
 
