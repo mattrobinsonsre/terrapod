@@ -432,7 +432,7 @@
                 }
             }
         },
-        "terrapod:index/getCatalogItemInterfaceOutput:getCatalogItemInterfaceOutput": {
+        "terrapod:index/getCatalogItemInterfaceModuleOutput:getCatalogItemInterfaceModuleOutput": {
             "properties": {
                 "description": {
                     "type": "string",
@@ -7216,9 +7216,9 @@
                     "interfaceError": {
                         "type": "string"
                     },
-                    "outputs": {
+                    "moduleOutputs": {
                         "items": {
-                            "$ref": "#/types/terrapod:index/getCatalogItemInterfaceOutput:getCatalogItemInterfaceOutput"
+                            "$ref": "#/types/terrapod:index/getCatalogItemInterfaceModuleOutput:getCatalogItemInterfaceModuleOutput"
                         },
                         "type": "array"
                     },
@@ -7230,7 +7230,7 @@
                     "catalogItemId",
                     "inputs",
                     "interfaceError",
-                    "outputs",
+                    "moduleOutputs",
                     "resolvedVersion"
                 ],
                 "type": "object"

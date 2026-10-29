@@ -4226,6 +4226,7 @@ jobs:
       - python-checks
       - node-checks
       - go-modules
+      - pulumi-sdk-build
       - python-test
       - python-audit
       - secret-scan
@@ -4241,6 +4242,7 @@ jobs:
             python-checks=${{ needs.python-checks.result }}
             node-checks=${{ needs.node-checks.result }}
             go-modules=${{ needs.go-modules.result }}
+            pulumi-sdk-build=${{ needs.pulumi-sdk-build.result }}
             python-test=${{ needs.python-test.result }}
             python-audit=${{ needs.python-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
@@ -5163,6 +5165,91 @@ jobs:
           git push origin ":refs/tags/$version" 2>/dev/null || true
 
   # ── Gate ───────────────────────────────────────────────
+  # ── Pulumi SDK Build ──────────────────────────────────
+  # Generates a per-language SDK from the COMMITTED schema and compiles it.
+  #
+  # This exists because nothing else in CI did, and #2284 is what that cost: the
+  # Go SDK did not compile at all -- one name collision, eleven errors -- while
+  # every gate was green, because the schema was fine and the defect was in what
+  # Pulumi GENERATES from it. The provider is a published artifact whose
+  # per-language SDK is generated on the practitioner's own machine, so without
+  # this the next collision is found by whoever picks a language first.
+  #
+  # It generates from the committed schema deliberately: that is what
+  # `pulumi package add` consumes. Whether that schema is STALE against the
+  # Terraform provider is already gated by the pulumi-provider tests in
+  # `go-modules`, so this does not re-check it.
+  #
+  # GO ONLY, for now. Go fails loudly on a duplicate declaration, which makes it
+  # the cheapest canary for exactly this class; all four languages generate from
+  # the same language-independent path. Adding one is a runner-minutes decision
+  # rather than a correctness one.
+  #
+  # If this fails after a bridge or Pulumi CLI bump and the diff touched neither
+  # the provider nor the schema, suspect upstream before suspecting us: the tree
+  # being compiled is GENERATED, so a generator change can break it with nothing
+  # of ours having moved.
+  pulumi-sdk-build:
+    name: Pulumi SDK builds
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: pulumi-provider/go.mod
+
+      # Pinned, and from the release archive rather than piped from
+      # get.pulumi.com into a shell -- the same shape `release-rescan.yml` uses
+      # for crane.
+      - name: Install the Pulumi CLI
+        run: |
+          set -euo pipefail
+          version=3.272.0
+          curl -fsSL -o pulumi.tar.gz \
+            "https://github.com/pulumi/pulumi/releases/download/v${version}/pulumi-v${version}-linux-x64.tar.gz"
+          tar -xzf pulumi.tar.gz
+          sudo install -m 0755 pulumi/pulumi /usr/local/bin/pulumi
+          pulumi version
+
+      - name: Generate the Go SDK from the committed schema
+        run: |
+          set -euo pipefail
+          pulumi package gen-sdk \
+            pulumi-provider/cmd/pulumi-resource-terrapod/schema.json \
+            --language go --out "$RUNNER_TEMP/sdk"
+          # gen-sdk exits 0 when it writes nothing, which is the shape to
+          # distrust -- an absent SDK would otherwise read as a passing build.
+          test -d "$RUNNER_TEMP/sdk/go" || {
+            echo "gen-sdk reported success and produced no Go SDK."
+            exit 1
+          }
+          echo "go files: $(find "$RUNNER_TEMP/sdk/go" -name '*.go' | wc -l)"
+
+      # The generator emits no go.mod, so the module path the SDK imports itself
+      # under has to be supplied. It must match `ImportBasePath` in provider.go
+      # minus the trailing package, or the SDK's own `internal` package does not
+      # resolve and the build fails for a reason unrelated to the schema.
+      - name: Compile it
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/sdk/go"
+          goline=$(grep -m1 '^go ' "$GITHUB_WORKSPACE/pulumi-provider/go.mod")
+          printf 'module github.com/mattrobinsonsre/terrapod/pulumi-provider/sdk/go\n\n%s\n' "$goline" > go.mod
+          go mod tidy
+          go build ./... || {
+            echo
+            echo "The generated Pulumi Go SDK does not compile."
+            echo "A duplicate declaration here is usually a NAME COLLISION between a"
+            echo "generated nested type and a function's own <Function>Output helper."
+            echo "See TestNoFunctionsOutputHelperCollidesWithAGeneratedType and the"
+            echo "Fields override in pulumi-provider/provider.go (#2284)."
+            exit 1
+          }
+
   ci-pass:
     name: CI
     if: always()
@@ -5171,6 +5258,7 @@ jobs:
       - python-checks
       - node-checks
       - go-modules
+      - pulumi-sdk-build
       - build-ee-agent
       - build-query
       - python-test
@@ -5217,6 +5305,7 @@ jobs:
             "${{ needs.python-checks.result }}"
             "${{ needs.node-checks.result }}"
             "${{ needs.go-modules.result }}"
+            "${{ needs.pulumi-sdk-build.result }}"
             "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
