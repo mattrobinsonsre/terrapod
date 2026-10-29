@@ -5309,11 +5309,27 @@ jobs:
           PY
           "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/import_probe.py"
 
+      # .NET needs one file supplied, for the same reason Go needs a go.mod:
+      # the generated tree is not self-sufficient. The csproj carries
+      # `<EmbeddedResource Include="version.txt" />` and the generator does not
+      # write that file -- Pulumi's own packaging scripts do -- so a bare
+      # `dotnet build` fails CS1566 reading a resource that was never created.
+      #
+      # The version is read from the schema rather than hardcoded, and falls back
+      # to 0.0.0 because the COMMITTED schema deliberately carries none: the
+      # plugin injects its build version at serve time (#2283), so generating
+      # from the file on disk yields an unversioned SDK. That is correct for a
+      # compile check and wrong to paper over with a fixed number that would then
+      # disagree with a real build.
       - name: Build the .NET SDK
         if: matrix.language == 'dotnet'
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/sdk/dotnet"
+          version=$(jq -r '.version // "0.0.0"' \
+            "$GITHUB_WORKSPACE/pulumi-provider/cmd/pulumi-resource-terrapod/schema.json")
+          echo "embedding version: $version"
+          printf '%s\n' "$version" > version.txt
           dotnet --version
           dotnet build --nologo
 
