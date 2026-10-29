@@ -5164,41 +5164,56 @@ jobs:
           gh release delete "$version" --cleanup-tag --yes 2>/dev/null || true
           git push origin ":refs/tags/$version" 2>/dev/null || true
 
-  # ── Gate ───────────────────────────────────────────────
   # ── Pulumi SDK Build ──────────────────────────────────
-  # Generates a per-language SDK from the COMMITTED schema and compiles it.
+  # Generates a per-language SDK from the COMMITTED schema and proves it is
+  # USABLE in that language -- one matrix leg each, in parallel.
   #
-  # This exists because nothing else in CI did, and #2284 is what that cost: the
-  # Go SDK did not compile at all -- one name collision, eleven errors -- while
-  # every gate was green, because the schema was fine and the defect was in what
-  # Pulumi GENERATES from it. The provider is a published artifact whose
-  # per-language SDK is generated on the practitioner's own machine, so without
-  # this the next collision is found by whoever picks a language first.
+  # This exists because nothing in CI generated or built an SDK, and two defects
+  # lived in exactly that gap while every other gate was green, because the
+  # schema was fine both times and the defect was in what Pulumi GENERATES from
+  # it:
+  #
+  #   - #2284, Go: a nested type collided with a function's own
+  #     `<Function>Output` helper, so the SDK did not compile at all.
+  #   - #2267, Python: the package name was hyphenated, and the generator uses
+  #     that field as the module DIRECTORY as well as the distribution name, so
+  #     the SDK installed and could never be imported.
+  #
+  # Both were found by generating an SDK and trying to use it, which is why each
+  # leg below does the cheapest thing that would have caught its own language's
+  # defect rather than stopping at "files were produced".
   #
   # It generates from the committed schema deliberately: that is what
   # `pulumi package add` consumes. Whether that schema is STALE against the
-  # Terraform provider is already gated by the pulumi-provider tests in
-  # `go-modules`, so this does not re-check it.
+  # Terraform provider is gated by the pulumi-provider tests in `go-modules`, so
+  # this does not re-check it.
   #
-  # GO ONLY, for now. Go fails loudly on a duplicate declaration, which makes it
-  # the cheapest canary for exactly this class; all four languages generate from
-  # the same language-independent path. Adding one is a runner-minutes decision
-  # rather than a correctness one.
+  # Node, Python and .NET come from the runner image rather than a setup action,
+  # deliberately: three more pinned actions is three more SHA comments to drift,
+  # and none of these legs depends on a specific toolchain version.
   #
-  # If this fails after a bridge or Pulumi CLI bump and the diff touched neither
-  # the provider nor the schema, suspect upstream before suspecting us: the tree
-  # being compiled is GENERATED, so a generator change can break it with nothing
-  # of ours having moved.
+  # When a leg fails after a bridge or Pulumi CLI bump and the diff touched
+  # neither the provider nor the schema, suspect upstream before suspecting us:
+  # the tree being built is GENERATED, so a generator change can break it with
+  # nothing of ours having moved.
   pulumi-sdk-build:
-    name: Pulumi SDK builds
+    name: Pulumi SDK (${{ matrix.language }})
     needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      # Every language, independently: a leg that fails must not hide the others,
+      # since the whole point is that a silently smaller surface is this
+      # feature's failure mode (#2267).
+      fail-fast: false
+      matrix:
+        language: [go, nodejs, python, dotnet]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.language == 'go'
         with:
           go-version-file: pulumi-provider/go.mod
 
@@ -5215,25 +5230,29 @@ jobs:
           sudo install -m 0755 pulumi/pulumi /usr/local/bin/pulumi
           pulumi version
 
-      - name: Generate the Go SDK from the committed schema
+      - name: Generate the ${{ matrix.language }} SDK from the committed schema
         run: |
           set -euo pipefail
           pulumi package gen-sdk \
             pulumi-provider/cmd/pulumi-resource-terrapod/schema.json \
-            --language go --out "$RUNNER_TEMP/sdk"
+            --language "${{ matrix.language }}" --out "$RUNNER_TEMP/sdk"
           # gen-sdk exits 0 when it writes nothing, which is the shape to
           # distrust -- an absent SDK would otherwise read as a passing build.
-          test -d "$RUNNER_TEMP/sdk/go" || {
-            echo "gen-sdk reported success and produced no Go SDK."
+          found=$(find "$RUNNER_TEMP/sdk" -type f \
+            \( -name '*.go' -o -name '*.ts' -o -name '*.py' -o -name '*.cs' \) | wc -l)
+          echo "generated source files: $found"
+          test "$found" -gt 0 || {
+            echo "gen-sdk reported success and produced no sources for ${{ matrix.language }}."
             exit 1
           }
-          echo "go files: $(find "$RUNNER_TEMP/sdk/go" -name '*.go' | wc -l)"
 
-      # The generator emits no go.mod, so the module path the SDK imports itself
-      # under has to be supplied. It must match `ImportBasePath` in provider.go
-      # minus the trailing package, or the SDK's own `internal` package does not
-      # resolve and the build fails for a reason unrelated to the schema.
-      - name: Compile it
+      # Go -- #2284's language. The generator emits no go.mod, so the module path
+      # the SDK imports itself under has to be supplied; it must match
+      # `ImportBasePath` in provider.go minus the trailing package, or the SDK's
+      # own `internal` package does not resolve and the failure has nothing to do
+      # with the schema.
+      - name: Compile the Go SDK
+        if: matrix.language == 'go'
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/sdk/go"
@@ -5249,6 +5268,71 @@ jobs:
             echo "Fields override in pulumi-provider/provider.go (#2284)."
             exit 1
           }
+
+      - name: Type-check the TypeScript SDK
+        if: matrix.language == 'nodejs'
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/sdk/nodejs"
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          test -f inventoryHost.ts || {
+            echo "inventoryHost.ts is absent -- the inventory resources are the"
+            echo "reason this provider exists (#1987), so their absence is a"
+            echo "failure even if everything else type-checks."
+            exit 1
+          }
+
+      # Python -- #2267's language. INSTALL and IMPORT rather than compile:
+      # Python has no compile step, and the defect this catches was a package
+      # that installed perfectly and could never be imported.
+      - name: Install and import the Python SDK
+        if: matrix.language == 'python'
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "$RUNNER_TEMP/sdk/python"
+          # To a FILE rather than `python3 - <<EOF`: a program on stdin is one
+          # heredoc away from colliding with piped data, and a file is the shape
+          # that keeps working when someone later adds an input to this step.
+          cat > "$RUNNER_TEMP/import_probe.py" <<'PY'
+          import terrapod_pulumi as tp
+
+          missing = [
+              n
+              for n in ("InventoryHost", "InventoryHostVar", "InventoryHostGroup")
+              if not hasattr(tp, n)
+          ]
+          if missing:
+              raise SystemExit(f"the imported SDK is missing {missing}")
+          print("imported, and the inventory resources are present")
+          PY
+          "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/import_probe.py"
+
+      # .NET needs one file supplied, for the same reason Go needs a go.mod:
+      # the generated tree is not self-sufficient. The csproj carries
+      # `<EmbeddedResource Include="version.txt" />` and the generator does not
+      # write that file -- Pulumi's own packaging scripts do -- so a bare
+      # `dotnet build` fails CS1566 reading a resource that was never created.
+      #
+      # The version is read from the schema rather than hardcoded, and falls back
+      # to 0.0.0 because the COMMITTED schema deliberately carries none: the
+      # plugin injects its build version at serve time (#2283), so generating
+      # from the file on disk yields an unversioned SDK. That is correct for a
+      # compile check and wrong to paper over with a fixed number that would then
+      # disagree with a real build.
+      - name: Build the .NET SDK
+        if: matrix.language == 'dotnet'
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/sdk/dotnet"
+          version=$(jq -r '.version // "0.0.0"' \
+            "$GITHUB_WORKSPACE/pulumi-provider/cmd/pulumi-resource-terrapod/schema.json")
+          echo "embedding version: $version"
+          printf '%s\n' "$version" > version.txt
+          dotnet --version
+          dotnet build --nologo
+
 
   ci-pass:
     name: CI

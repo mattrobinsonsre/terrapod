@@ -4,12 +4,22 @@ Manage Terrapod itself from a Pulumi program — the same objects the
 [Terraform provider](terraform-provider.md) manages, in whichever language that
 program is written in.
 
-> **Verified so far:** SDK generation and a compiling resource declaration in
-> **TypeScript**, and SDK generation in **Go**. The generated Go SDK does not
-> yet compile — a name collision in it is tracked separately — and Python and
-> C# have had generation exercised only through the same code path, which is
-> language-independent. Treat anything beyond TypeScript as untested until that
-> is closed out.
+> **All four languages generate, and CI keeps them that way.** A matrix job
+> generates each SDK from the committed schema on every run and then does the
+> cheapest thing that would catch that language's own failure: Go is compiled,
+> TypeScript is type-checked, Python is installed and imported, and .NET is
+> built. Two real defects lived in exactly that gap before it existed — the Go
+> SDK did not compile at all, and the Python package could not be imported — so
+> "the schema is fine" was never evidence that an SDK worked.
+
+Which language you write in is yours; the import name differs per ecosystem:
+
+| language | how you reference it |
+|---|---|
+| TypeScript | `import * as terrapod from "@terrapod/pulumi"` |
+| Python | `import terrapod_pulumi` — underscored, and `pip` resolves `terrapod-pulumi` to the same thing |
+| Go | `github.com/mattrobinsonsre/terrapod/pulumi-provider/sdk/go/terrapod` |
+| C# | the `Terrapod` root namespace |
 
 It exists because of one concrete gap. A workspace's Ansible inventory is
 [declared from the IaC program that provisions the hosts](ansible-inventory.md),
