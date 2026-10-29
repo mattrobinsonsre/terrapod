@@ -1,6 +1,7 @@
 """Services-API tests for the catalog router (#535): feature gate, admin gating
 on management endpoints, catalog-RBAC on read/use, and provision validation."""
 
+import pathlib
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1041,3 +1042,121 @@ class TestProvisionConsultsTheSelfJoinGuard:
         escalate to — and they are the only principal who can set the rule up."""
         resp, _ = await self._provision(secret_name="teamA-creds", roles=["admin", "everyone"])
         assert resp.status_code == 201, resp.text
+
+
+class TestTheAnsibleHalfOnACatalogItem:
+    """The four attributes an item declares its Ansible half with (#2019).
+
+    Validated and stored byte for byte, never normalised: a provider writes the
+    server's response back into state, so a trimmed or lower-cased value fails
+    the apply with "Provider produced inconsistent result after apply" -- the
+    v1.9.0 advisory batch in miniature.
+    """
+
+    async def _coerce(self, attrs, *, on_create=True, current=None):
+        # A bare AsyncMock db is enough: the only lookup `_coerce_item` makes is
+        # `db.get(RegistryModule, ...)`, which on a mock returns non-None.
+        from terrapod.api.routers import catalog as cat
+
+        return await cat._coerce_item(
+            AsyncMock(),
+            {"module-id": str(uuid.uuid4()), "name": "x", **attrs},
+            on_create=on_create,
+            current=current,
+        )
+
+    # -- stored verbatim ---------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "path", ["ansible", "deploy/ansible", "a/b/c", "Ansible-Prod", "ansible.d"]
+    )
+    async def test_an_accepted_path_is_stored_unchanged(self, path) -> None:
+        out = await self._coerce({"configure-enabled": True, "ansible-directory": path})
+        assert out["ansible_directory"] == path
+
+    @pytest.mark.parametrize(
+        "bad", ["/ansible", "ansible/", "../ansible", "a/../b", " ansible", "ansible "]
+    )
+    async def test_a_refused_path_is_refused_not_normalised(self, bad) -> None:
+        with pytest.raises(HTTPException) as e:
+            await self._coerce({"configure-enabled": True, "ansible-directory": bad})
+        assert e.value.status_code == 422
+
+    async def test_a_non_string_path_is_422_not_500(self) -> None:
+        """A sibling attribute answering 500 where every other answers 422 is
+        the shape v1.9.0 shipped on `owner-email`."""
+        with pytest.raises(HTTPException) as e:
+            await self._coerce({"ansible-directory": 7})
+        assert e.value.status_code == 422
+
+    async def test_a_stringified_boolean_is_refused(self) -> None:
+        """With a DIRECTORY supplied, and asserting the MESSAGE.
+
+        Both matter. Without the directory the cross-field invariant fires
+        instead -- `"true"` is truthy, so it refuses for a missing directory and
+        the test passes with the type check deleted. The mutation check caught
+        exactly that: a status code alone cannot tell two refusals apart when
+        more than one can fire.
+        """
+        with pytest.raises(HTTPException) as e:
+            await self._coerce({"configure-enabled": "true", "ansible-directory": "ansible"})
+        assert e.value.status_code == 422
+        assert "boolean" in str(e.value.detail)
+
+    # -- the cross-field invariant ----------------------------------------
+
+    async def test_enabled_with_no_directory_is_refused(self) -> None:
+        """Incoherent rather than a no-op: it would provision a workspace whose
+        Ansible root is the configuration version's root, where only the
+        generated wrapper lives."""
+        with pytest.raises(HTTPException) as e:
+            await self._coerce({"configure-enabled": True})
+        assert e.value.status_code == 422
+        assert "ansible-directory" in str(e.value.detail)
+
+    async def test_a_directory_with_the_switch_off_is_accepted(self) -> None:
+        """The path says where and the switch says whether, so a path with the
+        switch off is an item not yet turned on -- not an error."""
+        out = await self._coerce({"configure-enabled": False, "ansible-directory": "ansible"})
+        assert out["configure_enabled"] is False
+        assert out["ansible_directory"] == "ansible"
+
+    async def test_the_invariant_reads_the_RESULTING_values_on_a_patch(self) -> None:
+        """A PATCH turning the switch on, against a stored directory it does not
+        restate, must be ACCEPTED -- and the same PATCH against a stored empty
+        directory refused. Submitted-values-only would accept both."""
+        stored = SimpleNamespace(configure_enabled=False, ansible_directory="ansible")
+        out = await self._coerce({"configure-enabled": True}, on_create=False, current=stored)
+        assert out["configure_enabled"] is True
+
+        empty = SimpleNamespace(configure_enabled=False, ansible_directory="")
+        with pytest.raises(HTTPException) as e:
+            await self._coerce({"configure-enabled": True}, on_create=False, current=empty)
+        assert e.value.status_code == 422
+
+    async def test_an_untouched_patch_revalidates_nothing(self) -> None:
+        """A row written by a migration must stay editable (#316): a PATCH that
+        does not mention these must not be refused over a stored value."""
+        stored = SimpleNamespace(configure_enabled=True, ansible_directory="ansible")
+        out = await self._coerce({"labels": {}}, on_create=False, current=stored)
+        assert "ansible_directory" not in out
+        assert "configure_enabled" not in out
+
+    # -- the call site, which no test of the helper can see ----------------
+
+    def test_the_update_route_passes_the_CURRENT_row(self) -> None:
+        """The cross-field invariant reads stored values, so the route must hand
+        them over. A helper test cannot see this: `current` defaults to None, so
+        with it omitted every PATCH would compare against "no stored directory"
+        and refuse a legitimate switch-on.
+        """
+        from terrapod.api.routers import catalog as cat
+
+        src = pathlib.Path(cat.__file__).read_text(encoding="utf-8")
+        calls = [
+            ln.strip() for ln in src.splitlines() if "_coerce_item(" in ln and "def " not in ln
+        ]
+        update_calls = [c for c in calls if "on_create=False" in c]
+        assert update_calls, calls
+        for c in update_calls:
+            assert "current=" in c, c
