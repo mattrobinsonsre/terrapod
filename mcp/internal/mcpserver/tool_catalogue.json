@@ -1322,6 +1322,13 @@
           "description": "the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook",
           "type": "string"
         },
+        "dynamic_inventory_enabled": {
+          "description": "permit ansible's auto inventory plugin -- a DECLARED plugin config, which is a YAML file carrying a top-level plugin: key -- for this workspace's configure operations. DEFAULTS TO FALSE, so a workspace that says nothing refuses plugin sources. The API NEVER executes a plugin in either state: with it off the API refuses a plugin source BY NAME rather than resolving the other sources and reporting the short host set that results as the truth, and with it on the API SKIPS that source and says so per source, leaving the RUNNER to re-resolve the inventory as the authoritative answer. Independent of inventory_scripts_enabled on purpose, so declared configs can be permitted without also permitting arbitrary executables: a declared config is inspectable and names a collection that can be pinned and installed, where a script names nothing. Only meaningful with configure_enabled",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "engine": {
           "description": "the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI",
           "type": "string"
@@ -1346,6 +1353,13 @@
           "type": [
             "null",
             "array"
+          ]
+        },
+        "inventory_scripts_enabled": {
+          "description": "permit ansible's script inventory plugin -- an EXECUTABLE inventory script -- for this workspace's configure operations. DEFAULTS TO FALSE. The API NEVER executes a script in either state: with it off the API refuses such a source BY NAME rather than resolving partially and reporting a short host set as the truth, and with it on the API skips it, leaving the RUNNER to re-resolve and be authoritative. The STRICTER of the two switches and deliberately separate from dynamic_inventory_enabled: a script carries no config to read and nothing to pin, so permitting declared plugin configs does not imply permitting executables, and on the runner the environment is the only control because a committed script arrives executable. Only meaningful with configure_enabled",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "labels": {
@@ -1651,6 +1665,13 @@
             "array"
           ]
         },
+        "dynamic_inventory_enabled": {
+          "description": "turn ansible's auto inventory plugin -- a DECLARED plugin config, which is a YAML file carrying a top-level plugin: key -- on or off for this workspace. Omitting the field leaves the stored value alone. The API NEVER executes a plugin in either state: false makes the API refuse a plugin source BY NAME rather than resolving the other sources and reporting the short host set that results as the truth, and true makes it SKIP that source and say so per source, leaving the RUNNER to re-resolve the inventory as the authoritative answer. Independent of inventory_scripts_enabled on purpose, so declared configs can be permitted without also permitting arbitrary executables: a declared config is inspectable and names a collection that can be pinned and installed, where a script names nothing. A run SNAPSHOTS both switches at creation, so changing this cannot move the answer under a run already in flight",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "ee_resource_cpu": {
           "description": "CPU request for the Ansible EXECUTION ENVIRONMENT -- the sidecar container a configure run's playbooks execute in -- not the orchestrator, which resource_cpu sizes. Same quantity rules and the same 2x limit. EMPTY means this workspace takes the deployment default rather than sizing the environment itself, so passing an empty string is how a workspace rejoins that default; omitting the field leaves the stored value alone",
           "type": "string"
@@ -1679,6 +1700,13 @@
           "type": [
             "null",
             "array"
+          ]
+        },
+        "inventory_scripts_enabled": {
+          "description": "turn ansible's script inventory plugin -- an EXECUTABLE inventory script -- on or off for this workspace. Omitting the field leaves the stored value alone. The API NEVER executes a script in either state: false refuses such a source BY NAME rather than resolving partially and reporting a short host set as the truth, and true makes the API skip it, leaving the RUNNER to re-resolve and be authoritative. The STRICTER of the two switches and deliberately separate from dynamic_inventory_enabled: a script carries no config to read and nothing to pin, so permitting declared plugin configs does not imply permitting executables, and on the runner the environment is the only control because a committed script arrives executable. A run SNAPSHOTS both switches at creation",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "labels": {

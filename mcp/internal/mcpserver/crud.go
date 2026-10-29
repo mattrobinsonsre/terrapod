@@ -88,6 +88,16 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		InventoryPaths       []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
 		DefaultPlaybook      string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
 		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
+		// Which ansible inventory PLUGINS this workspace permits on the
+		// runner (#2033). Two independent booleans rather than one switch or a
+		// delimited value, for #1966's reasoning: a value that has to be parsed
+		// and kept in step across the API, the provider, this tool and the UI
+		// gets mistyped into a third meaning eventually, and two booleans
+		// cannot be. Pointers so unset stays distinguishable from false, like
+		// the declarations above; both default FALSE on the server, so omitting
+		// them creates a workspace that refuses plugin sources.
+		DynamicInventoryEnabled *bool `json:"dynamic_inventory_enabled,omitempty" jsonschema:"permit ansible's auto inventory plugin -- a DECLARED plugin config, which is a YAML file carrying a top-level plugin: key -- for this workspace's configure operations. DEFAULTS TO FALSE, so a workspace that says nothing refuses plugin sources. The API NEVER executes a plugin in either state: with it off the API refuses a plugin source BY NAME rather than resolving the other sources and reporting the short host set that results as the truth, and with it on the API SKIPS that source and says so per source, leaving the RUNNER to re-resolve the inventory as the authoritative answer. Independent of inventory_scripts_enabled on purpose, so declared configs can be permitted without also permitting arbitrary executables: a declared config is inspectable and names a collection that can be pinned and installed, where a script names nothing. Only meaningful with configure_enabled"`
+		InventoryScriptsEnabled *bool `json:"inventory_scripts_enabled,omitempty" jsonschema:"permit ansible's script inventory plugin -- an EXECUTABLE inventory script -- for this workspace's configure operations. DEFAULTS TO FALSE. The API NEVER executes a script in either state: with it off the API refuses such a source BY NAME rather than resolving partially and reporting a short host set as the truth, and with it on the API skips it, leaving the RUNNER to re-resolve and be authoritative. The STRICTER of the two switches and deliberately separate from dynamic_inventory_enabled: a script carries no config to read and nothing to pin, so permitting declared plugin configs does not imply permitting executables, and on the runner the environment is the only control because a committed script arrives executable. Only meaningful with configure_enabled"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_create",
@@ -156,6 +166,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			// #2033's two. Pointers straight through, so a create that mentions
+			// neither sends neither and takes the server's own default, which is
+			// OFF for both -- the safe direction, and the behaviour a workspace
+			// had before these existed.
+			DynamicInventoryEnabled: in.DynamicInventoryEnabled,
+			InventoryScriptsEnabled: in.InventoryScriptsEnabled,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
@@ -204,6 +220,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		InventoryPaths  []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
 		DefaultPlaybook *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
+		// Which ansible inventory PLUGINS this workspace permits on the runner
+		// (#2033). Settable here for the reason the block below gives at
+		// length: this server is not an authorization boundary, so an
+		// attribute a workspace read reports and this tool cannot set is an
+		// asymmetry rather than a control. Risk is signalled by the mutating
+		// annotation, never by absence.
+		DynamicInventoryEnabled *bool `json:"dynamic_inventory_enabled,omitempty" jsonschema:"turn ansible's auto inventory plugin -- a DECLARED plugin config, which is a YAML file carrying a top-level plugin: key -- on or off for this workspace. Omitting the field leaves the stored value alone. The API NEVER executes a plugin in either state: false makes the API refuse a plugin source BY NAME rather than resolving the other sources and reporting the short host set that results as the truth, and true makes it SKIP that source and say so per source, leaving the RUNNER to re-resolve the inventory as the authoritative answer. Independent of inventory_scripts_enabled on purpose, so declared configs can be permitted without also permitting arbitrary executables: a declared config is inspectable and names a collection that can be pinned and installed, where a script names nothing. A run SNAPSHOTS both switches at creation, so changing this cannot move the answer under a run already in flight"`
+		InventoryScriptsEnabled *bool `json:"inventory_scripts_enabled,omitempty" jsonschema:"turn ansible's script inventory plugin -- an EXECUTABLE inventory script -- on or off for this workspace. Omitting the field leaves the stored value alone. The API NEVER executes a script in either state: false refuses such a source BY NAME rather than resolving partially and reporting a short host set as the truth, and true makes the API skip it, leaving the RUNNER to re-resolve and be authoritative. The STRICTER of the two switches and deliberately separate from dynamic_inventory_enabled: a script carries no config to read and nothing to pin, so permitting declared plugin configs does not imply permitting executables, and on the runner the environment is the only control because a committed script arrives executable. A run SNAPSHOTS both switches at creation"`
 		// Resource sizing (#2154). Absent from this tool until #2154, so an
 		// agent could read a workspace's sizing with terrapod_workspace_get and
 		// not change it. That asymmetry is now closed for EVERY settable
@@ -343,6 +367,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			// #2033's two. Pointers straight through, so a PATCH that mentions
+			// neither sends neither and cannot disturb a stored switch.
+			DynamicInventoryEnabled: in.DynamicInventoryEnabled,
+			InventoryScriptsEnabled: in.InventoryScriptsEnabled,
 			// #2154's two pairs. Plain strings, so the SDK's own `!= ""` guards
 			// decide what reaches the wire -- which means an empty value cannot
 			// be SENT, and clearing an EE size back to the deployment default is
