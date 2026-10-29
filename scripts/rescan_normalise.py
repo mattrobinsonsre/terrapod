@@ -182,14 +182,16 @@ def from_pip_audit(data) -> list[dict]:
                 # Same ignore-unfixed policy as the other two legs: nothing to
                 # bump to means nothing a patch release can do.
                 continue
-            out.append({
-                "id": v.get("id", "?"),
-                "package": dep.get("name", "?"),
-                "installed": dep.get("version", "?"),
-                "fixed": ", ".join(fixes),
-                "severity": "HIGH",   # pip-audit does not grade; the gate treats all as actionable
-                "ecosystem": "pip",
-            })
+            out.append(
+                {
+                    "id": v.get("id", "?"),
+                    "package": dep.get("name", "?"),
+                    "installed": dep.get("version", "?"),
+                    "fixed": ", ".join(fixes),
+                    "severity": "HIGH",  # pip-audit does not grade; the gate treats all as actionable
+                    "ecosystem": "pip",
+                }
+            )
     return out
 
 
@@ -228,14 +230,16 @@ def from_npm_audit(data, allowlist: set[str]) -> list[dict]:
         for advisory in ids:
             if advisory in allowlist:
                 continue
-            out.append({
-                "id": advisory,
-                "package": name,
-                "installed": (v.get("range") or "?"),
-                "fixed": fixed,
-                "severity": v.get("severity", "?").upper(),
-                "ecosystem": "npm",
-            })
+            out.append(
+                {
+                    "id": advisory,
+                    "package": name,
+                    "installed": (v.get("range") or "?"),
+                    "fixed": fixed,
+                    "severity": v.get("severity", "?").upper(),
+                    "ecosystem": "npm",
+                }
+            )
     return out
 
 
@@ -244,19 +248,21 @@ def from_semgrep(data) -> list[dict]:
     for r in (data or {}).get("results") or []:
         extra = r.get("extra") or {}
         if (extra.get("severity") or "").upper() != "ERROR":
-            continue        # WARNING/INFO are advisory; only ERROR is actionable here
+            continue  # WARNING/INFO are advisory; only ERROR is actionable here
         start = (r.get("start") or {}).get("line", "?")
         path = r.get("path", "?")
         # Paths are absolute inside the scanner container; the repo-relative
         # form is what a reader needs.
         path = path.split("/src/", 1)[-1]
-        out.append({
-            "id": r.get("check_id", "?"),
-            "package": f"{path}:{start}",
-            "installed": "-",
-            "fixed": "-",
-            "severity": "ERROR",
-        })
+        out.append(
+            {
+                "id": r.get("check_id", "?"),
+                "package": f"{path}:{start}",
+                "installed": "-",
+                "fixed": "-",
+                "severity": "ERROR",
+            }
+        )
     return out
 
 
@@ -308,22 +314,32 @@ def main() -> int:
         findings, report_kind = from_semgrep(data), "code"
     elif kind == "semgrep-count":
         # Count only. Deliberately does not go through the findings path.
-        pathlib.Path(out).write_text(json.dumps({
-            "release": release,
-            "code_findings": count_semgrep_sarif(data),
-        }, indent=2))
+        pathlib.Path(out).write_text(
+            json.dumps(
+                {
+                    "release": release,
+                    "code_findings": count_semgrep_sarif(data),
+                },
+                indent=2,
+            )
+        )
         print(f"{label}: {count_semgrep_sarif(data)} code finding(s) (count only)")
         return 0
     else:
         print(f"unknown scanner {kind!r}", file=sys.stderr)
         return 2
 
-    pathlib.Path(out).write_text(json.dumps({
-        "release": release,
-        "source": label,
-        "kind": report_kind,
-        "findings": findings,
-    }, indent=2))
+    pathlib.Path(out).write_text(
+        json.dumps(
+            {
+                "release": release,
+                "source": label,
+                "kind": report_kind,
+                "findings": findings,
+            },
+            indent=2,
+        )
+    )
     # Say how many a rebuild could actually clear, not just how many were found.
     # The raw count alone reads as the size of the problem, and on the EE images
     # it was five when the answer was none (#2201).

@@ -74,19 +74,12 @@ def fingerprint(reports: list[dict], counts: dict[str, int]) -> str:
     across five images is one thing to fix, and letting the image list move the
     fingerprint would re-notify on noise.
     """
-    keys = {
-        f"{r['release']}|{f.get('id', '')}"
-        for r in reports
-        for f in (r.get("findings") or [])
-    }
+    keys = {f"{r['release']}|{f.get('id', '')}" for r in reports for f in (r.get("findings") or [])}
     keys |= {f"{rel}|code:{n}" for rel, n in counts.items() if n}
     return hashlib.sha256("\n".join(sorted(keys)).encode()).hexdigest()[:16]
 
 
-_LEDE = (
-    "The scheduled re-scan of supported releases has findings that need "
-    "attention."
-)
+_LEDE = "The scheduled re-scan of supported releases has findings that need attention."
 _WHY_EMPTY = (
     "**Deliberately no detail here.** This issue is public, and naming a "
     "supported release together with what is wrong with it tells anyone "
@@ -113,9 +106,7 @@ _REFS = (
     "Procedure: *Patching an older release line* in "
     f"[AGENTS.md]({_REPO_URL}/blob/main/AGENTS.md)."
 )
-_FOOTER = (
-    "Refreshed in place; only notifies when the finding set actually changes."
-)
+_FOOTER = "Refreshed in place; only notifies when the finding set actually changes."
 
 
 def main() -> int:

@@ -67,14 +67,10 @@ class Handler(BaseHTTPRequestHandler):
         p = self.path.split("?")[0].rstrip("/")
 
         if p in ("/api", "/api/v3"):
-            return self._json(
-                200, {"description": "capture", "available_versions": {"v3": "v3/"}}
-            )
+            return self._json(200, {"description": "capture", "available_versions": {"v3": "v3/"}})
 
         if "/imports/" in p:
-            return self._json(
-                200, {"state": "completed", "finished_at": "2026-01-01T00:00:00Z"}
-            )
+            return self._json(200, {"state": "completed", "finished_at": "2026-01-01T00:00:00Z"})
 
         if re.search(rf"/collections(/index)?/{NS}/{NAME}$", p):
             return self._json(
@@ -217,9 +213,7 @@ def main() -> int:
     def run(label: str, argv: list[str]) -> dict:
         # The client's own metadata cache will otherwise answer requests the
         # server never sees, which silently shortens the captured walk.
-        shutil.rmtree(
-            pathlib.Path.home() / ".ansible" / "galaxy_cache", ignore_errors=True
-        )
+        shutil.rmtree(pathlib.Path.home() / ".ansible" / "galaxy_cache", ignore_errors=True)
         LOG.clear()
         # check=False deliberately: a non-zero rc is a capture result to report,
         # not an error to raise — an incomplete walk is exactly what we want to see.
@@ -272,9 +266,7 @@ def main() -> int:
     if failed:
         print("\na step failed — the capture is incomplete", file=sys.stderr)
         return 1
-    print(
-        "\nCompare against docs/galaxy-cli-surface.md; update it if the client has moved."
-    )
+    print("\nCompare against docs/galaxy-cli-surface.md; update it if the client has moved.")
     return 0
 
 

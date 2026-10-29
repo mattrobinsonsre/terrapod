@@ -33,10 +33,12 @@ def _b64url(raw: bytes) -> str:
 
 
 def _post(url: str, body: bytes, content_type: str) -> dict:
-    request = urllib.request.Request(  # noqa: S310 — the URL is an operator argument
+    # The URL is an operator argument (`--url`), so its scheme is theirs to choose.
+    # Ruff's S310 audit is not in this directory's rule set; see scripts/ruff.toml.
+    request = urllib.request.Request(
         url, data=body, headers={"Content-Type": content_type}, method="POST"
     )
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+    with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read())
 
 

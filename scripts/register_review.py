@@ -97,9 +97,7 @@ def _load(path: pathlib.Path):
         text = path.read_text().strip()
         return json.loads(text) if text else None
     except (OSError, json.JSONDecodeError) as exc:
-        print(
-            f"note: {path} unreadable ({exc}); treating as no findings", file=sys.stderr
-        )
+        print(f"note: {path} unreadable ({exc}); treating as no findings", file=sys.stderr)
         return None
 
 
@@ -377,10 +375,7 @@ def main() -> int:
             "",
             "| Advisory | Register |",
             "|---|---|",
-            *[
-                f"| `{r['id']}` | {REGISTERS.get(r['scanner'], r['scanner'])} |"
-                for r in unmatched
-            ],
+            *[f"| `{r['id']}` | {REGISTERS.get(r['scanner'], r['scanner'])} |" for r in unmatched],
             "",
         ]
 
@@ -410,8 +405,7 @@ def main() -> int:
 
     if holding:
         body += [
-            f"<details><summary>{len(holding)} still doing their job (no fix upstream)"
-            "</summary>",
+            f"<details><summary>{len(holding)} still doing their job (no fix upstream)</summary>",
             "",
             *_table(holding, with_fix=False),
             "",
@@ -437,9 +431,7 @@ def main() -> int:
     # a major-only offer invisible rather than quiet. The fingerprint is what
     # stops it nagging: the issue is refreshed every run and only comments when
     # the entry set actually changes.
-    print(
-        f"has_findings={'true' if (fixable or unmatched or major) else 'false'}"
-    )
+    print(f"has_findings={'true' if (fixable or unmatched or major) else 'false'}")
     return 0
 
 

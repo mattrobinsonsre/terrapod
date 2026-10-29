@@ -405,8 +405,7 @@ def test_advisory_not_raised_for_code_findings_alone(tmp_path, monkeypatch):
     the moment it decides to write, so reaching the API at all would fail here.
     """
     monkeypatch.delenv("ADVISORY_TOKEN", raising=False)
-    _write(tmp_path, "codecount.json",
-           {"release": "v1.3.2", "code_findings": 8, "findings": []})
+    _write(tmp_path, "codecount.json", {"release": "v1.3.2", "code_findings": 8, "findings": []})
     urls = tmp_path / "urls.json"
     advisory.main.__globals__["sys"].argv = ["x", str(tmp_path), str(urls)]
 
@@ -419,8 +418,15 @@ def test_advisory_still_raised_when_a_dependency_finding_exists(tmp_path, monkey
     raises, and the code-finding count still rides along as context."""
     body = advisory.describe(
         "v1.3.2",
-        [{"severity": "high", "package": "js-yaml", "installed": "4.3.0",
-          "fixed": "4.3.1", "id": "GHSA-x"}],
+        [
+            {
+                "severity": "high",
+                "package": "js-yaml",
+                "installed": "4.3.0",
+                "fixed": "4.3.1",
+                "id": "GHSA-x",
+            }
+        ],
         code_count=8,
     )
     assert "js-yaml" in body

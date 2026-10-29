@@ -1,0 +1,70 @@
+# Ruff configuration for `scripts/` (#2299).
+#
+# WHY THIS FILE EXISTS AT ALL. Until #2299, nothing linted this directory --
+# 47 Python files, including all seventeen `scripts/docs-audit/` gates that CI
+# itself depends on. It was not a disabled check or a tuned-down rule set: the
+# files were simply outside the tree every linter was pointed at. `make lint`
+# runs `ruff check .` *inside* `terrapod-test:local`, and
+# `docker/Dockerfile.test` does not `COPY scripts/`, so the linter's `.` could
+# not see the directory; the pre-commit hook skips any staged file that is not
+# under `services/` or `alembic/`. The gate that closed the gap is a step in
+# `ci.yml`'s `python-checks` job, which runs against a full checkout.
+#
+# WHY `ruff.toml` AND NOT `pyproject.toml`. `scripts/` is a directory of
+# standalone, mostly stdlib-only programs, not a Python project. A
+# `pyproject.toml` here would make poetry, pip and every other packaging tool
+# treat it as one. Ruff discovers configuration by walking up from each file,
+# so this file governs `scripts/` from wherever ruff is invoked -- including
+# `ruff check .` from the repo root -- while `services/pyproject.toml`
+# continues to govern `services/`.
+#
+# WHY THE RULE SET IS PINNED RATHER THAN INHERITED FROM RUFF'S DEFAULTS. Ruff's
+# default selection is broad and it moves between releases: measured on this
+# same tree, `ruff check scripts/` reported 69 findings under 0.16.6 and 67
+# under 0.17.3, the difference being default-set changes alone (`I001` 3 -> 2,
+# `DTZ011` 1 -> 0) and not one line of code. A gate whose rule set arrives by
+# accident re-litigates itself on every ruff bump, so `select` is explicit here
+# and the CI step pins the ruff version to the one `services/poetry.lock`
+# resolves.
+target-version = "py313"
+line-length = 100
+
+[lint]
+# `E W F I B C4 UP` is the floor every other Python file in the repo is held to
+# (`services/pyproject.toml`), and holding standalone scripts to a *stricter*
+# bar than the product code would be backwards -- so the selection is that
+# floor plus only the two classes that are worth more here than there:
+#
+#   RUF100  an unused `noqa` is the class that quietly accumulates, and a
+#           directory nothing has ever linted is where it accumulates fastest.
+#   PLW1510 these scripts shell out constantly, and whether a non-zero exit is
+#           tolerated or fatal is the single most load-bearing fact about such
+#           a call. An explicit `check=` records that decision at the call.
+#
+# `EXE` is selected so the `EXE001` ignore below is live rather than decorative
+# -- it is what makes that decision bind if anyone widens this list -- and
+# because `EXE002` (the inverse: an exec bit on a file with no shebang, i.e.
+# one marked runnable that cannot run) is a real inconsistency worth catching.
+select = ["E", "W", "F", "I", "B", "C4", "UP", "EXE", "RUF100", "PLW1510"]
+ignore = [
+    "E501",    # line too long -- the formatter's job, as in services/
+    # EXE001 (shebang present, exec bit absent) describes a convention this
+    # repo does not use, so it is noise here rather than a finding: NOTHING in
+    # `scripts/` is executed directly. Every call site names an interpreter --
+    # `python3 scripts/...` for all 22 invocations in `ci.yml`, `python3` in
+    # the docs too -- and there is not one `./scripts/*.py` anywhere in
+    # `.github/`, the `Makefile`, `scripts/` or `docker/`. The bit is
+    # accordingly incidental: 11 of the 17 docs-audit gates do not carry it and
+    # are run by CI on every push regardless. Satisfying the rule would mean
+    # `chmod +x` on 20 files, making the bit meaningful where it is not, to
+    # assert a convention we do not follow; so the rule is ignored instead.
+    "EXE001",
+]
+
+[lint.isort]
+# Mirrors `services/pyproject.toml`. Without it `terrapod` reads as
+# third-party, and the two `I001` findings this resolved were scripts that had
+# correctly separated a first-party `terrapod` import from the third-party
+# block above it -- ruff's "fix" would have merged them, against the repo's own
+# convention.
+known-first-party = ["terrapod"]

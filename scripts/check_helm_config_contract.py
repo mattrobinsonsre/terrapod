@@ -169,7 +169,9 @@ def main() -> int:
         if runner_raw is not None:
             RunnerConfig()  # validate runners.yaml
     except Exception as e:  # pydantic ValidationError or import-time settings build
-        problems.append(f"rendered config fails model validation: {type(e).__name__}: {str(e)[:600]}")
+        problems.append(
+            f"rendered config fails model validation: {type(e).__name__}: {str(e)[:600]}"
+        )
 
     # 2) DRIFT + 3) COVERAGE (only if the models imported cleanly).
     if Settings is not None and api_raw is not None:

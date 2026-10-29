@@ -56,7 +56,10 @@ def refs() -> dict[int, list[str]]:
     out: dict[int, list[str]] = {}
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     for f in files:
         p = ROOT / f
@@ -96,7 +99,9 @@ def states(numbers: list[int]) -> dict[int, str]:
     for n in numbers:
         r = subprocess.run(
             ["gh", "issue", "view", str(n), "--repo", REPO, "--json", "state,title"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
+            check=False,  # a non-zero exit is expected here and skipped below
         )
         if r.returncode != 0:
             # A PR number, or an issue in another repo — not something to fail on.

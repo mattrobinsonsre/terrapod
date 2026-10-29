@@ -224,13 +224,11 @@ def main() -> int:
             # satisfied by any incidental occurrence -- a comment, an example,
             # the failure message of a different check -- so deleting the real
             # assertion survived it. Measured: it did.
-            elif not re.search(
-                rf'"\$uid"\s*=\s*"{required_uid}"', contract.read_text()
-            ):
+            elif not re.search(rf'"\$uid"\s*=\s*"{required_uid}"', contract.read_text()):
                 problems.append(
                     f"the agent requires uid {required_uid} at an EE's startup, but "
-                    f"{CONTRACT} does not TEST for it (expected a `[ \"$uid\" = "
-                    f"\"{required_uid}\" ]`), so one of our own images could pass its "
+                    f'{CONTRACT} does not TEST for it (expected a `[ "$uid" = '
+                    f'"{required_uid}" ]`), so one of our own images could pass its '
                     "build and fail its own startup probe"
                 )
             if len(required) < MIN_AGENT_BINARIES:

@@ -52,6 +52,8 @@ def strip_fenced(lines: list[str]):
                 continue
         if marker is None:
             yield i, line
+
+
 # A heading, or an HTML anchor some docs use for stable link targets.
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 HTML_ANCHOR = re.compile(r'<a\s+(?:id|name)="([^"]+)"', re.I)
@@ -72,7 +74,7 @@ def slug(text: str) -> str:
     # GitHub keeps it, so stripping it mangles every heading naming an
     # identifier — which is most of the runbook headings.
     t = re.sub(r"[`*~]", "", t)
-    t = re.sub(r"<[^>]+>", "", t)                      # inline html
+    t = re.sub(r"<[^>]+>", "", t)  # inline html
     t = t.strip().lower()
     t = re.sub(r"[^\w\s-]", "", t, flags=re.UNICODE)
     # ONE hyphen per whitespace character, not per run. Removing an em-dash
@@ -116,7 +118,10 @@ def links_of(path: Path) -> list[tuple[int, str]]:
 def main() -> int:
     files = subprocess.run(
         ["git", "ls-files", "*.md", "llms.txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     docs = [ROOT / f for f in files]
     anchor_cache: dict[Path, set[str]] = {}
@@ -160,9 +165,7 @@ def main() -> int:
 
             if frag and dest.suffix == ".md":
                 if frag.lower() not in anchors(dest):
-                    problems.append(
-                        f"{rel}:{lineno}: {target} exists but has no anchor #{frag}"
-                    )
+                    problems.append(f"{rel}:{lineno}: {target} exists but has no anchor #{frag}")
 
     print(f"  {len(docs)} docs, {checked} internal links checked")
     if problems:

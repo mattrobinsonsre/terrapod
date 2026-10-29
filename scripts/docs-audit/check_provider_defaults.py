@@ -85,9 +85,7 @@ def _engine_version_attrs() -> list[tuple[str, str, str | None]]:
     found: list[tuple[str, str, str | None]] = []
     for path in sorted(ROOT.glob("provider/internal/resources/*/resource.go")):
         src = path.read_text()
-        for m in re.finditer(
-            r'"([a-z_]+)": schema\.StringAttribute\{(.*?)\n\t\t\t\},', src, re.S
-        ):
+        for m in re.finditer(r'"([a-z_]+)": schema\.StringAttribute\{(.*?)\n\t\t\t\},', src, re.S):
             name, body = m.group(1), m.group(2)
             if name not in ENGINE_VERSION_ATTRS:
                 continue

@@ -123,9 +123,7 @@ def test_npm_ids_come_out_of_via_urls():
                     "severity": "high",
                     "range": "2.0.0 - 2.1.3",
                     "fixAvailable": {"name": "brace-expansion", "version": "2.1.4"},
-                    "via": [
-                        {"url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895"}
-                    ],
+                    "via": [{"url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895"}],
                 }
             }
         }
@@ -209,10 +207,7 @@ def test_the_workflow_does_not_scan_fix_only():
     those rows. A unit test of the parser cannot see that, so this reads the
     register scan job and asserts the setting is absent.
     """
-    wf = (
-        pathlib.Path(__file__).resolve().parents[2]
-        / ".github/workflows/release-rescan.yml"
-    )
+    wf = pathlib.Path(__file__).resolve().parents[2] / ".github/workflows/release-rescan.yml"
     text = wf.read_text()
     start = text.index("register-scan:")
     end = text.index("\n  register:", start)
@@ -349,9 +344,7 @@ def test_a_newly_fixable_entry_is_reported_with_its_bump(tmp_path, monkeypatch, 
     assert "has_findings=true" in capsys.readouterr().out
 
 
-def test_the_report_never_tells_you_to_take_a_major_change(
-    tmp_path, monkeypatch, capsys
-):
+def test_the_report_never_tells_you_to_take_a_major_change(tmp_path, monkeypatch, capsys):
     """End to end, because the defect was in what the reader is TOLD, not in any
     one function. `braces` is `<= 3.0.3` with no patched version anywhere and
     npm's only offer is a two-major downgrade; the review used to file that under
@@ -381,16 +374,12 @@ def test_the_report_never_tells_you_to_take_a_major_change(
     assert rc == 0
     assert "Only a major change on offer" in body
     assert "GHSA-vfj7-8cjw-p6xm" in body and "(major)" in body
-    assert "Fixable now" not in body, (
-        "a major-only offer must never be presented as a drop-in bump"
-    )
+    assert "Fixable now" not in body, "a major-only offer must never be presented as a drop-in bump"
     # It still has to notify, or the bucket appears and changes in silence.
     assert "has_findings=true" in capsys.readouterr().out
 
 
-def test_a_scanner_that_did_not_run_cannot_make_an_entry_look_stale(
-    tmp_path, monkeypatch, capsys
-):
+def test_a_scanner_that_did_not_run_cannot_make_an_entry_look_stale(tmp_path, monkeypatch, capsys):
     """The failure that would erode trust fastest. If a Trivy leg dies and its
     output never lands, every Trivy entry matches nothing — and telling someone
     to delete a live suppression on that basis is worse than saying nothing."""
@@ -418,9 +407,7 @@ def test_an_empty_register_reports_nothing_to_do(tmp_path, monkeypatch, capsys):
     assert "has_findings=false" in capsys.readouterr().out
 
 
-def test_the_fingerprint_tracks_the_finding_set_not_the_run(
-    tmp_path, monkeypatch, capsys
-):
+def test_the_fingerprint_tracks_the_finding_set_not_the_run(tmp_path, monkeypatch, capsys):
     """The fingerprint decides whether to re-notify. If it changed every run the
     issue would comment weekly and be muted; if it never changed, a newly
     fixable entry would be added silently to a body nobody re-reads."""
@@ -461,11 +448,7 @@ def test_the_fingerprint_tracks_the_finding_set_not_the_run(
 
 
 def _fp(stdout: str) -> str:
-    return next(
-        ln.split("=", 1)[1]
-        for ln in stdout.splitlines()
-        if ln.startswith("fingerprint=")
-    )
+    return next(ln.split("=", 1)[1] for ln in stdout.splitlines() if ln.startswith("fingerprint="))
 
 
 def test_the_real_registers_parse(tmp_path):

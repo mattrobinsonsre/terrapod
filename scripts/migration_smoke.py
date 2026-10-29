@@ -54,9 +54,7 @@ async def _main() -> int:
                 return 1
 
             suffix = uuid.uuid4().hex[:10]
-            user = m.User(
-                email=f"smoke-{suffix}@example.com", display_name="Migration Smoke"
-            )
+            user = m.User(email=f"smoke-{suffix}@example.com", display_name="Migration Smoke")
             db.add(user)
             ws = m.Workspace(name=f"smoke-ws-{suffix}", owner_email=user.email)
             db.add(ws)
@@ -68,13 +66,9 @@ async def _main() -> int:
             got = (
                 await db.execute(select(m.Workspace).where(m.Workspace.name == ws.name))
             ).scalar_one()
-            assert got.owner_email == user.email, (
-                "workspace owner_email round-trip mismatch"
-            )
+            assert got.owner_email == user.email, "workspace owner_email round-trip mismatch"
             assert got.engine_version, "expected a defaulted engine_version"
-            n_users = (
-                await db.execute(select(func.count()).select_from(m.User))
-            ).scalar_one()
+            n_users = (await db.execute(select(func.count()).select_from(m.User))).scalar_one()
             assert n_users >= 1
     finally:
         await engine.dispose()

@@ -193,6 +193,24 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: scripts/lint.sh python
+      # `scripts/` is linted HERE rather than by the step above, which runs
+      # ruff inside `terrapod-test:local` -- an image `docker/Dockerfile.test`
+      # does not COPY `scripts/` into, so that linter's `.` cannot see the
+      # directory and never has (#2299). This job is the right home because it
+      # runs against a full checkout, which is also why the docs-audit gates
+      # below live here. The version is pinned to the one
+      # `services/poetry.lock` resolves, so `scripts/` and `services/` are held
+      # to the same ruff and the same formatter output; ruff's default rule set
+      # moves between releases (measured: 69 findings here under 0.16.6, 67
+      # under 0.17.3, on identical code), so an unpinned gate would
+      # re-litigate itself on every bump. The rules are in `scripts/ruff.toml`.
+      - name: Install ruff, pinned, for the scripts/ lint below
+        run: pip install 'ruff==0.17.3'
+
+      - name: (lint) scripts/ is linted too
+        run: |
+          ruff check scripts/
+          ruff format --check scripts/
 
   # ── Frontend Lint ─────────────────────────────────────
 

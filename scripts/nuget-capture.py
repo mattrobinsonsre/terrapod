@@ -93,9 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == f"{PREFIX}/index.json":
             index = {
                 "version": "3.0.0",
-                "resources": [
-                    {"@id": f"{BASE}/flat/", "@type": "PackageBaseAddress/3.0.0"}
-                ],
+                "resources": [{"@id": f"{BASE}/flat/", "@type": "PackageBaseAddress/3.0.0"}],
             }
             send(json.dumps(index).encode(), "application/json")
             return
