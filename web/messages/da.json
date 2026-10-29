@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Hvilke værter, grupper eller mønstre der skal nås. Tomt betyder hver vært i inventaret.",
       "typeConfigure": "konfigurer",
       "typeConfigureHint": "Kører playbooken mod inventaret. Ingen plan og ingen anvendelse.",
-      "typeConfigureAfterApplyHint": "Efter anvendelsen følger en konfigurering i samme kørsel."
+      "typeConfigureAfterApplyHint": "Efter anvendelsen følger en konfigurering i samme kørsel.",
+      "queueConfigureConfirmDynamic": "Dette arbejdsområde løser lagerkilder på runneren, så de værter den vil nå, er ikke kendt, før kørslen starter."
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Wich hostz, groupz or patternz ta reech. Empti meanz evry host in teh inventree.",
       "typeConfigure": "konfigur",
       "typeConfigureHint": "Runz teh playbook agenst teh inventree. No plan an no apply.",
-      "typeConfigureAfterApplyHint": "Teh apply is followd by a konfigur on dis same run."
+      "typeConfigureAfterApplyHint": "Teh apply is followd by a konfigur on dis same run.",
+      "queueConfigureConfirmDynamic": "Dis workspace figurez out inventory sorces on da runner, so da hoomans it gonna touch is a mystry til da run startz. srsly."
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

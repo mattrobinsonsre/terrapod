@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Które hosty, grupy lub wzorce objąć. Puste oznacza każdy host w inwentarzu.",
       "typeConfigure": "konfiguracja",
       "typeConfigureHint": "Uruchamia playbook na inwentarzu. Bez planu i bez zastosowania.",
-      "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu."
+      "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu.",
+      "queueConfigureConfirmDynamic": "Ta przestrzeń robocza rozwiązuje źródła inwentarza na runnerze, więc hosty, do których dotrze, nie są znane do rozpoczęcia uruchomienia."
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

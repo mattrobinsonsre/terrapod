@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Vilka värdar, grupper eller mönster som ska nås. Tomt betyder varje värd i inventariet.",
       "typeConfigure": "konfigurera",
       "typeConfigureHint": "Kör playbooken mot inventariet. Ingen plan och ingen tillämpning.",
-      "typeConfigureAfterApplyHint": "Efter tillämpningen följer en konfigurering i samma körning."
+      "typeConfigureAfterApplyHint": "Efter tillämpningen följer en konfigurering i samma körning.",
+      "queueConfigureConfirmDynamic": "Den här arbetsytan löser inventariekällor på runnern, så värdarna den kommer att nå är inte kända förrän körningen startar."
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

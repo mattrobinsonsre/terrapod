@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Mitkä isännät, ryhmät tai mallit tavoitetaan. Tyhjä tarkoittaa jokaista isäntää inventaariossa.",
       "typeConfigure": "määritys",
       "typeConfigureHint": "Ajaa playbookin inventaariota vasten. Ei suunnitelmaa eikä käyttöönottoa.",
-      "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla."
+      "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla.",
+      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy."
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

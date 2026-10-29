@@ -2885,6 +2885,7 @@
       "queueConfigureTitle": "Run the playbook against the inventory now. No plan precedes it.",
       "queueConfigureConfirmAll": "Run the playbook against the WHOLE inventory? This changes real hosts and cannot be undone.",
       "queueConfigureConfirmLimited": "Run the playbook against {limit}? This changes real hosts and cannot be undone.",
+      "queueConfigureConfirmDynamic": "This workspace resolves inventory sources on the runner, so the hosts it will reach are not known until the run starts.",
       "configurePlaybook": "Playbook",
       "configurePlaybookPlaceholder": "the workspace default",
       "configureLimit": "Limit",

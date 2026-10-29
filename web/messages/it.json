@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Quali host, gruppi o pattern raggiungere. Vuoto significa ogni host dell''inventario.",
       "typeConfigure": "configurazione",
       "typeConfigureHint": "Esegue il playbook sull''inventario. Nessun plan e nessun apply.",
-      "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione."
+      "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione.",
+      "queueConfigureConfirmDynamic": "Questo workspace risolve le fonti di inventario sul runner, quindi gli host che raggiungerà non sono noti fino all''avvio dell''esecuzione."
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

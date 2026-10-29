@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Quais hosts, grupos ou padrões alcançar. Vazio significa todos os hosts do inventário.",
       "typeConfigure": "configuração",
       "typeConfigureHint": "Executa o playbook contra o inventário. Sem plano e sem apply.",
-      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução."
+      "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução.",
+      "queueConfigureConfirmDynamic": "Esta área de trabalho resolve as fontes de inventário no runner, pelo que os anfitriões que irá alcançar só são conhecidos quando a execução começa."
     },
     "state": {
       "deleteConfirm": "Eliminar a versão de estado #{serial}? Isto não pode ser anulado.",

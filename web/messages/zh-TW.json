@@ -2884,7 +2884,8 @@
       "configureLimitHint": "要觸及哪些主機、主機組或模式。留空表示清冊中的每一台主機。",
       "typeConfigure": "設定",
       "typeConfigureHint": "針對清冊執行該 playbook。既沒有計畫，也沒有套用。",
-      "typeConfigureAfterApplyHint": "在這同一次執行中，套用之後緊接一次設定。"
+      "typeConfigureAfterApplyHint": "在這同一次執行中，套用之後緊接一次設定。",
+      "queueConfigureConfirmDynamic": "此工作區在執行器上解析清單來源，因此在執行開始之前無法得知它將觸及哪些主機。"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

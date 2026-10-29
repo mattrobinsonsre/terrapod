@@ -2884,7 +2884,8 @@
       "configureLimitHint": "要触及哪些主机、主机组或模式。留空表示清单中的每一台主机。",
       "typeConfigure": "配置",
       "typeConfigureHint": "针对清单执行该 playbook。既没有计划，也没有应用。",
-      "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。"
+      "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。",
+      "queueConfigureConfirmDynamic": "此工作区在运行器上解析清单源，因此在运行开始之前无法得知它将触及哪些主机。"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

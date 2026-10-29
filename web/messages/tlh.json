@@ -2884,7 +2884,8 @@
       "configureLimitHint": "DaSIchnISbogh hostmey, ghommey ghap permey. chImchugh, tetlhDaq Hoch host ''oH.",
       "typeConfigure": "Qum",
       "typeConfigureHint": "tetlh-vaD Qu'' paq qaSmoH. nab ''ej lo'' Hutlh.",
-      "typeConfigureAfterApplyHint": "Sar rapvamDaq lo'' tlha'' Qum."
+      "typeConfigureAfterApplyHint": "Sar rapvamDaq lo'' tlha'' Qum.",
+      "queueConfigureConfirmDynamic": "DaH Qu'' Daq vumbogh inventory Daqmey Suqbogh runner Daq ghaj, vaj runmeH taghpa'' hostmey Sovlu''be''."
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

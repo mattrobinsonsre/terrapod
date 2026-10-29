@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Which marklars, marklars or marklars to reach. Empty means every marklar in the marklar.",
       "typeConfigure": "configure",
       "typeConfigureHint": "Runs the marklar against the marklar. No marklar and no marklar.",
-      "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar."
+      "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar.",
+      "queueConfigureConfirmDynamic": "This marklar resolves marklar marklars on the marklar, so the marklars it will reach are not known until the marklar starts."
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

@@ -1989,11 +1989,22 @@ function WorkspaceDetailContent() {
   // services, rotate credentials and reboot machines, and unlike an apply there
   // is no plan to review first. The message names what it will reach, because
   // an empty limit means the whole inventory.
+  //
+  // And where the workspace resolves dynamic inventory sources on the runner
+  // (#2033), it says the host set is not yet KNOWN. The limit is still a
+  // pattern, but the inventory it expands against is resolved inside the Job,
+  // so neither this page nor the API can show what it will match -- and a
+  // confirm naming a reach it cannot vouch for is worse than one admitting the
+  // gap.
   async function handleQueueConfigure() {
     const reach = (configureLimit || attrs['default-limit'] || '').trim()
-    const msg = reach
-      ? t('runs.queueConfigureConfirmLimited', { limit: reach })
-      : t('runs.queueConfigureConfirmAll')
+    const dynamic =
+      attrs['dynamic-inventory-enabled'] === true || attrs['inventory-scripts-enabled'] === true
+    const msg =
+      (reach
+        ? t('runs.queueConfigureConfirmLimited', { limit: reach })
+        : t('runs.queueConfigureConfirmAll')) +
+      (dynamic ? ' ' + t('runs.queueConfigureConfirmDynamic') : '')
     if (!window.confirm(msg)) return
     setQueueingConfigure(true)
     setError('')

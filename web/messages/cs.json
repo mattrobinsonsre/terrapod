@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Které hostitele, skupiny nebo vzory zasáhnout. Prázdné znamená každého hostitele v inventáři.",
       "typeConfigure": "konfigurace",
       "typeConfigureHint": "Spustí playbook proti inventáři. Bez plánu a bez použití.",
-      "typeConfigureAfterApplyHint": "Po použití následuje konfigurace ve stejném běhu."
+      "typeConfigureAfterApplyHint": "Po použití následuje konfigurace ve stejném běhu.",
+      "queueConfigureConfirmDynamic": "Tento pracovní prostor řeší zdroje inventáře na runneru, takže hosty, kterých se dotkne, nejsou známy až do začátku běhu."
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

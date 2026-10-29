@@ -2884,7 +2884,8 @@
       "configureLimitHint": "対象とするホスト、グループ、またはパターンを指定します。空欄の場合はインベントリ内のすべてのホストが対象になります。",
       "typeConfigure": "構成",
       "typeConfigureHint": "インベントリに対してプレイブックを実行します。プランも適用もありません。",
-      "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。"
+      "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。",
+      "queueConfigureConfirmDynamic": "このワークスペースはインベントリソースをランナー上で解決するため、到達するホストは実行が開始されるまで分かりません。"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

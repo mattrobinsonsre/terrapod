@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Hangi ana makinelere, gruplara veya desenlere ulaşılacağı. Boş bırakmak envanterdeki her ana makine anlamına gelir.",
       "typeConfigure": "yapılandırma",
       "typeConfigureHint": "Playbook'u envantere karşı çalıştırır. Plan yok, uygulama yok.",
-      "typeConfigureAfterApplyHint": "Uygulamanın ardından bu aynı çalıştırmada bir yapılandırma gelir."
+      "typeConfigureAfterApplyHint": "Uygulamanın ardından bu aynı çalıştırmada bir yapılandırma gelir.",
+      "queueConfigureConfirmDynamic": "Bu çalışma alanı envanter kaynaklarını runner üzerinde çözümler, bu nedenle ulaşacağı ana makineler çalışma başlayana kadar bilinmez."
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

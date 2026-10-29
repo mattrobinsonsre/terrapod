@@ -2884,7 +2884,8 @@
       "configureLimitHint": "To reach, which hosts, groups or patterns. Every host in the inventory, empty means.",
       "typeConfigure": "configure",
       "typeConfigureHint": "Against the inventory, runs the playbook. No plan and no apply, there is.",
-      "typeConfigureAfterApplyHint": "By a configure on this same run, the apply is followed."
+      "typeConfigureAfterApplyHint": "By a configure on this same run, the apply is followed.",
+      "queueConfigureConfirmDynamic": "On the runner, inventory sources this workspace resolves. Known, the hosts it will reach are not, until the run starts."
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

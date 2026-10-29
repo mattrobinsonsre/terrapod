@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Qui hospites, greges aut exemplaria petenda sint. Vacuum omnem hospitem inventarii significat.",
       "typeConfigure": "configuratio",
       "typeConfigureHint": "Libellum ludendi adversus inventarium exsequitur. Nullum consilium et nulla applicatio.",
-      "typeConfigureAfterApplyHint": "Applicationem configuratio in hoc eodem cursu sequitur."
+      "typeConfigureAfterApplyHint": "Applicationem configuratio in hoc eodem cursu sequitur.",
+      "queueConfigureConfirmDynamic": "Hoc spatium operis fontes indicis in cursore resolvit, itaque hospites quos attinget ignoti sunt donec cursus incipiat."
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

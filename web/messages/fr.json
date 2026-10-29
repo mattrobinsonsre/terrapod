@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Quels hôtes, groupes ou motifs atteindre. Vide signifie chaque hôte de l''inventaire.",
       "typeConfigure": "configuration",
       "typeConfigureHint": "Exécute le playbook sur l''inventaire. Aucun plan et aucune application.",
-      "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution."
+      "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution.",
+      "queueConfigureConfirmDynamic": "Cet espace de travail résout les sources d''inventaire sur le runner, donc les hôtes qu''il atteindra ne sont pas connus avant le démarrage de l''exécution."
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

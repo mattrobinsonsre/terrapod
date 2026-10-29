@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Pa westeiwyr, grwpiau neu batrymau i'w cyrraedd. Mae gwag yn golygu pob gwesteiwr yn y rhestr eiddo.",
       "typeConfigure": "cyflunio",
       "typeConfigureHint": "Yn rhedeg y llyfr chwarae yn erbyn y rhestr eiddo. Dim cynllun a dim gweithredu.",
-      "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn."
+      "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn.",
+      "queueConfigureConfirmDynamic": "Mae'r gweithle hwn yn datrys ffynonellau rhestr eiddo ar y rhedwr, felly nid yw'r gwesteiwyr y bydd yn eu cyrraedd yn hysbys hyd nes i'r rhediad ddechrau."
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

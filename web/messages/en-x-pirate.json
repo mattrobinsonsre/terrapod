@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Which hands, crews or patterns t'' reach. Empty means every hand on th'' manifest.",
       "typeConfigure": "riggin''",
       "typeConfigureHint": "Runs th'' playbook against th'' manifest. No chart and no apply.",
-      "typeConfigureAfterApplyHint": "Th'' apply be followed by a riggin'' on this same run."
+      "typeConfigureAfterApplyHint": "Th'' apply be followed by a riggin'' on this same run.",
+      "queueConfigureConfirmDynamic": "This here workspace be reckonin' its inventory sources aboard the runner, so the ports it'll be makin' landfall upon be unknown 'til the voyage be underway, arr."
     },
     "state": {
       "deleteConfirm": "Send state version #{serial} t'' Davy Jones? This cannot be undone.",

@@ -2884,7 +2884,8 @@
       "configureLimitHint": "Wh1ch h0575, gr0up5 0r p4773rn5 70 r34ch. 3mp7y m34n5 3v3ry h057 1n 7h3 1nv3n70ry.",
       "typeConfigure": "c0nf1gur3",
       "typeConfigureHint": "Run5 7h3 pl4yb00k 4g41n57 7h3 1nv3n70ry. N0 pl4n 4nd n0 4pply.",
-      "typeConfigureAfterApplyHint": "7h3 4pply 15 f0ll0w3d by 4 c0nf1gur3 0n 7h15 54m3 run."
+      "typeConfigureAfterApplyHint": "7h3 4pply 15 f0ll0w3d by 4 c0nf1gur3 0n 7h15 54m3 run.",
+      "queueConfigureConfirmDynamic": "7h15 w0rk5p4c3 r350lv35 1nv3n70ry 50urc35 0n 7h3 runn3r, 50 7h3 h0575 17 w1ll r34ch 4r3 n07 kn0wn un71l 7h3 run 574r75."
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",

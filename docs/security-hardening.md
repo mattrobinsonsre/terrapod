@@ -597,6 +597,46 @@ which case runner Jobs never share an API server with the control plane. See
 - **Resource limits**: CPU and memory limits prevent noisy-neighbor issues
 - **Network isolation**: NetworkPolicies deny access to Postgres and Redis
 
+### Dynamic inventory stays off unless you mean it
+
+Two per-workspace settings, **both off by default**, let a repository's own
+inventory sources be resolved by ansible on the runner:
+
+| setting | what it permits |
+|---|---|
+| `dynamic-inventory-enabled` | a declared inventory **plugin configuration** — a YAML file with a top-level `plugin:` key |
+| `inventory-scripts-enabled` | an **executable** inventory source |
+
+**Neither ever runs in the API.** That is not a default but a property of the
+process: the API forces `ANSIBLE_INVENTORY_ENABLED=yaml,ini` in the environment,
+which beats the repository's own `ansible.cfg`, and the collections a cloud
+plugin lives in are not installed there at all.
+
+What a switch permits is execution **in a runner Job**, and the reason that is a
+different question is the environment each one holds. The API pod's holds the
+database URL, the token signing key and the key-encryption key; a runner Job's
+holds none of them, carries an identity scoped to one run and one phase, and
+already executes the operator's own playbook — which is strictly more powerful
+than the inventory plugin it is being trusted with. So turning a switch on does
+not widen what somebody who can write to the repository could already do.
+
+Two things to weigh before you do:
+
+- **`inventory-scripts-enabled` permits an arbitrary executable** from the
+  repository to run inside the Job, with that Job's cloud identity, before the
+  playbook does. `dynamic-inventory-enabled` is narrower: a plugin
+  configuration names a collection and can be read before it runs. They are
+  separate settings for exactly that reason — allow the one you need.
+- **The API's own view of the inventory becomes partial**, per source, and a
+  derived configure stops being narrowed to the hosts that changed. Both are
+  deliberate and visible rather than silent: see
+  [Resolving them on the runner instead](ansible-inventory.md#resolving-them-on-the-runner-instead).
+
+Prefer declaring the hosts. A `data` source, `for_each` and
+`terrapod_inventory_host` rows give the same discovery, versioned in git,
+reviewed in a pull request and visible in a plan before it takes effect — and
+with neither switch on.
+
 ### Plans on pull requests from forks
 
 The isolation above bounds what a run can reach; it does not decide **whose**
