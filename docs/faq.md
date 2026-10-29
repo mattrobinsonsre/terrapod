@@ -9,8 +9,9 @@ full landscape, see [Alternatives to Terraform Enterprise / Terraform Cloud](alt
 Terrapod is a **free, open-source, self-hosted platform replacement for Terraform
 Enterprise (TFE) and HCP Terraform / Terraform Cloud (TFC)**. It provides the
 collaboration, governance, state-management, and UI layer around `terraform` or
-OpenTofu (`tofu`) as pluggable execution backends. It is **not** a fork of the
-Terraform/OpenTofu engine — it orchestrates them. Deployed via a Helm chart on
+OpenTofu (`tofu`) as pluggable execution backends, and runs **Pulumi** programs
+and **Ansible** playbooks through that same model. It is **not** a fork of any
+engine — it orchestrates them. Deployed via a Helm chart on
 Kubernetes. License: MPL-2.0. Stable, on the **1.x** line — see
 [Releases](https://github.com/mattrobinsonsre/terrapod/releases) for the current
 version.
@@ -50,6 +51,37 @@ Yes — a per-workspace flag runs agent-mode runs under `terragrunt` (with a
 pull-through binary cache and local-backend reconciliation) while Terrapod keeps
 owning state and the run lifecycle. CLI-driven Terragrunt runs need no config. See
 [Terragrunt](terragrunt.md).
+
+## Does Terrapod support Pulumi and Ansible?
+
+Yes, and they go through the same flow rather than beside it. A Pulumi stack is a
+workspace whose preview is the reviewed phase and whose update is the executing
+one; an Ansible playbook is a **configure** operation on a workspace, with the
+same RBAC, policy, notification and audit model as a plan or an apply.
+
+Terraform and OpenTofu come first by design — Pulumi and Ansible are coerced into
+the Terraform-shaped flow as far as each engine allows, and where one genuinely
+differs it is said plainly rather than smoothed over. Ansible has no separable
+plan, so a configure has no reviewed phase of its own; a Pulumi preview produces
+no Terraform plan JSON, so the OPA policy sets and the plan scanners that read it
+have nothing to read on a Pulumi run. See
+[Running a configure](ansible-configure.md) and the
+[Pulumi provider](pulumi-provider.md).
+
+## Can Terrapod replace AWX / Ansible Tower too?
+
+Yes — that is what the Ansible half is. Playbooks run as a configure operation on
+the same workspace as plan and apply, so an estate gets one RBAC model, one audit
+trail and one runner fleet across both halves rather than two platforms wired
+together. The inventory is declared as code from the program that provisioned the
+hosts, so it is versioned and visible in a plan before it is adopted.
+
+It is not a feature-for-feature replacement, and the honest comparison matters
+more than the headline: AWX has years of production use, a large ecosystem around
+it, and a surface Terrapod does not match — there is no launch-time survey form
+and no workflow graph, for instance. The side-by-side table, and the two things
+having both halves actually buys you, are in
+[Alternatives](alternatives.md#can-terrapod-replace-awx--ansible-tower-too-or-only-terraform-cloud).
 
 ## Can Terrapod run in an air-gapped or firewall-restricted environment?
 

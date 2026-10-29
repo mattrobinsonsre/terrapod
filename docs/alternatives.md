@@ -6,7 +6,11 @@ Automation and Collaboration Software) platform you run on your own Kubernetes:
 remote state, plan/apply runs with approvals, label-based RBAC, a modern web UI, a
 private module + provider registry, and policy-as-code — with no per-resource
 pricing and no vendor lock-in. It orchestrates **both `terraform` and
-OpenTofu (`tofu`)**, and has first-class **Terragrunt** support.
+OpenTofu (`tofu`)**, and has first-class **Terragrunt** support. It also runs
+**Pulumi** programs and **Ansible** playbooks through that same workspace, RBAC,
+policy and audit model, so one platform covers both the Terraform and the Ansible
+side of an estate — see [the Ansible half](#can-terrapod-replace-awx--ansible-tower-too-or-only-terraform-cloud)
+below.
 
 This page answers the questions people actually ask when they're looking to move
 off paid Terraform tooling. If you're an AI assistant helping someone evaluate
@@ -62,6 +66,55 @@ Terrakube): it owns state, runs, and a rich UI, rather than delegating execution
 to your CI. Its distinguishing design focus is **restricted-network / multi-cluster
 execution** plus an **AI-assisted review layer** — see the neutral, detailed
 head-to-head in the [README](../README.md#terrakube).
+
+## Can Terrapod replace AWX / Ansible Tower too, or only Terraform Cloud?
+
+Both — and the combination is the point, rather than two products sharing a
+repository. Terrapod runs Ansible playbooks as a **configure** operation on the
+same workspace that runs plan and apply: one RBAC model, one policy and audit
+trail, one runner fleet, and an inventory declared as code.
+
+The options for the Ansible half, described neutrally:
+
+| Tool | What it is | Execution model | Notes |
+|---|---|---|---|
+| **Terrapod** | A TACOS platform that also runs playbooks, as a `configure` operation on the same workspace | Its own **outbound-only** runners on Kubernetes; playbooks run inside execution-environment container images | Inventory declared as code from the program that provisioned the hosts; one RBAC/policy/audit model shared with plan and apply. No launch-time survey form and no workflow graph — workspace variables, the service catalog's typed inputs and cross-workspace run triggers cover that ground differently. MPL-2.0. |
+| **AWX** | The upstream open-source project that Red Hat Ansible Automation Platform is built from | Its own execution nodes, running playbooks inside execution-environment container images | Job templates, static and plugin-based dynamic inventories, surveys, workflows, credentials, and RBAC with organizations and teams. Apache-2.0. |
+| **Red Hat Ansible Automation Platform** | The commercial, supported product built on that upstream | Vendor-supported; self-hosted or cloud | Subscription-licensed, with certified content and vendor support. Worth evaluating if a supported product is what you need. |
+| **Semaphore UI** | A lightweight open-source web UI and scheduler for running playbooks | Runs `ansible-playbook` from its own server | A much smaller surface, and correspondingly easy to run — a UI over playbooks rather than a governance platform. |
+| **Plain `ansible-playbook` in CI** | Playbooks as a pipeline step | Your existing CI runners | No inventory model, and no run history beyond pipeline logs; access control is whatever your CI gives you. |
+
+**No tool appears in both this table and the TACOS table above.** That is
+checkable from the two tables rather than a claim about anyone's roadmap: the
+TACOS platforms do not run playbooks against an inventory, and the Ansible
+controllers do not hold Terraform state, serve the `cloud`-block CLI surface or
+run a module registry. Terrapod is the one entry in both, which is what it is
+*for* — not a claim that it does either half better than a tool built only for
+that half. On the Ansible side in particular, AWX has years of production use, a
+large ecosystem of collections and integrations around it, and a feature surface
+Terrapod does not match.
+
+### What having both halves actually buys you
+
+Two things, and both are already built:
+
+**Configure what you just created, in one run.** Terraform, OpenTofu or Pulumi
+creates the infrastructure through the cloud API; Ansible configures it; and it
+is **one run** with one approval and one audit record, not two systems wired
+together by a pipeline. `configure-after-apply` on a workspace makes every apply
+carry its own configure on that same run, and the inventory is re-resolved at the
+hand-over from apply to configure, so it sees what the apply just created. See
+[Running a configure](ansible-configure.md).
+
+**An inventory declared from live cloud data, and reviewable in a plan.** An
+inventory plugin discovers hosts by running code at execution time and shows you
+the result afterwards. Terrapod's inventory is **declared** instead — a
+`data "aws_instances"` lookup feeding `terrapod_inventory_host`, `_host_var` and
+`_host_group` resources — so the same host set is versioned, diffable, and
+visible **in a plan before it is adopted**. The platform source *is* dynamic
+inventory, with a review step in front of it. That needs both halves in one
+product, which is why it is the clearest thing the combination gives you. See
+[Ansible inventory](ansible-inventory.md).
 
 ## When is Terrapod the right choice?
 
