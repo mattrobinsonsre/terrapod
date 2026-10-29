@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/mattrobinsonsre/terrapod/provider/tfprovider"
@@ -149,4 +150,78 @@ func keys(m map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestNoFunctionsOutputHelperCollidesWithAGeneratedType is a regression test
+// named after the failure mode, and it is DERIVED from the schema's own
+// function list rather than naming the one case that bit (#2284).
+//
+// Pulumi emits an output-form invoke helper called `<Function>Output` for every
+// function, and it derives a nested type's token from the function token plus
+// the property name. So a data source with a property called `outputs` produces
+// a type whose Go name is exactly the name already taken by that function's own
+// helper. In Go that is a redeclaration and the generated SDK does not compile
+// -- eleven errors from one name, because it cascades into `...OutputArgs` and
+// its `ElementType`.
+//
+// `terrapod_catalog_item_interface` did exactly that, with `outputs` renamed to
+// `moduleOutputs` in `Provider()` to clear it. This asserts the PROPERTY rather
+// than that one rename, so the next data source to grow an `outputs` attribute
+// fails here instead of reaching whoever generates an SDK first.
+//
+// The CI job that generates and builds the Go SDK is the authoritative gate --
+// it catches anything that stops a build, not one shape. This is the fast,
+// dependency-free half: it runs with the other Go tests and says, in words, what
+// the rule is.
+func TestNoFunctionsOutputHelperCollidesWithAGeneratedType(t *testing.T) {
+	s := theSchema(t)
+
+	fns, ok := s["functions"].(map[string]any)
+	if !ok || len(fns) == 0 {
+		t.Fatal("the schema declares no functions -- this test would then assert nothing")
+	}
+	types, ok := s["types"].(map[string]any)
+	if !ok || len(types) == 0 {
+		t.Fatal("the schema declares no types -- this test would then assert nothing")
+	}
+
+	// `terrapod:index/getX:getX` -> `GetX`, which is how the Go generator names
+	// it; `<that>Output` is the name it reserves for the output-form helper.
+	goName := func(token string) string {
+		leaf := token
+		if i := strings.LastIndex(token, ":"); i >= 0 {
+			leaf = token[i+1:]
+		}
+		if leaf == "" {
+			return ""
+		}
+		return strings.ToUpper(leaf[:1]) + leaf[1:]
+	}
+
+	reserved := make(map[string]string, len(fns))
+	for fn := range fns {
+		if n := goName(fn); n != "" {
+			reserved[n+"Output"] = fn
+		}
+	}
+
+	for typ := range types {
+		n := goName(typ)
+		if fn, taken := reserved[n]; taken {
+			t.Errorf(
+				"generated type %q has the Go name %q, which Pulumi reserves for function %q's "+
+					"output-form helper -- the Go SDK will not compile. Rename the offending "+
+					"PROPERTY via `Fields` in Provider(): that renames the type as a consequence. "+
+					"Note `SchemaInfo.NestedType` is silently ignored here, and renaming the data "+
+					"source token cannot help, because the type name is derived from the token AND "+
+					"the property.",
+				typ, n, fn,
+			)
+		}
+	}
+
+	if len(reserved) < 10 {
+		t.Errorf("only %d function helper names were derived, which is too few to be the real "+
+			"surface -- has the schema or the token shape changed?", len(reserved))
+	}
 }

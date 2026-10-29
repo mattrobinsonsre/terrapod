@@ -35,6 +35,24 @@ not written separately. Two consequences, and the second is a real trade:
   trade for not maintaining a second provider surface, and it is the thing worth
   revisiting if Pulumi use here grows.
 
+### One name differs from Terraform's, and only one
+
+On `terrapod_catalog_item_interface`, the attribute Terraform calls **`outputs`**
+is **`moduleOutputs`** here. Everything else carries its Terraform name.
+
+It is not a style choice. Pulumi derives a nested type's name from the function
+plus the property, and separately emits a `<Function>Output` helper for every
+function — so an attribute called `outputs` on `getCatalogItemInterface` produces
+a type named exactly what that helper is already called. In Go that is a
+redeclaration, so the generated SDK did not compile at all until the property was
+renamed (#2284). Renaming the property is the only lever that works: the bridge's
+`NestedType` override is ignored on this path, and renaming the data source would
+not help, because the colliding name comes from the property as much as from the
+token.
+
+A CI job now generates the Go SDK from the committed schema and compiles it, so
+the next attribute that would collide fails for us rather than for you.
+
 ## Getting started
 
 ### 1. Add the package

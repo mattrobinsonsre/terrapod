@@ -180,6 +180,49 @@ func Provider(version string) tfbridge.ProviderInfo {
 		Namespace+"_", mainModule, tokens.MakeStandard(Namespace),
 	))
 
+	// The ONE name collision in the generated SDKs, and it is structural rather
+	// than a mistake anyone made.
+	//
+	// `terrapod_catalog_item_interface` has an attribute literally called
+	// `outputs` -- a module's outputs, which is the right name for it in
+	// Terraform. Pulumi derives a nested type's token from the function token
+	// plus the property name, giving `getCatalogItemInterfaceOutput`; and it
+	// ALSO emits an output-form invoke helper named `<Function>Output` for
+	// every function, which for this one is `GetCatalogItemInterfaceOutput`.
+	// Same name. In Go that is a redeclaration, so the generated SDK does not
+	// compile at all -- eleven errors from this single name, because it
+	// cascades into `...OutputArgs` and its `ElementType` too.
+	//
+	// Renaming the PROPERTY is the only lever that works, and it fixes the type
+	// name as a consequence: the token becomes
+	// `getCatalogItemInterfaceModuleOutput`, which collides with nothing.
+	// Measured against bridge v3.142.0 and Pulumi 3.272.0 -- the generated Go
+	// SDK builds clean afterwards, and the schema carries zero collisions
+	// derived from its own function list.
+	//
+	// Two alternatives were tried and do NOT work, so do not reach for them:
+	//
+	//   - `SchemaInfo.NestedType`, whose doc says "a type to override when the
+	//     property is a nested structure", is silently ignored here -- both on
+	//     the field and on `Elem`. It reads like the precise lever for this and
+	//     is not.
+	//   - Renaming the data source TOKEN cannot fix it. The colliding type name
+	//     is derived from the token AND the property, so any `getX` with an
+	//     `outputs` property collides with `getX`'s own helper whatever X is.
+	//     It would change a user-facing name for nothing.
+	//
+	// The cost is that this one property is `moduleOutputs` in Pulumi and
+	// `outputs` in Terraform. That divergence is a bridged provider's normal
+	// recourse, it is arguably the clearer name, and it is stated in
+	// `docs/pulumi-provider.md` so a practitioner reading one surface is not
+	// surprised by the other.
+	if ds, ok := info.DataSources["terrapod_catalog_item_interface"]; ok && ds != nil {
+		if ds.Fields == nil {
+			ds.Fields = map[string]*tfbridge.SchemaInfo{}
+		}
+		ds.Fields["outputs"] = &tfbridge.SchemaInfo{Name: "moduleOutputs"}
+	}
+
 	info.SetAutonaming(255, "-")
 
 	return info
