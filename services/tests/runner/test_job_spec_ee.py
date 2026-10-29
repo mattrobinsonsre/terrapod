@@ -211,6 +211,59 @@ class TestTheVolumeContract:
         assert env["ANSIBLE_COLLECTIONS_PATH"].startswith("/tp/")
         assert env["ANSIBLE_ROLES_PATH"].startswith("/tp/")
 
+    def test_the_ee_gets_a_writable_home_for_its_PASSWD_user(self):
+        """A play targeting the EE itself fails UNREACHABLE without it (#2228).
+
+        Ansible resolves `remote_tmp`'s leading `~` against the target user's
+        PASSWD entry, never `$HOME`. For `connection: local`, `hosts: localhost`,
+        or anything driving a cloud API from the controller -- all ordinary
+        patterns -- the "target" is this container, so `~` is `/home/ansible` on
+        the read-only root and every task fails with a permissions message that
+        points away from the cause.
+
+        Mounted over `/home` rather than one image's specific home so it holds
+        for any EE whose user came from `useradd`'s default. Measured on the
+        published image with a control: read-only genuinely in effect, the defect
+        reproduced as `unreachable=1`, and `ok=1 changed=1 unreachable=0` with
+        the volume.
+        """
+        pod = _pod(ee_image=EE)
+        ee = {m["name"]: m["mountPath"] for m in _init(pod, "ee")["volumeMounts"]}
+        assert ee.get("ee-passwd-home") == "/home", (
+            "the EE has no writable /home, so a `connection: local` play fails "
+            "every task as UNREACHABLE"
+        )
+        # Writable means an emptyDir rather than a projected or read-only source.
+        vol = next(v for v in pod["volumes"] if v["name"] == "ee-passwd-home")
+        assert "emptyDir" in vol and not vol.get("readOnly")
+
+    def test_only_the_EE_gets_that_home_not_the_orchestrator(self):
+        """The orchestrator has its own HOME and does not run ansible, so giving
+        it this would widen the pod for nothing -- and `/home` there would shadow
+        the runner image's own user directory."""
+        pod = _pod(ee_image=EE)
+        runner = {m["name"] for m in pod["containers"][0]["volumeMounts"]}
+        assert "ee-passwd-home" not in runner
+
+    def test_no_writable_home_when_there_is_no_EE(self):
+        """It is the sidecar's volume, so a plan or an apply must not carry it."""
+        pod = _pod()
+        assert all(v["name"] != "ee-passwd-home" for v in pod["volumes"])
+
+    def test_ANSIBLE_REMOTE_TEMP_still_names_a_path_on_the_TARGET(self):
+        """The alternative fix, and it is wrong -- so this pins that we did not
+        take it.
+
+        Pointing `ANSIBLE_REMOTE_TEMP` at the shared volume would fix the local
+        case and break EVERY SSH-targeted play, because the value names a path on
+        the managed node and `/tp` does not exist there. Measured. If someone
+        "fixes" #2228 again by editing this variable, this fails."""
+        env = {e["name"]: e.get("value") for e in _init(_pod(ee_image=EE), "ee")["env"]}
+        assert env["ANSIBLE_REMOTE_TEMP"] == "~/.ansible/tmp", (
+            "ANSIBLE_REMOTE_TEMP names a path on the TARGET host; a shared-volume "
+            "path here breaks every SSH-targeted play to fix the local case"
+        )
+
     def test_the_fsGroup_is_merged_UNDER_the_operator_s_own_context(self):
         """Their fsGroup is the deployment's business; we only supply one when
         they have not. Merged rather than assigned, because the EE block runs

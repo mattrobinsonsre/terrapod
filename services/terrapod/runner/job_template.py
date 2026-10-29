@@ -105,6 +105,27 @@ _EE_TMPDIR = f"{_EE_SHARED_DIR}/tmp"
 _EE_COLLECTIONS_DIR = f"{_EE_SHARED_DIR}/collections"
 _EE_ROLES_DIR = f"{_EE_SHARED_DIR}/roles"
 _EE_HOME = f"{_EE_SHARED_DIR}/home"
+#: The EE's PASSWD home, which is a different thing from `$HOME` above and is why
+#: it needs a volume of its own (#2228).
+#:
+#: Ansible resolves `remote_tmp`'s leading `~` against the target user's **passwd
+#: entry**, never `$HOME`. For a play that targets the EE itself --
+#: `connection: local`, `hosts: localhost`, or anything driving a cloud API from
+#: the controller, all ordinary patterns -- the "target" is this container, so `~`
+#: is `/home/ansible` on the read-only root and EVERY TASK fails as UNREACHABLE
+#: with a message about permissions that points away from the cause.
+#:
+#: Mounted over `/home` rather than over one image's specific home, so it holds
+#: for any EE whose user came from `useradd`'s default. `/etc/passwd` is not
+#: shadowed, so the lookup still resolves, and ansible's own `mkdir -p` creates
+#: the rest inside the writable volume.
+#:
+#: The alternative -- pointing `ANSIBLE_REMOTE_TEMP` at the shared volume -- was
+#: measured and is WRONG: that value names a path on the *target*, and `/tp` does
+#: not exist on a managed node, so it would break every SSH-targeted play to fix
+#: the local case.
+_EE_PASSWD_HOME_VOLUME = "ee-passwd-home"
+_EE_PASSWD_HOME_DIR = "/home"
 #: Where the orchestrator writes the run's resolved inventory for the EE to
 #: read (#1972). It MUST be on the shared volume: ansible runs in the EE, which
 #: mounts only this volume and the workspace, so an inventory written to the
@@ -433,6 +454,13 @@ def _add_execution_environment(
     # rather than one per concern.
     pod["volumes"].append({"name": _EE_SHARED_VOLUME, "emptyDir": {}})
 
+    # A writable home for the EE's own passwd user (#2228). Separate from the
+    # shared volume deliberately: this one is mounted at an ABSOLUTE path the
+    # image chose (`/home`), not under `/tp`, so folding it into the shared
+    # volume would mean mounting `/tp` over `/home` and losing the one-path
+    # contract that volume exists to keep.
+    pod["volumes"].append({"name": _EE_PASSWD_HOME_VOLUME, "emptyDir": {}})
+
     # Both containers reach the playbook directory and the resolved inventory
     # (#2021) through the workspace volume the orchestrator already fetches
     # into, so the inventory handoff needs no volume of its own.
@@ -442,6 +470,11 @@ def _add_execution_environment(
     ]
     if ca_mounted:
         ee_mounts.append({"name": "ca-merged", "mountPath": _CA_MERGED_DIR, "readOnly": True})
+    # LAST, so adding it leaves every existing mount at the index the job-spec
+    # golden already records -- a reorder there is noise that can mask a real
+    # change in a later diff. The EE ONLY: the orchestrator has its own home and
+    # does not run ansible, so giving it this would widen the pod for nothing.
+    ee_mounts.append({"name": _EE_PASSWD_HOME_VOLUME, "mountPath": _EE_PASSWD_HOME_DIR})
 
     # The orchestrator sees the same shared volume: it is how it reads what the
     # agent installed, and how the agent binary gets there in the first place.
