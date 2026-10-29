@@ -157,7 +157,21 @@ func Provider(version string) tfbridge.ProviderInfo {
 			PackageName: "@terrapod/pulumi",
 		},
 		Python: &tfbridge.PythonInfo{
-			PackageName: "terrapod-pulumi",
+			// UNDERSCORED, and that is load-bearing rather than cosmetic.
+			// `PackageName` is one field with two uses: the generator makes it
+			// both the distribution name AND the module DIRECTORY. A hyphen is
+			// legal in the first and illegal in the second, so
+			// `terrapod-pulumi` produced an SDK that installs and can never be
+			// imported -- `import terrapod_pulumi` is ModuleNotFoundError and
+			// `import terrapod-pulumi` is a SyntaxError. Measured, by installing
+			// it into a venv and trying both (#2267).
+			//
+			// Underscored it generates `terrapod_pulumi/`, which imports, and
+			// pip still resolves `pip install terrapod-pulumi` because PEP 503
+			// normalises the two to the same name. So this costs nothing and is
+			// the convention every published Pulumi Python SDK follows
+			// (`pulumi_aws`, `pulumi_gcp`).
+			PackageName: "terrapod_pulumi",
 		},
 		Golang: &tfbridge.GolangInfo{
 			ImportBasePath: "github.com/mattrobinsonsre/terrapod/pulumi-provider/sdk/go/terrapod",

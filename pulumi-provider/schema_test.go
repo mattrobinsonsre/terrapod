@@ -91,7 +91,7 @@ func TestThePackageNamesAreTheOnesTerrapodServes(t *testing.T) {
 	lang, _ := s["language"].(map[string]any)
 	for _, c := range []struct{ lang, key, want string }{
 		{"nodejs", "packageName", "@terrapod/pulumi"},
-		{"python", "packageName", "terrapod-pulumi"},
+		{"python", "packageName", "terrapod_pulumi"},
 		{"csharp", "rootNamespace", "Terrapod"},
 		{"go", "importBasePath", "github.com/mattrobinsonsre/terrapod/pulumi-provider/sdk/go/terrapod"},
 	} {
@@ -223,5 +223,68 @@ func TestNoFunctionsOutputHelperCollidesWithAGeneratedType(t *testing.T) {
 	if len(reserved) < 10 {
 		t.Errorf("only %d function helper names were derived, which is too few to be the real "+
 			"surface -- has the schema or the token shape changed?", len(reserved))
+	}
+}
+
+// TestEachLanguagesPackageNameIsUsableInThatLanguage is the general form of a
+// defect that shipped: the Python SDK installed and could never be imported.
+//
+// `PythonInfo.PackageName` is one field with two uses -- the generator makes it
+// the distribution name AND the module directory. A hyphen is legal in the first
+// and illegal in the second, so `terrapod-pulumi` generated `terrapod-pulumi/`:
+// `import terrapod_pulumi` is ModuleNotFoundError and `import terrapod-pulumi`
+// is a SyntaxError. Nothing caught it, because the name was asserted as a STRING
+// and a string cannot be wrong (#2267).
+//
+// So this asserts the PROPERTY instead. Python is the one with a real constraint
+// worth encoding -- a module name must be an identifier -- and the other three
+// are checked for the shapes that would be obviously wrong in their own
+// ecosystem rather than guessed at.
+func TestEachLanguagesPackageNameIsUsableInThatLanguage(t *testing.T) {
+	s := theSchema(t)
+
+	lang, ok := s["language"].(map[string]any)
+	if !ok || len(lang) == 0 {
+		t.Fatal("the schema declares no language blocks -- this test would then assert nothing")
+	}
+
+	// A Python module name is an identifier: letters, digits and underscores,
+	// not starting with a digit. Notably NOT hyphens, which is the whole point.
+	py, ok := lang["python"].(map[string]any)
+	if !ok {
+		t.Fatal("no python language block")
+	}
+	name, _ := py["packageName"].(string)
+	if name == "" {
+		t.Fatal("the python block declares no packageName")
+	}
+	for i, r := range name {
+		valid := r == '_' ||
+			(r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9' && i > 0)
+		if !valid {
+			t.Errorf(
+				"python packageName %q is not a valid Python module name (%q at %d). The "+
+					"generator uses this field as the module DIRECTORY as well as the "+
+					"distribution name, so the SDK would install and never import. Use "+
+					"underscores; pip normalises them to hyphens for the distribution anyway.",
+				name, r, i,
+			)
+			break
+		}
+	}
+
+	// The others, each against what its own ecosystem forbids rather than a
+	// guess: an npm name is lowercase, and a C# root namespace is dotted
+	// identifiers.
+	if js, ok := lang["nodejs"].(map[string]any); ok {
+		if n, _ := js["packageName"].(string); n != strings.ToLower(n) {
+			t.Errorf("nodejs packageName %q is not lowercase, which npm requires", n)
+		}
+	}
+	if cs, ok := lang["csharp"].(map[string]any); ok {
+		if n, _ := cs["rootNamespace"].(string); strings.ContainsAny(n, "- ") {
+			t.Errorf("csharp rootNamespace %q contains a character C# does not allow in an identifier", n)
+		}
 	}
 }
