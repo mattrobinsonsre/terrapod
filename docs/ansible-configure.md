@@ -680,41 +680,41 @@ ServiceAccount is a cloud principal a configure has no reason to hold. See
 [Cloud Identity → Which phase gets which
 account](cloud-identity.md#which-phase-gets-which-account).
 
-## A play that targets the execution environment itself needs `ansible_remote_tmp`
+## A play that targets the execution environment itself
 
-Most configures target managed nodes over SSH and need nothing here. But a play
-that targets the execution environment — `connection: local`, `hosts: localhost`,
-or anything driving a cloud API from the controller — needs one host variable, and
-without it **every task fails as UNREACHABLE** with a message about permissions
-that points away from the cause:
+`connection: local`, `hosts: localhost`, or anything driving a cloud API from the
+controller — **these work with no host variable of their own.** If you are
+reading this because an older release told you to set `ansible_remote_tmp`, you
+no longer need to; a value you have set is still honoured and does no harm.
+
+The mechanism is worth knowing, because the failure it used to cause pointed
+nowhere near its cause. Ansible resolves `remote_tmp`'s leading `~` against the
+**target user's passwd entry**, never `$HOME` — and for these plays the "target"
+is the execution environment itself, where that is `/home/ansible` on a read-only
+root filesystem. So every task failed as UNREACHABLE with a message about
+permissions:
 
 ```
 Failed to create temporary directory ... Failed command was:
 ( umask 77 && mkdir -p "` echo /home/ansible/.ansible/tmp `" ...
 ```
 
-Ansible resolves `remote_tmp`'s leading `~` against the **target user's passwd
-entry**, not `$HOME`. Inside the execution environment that is `/home/ansible`,
-which sits on the EE's read-only root filesystem, so the directory cannot be
-created. The `$HOME` the Job sets (`/tp/home`, on the writable shared volume) is
-not consulted for this.
+The Job now mounts a writable volume over the execution environment's `/home`,
+so that path is creatable and ansible's own `mkdir -p` does the rest. It is
+mounted over `/home` rather than over one image's particular home, so it holds
+for any execution environment whose user came from `useradd`'s default — which
+includes your own, if you supply one.
 
-Point it at the shared volume instead:
+What Terrapod still does **not** do is set `ANSIBLE_REMOTE_TEMP` to a shared
+volume path: that variable names a path on the *target*, and `/tp` does not exist
+on a managed node, so a global value would break every SSH-targeted play to fix
+the local case. That is why the fix is a volume rather than a variable.
 
-```yaml
-all:
-  hosts:
-    localhost:
-      ansible_connection: local
-      ansible_remote_tmp: /tp/tmp/ansible-remote
-```
-
-It can equally go in `group_vars`, or in your own `ansible.cfg` as
-`remote_tmp` — Terrapod never overwrites that file, so a value you set there is
-honoured. What Terrapod does **not** do is set `ANSIBLE_REMOTE_TEMP` to a shared
-volume path globally: that variable names a path on the *target*, and `/tp` does
-not exist on a managed node, so a global value would break every SSH-targeted
-play to fix the local case.
+> **This part of the Job is built by the listener**, so the writable home arrives
+> when your listeners are upgraded, not when the API is. A newer runner launched
+> by a listener from an older release renders the pod without it, and such a play
+> fails as it did before — the host variable above is the stop-gap until the
+> listeners move.
 
 ## Troubleshooting
 
