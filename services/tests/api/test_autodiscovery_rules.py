@@ -61,6 +61,13 @@ def _mock_rule(
     r.auto_configure_enabled = False
     r.configure_after_apply = False
     r.configure_all_hosts = False
+    # #2033's pair. Set EXPLICITLY rather than left to the MagicMock,
+    # because an unset attribute here is a distinct auto-mock that reaches
+    # `json.dumps` and fails with "Object of type MagicMock is not JSON
+    # serializable" -- naming neither the attribute nor this fixture. Do not
+    # delete these as noise.
+    r.dynamic_inventory_enabled = False
+    r.inventory_scripts_enabled = False
     r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""

@@ -3663,6 +3663,19 @@ async def next_run(
     run_data["data"]["attributes"]["ansible-collections"] = (
         ansible_collection_arguments(ws.ansible_collections) if ws else []
     )
+    # #2033's pair, from the RUN rather than the workspace -- the one place on
+    # this wire where that distinction is load-bearing. The run carries what it
+    # was dispatched with, so a workspace setting flipped after dispatch cannot
+    # change what an in-flight Job is permitted to execute. Always emitted, like
+    # `var-files` above, so the runner never has to read anything into an absent
+    # key -- though its own floor is `yaml,ini`, so an older runner that ignores
+    # these behaves exactly as it does today.
+    run_data["data"]["attributes"]["dynamic-inventory-enabled"] = bool(
+        run.dynamic_inventory_enabled
+    )
+    run_data["data"]["attributes"]["inventory-scripts-enabled"] = bool(
+        run.inventory_scripts_enabled
+    )
     # What a configure needs to run (#1972), from the workspace's own columns
     # (#1929). Emitted ONLY for the configure phase, and `config-directory` is
     # what the runner keys on, so sending it on a plan or an apply would offer a

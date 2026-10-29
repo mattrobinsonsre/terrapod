@@ -62,7 +62,6 @@ log = structlog.get_logger(__name__)
 #: Both are measured to beat the operator's `ansible.cfg` while leaving the rest
 #: of their file in force.
 _FORCED_ENV = {
-    "ANSIBLE_INVENTORY_ENABLED": "yaml,ini",
     "ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED": "True",
     # Colour is terminal control bytes in a log nobody views in a terminal.
     "ANSIBLE_FORCE_COLOR": "0",
@@ -81,6 +80,42 @@ class ConfigureNotConfigured(RuntimeError):
     """
 
 
+def _enabled_plugins(cfg: RunnerConfig) -> str:
+    """Which ansible inventory plugins this run may use (#2033).
+
+    `yaml,ini` is the floor and is what every run got before the switches
+    existed. A workspace may add:
+
+    * `auto` -- the generic dispatcher, which reads a file's own `plugin:`
+      key and runs whatever it names;
+    * `script` -- an executable inventory source.
+
+    **Ansible's own relative order is kept** (`script` before `auto` before
+    `yaml` before `ini`, as in its documented default), because the order is
+    the order plugins are offered a file and therefore decides which one
+    claims an ambiguous name. Reordering would be a behaviour change dressed
+    as a tidy-up.
+
+    **The API never gets either**, whatever these say: it forces its own
+    `yaml,ini` and that is permanent (#1970). The switch is the runner's
+    alone, because the objection was always about WHERE the code runs -- this
+    Job has no database URL, no KEK and an ephemeral identity, and it already
+    executes the operator's playbook, which is strictly more powerful.
+
+    Measured against ansible-core 2.18.3: a `script` source needs BOTH this
+    and an intact exec bit. It has the bit because the configuration version
+    is extracted with `set_attrs=True`, which the API-side exec strip never
+    touches -- so the two halves meet only here.
+    """
+    enabled = []
+    if cfg.inventory_scripts_enabled:
+        enabled.append("script")
+    if cfg.dynamic_inventory_enabled:
+        enabled.append("auto")
+    enabled += ["yaml", "ini"]
+    return ",".join(enabled)
+
+
 def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     """The environment ansible runs under, with inherited `ANSIBLE_*` stripped.
 
@@ -91,6 +126,7 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     what we set is not the same as a bound on what reaches the process.
     """
     env = dict(_FORCED_ENV)
+    env["ANSIBLE_INVENTORY_ENABLED"] = _enabled_plugins(cfg)
     # Temp directories must be writable, which a read-only root filesystem makes
     # a live concern: ansible exits `rc 250` with "No usable temporary directory
     # found" rather than naming the cause. The Job supplies them.

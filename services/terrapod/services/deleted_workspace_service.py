@@ -128,6 +128,8 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # restore.
         "auto_configure_enabled": ws.auto_configure_enabled,
         "configure_all_hosts": ws.configure_all_hosts,
+        "dynamic_inventory_enabled": ws.dynamic_inventory_enabled,
+        "inventory_scripts_enabled": ws.inventory_scripts_enabled,
         "configure_after_apply": ws.configure_after_apply,
         # The Ansible roots and run defaults (#1929). An ordinary path now, so
         # it snapshots and restores like `working_directory` beside it.
@@ -643,6 +645,11 @@ async def restore_workspace(
         # truthiness fallback is the failure to avoid.
         auto_configure_enabled=settings.get("auto_configure_enabled") is True,
         configure_all_hosts=settings.get("configure_all_hosts") is True,
+        # `is True` rather than truthy, matching the neighbours: a snapshot
+        # taken before #2033 has no key, and the absence must restore as the
+        # column default rather than as anything a loose test would accept.
+        dynamic_inventory_enabled=settings.get("dynamic_inventory_enabled") is True,
+        inventory_scripts_enabled=settings.get("inventory_scripts_enabled") is True,
         configure_after_apply=settings.get("configure_after_apply") is True,
         # An ordinary path (#1966): `or ""` is right now that "" and absent both
         # mean the configuration version's root. It used to be `.get()` with no

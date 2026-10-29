@@ -84,6 +84,13 @@ def _mock_workspace(
     ws.auto_configure_enabled = False
     ws.configure_after_apply = False
     ws.configure_all_hosts = False
+    # #2033's pair. Set EXPLICITLY rather than left to the MagicMock,
+    # because an unset attribute here is a distinct auto-mock that reaches
+    # `json.dumps` and fails with "Object of type MagicMock is not JSON
+    # serializable" -- naming neither the attribute nor this fixture. Do not
+    # delete these as noise.
+    ws.dynamic_inventory_enabled = False
+    ws.inventory_scripts_enabled = False
     ws.config_directory = ""
     ws.inventory_paths = []
     ws.default_playbook = ""

@@ -81,6 +81,12 @@ class RunnerConfig:
     #: workspace entry overrides the repository's build of that collection and
     #: leaves every other one standing.
     ansible_collections: list[str]
+    #: #2033's pair, snapshotted onto the run rather than read from the
+    #: workspace at dispatch, so a setting that moves mid-run cannot change
+    #: what this Job is permitted to resolve. They compose
+    #: `ANSIBLE_INVENTORY_ENABLED`; see `phases/configure._forced_env`.
+    dynamic_inventory_enabled: bool
+    inventory_scripts_enabled: bool
     #: Where the Ansible configuration root sits inside the fetched tree -- the
     #: operator's `ansible.cfg`, their playbooks, their `roles/` (#1929). It is
     #: the configure's WORKING DIRECTORY and nothing else will do: `group_vars`
@@ -188,6 +194,8 @@ class RunnerConfig:
             replace_addrs=_json_list("TP_REPLACE_ADDRS"),
             var_files=_json_list("TP_VAR_FILES"),
             ansible_collections=_json_list("TP_ANSIBLE_COLLECTIONS"),
+            dynamic_inventory_enabled=_bool("TP_DYNAMIC_INVENTORY_ENABLED"),
+            inventory_scripts_enabled=_bool("TP_INVENTORY_SCRIPTS_ENABLED"),
             config_directory=e.get("TP_CONFIG_DIRECTORY", ""),
             playbook=e.get("TP_PLAYBOOK", ""),
             ansible_limit=e.get("TP_ANSIBLE_LIMIT", ""),

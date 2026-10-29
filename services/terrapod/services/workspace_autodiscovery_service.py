@@ -405,6 +405,8 @@ async def find_or_autocreate_workspace(
         configure_enabled=rule.configure_enabled,
         auto_configure_enabled=rule.auto_configure_enabled,
         configure_all_hosts=rule.configure_all_hosts,
+        dynamic_inventory_enabled=rule.dynamic_inventory_enabled,
+        inventory_scripts_enabled=rule.inventory_scripts_enabled,
         configure_after_apply=rule.configure_after_apply,
         config_directory=rule.config_directory,
         inventory_paths=list(rule.inventory_paths or []),

@@ -59,6 +59,12 @@ class TerraformRunOptions:
     parallelism: int = 10
     #: The collections a configure installs, in `name[:version]` form (#1931).
     ansible_collections: list[str] | None = None
+    #: #2033's pair, taken from the RUN's snapshot rather than the workspace,
+    #: so a setting that moves mid-run cannot change what the Job may resolve.
+    #: They compose the runner's `ANSIBLE_INVENTORY_ENABLED`; the API's own
+    #: resolution never gets either, permanently.
+    dynamic_inventory_enabled: bool = False
+    inventory_scripts_enabled: bool = False
     #: The Ansible config root, repo-root-relative (#1929). `""` is the
     #: repository root; absent means this run performs no configure, which is
     #: every plan and apply.
@@ -157,6 +163,8 @@ class TerraformStrategy:
         is_destroy = options.is_destroy
         parallelism = options.parallelism
         ansible_collections = options.ansible_collections
+        dynamic_inventory_enabled = options.dynamic_inventory_enabled
+        inventory_scripts_enabled = options.inventory_scripts_enabled
         cost_estimation = options.cost_estimation
         cost_default_region = options.cost_default_region
         working_directory = options.working_directory
@@ -213,6 +221,15 @@ class TerraformStrategy:
             env.append({"name": "TP_PLAYBOOK", "value": playbook})
         if ansible_limit:
             env.append({"name": "TP_ANSIBLE_LIMIT", "value": ansible_limit})
+        # Only when ON, like the configure instructions above: both default off,
+        # so a deployment that has not opted in renders a byte-identical Job
+        # spec and the golden matrix stays as it is. The runner floors itself at
+        # `yaml,ini`, so an absent variable and `false` mean the same thing --
+        # which is the safe direction for a switch that widens what may execute.
+        if dynamic_inventory_enabled:
+            env.append({"name": "TP_DYNAMIC_INVENTORY_ENABLED", "value": "true"})
+        if inventory_scripts_enabled:
+            env.append({"name": "TP_INVENTORY_SCRIPTS_ENABLED", "value": "true"})
         if target_addrs:
             env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
         if replace_addrs:
@@ -326,6 +343,12 @@ class TerraformStrategy:
             is_destroy=attrs.get("is-destroy", False),
             parallelism=attrs.get("parallelism", 10),
             ansible_collections=attrs.get("ansible-collections", []),
+            # Defaulting FALSE rather than True, which is the safe direction
+            # for a switch that widens what may execute: a runner claiming a
+            # run from an API that predates #2033 sees no attribute and
+            # floors itself at `yaml,ini`, exactly as it does today.
+            dynamic_inventory_enabled=attrs.get("dynamic-inventory-enabled", False),
+            inventory_scripts_enabled=attrs.get("inventory-scripts-enabled", False),
             config_directory=attrs.get("config-directory", ""),
             # The run's own choice first, the workspace's default second. Both
             # keys are read here so the precedence is stated once; until #1974
