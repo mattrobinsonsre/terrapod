@@ -1478,7 +1478,16 @@
       "anyPool": "N'importe quel pool d'agents peut être utilisé.",
       "labels": "Labels",
       "variableOptions": "Options de variables (avancé, JSON)",
-      "variableOptionsHint": "Remplacements par entrée (options, masqué, valeur par défaut). Laissez <code>[]</code> si inutilisé."
+      "variableOptionsHint": "Remplacements par entrée (options, masqué, valeur par défaut). Laissez <code>[]</code> si inutilisé.",
+      "ansibleHeading": "Configuration Ansible",
+      "ansibleDirectory": "Répertoire de configuration Ansible",
+      "defaultPlaybook": "Playbook par défaut",
+      "defaultPlaybookHint": "Le playbook qu'exécute une opération de configuration lorsque l'exécution elle-même n'en nomme aucun. Par rapport au répertoire de configuration.",
+      "defaultLimit": "Limite par défaut",
+      "defaultLimitHint": "Le motif --limit par défaut d'une opération de configuration. Laissez-le vide pour viser l'inventaire entier.",
+      "configureEnabled": "Provisionner une opération de configuration",
+      "configureEnabledHint": "Désactivé sauf si vous l'activez. L'espace de travail provisionné par cet élément reçoit alors une opération de configuration en plus de son plan et de son apply.",
+      "ansibleDirectoryHint": "Le sous-répertoire du module qui contient le playbook. Terrapod le copie dans la version de configuration générée, et il devient le répertoire de configuration Ansible de l'espace de travail provisionné. Relatif à la racine du module, sans barre oblique au début ni à la fin."
     },
     "table": {
       "name": "Nom",
@@ -1506,7 +1515,8 @@
       "delete": "Échec de la suppression de l'élément de catalogue",
       "deleteConflict": "Suppression impossible : cet élément de catalogue a des instances provisionnées.",
       "varOptsInvalidJson": "Les options de variables doivent être un JSON valide (un tableau).",
-      "varOptsNotArray": "Les options de variables doivent être un tableau JSON."
+      "varOptsNotArray": "Les options de variables doivent être un tableau JSON.",
+      "configureNeedsDirectory": "Un répertoire de configuration Ansible est requis pour provisionner une opération de configuration. Indiquez le sous-répertoire du module qui contient le playbook."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Aucun élément de catalogue disponible.",
     "card": {
       "pinned": "épinglée {version}",
-      "latest": "la plus récente"
+      "latest": "la plus récente",
+      "configure": "Configuration Ansible"
     },
     "errors": {
       "loadItems": "Échec du chargement des éléments de catalogue"
@@ -1820,7 +1831,11 @@
       "module": "Module :",
       "resolvedVersion": "Version résolue :",
       "latest": "la plus récente",
-      "disabled": "désactivé"
+      "disabled": "désactivé",
+      "configureBadge": "Configuration Ansible",
+      "configureDirectory": "Répertoire :",
+      "configurePlaybook": "Playbook :",
+      "configureLimit": "Limite :"
     },
     "pending": {
       "banner": "L'exécution pour <strong>{name}</strong> est planifiée et en attente de revue. Confirmez pour appliquer, ou abandonnez.",

@@ -1478,7 +1478,16 @@
       "anyPool": "Any agent marklar may be used.",
       "labels": "Marklars",
       "variableOptions": "Marklar marklars (advanced, JSON)",
-      "variableOptionsHint": "Per-marklar overrides (marklars, hidden, default). Leave as <code>[]</code> if unused."
+      "variableOptionsHint": "Per-marklar overrides (marklars, hidden, default). Leave as <code>[]</code> if unused.",
+      "ansibleHeading": "Marklar marklar",
+      "ansibleDirectory": "Marklar marklar marklar",
+      "defaultPlaybook": "Default marklar",
+      "defaultPlaybookHint": "The marklar a marklar runs when the marklar itself names none. Relative to the marklar marklar.",
+      "defaultLimit": "Default marklar",
+      "defaultLimitHint": "The default --limit marklar for a marklar. Leave it empty to target the whole marklar.",
+      "configureEnabled": "Provision a configure marklar",
+      "configureEnabledHint": "Off unless you turn it on. The marklar this marklar provisions then gets a configure marklar alongside its marklar and apply.",
+      "ansibleDirectoryHint": "The marklar of the marklar that holds the marklar. Terrapod copies it into the generated marklar marklar, and it becomes the provisioned marklar's Ansible config marklar. Relative to the marklar marklar, with no leading or trailing marklar."
     },
     "table": {
       "name": "Marklar",
@@ -1506,7 +1515,8 @@
       "delete": "Failed to delete marklar marklar",
       "deleteConflict": "Cannot delete: this marklar marklar has provisioned marklars.",
       "varOptsInvalidJson": "Marklar marklars must be valid JSON (an marklar).",
-      "varOptsNotArray": "Marklar marklars must be a JSON marklar."
+      "varOptsNotArray": "Marklar marklars must be a JSON marklar.",
+      "configureNeedsDirectory": "An Ansible config marklar is required to provision a configure marklar. Name the marklar of the marklar that holds the marklar."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "No marklar marklars available.",
     "card": {
       "pinned": "pinned {version}",
-      "latest": "latest"
+      "latest": "latest",
+      "configure": "Marklar marklar"
     },
     "errors": {
       "loadItems": "Failed to load marklar marklars"
@@ -1820,7 +1831,11 @@
       "module": "Marklar:",
       "resolvedVersion": "Resolved marklar:",
       "latest": "latest",
-      "disabled": "disabled"
+      "disabled": "disabled",
+      "configureBadge": "Marklar marklar",
+      "configureDirectory": "Marklar:",
+      "configurePlaybook": "Marklar:",
+      "configureLimit": "Marklar:"
     },
     "pending": {
       "banner": "The marklar for <strong>{name}</strong> is planned and waiting for marklar. Confirm to apply, or discard.",

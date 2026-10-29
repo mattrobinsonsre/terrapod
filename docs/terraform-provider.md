@@ -401,7 +401,9 @@ materialises will have — with two independent booleans:
 
 Omit both and you get today's behaviour — a plan/apply workspace with no Ansible
 — which is why adding these attributes drifts nothing on an existing
-configuration.
+configuration. `terrapod_catalog_item` carries `configure_enabled` as well, with
+a different companion attribute and a different pair rule; see
+[On `terrapod_catalog_item`](#on-terrapod_catalog_item) below.
 
 **Setting both to `false` is refused by the API with a 422**, so it fails at
 apply rather than silently creating a workspace that can never produce a run.
@@ -445,3 +447,46 @@ for `working_directory`. It was briefly nullable, with `null` meaning "no
 configure operation"; that meaning now lives in `configure_enabled`, and the API
 refuses an explicit `null` rather than coercing it — which is what keeps a plan
 agreeing with its result.
+
+### On `terrapod_catalog_item`
+
+A [service catalog](service-catalog.md) item carries `configure_enabled` too, so
+it can provision a workspace that is primarily Ansible — one holding only as much
+Terraform as it takes to declare the
+[inventory](ansible-inventory.md). Three more attributes come with it, and all
+four are templated onto every workspace provisioned from the item:
+
+| Attribute | Default | What it gives the provisioned workspace |
+|---|---|---|
+| `configure_enabled` | `false` | a configure operation |
+| `ansible_directory` | `""` | the subdirectory **of the module** whose contents are copied into the generated configuration version, and the workspace's `config_directory` |
+| `default_playbook` | `""` | its `default_playbook`, relative to `ansible_directory` |
+| `default_limit` | `""` | its `default_limit` |
+
+**The pair rule here is a different rule, not the workspace's inverted.**
+`configure_enabled = true` with an empty `ansible_directory` is refused — by the
+provider at plan time where the configuration says so outright, and by the API at
+apply time in every other case — because a configure rooted at the configuration
+version's root would find only the generated wrapper there and fail at run time
+for want of a playbook. There is no second boolean to turn off, so nothing here
+refuses a pair of falses.
+
+```hcl
+resource "terrapod_catalog_item" "fleet" {
+  name      = "ansible-fleet"
+  module_id = terrapod_registry_module.fleet.id
+
+  configure_enabled = true
+  ansible_directory = "ansible"    # a subdirectory of the MODULE
+  default_playbook  = "site.yml"   # relative to ansible_directory
+  default_limit     = "web"
+}
+```
+
+`ansible_directory` names a subtree that is **copied** out of the module rather
+than referenced, and that is forced rather than preferred: a composite run is two
+runner Jobs, so the configure Job re-fetches the configuration version and never
+runs `init` — the module's own checkout does not exist in it. All four are stored
+byte for byte, so a leading or trailing slash, a `..` or stray whitespace is
+refused rather than quietly cleaned up; that is what keeps a plan agreeing with
+its result.

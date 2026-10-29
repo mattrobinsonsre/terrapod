@@ -24,6 +24,10 @@
 //	"variable-options"       -> variable_options_json   (string, optional; JSON
 //	    array of objects, kept as a JSON string to track the open-ended server
 //	    contract)
+//	"configure-enabled"      -> configure_enabled       (bool, optional+computed)
+//	"ansible-directory"      -> ansible_directory       (string, optional+computed)
+//	"default-playbook"       -> default_playbook        (string, optional+computed)
+//	"default-limit"          -> default_limit           (string, optional+computed)
 //	"labels"                 -> labels                  (map[string]string, optional)
 //
 // Read-only:
@@ -52,8 +56,9 @@ import (
 )
 
 var (
-	_ resource.Resource                = &catalogItemResource{}
-	_ resource.ResourceWithImportState = &catalogItemResource{}
+	_ resource.Resource                   = &catalogItemResource{}
+	_ resource.ResourceWithImportState    = &catalogItemResource{}
+	_ resource.ResourceWithValidateConfig = &catalogItemResource{}
 )
 
 type catalogItemModel struct {
@@ -69,6 +74,16 @@ type catalogItemModel struct {
 	AllowedAgentPoolIDs types.List   `tfsdk:"allowed_agent_pool_ids"`
 	VariableOptionsJSON types.String `tfsdk:"variable_options_json"`
 	Labels              types.Map    `tfsdk:"labels"`
+
+	// The Ansible half this item provisions (#2019): a workspace that is
+	// primarily Ansible, carrying only as much Terraform as it takes to declare
+	// the inventory. ConfigureEnabled says WHETHER and AnsibleDirectory says
+	// WHERE; an empty directory does not carry "off", because #1966 corrected
+	// exactly that on the workspace's own config_directory.
+	ConfigureEnabled types.Bool   `tfsdk:"configure_enabled"`
+	AnsibleDirectory types.String `tfsdk:"ansible_directory"`
+	DefaultPlaybook  types.String `tfsdk:"default_playbook"`
+	DefaultLimit     types.String `tfsdk:"default_limit"`
 
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
@@ -86,6 +101,53 @@ func NewResource() resource.Resource {
 
 func (r *catalogItemResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_catalog_item"
+}
+
+// ValidateConfig rejects a config that asks for a configure operation without
+// saying where the playbook lives.
+//
+// The server refuses the same pair with a 422 (#2019); catching it at plan time
+// turns an apply-time failure into an error the operator sees before anything is
+// sent, which is the precedent the workspace resource sets with
+// validateOperationsPair.
+func (r *catalogItemResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m catalogItemModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	validateConfigureDirectoryPair(m.ConfigureEnabled, m.AnsibleDirectory, resp)
+}
+
+// validateConfigureDirectoryPair errors when a config turns the configure
+// operation on and declares an empty directory in the same breath (#2019).
+//
+// An OMITTED directory is deliberately not an error here. The server evaluates
+// the invariant against the row the write would PRODUCE, which is the authority:
+// only it knows which directory the item already holds, so switching
+// `configure_enabled` on is legitimate against a stored one. A null is not a
+// declaration of emptiness -- it is "leave whatever is there" on update and
+// "take the default" on create -- and ValidateConfig sees the configuration
+// alone, with no state to tell the two apart. So this catches the subset that is
+// decidable from the configuration, and the rest stays the server's 422, exactly
+// as validateOperationsPair leaves the workspace's unknown half to the server.
+func validateConfigureDirectoryPair(enabled types.Bool, directory types.String, resp *resource.ValidateConfigResponse) {
+	if enabled.IsNull() || enabled.IsUnknown() || !enabled.ValueBool() {
+		return
+	}
+	if directory.IsNull() || directory.IsUnknown() {
+		return
+	}
+	if directory.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"configure_enabled needs an ansible_directory",
+			"This configuration sets `configure_enabled = true` with an empty "+
+				"`ansible_directory`, which would provision a workspace whose Ansible root "+
+				"is the configuration version's root -- where only the generated wrapper "+
+				"lives, so a configure would fail at run time for want of a playbook. Name "+
+				"the subdirectory of the module that holds the playbook.",
+		)
+	}
 }
 
 func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -146,6 +208,61 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 				// cannot mark sub-fields of one.
 				Sensitive: true,
 			},
+
+			// The Ansible half this item provisions (#2019). `configure_enabled`
+			// says whether and `ansible_directory` says where.
+			//
+			// Requiredness follows this resource's own siblings rather than the
+			// workspace's, because the read-back helper is what decides it. The
+			// bool is Optional+Computed like `enabled`: the server always returns
+			// one, so a null plan against a `false` result would fail the apply.
+			// The three strings are Optional-only like `display_name`: the server
+			// returns "" when unset and optString maps that back to null, so an
+			// omitted attribute stays null in state instead of planning as
+			// "(known after apply)".
+			"configure_enabled": schema.BoolAttribute{
+				Description: "Whether a workspace provisioned from this item has the Ansible " +
+					"configure operation. Defaults to false — configure is opt-in. " +
+					"**Turning it on needs a non-empty `ansible_directory`; the pair is " +
+					"refused (422) otherwise**, because a configure rooted at the generated " +
+					"wrapper has no playbook to run.",
+				Optional: true,
+				Computed: true,
+			},
+			"ansible_directory": schema.StringAttribute{
+				Description: "Subdirectory of the MODULE whose contents are copied into the " +
+					"generated configuration version, and the `config_directory` the " +
+					"provisioned workspace is given. Module-relative, written without a " +
+					"leading or trailing slash. Copied rather than referenced because a " +
+					"configure Job never runs init, so the module's own checkout does not " +
+					"exist in it.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"default_playbook": schema.StringAttribute{
+				Description: "Playbook templated onto the provisioned workspace, relative to " +
+					"`ansible_directory` — which becomes that workspace's Ansible root. " +
+					"Written without a leading or trailing slash.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"default_limit": schema.StringAttribute{
+				Description: "Ansible `--limit` templated onto the provisioned workspace. " +
+					"Stored byte for byte, so leading or trailing whitespace is refused " +
+					"rather than trimmed.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+
 			"labels": schema.MapAttribute{
 				Description: "Labels feeding Terrapod's label-based RBAC and filtering.",
 				Optional:    true,
@@ -319,6 +436,29 @@ func buildCatalogItemAttrs(m *catalogItemModel) (map[string]any, diag.Diagnostic
 		attrs["variable-options"] = opts
 	}
 
+	// The Ansible half (#2019). Each is sent only when the config declares it:
+	// the server validates what it is sent and leaves the rest of the row alone,
+	// so a PATCH of something else cannot be refused over a stored value it never
+	// mentioned (#316).
+	//
+	// Sent VERBATIM. The server stores these byte for byte and this is the other
+	// half of that bargain: trimming or lower-casing a value on the way out is how
+	// the state written back stops matching the plan, which fails the apply with
+	// "Provider produced inconsistent result after apply". A value the server would
+	// refuse is left to the server to refuse.
+	if !m.ConfigureEnabled.IsNull() && !m.ConfigureEnabled.IsUnknown() {
+		attrs["configure-enabled"] = m.ConfigureEnabled.ValueBool()
+	}
+	if !m.AnsibleDirectory.IsNull() && !m.AnsibleDirectory.IsUnknown() {
+		attrs["ansible-directory"] = m.AnsibleDirectory.ValueString()
+	}
+	if !m.DefaultPlaybook.IsNull() && !m.DefaultPlaybook.IsUnknown() {
+		attrs["default-playbook"] = m.DefaultPlaybook.ValueString()
+	}
+	if !m.DefaultLimit.IsNull() && !m.DefaultLimit.IsUnknown() {
+		attrs["default-limit"] = m.DefaultLimit.ValueString()
+	}
+
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {
@@ -395,6 +535,34 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 	} else {
 		m.VariableOptionsJSON = types.StringNull()
 	}
+
+	// The Ansible half (#2019), read back unchanged. The bool follows `enabled`
+	// above; the three strings go through optString, so the server's "" comes back
+	// as null and a config that omits them matches its state.
+	if v, ok := ci.Attributes["configure-enabled"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			m.ConfigureEnabled = types.BoolValue(b)
+		} else {
+			m.ConfigureEnabled = types.BoolNull()
+		}
+	} else {
+		m.ConfigureEnabled = types.BoolNull()
+	}
+	// CONCRETE, not optString. These three are Optional+Computed, so an omitted
+	// one plans as unknown and any concrete result satisfies it -- while an
+	// EXPLICIT "" must read back as "" or the apply fails "Provider produced
+	// inconsistent result after apply". optString collapses "" to null, which is
+	// correct for this resource's Optional-only strings and wrong for these.
+	//
+	// Not local tidiness: `default_playbook` and `default_limit` are the SAME
+	// attribute names on `terrapod_workspace`, where they are Optional+Computed
+	// with a concrete read-back. One name behaving two ways across two resources
+	// is worse than two helpers in one file, and the Optional-only shape ships
+	// the "inconsistent result" defect this provider has already closed six
+	// times (#684, #732, #1634, #1748, #1771, #2110).
+	m.AnsibleDirectory = types.StringValue(attrString(ci.Attributes, "ansible-directory"))
+	m.DefaultPlaybook = types.StringValue(attrString(ci.Attributes, "default-playbook"))
+	m.DefaultLimit = types.StringValue(attrString(ci.Attributes, "default-limit"))
 
 	labels := attrStringMap(ci.Attributes, "labels")
 	if len(labels) > 0 {

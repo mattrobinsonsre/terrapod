@@ -129,6 +129,14 @@ def _item_json(item: CatalogItem) -> dict:
                 else None
             ),
             "variable-options": list(item.variable_options or []),
+            # The Ansible half this item provisions (#2019). `configure-enabled`
+            # says WHETHER and `ansible-directory` says WHERE; the path does not
+            # carry "off" in its emptiness, because #1966 corrected exactly that
+            # on the workspace's own `config-directory`.
+            "configure-enabled": item.configure_enabled,
+            "ansible-directory": item.ansible_directory or "",
+            "default-playbook": item.default_playbook or "",
+            "default-limit": item.default_limit or "",
             "labels": dict(item.labels or {}),
             "owner-email": item.owner_email or "",
             "created-at": _rfc3339(item.created_at),
@@ -330,7 +338,13 @@ async def delete_provider_template(
 # ── Catalog items ──────────────────────────────────────────────────────
 
 
-async def _coerce_item(db: AsyncSession, attrs: dict, *, on_create: bool) -> dict:
+async def _coerce_item(
+    db: AsyncSession,
+    attrs: dict,
+    *,
+    on_create: bool,
+    current: CatalogItem | None = None,
+) -> dict:
     out: dict = {}
     if on_create or "name" in attrs:
         name = str(attrs.get("name", "")).strip()
@@ -430,7 +444,85 @@ async def _coerce_item(db: AsyncSession, attrs: dict, *, on_create: bool) -> dic
         out["variable_options"] = vo
     if "labels" in attrs:
         out["labels"] = validate_labels(attrs["labels"] or {})
+
+    # --- the Ansible half (#2019) ---------------------------------------
+    #
+    # Validate what the CALLER SENT and store it byte for byte -- the v1.9.0
+    # rule, because a provider writes the server's response back into state and
+    # a trimmed or lower-cased value fails the apply with "Provider produced
+    # inconsistent result after apply". Re-validating a stored value is also how
+    # a row written by a migration becomes uneditable (#316), which is why each
+    # of these is gated on the key being present.
+    if "configure-enabled" in attrs:
+        raw = attrs["configure-enabled"]
+        if not isinstance(raw, bool):
+            raise HTTPException(status_code=422, detail="configure-enabled must be a boolean")
+        out["configure_enabled"] = raw
+    if "ansible-directory" in attrs:
+        out["ansible_directory"] = _item_relative_path(
+            attrs["ansible-directory"], "ansible-directory"
+        )
+    if "default-playbook" in attrs:
+        out["default_playbook"] = _item_relative_path(attrs["default-playbook"], "default-playbook")
+    if "default-limit" in attrs:
+        raw = attrs["default-limit"]
+        if not isinstance(raw, str):
+            raise HTTPException(status_code=422, detail="default-limit must be a string")
+        if raw != raw.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="default-limit: leading or trailing whitespace is not allowed",
+            )
+        out["default_limit"] = raw
+
+    # A cross-field invariant, so it takes the RESULTING values rather than the
+    # submitted ones -- the #1966 shape, and the exception that proves the
+    # validate-only-what-was-sent rule either side of it. `configure-enabled`
+    # with no directory is incoherent rather than a no-op: it would provision a
+    # workspace whose Ansible root is the configuration version's root, where
+    # only the generated wrapper lives, and fail at run time for want of a
+    # playbook.
+    enabled = out.get("configure_enabled", current.configure_enabled if current else False)
+    directory = out.get("ansible_directory", current.ansible_directory if current else "")
+    if enabled and not directory:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "configure-enabled needs an ansible-directory naming the subdirectory "
+                "of the module that holds the playbook"
+            ),
+        )
     return out
+
+
+def _item_relative_path(raw: object, field: str) -> str:
+    """A module-relative path, refused rather than normalised.
+
+    The same refusals as the workspace's own Ansible paths (#1929): no traversal,
+    no leading or trailing slash, no stray whitespace. Refused rather than
+    stripped because this value round-trips through a Terraform provider, and
+    silently storing a different one than the caller sent is what fails an apply
+    with "Provider produced inconsistent result after apply".
+    """
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=422, detail=f"{field} must be a string")
+    if len(raw) > 255:
+        raise HTTPException(status_code=422, detail=f"{field}: maximum 255 characters")
+    if ".." in raw:
+        raise HTTPException(status_code=422, detail=f"{field}: path traversal not allowed")
+    if raw.startswith("/") or raw.endswith("/"):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{field}: write the path without a leading or trailing slash "
+                f"(it is relative to the module root)"
+            ),
+        )
+    if raw != raw.strip():
+        raise HTTPException(
+            status_code=422, detail=f"{field}: leading or trailing whitespace is not allowed"
+        )
+    return raw
 
 
 @router.get("/catalog-items")
@@ -472,6 +564,10 @@ async def create_catalog_item(
         provider_template_ids=fields.get("provider_template_ids", []),
         allowed_agent_pool_ids=fields.get("allowed_agent_pool_ids"),
         variable_options=fields.get("variable_options", []),
+        configure_enabled=fields.get("configure_enabled", False),
+        ansible_directory=fields.get("ansible_directory", ""),
+        default_playbook=fields.get("default_playbook", ""),
+        default_limit=fields.get("default_limit", ""),
         labels=fields.get("labels", {}),
         owner_email=user.email,
         created_at=_now(),
@@ -531,7 +627,7 @@ async def update_catalog_item(
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
     attrs = body.get("data", {}).get("attributes", {})
-    for k, v in (await _coerce_item(db, attrs, on_create=False)).items():
+    for k, v in (await _coerce_item(db, attrs, on_create=False, current=item)).items():
         setattr(item, k, v)
     item.updated_at = _now()
     try:

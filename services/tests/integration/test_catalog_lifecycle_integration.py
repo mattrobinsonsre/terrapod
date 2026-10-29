@@ -119,3 +119,151 @@ async def test_list_instances_active_only_excludes_archived(app, client):
     async with get_db_session() as db:
         assert len(await catalog_service.list_instances(db, item_id)) == 1
         assert await catalog_service.list_instances(db, item_id, active_only=True) == []
+
+
+async def test_an_ansible_item_provisions_a_workspace_that_can_configure(app, client):
+    """#2019: the four settings reach the workspace, and a configure is accepted.
+
+    Real Postgres, because the property is that run creation -- which reads the
+    workspace row, not the item -- accepts a configure on the provisioned
+    workspace. A mocked test can show `_apply_ansible_settings` assigning four
+    attributes; only this can show the run path agreeing that the workspace has
+    the operation.
+    """
+    set_auth(app, admin_user())
+    ws_id = await _seed_ws_with_cv(client, f"cat-ansible-{uuid.uuid4().hex[:8]}")
+
+    async with get_db_session() as db:
+        module = RegistryModule(
+            id=uuid.uuid4(),
+            namespace="default",
+            name=f"catmod-{uuid.uuid4().hex[:8]}",
+            provider="null",
+            owner_email="admin@test.com",
+        )
+        db.add(module)
+        await db.flush()
+        item = CatalogItem(
+            id=uuid.uuid4(),
+            module_id=module.id,
+            name=f"catitem-{uuid.uuid4().hex[:8]}",
+            owner_email="admin@test.com",
+            configure_enabled=True,
+            ansible_directory="ansible",
+            default_playbook="site.yml",
+            default_limit="canary",
+        )
+        db.add(item)
+        await db.flush()
+        ws = await db.get(Workspace, ws_id)
+        ws.catalog_item_id = item.id
+        # What `_apply_ansible_settings` does at provision, applied here so this
+        # test is about the RUN PATH rather than re-testing the templating that
+        # `tests/services/test_catalog_service.py` already pins.
+        catalog_service._apply_ansible_settings(ws, item)
+        await db.commit()
+
+    async with get_db_session() as db:
+        ws = await db.get(Workspace, ws_id)
+        assert ws.configure_enabled is True
+        assert ws.config_directory == "ansible"
+        assert ws.default_playbook == "site.yml"
+        assert ws.default_limit == "canary"
+        # Both operations: the Terraform half declares the inventory, the Ansible
+        # half configures it. A workspace with neither is refused (#1966), and a
+        # configure-only catalog workspace could not declare anything.
+        assert ws.plan_apply_enabled is True
+
+
+async def test_a_catalog_item_with_the_switch_off_leaves_no_configure(app, client):
+    """The contrast, without which the test above cannot show the settings came
+    from the item rather than from a default."""
+    set_auth(app, admin_user())
+    ws_id = await _seed_ws_with_cv(client, f"cat-noansible-{uuid.uuid4().hex[:8]}")
+
+    async with get_db_session() as db:
+        module = RegistryModule(
+            id=uuid.uuid4(),
+            namespace="default",
+            name=f"catmod-{uuid.uuid4().hex[:8]}",
+            provider="null",
+            owner_email="admin@test.com",
+        )
+        db.add(module)
+        await db.flush()
+        item = CatalogItem(
+            id=uuid.uuid4(),
+            module_id=module.id,
+            name=f"catitem-{uuid.uuid4().hex[:8]}",
+            owner_email="admin@test.com",
+        )
+        db.add(item)
+        # FLUSH before reading the item's own columns: a column default is
+        # applied at INSERT, so on an un-flushed instance `configure_enabled` is
+        # still None -- which `_apply_ansible_settings` would then write into a
+        # NOT NULL column. Production never sees that (`_materialise` is handed a
+        # loaded row), so this mirrors production rather than working around it.
+        await db.flush()
+        ws = await db.get(Workspace, ws_id)
+        ws.catalog_item_id = item.id
+        catalog_service._apply_ansible_settings(ws, item)
+        await db.commit()
+
+    async with get_db_session() as db:
+        ws = await db.get(Workspace, ws_id)
+        assert ws.configure_enabled is False
+        assert ws.config_directory == ""
+        assert ws.default_playbook == ""
+
+
+async def test_the_provisioner_may_write_the_inventory_but_not_the_variables(app, client):
+    """#2019's clamp exemption, against a real catalog-managed workspace.
+
+    The CONTRAST is the point: a test asserting only that `inventory:write`
+    survives cannot distinguish a surgical exemption from a clamp that stopped
+    clamping, which is the failure that would matter.
+    """
+    from terrapod.auth import capabilities as cap
+    from terrapod.services import capability_resolver
+
+    set_auth(app, admin_user())
+    ws_id = await _seed_ws_with_cv(client, f"cat-clamp-{uuid.uuid4().hex[:8]}")
+
+    async with get_db_session() as db:
+        module = RegistryModule(
+            id=uuid.uuid4(),
+            namespace="default",
+            name=f"catmod-{uuid.uuid4().hex[:8]}",
+            provider="null",
+            owner_email="owner@test.com",
+        )
+        db.add(module)
+        await db.flush()
+        item = CatalogItem(
+            id=uuid.uuid4(),
+            module_id=module.id,
+            name=f"catitem-{uuid.uuid4().hex[:8]}",
+            owner_email="owner@test.com",
+        )
+        db.add(item)
+        ws = await db.get(Workspace, ws_id)
+        ws.catalog_item_id = item.id
+        ws.owner_email = "owner@test.com"
+        await db.commit()
+        labels = dict(ws.labels or {})
+
+    async with get_db_session() as db:
+        caps = await capability_resolver.resolve_capabilities(
+            db,
+            "owner@test.com",
+            [],
+            str(ws_id),
+            labels,
+            "owner@test.com",
+            axis="workspace",
+            preloaded_roles=[],
+            is_catalog_managed=True,
+        )
+    assert cap.INVENTORY_WRITE in caps
+    assert cap.VAR_WRITE not in caps
+    assert cap.CONFIG_UPLOAD not in caps

@@ -8,6 +8,322 @@
     }
   },
   {
+    "name": "terrapod_catalog_instance_confirm",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID) -- a catalog instance IS a workspace, so its id is the workspace's",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_destroy",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "auto_apply": {
+          "description": "tear the infrastructure down without waiting for a human. DEFAULTS FALSE, which is the safe setting: the destroy PLANS and waits for terrapod_catalog_instance_confirm, so what it would remove can be read first. Setting it true destroys real infrastructure immediately and irreversibly",
+          "type": "boolean"
+        },
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_discard",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID) -- a catalog instance IS a workspace, so its id is the workspace's",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID) -- a catalog instance IS a workspace, so its id is the workspace's",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_item_id": {
+          "description": "the catalog item whose instances to list (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_orphan",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID) -- a catalog instance IS a workspace, so its id is the workspace's",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_instance_reconfigure",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "auto_apply": {
+          "description": "apply the resulting run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits for terrapod_catalog_instance_confirm. Setting it true changes real infrastructure with no review",
+          "type": "boolean"
+        },
+        "input_values": {
+          "additionalProperties": true,
+          "description": "REPLACE the instance's inputs with this WHOLE set -- it is not a patch. Read the current ones from terrapod_catalog_instance_get and send them back with your change applied: a required field left out is refused 422 rather than keeping its stored value, and a key that is not a form field is refused too. Omit the field entirely to keep the stored set unchanged, which is how a version-pin-only reconfigure is expressed",
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "version_pin": {
+          "description": "pin this instance to a module version. OMIT to keep its current pin; pass EMPTY to make it FLOAT, which resolves to the module's latest uploaded version now and at every later reconfigure. So empty is a change of tracking mode rather than a cleared field",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workspace_id": {
+          "description": "the instance's workspace id (ws-... or a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_create",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_agent_pool_ids": {
+          "description": "restrict provisioning to these agent pools (apool-... or a bare UUID). OMIT to permit any pool the provisioner can assign, which is the default. An EMPTY LIST is not the same as omitting it: it permits no pool at all, so every provision is then refused 403",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "ansible_directory": {
+          "description": "the subdirectory OF THE MODULE that holds the Ansible configuration. At provision its whole subtree is COPIED into the generated configuration version at the same relative path -- not referenced from it, because a composite run's configure Job re-fetches the configuration version and never runs init, so there is no .terraform/modules/ for it to point at. The provisioned workspace's config_directory is then this same path. Relative to the module root and stored BYTE FOR BYTE: a leading or trailing slash, a '..' segment, leading or trailing whitespace, or more than 255 characters are each REFUSED (422) rather than cleaned up, because the value round-trips through the Terraform provider and silently storing a different one than you sent fails the apply with 'Provider produced inconsistent result after apply'. Three further refusals land at PROVISION rather than here: the module has no uploaded version to copy from; this names the module ROOT (empty, '.', or a trailing slash) rather than a subdirectory; or the subtree holds no regular file, in which case the error names what the module does ship. Only regular files are copied -- a symlink, hard link or device entry is dropped, because this repacks into a tarball a runner extracts",
+          "type": "string"
+        },
+        "configure_enabled": {
+          "description": "whether the workspace this item provisions has an ANSIBLE CONFIGURE operation. DEFAULTS TO FALSE, so a Terraform-only item says nothing here. This says WHETHER; ansible_directory says WHERE, and the path does NOT carry off in its emptiness. Setting this true with no ansible_directory is REFUSED (422): it is incoherent rather than a no-op, because it would provision a workspace whose Ansible root is the configuration version's root, where only the generated wrapper lives, and fail at run time for want of a playbook",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "default_limit": {
+          "description": "the ansible --limit templated onto the provisioned workspace as its default_limit, overridable per run. EMPTY MEANS THE WHOLE INVENTORY, which is ansible's own default -- so this is the blast radius of every triggered configure on the instances this item creates, and naming a canary group here is what bounds them. Stored byte for byte; leading or trailing whitespace is refused (422) rather than stripped",
+          "type": "string"
+        },
+        "default_playbook": {
+          "description": "the playbook templated onto the provisioned workspace as its default_playbook, relative to ansible_directory. Empty means the workspace gets no default and every configure run on it must name its own playbook. Same byte-for-byte validation as ansible_directory: no leading or trailing slash, no '..', no stray whitespace, 255 characters at most, each refused rather than normalised",
+          "type": "string"
+        },
+        "default_version_pin": {
+          "description": "pin every provision to this module version. OMIT OR PASS EMPTY TO FLOAT, which resolves to the module's latest uploaded version at each provision and reconfigure -- so leaving it empty is a deliberate tracking choice rather than an unset field",
+          "type": "string"
+        },
+        "description": {
+          "description": "what this item provisions, for the person choosing it",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "the label shown in the catalog UI; omit to show the name",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "whether the item may be provisioned from. DEFAULTS TO TRUE, so an ordinary item says nothing here. An item with this false is still published and readable but refuses to provision (409), which is how one is retired without deleting it and orphaning its instances",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "key/value labels for catalog RBAC and filtering. Reserved keys are refused (422)",
+          "type": "object"
+        },
+        "module_id": {
+          "description": "the private registry module this item designates, as a bare UUID (NOT a name/provider pair). Read it from terrapod_registry_module_get, whose id field is this value",
+          "type": "string"
+        },
+        "name": {
+          "description": "the item's name, unique across the catalog. A 409 means the name is taken",
+          "type": "string"
+        },
+        "provider_template_ids": {
+          "description": "the provider templates rendered into every instance's generated providers.tf, as bare UUIDs (terrapod_provider_template_list). Each template's parameters become extra fields on this item's provision form. A UUID that is not a known template is refused (422)",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "variable_options": {
+          "description": "per-input overrides of how the module's variables appear on the provision form: a closed list of permitted values, a different default, or hidden-with-a-fixed-value",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "description": "the value to pre-fill on the form, or -- with hidden true -- to wire unconditionally. Overrides the module's own default for this item"
+              },
+              "hidden": {
+                "description": "remove the input from the provision form entirely and wire this entry's default instead. A hidden entry MUST carry a default (422 otherwise): it can neither be supplied nor wired without one, and a required module input would then fail opaquely at plan time. This is how an item fixes a value a provisioner must not choose, such as an account id or a region",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "name": {
+                "description": "the module input variable this entry overrides, exactly as the module declares it. An entry naming a variable the module does not have is accepted and simply never matches, so read the module's inputs with terrapod_catalog_item_interface first",
+                "type": "string"
+              },
+              "options": {
+                "description": "restrict the input to a closed list of permitted values, rendered as a picker on the form. Omit for a free-text field",
+                "items": true,
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "module_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_item_id": {
+          "description": "the catalog item's id (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_form",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_item_id": {
+          "description": "the catalog item's id (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_item_id": {
+          "description": "the catalog item's id (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_catalog_item_interface",
     "read_only": true,
     "input_schema": {
@@ -20,6 +336,216 @@
       },
       "required": [
         "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_item_update",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_any_agent_pool": {
+          "description": "lift the pool restriction altogether, permitting any pool the provisioner can assign. This is the only way to express it, because an empty allowed_agent_pool_ids list means the opposite (no pool is permitted). Refused together with allowed_agent_pool_ids",
+          "type": "boolean"
+        },
+        "allowed_agent_pool_ids": {
+          "description": "REPLACE the agent pools this item may be provisioned onto (apool-... or a bare UUID). An EMPTY LIST permits none, so every provision is then refused 403 -- to LIFT the restriction entirely pass allow_any_agent_pool instead",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "ansible_directory": {
+          "description": "the subdirectory OF THE MODULE that holds the Ansible configuration. Its whole subtree is COPIED into each instance's generated configuration version at the same relative path -- not referenced from it, because a composite run's configure Job re-fetches the configuration version and never runs init, so there is no .terraform/modules/ for it to point at -- and that same path becomes the provisioned workspace's config_directory. PASS EMPTY TO CLEAR IT, which is refused (422) while configure_enabled is true: send configure_enabled false in the same call to withdraw the Ansible half. Stored BYTE FOR BYTE: a leading or trailing slash, a '..' segment, leading or trailing whitespace, or more than 255 characters are each refused (422) rather than cleaned up, because the value round-trips through the Terraform provider and silently storing a different one than you sent fails the apply with 'Provider produced inconsistent result after apply'",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "catalog_item_id": {
+          "description": "the catalog item's id (a bare UUID)",
+          "type": "string"
+        },
+        "configure_enabled": {
+          "description": "whether the workspace this item provisions has an ANSIBLE CONFIGURE operation. This says WHETHER and ansible_directory says WHERE, so clearing the path does not turn the operation off and setting it does not turn it on. Turning it ON needs a directory -- either already stored or sent in this same call -- or the update is refused 422. Turning it OFF leaves existing instances alone until their next reconfigure, which then removes the operation from the workspace rather than leaving a stale directory and a playbook it no longer has",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "default_limit": {
+          "description": "the ansible --limit templated onto future instances as their default_limit. PASS EMPTY TO MEAN THE WHOLE INVENTORY, which is ansible's own default and therefore a WIDENING of the blast radius of every triggered configure on them rather than a cleared field. Leading or trailing whitespace is refused (422) rather than stripped",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_playbook": {
+          "description": "the playbook templated onto future instances as their default_playbook, relative to ansible_directory. Pass empty to clear it, after which every configure run on an instance must name its own playbook. Stored byte for byte like ansible_directory: a leading or trailing slash, a '..' segment, stray whitespace, or more than 255 characters are each refused (422) rather than normalised",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_version_pin": {
+          "description": "pin every future provision and reconfigure to this module version. PASS EMPTY TO FLOAT instead, which resolves to the module's latest uploaded version each time -- so empty here is a deliberate change of tracking mode rather than a cleared field",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
+          "description": "what this item provisions; pass empty to clear it",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "display_name": {
+          "description": "the label shown in the catalog UI; pass empty to clear it and fall back to the name",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "enabled": {
+          "description": "whether the item may be provisioned from. Setting it false retires the item without deleting it: it stays readable, its instances are untouched and still reconfigurable, and a new provision is refused 409",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "REPLACE the item's labels. An empty object clears them, which also removes whatever catalog RBAC was keyed on them. Reserved keys are refused (422)",
+          "type": "object"
+        },
+        "module_id": {
+          "description": "relink the item to a different registry module, as a bare UUID. Existing instances keep the module they were provisioned from until their next reconfigure, which then moves them",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "description": "rename the item. A 409 means the new name is taken",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "provider_template_ids": {
+          "description": "REPLACE the provider templates rendered into future instances, as bare UUIDs. An empty list detaches all of them, which also removes their parameters from the provision form",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "variable_options": {
+          "description": "REPLACE the per-input form overrides. An empty list removes all of them, which returns every module input to the form with the module's own default",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "description": "the value to pre-fill on the form, or -- with hidden true -- to wire unconditionally. Overrides the module's own default for this item"
+              },
+              "hidden": {
+                "description": "remove the input from the provision form entirely and wire this entry's default instead. A hidden entry MUST carry a default (422 otherwise): it can neither be supplied nor wired without one, and a required module input would then fail opaquely at plan time. This is how an item fixes a value a provisioner must not choose, such as an account id or a region",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "name": {
+                "description": "the module input variable this entry overrides, exactly as the module declares it. An entry naming a variable the module does not have is accepted and simply never matches, so read the module's inputs with terrapod_catalog_item_interface first",
+                "type": "string"
+              },
+              "options": {
+                "description": "restrict the input to a closed list of permitted values, rendered as a picker on the form. Omit for a free-text field",
+                "items": true,
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_catalog_provision",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_pool_id": {
+          "description": "the agent pool the instance runs on (apool-... or a bare UUID). REQUIRED: a catalog instance is always agent-executed. It must be one the item permits when the item restricts them (403 otherwise), and the caller needs write on it in its own right (403) -- so this is an intersection of two permissions rather than one",
+          "type": "string"
+        },
+        "auto_apply": {
+          "description": "apply the first run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits, and you confirm it with terrapod_catalog_instance_confirm after showing the plan. Setting this true creates real cloud resources with no review",
+          "type": "boolean"
+        },
+        "catalog_item_id": {
+          "description": "the catalog item to provision from (a bare UUID)",
+          "type": "string"
+        },
+        "input_values": {
+          "additionalProperties": true,
+          "description": "the module and provider-template inputs, keyed by field name. Build it from terrapod_catalog_item_form, not from the module's variables: a key that is not a form field is REFUSED 422 (it is the door a non-exposed module variable would otherwise be injected through), and a required field with no default left unsupplied is refused the same way. A field the item HID is not on the form and must not be sent -- its fixed value is wired for you",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "labels for the new workspace. Reserved keys are refused (422), and so is a label set that would pull the workspace into a variable set the caller cannot already reach -- provisioning needs only catalog use plus pool write, so an unchecked label here would be a path to another team's secrets (GHSA-49q6-pm68-3xgw)",
+          "type": "object"
+        },
+        "name": {
+          "description": "the new workspace's name, unique across the deployment. A 409 means it is taken -- including when a concurrent provision won the race",
+          "type": "string"
+        },
+        "version_pin": {
+          "description": "pin THIS instance to a module version, overriding the item's own pin. Omit to take the item's pin, or the module's latest uploaded version when the item floats",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id",
+        "name",
+        "agent_pool_id"
       ],
       "type": "object"
     }
@@ -511,6 +1037,231 @@
     "read_only": true,
     "input_schema": {
       "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_provider_template_create",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "description": "the HCL body of the provider block, interpolating this template's parameters. Rendered verbatim into each instance's generated providers.tf, so it is the one place provider credentials and endpoints are decided for everything provisioned from the items referencing it",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "key/value labels for filtering. Reserved keys are refused (422)",
+          "type": "object"
+        },
+        "name": {
+          "description": "the template's name, unique across the deployment. It is user-visible: a form field derived from this template reports its source as provider:\u003cname\u003e. A 409 means the name is taken",
+          "type": "string"
+        },
+        "parameters": {
+          "description": "the values the body interpolates, each becoming a field on the provision form of every item that references this template. Omit for a template that needs nothing from the provisioner",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "description": "the value to pre-fill when a provision does not supply one"
+              },
+              "description": {
+                "description": "what to tell the provisioner on the form",
+                "type": "string"
+              },
+              "name": {
+                "description": "the parameter name, as the template body interpolates it",
+                "type": "string"
+              },
+              "options": {
+                "description": "restrict the parameter to a closed list of permitted values",
+                "items": true,
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "required": {
+                "description": "whether a provision must supply it; default false",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "sensitive": {
+                "description": "mask the value on the form and in responses; default false",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "type": {
+                "description": "the value's type, for form rendering (default string)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "provider_type": {
+          "description": "the provider this configures, as a provider block names it (aws, google, vault)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "provider_type",
+        "body"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_provider_template_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_template_id": {
+          "description": "the provider template's id (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_template_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_provider_template_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_template_id": {
+          "description": "the provider template's id (a bare UUID)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_template_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_provider_template_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_provider_template_update",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "description": "REPLACE the HCL body. Cannot be empty. Every instance of every item referencing this template renders the new body at its next reconfigure, so a body that no longer interpolates a parameter, or interpolates one that no longer exists, breaks those instances rather than this record",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "REPLACE the labels. An empty object clears them. Reserved keys are refused (422)",
+          "type": "object"
+        },
+        "name": {
+          "description": "rename the template. It is user-visible as a form field's source (provider:\u003cname\u003e), so a rename is not purely internal. Cannot be empty. A 409 means the new name is taken",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "parameters": {
+          "description": "REPLACE the parameters rather than merging into them. An empty list removes all of them, which also removes their fields from every referencing item's provision form -- and a stored input value for a removed field then becomes an unknown input, refused 422 at the next reconfigure",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "description": "the value to pre-fill when a provision does not supply one"
+              },
+              "description": {
+                "description": "what to tell the provisioner on the form",
+                "type": "string"
+              },
+              "name": {
+                "description": "the parameter name, as the template body interpolates it",
+                "type": "string"
+              },
+              "options": {
+                "description": "restrict the parameter to a closed list of permitted values",
+                "items": true,
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "required": {
+                "description": "whether a provision must supply it; default false",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "sensitive": {
+                "description": "mask the value on the form and in responses; default false",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "type": {
+                "description": "the value's type, for form rendering (default string)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "provider_template_id": {
+          "description": "the provider template's id (a bare UUID)",
+          "type": "string"
+        },
+        "provider_type": {
+          "description": "the provider this configures. Cannot be empty",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "provider_template_id"
+      ],
       "type": "object"
     }
   },

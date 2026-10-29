@@ -169,7 +169,7 @@ def _entry(role: Role, axis: str, kind: str, obj: Any) -> dict[str, Any]:
         # catalog-managed workspace caps every non-platform-admin grant at read,
         # so a role granting write there does not actually give write.
         if axis == "workspace" and getattr(obj, "catalog_item_id", None) is not None:
-            clamped = caps & cap.axis_read_caps(axis)
+            clamped = cap.clamp_for_catalog_workspace(caps, axis)
             if clamped != caps:
                 notes.append(NOTE_CATALOG_CLAMPED)
             caps = clamped

@@ -321,6 +321,15 @@ class TestReconfigureInstance:
         item.provider_template_ids = []
         item.variable_options = []
         item.default_version_pin = None
+        # Set explicitly, and NOT noise to delete: `_materialise` reads the
+        # item's Ansible half (#2019), and on a MagicMock an unset attribute is
+        # a truthy auto-mock -- so omitting these makes provisioning try to copy
+        # an Ansible subtree out of the module and fail on a tarfile it never
+        # downloaded, which reads as a storage fault rather than a fixture one.
+        item.configure_enabled = False
+        item.ansible_directory = ""
+        item.default_playbook = ""
+        item.default_limit = ""
 
         ws = MagicMock()
         ws.id = uuid.uuid4()
@@ -409,6 +418,15 @@ class TestReconfigureInstance:
         item.provider_template_ids = []
         item.variable_options = []
         item.default_version_pin = None
+        # Set explicitly, and NOT noise to delete: `_materialise` reads the
+        # item's Ansible half (#2019), and on a MagicMock an unset attribute is
+        # a truthy auto-mock -- so omitting these makes provisioning try to copy
+        # an Ansible subtree out of the module and fail on a tarfile it never
+        # downloaded, which reads as a storage fault rather than a fixture one.
+        item.configure_enabled = False
+        item.ansible_directory = ""
+        item.default_playbook = ""
+        item.default_limit = ""
         ws = MagicMock()
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
@@ -431,3 +449,225 @@ class TestReconfigureInstance:
                     auto_apply=False,
                 )
         assert "Missing required" in str(exc.value)
+
+
+class TestTheAnsibleHalfACatalogItemProvisions:
+    """A catalog item may provision the Ansible half of a workspace (#2019).
+
+    The subtree is COPIED out of the module into the generated configuration
+    version rather than referenced, and that is forced rather than preferred: a
+    composite run is two runner Jobs, so the configure Job re-fetches the CV and
+    never runs `init`. A `config_directory` naming `.terraform/modules/this/...`
+    passes every validator -- measured, only `..`, a leading or trailing slash
+    and stray whitespace are refused -- and fails at run time on a directory
+    nothing created.
+
+    These drive the real extractor against a real gzipped tar, because the thing
+    worth pinning is what ends up in the tarball a runner will extract, not the
+    shape of a dict on the way there.
+    """
+
+    def _module_tarball(self, members: dict[str, bytes], *, symlink: str | None = None) -> bytes:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            for name, data in members.items():
+                info = tarfile.TarInfo(name=name)
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+            if symlink is not None:
+                link = tarfile.TarInfo(name=symlink)
+                link.type = tarfile.SYMTYPE
+                link.linkname = "../../../etc/passwd"
+                tar.addfile(link)
+        return buf.getvalue()
+
+    def _item(self, **kw):
+        item = MagicMock()
+        item.module = SimpleNamespace(
+            id=uuid.uuid4(), namespace="default", name="vpc", provider="aws"
+        )
+        item.provider_template_ids = []
+        item.variable_options = []
+        item.default_version_pin = None
+        item.configure_enabled = kw.get("configure_enabled", True)
+        item.ansible_directory = kw.get("ansible_directory", "ansible")
+        item.default_playbook = kw.get("default_playbook", "site.yml")
+        item.default_limit = kw.get("default_limit", "")
+        return item
+
+    async def _provision(self, item, tarball: bytes | None, ws=None):
+        """Drive `reconfigure_instance` and return (ws, the CV's member names)."""
+        ws = ws or MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = uuid.uuid4()
+        mv = SimpleNamespace(version="1.0.0", inputs=[], outputs=[])
+        cv = MagicMock(id=uuid.uuid4())
+        run = MagicMock()
+
+        async def _get_stream(_key):
+            yield tarball if tarball is not None else b""
+
+        storage = MagicMock()
+        storage.put_stream = AsyncMock()
+        storage.get_stream = _get_stream
+
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=item)
+        with (
+            patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)),
+            patch.object(
+                catalog_service.variable_service, "list_variables", AsyncMock(return_value=[])
+            ),
+            patch.object(catalog_service.variable_service, "create_variable", AsyncMock()),
+            patch.object(
+                catalog_service.run_service,
+                "create_configuration_version",
+                AsyncMock(return_value=cv),
+            ),
+            patch.object(catalog_service.run_service, "mark_configuration_uploaded", AsyncMock()),
+            patch.object(catalog_service.run_service, "create_run", AsyncMock(return_value=run)),
+            patch.object(catalog_service.run_service, "queue_run", AsyncMock(return_value=run)),
+            patch("terrapod.storage.get_storage", return_value=storage),
+        ):
+            await catalog_service.reconfigure_instance(
+                db,
+                user_email="u@test.com",
+                ws=ws,
+                input_values={},
+                version_pin="1.0.0",
+                auto_apply=False,
+            )
+        sent = storage.put_stream.await_args.args[1]
+        return ws, sent
+
+    async def _cv_members(self, sent) -> dict[str, bytes]:
+        chunks = [c async for c in sent]
+        with tarfile.open(fileobj=io.BytesIO(b"".join(chunks)), mode="r:gz") as tar:
+            return {
+                m.name: (tar.extractfile(m).read() if tar.extractfile(m) else b"")
+                for m in tar.getmembers()
+            }
+
+    # -- the subtree reaches the configuration version --------------------
+
+    @pytest.mark.asyncio
+    async def test_the_subtree_lands_at_its_module_path(self) -> None:
+        """At the SAME relative path, which is why `config_directory` is simply
+        the directory name with nothing to translate."""
+        tb = self._module_tarball(
+            {
+                "main.tf": b"# the module\n",
+                "ansible/site.yml": b"- hosts: all\n",
+                "ansible/roles/web/tasks/main.yml": b"- debug:\n",
+            }
+        )
+        _ws, sent = await self._provision(self._item(), tb)
+        members = await self._cv_members(sent)
+        assert "ansible/site.yml" in members
+        assert "ansible/roles/web/tasks/main.yml" in members
+        assert members["ansible/site.yml"] == b"- hosts: all\n"
+        # The module's own Terraform is NOT dragged along -- only the subtree.
+        assert "main.tf" in members  # the generated wrapper's, not the module's
+        assert members["main.tf"] != b"# the module\n"
+
+    @pytest.mark.asyncio
+    async def test_binary_content_survives_the_copy(self) -> None:
+        """A role may ship a binary file; re-encoding one through `str` would
+        corrupt it silently, which is why the tarball builder takes bytes."""
+        blob = bytes(range(256))
+        tb = self._module_tarball({"ansible/files/blob.bin": blob, "ansible/site.yml": b"x\n"})
+        _ws, sent = await self._provision(self._item(), tb)
+        assert (await self._cv_members(sent))["ansible/files/blob.bin"] == blob
+
+    @pytest.mark.asyncio
+    async def test_a_symlink_member_is_not_copied(self) -> None:
+        """This repacks into a tarball a runner extracts, and a link is how a tar
+        carries a path outside its own tree."""
+        tb = self._module_tarball({"ansible/site.yml": b"x\n"}, symlink="ansible/escape")
+        members = await self._cv_members((await self._provision(self._item(), tb))[1])
+        assert "ansible/site.yml" in members
+        assert "ansible/escape" not in members
+
+    # -- the workspace settings -------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_all_four_settings_are_templated(self) -> None:
+        tb = self._module_tarball({"ansible/site.yml": b"x\n"})
+        item = self._item(default_playbook="site.yml", default_limit="canary")
+        ws, _sent = await self._provision(item, tb)
+        assert ws.configure_enabled is True
+        assert ws.config_directory == "ansible"
+        assert ws.default_playbook == "site.yml"
+        assert ws.default_limit == "canary"
+
+    @pytest.mark.asyncio
+    async def test_the_off_case_clears_a_previous_configure(self) -> None:
+        """An item whose switch is turned OFF must leave a reconfigured workspace
+        with the operation gone, not with a stale config_directory and a playbook
+        it no longer ships -- which is what an `if enabled:` guard would leave."""
+        ws = MagicMock()
+        ws.configure_enabled = True
+        ws.config_directory = "ansible"
+        ws.default_playbook = "site.yml"
+        ws.default_limit = "canary"
+        item = self._item(configure_enabled=False)
+        ws, _sent = await self._provision(item, None, ws=ws)
+        assert ws.configure_enabled is False
+        assert ws.config_directory == ""
+        assert ws.default_playbook == ""
+        assert ws.default_limit == ""
+
+    @pytest.mark.asyncio
+    async def test_the_switch_off_copies_nothing_even_with_a_path(self) -> None:
+        """The boolean says whether and the path says where (#1966's correction),
+        so a path with the switch off provisions no configure."""
+        item = self._item(configure_enabled=False, ansible_directory="ansible")
+        _ws, sent = await self._provision(item, None)
+        assert not [n for n in (await self._cv_members(sent)) if n.startswith("ansible/")]
+
+    # -- refusals, at provision rather than at run ------------------------
+
+    @pytest.mark.asyncio
+    async def test_an_absent_subtree_is_refused_naming_what_the_module_ships(self) -> None:
+        """A provisioning-time refusal on purpose: the alternative is a workspace
+        whose config_directory names nothing, failing later and reporting it as a
+        runner problem."""
+        tb = self._module_tarball({"main.tf": b"x\n", "playbooks/site.yml": b"y\n"})
+        with pytest.raises(catalog_service.CatalogError) as e:
+            await self._provision(self._item(ansible_directory="ansible"), tb)
+        assert "ansible" in str(e.value)
+        assert "playbooks" in str(e.value)  # what it DOES ship
+        assert e.value.status_code == 422
+
+    @pytest.mark.parametrize("root_form", ["", ".", "ansible/"])
+    @pytest.mark.asyncio
+    async def test_a_root_form_directory_is_refused_naming_the_cause(self, root_form) -> None:
+        """The forms that would copy the module over the generated wrapper.
+
+        Refused by their FORM rather than left to fall through to "holds no
+        files", which is true for all three and names the wrong cause -- the
+        module is fine, the path is not. An earlier version of this test
+        asserted a collision check instead, and the mutation check showed it was
+        passing via the absent-subtree refusal: the collision is structurally
+        impossible, because every copied member keeps its `<dir>/...` path while
+        the wrapper's files are at the root.
+        """
+        tb = self._module_tarball({"main.tf": b"x\n", "ansible/site.yml": b"y\n"})
+        with pytest.raises(catalog_service.CatalogError) as e:
+            await self._provision(self._item(ansible_directory=root_form), tb)
+        assert e.value.status_code == 422
+        assert "subdirectory" in str(e.value)
+
+    @pytest.mark.asyncio
+    async def test_a_copied_member_can_never_shadow_the_generated_wrapper(self) -> None:
+        """The property that makes a collision check unnecessary, asserted so
+        that a change to the copied paths has to confront it."""
+        tb = self._module_tarball({"ansible/main.tf": b"module own\n", "ansible/site.yml": b"y\n"})
+        _ws, sent = await self._provision(self._item(), tb)
+        members = await self._cv_members(sent)
+        assert "ansible/main.tf" in members
+        assert members["main.tf"] != b"module own\n"  # the wrapper's, untouched
+        assert all(
+            n.startswith("ansible/") or n in {"main.tf", "providers.tf", "outputs.tf"}
+            for n in members
+        ), sorted(members)

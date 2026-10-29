@@ -203,7 +203,11 @@
   ],
   "catalog._item_json": [
     "allowed-agent-pool-ids",
+    "ansible-directory",
+    "configure-enabled",
     "created-at",
+    "default-limit",
+    "default-playbook",
     "default-version-pin",
     "description",
     "display-name",

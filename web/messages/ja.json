@@ -1478,7 +1478,16 @@
       "anyPool": "任意のエージェントプールを使用できます。",
       "labels": "ラベル",
       "variableOptions": "変数オプション（詳細設定、JSON）",
-      "variableOptionsHint": "入力ごとのオーバーライド（options、hidden、default）です。使用しない場合は<code>[]</code>のままにしてください。"
+      "variableOptionsHint": "入力ごとのオーバーライド（options、hidden、default）です。使用しない場合は<code>[]</code>のままにしてください。",
+      "ansibleHeading": "Ansible 構成",
+      "ansibleDirectory": "Ansible 設定ディレクトリ",
+      "defaultPlaybook": "既定のプレイブック",
+      "defaultPlaybookHint": "実行自体がプレイブックを指定しない場合に構成操作が実行するプレイブック。設定ディレクトリからの相対パスです。",
+      "defaultLimit": "既定の limit",
+      "defaultLimitHint": "構成操作の既定の --limit パターン。空のままにするとインベントリ全体が対象になります。",
+      "configureEnabled": "構成オペレーションをプロビジョニングする",
+      "configureEnabledHint": "有効にしない限りオフです。このアイテムがプロビジョニングするワークスペースには、プランとアプライに加えて構成オペレーションが追加されます。",
+      "ansibleDirectoryHint": "プレイブックを含むモジュールのサブディレクトリです。Terrapod はこれを生成された構成バージョンにコピーし、プロビジョニングされたワークスペースの Ansible 構成ディレクトリになります。モジュールルートからの相対パスで、先頭と末尾にスラッシュは付けません。"
     },
     "table": {
       "name": "名前",
@@ -1506,7 +1515,8 @@
       "delete": "カタログ項目の削除に失敗しました",
       "deleteConflict": "削除できません: このカタログ項目にはプロビジョニング済みインスタンスがあります。",
       "varOptsInvalidJson": "変数オプションは有効なJSON（配列）である必要があります。",
-      "varOptsNotArray": "変数オプションはJSON配列である必要があります。"
+      "varOptsNotArray": "変数オプションはJSON配列である必要があります。",
+      "configureNeedsDirectory": "構成オペレーションをプロビジョニングするには Ansible 構成ディレクトリが必要です。プレイブックを含むモジュールのサブディレクトリを指定してください。"
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "利用可能なカタログ項目はありません。",
     "card": {
       "pinned": "固定 {version}",
-      "latest": "最新"
+      "latest": "最新",
+      "configure": "Ansible 構成"
     },
     "errors": {
       "loadItems": "カタログ項目の読み込みに失敗しました"
@@ -1820,7 +1831,11 @@
       "module": "モジュール:",
       "resolvedVersion": "解決されたバージョン:",
       "latest": "最新",
-      "disabled": "無効"
+      "disabled": "無効",
+      "configureBadge": "Ansible 構成",
+      "configureDirectory": "ディレクトリ:",
+      "configurePlaybook": "プレイブック:",
+      "configureLimit": "limit:"
     },
     "pending": {
       "banner": "<strong>{name}</strong> の実行はプラン完了し、レビュー待ちです。確認して適用するか、破棄してください。",

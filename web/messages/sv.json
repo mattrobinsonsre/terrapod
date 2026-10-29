@@ -1478,7 +1478,16 @@
       "anyPool": "Vilken agentpool som helst får användas.",
       "labels": "Etiketter",
       "variableOptions": "Variabelalternativ (avancerat, JSON)",
-      "variableOptionsHint": "Åsidosättanden per indata (options, hidden, default). Lämna som <code>[]</code> om oanvänt."
+      "variableOptionsHint": "Åsidosättanden per indata (options, hidden, default). Lämna som <code>[]</code> om oanvänt.",
+      "ansibleHeading": "Ansible-konfiguration",
+      "ansibleDirectory": "Ansible-konfigurationskatalog",
+      "defaultPlaybook": "Standardplaybook",
+      "defaultPlaybookHint": "Playbooken som en konfigurationsoperation kör när körningen själv inte namnger någon. Relativt konfigurationskatalogen.",
+      "defaultLimit": "Standardgräns",
+      "defaultLimitHint": "Standardmönstret för --limit vid en konfigurationsoperation. Lämna tomt för att träffa hela inventariet.",
+      "configureEnabled": "Provisionera en konfigurationsåtgärd",
+      "configureEnabledHint": "Av om du inte slår på det. Arbetsytan som det här objektet provisionerar får då en konfigurationsåtgärd vid sidan av sin plan och apply.",
+      "ansibleDirectoryHint": "Underkatalogen i modulen som innehåller playbooken. Terrapod kopierar den till den genererade konfigurationsversionen, och den blir Ansible-konfigurationskatalogen för den provisionerade arbetsytan. Relativt modulens rot, utan inledande eller avslutande snedstreck."
     },
     "table": {
       "name": "Namn",
@@ -1506,7 +1515,8 @@
       "delete": "Det gick inte att ta bort katalogobjektet",
       "deleteConflict": "Kan inte ta bort: detta katalogobjekt har provisionerade instanser.",
       "varOptsInvalidJson": "Variabelalternativ måste vara giltig JSON (en array).",
-      "varOptsNotArray": "Variabelalternativ måste vara en JSON-array."
+      "varOptsNotArray": "Variabelalternativ måste vara en JSON-array.",
+      "configureNeedsDirectory": "En Ansible-konfigurationskatalog krävs för att provisionera en konfigurationsåtgärd. Ange underkatalogen i modulen som innehåller playbooken."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Inga katalogobjekt tillgängliga.",
     "card": {
       "pinned": "fixerad {version}",
-      "latest": "senaste"
+      "latest": "senaste",
+      "configure": "Ansible-konfiguration"
     },
     "errors": {
       "loadItems": "Det gick inte att läsa in katalogobjekt"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Upplöst version:",
       "latest": "senaste",
-      "disabled": "inaktiverad"
+      "disabled": "inaktiverad",
+      "configureBadge": "Ansible-konfiguration",
+      "configureDirectory": "Katalog:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Gräns:"
     },
     "pending": {
       "banner": "Körningen för <strong>{name}</strong> är planerad och väntar på granskning. Bekräfta för att applicera, eller kassera.",

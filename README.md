@@ -207,7 +207,7 @@ Everything below is implemented and shipped today.
 | Interactive Slack app | Outbound Socket Mode app — `/terrapod` account linking + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace |
 | Run tasks | Webhook hooks for external validation at three boundaries — `pre_plan`, `post_plan` and `pre_apply`. A mandatory `post_plan` failure can be overridden by an admin; `pre_plan` and `pre_apply` verdicts are final |
 | Execution hooks | **Custom execution steps** — admin-managed shell run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
-| Service catalog | No-code self-service provisioning over the module registry |
+| Service catalog | No-code self-service provisioning over the module registry — including **Ansible-first** instances, where a blessed module declares the inventory and ships the playbook |
 | Cost estimation | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native cost engine, on by default; optional AI layer estimates the resources the engine can't price + savings advisories + a grounded cost chat |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |

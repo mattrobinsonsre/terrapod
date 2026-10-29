@@ -1478,7 +1478,16 @@
       "anyPool": "可使用任意代理池。",
       "labels": "标签",
       "variableOptions": "变量选项（高级，JSON）",
-      "variableOptionsHint": "按输入的覆盖项（选项、隐藏、默认值）。若不使用，请保留为 <code>[]</code>。"
+      "variableOptionsHint": "按输入的覆盖项（选项、隐藏、默认值）。若不使用，请保留为 <code>[]</code>。",
+      "ansibleHeading": "Ansible 配置",
+      "ansibleDirectory": "Ansible 配置目录",
+      "defaultPlaybook": "默认 playbook",
+      "defaultPlaybookHint": "当运行本身未指定时，配置操作执行的 playbook。相对于配置目录。",
+      "defaultLimit": "默认 limit",
+      "defaultLimitHint": "配置操作的默认 --limit 模式。留空则以整个清单为目标。",
+      "configureEnabled": "预配配置操作",
+      "configureEnabledHint": "默认关闭，除非你开启。此项目预配的工作区随后将在计划和应用之外获得一个配置操作。",
+      "ansibleDirectoryHint": "模块中存放剧本的子目录。Terrapod 会将其复制到生成的配置版本中，并成为所预配工作区的 Ansible 配置目录。相对于模块根目录，开头和结尾都不要加斜杠。"
     },
     "table": {
       "name": "名称",
@@ -1506,7 +1515,8 @@
       "delete": "删除目录项失败",
       "deleteConflict": "无法删除：此目录项存在已预配的实例。",
       "varOptsInvalidJson": "变量选项必须是有效的 JSON（数组）。",
-      "varOptsNotArray": "变量选项必须是 JSON 数组。"
+      "varOptsNotArray": "变量选项必须是 JSON 数组。",
+      "configureNeedsDirectory": "预配配置操作需要一个 Ansible 配置目录。请指定模块中存放剧本的子目录。"
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "无可用的目录项。",
     "card": {
       "pinned": "已固定 {version}",
-      "latest": "最新"
+      "latest": "最新",
+      "configure": "Ansible 配置"
     },
     "errors": {
       "loadItems": "加载目录项失败"
@@ -1820,7 +1831,11 @@
       "module": "模块：",
       "resolvedVersion": "已解析版本：",
       "latest": "最新",
-      "disabled": "已禁用"
+      "disabled": "已禁用",
+      "configureBadge": "Ansible 配置",
+      "configureDirectory": "目录：",
+      "configurePlaybook": "playbook：",
+      "configureLimit": "limit："
     },
     "pending": {
       "banner": "<strong>{name}</strong> 的运行已计划完成，正在等待审查。确认以应用，或丢弃。",

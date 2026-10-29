@@ -26,7 +26,10 @@ makes the RBAC clamp and config-managed guardrails apply.
 import asyncio
 import io
 import json
+import os
+import posixpath
 import tarfile
+import tempfile
 import uuid
 from datetime import UTC, datetime
 
@@ -280,22 +283,191 @@ def render_wrapper_hcl(
     return files
 
 
-def _build_tarball(files: dict[str, str]) -> bytes:
+def _build_tarball(files: dict[str, str | bytes]) -> bytes:
     """Pack {filename: content} into a gzipped tar (sync — run in a thread).
 
     The payload is a few KB of generated .tf text (small-file exemption), so
     building it in memory is fine; tarfile is still sync CPU work, hence the
     caller wraps this in asyncio.to_thread (HARD RULE 13).
+
+    Takes `bytes` as well as `str` because an item's Ansible subtree is copied
+    out of the module verbatim (#2019) and a playbook tree is not necessarily
+    all text -- a role may ship a binary file, and re-encoding one through `str`
+    would corrupt it silently.
     """
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for name, content in files.items():
-            data = content.encode("utf-8")
+            data = content.encode("utf-8") if isinstance(content, str) else content
             info = tarfile.TarInfo(name=name)
             info.size = len(data)
             info.mtime = 0  # deterministic
             tar.addfile(info, io.BytesIO(data))
     return buf.getvalue()
+
+
+def _resolve_tmpdir() -> str | None:
+    """Reuse the VCS tmpdir setting — same PVC, same sweep behaviour."""
+    configured = settings.vcs.tmpdir
+    if configured and os.path.isdir(configured):
+        return configured
+    return None
+
+
+def _subtree_members(path: str, subdir: str) -> dict[str, bytes]:
+    """Every regular file under `subdir/` in the module tarball at `path`.
+
+    Sync: `tarfile` plus the reads, so the caller runs it in a thread (rule 13).
+    Keys are the member names UNCHANGED, so the subtree lands in the generated
+    configuration version at the same relative path it has in the module and
+    the workspace's `config_directory` is simply `subdir`.
+
+    **Only regular files.** A symlink, a hard link, a device or a directory
+    entry is dropped rather than copied: this repacks into a tarball a runner
+    extracts, and a link is how a tar carries a path outside its own tree. The
+    names are additionally checked, because a member name is attacker-controlled
+    in the sense that matters here -- it comes from whatever was published.
+    """
+    prefix = f"{subdir}/"
+    out: dict[str, bytes] = {}
+    with tarfile.open(path, mode="r:*") as tar:
+        for member in tar.getmembers():
+            name = member.name
+            # Normalise a leading `./`, which some packers emit and which would
+            # otherwise make an identical tree miss the prefix test.
+            if name.startswith("./"):
+                name = name[2:]
+            if not name.startswith(prefix):
+                continue
+            if not member.isfile():
+                continue
+            if name != posixpath.normpath(name) or name.startswith("/") or ".." in name:
+                continue
+            fh = tar.extractfile(member)
+            if fh is None:
+                continue
+            out[name] = fh.read()
+    return out
+
+
+def _tarball_top_level(path: str) -> list[str]:
+    """The tarball's top-level entries, for a refusal that is actionable.
+
+    Named so an operator whose item points at a directory the module does not
+    ship is told what it DOES ship, rather than only that their path was wrong.
+    """
+    top: set[str] = set()
+    with tarfile.open(path, mode="r:*") as tar:
+        for member in tar.getmembers():
+            name = member.name[2:] if member.name.startswith("./") else member.name
+            head = name.split("/", 1)[0]
+            if head and head != ".":
+                top.add(head)
+    return sorted(top)
+
+
+async def ansible_files_from_module(
+    *,
+    namespace: str,
+    name: str,
+    provider: str,
+    version: str,
+    subdir: str,
+) -> dict[str, bytes]:
+    """Copy a module version's Ansible subtree, for the generated config version.
+
+    **Copied rather than referenced, and that is forced rather than chosen.** A
+    composite run is two runner Jobs -- `job_entrypoint` says so in as many
+    words -- so the configure Job re-fetches the configuration version and never
+    runs `init`. `.terraform/modules/this/` does not exist in it, so a
+    `config_directory` pointing there passes every validator (measured: only
+    `..`, a leading or trailing slash and stray whitespace are refused) and
+    fails at run time on a directory nothing created.
+
+    The tarball goes to the PVC tempdir rather than `/tmp` (HARD RULE 14): a
+    module tarball is operator content with no size bound, and `/tmp` on the API
+    pod is RAM-backed.
+
+    Raises `CatalogError` 422 naming the directory, and what the module does
+    ship, when the subtree is absent. That is a provisioning-time refusal on
+    purpose: the alternative is a workspace whose `config_directory` names
+    nothing, which fails later and reports it as a runner problem.
+    """
+    # Local imports, matching `_materialise`'s own: `terrapod.storage` pulls in
+    # a backend SDK and this module is imported by the API at startup.
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import module_tarball_key
+
+    storage = get_storage()
+    key = module_tarball_key(namespace, name, provider, version)
+    tmpdir = _resolve_tmpdir()
+    fd, path = await asyncio.to_thread(tempfile.mkstemp, suffix=".module.tar.gz", dir=tmpdir)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            async for chunk in storage.get_stream(key):
+                await asyncio.to_thread(out.write, chunk)
+        files = await asyncio.to_thread(_subtree_members, path, subdir)
+        if not files:
+            top = await asyncio.to_thread(_tarball_top_level, path)
+            raise CatalogError(
+                f"the catalog item's ansible-directory {subdir!r} holds no files in "
+                f"{namespace}/{name}/{provider} {version}. That module's top-level "
+                f"entries are: {', '.join(top) or '(none)'}",
+                status_code=422,
+            )
+        return files
+    finally:
+        await asyncio.to_thread(_unlink_quietly, path)
+
+
+def _require_subdirectory(subdir: str) -> None:
+    """`ansible_directory` must name a SUBDIRECTORY of the module.
+
+    The root forms -- `""`, `"."`, and anything with a trailing slash -- would
+    copy the module's own root into the generated configuration version, where
+    the wrapper's `main.tf` lives. Refused here rather than left to fall through
+    to "holds no files", which is true for all of them and names the wrong
+    cause: the module is fine, the path form is not.
+
+    This is also what makes a collision check in the caller unnecessary rather
+    than merely unwritten -- see the comment there.
+    """
+    if not subdir or subdir == "." or subdir.endswith("/"):
+        raise CatalogError(
+            f"the catalog item's ansible-directory must name a subdirectory of the "
+            f"module, not its root: {subdir!r} would copy the module over the "
+            f"generated configuration",
+            status_code=422,
+        )
+
+
+def _apply_ansible_settings(ws: Workspace, item: CatalogItem) -> None:
+    """Template the item's Ansible half onto the workspace (#2019).
+
+    One writer, called from `_materialise`, so provision and reconfigure cannot
+    disagree -- the shape every other catalog-managed workspace setting has.
+
+    `config_directory` IS `ansible_directory`: the subtree is copied into the
+    configuration version at the path it has in the module, so the workspace's
+    Ansible root is that same path and there is nothing to translate.
+
+    **It writes all four every time, including the off case.** An item that had
+    the switch on and has it turned off must leave a reconfigured workspace with
+    the operation gone, not with a stale `config_directory` and a playbook it no
+    longer has -- which is what an `if item.configure_enabled:` guard here would
+    have left behind.
+    """
+    ws.configure_enabled = item.configure_enabled
+    ws.config_directory = item.ansible_directory if item.configure_enabled else ""
+    ws.default_playbook = item.default_playbook if item.configure_enabled else ""
+    ws.default_limit = item.default_limit if item.configure_enabled else ""
+
+
+def _unlink_quietly(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 # ── Provision orchestration ────────────────────────────────────────────
@@ -486,7 +658,50 @@ async def _materialise(
         module_outputs=module_outputs,
         provider_templates=templates,
     )
-    tarball = await asyncio.to_thread(_build_tarball, files)
+    # The Ansible half (#2019). Copied out of the module into this very
+    # configuration version, because the configure Job re-fetches the CV and
+    # never runs `init` -- see `ansible_files_from_module`.
+    #
+    # Gated on `configure_enabled` ALONE, never on the path being non-empty:
+    # the boolean says whether and the path says where, so an item with a path
+    # and the switch off provisions no configure, which is what it asked for --
+    # and an item with the switch ON and no path is incoherent rather than a
+    # no-op, so it must reach `_require_subdirectory` and be refused. Gating on
+    # both would skip the block instead, leaving a workspace whose Ansible root
+    # is the configuration version's root, where only the generated wrapper
+    # lives: a configure that fails at run time for want of a playbook.
+    #
+    # The same cross-field shape as #1966's `validate_operations`, which takes
+    # the RESULTING values rather than the submitted ones.
+    cv_files: dict[str, str | bytes] = dict(files)
+    if item.configure_enabled:
+        if resolved_version is None:
+            raise CatalogError(
+                f"Module {module.name} has no uploaded version to copy the catalog "
+                f"item's ansible-directory {item.ansible_directory!r} from",
+                status_code=422,
+            )
+        _require_subdirectory(item.ansible_directory)
+        ansible_files = await ansible_files_from_module(
+            namespace=module.namespace,
+            name=module.name,
+            provider=module.provider,
+            version=resolved_version,
+            subdir=item.ansible_directory,
+        )
+        # No collision check, and that is a measured absence rather than an
+        # oversight: every copied member keeps its `<ansible_directory>/...`
+        # path while the generated wrapper's files are always at the root, so a
+        # module shipping `ansible/main.tf` lands at `ansible/main.tf` and
+        # cannot shadow the root module. The root form that COULD collide is
+        # refused above, by `_require_subdirectory`. A check here would be a
+        # gate that cannot fire -- which this codebase has shipped before and
+        # which reads as protection while protecting nothing.
+        cv_files.update(ansible_files)
+
+    _apply_ansible_settings(ws, item)
+
+    tarball = await asyncio.to_thread(_build_tarball, cv_files)
 
     cv = await run_service.create_configuration_version(
         db, workspace_id=ws.id, source="catalog", auto_queue_runs=False

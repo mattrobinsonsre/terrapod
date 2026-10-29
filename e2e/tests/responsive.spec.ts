@@ -1111,6 +1111,39 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the catalog admin form fits a phone with the Ansible group open (#2019)', async ({
+    page,
+  }) => {
+    // `responsive.spec.ts` had NO coverage of /admin/catalog, while
+    // `catalog.spec.ts` covers it at desktop width only — so the mobile guard
+    // did not reach this form either before or after the Ansible group landed
+    // on it.
+    //
+    // Locators read off the component, and ids where the component has them,
+    // following `catalog.spec.ts`: the directory's own <label> carries a `*`
+    // inside it, so its accessible name is not the label text.
+    await page.goto('/admin/catalog');
+    await expect(page.locator('h1:has-text("Catalog Admin")')).toBeVisible({ timeout: 15_000 });
+    await page.click('button:has-text("New Catalog Item")');
+
+    // The three paths render only while the checkbox is on
+    // (`{f.configureEnabled && …}`), so this is also what makes the assertion
+    // bite: without the click the form would fit a phone by not having the new
+    // controls at all, which is the shape of pass that proves nothing.
+    await expect(page.getByText('Ansible configure')).toBeVisible();
+    await page.getByText('Provision a configure operation').click();
+    await expect(page.locator('#cat-ansible-dir')).toBeVisible();
+    await expect(page.locator('#cat-playbook')).toBeVisible();
+
+    // A long value in the widest of the three, because the overflow this
+    // guards against is content-driven: the group is a plain <div> rather than
+    // a <fieldset> precisely so it can shrink, and a fieldset's
+    // `min-inline-size: min-content` is how a phone-width overflow shipped
+    // here once before.
+    await page.fill('#cat-ansible-dir', 'deploy/ansible/environments/production/playbooks');
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('a catalog item page fits a phone: provision form, interface and instances', async ({ page }) => {
     // The item, its form, interface and instances are stubbed so the page has
     // every section populated — including an instances table, which must

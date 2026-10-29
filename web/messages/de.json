@@ -1478,7 +1478,16 @@
       "anyPool": "Jeder Agent-Pool kann verwendet werden.",
       "labels": "Beschriftungen",
       "variableOptions": "Variablen-Optionen (erweitert, JSON)",
-      "variableOptionsHint": "Überschreibungen pro Eingabe (Optionen, ausgeblendet, Standard). Lassen Sie <code>[]</code> stehen, wenn nicht verwendet."
+      "variableOptionsHint": "Überschreibungen pro Eingabe (Optionen, ausgeblendet, Standard). Lassen Sie <code>[]</code> stehen, wenn nicht verwendet.",
+      "ansibleHeading": "Ansible-Konfiguration",
+      "ansibleDirectory": "Ansible-Konfigurationsverzeichnis",
+      "defaultPlaybook": "Standard-Playbook",
+      "defaultPlaybookHint": "Das Playbook, das eine Konfigurationsoperation ausführt, wenn der Lauf selbst keines nennt. Relativ zum Konfigurationsverzeichnis.",
+      "defaultLimit": "Standard-Limit",
+      "defaultLimitHint": "Das Standardmuster für --limit bei einer Konfigurationsoperation. Leer lassen, um das gesamte Inventar anzusprechen.",
+      "configureEnabled": "Eine Konfigurationsoperation bereitstellen",
+      "configureEnabledHint": "Standardmäßig aus. Der Arbeitsbereich, den dieses Element bereitstellt, erhält dann neben Plan und Apply auch eine Konfigurationsoperation.",
+      "ansibleDirectoryHint": "Das Unterverzeichnis des Moduls, das das Playbook enthält. Terrapod kopiert es in die erzeugte Konfigurationsversion, und es wird zum Ansible-Konfigurationsverzeichnis des bereitgestellten Arbeitsbereichs. Relativ zum Modulwurzelverzeichnis, ohne führenden oder abschließenden Schrägstrich."
     },
     "table": {
       "name": "Name",
@@ -1506,7 +1515,8 @@
       "delete": "Dienstleistungskatalog-Eintrag konnte nicht gelöscht werden",
       "deleteConflict": "Löschen nicht möglich: Für diesen Dienstleistungskatalog-Eintrag bestehen bereitgestellte Instanzen.",
       "varOptsInvalidJson": "Variablen-Optionen müssen gültiges JSON (ein Array) sein.",
-      "varOptsNotArray": "Variablen-Optionen müssen ein JSON-Array sein."
+      "varOptsNotArray": "Variablen-Optionen müssen ein JSON-Array sein.",
+      "configureNeedsDirectory": "Für die Bereitstellung einer Konfigurationsoperation ist ein Ansible-Konfigurationsverzeichnis erforderlich. Geben Sie das Unterverzeichnis des Moduls an, das das Playbook enthält."
     }
   },
   "adminProviderTemplates": {
@@ -1802,7 +1812,8 @@
     "empty": "Keine Dienstleistungskatalog-Einträge verfügbar.",
     "card": {
       "pinned": "angeheftet {version}",
-      "latest": "aktuellste"
+      "latest": "aktuellste",
+      "configure": "Ansible-Konfiguration"
     },
     "errors": {
       "loadItems": "Dienstleistungskatalog-Einträge konnten nicht geladen werden"
@@ -1820,7 +1831,11 @@
       "module": "Modul:",
       "resolvedVersion": "Aufgelöste Version:",
       "latest": "aktuellste",
-      "disabled": "deaktiviert"
+      "disabled": "deaktiviert",
+      "configureBadge": "Ansible-Konfiguration",
+      "configureDirectory": "Verzeichnis:",
+      "configurePlaybook": "Playbook:",
+      "configureLimit": "Limit:"
     },
     "pending": {
       "banner": "Der Lauf für <strong>{name}</strong> ist geplant und wartet auf die Überprüfung. Bestätigen Sie, um anzuwenden, oder verwerfen Sie ihn.",

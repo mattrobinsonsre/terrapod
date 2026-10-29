@@ -203,7 +203,7 @@ RBAC or in the feature rather than in which clients can see it.
 | `terrapod_module_autodiscovery_rule_list` | The module autodiscovery rules — each names a repository, an org or group, or a repository-name pattern (`target-kind`), which directories count as modules (a glob pattern and ignore paths) and how they are named, and any `last-error`. Platform admin only. |
 | `terrapod_module_autodiscovery_rule_preview` | What a rule finds now: each module directory (root and submodules) with its repository, the name and provider it would get, the module already registered from it, and whether its name is taken. A rule over an org or group is served from what the last poll found, a page of repositories at a time (`page_number`, `page_size`), or reads one `repository` live. Registers nothing. Platform admin only. |
 | `terrapod_module_autodiscovery_rule_repositories` | The repositories a rule looks at, each with its status (active, archived, empty, no-branch, out-of-scope, covered, error), origin (baseline or new), candidates, last skips, previous paths and last error; filter by `status`, paged (default 50). Use it to see why a repository registered nothing. Platform admin only. |
-| `terrapod_catalog_item_interface` | A service-catalog item's module interface — the **inputs + outputs** of the module version the item resolves to (its pin, or the latest uploaded version). Needs catalog read on the item. |
+| `terrapod_catalog_item_interface` | A service-catalog item's module interface — the **inputs + outputs** of the module version the item resolves to (its pin, or the latest uploaded version). Needs catalog read on the item. Its pair is `terrapod_catalog_item_form` below: this is the module's whole surface, the form is the curated subset a provisioner fills in. |
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
 
@@ -235,6 +235,62 @@ Ansible is the ordinary default rather than a problem, and
 | `terrapod_inventory_link` | — | A membership (host in group) or a nesting (group in group). |
 | `terrapod_inventory_var_set` | — | Set a variable on a host, on a group, or on the inventory (`group_vars/all`). |
 | `terrapod_inventory_remove` | destructive | Remove any row by its typed id. A host takes its memberships and variables with it; a group takes its memberships, nestings and variables. |
+
+### Service catalog (gated) — publish items and provision from them
+
+The [service catalog](service-catalog.md) has its three objects: **provider
+templates** (the parameterised `provider` blocks an administrator writes once),
+**catalog items** (a blessed designation over a registry module, narrowing it to
+a pinned version, permitted agent pools and a curated input form), and
+**instances** (the catalog-managed workspaces a user provisions from an item
+without writing any Terraform).
+
+The permission axis is its own — catalog `read`, `use` and `admin`, plus platform
+admin for publishing — so a workspace grant answers none of it, and each tool
+says which it needs. The whole surface answers `404` when the deployment has the
+catalog feature off, which is not the same as "there are no items".
+
+**Confirm an instance's run with `terrapod_catalog_instance_confirm`, not
+`terrapod_run_apply`.** An instance's workspace is clamped: every
+non-platform-admin grant on it is capped at read, including for the person who
+provisioned it, so the workspace run API refuses them and the catalog surface is
+the instance's control plane. The one capability exempt from the clamp is
+`inventory:write`, so a provisioner may edit the instance's ansible inventory
+rows — though the module declares them, so an apply reverts a hand-edited row.
+
+An item may also declare the **Ansible half** of what it provisions, as two
+independent fields: `configure_enabled` says *whether* the provisioned workspace
+has a configure operation (default `false`), and `ansible_directory` says *which
+subdirectory of the module* holds it. The path does not carry "off" in its
+emptiness — `configure_enabled` true with no directory is refused `422` — which
+is the same correction the workspace's own `config-directory` needed. At
+provision that subtree is **copied** into the generated configuration version at
+the same relative path (not referenced from it: a composite run's configure Job
+re-fetches the configuration version and never runs `init`), and becomes the
+workspace's `config-directory` alongside the item's `default_playbook` and
+`default_limit`.
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_catalog_item_list` | read-only | The catalog items published here, each with its module, version pin, permitted pools, form overrides and Ansible half. Only the items you have catalog read on. |
+| `terrapod_catalog_item_get` | read-only | One item by id. `default-version-pin` empty means it **floats** to the module's latest uploaded version; `allowed-agent-pool-ids` null means any pool you can assign while an empty list permits none; `enabled: false` is published-but-refusing-to-provision. |
+| `terrapod_catalog_item_form` | read-only | The provision **form** — the fields a provisioner fills in, which is the curated subset of the module's inputs plus every provider-template parameter, each with its type, whether it is required, its default and any closed list of permitted values. Build `input_values` from this: provisioning refuses an input that is not on it. Hidden inputs are absent by design, their fixed value wired for you. |
+| `terrapod_catalog_item_create` | — | Publish an item over a registry module. Platform admin only. |
+| `terrapod_catalog_item_update` | — | Change an item. Lists and maps **replace** rather than merge, and an empty value is a meaning on four fields (float the pin, widen the limit to every host, permit no pool, clear the labels). Applies to future provisions and to each instance at its next reconfigure. Platform admin only. |
+| `terrapod_catalog_item_delete` | destructive | Delete the designation (no infrastructure, no module). Refused `409` while any instance is active. Prefer `enabled: false` to retire one reversibly. Platform admin only. |
+| `terrapod_provider_template_list` | read-only | The provider templates, and the UUIDs to reference them by. Admin or audit. |
+| `terrapod_provider_template_get` | read-only | One template — provider type, HCL body, and the parameters that body interpolates. Admin or audit. |
+| `terrapod_provider_template_create` | — | Create a template. Its body is rendered into every instance of every item referencing it, so it is where those instances' provider credentials are decided. Platform admin only. |
+| `terrapod_provider_template_update` | — | Change a template. Wider blast radius than the record: every referencing instance renders the new body and parameters at its next reconfigure, so a removed parameter turns a stored input value into an unknown input. Platform admin only. |
+| `terrapod_provider_template_delete` | destructive | Delete a template. Refused `409` while an item still references it. Platform admin only. |
+| `terrapod_catalog_provision` | destructive | Provision an instance from an item and queue its first run — **this creates real cloud infrastructure**. The run is never plan-only; with `auto_apply` false (the default) it plans and waits for `terrapod_catalog_instance_confirm`. Needs catalog `use` on the item **and** write on the chosen pool, which must be one the item permits. |
+| `terrapod_catalog_instance_list` | read-only | An item's instances, every page. An instance's id **is** its workspace UUID, so it is also `ws-<id>` to the workspace tools. |
+| `terrapod_catalog_instance_get` | read-only | One instance, with the `input-values` it was last provisioned or reconfigured with — the set to start from for a reconfigure. Needs catalog read on the **originating item**, a different permission from read on the workspace. |
+| `terrapod_catalog_instance_reconfigure` | destructive | New inputs and/or a new version pin, then a run — a changed input can force a replacement, so treat it as an apply. `input_values` **replaces** the stored set; omitting it keeps them. It also re-renders whatever the item now says, including turning a withdrawn Ansible half off rather than leaving a stale directory. Refused `409` on an archived instance. |
+| `terrapod_catalog_instance_destroy` | destructive | Tear the infrastructure down and archive the workspace on a successful apply. The **recommended** teardown. With `auto_apply` false it plans and waits, so what it would remove can be read first. |
+| `terrapod_catalog_instance_confirm` | destructive | Confirm the instance's pending planned run so it applies. Acts only on a catalog run awaiting confirmation — a speculative module-impact plan on the same workspace is deliberately not confirmable, or module write access would become apply access to every consuming instance. |
+| `terrapod_catalog_instance_discard` | — | Discard the pending planned run without applying it. |
+| `terrapod_catalog_instance_orphan` | destructive | **Abandon** an instance: delete its workspace record and leave its infrastructure running, untracked. The discouraged escape hatch, not a teardown — nothing is reclaimed and nothing records what created the resources. Needs catalog `admin`. |
 
 ### Discover (gated) — onboard existing resources
 
@@ -275,7 +331,8 @@ warns you through the agent.
 ## Roadmap (additive)
 
 Observe + gated Act + workspace/variable **Manage** + registry **Ground** +
-resource **Discover** have landed. Continuing additively (no breaking changes):
+ansible **Inventory** + the **service catalog** + resource **Discover** have
+landed. Continuing additively (no breaking changes):
 the rest of management **CRUD** (VCS connections, roles, agent pools, run tasks,
 notifications, execution hooks, …), and — once the gated import-only apply lands
 — an `onboard_apply` tool to adopt the generated import blocks.

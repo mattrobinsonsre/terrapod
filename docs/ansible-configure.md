@@ -43,6 +43,20 @@ resource "terrapod_workspace" "fleet" {
 nothing without it. All three default to **false** for an existing workspace,
 so upgrading changes nothing about what runs.
 
+### Or let the service catalog turn it on for you
+
+A [catalog item](service-catalog.md#provisioning-an-ansible-first-workspace) can
+declare the Ansible half it provisions, so a consuming team gets a workspace with
+`configure-enabled`, `config-directory`, `default-playbook` and `default-limit`
+already set, an inventory its first apply wrote, and the playbook copied out of
+the blessed module. Nothing is written by hand and the playbook is versioned with
+the module.
+
+The triggers are **not** templated: a provisioned instance has the operation and
+no trigger, and because the catalog clamp withholds `run:apply` from everyone but
+a platform admin, a configure on a catalog instance is started by an admin — or
+by an admin turning `configure-after-apply` on for that instance once.
+
 ## An inventory change configures, and the debounce is a settle
 
 The on-push trigger watches `config-directory`, so it sees a playbook or an
@@ -732,3 +746,5 @@ the local case. That is why the fix is a volume rather than a variable.
 | A cloud rejects the token with a signature error | the value was read with surrounding whitespace — `| trim` the file for the forms that take the token rather than a path |
 | `The specified OIDC token file does not exist` | Azure's `oidc_token_file_path` names a path that is not there, usually the engine's directory rather than a configure's |
 | The cloud refuses an otherwise valid token | the trust policy conditions on `phase` and does not name `configure` |
+| A catalog instance has a configure operation but nothing ever runs it | provisioning declares the operation and sets no trigger, and the catalog clamp withholds `run:apply` — see [Starting the configure](service-catalog.md#starting-the-configure) |
+| 422 naming `ansible-directory` when you provision a catalog item | the module version does not ship that subdirectory, or the path names the module root — the message says which, and names what the module version's top level does hold |

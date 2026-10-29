@@ -24,6 +24,12 @@ interface CatalogItem {
     'module-name': string
     'module-provider': string
     'default-version-pin': string | null
+    // Read-only (#2019). The card's badge row already carries the item
+    // properties someone picks on -- the module and the version pin -- and
+    // "this provisions an Ansible configure" is the same class of fact, so it
+    // belongs beside them rather than only on the detail page. Only the boolean
+    // is needed here: the paths are detail, not a selection criterion.
+    'configure-enabled'?: boolean
     labels?: Record<string, string> | null
   }
 }
@@ -116,6 +122,11 @@ export default function CatalogPage() {
                         ? t('card.pinned', { version: a['default-version-pin'] })
                         : t('card.latest')}
                     </span>
+                    {a['configure-enabled'] && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-900/50 text-sky-300">
+                        {t('card.configure')}
+                      </span>
+                    )}
                   </div>
                 </Link>
               )
