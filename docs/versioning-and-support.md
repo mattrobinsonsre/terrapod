@@ -248,9 +248,56 @@ migration convention in [`AGENTS.md`](../AGENTS.md).
 - Older minors are best-effort. Because Terrapod ships as a single Helm chart and
   every migration is reversible, upgrading forward one minor at a time is the
   supported upgrade path.
+- A line named in [`extended-support.json`](../extended-support.json) keeps
+  receiving security fixes and obvious bug fixes **for as long as it is listed**,
+  whatever newer lines have shipped in the meantime.
 
 Releases and their notes are published on the
 [GitHub Releases](https://github.com/mattrobinsonsre/terrapod/releases) page.
+
+### Why the last bullet exists, and what it is not
+
+The first three bullets are **version-relative** — a line leaves support because
+newer ones shipped, not because anyone decided. That is the right default, and it
+has one edge where it behaves badly: at a MAJOR boundary. Read literally, every
+line of the old major drops as soon as the new major has two minors, so 1.x would
+survive exactly one 2.x minor by accident of the wording and then disappear with
+no announcement.
+
+So a line can be **held**, and it stays held while 2.x advances past it:
+
+| after | supported |
+|---|---|
+| 2.0.0 | 2.0.x, 1.11.x |
+| 2.1.0 | 2.1.x, 2.0.x, 1.11.x |
+| 2.2.0 | 2.2.x, 2.1.x, 1.11.x |
+
+Two properties are deliberate, and the second is the one worth reading twice:
+
+- **It is a named line, not a count.** The re-scan takes "the N most recent
+  minors", and a count cannot hold a line still while the majors move past it:
+  raising it from 2 to 3 buys one release and then drops 1.11 again, one release
+  later, for the identical reason.
+- **An entry does not expire.** A held line keeps its support for as long as it
+  is listed. Retiring it is a **deliberate act** — deleting the entry — and the
+  `earliest_retirement` date beside it is a floor on when that may happen, with a
+  commitment of at least twelve weeks, rather than a date on which support
+  lapses. A line that left support because a date passed, with nobody deciding to
+  drop it, is the failure this exists to prevent, so the date is checked by the
+  gate and deliberately not read by the re-scan.
+
+`extended-support.json` is the only place a held line is named, and
+`scripts/docs-audit/check_extended_support.py` keeps the file, the re-scan and
+this page agreeing: it validates each entry — including that its floor really is
+twelve weeks or more, so an entry cannot promise less than this page states — and
+drives the re-scan's own discovery code to prove a held line is scanned
+**whatever its dates**, the case a date-driven version would get wrong. It fails
+if this page or `SECURITY.md` stops naming the file.
+
+**It is not a second support tier with its own promise.** A held line gets what
+the previous minor gets — security fixes, and obvious bug fixes. Nothing here
+extends the deprecation window or the compatibility guarantees above; it only
+decides how long a line keeps receiving them.
 
 ## How this is enforced
 

@@ -285,6 +285,17 @@ jobs:
       - name: (docs-audit) The release trigger admits a pre-release, and lets it hold the badge
         run: python3 scripts/docs-audit/check_release_tag_triggers.py
 
+      # The support window in SECURITY.md is version-relative, so at a MAJOR
+      # boundary a line can leave support on a date nobody chose. A line held
+      # beyond it is a line plus a SUNSET DATE in `extended-support.json`, and a
+      # date in a committed file is exactly the kind of claim that goes stale in
+      # silence -- so this drives the re-scan's OWN discovery code over fixture
+      # dates rather than reimplementing it, and proves the entry is
+      # self-expiring. Needs PyYAML, installed above, because it reads the
+      # workflow rather than grepping it.
+      - name: (docs-audit) A held release line is honoured by the re-scan and expires by itself
+        run: python3 scripts/docs-audit/check_extended_support.py
+
       # The `go-modules` job below reads its toolchain from ONE module's
       # directive, and its own comment said the modules "are kept in step by
       # `check_go_directives.py`" for years before that script existed. Nine
