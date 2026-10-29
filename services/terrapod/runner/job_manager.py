@@ -14,6 +14,65 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+#: Kubernetes API statuses that are the ORDINARY shape of "not yet" on a read of
+#: a pod or Job, and so belong at debug.
+#:
+#:   404 -- the pod or Job does not exist: it has not been created yet, or it has
+#:          already been garbage-collected. Both are expected on the normal
+#:          timeline of a run.
+#:   400 -- what the API answers for a container that is still `ContainerCreating`,
+#:          which is every log read in the first seconds after a Job launches.
+#:
+#: Everything else is reported louder. 401 and 403 are never "not yet": no amount
+#: of waiting grants a permission, so a listener refused once will be refused for
+#: the life of the deployment. 5xx may pass, but a reader should see it.
+_TRANSIENT_API_STATUSES = frozenset({400, 404})
+
+#: Statuses that can only be a configuration problem, so they are errors rather
+#: than warnings: the operator has to change something.
+_PERMANENT_API_STATUSES = frozenset({401, 403})
+
+
+def _log_api_refusal(operation: str, exc: ApiException, **context: object) -> None:
+    """Report a swallowed `ApiException` so a permanent failure is visible.
+
+    **All three callers are DIAGNOSTIC reads** -- the pod log, a pod's terminated
+    state, a Job's failure reason -- which is to say they are what something calls
+    once a run has already gone wrong. All three ended in a bare
+    `except ApiException: return <empty>`, so a refusal produced an empty result
+    and no record anywhere, at any level.
+
+    That is worse than it sounds, because `listener.py`'s own handler carries a
+    comment saying it exists precisely so that permanent failures stay
+    diagnosable, naming "auth, RBAC, wrong namespace" and the bare `except` it
+    replaced. The inner swallow defeated it: nothing ever reached that handler, so
+    a listener with no permission to read pods in its namespace looked exactly
+    like a pod that had not started yet, for ever (#2246).
+
+    Control flow is deliberately UNCHANGED -- each caller still returns its empty
+    value. The defect was the absence of a record, not the fallback, and a read
+    used for diagnosis should not start raising into paths that have always
+    treated it as best-effort.
+    """
+    status = getattr(exc, "status", None)
+    detail = {
+        "operation": operation,
+        "status": status,
+        "reason": getattr(exc, "reason", None),
+        **context,
+    }
+    if status in _PERMANENT_API_STATUSES:
+        logger.error(
+            "Kubernetes refused a diagnostic read; this will not resolve on its own "
+            "-- check the listener's RBAC and namespace",
+            **detail,
+        )
+    elif status in _TRANSIENT_API_STATUSES:
+        logger.debug("Kubernetes diagnostic read unavailable yet", **detail)
+    else:
+        logger.warning("Kubernetes diagnostic read failed", **detail)
+
+
 _batch_v1: client.BatchV1Api | None = None
 _core_v1: client.CoreV1Api | None = None
 
@@ -590,7 +649,8 @@ async def get_pod_terminated_info(
             ),
         )
         core_api.api_client.last_response = None
-    except ApiException:
+    except ApiException as exc:
+        _log_api_refusal("list pods for terminated-state", exc, job=job_name, namespace=namespace)
         return None
 
     if not pods.items:
@@ -663,7 +723,8 @@ async def get_job_failure_info(job_name: str, namespace: str = "") -> dict[str, 
             None,
             lambda: batch_api.read_namespaced_job(name=job_name, namespace=namespace),
         )
-    except ApiException:
+    except ApiException as exc:
+        _log_api_refusal("read Job for failure info", exc, job=job_name, namespace=namespace)
         return None
 
     conditions = getattr(getattr(job, "status", None), "conditions", None) or []
@@ -749,5 +810,6 @@ async def get_pod_logs(
             except Exception:
                 pass
             core_api.api_client.last_response = None
-    except ApiException:
+    except ApiException as exc:
+        _log_api_refusal("read pod logs", exc, job=job_name, namespace=namespace)
         return ""
