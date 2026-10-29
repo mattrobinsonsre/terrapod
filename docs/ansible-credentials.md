@@ -276,6 +276,31 @@ on the Terraform side, read them with the OpenBao/Vault provider and
 `jsonencode` them into the envelope. The same rule, and the same reasoning,
 applies to `git_http_auth` and `git_ssh_auth`.
 
+## A playbook that reads its own secrets at play time
+
+Both categories above are a credential Terrapod resolves **before** the run
+starts. A playbook that reads secrets from OpenBao (or HashiCorp Vault) itself,
+part-way through a play — a role calling `community.hashi_vault`, or the HTTP API
+over `uri` — is a different question, and it is not a third credential category.
+It is answered by the machinery every other authentication flow a configure uses
+is answered by: [per-workspace cloud
+identity](cloud-identity.md#every-collection-takes-it-from-the-environment).
+
+Declare `vault` among the workspace's cloud-identity targets, and Terrapod mints
+a JWT at that target's own audience into the run's token directory — exactly as
+it does for AWS, Azure and GCP, and in the same place. The play points
+`community.hashi_vault` at it from its `environment:` block with
+`ANSIBLE_HASHI_VAULT_AUTH_METHOD=jwt`, `ANSIBLE_HASHI_VAULT_ROLE_ID` and
+`ANSIBLE_HASHI_VAULT_JWT`, and authenticates **as the workspace** rather than as
+something stored.
+
+So there is no approle and no long-lived token to hold: nothing to rotate,
+nothing for a log to leak, and the server decides what that workspace may read
+rather than Terrapod brokering it. The one asymmetry to know is that the Vault
+collection reads the token's **value** where the cloud collections read a path,
+so the play reads the file itself — the cloud-identity page covers that and why
+`| trim` is not optional.
+
 ## Where the credential physically goes at run time
 
 The path is the one every other credential takes, with one difference that
@@ -606,3 +631,6 @@ reason this is a feature rather than a gap:
   mechanism, for private git module sources
 - [OpenBao/Vault as a variable value source](vault.md) — the *other* Vault, and
   the one `value_source: "vault"` means
+- [Per-workspace cloud identity](cloud-identity.md#every-collection-takes-it-from-the-environment)
+  — how a play authenticates to OpenBao/Vault, AWS, Azure or GCP for itself,
+  with no stored credential
