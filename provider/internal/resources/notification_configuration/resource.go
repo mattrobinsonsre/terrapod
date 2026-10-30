@@ -45,7 +45,7 @@ func (r *notificationConfigResource) Schema(_ context.Context, _ resource.Schema
 			"workspace_id":     schema.StringAttribute{Optional: true, Computed: true, Description: "Workspace ID. Defaults to the provider's `workspace`.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}},
 			"name":             schema.StringAttribute{Required: true, Description: "Notification name."},
 			"destination_type": schema.StringAttribute{Required: true, Description: "Type: generic, slack, or email.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"url":              schema.StringAttribute{Optional: true, Description: "Webhook URL (required for generic/slack)."},
+			"url":              schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Webhook URL (required for generic/slack)."},
 			"token":            schema.StringAttribute{Optional: true, Sensitive: true, Description: "HMAC or auth token (write-only)."},
 			"enabled":          schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Whether the notification is enabled."},
 			"triggers":         schema.ListAttribute{Optional: true, ElementType: types.StringType, Description: "Run event triggers."},
@@ -215,11 +215,7 @@ func readNCFromSDK(ctx context.Context, nc *terrapod.NotificationConfiguration, 
 	m.CreatedAt = types.StringValue(nc.CreatedAt)
 	m.UpdatedAt = types.StringValue(nc.UpdatedAt)
 
-	if nc.URL != "" {
-		m.URL = types.StringValue(nc.URL)
-	} else {
-		m.URL = types.StringNull()
-	}
+	m.URL = types.StringValue(nc.URL)
 
 	if len(nc.Triggers) > 0 {
 		val, d := types.ListValueFrom(ctx, types.StringType, nc.Triggers)

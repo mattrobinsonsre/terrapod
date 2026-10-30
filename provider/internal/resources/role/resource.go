@@ -92,7 +92,7 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"description": schema.StringAttribute{
 				Description: "Human-readable description of the role.",
-				Optional:    true,
+				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"allow_all": schema.BoolAttribute{
 				Description: "An estate-wide grant: this role's allow side matches EVERY resource on every axis. Deny rules still take precedence, so 'everything except the sealed ones' remains expressible, and it does not raise the role's permission level -- a role granting read still grants read, just everywhere. Use it instead of putting a shared label on every workspace: label and name rules are exact-match, so a workspace created without that label would silently fall outside the role. Defaults to false.",
@@ -437,11 +437,7 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 	m.CreatedAt = types.StringValue(role.CreatedAt)
 	m.UpdatedAt = types.StringValue(role.UpdatedAt)
 
-	if role.Description != "" {
-		m.Description = types.StringValue(role.Description)
-	} else {
-		m.Description = types.StringNull()
-	}
+	m.Description = types.StringValue(role.Description)
 
 	// Optional+Computed: always set from the server, so a config that omits it
 	// takes the server's false rather than drifting forever (#684).

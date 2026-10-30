@@ -57,7 +57,7 @@ func (r *executionHookResource) Schema(_ context.Context, _ resource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, Description: "Execution hook ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"name":        schema.StringAttribute{Required: true, Description: "The hook name (unique)."},
-			"description": schema.StringAttribute{Optional: true, Description: "Description of the hook."},
+			"description": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Description of the hook."},
 			"hook_point": schema.StringAttribute{
 				Required:    true,
 				Description: "When the hook runs: one of pre_init, pre_plan, post_plan, pre_apply, post_apply.",
@@ -234,9 +234,5 @@ func readHookFromSDK(h *terrapod.ExecutionHook, m *executionHookModel) {
 	m.WorkspaceCount = types.Int64Value(h.WorkspaceCount)
 	m.CreatedAt = types.StringValue(h.CreatedAt)
 	m.UpdatedAt = types.StringValue(h.UpdatedAt)
-	if h.Description != "" {
-		m.Description = types.StringValue(h.Description)
-	} else {
-		m.Description = types.StringNull()
-	}
+	m.Description = types.StringValue(h.Description)
 }

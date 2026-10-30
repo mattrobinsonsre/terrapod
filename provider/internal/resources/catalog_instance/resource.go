@@ -136,7 +136,7 @@ func (r *catalogInstanceResource) Schema(_ context.Context, _ resource.SchemaReq
 			},
 			"version_pin": schema.StringAttribute{
 				Description: "Module version pin to provision/reconfigure to (e.g. \"~> 1.0\").",
-				Optional:    true,
+				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"auto_apply": schema.BoolAttribute{
 				Description: "Whether provision and reconfigure runs auto-apply. Defaults to false.",
@@ -346,11 +346,7 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 	// The instance RESPONSE carries the pin as "catalog-version-pin"
 	// (the bare "version-pin" is an inbound provision/reconfigure attribute
 	// only). Reading the wrong key here caused perpetual plan drift.
-	if pin := attrString(inst.Attributes, "catalog-version-pin"); pin != "" {
-		m.VersionPin = types.StringValue(pin)
-	} else {
-		m.VersionPin = types.StringNull()
-	}
+	m.VersionPin = types.StringValue(attrString(inst.Attributes, "catalog-version-pin"))
 
 	if v, ok := inst.Attributes["auto-apply"]; ok && v != nil {
 		if b, ok := v.(bool); ok {
