@@ -1680,11 +1680,6 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	return req, diags
 }
 
-// buildUpdateWorkspaceRequest is the partial-update counterpart to
-// buildCreateWorkspaceRequest. Same translation logic; Name is
-// included so a Terraform-driven rename round-trips via PATCH (the
-// API supports rename — terrapod-vcs-test moves between names
-// during e.g. the cutover smoke).
 // optionalStringKeepingExplicitEmpty returns null only when the server is empty
 // AND the configuration did not ask for a value, so an omitted attribute stays
 // null while an explicit "" round-trips as "".
@@ -1699,6 +1694,11 @@ func optionalStringKeepingExplicitEmpty(configured types.String, server string) 
 	return types.StringValue(server)
 }
 
+// buildUpdateWorkspaceRequest is the partial-update counterpart to
+// buildCreateWorkspaceRequest. Same translation logic; Name is
+// included so a Terraform-driven rename round-trips via PATCH (the
+// API supports rename — terrapod-vcs-test moves between names
+// during e.g. the cutover smoke).
 func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrapod.UpdateWorkspaceRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := terrapod.UpdateWorkspaceRequest{}
@@ -1997,9 +1997,6 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.AnsibleVersion = types.StringNull()
 	}
-	// Null rather than StringValue("") for an unset label: the attribute is
-	// Optional and not Computed, so writing "" into state against a null config
-	// would diff on every plan.
 	// Still null for an unset label -- the schema above records a deliberate
 	// decision against Computed here -- but decided from what the configuration
 	// asked for rather than only from the server's answer, so an EXPLICIT "" now
