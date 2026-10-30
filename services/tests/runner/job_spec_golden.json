@@ -549,6 +549,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -621,7 +625,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -679,6 +683,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -966,6 +974,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1079,7 +1091,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -1137,6 +1149,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -1420,6 +1436,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -1492,7 +1512,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -1550,6 +1570,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -2425,6 +2449,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -2497,7 +2525,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -2555,6 +2583,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -3113,6 +3145,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -3185,7 +3221,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3243,6 +3279,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -3713,6 +3753,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -3785,7 +3829,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3843,6 +3887,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",
@@ -4322,6 +4370,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_GIT_DIR",
+                  "value": "/tp/git"
+                },
+                {
                   "name": "TP_EE_TOKEN",
                   "valueFrom": {
                     "secretKeyRef": {
@@ -4394,7 +4446,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -4452,6 +4504,10 @@
                 {
                   "name": "ANSIBLE_ROLES_PATH",
                   "value": "/tp/roles"
+                },
+                {
+                  "name": "GIT_CONFIG_GLOBAL",
+                  "value": "/tp/git/gitconfig"
                 },
                 {
                   "name": "TP_EE_TOKEN",

@@ -753,8 +753,25 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # the returned env (GIT_CONFIG_GLOBAL, sshCommand) flows into init's environment
     # since init_phase inherits os.environ. A single malformed credential is still
     # skipped, but credentials that cannot be applied at all fail the run (#1442).
+    # On a CONFIGURE the material goes on the SHARED volume instead of this
+    # container's HOME, because the container that clones a git-sourced role is
+    # the execution environment and it cannot see our HOME (#2320). One copy
+    # serves both: the volume is mounted at the same path in each container, so
+    # the absolute paths inside the generated gitconfig resolve in both, and the
+    # EE already carries `GIT_CONFIG_GLOBAL` pointing at it.
+    #
+    # Keyed on the directory EXISTING rather than on the phase, because that is
+    # the same question asked directly: the init container creates it, and it
+    # creates it exactly when an execution environment is attached. A plan or
+    # apply run has no such volume and falls back to HOME, unchanged.
+    # `TP_EE_GIT_DIR` is set by the Job beside the other `TP_EE_*` paths, and
+    # only when an execution environment is attached -- so its presence IS the
+    # question "is there a second container that needs to see this", asked
+    # directly rather than inferred from the phase. Absent on a plan or apply,
+    # where the fallback to HOME is correct and unchanged.
+    _git_base = Path(_ee_git_dir) if (_ee_git_dir := os.environ.get("TP_EE_GIT_DIR")) else None
     try:
-        for _k, _v in git_auth.run().items():
+        for _k, _v in git_auth.run(base_dir=_git_base).items():
             os.environ[_k] = _v
     except git_auth.GitAuthUnavailable:
         # Not advisory. Credentials were declared for this workspace and could
