@@ -174,10 +174,18 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"display_name": schema.StringAttribute{
 				Description: "Human-friendly display name shown in the catalog UI.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of what provisioning this item produces.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"enabled": schema.BoolAttribute{
 				Description: "Whether the catalog item is available for provisioning.",
@@ -187,6 +195,10 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"default_version_pin": schema.StringAttribute{
 				Description: "Default module version pin offered when provisioning (e.g. \"~> 1.0\").",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"provider_template_ids": schema.ListAttribute{
 				Description: "Provider template IDs rendered into the generated wrapper for instances.",
@@ -212,14 +224,13 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 			// The Ansible half this item provisions (#2019). `configure_enabled`
 			// says whether and `ansible_directory` says where.
 			//
-			// Requiredness follows this resource's own siblings rather than the
-			// workspace's, because the read-back helper is what decides it. The
-			// bool is Optional+Computed like `enabled`: the server always returns
-			// one, so a null plan against a `false` result would fail the apply.
-			// The three strings are Optional-only like `display_name`: the server
-			// returns "" when unset and optString maps that back to null, so an
-			// omitted attribute stays null in state instead of planning as
-			// "(known after apply)".
+			// Requiredness is uniform across this resource's settable strings:
+			// Optional+Computed with UseStateForUnknown, read back concretely. The
+			// bool is Optional+Computed like `enabled` -- the server always returns
+			// one, so a null plan against a `false` result would fail the apply --
+			// and #2307 brought `display_name`, `description` and
+			// `default_version_pin` onto the same shape, so there is no longer a
+			// second convention in this file to choose between.
 			"configure_enabled": schema.BoolAttribute{
 				Description: "Whether a workspace provisioned from this item has the Ansible " +
 					"configure operation. Defaults to false — configure is opt-in. " +
@@ -488,8 +499,8 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 	m.Name = types.StringValue(attrString(ci.Attributes, "name"))
 	m.ModuleID = types.StringValue(attrString(ci.Attributes, "module-id"))
 
-	m.DisplayName = optString(ci.Attributes, "display-name")
-	m.Description = optString(ci.Attributes, "description")
+	m.DisplayName = types.StringValue(attrString(ci.Attributes, "display-name"))
+	m.Description = types.StringValue(attrString(ci.Attributes, "description"))
 
 	if v, ok := ci.Attributes["enabled"]; ok && v != nil {
 		if b, ok := v.(bool); ok {
@@ -501,7 +512,7 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 		m.Enabled = types.BoolNull()
 	}
 
-	m.DefaultVersionPin = optString(ci.Attributes, "default-version-pin")
+	m.DefaultVersionPin = types.StringValue(attrString(ci.Attributes, "default-version-pin"))
 
 	ptIDs := attrStringList(ci.Attributes, "provider-template-ids")
 	if len(ptIDs) > 0 {
@@ -537,8 +548,7 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 	}
 
 	// The Ansible half (#2019), read back unchanged. The bool follows `enabled`
-	// above; the three strings go through optString, so the server's "" comes back
-	// as null and a config that omits them matches its state.
+	// above; the strings follow the concrete read-back below.
 	if v, ok := ci.Attributes["configure-enabled"]; ok && v != nil {
 		if b, ok := v.(bool); ok {
 			m.ConfigureEnabled = types.BoolValue(b)
@@ -548,18 +558,22 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 	} else {
 		m.ConfigureEnabled = types.BoolNull()
 	}
-	// CONCRETE, not optString. These three are Optional+Computed, so an omitted
-	// one plans as unknown and any concrete result satisfies it -- while an
-	// EXPLICIT "" must read back as "" or the apply fails "Provider produced
-	// inconsistent result after apply". optString collapses "" to null, which is
-	// correct for this resource's Optional-only strings and wrong for these.
+	// CONCRETE for every settable string on this resource (#2307). They are
+	// Optional+Computed, so an omitted one plans as unknown and any concrete
+	// result satisfies it -- while an EXPLICIT "" must read back as "" or the
+	// apply fails "Provider produced inconsistent result after apply".
+	//
+	// This file used to carry an `optString` that collapsed "" to null, which
+	// shipped exactly that defect on `display_name`, `description` and
+	// `default_version_pin`. It had no other callers, so #2307 deleted the
+	// helper rather than only its uses: the mechanism is gone, not patched.
 	//
 	// Not local tidiness: `default_playbook` and `default_limit` are the SAME
 	// attribute names on `terrapod_workspace`, where they are Optional+Computed
 	// with a concrete read-back. One name behaving two ways across two resources
-	// is worse than two helpers in one file, and the Optional-only shape ships
-	// the "inconsistent result" defect this provider has already closed six
-	// times (#684, #732, #1634, #1748, #1771, #2110).
+	// is worse than one convention here, and the Optional-only shape ships the
+	// "inconsistent result" defect this provider has already closed six times
+	// (#684, #732, #1634, #1748, #1771, #2110).
 	m.AnsibleDirectory = types.StringValue(attrString(ci.Attributes, "ansible-directory"))
 	m.DefaultPlaybook = types.StringValue(attrString(ci.Attributes, "default-playbook"))
 	m.DefaultLimit = types.StringValue(attrString(ci.Attributes, "default-limit"))
@@ -588,15 +602,6 @@ func attrString(attrs map[string]any, key string) string {
 		}
 	}
 	return ""
-}
-
-// optString reads a string attribute into a types.String, returning null
-// when absent/empty so a config that omits the field matches state.
-func optString(attrs map[string]any, key string) types.String {
-	if s := attrString(attrs, key); s != "" {
-		return types.StringValue(s)
-	}
-	return types.StringNull()
 }
 
 // attrStringList reads a list-of-strings attribute out of an SDK
