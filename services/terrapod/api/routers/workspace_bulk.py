@@ -894,6 +894,12 @@ async def _apply(
         for attr, new in plan["fields"].items():
             if attr == _POOL_SET_FIELD:
                 pool_set.set_workspace_pools(ws, new)
+            elif attr == "auto_configure_enabled":
+                # Not a plain setattr: turning the trigger off must forget the
+                # auto-configure baseline too, or a later re-enable fires across
+                # the fleet this surface just touched. See
+                # workspace_settings.set_auto_configure_enabled.
+                workspace_settings.set_auto_configure_enabled(ws, new)
             else:
                 setattr(ws, attr, new)
 

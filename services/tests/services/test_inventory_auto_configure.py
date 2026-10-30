@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services import inventory_auto_configure as iac
+from terrapod.services import workspace_settings
 
 _TOKEN_OLD = "aaaaaaaaaaaaaaaaaaaaaaaa"
 _TOKEN_NEW = "bbbbbbbbbbbbbbbbbbbbbbbb"
@@ -282,3 +283,120 @@ class TestTheRunIsActuallyQUEUED:
         created, _ = await _run([ws], redis=redis, current=_TOKEN_OLD)
         created.assert_not_called()
         created.queued.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+class TestTurningTheTriggerOffForgetsTheBaseline:
+    """A RE-ENABLE must adopt, exactly as a first-ever enable does (#2277 A2).
+
+    `docs/ansible-configure.md` promises that switching the flag on for a fleet
+    that already has hosts is safe, and the adopt-don't-fire guard above is what
+    delivers that -- keyed on a NULL stamp. Nothing cleared the stamp when the
+    flag was turned off, so
+
+        on -> off -> the inventory moves while off -> on again
+
+    left a stale baseline, and the next cycle read the difference as an unacted
+    change and queued a run against `default-limit`, where empty means every
+    host. Reachable across a whole fleet in one bulk call.
+
+    Driven through the real cycle rather than asserting on the producer alone,
+    because the property is "does it fire", not "is a column None".
+    """
+
+    async def test_disabling_clears_the_stamp(self):
+        ws = _ws(stamp=_TOKEN_OLD)
+        workspace_settings.set_auto_configure_enabled(ws, False)
+        assert ws.auto_configure_enabled is False
+        assert ws.auto_configure_inventory_stamp is None, (
+            "the baseline must be forgotten when the trigger goes off, or a "
+            "re-enable fires for a change made while it was off"
+        )
+
+    async def test_enabling_does_not_clear_the_stamp(self):
+        """The other direction, which is what stops the careless fix.
+
+        Clearing on every write would make the trigger forget its baseline each
+        time any bulk update touched the flag -- including a no-op re-assert of
+        True -- and the next cycle would then adopt a change it should have
+        acted on. So the clear is conditional, and this is the test that keeps
+        it conditional.
+        """
+        ws = _ws(stamp=_TOKEN_OLD)
+        workspace_settings.set_auto_configure_enabled(ws, True)
+        assert ws.auto_configure_enabled is True
+        assert ws.auto_configure_inventory_stamp == _TOKEN_OLD
+
+    async def test_a_re_enabled_workspace_adopts_rather_than_fires(self):
+        """The whole point, end to end: off then on, and the cycle must not fire."""
+        ws = _ws(stamp=_TOKEN_OLD)
+        workspace_settings.set_auto_configure_enabled(ws, False)
+        workspace_settings.set_auto_configure_enabled(ws, True)
+
+        redis = _Redis({f"tp:inv_settle:{ws.id}": _TOKEN_NEW})
+        created, _ = await _run([ws], redis=redis, current=_TOKEN_NEW)
+
+        created.assert_not_called()
+        assert ws.auto_configure_inventory_stamp == _TOKEN_NEW, (
+            "it should have adopted the current inventory as the new baseline"
+        )
+
+    async def test_a_workspace_whose_trigger_was_never_off_still_fires(self):
+        """The feature itself, unbroken -- a stale stamp with no disable in its
+        history is a real unacted change and must still queue a run."""
+        ws = _ws(stamp=_TOKEN_OLD)
+        redis = _Redis({f"tp:inv_settle:{ws.id}": _TOKEN_NEW})
+        created, _ = await _run([ws], redis=redis, current=_TOKEN_NEW)
+        created.assert_called_once()
+
+
+class TestBothUpdatePathsGoThroughTheProducer:
+    """The rule is one producer, so a bare assignment has to fail here.
+
+    Behaviourally invisible: a route that sets the column directly passes every
+    test above, because those drive the producer. This is the call-site half --
+    the recorded "a presence check is not an application check" shape, where the
+    rule exists and nothing routes through it.
+    """
+
+    def test_no_module_assigns_the_column_outside_the_producer(self):
+        import ast
+        import pathlib
+
+        root = pathlib.Path(workspace_settings.__file__).resolve().parents[1]
+        producer = pathlib.Path(workspace_settings.__file__).resolve()
+        offenders = []
+        for path in root.rglob("*.py"):
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assign):
+                    continue
+                for tgt in node.targets:
+                    if (
+                        isinstance(tgt, ast.Attribute)
+                        and tgt.attr == "auto_configure_enabled"
+                        and path != producer
+                    ):
+                        offenders.append(f"{path.name}:{tgt.lineno}")
+        assert not offenders, (
+            "these assign `auto_configure_enabled` directly, so turning the "
+            "trigger off there leaves a stale baseline and a later re-enable "
+            f"fires across the fleet: {offenders}. Call "
+            "workspace_settings.set_auto_configure_enabled instead."
+        )
+
+    def test_the_bulk_apply_loop_routes_the_flag_to_the_producer(self):
+        """The bulk path mutates through `setattr(ws, attr, new)`, which no AST
+        walk can attribute to a column -- so the clause above cannot see it and
+        this one has to read the loop itself."""
+        import inspect
+
+        from terrapod.api.routers import workspace_bulk
+
+        src = inspect.getsource(workspace_bulk)
+        assert 'elif attr == "auto_configure_enabled":' in src, (
+            "the bulk apply loop must special-case the flag the way it already "
+            "special-cases the agent-pool set, or a fleet-wide disable leaves "
+            "every stamp stale"
+        )
+        assert "set_auto_configure_enabled" in src
