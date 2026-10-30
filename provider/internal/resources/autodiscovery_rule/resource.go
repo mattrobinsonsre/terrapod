@@ -1716,8 +1716,6 @@ func rawStr(m map[string]any, keys ...string) types.String {
 	return types.StringNull()
 }
 
-// rawBool reads a bool key from a decoded object, returning a null
-// types.Bool if absent or not a bool.
 // optionalStringKeepingExplicitEmpty returns null only when the server is empty
 // AND the configuration did not ask for a value, so an omitted attribute stays
 // null (no spurious diff) while an explicit "" round-trips as "".
@@ -1735,6 +1733,8 @@ func optionalStringKeepingExplicitEmpty(configured types.String, server string) 
 	return types.StringValue(server)
 }
 
+// rawBool reads a bool key from a decoded object, returning a null
+// types.Bool if absent or not a bool.
 func rawBool(m map[string]any, key string) types.Bool {
 	if v, ok := m[key]; ok && v != nil {
 		if b, ok := v.(bool); ok {
