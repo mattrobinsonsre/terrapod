@@ -264,7 +264,7 @@ jobs:
       # Checks itself along with the rest, which is what makes the set closed
       # rather than merely one longer.
 
-      - name: (docs-audit) Every docs-audit gate is run by this job
+      - name: (docs-audit) Every gate in the repository is run by some job
         run: python3 scripts/docs-audit/check_docs_audit_wiring.py
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency

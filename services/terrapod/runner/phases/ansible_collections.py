@@ -545,8 +545,23 @@ def install(
         # Roles first, and unconditionally: a file with no `roles:` section
         # prints "Skipping install, no requirements found" and exits 0, so this
         # costs one process rather than a YAML parser the runner does not have.
-        # A git-sourced role clones with the credentials `git_auth` has already
-        # written into git's own config.
+        # A git-sourced role clones with NO credentials -- corrected 2026-10-30,
+        # having claimed `git_auth`'s config applies here (#2318, and #2320 is
+        # the fix). It does not: `git_auth` writes under the ORCHESTRATOR's
+        # $HOME, the EE mounts a different /home, `_ee_env` carries no `GIT_*`
+        # and `galaxy_env` is an allow-list without `GIT_CONFIG_GLOBAL`.
+        #
+        # Measured against the published EE image. Every failure below is the
+        # CLONE failing for want of a credential, which is one problem and not
+        # several:
+        #   * `git+https://` to a public repo installs
+        #   * `git+ssh://git@host/org/role.git` fails the clone
+        #   * `git@host:org/role.git` WITH `scm: git` fails the clone -- so the
+        #     SCP form IS a git reference to ansible, contrary to what this
+        #     comment said for one revision
+        #   * `git@host:org/role.git` WITHOUT `scm:` is guessed as a Galaxy name
+        #     and looked up on galaxy.ansible.com. That is ansible's documented
+        #     contract for a src with no scheme, not a gap of ours
         logger.info("installing the configuration's roles", requirements=str(path))
         _run_install(
             ["role", "install", "-r", str(path), "-p", str(roles)],
