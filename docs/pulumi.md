@@ -79,8 +79,12 @@ replaced Pulumi run takes; the API attribute is `target-addrs` either way.
 
 ### Execution hooks
 
-A workspace's `pre_plan`, `post_plan`, `pre_apply` and `post_apply` hooks run
-for a Pulumi run at the same four points, around the preview and the update. A
+A workspace's `pre_init`, `pre_plan`, `post_plan`, `pre_apply` and `post_apply`
+hooks run for a Pulumi run at the same **five** points as a Terraform one.
+`pre_init` is engine-neutral and fires before the run branches on its engine, so
+it runs here too -- which is the one worth knowing, because cloud and secret
+auth and extra tooling are exactly what a Pulumi program wants set up first. The
+other four sit around the preview and the update. A
 hook that exits non-zero fails the run, so a `pre_apply` hook that refuses means
 nothing is applied.
 

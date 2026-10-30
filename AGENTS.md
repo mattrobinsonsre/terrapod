@@ -37,7 +37,7 @@ Two things follow, and they decide arguments rather than start them:
 - **A Terraform-shaped answer wins.** Where an engine offers a choice, take the
   one that lands in the existing flow: a per-workspace engine version resolved
   through the binary cache, because that is how `terraform_version` works, not a
-  deployment-wide pin; the same execution hooks at the same four points; run
+  deployment-wide pin; the same execution hooks at the same five points; run
   options that mean what they mean on a Terraform run.
 - **Where an engine cannot be coerced, say so plainly.** Ansible has no
   separable plan; Pulumi's update plans are experimental upstream and its

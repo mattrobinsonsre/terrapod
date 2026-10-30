@@ -497,7 +497,7 @@ object in storage alongside the run's other artifacts, under
 That split is sized rather than guessed. Measured on a four-host play with one
 25-iteration loop: **107 events, 79 KB**, of which 75 were loop items, and a
 single `gather_facts` result is **16.5 KB per host**. A row per event at that
-rate is the scaling problem large AWX installations are known for.
+rate is a known scaling constraint for any event-per-row design.
 
 Nothing is discarded at capture. A single result above 64 KiB is moved to a
 sidecar object and referenced by id, so the file a host filter has to read stays
