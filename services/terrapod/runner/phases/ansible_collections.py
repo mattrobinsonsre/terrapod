@@ -16,9 +16,24 @@ both remain available either way:
 * **Roles are usually in-house and come from git**, which is already solved: an
   operator declares the credential once as a `git_http_auth` / `git_ssh_auth`
   workspace variable and `runner/phases/git_auth.py` materialises it into git's
-  own config, with `insteadOf` rewrites, *before* anything fetches. A role whose
-  requirement names a git source is an ordinary clone and inherits all of that,
-  needing nothing from this phase.
+  own config, with `insteadOf` rewrites, *before* anything fetches.
+
+  **A git-sourced role is an ordinary clone, and it inherits NONE of that --
+  corrected 2026-10-30, having claimed the opposite (#2318).** Measured: a
+  PUBLIC git-sourced role installs in the execution environment, so the claim
+  held for the case anyone would test first. A PRIVATE one cannot, because
+  `git_auth` writes its config, its keys and its known_hosts under the
+  ORCHESTRATOR's `$HOME`, and the EE mounts a different `/home` on a separate
+  volume; `_ee_env` sets six variables and no `GIT_*` of any kind, and
+  `galaxy_env` is an allow-list that does not carry `GIT_CONFIG_GLOBAL`. So an
+  operator whose roles live in a private repository reads this paragraph, sees
+  that git auth is "already solved", and meets a clone failure with no
+  credential in sight.
+
+  Plumbing git_auth's config into the EE is a real change rather than a fix for
+  a wrong sentence -- it widens what the EE can see, which is a security
+  question -- so it is recorded on #2318 as a measured gap and this paragraph
+  now says what is true instead of implying it is served.
 * **A Galaxy-HOSTED role is the one corner not served.** `ansible-galaxy role
   install ns.name` uses the v1 roles API, which Terrapod does not implement
   (`docs/galaxy-cli-surface.md`), so such a role reaches upstream directly where
