@@ -1394,9 +1394,13 @@ class OCIGarbageCollectionConfig(BaseModel):
     enabled: bool = Field(
         default=True,
         description="Collect unreferenced blobs. On by default because the "
-        "alternative is a registry that only ever grows: there is no delete API, "
-        "so without this an operator's only recourse is manual SQL and object "
-        "deletion. Turn it off only to investigate an unexpected reclaim.",
+        "alternative is a registry that only ever grows. Deleting content is a "
+        "first-class audited operation — a tag or a manifest under /v2/, a whole "
+        "repository on the native API — but no deletion frees storage: layers are "
+        "shared, so un-referencing a manifest reclaims nothing, and a direct blob "
+        "delete is refused with 405 because those bytes belong to every manifest "
+        "pointing at them. Collection is therefore the only thing that returns "
+        "space. Turn it off only to investigate an unexpected reclaim.",
     )
     grace_hours: int = Field(
         default=24,

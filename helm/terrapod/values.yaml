@@ -572,6 +572,21 @@ api:
         #       username: robot
         #       existingSecret: terrapod-upstream-example
         #       existingSecretKey: password        # optional, defaults to "password"
+        #     - host: mirror.example.com           # API not on its own hostname
+        #       api_url: https://artifacts.internal/v2-proxy
+        #
+        # host does two jobs: it is the first path component clients name AND,
+        # by default, the address Terrapod fetches from (https://{host}).
+        # api_url splits the second off for a registry whose API is not served
+        # from its own hostname — an internal mirror or a reverse proxy in front
+        # of one. Clients still pull <terrapod>/mirror.example.com/..., so the
+        # name they use is unchanged. Leave it unset for a normal registry.
+        #
+        # It is part of the allow-list, not a way round it: a caller still
+        # cannot reach a host that is not listed. But it IS the field that
+        # decides the outbound address, so review it as you would host — and
+        # note the password Secret is keyed on host, not on api_url.
+
         # How long an in-progress blob upload may sit untouched before it is
         # reaped along with its chunks. The spec expects a server to time
         # unfinished uploads out; without it a push that starts and dies leaks
@@ -579,10 +594,13 @@ api:
         # access can repeat. Generous by default: a slow, resumed push over a
         # poor link is legitimate, and reaping it mid-flight destroys real work.
         upload_session_timeout_hours: 24
-        # Reclaiming storage (#1419). There is no delete API — deleting a
-        # manifest reclaims nothing on its own, because its layers are usually
-        # shared — so space comes back only by collecting blobs that no manifest
-        # references any more.
+        # Reclaiming storage (#1419). Deleting content IS supported and audited
+        # — DELETE a tag or a manifest under /v2/, or a whole repository on the
+        # native API — but no deletion frees storage on its own: a manifest's
+        # layers are usually shared, and a direct blob delete is refused with
+        # 405 because those bytes belong to every manifest pointing at them. So
+        # space comes back only by collecting blobs that no manifest references
+        # any more, which is what this does.
         #
         # Nothing is deleted for being old — not a pushed image, not a mirrored
         # one. Collection reclaims only blobs that no manifest references any
@@ -632,12 +650,10 @@ api:
         npm:
           enabled: true
           upstream: https://registry.npmjs.org
-        # Ansible Galaxy v3 (collections). Ansible-only, so it disappears
-        # entirely with engines.ansible.enabled: false. Point ansible-galaxy at
-        # it with a galaxy_server entry whose url is this proxy's base.
-        # Pulumi resource and language plugins. Pulumi-only, so it disappears
-        # entirely with engines.pulumi.enabled: false. Point the CLI at it with
-        # PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES.
+        # Pulumi resource and language plugins. Point the CLI at it with
+        # PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES. Serves Pulumi runs only, but it
+        # is on regardless: there is no engine on/off switch, and a proxy costs
+        # nothing until a run of that engine asks it for something.
         pulumi:
           enabled: true
           upstream: https://get.pulumi.com/releases/plugins
@@ -657,6 +673,10 @@ api:
         nuget:
           enabled: true
           upstream: https://api.nuget.org/v3-flatcontainer
+        # Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a
+        # galaxy_server entry whose url is this proxy's base. Also carries
+        # private collection publishing and signature verification, so unlike
+        # the others it holds content that exists nowhere upstream.
         galaxy:
           enabled: true
           upstream: https://galaxy.ansible.com

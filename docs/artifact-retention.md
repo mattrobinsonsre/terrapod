@@ -1,6 +1,6 @@
 # Artifact Retention & Cleanup
 
-Terrapod stores versioned state files, run logs, plan outputs, configuration tarballs, cached binaries, and cached providers in object storage. Without cleanup, storage grows unboundedly. The artifact retention system automatically purges old artifacts while preserving safety invariants.
+Terrapod stores versioned state files, run logs, plan outputs, configuration tarballs, cached binaries, cached providers, and cached language-registry packages in object storage. Without cleanup, storage grows unboundedly. The artifact retention system automatically purges old artifacts while preserving safety invariants.
 
 ---
 
@@ -16,10 +16,14 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 | **Config versions (count)** | `config_versions_keep` | 50 per workspace | Excess CVs beyond the keep count (oldest first); CVs referenced by an active run are always preserved |
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
 | **Binary cache** | `binary_cache_retention_days` | 30 days | Cached terraform/tofu CLI binaries not accessed within the retention window |
+| **Package cache** | `package_cache_retention_days` | 30 days | Cached language-registry artifacts not accessed within the retention window -- PyPI, npm, Ansible Galaxy, Go module, NuGet and Pulumi-plugin files alike, which all share one table |
 | **Module overrides** | `module_overrides_retention_days` | 14 days | Module impact analysis override tarballs from completed speculative runs |
+| **VCS archives** | `vcs.archive_cache_retention_days` | 7 days | Cached VCS archive tarballs older than the threshold. The only category keyed on **age** rather than last access, because these have no database table -- they are content-addressed by commit SHA, so the sweep lists the prefix and reads each object's own `last_modified`. Its key lives under `vcs`, not `artifact_retention` |
 | **Deleted workspaces** | `deleted_workspace_retention_days` | 30 days | State left behind by a deleted workspace, once it has been recoverable for the full window |
 
-Set any per-category value to `0` to disable cleanup for that category.
+Set any per-category value to `0` to disable cleanup for that category. Every key above sits
+under `api.config.artifact_retention` except `vcs.archive_cache_retention_days`, which is under
+`api.config.vcs`.
 
 ---
 
@@ -37,12 +41,21 @@ api:
       state_versions_keep: 20              # state versions to keep per workspace
       run_artifacts_retention_days: 90     # days before run logs/plans are deleted
       config_versions_retention_days: 90   # days before config tarballs are deleted (age-based)
-      config_versions_keep: 50             # CVs to keep per workspace (count-based; 0 disables)
       provider_cache_retention_days: 30    # days since last access before provider cache entry is deleted
       binary_cache_retention_days: 30      # days since last access before binary cache entry is deleted
+      package_cache_retention_days: 30     # days since last access before a cached package artifact is deleted
       module_overrides_retention_days: 14  # days before module override tarballs are deleted
       deleted_workspace_retention_days: 30 # days a deleted workspace's state stays recoverable
+    vcs:
+      archive_cache_retention_days: 7      # days before a cached VCS archive tarball is deleted (age-based)
 ```
+
+> **`config_versions_keep` is not a chart value.** The count-based config-version
+> sweep in the table above is a server setting with a default of 50, and the chart
+> neither declares nor renders it. `values.schema.json` sets
+> `additionalProperties: false`, so putting it under `api.config.artifact_retention`
+> fails `helm lint` and `helm upgrade` outright rather than being quietly ignored.
+> The default applies, and there is currently no supported way to change it.
 
 ### Enabled by Default
 
@@ -96,10 +109,11 @@ The retention system enforces several invariants to prevent data loss:
 
 - **Config versions referenced by non-terminal runs are preserved.** A configuration tarball is only eligible for deletion if no active run references it. This prevents removing config that a running plan/apply needs.
 
-### Cache Entries (Provider & Binary)
+### Cache Entries (Provider, Binary & Package)
 
-- **Retention is based on last access time, not creation time.** A cached binary or provider that is actively used by runners will have its `last_accessed_at` timestamp refreshed on every cache hit. Only entries that haven't been accessed within the retention window are deleted.
+- **Retention is based on last access time, not creation time.** A cached binary, provider or package that is actively used by runners will have its `last_accessed_at` timestamp refreshed on every cache hit. Only entries that haven't been accessed within the retention window are deleted.
 - This ensures frequently-used cache entries are preserved regardless of age, while entries that were cached once and never used again are cleaned up.
+- **All three are skipped entirely in sealed (cache-only) mode.** With `registry.cache_only: true` nothing may be fetched from upstream, so evicting an artifact would lose it permanently rather than cost a re-fetch. The provider, binary and package caches are therefore left alone while sealed; no other category is affected. See [Sealed (cache-only) mode](runbooks.md#sealed-cache-only-mode--runs-failing-with-cache-miss-404).
 
 ### Module Overrides
 
@@ -156,10 +170,11 @@ All storage deletions are wrapped in try/except blocks. If an individual object 
 
 ## Access-Based Cache Retention
 
-Both the provider cache and binary cache track when each entry was last accessed via a `last_accessed_at` column. This timestamp is updated every time a cache hit occurs:
+All three pull-through caches -- provider, binary and package -- track when each entry was last accessed via a `last_accessed_at` column. This timestamp is updated every time a cache hit occurs:
 
 - **Binary cache**: When a runner downloads a cached terraform/tofu binary, the `last_accessed_at` on the `CachedBinary` record is touched.
 - **Provider cache**: When the `{version}.json` endpoint serves cached platform info (tier 1 lookup), `last_accessed_at` is touched on each `CachedProviderPackage` record.
+- **Package cache**: When a cached PyPI, npm, Galaxy, Go, NuGet or Pulumi-plugin file is served, `last_accessed_at` is touched on its `CachedPackageFile` record. Every read path goes through the one lookup helper that touches it, so no read path can skip it.
 
 The retention cleanup compares `last_accessed_at` against the configured retention days -- not `cached_at`. This means:
 
@@ -183,7 +198,7 @@ Three Prometheus metrics track retention activity:
 
 > `category="deleted_workspaces"` counts **irreversible destruction of customer state** — the reaper deleting the state of a workspace past its undelete window. It is the one category worth alerting on rather than merely graphing.
 
-Categories: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `module_overrides`, `vcs_archives`.
+Categories, in the order the cycle runs them: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `package_cache`, `module_overrides`, `vcs_archives`, `deleted_workspaces`.
 
 ### Recommended Alert
 
@@ -257,6 +272,7 @@ api:
       config_versions_retention_days: 90   # 3 months of config tarballs
       provider_cache_retention_days: 60    # keep popular providers longer
       binary_cache_retention_days: 60      # keep popular binaries longer
+      package_cache_retention_days: 60     # keep popular package artifacts longer
       module_overrides_retention_days: 7   # clean up speculative overrides quickly
 ```
 
@@ -276,5 +292,6 @@ api:
       config_versions_retention_days: 30   # 1 month of config tarballs
       provider_cache_retention_days: 14    # 2 weeks of cache inactivity
       binary_cache_retention_days: 14      # 2 weeks of cache inactivity
+      package_cache_retention_days: 14     # 2 weeks of cache inactivity
       module_overrides_retention_days: 3   # clean up quickly
 ```

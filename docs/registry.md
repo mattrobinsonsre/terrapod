@@ -848,16 +848,21 @@ cache/providers/{hostname}/{namespace}/{type}/{version}/{filename}
 
 ---
 
-## Binary Caching (Terraform/Tofu CLI)
+## Binary Caching (engine CLIs and language runtimes)
 
-The binary cache stores terraform and tofu CLI binaries so runner Jobs can fetch the exact version they need at startup, without downloading from the internet.
+The binary cache stores the executables a runner Job needs at startup, so it can fetch the exact version a workspace pins without downloading from the internet. Seven tools, in two groups:
+
+- **Engine CLIs** — `tofu`, `terraform`, `terragrunt` and `pulumi`, each resolved from the workspace's own pinned version.
+- **Language runtimes** — `node`, `go` and the `dotnet` SDK, fetched when a Pulumi program is written in that language and needs a runtime to execute.
+
+They share one endpoint, one storage layout and one set of override keys, so everything below applies to all seven unless it names a tool. The three scanning tools (`opa`, `trivy`, `checkov`) are fetched the same way but have their own keys — see [the platform tools](#the-platform-tools-and-the-one-pair-that-must-move-together) below.
 
 ### How It Works
 
 1. Runner Job starts with a generic image (no baked-in terraform/tofu binary)
 2. Runner entrypoint calls `GET /api/v1/binary-cache/{tool}/{version}/{os}/{arch}` with auth header (`Authorization: Bearer <runner-token>`)
 3. API validates authentication, returns 302 redirect to presigned URL in object storage
-4. Cache miss: API fetches from upstream (`releases.hashicorp.com` for terraform, GitHub releases for tofu), stores, redirects
+4. Cache miss: API fetches from that tool's configured upstream (`releases.hashicorp.com` for terraform, GitHub releases for tofu, and so on — all overridable, see below), stores, redirects
 5. Runner downloads binary and begins execution
 
 **Note:** The binary cache download endpoint requires authentication. Unauthenticated requests return 401.
@@ -883,19 +888,34 @@ Every upstream the binary cache reaches is operator-overridable, so a deployment
 1. **Download base** (`*_mirror_url`) — where the per-platform binary is fetched.
 2. **Version index** (`*_version_index_url`) — the endpoint the cache reads to **list** versions and to resolve a partial version (e.g. `terraform_version = "1.12"` → `1.12.3`). Upstream these live on different hosts from the download base, which is why they are separate keys.
 
+**This applies to all seven tools, not just terraform and tofu.** A sealed deployment
+running Pulumi has to override `pulumi_*` for the CLI **and** the `node_*` / `go_*` /
+`dotnet_*` pair for whichever language runtime its programs need — the same two
+sources each, from the same keys.
+
 ```yaml
 api:
   config:
     registry:
       binary_cache:
-        # Download bases
+        # Download bases — engines
         terraform_mirror_url:  "https://artifacts.internal/terraform"
         tofu_mirror_url:       "https://artifacts.internal/opentofu/releases/download"
         terragrunt_mirror_url: "https://artifacts.internal/terragrunt/releases/download"
-        # Version-index sources
+        pulumi_mirror_url:     "https://artifacts.internal/pulumi/releases/download"
+        # Download bases — language runtimes a Pulumi program needs
+        node_mirror_url:       "https://artifacts.internal/nodejs/dist"
+        go_mirror_url:         "https://artifacts.internal/golang/dl"
+        dotnet_mirror_url:     "https://artifacts.internal/dotnet"
+        # Version-index sources — engines
         terraform_version_index_url:  "https://artifacts.internal/terraform/index.json"
         tofu_version_index_url:       "https://artifacts.internal/opentofu/api.json"
         terragrunt_version_index_url: "https://artifacts.internal/terragrunt/releases"
+        pulumi_version_index_url:     "https://artifacts.internal/pulumi/releases"
+        # Version-index sources — language runtimes
+        node_version_index_url:       "https://artifacts.internal/nodejs/dist/index.json"
+        go_version_index_url:         "https://artifacts.internal/golang/dl/?mode=json&include=all"
+        dotnet_version_index_url:     "https://artifacts.internal/dotnet/release-metadata/releases-index.json"
 ```
 
 A mirror **must serve the same response shape** as the upstream it replaces, because the cache parses the upstream JSON format:
@@ -905,9 +925,43 @@ A mirror **must serve the same response shape** as the upstream it replaces, bec
 | `terraform_version_index_url` | HashiCorp releases index JSON: `{"versions": {"1.12.3": {...}, ...}}` |
 | `tofu_version_index_url` | OpenTofu index JSON: `{"versions": [{"id": "1.12.3"}, ...]}` (ids carry no leading `v`) |
 | `terragrunt_version_index_url` | GitHub releases array: `[{"tag_name": "v0.58.0", "prerelease": false}, ...]` |
+| `pulumi_version_index_url` | GitHub releases array, the same shape as terragrunt: `[{"tag_name": "v3.208.0", "prerelease": false}, ...]`. Pulumi publishes no static index of its own, so the default reads the GitHub API and inherits its rate limit — a mirror of this shape is worth having for that reason alone |
+| `node_version_index_url` | Node's own index: a JSON array of `{"version": "v22.20.0", ...}`. Static and CDN-backed rather than an API, so it carries no rate limit |
+| `go_version_index_url` | Go's release index: a JSON array of `{"version": "go1.25.1", "files": [{"filename": ..., "sha256": ...}]}`. **Serves both jobs** — version resolution and artifact verification — because Go publishes no checksum manifest |
+| `dotnet_version_index_url` | .NET's channel index: `{"releases-index": [{"channel-version": "9.0", "latest-sdk": ..., "releases.json": "<url>"}]}`. **Two hops**, see below |
 | `terraform_mirror_url` | `…/{version}/terraform_{version}_{os}_{arch}.zip` |
 | `tofu_mirror_url` | `…/v{version}/tofu_{version}_{os}_{arch}.zip` |
 | `terragrunt_mirror_url` | `…/v{version}/terragrunt_{os}_{arch}` (a bare binary, not an archive) |
+| `pulumi_mirror_url` | `…/v{version}/pulumi-v{version}-{platform}.tar.gz`, plus a `…/v{version}/pulumi-{version}-checksums.txt` manifest. Note the version appears **twice spelled differently** in that pair — the tag carries the `v`, the manifest filename does not |
+| `node_mirror_url` | `…/v{version}/node-v{version}-{platform}.tar.gz`, plus a `…/v{version}/SHASUMS256.txt` manifest |
+| `go_mirror_url` | `…/go{version}.{platform}.tar.gz`. No checksum file — the digest comes from the version index |
+| `dotnet_mirror_url` | `…/Sdk/{version}/dotnet-sdk-{version}-{rid}.tar.gz`. No checksum file — the digest comes from the channel's `releases.json`, and it is a **SHA-512**: .NET states no SHA-256, so the cache computes both as the artifact streams past |
+
+**The platform spellings are each publisher's own, not Terrapod's.** Terrapod speaks
+Go-style `os`/`arch` throughout, and three of these four publishers do not: Pulumi,
+Node and .NET all say `x64` where Go says `amd64`, and .NET says `osx` where the
+others say `darwin`. A mirror has to serve the upstream filename verbatim.
+
+| | linux/amd64 | linux/arm64 | darwin/amd64 | darwin/arm64 |
+|---|---|---|---|---|
+| `pulumi` | `linux-x64` | `linux-arm64` | `darwin-x64` | `darwin-arm64` |
+| `node` | `linux-x64` | `linux-arm64` | `darwin-x64` | `darwin-arm64` |
+| `dotnet` (its “RID”) | `linux-x64` | `linux-arm64` | `osx-x64` | `osx-arm64` |
+| `go` | `linux-amd64` | `linux-arm64` | `darwin-amd64` | `darwin-arm64` |
+
+**`dotnet_version_index_url` is the one that takes two hops**, and the second one is
+not a key you can set. The channel index names a `releases.json` **absolute URL** per
+channel, and the cache follows whatever that document says — so a mirror must rewrite
+those URLs to point back at itself. Mirroring the index unchanged leaves every
+resolution reaching `builds.dotnet.microsoft.com` for the second hop, which on a
+sealed network fails at the step after the one you configured.
+
+**Pulumi plugins are a separate cache from the Pulumi CLI.** `pulumi_mirror_url` here
+is the CLI archive; the resource plugin `pulumi up` downloads per provider comes from
+`registry.package_cache.pulumi.upstream` — see
+[Language package proxies](package-cache.md#pulumi-plugins). A sealed Pulumi
+deployment needs both, and the language SDK proxy (npm, PyPI, Go modules or NuGet)
+for the program's own dependencies on top.
 
 The provider network mirror has the equivalent override: `registry.provider_cache.upstream_registries` (see [Provider Caching](#provider-caching-network-mirror) above) — point it at an internal provider registry that implements the provider network-mirror protocol.
 

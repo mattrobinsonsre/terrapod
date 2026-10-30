@@ -55,60 +55,73 @@ block and the conditional and move the choice into the trust policy or into an
 apply-only variable. Leaving the declaration in place is harmless once the
 export is gone — nothing supplies it, so it takes its `default`.
 
-### The deprecated path aliases are removed
+### The deprecated path aliases are still served — they are not removed in 2.0
 
-**Affects:** anything still calling `/api/terrapod/v1/…` — your own scripts,
-dashboards, and any Terrapod runner/listener image, SDK or provider you have not
-upgraded.
+**Affects:** nobody at the upgrade. It is listed because "are the aliases gone in
+2.0?" is the most consequential compatibility question about this release, and the
+answer is no.
 
-Three aliases go at 2.0:
+All three keep serving, exactly as they do on 1.x:
 
-| removed | use |
+| still served | canonical path to move to |
 |---|---|
 | `/api/terrapod/v1/…` | `/api/v1/…` |
 | `/api/v2/…` | `/api/tfe/v2/…` |
 | `/v1/providers/…` | `/api/v1/provider-mirror/…` |
 
-`terraform` and `tofu` need nothing — they take the path from service
-discovery, which has advertised the new one since v1.7.0.
+Each is, in the API's own words, "a deprecated alias, kept for the support window
+because our own runner and listener images construct it directly and are expected
+to lag the API by minors". Both prefixes are mounted from one helper and there is
+no switch that turns the alias off, so a route cannot exist on one and not the
+other.
 
-**The Prometheus `path_template` label changes at the same time.** Until 2.0 it
-reports the OLD path for both prefixes, so dashboards keep working through the
-window; at 2.0 it reports the canonical one. Update any panel or alert that
-matches `/api/v2/` or `/api/terrapod/v1/` literally.
+**Nothing breaks when you upgrade, and there is no step to take first.** Move your
+own scripts, `curl` calls and dashboards onto `/api/v1` and `/api/tfe/v2` at
+whatever pace suits you; until you do, the old paths answer as before. `terraform`
+and `tofu` need nothing either way — they take the path from service discovery,
+which has advertised the canonical one since v1.7.0.
 
-`/api/v1` has been canonical since v1.7.0, with `/api/terrapod/v1` served
-alongside it and advertising `Deprecation` / `Sunset` headers. 2.0 removes the
-alias.
+**The sunset waits on Terrapod, not on the major version.** Terrapod's own
+consumers still call the alias, by design: the runner and listener images, the HA
+peer-replication calls, `go-terrapod`, the Terraform provider, `terrapod-migrate`
+and the MCP server. Removing the alias while they do would break them, so they move
+onto `/api/v1` in a later 1.x minor first, and the sunset follows that migration
+rather than the version number.
 
-**Order matters, and Terrapod moves first.** The runner and listener images, the
-HA peer-replication calls, `go-terrapod`, the provider and the MCP server all
-still call the alias as of v1.7.0 — deliberately, because runners are expected to
-lag the API. They are moved onto `/api/v1` in a 1.x minor *before* 2.0, so that
-by the time the alias goes, nothing Terrapod ships still depends on it.
+**[`deprecations.md`](deprecations.md) is the schedule, and the only place it is
+written down.** It records the alias as removed *no earlier than* the published
+sunset — a floor rather than a date, precisely because the prerequisite above has
+to land first. Read the schedule there rather than from a second copy here: a date
+restated in two places is how this page came to describe a removal as done.
 
-**What you must do before upgrading:**
+**Do not drop the alias entries from `webhookIngress.paths`.** The chart ships both
+prefixes for `vcs-events` and `task-stage-results`, and the alias entries are what
+keep already-registered webhooks working. Removing them breaks every webhook
+registered before you re-register it against the canonical path.
 
-1. Upgrade runner/listener images to a version that calls `/api/v1` — check
-   `docs/deprecations.md` for which minor that is.
-2. Upgrade `go-terrapod`, `terraform-provider-terrapod` and `terrapod-mcp` if you
-   use them directly.
-3. Update your own scripts, `curl` calls, dashboards and Prometheus queries.
-4. If you pinned `webhookIngress.paths` or `internalIngress.paths`, drop the
-   `/api/terrapod/v1` entries and keep the `/api/v1` ones.
+**The Prometheus `path_template` label still reports the alias** for both prefixes,
+so existing dashboards and alerts keep matching. It folds onto the legacy name on
+purpose — an alert holding a path literal is the same kind of consumer as an IdP
+allow-list, so renaming it mid-window would blank a panel nobody asked to change —
+and it is scheduled to flip with the aliases rather than ahead of them. Panels
+matching `/api/terrapod/v1/` or `/api/v2/` literally are the ones to revisit then.
 
 **How to find what still uses it:** the alias returns `Deprecation: true` and a
 `Sunset` date on every response, so a client hitting it is visible in your own
-logs and proxies before you upgrade.
+logs and proxies.
 
 ### SSO callback URLs move to `/api/v1` — re-register them with your IdP FIRST
 
 **Affects:** every deployment using OIDC or SAML. **This one will lock you out of
 the UI if you skip it**, so it is listed first deliberately.
 
-In 2.0.0 the default for `api.config.auth.legacy_callback_url` flips from `true`
-to `false`, and Terrapod starts building its IdP-facing URLs on the canonical
-`/api/v1` prefix:
+`api.config.auth.legacy_callback_url` selects which prefix Terrapod builds its
+IdP-facing URLs on, and **its default has not flipped yet** — it is `true`
+today, so those URLs are still built on the deprecated `/api/terrapod/v1`
+prefix. 2.0.0 is where it becomes `false` and they move to the canonical
+`/api/v1`; the setting's own description says so ("The default flips in
+2.0.0"), which is why this is listed as a change to prepare for rather than one
+you can already see. When it flips:
 
 ```
 before:  {callback_base_url}/api/terrapod/v1/auth/callback
@@ -260,8 +273,12 @@ finished yet", and anything that expects a failed mandatory run task to error a
 run. The `tofu`/`terraform` CLI is not affected, except that it now does the
 right thing.
 
-In 2.0.0 `api.config.runs.tfe_post_plan_decisions` defaults to `true`. A run that
-a post-plan gate holds reports:
+`api.config.runs.tfe_post_plan_decisions` selects this reporting, and **its
+default has not flipped yet** — it is `false` today, so the new statuses are
+opt-in until it does. 2.0.0 is where it becomes `true`; both the setting's own
+description and the chart's comment beside it say so, which is why this is listed
+as a change to prepare for rather than one you can already see. With it on, a run
+that a post-plan gate holds reports:
 
 | before | after |
 |---|---|
@@ -341,16 +358,19 @@ clears a held run, which previously had no SDK route at all.
 
 See [policies.md](policies.md).
 
-### A column is renamed, so the API rollout has a brief window of errors
+### Two columns are renamed, so the API rollout has a brief window of errors
 
 **Affects:** every deployment, but only for the length of one rolling upgrade, and
 only if you run more than one API replica. Nothing you configure changes, and no
 API, wire, config or Helm surface is removed.
 
-The `terraform_version` column on `workspaces`, `runs` and `autodiscovery_rules`
-becomes `engine_version` — it pins the version of whichever engine the workspace
-runs, and two of the three engines Terrapod now supports are not Terraform. The
-migration renames it in place.
+Two migrations rename a column in place rather than adding one and dropping the
+old a release later:
+
+| renamed | on | why |
+|---|---|---|
+| `terraform_version` → `engine_version` | `workspaces`, `runs`, `autodiscovery_rules` | it pins the version of whichever engine the workspace runs, and two of the three engines Terrapod now supports are not Terraform |
+| `hcl` → `structured` | `variables`, `variable_set_variables` | the flag answers whether a value is a raw expression rather than a string, which is the same question for Pulumi's stack config and Ansible's extra vars as it is for Terraform |
 
 **What that costs you.** Migrations run as a pre-upgrade hook, and the API rolls
 with `maxSurge: 1, maxUnavailable: 0`, so between the hook finishing and the last
@@ -359,17 +379,25 @@ longer there. Requests those pods serve in that window fail. It is seconds to a
 couple of minutes, and it self-heals — no data is at risk and nothing needs
 re-running.
 
+**Which requests fail.** For `engine_version`, anything reading or writing a
+workspace, a run or an autodiscovery rule — most of the API. For `structured`,
+variable and variable-set reads and writes, which is the surface `tofu`,
+`terraform` and `tfci` drive — **and** the server-side variable resolution a
+runner's run claim depends on, so a run claimed in that window fails to be handed
+its variables rather than only a variable edit failing. Expect CLI and `tfci`
+variable operations to error in the window, not just the UI's variables tab.
+
 **If you cannot take even that**, scale the API to one replica for the upgrade and
 back up afterwards; a single replica is replaced rather than overlapped, so there
 is no window at all.
 
 Terrapod's normal rule is expand/contract — add the new column, dual-write, drop
 the old one a release later — precisely so this window does not exist. It is
-deliberately not followed here: three tables would each carry two columns, every
-write path would have to set both, and the dual-write would have to stay correct
-across a release boundary for a column nothing reads. Nothing outside the API
-touches the database, and the API and the schema ship together, so the exposure is
-that one rollout and nothing else.
+deliberately not followed here: each of the five tables would carry two columns,
+every write path would have to set both, and the dual-write would have to stay
+correct across a release boundary for a column nothing reads. Nothing outside the
+API touches the database, and the API and the schema ship together, so the
+exposure is that one rollout and nothing else.
 
 **The API is not renamed.** `terraform-version` keeps being accepted and returned
 alongside the canonical `engine-version`, permanently — go-tfe reads it by that
@@ -377,32 +405,35 @@ name. See [api-reference.md](api-reference.md#engine-version-and-its-older-name-
 
 ### `registry.platform_tools.pulumi_version` is removed — the version is per workspace
 
-**Affects:** deployments running Pulumi workspaces. Terraform and OpenTofu are
-untouched.
+**Affects:** a `values.yaml` written against a pre-release build of 2.0. **Neither
+key ever shipped in a 1.x release** — Pulumi arrived during 2.0 development, and no
+1.x chart carried either key — so an upgrade from 1.x has nothing to remove here.
+The rest of this section is recorded for anyone who set them on a pre-release
+build. Terraform and OpenTofu are untouched either way.
 
 The Pulumi CLI version used to be one value for the whole deployment, pinned in
 Helm. It is the workspace's now, in the same `engine-version` attribute a
 Terraform workspace uses — so two Pulumi workspaces can sit on different CLI
 versions, which is what every other per-workspace setting already allowed.
 
-**What to do before upgrading:** delete
+**If you set either key on a pre-release build:** delete
 `api.config.registry.platform_tools.pulumi_version` and
 `api.config.registry.platform_tools.pulumi_mirror_url` from your values. The
-chart's schema rejects unknown keys, so leaving them in place fails the upgrade
-rather than being ignored. If you were pinning a version, set
+chart's schema rejects unknown keys, so leaving them in place fails `helm lint`
+and the upgrade rather than being ignored. If you were pinning a version, set
 `api.config.default_pulumi_version` to it instead — that is what a workspace
 gets when it pins none. The mirror moved rather than vanished: it is
 `api.config.registry.binary_cache.pulumi_mirror_url` now, beside the other CLI
 tools, with `pulumi_version_index_url` alongside it for partial-version
 resolution.
 
-**What happens to your existing Pulumi workspaces.** They carry a Terraform
-version in that column — typically `1.12` — because the workspace-creation path
-filled it in from `default_terraform_version` and nothing read it. Read as a
-Pulumi version it is nonsense, and the first run would ask for a Pulumi 1.12
-that has never existed. A migration clears it, so those workspaces take the
-deployment default: the same behaviour they have had all along. Pin a version on
-any workspace that wants a specific one.
+**What happens to a pre-release deployment's Pulumi workspaces.** They carry a
+Terraform version in that column — typically `1.12` — because the
+workspace-creation path filled it in from `default_terraform_version` and nothing
+read it. Read as a Pulumi version it is nonsense, and the first run would ask for
+a Pulumi 1.12 that has never existed. A migration clears it, so those workspaces
+take the deployment default: the same behaviour they have had all along. Pin a
+version on any workspace that wants a specific one.
 
 **Air-gapped deployments:** the default version is still warmed for you, but a
 workspace pinned to anything else now needs an explicit entry in the warm
@@ -672,17 +703,22 @@ SELECT provider_name, email, role_name FROM platform_role_assignments;
 
 and if that returns nothing while your administrators currently sign in through an
 IdP group, they will lose `admin` at the upgrade. Grant it deliberately first,
-either with a platform role assignment or with a `claims_to_roles` rule:
+either with a platform role assignment or with a `claims_to_roles` rule on the
+provider entry you already have:
 
 ```yaml
-auth:
-  sso:
-    oidc:
-      - name: okta
-        claims_to_roles:
-          - claim: groups
-            value: "platform-engineering"   # the group, named as the IdP names it
-            roles: ["admin"]
+api:
+  config:
+    auth:
+      sso:
+        oidc:
+          - name: okta
+            issuer_url: https://okta.example.com/
+            client_id: "..."
+            claims_to_roles:
+              - claim: groups
+                value: "platform-engineering"   # the group, named as the IdP names it
+                roles: ["admin"]
 ```
 
 A rule is written by whoever administers Terrapod; a group name is written by
@@ -879,7 +915,11 @@ no values edit is required.
 
 ### The engine on/off switch is removed
 
-**Affects:** any deployment whose `values.yaml` sets `api.config.engines`.
+**Affects:** a `values.yaml` written against a pre-release build of 2.0. **The
+switch never shipped in a 1.x release** — no 1.x chart had an `engines:` block to
+set — so an upgrade from 1.x has nothing to remove here. It is recorded because the
+block existed on `main` through 2.0 development, and because the table below is
+what changes if you were relying on it.
 
 `api.config.engines.ansible.enabled` and `api.config.engines.pulumi.enabled` are
 gone, along with the `engines:` block that held them. Because
@@ -924,7 +964,11 @@ routes rather than leaving them answering 404.
 
 ### `api.config.default_ansible_version` is removed
 
-**Affects:** any deployment whose `values.yaml` sets it.
+**Affects:** a `values.yaml` written against a pre-release build of 2.0. **The key
+never shipped in a 1.x release** — no 1.x chart carried any ansible setting at
+all — so an upgrade from 1.x has nothing to remove. It is recorded for anyone who
+set it on a pre-release build, and because the two questions it used to answer now
+have separate answers worth knowing.
 
 ```yaml
 # remove this line entirely

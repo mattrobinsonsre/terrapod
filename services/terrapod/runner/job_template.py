@@ -164,7 +164,10 @@ _EE_OIDC_DIR = f"{_EE_SHARED_DIR}/oidc"
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
 #: volume to this gid AND adds it to the supplementary groups of every container
 #: in the pod, so volume access does not depend on the EE's uid at all. That is
-#: why we must NOT pin `runAsUser` on the EE -- see `_ee_security_context`.
+#: why volume access never depended on pinning `runAsUser` on the EE. It IS
+#: pinned now, to this same id (#1928) -- see `_ee_security_context`, which is
+#: the authority. This comment used to say we must NOT pin it, which was true
+#: when written and then asserted the withdrawn mechanism as present fact.
 _EE_FS_GROUP = 1000
 #: The builder's own fallback when a run carries no EE size -- a run created
 #: before the columns existed, or by an API up to N-2 minors behind. It is a

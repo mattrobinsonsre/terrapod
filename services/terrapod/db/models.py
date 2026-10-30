@@ -1621,8 +1621,9 @@ class CachedPackageFile(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    #: "pypi" | "npm". Not an enum: a new ecosystem should be an adapter and a
-    #: row, never a migration.
+    #: "pypi" | "npm" | "galaxy" | "go" | "nuget" | "pulumi". Not an enum: a new
+    #: ecosystem should be an adapter and a row, never a migration -- which is
+    #: exactly why this comment drifted while four more were added.
     ecosystem: Mapped[str] = mapped_column(String(20), nullable=False)
     #: The package name as the ecosystem normalises it — PEP 503 normalisation
     #: for PyPI, the literal (scope-bearing) name for npm. Normalised on the way

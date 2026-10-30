@@ -2469,10 +2469,16 @@ async def update_workspace(
             )
         )
     if "auto-configure-enabled" in attrs:
-        ws.auto_configure_enabled = _422(
-            workspace_settings.validate_bool,
-            attrs["auto-configure-enabled"],
-            "auto-configure-enabled",
+        # Through the producer, never a bare assignment: turning the trigger off
+        # must also forget the baseline, or a later re-enable fires a fleet-wide
+        # configure instead of adopting. See set_auto_configure_enabled.
+        workspace_settings.set_auto_configure_enabled(
+            ws,
+            _422(
+                workspace_settings.validate_bool,
+                attrs["auto-configure-enabled"],
+                "auto-configure-enabled",
+            ),
         )
     if "configure-after-apply" in attrs:
         ws.configure_after_apply = _422(

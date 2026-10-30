@@ -949,3 +949,34 @@ def validate_oidc_audiences(raw: object) -> dict[str, list[str]]:
             entries.append(entry)
         out[key] = entries
     return out
+
+
+def set_auto_configure_enabled(ws, value: bool) -> None:  # type: ignore[no-untyped-def]
+    """Set the auto-configure trigger and, when it goes OFF, forget the baseline.
+
+    `inventory_auto_configure`'s adopt-don't-fire guard keys on a NULL stamp
+    meaning "never observed", so that turning the trigger on for a fleet that
+    already has hosts adopts the current inventory instead of configuring
+    everything. Nothing cleared the stamp when the trigger was turned off, so
+
+        on -> off -> the inventory moves while off -> on again
+
+    left a stale non-NULL baseline, and the next cycle read the difference as a
+    change nobody had acted on and queued a run. Its blast radius is the
+    workspace's `default-limit`, which `docs/ansible-configure.md` titles "empty
+    means everything", and `auto-configure-enabled` is settable across a fleet in
+    one bulk call -- so the whole estate was reachable from one request.
+
+    `docs/ansible-configure.md` promises that switching the flag on for a fleet
+    that already has hosts is safe. That was true only for a FIRST-EVER enable;
+    this is what makes it true for a re-enable too, which is what the sentence an
+    operator acts on actually says.
+
+    One producer, because the flag has two update paths (the single-workspace
+    PATCH and the bulk update) and a rule written twice is a rule that drifts.
+    Create and restore need nothing: both build a new row whose stamp is already
+    NULL, so they adopt.
+    """
+    ws.auto_configure_enabled = value
+    if not value:
+        ws.auto_configure_inventory_stamp = None

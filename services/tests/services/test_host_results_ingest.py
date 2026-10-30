@@ -3,7 +3,7 @@
 What comes into Postgres is the per-host summary plus failed and unreachable
 events, and nothing else -- measured volume is why: a four-host play with one
 25-item loop produced 107 events and 79 KB, 75 of them loop items. Row-per-event
-at that rate is the scaling pain large AWX installs are known for.
+at that rate is a known scaling constraint for any event-per-row design.
 """
 
 from __future__ import annotations

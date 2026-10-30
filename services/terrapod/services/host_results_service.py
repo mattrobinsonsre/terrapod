@@ -7,8 +7,8 @@ Postgres into rows and leaves everything else in the object.
 **What comes into Postgres, and why only that.** Measured on ansible-core
 2.18.3: a four-host play with one 25-item loop produced 107 events and 79 KB of
 result payloads, 75 of them loop items, with a single `gather_facts` result at
-16.5 KB per host. Row-per-event at that rate is the scaling pain large AWX
-installs are known for, so the rows are the per-host summary -- one per
+16.5 KB per host. Row-per-event at that rate is a known scaling constraint for
+any event-per-row design, so the rows are the per-host summary -- one per
 `(run, host)`, bounded by the inventory -- plus failed and unreachable events,
 which are normally zero. Those two buy what an object cannot: a run's failures
 readable without a fetch, and "has this task ever failed, anywhere" as a query.

@@ -111,6 +111,8 @@ api:
             username: robot
             existingSecret: terrapod-upstream-example
             existingSecretKey: password        # optional, defaults to "password"
+          - host: mirror.example.com           # API not on its own hostname
+            api_url: https://artifacts.internal/v2-proxy
 ```
 
 An upstream password is **never** written into values or a ConfigMap. It comes
@@ -119,6 +121,37 @@ uppercased, with non-alphanumeric characters replaced by underscores).
 
 `registry.cache_only` seals upstream fetching across every Terrapod cache
 including this one, and takes precedence over anything listed here.
+
+### When the upstream's API is not on its own hostname
+
+`host` does two jobs at once: it is the first path component clients name,
+**and** it is the address Terrapod fetches from, as `https://{host}`. For a
+public registry that is the same thing and there is nothing to configure.
+
+`api_url` splits the second job off. Set it for a registry whose distribution
+API lives somewhere else — an internal mirror, or a reverse proxy serving `/v2/`
+under a path prefix. Clients go on pulling
+`terrapod.example.com/mirror.example.com/...`, so the name they use does not
+change; only where Terrapod goes for it does.
+
+| | |
+|---|---|
+| Default | `https://{host}` |
+| Set it when | the API is not served from the host clients name |
+| Leave it unset when | the upstream is an ordinary registry |
+
+It does not widen the allow-list. A caller still cannot name a host that is
+not listed, so no amount of `api_url` lets a client choose where Terrapod
+connects. But it **is** the field that decides the outbound address, so it
+deserves the same review as `host` itself — pointing a listed host at an
+unexpected address is the one way an entry can mean something other than it
+appears to.
+
+Two details worth knowing before you set it. The password Secret's environment
+variable is derived from **`host`**, not from `api_url`, so an authenticated
+upstream keeps the same Secret whichever address it is fetched from. And a
+trailing slash is stripped, so `https://mirror/v2-proxy` and
+`https://mirror/v2-proxy/` behave identically.
 
 ## Storage
 
@@ -277,9 +310,9 @@ mid-flight would destroy real work.
 | Value | Default | What it does |
 |---|---|---|
 | `api.config.registry.oci.enabled` | `true` | Serve the registry at `/v2/`. Disabling hides the surface; pushed images stay in storage and reappear if re-enabled. |
-| `api.config.registry.oci.upstreams` | `[]` | The pull-through allow-list. Empty means push-only. |
+| `api.config.registry.oci.upstreams` | `[]` | The pull-through allow-list. Empty means push-only. Each entry takes `host`, an optional `api_url` (where to fetch from, default `https://{host}`), and an optional `username` plus Secret-backed password. |
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
-| `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows — there is no delete API. |
+| `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows: deleting a manifest un-references its layers but frees nothing, and there is no *blob* delete API — see [Deleting content](#deleting-content). |
 | `api.config.registry.oci.gc.grace_hours` | `24` | How long newly-arrived content is protected, so a push in flight is never collected. |
 | `api.config.registry.oci.mirror_tag_ttl_hours` | `24` (one day) | How long a pull-through cached image is served before the next pull re-checks upstream. |
 | `api.config.registry.cache_only` | `false` | Seals upstream fetching for every cache, this one included. |

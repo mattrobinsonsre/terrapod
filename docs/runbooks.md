@@ -967,7 +967,7 @@ A rule whose `repo-url` names an org, group or pattern (`target-kind` `namespace
 ### Verification
 
 - Re-query the affected workspaces (server-side workspace search) and confirm the field is restored
-- No unexpected runs were created by the revert (bulk-update never triggers runs — if you see runs, they came from VCS/drift, not the bulk-update)
+- No unexpected runs were created by the revert. The bulk-update still triggers none itself, but it is no longer true that any run you see came from VCS or drift: a bulk-update that turns `auto-configure-enabled` on across a matched set lets the auto-configure cycle create runs of its own thereafter, and those carry `source: auto-configure` rather than arriving from a push or a drift check. Check a surprising run's `source` before attributing it.
 
 ## Cross-workspace `terraform_remote_state` returns 403
 
@@ -1544,7 +1544,7 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 
 - Re-list the binary/provider caches and confirm the previously-missing artifact (and the right partial-version match) is present.
 - Re-queue the failed run; `init` now resolves the binary + providers from cache and the run proceeds.
-- Note: the artifact-retention sweeper intentionally **skips** the binary/provider caches while sealed, so warmed artifacts won't be evicted out from under a sealed instance.
+- Note: the artifact-retention sweeper intentionally **skips** all three pull-through caches while sealed — binary, provider **and** package (PyPI, npm, Galaxy, Go, NuGet, Pulumi plugins) — so warmed artifacts won't be evicted out from under a sealed instance. See [Cache Entries](artifact-retention.md#cache-entries-provider-binary--package).
 
 ---
 

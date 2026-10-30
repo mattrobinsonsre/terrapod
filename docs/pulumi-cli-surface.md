@@ -568,7 +568,7 @@ The main lifecycle above was captured in #1502. This section covers the rest of 
 
 - **Every update longer than a few minutes fails.** The CLI renews its lease part-way through and uses the token in the response. Terrapod's renewal returns none, so every call after it carries an empty lease and gets a 401. The update then ends with "this command requires logging in". Its `complete` never lands, so the stack lock stays held until the lease runs out: 30 minutes in which the next update is refused with a 409. The live pass hit exactly this on a 200-second update. **Fixed by #1562**, which returns the lease from the renewal.
 - **`encrypt` is not byte-safe.** The CLI encrypts binary values, not only text. Terrapod decodes the plaintext as UTF-8 with `surrogateescape`, and the encryption layer then fails to encode it. The result is a 500 (`UnicodeEncodeError`) that the CLI retries four times at the start of every `up`, and a hard failure when moving a stack back to the service's own secrets provider. `decrypt` has the mirror-image problem. **Fixed by #1573:** values are sealed as bytes. The encryption layer is handed their base64, and `decrypt` and `batch-decrypt` return the exact bytes. The sealed value is marked outside the envelope (`terrapod-bytes:v1:`), so anything sealed before the fix is still read the old way.
-- **A Pulumi workspace cannot be deleted through the native API.** `DELETE /api/v1/workspaces/{id}` still goes through the Terraform-only lookup, so it answers 404. That is how the live pass's cleanup failed. It is the delete half of #1554.
+- **A Pulumi workspace could not be deleted through the native API.** `DELETE /api/v1/workspaces/{id}` went through the TFE surface's Terraform-only lookup, so it answered 404 -- not from the UI's delete button, and not through go-terrapod, the provider or MCP either. That is how the live pass's cleanup failed, and an operator cleaning up stacks had to delete the workspace by hand, forfeiting the undelete marker. **Fixed by #1574:** the route resolves the way its siblings do, for any enabled engine. It is the delete half of #1554. A workspace whose engine is switched off stays undeletable by design (#1429) -- gating hides and halts, so turn the engine back on to delete it.
 
 The passphrase and cloud-KMS providers can no longer be chosen at `stack init`, which refuses (#1535). They are reached with `change-secrets-provider` on a workspace that already exists, and the rows above cover that path.
 
@@ -582,8 +582,8 @@ python3 scripts/pulumi-secondary-capture.py \
 ```
 
 The live pass creates the workspace `proj::capture` through the native API and
-tries to delete it afterwards. Until the native delete serves Pulumi workspaces,
-that clean-up fails and the workspace has to be removed by hand.
+deletes it afterwards. That clean-up used to fail, because the native delete did
+not serve Pulumi workspaces; since #1574 it succeeds.
 
 Requires Docker. Re-run it against a new CLI rather than assuming this still
 holds; that is what the script is for.
