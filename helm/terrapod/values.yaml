@@ -1699,6 +1699,13 @@ api:
       state_versions_keep: 20       # per workspace; 0 = disabled
       run_artifacts_retention_days: 90
       config_versions_retention_days: 90
+      # Retain-by-count alongside the by-age key above, mirroring
+      # state_versions_keep and the registry-module pattern: a busy workspace
+      # accumulates configuration versions faster than 90 days bounds. A CV
+      # referenced by an active run is never reaped; an older run still renders
+      # (the CV row survives via the SET NULL FK) but its tarball is gone and
+      # the CV is no longer downloadable. 0 = disabled.
+      config_versions_keep: 50
       provider_cache_retention_days: 30   # days since last access
       binary_cache_retention_days: 30     # days since last access
       package_cache_retention_days: 30    # days since last access (PyPI/npm artifacts)
