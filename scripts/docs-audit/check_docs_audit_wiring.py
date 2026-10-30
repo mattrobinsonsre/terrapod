@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Every gate in this directory is actually run by CI.
+"""Every gate in the repository is actually run by CI.
 
-Nothing auto-discovers `scripts/docs-audit/check_*.py` -- each one is an
-explicit step in `ci.yml`'s `docs-audit` job -- so writing a gate and forgetting
-the step produces a file that looks like enforcement and enforces nothing. That
+Two families, because the defect is identical in both and the second arrived
+later: `scripts/docs-audit/check_*.py`, and the shell gates `scripts/*-gate.sh`.
+Nothing auto-discovers either -- each one is an explicit step in `ci.yml` -- so
+writing a gate and forgetting the step produces a file that looks like
+enforcement and enforces nothing. That
 is the same shape as a configuration flag no code reads, with the gate itself as
 the unread thing, and it had already happened: `check_issue_refs.py` sat in this
 directory unwired from the day it was written.
@@ -37,8 +39,11 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 WORKFLOW = Path(".github/workflows/ci.yml")
 
-#: A matcher that stops matching must fail rather than pass on nothing.
+#: A matcher that stops matching must fail rather than pass on nothing. One
+#: floor PER FAMILY: a single combined floor would let a broken glob take its
+#: own family to zero while the other family carried the count.
 MIN_GATES = 8
+MIN_SHELL_GATES = 2
 
 
 def main() -> int:
@@ -68,9 +73,13 @@ def main() -> int:
         )
 
     gates = sorted(p for p in HERE.glob("check_*.py"))
+    # The shell gates, which live beside this directory rather than in it.
+    # Matched on the `-gate.sh` suffix the existing ones share, so a new one is
+    # in scope by its name alone and needs no entry anywhere.
+    shell_gates = sorted(p for p in (ROOT / "scripts").glob("*-gate.sh"))
     problems: list[str] = []
 
-    for gate in gates:
+    for gate in gates + shell_gates:
         rel = gate.relative_to(ROOT)
         where = sorted(job for job, commands in runs_in.items() if str(rel) in commands)
         if not where:
@@ -79,6 +88,12 @@ def main() -> int:
                 "one, because nothing discovers these"
             )
 
+    if len(shell_gates) < MIN_SHELL_GATES:
+        problems.append(
+            f"only found {len(shell_gates)} shell gate(s) matching scripts/*-gate.sh; "
+            f"expected at least {MIN_SHELL_GATES}, so that matcher has stopped matching"
+        )
+
     if len(gates) < MIN_GATES:
         problems.append(
             f"only found {len(gates)} gate(s) in {HERE.relative_to(ROOT)}; expected at "
@@ -86,12 +101,15 @@ def main() -> int:
         )
 
     if problems:
-        print(f"FAIL — {len(problems)} problem(s) with the docs-audit wiring:")
+        print(f"FAIL — {len(problems)} problem(s) with the CI gate wiring:")
         for p in problems:
             print(f"  - {p}")
         return 1
 
-    print(f"PASS — all {len(gates)} docs-audit gate(s) are run by a job in {WORKFLOW}.")
+    print(
+        f"PASS — all {len(gates)} docs-audit gate(s) and {len(shell_gates)} shell "
+        f"gate(s) are run by a job in {WORKFLOW}."
+    )
     return 0
 
 

@@ -1,0 +1,59 @@
+# A throwaway SSH target for exercising a real configure.
+#
+# This is a TEST FIXTURE, not a product image. It exists because every playbook
+# exercise in this repository was `connection: local` and the only
+# `connection: ssh` host in the tree is engineered to be unreachable -- so SSH,
+# the machine credential and host-key verification had never been executed in
+# the success direction (#2318).
+#
+# It runs sshd as ROOT on port 22, which is the one place this image departs from
+# the posture everything else here holds to, and the reason is worth stating
+# rather than leaving as an apparent oversight: modern OpenSSH requires privilege
+# separation, so an sshd that can accept a login as a DIFFERENT user than itself
+# has to start as root. Running it as uid 2000 on a high port would work only
+# while the login user is also uid 2000, which would quietly stop the fixture
+# from exercising `become` -- the thing a real configure does constantly. The
+# container is a disposable target on a dev cluster and in a CI docker network;
+# nothing in the product trusts it and no Terrapod artefact is installed in it.
+#
+# `StrictModes no` is here for the same honest reason: `authorized_keys` arrives
+# as a projected Secret, which is root-owned and 0444, and sshd otherwise refuses
+# to read a key file it does not consider private enough. An init container
+# copying it to 0600 would be the alternative; for a fixture whose whole purpose
+# is to accept one generated key, the config line is the smaller lie.
+#
+# NO KEY MATERIAL IS BAKED IN. The host key is generated at build time, so it is
+# stable for the life of the image and a test can capture it the way an operator
+# captures a real host's -- and `authorized_keys` is mounted, never committed,
+# because a private key in a public repository is a secret-scanner finding
+# whatever its intended lifetime.
+FROM alpine:3.21
+
+RUN apk add --no-cache openssh-server \
+ && ssh-keygen -A
+
+# The login user. Deliberately NOT uid 1000: the EE runs as 1000, and a fixture
+# that happens to share the caller's uid can mask a permissions defect.
+RUN adduser -D -u 2000 target \
+ && mkdir -p /home/target/.ssh \
+ && chown -R target:target /home/target \
+ && sed -i 's/^target:!/target:*/' /etc/shadow
+
+# A writable place for ansible's remote tmp. The real lesson behind this is in
+# `job_template.py`: ansible resolves `remote_tmp`'s leading `~` against the
+# TARGET user's passwd entry, so a target whose home is unwritable fails every
+# task as UNREACHABLE with a message that points away from the cause.
+RUN mkdir -p /home/target/.ansible/tmp \
+ && chown -R target:target /home/target/.ansible
+
+RUN printf '%s\n' \
+      'PermitRootLogin no' \
+      'PasswordAuthentication no' \
+      'PubkeyAuthentication yes' \
+      'StrictModes no' \
+      'AuthorizedKeysFile /etc/ssh/authorized_keys.d/%u' \
+      > /etc/ssh/sshd_config.d/10-terrapod-fixture.conf \
+ && mkdir -p /etc/ssh/authorized_keys.d
+
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]
