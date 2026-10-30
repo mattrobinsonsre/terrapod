@@ -45,6 +45,7 @@ type workspaceDataSourceModel struct {
 	AutoConfigureEnabled          types.Bool   `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply           types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts             types.Bool   `tfsdk:"configure_all_hosts"`
+	AnsibleHostKeyChecking        types.Bool   `tfsdk:"ansible_host_key_checking"`
 	DynamicInventoryEnabled       types.Bool   `tfsdk:"dynamic_inventory_enabled"`
 	InventoryScriptsEnabled       types.Bool   `tfsdk:"inventory_scripts_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
@@ -138,6 +139,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"auto_configure_enabled":        computedBool("Whether a push that changes the workspace's ansible config root queues a configure. Defaults to false. The run uses `default_playbook` and `default_limit`, because a push carries no run options."),
 			"configure_all_hosts":           computedBool("Whether a derived configure — one an inventory change or an apply produced — targets every host rather than only the hosts that changed. Defaults to false, which narrows: a derived configure narrows when the ansible code under `config_directory` is unchanged since the last successful configure, and goes wide when it moved."),
 			"configure_after_apply":         computedBool("Whether an apply on this workspace is followed by a configure on the same run — which is what lets a `terraform`/`tofu` CLI apply stream the configure's logs. Defaults to false. A destroy apply never chains one."),
+			"ansible_host_key_checking":     computedBool("Whether a configure verifies the SSH host key of the hosts it targets. Defaults to true, which is ansible's own default and the behaviour that already existed — first contact with an unseen host fails closed. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group rather than forcing an environment variable, so an inventory host variable still beats it and a single host may re-enable verification over a workspace-level relaxation."),
 			"dynamic_inventory_enabled":     computedBool("Whether ansible's `auto` inventory plugin — a declared plugin config, a YAML file with a top-level `plugin:` key — may run on the runner. Defaults to false. The API never executes a plugin in either state: off, a plugin source is refused by name rather than resolving partially; on, the API skips it and the runner re-resolves the inventory and is authoritative."),
 			"inventory_scripts_enabled":     computedBool("Whether ansible's `script` inventory plugin — an executable inventory script — may run on the runner. Defaults to false, and the API never executes one in either state. Separate from dynamic_inventory_enabled so declared plugin configs can be permitted without also permitting arbitrary executables: a declared config names a collection that can be pinned and installed, a script names nothing."),
 			"config_directory":              computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
@@ -339,6 +341,16 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.ConfigureAllHosts = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "configure-all-hosts"); v != nil {
 		m.ConfigureAllHosts = types.BoolValue(*v)
+	}
+	// Host-key verification (#2318). Falls back to its own server-side default --
+	// TRUE -- for exactly the reason `plan-apply-enabled` does above: a server
+	// predating #2318 sends the attribute not at all and a workspace read
+	// through /api/tfe/v2 drops it, and reading absent as `false` would be wrong
+	// in the dangerous direction. It would report a workspace as NOT verifying
+	// host keys when it does.
+	m.AnsibleHostKeyChecking = types.BoolValue(true)
+	if v := terrapod.GetBoolPtrAttr(res, "ansible-host-key-checking"); v != nil {
+		m.AnsibleHostKeyChecking = types.BoolValue(*v)
 	}
 	// #2033's pair. Both default FALSE, so a plain GetBoolAttr would answer
 	// correctly for an absent key; the pointer form is here to state that

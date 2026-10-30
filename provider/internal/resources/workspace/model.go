@@ -109,6 +109,18 @@ type workspaceModel struct {
 	AutoConfigureEnabled types.Bool `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply  types.Bool `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts    types.Bool `tfsdk:"configure_all_hosts"`
+	// Whether a configure verifies the SSH host key of the hosts it targets
+	// (#2318). The server defaults it TRUE -- ansible's own default, and the
+	// behaviour that already existed -- which is why both requests carry it as a
+	// POINTER: a plain bool would make an omitted attribute indistinguishable
+	// from a deliberate relaxation. Optional+Computed like its neighbours, so a
+	// configuration that never mentions it plans UNKNOWN and takes the server's
+	// value rather than planning NULL against an answer of `true`.
+	//
+	// The setting is not the mechanism: relaxing it emits
+	// `ansible_ssh_common_args` on the `all` group, so an inventory host
+	// variable still overrides it.
+	AnsibleHostKeyChecking types.Bool `tfsdk:"ansible_host_key_checking"`
 	// Whether ansible's inventory PLUGINS may run, and they run ON THE
 	// RUNNER only (#2033). Both default false on the server, and the API
 	// never executes a plugin or a script in either state -- so neither

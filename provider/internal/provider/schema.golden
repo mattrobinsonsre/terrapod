@@ -90,6 +90,7 @@ data terrapod_workspace.ai_summary_mode required=false optional=false computed=t
 data terrapod_workspace.allow_fork_pr_plans required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_collections required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 data terrapod_workspace.ansible_execution_environment required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.ansible_host_key_checking required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -563,6 +564,7 @@ resource terrapod_workspace.ai_summary_mode required=false optional=true compute
 resource terrapod_workspace.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_collections required=false optional=true computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 resource terrapod_workspace.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_workspace.ansible_host_key_checking required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
