@@ -68,6 +68,9 @@ def _mock_rule(
     # delete these as noise.
     r.dynamic_inventory_enabled = False
     r.inventory_scripts_enabled = False
+    # #2318's, same reason, and to its REAL default -- TRUE, because a rule
+    # written before the column materialises a workspace that verifies.
+    r.ansible_host_key_checking = True
     r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""
