@@ -1002,3 +1002,88 @@ own EE images do), or by adding one to the image you have.
 probe, ahead of the binary checks, so a non-conforming image fails at pod start naming the
 uid — rather than part way through a playbook on a file it cannot read, which is where the
 older, looser contract would have sent you.
+
+### An explicit `= ""` clears an optional string, and removing the line no longer does
+
+**Affects:** Terraform configurations that clear an optional string attribute by
+deleting its line, on five attributes; and any Go program importing
+`go-terrapod` that builds an `UpdateWorkspaceRequest`.
+
+Five attributes become `Optional + Computed`:
+
+| resource | attribute |
+|---|---|
+| `terrapod_workspace` | `vcs_repo_url`, `vcs_branch`, `vcs_connection_id` |
+| `terrapod_agent_pool_token` | `description` |
+| `terrapod_gpg_key` | `source_url` |
+
+**What changes is what *removing* the line means.** Before, deleting the
+attribute from your configuration asked for a clear; now the diff is suppressed
+and the stored value is kept, and you clear by setting it explicitly:
+
+```hcl
+resource "terrapod_workspace" "example" {
+  name = "example"
+
+  # Clears the binding. Deleting these lines no longer does.
+  vcs_repo_url      = ""
+  vcs_branch        = ""
+  vcs_connection_id = ""
+}
+```
+
+**It replaces a broken removal with a defined one rather than taking away a
+working affordance** — which is the whole reason the trade is worth making.
+Deleting those lines never cleared the binding: the SDK's update struct carried
+them as plain `string` with `,omitempty`, so an empty value was dropped before
+serialisation and the server's `PATCH` then merged, leaving the stored value
+exactly as it was. The configuration said one thing, the deployment did another,
+and the plan showed the difference again on every run. So the behaviour you had
+was a perpetual diff, not a clear.
+
+**And the explicit form did not work either, which is the defect this fixes.**
+An `Optional + Computed` attribute plans an explicit `""` as `""`, so the
+framework then requires `""` back from the apply — and both legs dropped it: the
+write leg through `,omitempty`, and the read leg by mapping the server's `""` to
+null. Either one alone produced
+
+```
+Error: Provider produced inconsistent result after apply
+```
+
+on the one configuration that asked for the value to be cleared. The two legs
+are fixed together, because a fix to either on its own still fails.
+
+#### The Go SDK change, for anyone importing `go-terrapod`
+
+Four fields on `UpdateWorkspaceRequest` become `*string`:
+
+```go
+// before
+req := terrapod.UpdateWorkspaceRequest{VCSBranch: "main"}
+
+// now
+branch := "main"
+req := terrapod.UpdateWorkspaceRequest{VCSBranch: &branch}
+```
+
+They are `AnsibleExecutionEnvironment`, `VCSRepoURL`, `VCSBranch` and
+`VCSConnectionID`. This is a **compile break**, deliberately: a pointer is the
+only way the struct can distinguish "leave this alone" (`nil`) from "set it to
+empty" (a pointer to `""`), and that distinction is what a partial update needs.
+`CreateWorkspaceRequest` is untouched — a create has no stored value to leave
+alone, so an absent field there takes the column default and a plain `string`
+says everything it needs to.
+
+`vcs-connection-id` now also travels as an attribute alongside its JSON:API
+relationship, because a relationship cannot express a clear; the server reads
+either, and an empty attribute is what removes the binding.
+
+**What does not break.** `terrapod_workspace.ansible_execution_environment`
+keeps its `Optional`-only schema, so removing *that* line still clears it — the
+server has no value of its own to supply for an unset label, and making it
+`Computed` would write `""` into state against a configuration that never set it
+and diff for ever. Its explicit `= ""` round-trips too, decided from what the
+configuration asked for as well as what the server answered. No other attribute
+changes shape, no state migration is needed, and a stored value is never
+rewritten by the upgrade itself.

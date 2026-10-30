@@ -548,7 +548,7 @@ type UpdateWorkspaceRequest struct {
 	//
 	// Available labels come from ListAnsibleExecutionEnvironments; naming one
 	// the deployment has not configured is refused at the write with a 422.
-	AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
+	AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
 	// AnsibleCollections are the collections a configure installs, declared on
 	// the platform (#1931). Installed AFTER the configuration's own
 	// requirements file and with --force, so an entry here overrides the
@@ -622,10 +622,10 @@ type UpdateWorkspaceRequest struct {
 	// deployment's configured value — an empty list would otherwise be an
 	// opt-out that looks identical to a typo.
 	OIDCAudiences                 map[string][]string `json:"oidc-audiences,omitempty"`
-	VCSRepoURL                    string              `json:"vcs-repo-url,omitempty"`
-	VCSBranch                     string              `json:"vcs-branch,omitempty"`
+	VCSRepoURL                    *string             `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     *string             `json:"vcs-branch,omitempty"`
 	VCSWorkflow                   string              `json:"vcs-workflow,omitempty"`
-	VCSConnectionID               string              `json:"-"`
+	VCSConnectionID               *string             `json:"-"` // attribute AND relationship; see workspaceUpdateAttrs
 	AgentPoolID                   string              `json:"agent-pool-id,omitempty"`
 	AgentPoolIDs                  []string            `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
 	AutoMerge                     *bool               `json:"auto-merge,omitempty"`
@@ -703,7 +703,10 @@ type WorkspaceList struct {
 //   - *AuthorizationError when the token lacks `admin` on the workspace
 func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error) {
 	attrs := workspaceCreateAttrs(req)
-	rels := workspaceRels(req.VCSConnectionID)
+	// Create keeps a plain string: there is nothing to "leave unchanged" on a
+	// create, so "" and absent mean the same thing and the address is safe to
+	// take. Only the UPDATE request needs the pointer, to tell clear from leave.
+	rels := workspaceRels(&req.VCSConnectionID)
 	body, err := MarshalResource("workspaces", attrs, rels)
 	if err != nil {
 		return nil, fmt.Errorf("marshal create workspace: %w", err)
@@ -1118,8 +1121,8 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AnsibleVersion != "" {
 		attrs["ansible-version"] = req.AnsibleVersion
 	}
-	if req.AnsibleExecutionEnvironment != "" {
-		attrs["ansible-execution-environment"] = req.AnsibleExecutionEnvironment
+	if req.AnsibleExecutionEnvironment != nil {
+		attrs["ansible-execution-environment"] = *req.AnsibleExecutionEnvironment
 	}
 	// #1966's two, then #1929's six. Each is sent only when the caller set it,
 	// so a PATCH that mentions none of them leaves all eight alone.
@@ -1184,11 +1187,18 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.ResourceMemory != "" {
 		attrs["resource-memory"] = req.ResourceMemory
 	}
-	if req.VCSRepoURL != "" {
-		attrs["vcs-repo-url"] = req.VCSRepoURL
+	if req.VCSRepoURL != nil {
+		attrs["vcs-repo-url"] = *req.VCSRepoURL
 	}
-	if req.VCSBranch != "" {
-		attrs["vcs-branch"] = req.VCSBranch
+	if req.VCSBranch != nil {
+		attrs["vcs-branch"] = *req.VCSBranch
+	}
+	// vcs-connection-id travels as an ATTRIBUTE as well as through the
+	// relationship, because only the attribute can carry a CLEAR: the server maps
+	// an empty one to None (_parse_conn_id), while an ABSENT relationship means
+	// "leave unchanged" and so cannot express it. A nil pointer sends neither.
+	if req.VCSConnectionID != nil {
+		attrs["vcs-connection-id"] = *req.VCSConnectionID
 	}
 	if req.VCSWorkflow != "" {
 		attrs["vcs-workflow"] = req.VCSWorkflow
@@ -1270,14 +1280,17 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 // workspaceRels builds the relationships block for create + update.
 // Empty vcsConnectionID returns nil — caller's MarshalResource handles
 // that by omitting the `relationships` key entirely.
-func workspaceRels(vcsConnectionID string) map[string]any {
-	if vcsConnectionID == "" {
+func workspaceRels(vcsConnectionID *string) map[string]any {
+	// nil is "leave unchanged" and a pointer to "" is "clear" -- a relationship
+	// cannot express the second, so the clear rides on the vcs-connection-id
+	// attribute and this returns nil for both.
+	if vcsConnectionID == nil || *vcsConnectionID == "" {
 		return nil
 	}
 	return map[string]any{
 		"vcs-connection": map[string]any{
 			"data": map[string]any{
-				"id":   vcsConnectionID,
+				"id":   *vcsConnectionID,
 				"type": "vcs-connections",
 			},
 		},

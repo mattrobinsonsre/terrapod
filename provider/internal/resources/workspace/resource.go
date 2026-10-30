@@ -916,15 +916,15 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"vcs_repo_url": schema.StringAttribute{
 				Description: "Git HTTPS URL for VCS integration.",
-				Optional:    true,
+				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vcs_branch": schema.StringAttribute{
 				Description: "Branch to track (empty = repo default).",
-				Optional:    true,
+				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vcs_connection_id": schema.StringAttribute{
 				Description: "VCS connection ID (e.g. vcs-abc123).",
-				Optional:    true,
+				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vcs_workflow": schema.StringAttribute{
 				Description: "VCS workflow mode: `merge_then_apply` (default, TFE/HCP standard) or `apply_then_merge` (Atlantis-style; PR runs are full plan-and-apply that wait on a `terrapod apply` comment). Apply-then-merge requires a VCS connection and is incompatible with `auto_apply=true`.",
@@ -1680,6 +1680,20 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	return req, diags
 }
 
+// optionalStringKeepingExplicitEmpty returns null only when the server is empty
+// AND the configuration did not ask for a value, so an omitted attribute stays
+// null while an explicit "" round-trips as "".
+//
+// It exists instead of Optional+Computed for the one attribute whose schema
+// records a decision against Computed. `configured` is the model's own current
+// value: the PLANNED value during create/update, prior state during a refresh.
+func optionalStringKeepingExplicitEmpty(configured types.String, server string) types.String {
+	if server == "" && (configured.IsNull() || configured.IsUnknown()) {
+		return types.StringNull()
+	}
+	return types.StringValue(server)
+}
+
 // buildUpdateWorkspaceRequest is the partial-update counterpart to
 // buildCreateWorkspaceRequest. Same translation logic; Name is
 // included so a Terraform-driven rename round-trips via PATCH (the
@@ -1731,7 +1745,8 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		req.AnsibleVersion = m.AnsibleVersion.ValueString()
 	}
 	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
-		req.AnsibleExecutionEnvironment = m.AnsibleExecutionEnvironment.ValueString()
+		v := m.AnsibleExecutionEnvironment.ValueString()
+		req.AnsibleExecutionEnvironment = &v
 	}
 	// Which operations the workspace has (#1966). Pointers for the same reason
 	// as on create: an explicit `false` has to be distinguishable from an
@@ -1822,10 +1837,12 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		req.ResourceMemory = m.ResourceMemory.ValueString()
 	}
 	if !m.VCSRepoURL.IsNull() {
-		req.VCSRepoURL = m.VCSRepoURL.ValueString()
+		v := m.VCSRepoURL.ValueString()
+		req.VCSRepoURL = &v
 	}
 	if !m.VCSBranch.IsNull() {
-		req.VCSBranch = m.VCSBranch.ValueString()
+		v := m.VCSBranch.ValueString()
+		req.VCSBranch = &v
 	}
 	if !m.VCSWorkflow.IsNull() && !m.VCSWorkflow.IsUnknown() {
 		req.VCSWorkflow = m.VCSWorkflow.ValueString()
@@ -1838,7 +1855,8 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		req.AutoMergeStrategy = m.AutoMergeStrategy.ValueString()
 	}
 	if !m.VCSConnectionID.IsNull() && !m.VCSConnectionID.IsUnknown() {
-		req.VCSConnectionID = m.VCSConnectionID.ValueString()
+		v := m.VCSConnectionID.ValueString()
+		req.VCSConnectionID = &v
 	}
 	if !m.AgentPoolID.IsNull() {
 		req.AgentPoolID = m.AgentPoolID.ValueString()
@@ -1979,14 +1997,13 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.AnsibleVersion = types.StringNull()
 	}
-	// Null rather than StringValue("") for an unset label: the attribute is
-	// Optional and not Computed, so writing "" into state against a null config
-	// would diff on every plan.
-	if ws.AnsibleExecutionEnvironment != "" {
-		m.AnsibleExecutionEnvironment = types.StringValue(ws.AnsibleExecutionEnvironment)
-	} else {
-		m.AnsibleExecutionEnvironment = types.StringNull()
-	}
+	// Still null for an unset label -- the schema above records a deliberate
+	// decision against Computed here -- but decided from what the configuration
+	// asked for rather than only from the server's answer, so an EXPLICIT "" now
+	// round-trips instead of failing the apply (#2310). Same shape as
+	// `terrapod_autodiscovery_rule` and `terrapod_policy_set`.
+	m.AnsibleExecutionEnvironment = optionalStringKeepingExplicitEmpty(
+		m.AnsibleExecutionEnvironment, ws.AnsibleExecutionEnvironment)
 
 	// Which operations the workspace has (#1966), read side. Straight
 	// projections: both are Optional+Computed, so a null read-back is the
@@ -2027,16 +2044,8 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.DefaultLimit = types.StringNull()
 	}
-	if ws.VCSRepoURL != "" {
-		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
-	} else {
-		m.VCSRepoURL = types.StringNull()
-	}
-	if ws.VCSBranch != "" {
-		m.VCSBranch = types.StringValue(ws.VCSBranch)
-	} else {
-		m.VCSBranch = types.StringNull()
-	}
+	m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
+	m.VCSBranch = types.StringValue(ws.VCSBranch)
 	if ws.AgentPoolID != "" {
 		m.AgentPoolID = types.StringValue(ws.AgentPoolID)
 	} else {
@@ -2059,11 +2068,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	apnVal, apnDiag := types.ListValueFrom(ctx, types.StringType, ws.AgentPoolNames)
 	diags.Append(apnDiag...)
 	m.AgentPoolNames = apnVal
-	if ws.VCSConnectionID != "" {
-		m.VCSConnectionID = types.StringValue(ws.VCSConnectionID)
-	} else {
-		m.VCSConnectionID = types.StringNull()
-	}
+	m.VCSConnectionID = types.StringValue(ws.VCSConnectionID)
 
 	// Drift detection
 	m.DriftDetectionEnabled = types.BoolValue(ws.DriftDetectionEnabled)
