@@ -1,14 +1,28 @@
-# Language package proxies (PyPI and npm)
+# Language package proxies
 
-Terrapod proxies PyPI and the npm registry, so a run can resolve its dependency
-closure without reaching the internet. Point a runner at them and `pip install`
-and `npm install` work inside a sealed network.
+Terrapod proxies the registries a run resolves its language dependencies from,
+so it can resolve its whole closure without reaching the internet. Point a
+runner at them and `pip install`, `npm install`, `go mod download`,
+`dotnet restore`, `ansible-galaxy install` and a Pulumi plugin download all
+work inside a sealed network.
+
+| Ecosystem | Serves | Point a client at it with |
+|---|---|---|
+| [PyPI](#using-it) | Pulumi Python programs, Ansible collections' Python dependencies, `ansible-builder` | `PIP_INDEX_URL` |
+| [npm](#using-it) | Pulumi TypeScript and JavaScript programs | `NPM_CONFIG_REGISTRY` |
+| [Ansible Galaxy](#ansible-galaxy) | collections — pull-through, private publishing, signatures | a `galaxy_server` entry |
+| [Pulumi plugins](#pulumi-plugins) | the resource plugin `pulumi up` fetches per provider | `PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES` |
+| [Go modules](#go-modules) | Pulumi programs written in Go | `GOPROXY` |
+| [NuGet](#nuget) | Pulumi programs written in C# | a `nuget.config` `packageSource` |
 
 ```yaml
 # The runner's environment
 PIP_INDEX_URL: https://terrapod.example.com/api/v1/package-cache/pypi/simple
 NPM_CONFIG_REGISTRY: https://terrapod.example.com/api/v1/package-cache/npm/
 ```
+
+Each has its own section below; they share one substrate, so the integrity,
+air-gap and retention behaviour described here applies to all six.
 
 ## Why this exists
 
@@ -26,7 +40,7 @@ but building it runs `pip install`.
 
 ## Using it
 
-Both proxies require authentication, including for reads. Any Terrapod
+Every proxy requires authentication, including for reads. Any Terrapod
 credential works.
 
 **pip** sends Basic auth, so the credential goes in the index URL or `.netrc`:
@@ -42,8 +56,8 @@ registry=https://terrapod.example.com/api/v1/package-cache/npm/
 //terrapod.example.com/api/v1/package-cache/npm/:_authToken=${TERRAPOD_TOKEN}
 ```
 
-A runner's own short-lived token works for both, so a run authenticates as
-itself rather than carrying a shared credential.
+A runner's own short-lived token works for all of them, so a run authenticates
+as itself rather than carrying a shared credential.
 
 ### Why reads need a credential
 
@@ -96,10 +110,15 @@ off — pointing at an internal mirror if you have one — then seal.
 
 | Value | Default | What it does |
 |---|---|---|
-| `api.config.registry.package_cache.enabled` | `true` | Serve the proxies. |
-| `...package_cache.pypi.enabled` / `.npm.enabled` | `true` | Per ecosystem. Disabling 404s the endpoints; cached artifacts stay and reappear if re-enabled. |
-| `...package_cache.pypi.upstream` | `https://pypi.org` | Where to pull through to. Point it at an internal mirror to cache that instead. |
-| `...package_cache.npm.upstream` | `https://registry.npmjs.org` | As above. |
+| `api.config.registry.package_cache.enabled` | `true` | Serve the proxies. All six at once. |
+| `...package_cache.{pypi,npm,galaxy,pulumi,go,nuget}.enabled` | `true` | Per ecosystem. Off means the routes are **never registered** — see [Turning a proxy off](#turning-a-proxy-off). Cached artifacts stay and reappear if re-enabled. |
+| `api.config.registry.package_cache.pypi.upstream` | `https://pypi.org` | Where to pull through to. Point it at an internal mirror to cache that instead. |
+| `api.config.registry.package_cache.npm.upstream` | `https://registry.npmjs.org` | As above. |
+| `api.config.registry.package_cache.galaxy.upstream` | `https://galaxy.ansible.com` | As above. |
+| `api.config.registry.package_cache.pulumi.upstream` | `https://get.pulumi.com/releases/plugins` | As above. Where **Pulumi's** plugins come from. |
+| `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. |
+| `api.config.registry.package_cache.go.upstream` | `https://proxy.golang.org` | As above. |
+| `api.config.registry.package_cache.nuget.upstream` | `https://api.nuget.org/v3-flatcontainer` | As above. |
 | `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched. |
 | `api.config.registry.cache_only` | `false` | Seals every cache, these included. |
 
@@ -116,15 +135,6 @@ inference — and it is the only one a client cannot influence.
 
 PyPI needs no such setting: the simple index resolves relative URLs against the
 index page, so those links are correct by construction.
-
-## What is not here yet
-
-**GOPROXY and NuGet.** Both are small additions on the same substrate, for Pulumi
-Go and .NET programs.
-
-**A warm-ahead API.** Warming today means running the install you expect to need.
-An explicit "cache these packages" endpoint would make preparing an air-gapped
-deployment less of a rehearsal.
 
 ## Warming ahead of a seal
 
@@ -354,8 +364,8 @@ means, and that resolution does not go through the download URL, so it still
 needs upstream. Pinning is good practice in a restricted estate regardless.
 
 **No digest is recorded**, because upstream publishes none alongside the
-tarball. That is weaker than the PyPI and npm proxies, where the client verifies
-our bytes against a published digest.
+tarball. That is weaker than the PyPI, npm and Galaxy proxies, where the client
+verifies our bytes against a published digest.
 
 
 ## Go modules
