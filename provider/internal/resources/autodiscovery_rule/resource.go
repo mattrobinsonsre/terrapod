@@ -1419,13 +1419,20 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	} else {
 		m.AnsibleVersion = types.StringNull()
 	}
-	// Same shape and the same reason: null for an unset label, so a rule that
-	// templates none produces no diff.
-	if v := terrapod.GetStringAttr(res, "ansible-execution-environment"); v != "" {
-		m.AnsibleExecutionEnvironment = types.StringValue(v)
-	} else {
-		m.AnsibleExecutionEnvironment = types.StringNull()
-	}
+	// Still null for an unset label, so a rule that templates none produces no
+	// diff -- but now by consulting what the configuration asked for rather than
+	// only what the server answered, so an EXPLICIT "" round-trips as "" instead
+	// of failing the apply with "Provider produced inconsistent result after
+	// apply" (#2310).
+	//
+	// NOT Optional+Computed, which is how the rest of that class was fixed: the
+	// schema above records a deliberate decision against Computed here, because
+	// the server returns "" when no label is templated and has no value to
+	// supply. This shape honours that decision and still fixes the round trip --
+	// the trade `terrapod_policy_set` already makes with its own `optionalString`.
+	m.AnsibleExecutionEnvironment = optionalStringKeepingExplicitEmpty(
+		m.AnsibleExecutionEnvironment,
+		terrapod.GetStringAttr(res, "ansible-execution-environment"))
 	acObjType := types.ObjectType{AttrTypes: ruleCollectionAttrTypes}
 	if rawCols := parseRawObjectList(res, "ansible-collections"); len(rawCols) > 0 {
 		elems := make([]attr.Value, 0, len(rawCols))
@@ -1707,6 +1714,23 @@ func rawStr(m map[string]any, keys ...string) types.String {
 		}
 	}
 	return types.StringNull()
+}
+
+// optionalStringKeepingExplicitEmpty returns null only when the server is empty
+// AND the configuration did not ask for a value, so an omitted attribute stays
+// null (no spurious diff) while an explicit "" round-trips as "".
+//
+// `configured` is the model's own current value, which holds the PLANNED value
+// during create/update and prior state during a refresh -- correct in both, and
+// the same call shape `terrapod_policy_set` uses.
+//
+// This exists instead of Optional+Computed because the schema records a
+// deliberate decision against Computed for the one attribute that uses it.
+func optionalStringKeepingExplicitEmpty(configured types.String, server string) types.String {
+	if server == "" && (configured.IsNull() || configured.IsUnknown()) {
+		return types.StringNull()
+	}
+	return types.StringValue(server)
 }
 
 // rawBool reads a bool key from a decoded object, returning a null

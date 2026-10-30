@@ -86,7 +86,7 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, Description: "Variable set ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"name":        schema.StringAttribute{Required: true, Description: "The variable set name."},
-			"description": schema.StringAttribute{Optional: true, Description: "Description of the variable set."},
+			"description": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Description of the variable set."},
 			"global":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Apply this variable set to all workspaces."},
 			"priority":    schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Priority variable sets override workspace variables."},
 			"assignment_rule": schema.SingleNestedAttribute{
@@ -349,9 +349,5 @@ func readVarsetFromSDK(v *terrapod.VariableSet, m *variableSetModel) {
 	m.WorkspaceCount = types.Int64Value(v.WorkspaceCount)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)
-	if v.Description != "" {
-		m.Description = types.StringValue(v.Description)
-	} else {
-		m.Description = types.StringNull()
-	}
+	m.Description = types.StringValue(v.Description)
 }

@@ -150,7 +150,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"apply either\". Setting both flags on one variable is refused by the " +
 					"server with a 422 rather than resolved.",
 			},
-			"description": schema.StringAttribute{Optional: true, Description: "Description."},
+			"description": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Description."},
 			"value_source": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
 				Description: "Where the value comes from: `static` (the default — `value` is the " +
@@ -377,11 +377,7 @@ func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel
 	m.VersionID = types.StringValue(v.VersionID)
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)
-	if v.Description != "" {
-		m.Description = types.StringValue(v.Description)
-	} else {
-		m.Description = types.StringNull()
-	}
+	m.Description = types.StringValue(v.Description)
 	if v.ValueSource != "" {
 		m.ValueSource = types.StringValue(v.ValueSource)
 	} else {
