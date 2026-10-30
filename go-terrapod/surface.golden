@@ -1253,7 +1253,7 @@ field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
-field UpdateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
+field UpdateWorkspaceRequest.AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1296,9 +1296,9 @@ field UpdateWorkspaceRequest.TerraformVersion string `json:"terraform-version,om
 field UpdateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
 field UpdateWorkspaceRequest.TerragruntVersion string `json:"terragrunt-version,omitempty"`
 field UpdateWorkspaceRequest.TriggerPrefixes []string `json:"trigger-prefixes,omitempty"`
-field UpdateWorkspaceRequest.VCSBranch string `json:"vcs-branch,omitempty"`
-field UpdateWorkspaceRequest.VCSConnectionID string `json:"-"`
-field UpdateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field UpdateWorkspaceRequest.VCSBranch *string `json:"vcs-branch,omitempty"`
+field UpdateWorkspaceRequest.VCSConnectionID *string `json:"-"`
+field UpdateWorkspaceRequest.VCSRepoURL *string `json:"vcs-repo-url,omitempty"`
 field UpdateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field UpdateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field UpdateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`

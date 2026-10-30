@@ -40,8 +40,11 @@ func tagOf(f reflect.StructField) string {
 // attribute, with the reason. An entry here is a decision; anything else that
 // fails is a bug.
 var notPlainAttributes = map[string]string{
-	"name":              "create sends it as the resource's identity, update as a rename",
-	"vcs-connection-id": "travels in the JSON:API relationships block, not attributes",
+	"name": "create sends it as the resource's identity, update as a rename",
+	// CREATE only. On UPDATE it travels as a plain attribute as well, because
+	// that is the only one of the two that can carry a CLEAR -- see
+	// notPlainAttributesUpdate, which drops this entry so the gate REQUIRES it.
+	"vcs-connection-id": "create sends it in the JSON:API relationships block, not attributes",
 	"organization":      "single-org: the path carries it",
 	// An alias, not a drop: both builders fold TerraformVersion into the
 	// canonical `engine-version` when EngineVersion is unset (#1559), so the
@@ -50,6 +53,25 @@ var notPlainAttributes = map[string]string{
 	// cannot quietly become a real drop.
 	"terraform-version": "an alias the builders send as engine-version",
 }
+
+// notPlainAttributesUpdate is notPlainAttributes minus `vcs-connection-id`,
+// which on UPDATE does travel as a plain attribute (#2310): a nil pointer means
+// "leave unchanged" and a pointer to "" means "clear", and only the attribute
+// can express the second -- an ABSENT relationship is indistinguishable from
+// leave-unchanged. So the update gate requires it rather than excusing it.
+//
+// Derived from the base map rather than written out, so an exemption added there
+// is inherited here instead of silently applying to create alone.
+var notPlainAttributesUpdate = func() map[string]string {
+	m := map[string]string{}
+	for k, v := range notPlainAttributes {
+		if k == "vcs-connection-id" {
+			continue
+		}
+		m[k] = v
+	}
+	return m
+}()
 
 func wireNames(v any) map[string]bool {
 	out := map[string]bool{}
@@ -105,19 +127,22 @@ func fill(v reflect.Value) {
 func TestEveryCreateRequestFieldReachesTheWire(t *testing.T) {
 	req := CreateWorkspaceRequest{}
 	fill(reflect.ValueOf(&req).Elem())
-	assertAllSent(t, "CreateWorkspaceRequest", req, workspaceCreateAttrs(req), "workspaceCreateAttrs")
+	assertAllSent(t, "CreateWorkspaceRequest", req, workspaceCreateAttrs(req), "workspaceCreateAttrs", notPlainAttributes)
 }
 
 func TestEveryUpdateRequestFieldReachesTheWire(t *testing.T) {
 	req := UpdateWorkspaceRequest{}
 	fill(reflect.ValueOf(&req).Elem())
-	assertAllSent(t, "UpdateWorkspaceRequest", req, workspaceUpdateAttrs(req), "workspaceUpdateAttrs")
+	assertAllSent(t, "UpdateWorkspaceRequest", req, workspaceUpdateAttrs(req), "workspaceUpdateAttrs", notPlainAttributesUpdate)
 }
 
-func assertAllSent(t *testing.T, structName string, req any, attrs map[string]any, builder string) {
+func assertAllSent(
+	t *testing.T, structName string, req any, attrs map[string]any, builder string,
+	excusedSet map[string]string,
+) {
 	t.Helper()
 	for name := range wireNames(req) {
-		if _, excused := notPlainAttributes[name]; excused {
+		if _, excused := excusedSet[name]; excused {
 			continue
 		}
 		if _, sent := attrs[name]; !sent {
@@ -242,5 +267,134 @@ func TestEngineVersionBeatsTheAlias(t *testing.T) {
 	attrs := workspaceCreateAttrs(CreateWorkspaceRequest{EngineVersion: "1.9.2", TerraformVersion: "1.5.0"})
 	if got := attrs["engine-version"]; got != "1.9.2" {
 		t.Errorf("EngineVersion must win over TerraformVersion, got %v", got)
+	}
+}
+
+// Every *string field on the update request sends an explicit "" — the question
+// the gate above cannot ask.
+//
+// `TestEveryUpdateRequestFieldReachesTheWire` fills every field with a non-zero
+// value, so it answers "does this field cross the wire AT ALL". Four fields
+// crossed it for "x" and were silently dropped for "", because they were plain
+// strings with `,omitempty`: the server then kept its stored value and returned
+// it, and the apply failed "Provider produced inconsistent result after apply"
+// (#2310). Presence and value-fidelity are different properties, and the second
+// is the one an operator meets when clearing a field.
+//
+// Derived by reflection over the pointer-to-string fields, so a field added
+// tomorrow is covered without anyone remembering this file.
+func TestEveryUpdatePointerStringFieldSendsAnExplicitEmptyString(t *testing.T) {
+	req := UpdateWorkspaceRequest{}
+	v := reflect.ValueOf(&req).Elem()
+	rt := v.Type()
+
+	want := map[string]string{} // wire name -> Go field name
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		if f.Type.Kind() != reflect.Pointer || f.Type.Elem().Kind() != reflect.String {
+			continue
+		}
+		empty := ""
+		v.Field(i).Set(reflect.ValueOf(&empty))
+		name := tagOf(f)
+		if name == "" {
+			// `json:"-"` fields still travel, by another route. vcs-connection-id
+			// is emitted as an attribute precisely so a clear can be expressed.
+			if f.Name == "VCSConnectionID" {
+				name = "vcs-connection-id"
+			} else {
+				continue
+			}
+		}
+		want[name] = f.Name
+	}
+	// A floor alone is not enough: the derived set loses a field the moment it
+	// stops being a pointer, and other *string fields keep the count up — so a
+	// regression on one of these four would shrink the subject silently while
+	// still passing a `len >= 4` check. Mutation-proven: reverting
+	// `VCSRepoURL` to a plain string left the count at four and only the
+	// exported-surface golden noticed. So assert MEMBERSHIP by name as well.
+	for _, required := range []string{
+		"ansible-execution-environment", "vcs-branch", "vcs-connection-id", "vcs-repo-url",
+	} {
+		if _, ok := want[required]; !ok {
+			t.Errorf("%q is no longer a *string on UpdateWorkspaceRequest, so an "+
+				"explicit \"\" cannot be distinguished from an omitted one and this "+
+				"gate silently stopped covering it (#2310)", required)
+		}
+	}
+	if len(want) < 4 {
+		t.Fatalf("found only %d pointer-to-string fields on UpdateWorkspaceRequest; "+
+			"this gate derives its subject, so too few means the derivation broke "+
+			"rather than that the struct is small", len(want))
+	}
+
+	attrs := workspaceUpdateAttrs(req)
+	for name, goField := range want {
+		got, sent := attrs[name]
+		if !sent {
+			t.Errorf("%s is a *string set to \"\" and %q never reaches the wire. "+
+				"An explicit empty must be sent, or the server keeps its stored "+
+				"value and the apply fails as an inconsistent result.", goField, name)
+			continue
+		}
+		if got != "" {
+			t.Errorf("%s sent %q as %#v, want an empty string", goField, name, got)
+		}
+	}
+}
+
+// And the other direction, which is what stops the careless fix. Sending
+// unconditionally would make every PATCH clear every field the caller did not
+// mention — so a nil pointer must send NOTHING.
+func TestANilPointerSendsNothing(t *testing.T) {
+	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{})
+	rt := reflect.TypeOf(UpdateWorkspaceRequest{})
+	checked := 0
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		if f.Type.Kind() != reflect.Pointer || f.Type.Elem().Kind() != reflect.String {
+			continue
+		}
+		name := tagOf(f)
+		if name == "" && f.Name == "VCSConnectionID" {
+			name = "vcs-connection-id"
+		}
+		if name == "" {
+			continue
+		}
+		checked++
+		if _, sent := attrs[name]; sent {
+			t.Errorf("%s is nil and %q was still sent; an unmentioned field must "+
+				"not be cleared", f.Name, name)
+		}
+	}
+	if checked < 4 {
+		t.Fatalf("checked only %d fields; the derivation broke", checked)
+	}
+}
+
+// A relationship cannot express a clear, so the pointer semantics land on the
+// attribute and workspaceRels stays quiet for both nil and "".
+func TestWorkspaceRelsDistinguishesLeaveUnchangedFromClear(t *testing.T) {
+	if got := workspaceRels(nil); got != nil {
+		t.Errorf("nil (leave unchanged) produced a relationship: %#v", got)
+	}
+	empty := ""
+	if got := workspaceRels(&empty); got != nil {
+		t.Errorf("a clear must ride on the attribute, not a relationship: %#v", got)
+	}
+	id := "vcs-123"
+	got := workspaceRels(&id)
+	if got == nil {
+		t.Fatal("a concrete id produced no relationship")
+	}
+	rel, ok := got["vcs-connection"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected shape: %#v", got)
+	}
+	data, ok := rel["data"].(map[string]any)
+	if !ok || data["id"] != id || data["type"] != "vcs-connections" {
+		t.Errorf("relationship data is %#v, want id=%q type=vcs-connections", rel["data"], id)
 	}
 }

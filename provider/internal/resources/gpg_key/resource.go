@@ -54,7 +54,7 @@ func (r *gpgKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"ascii_armor": schema.StringAttribute{Required: true, Sensitive: true, Description: "ASCII-armored PGP public key (write-only).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"namespace":   schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("default"), Description: "Namespace.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"source":      schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("terrapod"), Description: "Key source.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"source_url":  schema.StringAttribute{Optional: true, Description: "Source URL.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"source_url":  schema.StringAttribute{Optional: true, Computed: true, Description: "Source URL.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"key_id":      schema.StringAttribute{Computed: true, Description: "PGP key ID (extracted from armor).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
@@ -153,10 +153,6 @@ func readGPGKeyFromSDK(k *terrapod.GPGKey, m *gpgKeyModel) {
 	m.Source = types.StringValue(k.Source)
 	m.CreatedAt = types.StringValue(k.CreatedAt)
 	m.UpdatedAt = types.StringValue(k.UpdatedAt)
-	if k.SourceURL != "" {
-		m.SourceURL = types.StringValue(k.SourceURL)
-	} else {
-		m.SourceURL = types.StringNull()
-	}
+	m.SourceURL = types.StringValue(k.SourceURL)
 	// ascii_armor is write-only — preserved by Terraform from plan/config.
 }

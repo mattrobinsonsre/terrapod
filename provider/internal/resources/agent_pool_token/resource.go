@@ -64,7 +64,7 @@ func (r *agentPoolTokenResource) Schema(_ context.Context, _ resource.SchemaRequ
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"description": schema.StringAttribute{
-				Description: "Description.", Optional: true,
+				Description: "Description.", Optional: true, Computed: true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"max_uses": schema.Int64Attribute{
@@ -208,11 +208,7 @@ func (r *agentPoolTokenResource) ImportState(ctx context.Context, req resource.I
 
 func readPoolTokenFromSDK(t *terrapod.AgentPoolToken, m *agentPoolTokenModel) {
 	m.ID = types.StringValue(t.ID)
-	if t.Description != "" {
-		m.Description = types.StringValue(t.Description)
-	} else {
-		m.Description = types.StringNull()
-	}
+	m.Description = types.StringValue(t.Description)
 	if t.MaxUses != 0 {
 		m.MaxUses = types.Int64Value(t.MaxUses)
 	} else {

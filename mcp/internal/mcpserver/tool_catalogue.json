@@ -2304,8 +2304,11 @@
           ]
         },
         "ansible_execution_environment": {
-          "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line",
-          "type": "string"
+          "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored. OMIT to leave the stored value alone; pass an empty string to CLEAR it, after which the built-in image for the line is used again",
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "ansible_version": {
           "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
