@@ -2015,6 +2015,13 @@
           "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line",
           "type": "string"
         },
+        "ansible_host_key_checking": {
+          "description": "whether a configure on this workspace VERIFIES the SSH host key of each host it targets. DEFAULTS TO TRUE, which is ansible's own default and the behaviour every workspace already had: with no known_hosts shipped, first contact with an unseen host fails closed with Host key verification failed. Pass false only for an exception you mean -- it makes the server emit ansible_ssh_common_args as a variable on the all group, NOT an environment variable, so an inventory HOST variable still overrides it and one host may keep verification on over a relaxed workspace. Prefer the other route: an ansible_machine_auth credential carries a known_hosts field, referenced from an inventory variable as ${terrapod:\u003ccredential-name\u003e.known_hosts}, which gets a run past an unknown host with verification left ON",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "ansible_version": {
           "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
@@ -2308,6 +2315,13 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "ansible_host_key_checking": {
+          "description": "turn SSH HOST-KEY VERIFICATION for this workspace's configure runs off or back on: true verifies the host key of each host a configure targets, false relaxes it by emitting ansible_ssh_common_args as a variable on the all group -- which an inventory HOST variable still overrides, so relaxing the workspace does not stop a single host re-enabling it. Omitting the field leaves the stored value alone. TRUE is the default and the pre-existing behaviour, so before reaching for false consider the known_hosts field on an ansible_machine_auth credential, referenced as ${terrapod:\u003ccredential-name\u003e.known_hosts}, which supplies the host key and keeps verification ON",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "ansible_version": {

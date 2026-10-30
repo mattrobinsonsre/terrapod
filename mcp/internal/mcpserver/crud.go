@@ -88,6 +88,20 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		InventoryPaths       []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
 		DefaultPlaybook      string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
 		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
+		// Whether a configure verifies the SSH host key of the hosts it
+		// targets (#2318). A pointer like the declarations above, so omitting
+		// it takes the server's TRUE rather than asserting a false nobody
+		// asked for -- and TRUE is the EXISTING behaviour rather than a new
+		// restriction: ansible's own HOST_KEY_CHECKING defaults on, the
+		// configure phase forces nothing about it, and no known_hosts ships,
+		// so first contact with an unseen host already fails closed. What was
+		// missing was any way to express an exception.
+		//
+		// The setting is NOT the mechanism, which is what keeps the per-host
+		// override reachable: relaxing it emits `ansible_ssh_common_args` as a
+		// variable on the `all` group, and an inventory HOST variable replaces
+		// a group variable rather than merging with it.
+		AnsibleHostKeyChecking *bool `json:"ansible_host_key_checking,omitempty" jsonschema:"whether a configure on this workspace VERIFIES the SSH host key of each host it targets. DEFAULTS TO TRUE, which is ansible's own default and the behaviour every workspace already had: with no known_hosts shipped, first contact with an unseen host fails closed with Host key verification failed. Pass false only for an exception you mean -- it makes the server emit ansible_ssh_common_args as a variable on the all group, NOT an environment variable, so an inventory HOST variable still overrides it and one host may keep verification on over a relaxed workspace. Prefer the other route: an ansible_machine_auth credential carries a known_hosts field, referenced from an inventory variable as ${terrapod:<credential-name>.known_hosts}, which gets a run past an unknown host with verification left ON"`
 		// Which ansible inventory PLUGINS this workspace permits on the
 		// runner (#2033). Two independent booleans rather than one switch or a
 		// delimited value, for #1966's reasoning: a value that has to be parsed
@@ -166,6 +180,9 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			// #2318's one. A pointer straight through, so a create that leaves
+			// it out sends nothing and takes the server's TRUE, which verifies.
+			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
 			// #2033's two. Pointers straight through, so a create that mentions
 			// neither sends neither and takes the server's own default, which is
 			// OFF for both -- the safe direction, and the behaviour a workspace
@@ -220,6 +237,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		InventoryPaths  []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
 		DefaultPlaybook *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
+		// Host-key verification, settable here for the reason the block below
+		// gives at length: this server is not an authorization boundary, so an
+		// attribute a workspace read reports and this tool cannot set is an
+		// asymmetry rather than a control (#2318). A pointer so nil leaves the
+		// stored value alone.
+		AnsibleHostKeyChecking *bool `json:"ansible_host_key_checking,omitempty" jsonschema:"turn SSH HOST-KEY VERIFICATION for this workspace's configure runs off or back on: true verifies the host key of each host a configure targets, false relaxes it by emitting ansible_ssh_common_args as a variable on the all group -- which an inventory HOST variable still overrides, so relaxing the workspace does not stop a single host re-enabling it. Omitting the field leaves the stored value alone. TRUE is the default and the pre-existing behaviour, so before reaching for false consider the known_hosts field on an ansible_machine_auth credential, referenced as ${terrapod:<credential-name>.known_hosts}, which supplies the host key and keeps verification ON"`
 		// Which ansible inventory PLUGINS this workspace permits on the runner
 		// (#2033). Settable here for the reason the block below gives at
 		// length: this server is not an authorization boundary, so an
@@ -367,6 +390,9 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			// #2318's one. A pointer straight through, so a PATCH that does not
+			// mention it cannot disturb the stored setting.
+			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
 			// #2033's two. Pointers straight through, so a PATCH that mentions
 			// neither sends neither and cannot disturb a stored switch.
 			DynamicInventoryEnabled: in.DynamicInventoryEnabled,
