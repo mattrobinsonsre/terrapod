@@ -339,6 +339,18 @@ jobs:
       - name: (docs-audit) The forced-environment prose names the real set
         run: python3 scripts/docs-audit/check_forced_env.py
 
+      # A LOCAL composite action's required inputs, read out of its own
+      # `action.yml`. `ssh-target-gate` and `git-source-gate` both called
+      # `./.github/actions/ghcr-login` with no `with:` block at all, so
+      # `docker login` ran with an empty password -- and the step carries
+      # `if: ... is_pr != 'true'`, so it is SKIPPED on every pull request and
+      # could not fail where anyone was looking. Both gates passed their own PRs
+      # and `main` was red for four consecutive runs with neither gate's logic
+      # ever executing. Derived from each action's declared inputs rather than a
+      # list here, which would have gone stale exactly as the thing it guards did.
+      - name: (docs-audit) Every local-action call passes its required inputs
+        run: python3 scripts/docs-audit/check_local_action_inputs.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
@@ -3961,6 +3973,9 @@ jobs:
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
 
       - name: A configure connects over SSH, and refuses an unknown host key
         run: scripts/ssh-target-gate.sh
@@ -3996,6 +4011,9 @@ jobs:
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
 
       - name: Install the git_auth phase's only dependency
         run: pip install structlog
