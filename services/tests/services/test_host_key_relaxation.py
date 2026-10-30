@@ -89,9 +89,29 @@ class TestTheRelaxationIsNotAnEnvironmentVariable:
     """
 
     def test_the_configure_phase_forces_no_host_key_setting(self):
+        """Driven through `_forced_env`, not read off `_FORCED_ENV`.
+
+        Measured: the literal dict holds three keys while the function returns
+        six -- it adds `ANSIBLE_INVENTORY_ENABLED` and a conditional
+        `ANSIBLE_FORKS`, and passes three temp-directory variables through. So an
+        assertion on the literal has a blind spot exactly where a future setting
+        would most likely be added, and this test had it until the forced-env
+        documentation gate derived both halves and showed the gap.
+        """
+        import types
+
         from terrapod.runner.phases import configure
 
-        forced = set(configure._FORCED_ENV)
+        cfg = types.SimpleNamespace(
+            parallelism=4,
+            dynamic_inventory_enabled=False,
+            inventory_scripts_enabled=False,
+        )
+        forced = set(configure._forced_env(cfg))
+        assert len(forced) > len(configure._FORCED_ENV), (
+            "this test exists because the function returns more than the literal; "
+            "if that is no longer true it is reading the wrong thing"
+        )
         assert not any("HOST_KEY" in name for name in forced), (
             "the configure phase must force no host-key setting: it is per-process, "
             "so it would override the operator's own ansible.cfg and sit above the "
