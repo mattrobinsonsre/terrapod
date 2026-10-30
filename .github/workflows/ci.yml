@@ -3914,6 +3914,47 @@ jobs:
         if: always()
         run: docker compose -f e2e/docker-compose.e2e.yml down -v
 
+  # ── SSH Target Gate (a configure's transport, actually exercised) ───────────
+  # Every playbook exercise in this repository was `connection: local`, and the
+  # only `connection: ssh` host in the tree is loopback on port 1 -- engineered
+  # to be UNREACHABLE so ansible's unreachable callback fires. So the SSH
+  # transport, the key file the machine credential writes, and host-key
+  # verification were implemented, unit-tested, and had never been executed in
+  # the success direction (#2318).
+  #
+  # Needs no Kubernetes, which is what makes it a gate rather than a manual
+  # smoke: the property is the EE image's SSH behaviour, settled by two
+  # containers on a docker network in seconds. The Job wiring -- sidecar,
+  # volumes, credential plumbing, fsGroup -- genuinely cannot be shown here and
+  # is a separate proof on the Tilt stack.
+  #
+  # The load-bearing assertion is the FAILING one: an unknown host key must be
+  # refused. The three succeeding rows exist to prove the probe can succeed at
+  # all, which is what makes that refusal meaningful rather than a fixture that
+  # was broken from the start -- and a control checks the task's effect is
+  # present ON THE TARGET, so a play reporting `ok=` for a host it never touched
+  # cannot pass.
+  ssh-target-gate:
+    name: SSH Target Gate
+    needs: [prepare]
+    if: |
+      always()
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+
+      - name: A configure connects over SSH, and refuses an unknown host key
+        run: scripts/ssh-target-gate.sh
+
   # ── E2E Report (merge shard blob reports) ──────────────
   # Merges the per-shard Playwright blob reports into a single HTML report, so
   # a failure anywhere in the matrix is triaged from one artifact. Runs even
@@ -5464,6 +5505,7 @@ jobs:
       # nothing about the verdict changes (#1468).
       - oci-conformance
       - airgap-gate
+      - ssh-target-gate
       - create-manifests
       - release-create
       - release-images
@@ -5500,6 +5542,7 @@ jobs:
             "${{ needs.e2e-test.result }}"
             "${{ needs.oci-conformance.result }}"
             "${{ needs.airgap-gate.result }}"
+            "${{ needs.ssh-target-gate.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"

@@ -1,0 +1,79 @@
+# A throwaway SSH target for the local stack, so a configure can be driven
+# against a real managed node instead of `connection: local` (#2318).
+#
+# NOT part of the Helm chart, deliberately. A chart template would pull this
+# fixture into `values.schema.json` (which is `additionalProperties: false`), the
+# three-profile config contract, and `values-eval.yaml`'s zero-external-deps
+# promise -- three contracts that exist to protect what operators deploy, none of
+# which should have an opinion about a dev fixture. It is loaded by its own
+# `k8s_yaml` in the Tiltfile instead, which keeps it inside Tilt's lifecycle
+# (logs, teardown, a resource in the UI) without touching a single thing an
+# operator installs.
+#
+# `authorized_keys` arrives as a Secret the Tiltfile generates; no key material
+# is committed or baked into the image.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ssh-target
+  namespace: terrapod
+  labels:
+    app.kubernetes.io/name: ssh-target
+    app.kubernetes.io/component: dev-fixture
+spec:
+  selector:
+    app.kubernetes.io/name: ssh-target
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssh-target
+  namespace: terrapod
+  labels:
+    app.kubernetes.io/name: ssh-target
+    app.kubernetes.io/component: dev-fixture
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ssh-target
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ssh-target
+        app.kubernetes.io/component: dev-fixture
+    spec:
+      containers:
+        - name: sshd
+          image: terrapod-ssh-target
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 22
+              name: ssh
+          volumeMounts:
+            - name: authorized-keys
+              mountPath: /etc/ssh/authorized_keys.d
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 22
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+      volumes:
+        - name: authorized-keys
+          secret:
+            secretName: ssh-target-authorized-keys
+            items:
+              - key: target
+                path: target

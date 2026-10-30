@@ -297,6 +297,62 @@ k8s_resource('terrapod-postgresql', labels=['infra'])
 k8s_resource('terrapod-redis', labels=['infra'])
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SSH Target Fixture (#2318)
+# ─────────────────────────────────────────────────────────────────────────────
+# A real managed node to configure, because every playbook exercise in this
+# repository was `connection: local` and the only `connection: ssh` host in the
+# tree is engineered to be unreachable -- so SSH, the machine credential and
+# host-key verification had never been executed in the success direction.
+#
+# Loaded by its OWN k8s_yaml rather than added to the chart. A chart template
+# would pull a dev fixture into `values.schema.json`, the three-profile config
+# contract and `values-eval.yaml`'s zero-external-deps promise; an imperative
+# `kubectl apply` would survive `tilt down` and never appear in the UI. This way
+# it has a real Tilt lifecycle and the chart is untouched.
+#
+# The keypair is GENERATED and never committed -- a private key in a public
+# repository is a secret-scanner finding whatever its intended lifetime. Same
+# shape as setup-certificates above: idempotent, kept in the operator's own data
+# directory, pushed in as a Secret.
+
+local_resource(
+    'setup-ssh-target-key',
+    cmd='''
+KEY_DIR="$HOME/.local/share/terrapod/ssh-target"
+NAMESPACE="terrapod"
+
+mkdir -p "$KEY_DIR"
+
+if [ ! -f "$KEY_DIR/id_ed25519" ]; then
+    echo "Generating an SSH keypair for the configure fixture..."
+    ssh-keygen -q -t ed25519 -N '' -f "$KEY_DIR/id_ed25519" -C "terrapod-ssh-target"
+fi
+
+kubectl create secret generic ssh-target-authorized-keys \
+    --from-file=target="$KEY_DIR/id_ed25519.pub" \
+    --namespace="$NAMESPACE" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+echo ""
+echo "The fixture accepts this key. To drive a configure against it, create a"
+echo "machine credential whose private_key is the contents of:"
+echo "    $KEY_DIR/id_ed25519"
+echo "and point an inventory host at host 'ssh-target' as user 'target'."
+''',
+    labels=['setup'],
+)
+
+docker_build(
+    'terrapod-ssh-target',
+    context='docker',
+    dockerfile='docker/Dockerfile.ssh-target',
+    only=['Dockerfile.ssh-target'],
+)
+
+watch_file('dev/ssh-target.yaml')
+k8s_yaml('dev/ssh-target.yaml')
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Kubernetes Resources
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -378,6 +434,16 @@ k8s_resource(
     'terrapod-api',
     labels=['backend'],
     resource_deps=['terrapod-postgresql', 'terrapod-migrations-1', 'setup-certificates'],
+)
+
+# The SSH target fixture (#2318). Depends on the keypair resource, because the
+# Deployment mounts the Secret that resource creates -- without the ordering the
+# pod sits in ContainerCreating on a missing Secret, which reads as a broken
+# fixture rather than a race.
+k8s_resource(
+    'ssh-target',
+    labels=['dev-fixture'],
+    resource_deps=['setup-ssh-target-key'],
 )
 
 # Web UI (accessed via Ingress at https://terrapod.local)
