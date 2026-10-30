@@ -379,6 +379,22 @@ surface "Ansible Galaxy" tp-airgap-ansible:local "
 # requirements.txt at a fraction of the transfer. The property under test is the
 # chain, not which collection exercises it.
 #
+# A `python -c` import proves the wheels landed. It does NOT prove the clause
+# this row's acceptance item actually asks for -- that a PLAYBOOK can use them
+# -- because ansible stages a module with its own interpreter discovery, so
+# `python -c` and a staged module can resolve differently. Hence the playbook,
+# and hence TWO assertions rather than one.
+#
+# Both messages are measured against the published EE image, not guessed:
+#
+#   deps missing  Failed to import the required Python library (kubernetes)
+#   deps present  Could not create API client: Invalid kube-config file
+#
+# The POSITIVE clause is the load-bearing one. Asserting only the absence of
+# the missing-library message would pass if the task never ran at all, which is
+# the shape a broken fixture takes; `Invalid kube-config` can only be reached
+# by a module that imported its library and got as far as wanting a cluster.
+# There is deliberately no cluster -- this gate is about the dependency chain.
 # The `test -s` on the requirements file is a CONTROL, not decoration: if
 # upstream ever stops shipping one, `pip install -r` on an absent file would make
 # this row pass while proving nothing at all.
@@ -396,6 +412,13 @@ surface "Ansible collection Python requirements" tp-airgap-ansible:local "
     --index-url 'http://tp:$TOKEN@web:3000$PREFIX/pypi/simple/' \
     --trusted-host web -r \"\$REQ\"
   python -c 'import kubernetes, jsonpatch, requests_oauthlib; print(kubernetes.__version__)'
+  printf '%s\n' '- hosts: localhost' '  gather_facts: false' '  connection: local' \
+    '  tasks:' '    - kubernetes.core.k8s_info:' '        kind: Namespace' \
+    '      ignore_errors: true' > /tmp/r/p.yml
+  ANSIBLE_COLLECTIONS_PATH=/tmp/r/collections ANSIBLE_REMOTE_TEMP=/tmp/art \
+    ansible-playbook /tmp/r/p.yml > /tmp/r/out 2>&1 || true
+  grep -q 'Invalid kube-config' /tmp/r/out
+  ! grep -q 'Failed to import the required Python library' /tmp/r/out
 "
 
 # The Pulumi row is the sharpest of these. An override pattern that matches

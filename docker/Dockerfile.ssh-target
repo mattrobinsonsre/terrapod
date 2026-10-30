@@ -29,7 +29,20 @@
 # whatever its intended lifetime.
 FROM alpine:3.21
 
-RUN apk add --no-cache openssh-server \
+# `python3` is here so a real ansible MODULE can be staged on this target, not
+# just `ansible.builtin.raw`. It is the one line that makes this a managed node
+# rather than a shell to connect to, and removing it would silently narrow every
+# gate that uses it to transport-only.
+#
+# WHY IT MATTERS MORE THAN COMPLETENESS. Module staging is where `remote_tmp`
+# bites: ansible resolves its leading `~` against the TARGET user's passwd
+# entry, not `$HOME`, so a target whose home is unwritable fails every task as
+# UNREACHABLE with a message pointing away from the cause. That has cost this
+# epic two live-proof cycles and is the subject of an open issue -- and with
+# `raw` alone no gate in the tree could reach it, because `raw` needs no temp
+# directory at all. The success direction of module staging is therefore the one
+# thing this fixture could not prove until now.
+RUN apk add --no-cache openssh-server python3 \
  && ssh-keygen -A
 
 # The login user. Deliberately NOT uid 1000: the EE runs as 1000, and a fixture

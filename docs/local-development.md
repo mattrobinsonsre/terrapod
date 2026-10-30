@@ -165,5 +165,51 @@ have metadata, so `podman system check --repair` genuinely fixes them.
   Tilt-managed resources — it corrupts Tilt's state. Let Tilt manage its
   resources; use `tilt trigger` to force a rebuild.
 
+## The SSH target, for driving a real configure
+
+The stack ships a throwaway SSH server so a [configure](ansible-configure.md) can
+connect to something real rather than to loopback. Two Tilt resources bring it
+up — `setup-ssh-target-key` generates a keypair and the Secret the server trusts,
+and `ssh-target` is the server itself:
+
+```sh
+tilt trigger --port 10352 setup-ssh-target-key
+tilt trigger --port 10352 ssh-target
+```
+
+The keypair lands in `~/.local/share/terrapod/ssh-target/`. **No key material is
+in the repository** — the pair is generated on first use and the server's host
+key at image build time, because a private key in a public repository is a
+secret-scanner finding whatever its intended lifetime.
+
+To point a workspace at it, create an `ansible_machine_auth` credential whose
+`private_key` is that file and whose `known_hosts` is the server's host key:
+
+```sh
+kubectl -n terrapod exec deploy/ssh-target -- cat /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+prefixed with the hostname the inventory uses, which is the Service name:
+
+```yaml
+all:
+  hosts:
+    ssh-target:
+      ansible_user: target
+      ansible_ssh_private_key_file: "${terrapod:ssh-target-key.private_key}"
+      ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:ssh-target-key.known_hosts}"
+```
+
+Omit the `known_hosts` half and the configure fails `UNREACHABLE` with `Host key
+verification failed`, which is the behaviour rather than a fault — see [Host-key
+verification](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
+
+**It is a managed node, not just a shell**: it carries `python3`, so a real
+ansible module stages and runs on it. That matters because module staging is
+where `remote_tmp` is resolved, and `ansible.builtin.raw` reaches none of it.
+`scripts/ssh-target-gate.sh` exercises the same server at container level with
+no Kubernetes, which is the quicker loop when only the SSH behaviour is in
+question.
+
 For the architecture and conventions behind the stack, see
 [Architecture](architecture.md) and the repository `AGENTS.md`.
