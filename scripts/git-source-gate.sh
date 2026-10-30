@@ -111,6 +111,25 @@ git_dir, host, hostkey = sys.argv[1], sys.argv[2], sys.argv[3]
 key = Path(git_dir).parent.parent / "id"
 entries = [
     {
+        # An HTTP entry alongside the SSH one. `git_http_auth` is a different
+        # code path in `configure()` -- a credential STORE file plus a
+        # `[credential "<url>"]` section, nothing to do with the ssh config --
+        # and the acceptance names the two categories separately, so proving one
+        # does not prove the other.
+        #
+        # It needs no web server, and that is deliberate rather than a shortcut.
+        # What #2320 changes is WHERE the material lives and WHICH container
+        # reads it; that git's credential-store resolves an org-scoped entry for
+        # a repository under it is already proven against real git in
+        # `test_phase_git_auth.py`. So the question left is whether the EE's own
+        # git resolves it from the shared volume -- which `git credential fill`
+        # answers exactly, with no network. Standing up nginx with TLS would
+        # test git's HTTP client, which is not ours.
+        "category": "git_http_auth",
+        "key": "git-gate.invalid/org-a",
+        "value": json.dumps({"username": "x-access-token", "token": "GATE_HTTP_TOKEN"}),
+    },
+    {
         "category": "git_ssh_auth",
         # The scope pattern an operator writes for this host. `_host_of` reads
         # the host out of it, and every generated filename is derived from that.
@@ -159,7 +178,7 @@ REQ
 
 installed() { echo "$1" | grep -q 'was installed successfully'; }
 
-note "row 1/5: NO credential -> the clone must be REFUSED"
+note "row 1/6: NO credential -> the clone must be REFUSED"
 ROLE_ENTRY="  - src: ssh://git@$TARGET/srv/role.git
     name: gaterole
     scm: git" WITH_CREDENTIAL="" OUT="$(probe)"
@@ -169,7 +188,7 @@ else
   note "        refused, as it must be"
 fi
 
-note "row 2/5: git+ssh:// WITH the credential -> installs"
+note "row 2/6: git+ssh:// WITH the credential -> installs"
 ROLE_ENTRY="  - src: ssh://git@$TARGET/srv/role.git
     name: gaterole
     scm: git" WITH_CREDENTIAL=1 OUT="$(probe)"
@@ -180,7 +199,7 @@ else
   echo "$OUT" | tail -8 | sed 's/^/        /'
 fi
 
-note "row 3/5: the SCP form with scm: git -> installs"
+note "row 3/6: the SCP form with scm: git -> installs"
 ROLE_ENTRY="  - src: git@$TARGET:/srv/role.git
     name: gaterole
     scm: git" WITH_CREDENTIAL=1 OUT="$(probe)"
@@ -191,7 +210,7 @@ else
   echo "$OUT" | tail -8 | sed 's/^/        /'
 fi
 
-note "row 4/5: a scheme-less src with NO scm: resolves to Galaxy, and must not clone"
+note "row 4/6: a scheme-less src with NO scm: resolves to Galaxy, and must not clone"
 ROLE_ENTRY="  - src: git@$TARGET:/srv/role.git
     name: gaterole" WITH_CREDENTIAL=1 OUT="$(probe)"
 if installed "$OUT"; then
@@ -200,7 +219,24 @@ else
   note "        not cloned, which is ansible's own contract for a scheme-less src"
 fi
 
-note "row 5/5: host-key verification is still ON -- a WRONG known_hosts must refuse"
+note "row 5/6: the HTTP credential resolves INSIDE the EE"
+# Asks the EE's own git which credential it would use for a repository UNDER the
+# scoped org -- the #1449 case, where the entry is keyed to `host/org` and every
+# real fetch asks for `host/org/repo.git`. A wrong answer here is silent: git
+# sends the request unauthenticated and the clone fails with "could not read
+# Username", which reads as an auth-source problem rather than a lookup one.
+HTTP_OUT="$(docker run --rm --entrypoint sh \
+  -v "$WORK/tp:$WORK/tp:ro" --env-file "$GIT_DIR/gate-env" \
+  -e HOME=/tmp -e GIT_CONFIG_NOSYSTEM=1 "$EE_IMAGE" -c \
+  'printf "protocol=https\nhost=git-gate.invalid\npath=org-a/some-repo.git\n\n" | git credential fill' 2>&1 || true)"
+if echo "$HTTP_OUT" | grep -q '^password=GATE_HTTP_TOKEN$'; then
+  note "        resolved, for a repository under the scoped org"
+else
+  fail "the EE's git did not resolve the git_http_auth credential -- the store or its section is not reachable from the shared volume"
+  echo "$HTTP_OUT" | tail -6 | sed 's/^/        /'
+fi
+
+note "row 6/6: host-key verification is still ON -- a WRONG known_hosts must refuse"
 # Re-materialise with a host key that is syntactically valid and belongs to a
 # different host, which is what a stale `known_hosts` field looks like. If the
 # clone still succeeds, the credential was bought at the cost of verification --
@@ -236,7 +272,7 @@ fi
 
 echo
 if [ "$FAILURES" -eq 0 ]; then
-  note "all 5 rows as expected"
+  note "all 6 rows as expected"
 else
   note "$FAILURES row(s) failed"
 fi
