@@ -46,6 +46,19 @@ ssh-keygen -q -t ed25519 -N '' -f "$WORK/id" -C "terrapod-ssh-gate"
 mkdir -p "$WORK/akeys"
 cp "$WORK/id.pub" "$WORK/akeys/target"
 
+# The EE runs as uid 1000 and `mktemp -d` is 0700 owned by whoever runs this, so
+# without this the container cannot even TRAVERSE the mount and every row fails
+# with `cannot open /work/probe.sh: Permission denied` -- which reads as
+# host-key verification having regressed rather than as a uid boundary.
+#
+# It passed locally and failed in CI for exactly this reason: a macOS container
+# mount does not enforce the uid boundary a Linux bind mount does, so the
+# difference is the runner, not the product. The key is generated per run and
+# the runner is ephemeral, and the probe copies it to 0600 inside the container
+# before ssh will look at it.
+chmod 0755 "$WORK" "$WORK/akeys"
+chmod 0644 "$WORK/id" "$WORK/id.pub" "$WORK/akeys/target"
+
 docker build -q -t terrapod-ssh-target:gate -f docker/Dockerfile.ssh-target docker/ >/dev/null
 docker network create "$NET" >/dev/null
 docker run -d --name "$TARGET" --network "$NET" \
@@ -85,7 +98,8 @@ cp /work/id /tmp/k
 chmod 600 /tmp/k
 exec ansible-playbook -i /work/inv.yml /work/play.yml
 PROBE
-chmod +x "$WORK/probe.sh"
+chmod 0755 "$WORK/probe.sh"
+chmod 0644 "$WORK/inv.yml" "$WORK/play.yml" "$WORK/known_hosts"
 
 # ── the four rows ────────────────────────────────────────────────────────────
 probe() {

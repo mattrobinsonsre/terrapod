@@ -70,6 +70,20 @@ spec:
             limits:
               cpu: 200m
               memory: 64Mi
+          # Measured rather than asserted: sshd keeps working under
+          # `no_new_privs` (the docker equivalent), because privilege separation
+          # drops from root to an unprivileged child and a DROP is not an
+          # escalation. So this costs the fixture nothing and is a real
+          # restriction rather than a box ticked.
+          #
+          # `runAsNonRoot` is deliberately NOT set, and the Dockerfile says why:
+          # modern OpenSSH needs to start as root to accept a login as a
+          # different user, and an sshd running as the login user would quietly
+          # stop the fixture exercising `become` -- the thing a real configure
+          # does constantly. The default capability set stays for the same
+          # reason, since privsep needs CHOWN/SETUID/SETGID/SYS_CHROOT.
+          securityContext:
+            allowPrivilegeEscalation: false
       volumes:
         - name: authorized-keys
           secret:
