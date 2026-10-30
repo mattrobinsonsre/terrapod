@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamische inventaris-plug-ins",
       "dynamicInventoryEnabledHint": "Staat gedeclareerde inventaris-plug-ins toe — een YAML-bron met een plugin-sleutel op het hoogste niveau — wanneer de runner de inventaris oplost. Terrapod voert er zelf nooit een uit, in geen van beide standen. Zolang dit uit staat, wordt een plug-inbron bij naam geweigerd in plaats van tot een onvolledige hostlijst op te lossen; zolang het aan staat, is de hier weergegeven inventaris per bron uitdrukkelijk onvolledig, en is de door de runner opgeloste verzameling bepalend.",
       "inventoryScriptsEnabled": "Inventaris-scripts",
-      "inventoryScriptsEnabledHint": "Staat uitvoerbare inventaris-scripts toe wanneer de runner de inventaris oplost. Gescheiden van dynamische inventaris-plug-ins, zodat gedeclareerde plug-inconfiguraties, die een collection benoemen en vóór uitvoering gelezen kunnen worden, toegestaan kunnen worden zonder ook willekeurige uitvoerbare bestanden toe te staan."
+      "inventoryScriptsEnabledHint": "Staat uitvoerbare inventaris-scripts toe wanneer de runner de inventaris oplost. Gescheiden van dynamische inventaris-plug-ins, zodat gedeclareerde plug-inconfiguraties, die een collection benoemen en vóór uitvoering gelezen kunnen worden, toegestaan kunnen worden zonder ook willekeurige uitvoerbare bestanden toe te staan.",
+      "ansibleHostKeyChecking": "SSH-hostsleutelcontrole",
+      "ansibleHostKeyCheckingHint": "Staat standaard aan, en dat is het eigen gedrag van Ansible: een configure-run weigert een host waarvan hij de sleutel nog niet vertrouwt. Zet je het uit, dan wordt elke sleutel die een host aanbiedt geaccepteerd, zodat de verbinding kan worden afgeluisterd — beter is het de publieke sleutel van de host bij de machinereferentie aan te leveren en de controle aan te laten. Een Ansible-variabele per host gaat in beide gevallen voor op deze instelling."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

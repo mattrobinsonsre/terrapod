@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "ghom tetlh chenmoHwI''mey",
       "dynamicInventoryEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw'': YAML mung, plugin per tIn ghajbogh. cha'' Dotlhmey-vaD, Terrapod ''e'' vumbe'' net Sov. chu''be''chugh, chenmoHwI'' mung pong lajbe''lu'', ''ej hostmey puSqu'' ngu''be''lu''. chu''chugh, naDev ghom tetlh ''oH Hoch mung-vaD puSqu'' ''e'' maqlu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
       "inventoryScriptsEnabled": "ghom tetlh ghItlhmey",
-      "inventoryScriptsEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', vumlaHbogh ghom tetlh ghItlhmey chaw''. ghom tetlh chenmoHwI''mey-vo'' pIm: ngu''lu''bogh chenmoHwI'' De'' ghomHom pong ''ej vumpa'' laDlaH, vaj bIH chaw''laH ''ej Hoch vumlaHbogh De'' chaw''be''."
+      "inventoryScriptsEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', vumlaHbogh ghom tetlh ghItlhmey chaw''. ghom tetlh chenmoHwI''mey-vo'' pIm: ngu''lu''bogh chenmoHwI'' De'' ghomHom pong ''ej vumpa'' laDlaH, vaj bIH chaw''laH ''ej Hoch vumlaHbogh De'' chaw''be''.",
+      "ansibleHostKeyChecking": "SSH host ngaQHa'moHwI' tob",
+      "ansibleHostKeyCheckingHint": "motlh 'oH chu'lu'; Ansible Dotlh je 'oH. ngaQHa'moHwI' voqbe'bogh host lajQo' Qum. chu'Ha'lu'chugh, host ngaQHa'moHwI' nobbogh Hoch lajlu', vaj rar HIvlaH — QaQ law' jan chaw' tlhej host ngaQHa'moHwI' teH yInob 'ej tob yIchu'taH. host choHlaH Ansible reH Dochvam DIvI'."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

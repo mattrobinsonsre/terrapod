@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Ategion rhestr eiddo ddynamig",
       "dynamicInventoryEnabledHint": "Caniatáu ategion rhestr eiddo a ddatganwyd — ffynhonnell YAML sy''n cario allwedd plugin ar y lefel uchaf — pan fydd y rhedwr yn datrys y rhestr eiddo. Nid yw Terrapod ei hun byth yn rhedeg un, yn y naill gyflwr na''r llall. Pan fydd hwn i ffwrdd, caiff ffynhonnell ategyn ei gwrthod wrth ei henw yn lle datrys i set gwesteiwyr anghyflawn; pan fydd ymlaen, mae''r rhestr eiddo a ddangosir yma yn anghyflawn yn benodol fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
       "inventoryScriptsEnabled": "Sgriptiau rhestr eiddo",
-      "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd."
+      "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd.",
+      "ansibleHostKeyChecking": "Gwirio allwedd gwesteiwr SSH",
+      "ansibleHostKeyCheckingHint": "Ymlaen yn ddiofyn, sy'n ymddygiad Ansible ei hun: mae cyflunio yn gwrthod gwesteiwr nad yw'n ymddiried yn ei allwedd eto. Os byddwch yn ei ddiffodd, derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad — mae'n well darparu allwedd gyhoeddus y gwesteiwr gyda'r manylion peiriant a gadael y gwiriad ymlaen. Mae newidyn Ansible fesul gwesteiwr yn drech na'r gosodiad hwn y naill ffordd neu'r llall."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

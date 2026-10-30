@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynaamiset inventaariolaajennukset",
       "dynamicInventoryEnabledHint": "Sallii määritellyt inventaariolaajennukset — YAML-lähteen, jossa on ylimmän tason plugin-avain — kun suorittaja ratkaisee inventaarion. Terrapod ei koskaan suorita niitä itse, kummassakaan tilassa. Kun tämä on pois päältä, laajennuslähde hylätään nimeltä sen sijaan, että se ratkeaisi osittaiseksi konejoukoksi; kun se on päällä, tässä näytetty inventaario on nimenomaisesti osittainen lähdettä kohden, ja suorittajan ratkaisema joukko on määräävä.",
       "inventoryScriptsEnabled": "Inventaarioskriptit",
-      "inventoryScriptsEnabledHint": "Sallii suoritettavat inventaarioskriptit, kun suorittaja ratkaisee inventaarion. Erillinen dynaamisista inventaariolaajennuksista, jotta määritellyt laajennusasetukset, jotka nimeävät kokoelman ja jotka voidaan lukea ennen suoritusta, voidaan sallia sallimatta samalla mielivaltaisia suoritettavia tiedostoja."
+      "inventoryScriptsEnabledHint": "Sallii suoritettavat inventaarioskriptit, kun suorittaja ratkaisee inventaarion. Erillinen dynaamisista inventaariolaajennuksista, jotta määritellyt laajennusasetukset, jotka nimeävät kokoelman ja jotka voidaan lukea ennen suoritusta, voidaan sallia sallimatta samalla mielivaltaisia suoritettavia tiedostoja.",
+      "ansibleHostKeyChecking": "SSH-isäntäavaimen tarkistus",
+      "ansibleHostKeyCheckingHint": "Päällä oletuksena, mikä on Ansiblen oma toimintatapa: määritys hylkää isännän, joka esittää avaimen, johon se ei vielä luota. Jos tämän poistaa käytöstä, mikä tahansa isännän esittämä avain hyväksytään, jolloin yhteyttä voidaan salakuunnella — parempi on antaa isännän julkinen avain konetunnisteen mukana ja jättää tarkistus päälle. Isäntäkohtainen Ansible-muuttuja ohittaa tämän asetuksen kummassakin tapauksessa."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

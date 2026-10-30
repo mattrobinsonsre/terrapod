@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dinamik envanter eklentileri",
       "dynamicInventoryEnabledHint": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine — üst düzey bir plugin anahtarı taşıyan bir YAML kaynağına — izin verir. Terrapod bunları hiçbir durumda kendisi çalıştırmaz. Bu kapalıyken bir eklenti kaynağı, eksik bir makine kümesine çözümlenmek yerine adıyla reddedilir; açıkken burada gösterilen envanter kaynak kaynak açıkça eksiktir ve runner''ın çözümlediği küme belirleyici olandır.",
       "inventoryScriptsEnabled": "Envanter betikleri",
-      "inventoryScriptsEnabledHint": "Runner envanteri çözümlerken çalıştırılabilir envanter betiklerine izin verir. Dinamik envanter eklentilerinden ayrı tutulur; böylece bir koleksiyon adı veren ve çalışmadan önce okunabilen bildirilmiş eklenti yapılandırmalarına, rastgele çalıştırılabilir dosyalara da izin vermeden izin verilebilir."
+      "inventoryScriptsEnabledHint": "Runner envanteri çözümlerken çalıştırılabilir envanter betiklerine izin verir. Dinamik envanter eklentilerinden ayrı tutulur; böylece bir koleksiyon adı veren ve çalışmadan önce okunabilen bildirilmiş eklenti yapılandırmalarına, rastgele çalıştırılabilir dosyalara da izin vermeden izin verilebilir.",
+      "ansibleHostKeyChecking": "SSH ana makine anahtarı denetimi",
+      "ansibleHostKeyCheckingHint": "Öntanımlı olarak açıktır; bu, Ansible''ın kendi davranışıdır: bir yapılandırma, anahtarına henüz güvenmediği bir ana makineyi reddeder. Kapatırsanız bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir — ana makinenin açık anahtarını makine kimlik bilgisiyle birlikte vermek ve denetimi açık bırakmak daha iyidir. Ana makine başına tanımlanan bir Ansible değişkeni her durumda bu ayarın önüne geçer."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

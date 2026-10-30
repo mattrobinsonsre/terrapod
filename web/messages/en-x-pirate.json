@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamic manifest contraptions",
       "dynamicInventoryEnabledHint": "Let th'' deckhand use manifest contraptions ye have declared — a YAML source bearin'' a plugin key at th'' top — when it reckons th'' manifest. Terrapod itself never runs one, in neither state. While this be struck, a contraption source be refused by name rather than reckoned into half a crew; while it be hoisted, th'' manifest shown here be plainly part-reckoned source by source, an'' th'' crew th'' deckhand reckons be th'' word o'' law.",
       "inventoryScriptsEnabled": "Manifest scripts",
-      "inventoryScriptsEnabledHint": "Let th'' deckhand use runnable manifest scripts when it reckons th'' manifest. Kept apart from dynamic manifest contraptions, so declared contraption orders — which name a hoard an'' can be read afore they run — may be allowed without lettin'' any old runnable thing aboard."
+      "inventoryScriptsEnabledHint": "Let th'' deckhand use runnable manifest scripts when it reckons th'' manifest. Kept apart from dynamic manifest contraptions, so declared contraption orders — which name a hoard an'' can be read afore they run — may be allowed without lettin'' any old runnable thing aboard.",
+      "ansibleHostKeyChecking": "Checkin'' o'' the SSH host key",
+      "ansibleHostKeyCheckingHint": "On by default, which be Ansible''s own way o'' things: a riggin'' turns away a host whose key it don''t trust yet. Switch it off an'' any key a host waves at ye be taken, so the line can be listened in on — better t'' hand over the host''s public key wi'' the machine credential an'' leave the checkin'' on. An Ansible variable set fer one host still beats this setting either way, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

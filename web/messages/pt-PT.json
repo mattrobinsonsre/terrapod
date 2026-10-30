@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Plug-ins de inventário dinâmico",
       "dynamicInventoryEnabledHint": "Permite plug-ins de inventário declarados — uma fonte YAML com uma chave plugin de primeiro nível — quando o runner resolve o inventário. O próprio Terrapod nunca executa nenhum, em nenhum dos dois estados. Enquanto isto estiver desativado, uma fonte de plug-in é recusada pelo nome em vez de resolver para um conjunto de anfitriões parcial; enquanto estiver ativado, o inventário aqui mostrado é explicitamente parcial por fonte, e o conjunto que o runner resolve é o que prevalece.",
       "inventoryScriptsEnabled": "Scripts de inventário",
-      "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plug-ins de inventário dinâmico para que configurações de plug-in declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários."
+      "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plug-ins de inventário dinâmico para que configurações de plug-in declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários.",
+      "ansibleHostKeyChecking": "Verificação da chave de host SSH",
+      "ansibleHostKeyCheckingHint": "Ativada por predefinição, que é o que o Ansible faz por si: uma configuração recusa um host cuja chave ainda não conhece. Se a desativar, é aceite qualquer chave que um host apresente, pelo que a ligação pode ser interceptada — é preferível fornecer a chave pública do host com a credencial de máquina e deixar a verificação ativa. Uma variável do Ansible definida por host prevalece de qualquer modo sobre esta opção."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

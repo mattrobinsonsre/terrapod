@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamiczne wtyczki inwentarza",
       "dynamicInventoryEnabledHint": "Zezwala na zadeklarowane wtyczki inwentarza — źródło YAML z kluczem plugin na najwyższym poziomie — gdy runner rozwiązuje inwentarz. Sam Terrapod nigdy żadnej nie uruchamia, w żadnym z tych dwóch stanów. Dopóki to jest wyłączone, źródło wtyczki jest odrzucane z nazwy, zamiast rozwiązywać się do niepełnego zbioru hostów; gdy jest włączone, pokazany tutaj inwentarz jest wyraźnie częściowy dla każdego źródła, a zbiór rozwiązany przez runnera jest rozstrzygający.",
       "inventoryScriptsEnabled": "Skrypty inwentarza",
-      "inventoryScriptsEnabledHint": "Zezwala na wykonywalne skrypty inwentarza, gdy runner rozwiązuje inwentarz. Oddzielone od dynamicznych wtyczek inwentarza, aby zadeklarowane konfiguracje wtyczek, które wskazują kolekcję i można je przeczytać przed uruchomieniem, mogły być dozwolone bez dopuszczania także dowolnych plików wykonywalnych."
+      "inventoryScriptsEnabledHint": "Zezwala na wykonywalne skrypty inwentarza, gdy runner rozwiązuje inwentarz. Oddzielone od dynamicznych wtyczek inwentarza, aby zadeklarowane konfiguracje wtyczek, które wskazują kolekcję i można je przeczytać przed uruchomieniem, mogły być dozwolone bez dopuszczania także dowolnych plików wykonywalnych.",
+      "ansibleHostKeyChecking": "Sprawdzanie klucza hosta SSH",
+      "ansibleHostKeyCheckingHint": "Domyślnie włączone, co jest własnym zachowaniem Ansible: konfiguracja odrzuca hosta, którego klucza jeszcze nie zna. Po wyłączeniu przyjmowany jest dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone — lepiej podać klucz publiczny hosta wraz z poświadczeniem maszynowym i zostawić sprawdzanie włączone. Zmienna Ansible ustawiona dla pojedynczego hosta i tak ma pierwszeństwo nad tym ustawieniem."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

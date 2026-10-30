@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamiske inventar-plugins",
       "dynamicInventoryEnabledHint": "Tillader deklarerede inventar-plugins — en YAML-kilde med en plugin-nøgle på øverste niveau — når runneren opløser inventaret. Terrapod kører aldrig selv et, i ingen af de to tilstande. Så længe dette er slået fra, afvises en pluginkilde ved navn frem for at blive opløst til et ufuldstændigt værtssæt; så længe det er slået til, er inventaret, der vises her, udtrykkeligt ufuldstændigt pr. kilde, og det sæt, runneren opløser, er det gældende.",
       "inventoryScriptsEnabled": "Inventar-scripts",
-      "inventoryScriptsEnabledHint": "Tillader eksekverbare inventar-scripts, når runneren opløser inventaret. Holdt adskilt fra dynamiske inventar-plugins, så deklarerede pluginkonfigurationer, der navngiver en collection og kan læses, før de kører, kan tillades uden også at tillade vilkårlige eksekverbare filer."
+      "inventoryScriptsEnabledHint": "Tillader eksekverbare inventar-scripts, når runneren opløser inventaret. Holdt adskilt fra dynamiske inventar-plugins, så deklarerede pluginkonfigurationer, der navngiver en collection og kan læses, før de kører, kan tillades uden også at tillade vilkårlige eksekverbare filer.",
+      "ansibleHostKeyChecking": "Kontrol af SSH-værtsnøgle",
+      "ansibleHostKeyCheckingHint": "Slået til som standard, hvilket er Ansibles egen adfærd: en konfigurationskørsel afviser en vært, hvis nøgle den ikke allerede kender. Slår du den fra, accepteres enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes — det er bedre at angive værtens offentlige nøgle sammen med maskinoplysningerne og lade kontrollen være slået til. En Ansible-variabel pr. vært går under alle omstændigheder forud for denne indstilling."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

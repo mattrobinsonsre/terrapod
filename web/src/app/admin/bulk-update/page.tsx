@@ -142,6 +142,7 @@ export default function BulkUpdatePage() {
   // dynamic inventory does it across the workspaces that should have it.
   const [uDynamicInventoryEnabled, setUDynamicInventoryEnabled] = useState('')
   const [uInventoryScriptsEnabled, setUInventoryScriptsEnabled] = useState('')
+  const [uAnsibleHostKeyChecking, setUAnsibleHostKeyChecking] = useState('')
   // BOTH explicitly false is the only combination that can never succeed for
   // any matched workspace, so it is the only one blocked here. Turning just
   // plan/apply off is legitimate for a set that has configure on, and the
@@ -296,6 +297,8 @@ export default function BulkUpdatePage() {
       u['dynamic-inventory-enabled'] = uDynamicInventoryEnabled === 'true'
     if (uInventoryScriptsEnabled)
       u['inventory-scripts-enabled'] = uInventoryScriptsEnabled === 'true'
+    if (uAnsibleHostKeyChecking)
+      u['ansible-host-key-checking'] = uAnsibleHostKeyChecking === 'true'
     // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
     // value here (the configuration version's root), so the checkbox is what
     // says whether to write this at all. Never `null`: an explicit null on
@@ -1268,6 +1271,29 @@ export default function BulkUpdatePage() {
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
                   {tWs('fields.inventoryScriptsEnabledHint')}
+                </p>
+              </div>
+              {/* Whether a configure verifies the host key of the hosts it
+                  targets (#2318). Tri-state like every select on this surface:
+                  the column defaults TRUE, but "unchanged" is a real value
+                  here, so a fleet write says nothing about a workspace the
+                  operator left alone. */}
+              <div className="min-w-0">
+                <label className={labelCls} htmlFor="bu-ansible-host-key-checking">
+                  {tWs('fields.ansibleHostKeyChecking')}
+                </label>
+                <select
+                  id="bu-ansible-host-key-checking"
+                  value={uAnsibleHostKeyChecking}
+                  onChange={(e) => setUAnsibleHostKeyChecking(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('unchangedOption')}</option>
+                  <option value="true">{tCommon('yes')}</option>
+                  <option value="false">{tCommon('no')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {tWs('fields.ansibleHostKeyCheckingHint')}
                 </p>
               </div>
             </div>

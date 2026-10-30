@@ -67,6 +67,10 @@ interface AutodiscoveryRule {
     // would leave an operator editing every materialised workspace by hand.
     'dynamic-inventory-enabled'?: boolean
     'inventory-scripts-enabled'?: boolean
+    // Whether a configure on a materialised workspace verifies the SSH host
+    // key of the hosts it targets (#2318). Templated like the two above, and
+    // the only one of the three whose default is TRUE.
+    'ansible-host-key-checking'?: boolean
     // An ordinary templated path, '' meaning the configuration version's root.
     // No null state: the declaration is `configure-enabled` above (#1966).
     'config-directory'?: string
@@ -182,6 +186,7 @@ export default function AutodiscoveryPage() {
   const [configureAllHosts, setConfigureAllHosts] = useState(false)
   const [dynamicInventoryEnabled, setDynamicInventoryEnabled] = useState(false)
   const [inventoryScriptsEnabled, setInventoryScriptsEnabled] = useState(false)
+  const [ansibleHostKeyChecking, setAnsibleHostKeyChecking] = useState(true)
   // Where the configure operation runs in each materialised workspace
   // (#1929) — a plain text box, because the path is just a path and '' is the
   // configuration version's root. #1929 had a mode select here because NULL
@@ -400,6 +405,7 @@ export default function AutodiscoveryPage() {
     setConfigureAllHosts(a['configure-all-hosts'] ?? false)
     setDynamicInventoryEnabled(a['dynamic-inventory-enabled'] ?? false)
     setInventoryScriptsEnabled(a['inventory-scripts-enabled'] ?? false)
+    setAnsibleHostKeyChecking(a['ansible-host-key-checking'] ?? true)
     // `?? ''` and nothing to decide: a stored '' is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -482,6 +488,7 @@ export default function AutodiscoveryPage() {
       'configure-all-hosts': configureAllHosts,
       'dynamic-inventory-enabled': dynamicInventoryEnabled,
       'inventory-scripts-enabled': inventoryScriptsEnabled,
+      'ansible-host-key-checking': ansibleHostKeyChecking,
       // Where the configure operation runs (#1929). Sent verbatim and never
       // null — an explicit null is a 422 naming the field (#1966) — with ''
       // meaning the configuration version's root.
@@ -1267,6 +1274,26 @@ export default function AutodiscoveryPage() {
                     </select>
                     <p className="text-xs text-slate-500 mt-1">
                       {tWs('fields.inventoryScriptsEnabledHint')}
+                    </p>
+                  </div>
+                  {/* Whether a configure verifies the host key of the hosts
+                      it targets (#2318). Defaults to yes, which is both the
+                      rule column's default and ansible's own behaviour. */}
+                  <div className="min-w-0">
+                    <label htmlFor="ad-ansible-host-key-checking" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.ansibleHostKeyChecking')}
+                    </label>
+                    <select
+                      id="ad-ansible-host-key-checking"
+                      value={ansibleHostKeyChecking ? 'true' : 'false'}
+                      onChange={e => setAnsibleHostKeyChecking(e.target.value === 'true')}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    >
+                      <option value="true">{tCommon('yes')}</option>
+                      <option value="false">{tCommon('no')}</option>
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {tWs('fields.ansibleHostKeyCheckingHint')}
                     </p>
                   </div>
                 </div>
