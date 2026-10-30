@@ -497,15 +497,23 @@ hosts it holds only through its children.
 **`ansible.cfg` is the operator's, untouched.** Terrapod writes none and sets
 `ANSIBLE_CONFIG` nowhere, so a committed `ansible.cfg` at the config root is
 read normally, with its `roles_path`, `forks`, `strategy` and
-`inventory_ignore_extensions` intact. Four settings are forced through the
+`inventory_ignore_extensions` intact. Five settings are forced through the
 **environment**, which beats the file:
 
 | variable | why |
 |---|---|
 | `ANSIBLE_INVENTORY_ENABLED=yaml,ini` | no `auto` and no `script`, so no inventory plugin and no executable inventory can run |
 | `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED=True` | an unreadable source fails the run rather than resolving a partial host set |
-| `ANSIBLE_HOST_KEY_CHECKING` | an unattended run has no one to answer a host-key prompt |
+| `ANSIBLE_FORCE_COLOR=0` | colour is terminal control bytes, and nothing reads this log in a terminal |
 | `ANSIBLE_RETRY_FILES_ENABLED=False` | a retry file would be written into the fetched tree, and nothing reads it back |
+| `ANSIBLE_FORKS` | the workspace's own `parallelism`, so the platform's per-workspace setting governs rather than the file's `forks`. Set only when the workspace declares one |
+
+Three more are **forwarded** rather than decided: `TMPDIR`,
+`ANSIBLE_LOCAL_TEMP` and `ANSIBLE_REMOTE_TEMP` are passed through from the Job's
+own environment when it supplies them. The value is the Job's, not a choice made
+here — the root filesystem is read-only, and without a writable temp directory
+ansible exits `rc 250` with "No usable temporary directory found", which names
+nothing about the cause.
 
 Every other inherited `ANSIBLE_*` variable is **stripped** before these are
 set. Overriding them would not be enough: environment beats `ansible.cfg`, so an
@@ -513,8 +521,19 @@ set. Overriding them would not be enough: environment beats `ansible.cfg`, so an
 the plugin dispatcher that the second layer above exists to disable, and the set
 of ansible settings is far larger than the set anyone thinks about.
 
-`ANSIBLE_FORKS` is set from the workspace's `parallelism`, so the platform's own
-per-workspace setting governs rather than the file's `forks`.
+**Host-key verification is not in that set**, and an earlier version of this page
+said it was. `ANSIBLE_HOST_KEY_CHECKING` is never set for a configure, and
+nothing a configure does forces it either way, so ansible's own default stands
+and verification is **on**. The one place Terrapod sets it is the API's own
+`ansible-inventory` run, which parses inventory files and connects to nothing —
+a parse-time setting, and the reason this page used to give for it ("an
+unattended run has no one to answer a host-key prompt") was a connection-time
+one. An unattended run does not hang on a prompt, because there is no terminal
+to prompt at: first contact with an unseen host fails closed as
+`Host key verification failed`. Relaxing it, or supplying the key instead, is
+[a workspace setting and a credential field](ansible-configure.md#host-key-verification-and-how-to-satisfy-it)
+rather than anything in this table — deliberately, because a forced environment
+variable would sit above a per-host override and make the exception unreachable.
 
 **Collections install first, in the same environment.** `requires_ansible` is
 not enforced at install time, so installing with one ansible-core and running

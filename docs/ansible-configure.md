@@ -695,6 +695,114 @@ ServiceAccount is a cloud principal a configure has no reason to hold. See
 [Cloud Identity → Which phase gets which
 account](cloud-identity.md#which-phase-gets-which-account).
 
+## Host-key verification, and how to satisfy it
+
+A configure reaches its hosts over SSH, so every one of them has to present a
+host key ssh is willing to trust. **Verification is on, and always has been.**
+Ansible's own `HOST_KEY_CHECKING` defaults to true, the configure phase
+[forces nothing about it](runners.md#what-a-configure-actually-runs), and the
+execution environment ships no `known_hosts`. Measured against the published
+image, first contact with a host nobody has vouched for ends like this:
+
+```
+fatal: [web1.example.com]: UNREACHABLE! => {"changed": false,
+  "msg": "Failed to connect to the host via ssh: Host key verification failed.",
+  "unreachable": true}
+```
+
+`rc=4`, the host recorded as **unreachable**, and the run says so. Two things it
+does *not* do are worth stating, because both are what an operator fears here:
+it does not hang waiting for someone to type `yes` — a configure has no terminal
+to be prompted at — and it does not quietly accept the key and carry on. The
+default fails closed.
+
+What was missing was any way to say "this host is fine". There are two, and the
+first is the one to reach for.
+
+### Supply the key: `known_hosts` on the machine credential
+
+The machine credential carries a
+[`known_hosts` field](ansible-credentials.md#the-known_hosts-field). It is a
+**file** field, so a placeholder naming it substitutes the path of a file
+Terrapod writes beside ansible — which is exactly what `ssh`'s
+`UserKnownHostsFile` option takes:
+
+```yaml
+all:
+  vars:
+    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts}"
+```
+
+Measured: the host connects, and **verification stays on**. This is the shape to
+prefer, because it answers the question ssh is asking rather than withdrawing it
+— a host presenting the wrong key is still refused.
+
+### Or relax it: `ansible-host-key-checking` on the workspace
+
+Where supplying keys is not practical — ephemeral hosts whose keys are generated
+at boot, say — the workspace can turn verification off for its configure runs:
+
+| | |
+|---|---|
+| wire attribute | `ansible-host-key-checking` |
+| provider / MCP / database spelling | `ansible_host_key_checking` |
+| SDK field | `AnsibleHostKeyChecking` |
+| type | boolean |
+| default | **`true`** — verification on, which is the behaviour every existing workspace already had |
+
+It is settable on workspace create, on workspace `PATCH`, through the bulk
+settings update, and on an
+[autodiscovery rule](autodiscovery.md), which templates it onto the
+workspaces it materialises like every other configure setting. A rule that says
+nothing creates workspaces that verify.
+
+**The setting is not the mechanism, and that is what keeps a per-host exception
+reachable.** Turning it off makes the resolver emit one inventory variable on the
+`all` group:
+
+```yaml
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+```
+
+`UserKnownHostsFile=/dev/null` is there as well as `StrictHostKeyChecking=no`
+because without it ssh writes each accepted key into a `known_hosts` under the
+execution environment's home — a per-run volume, so it is discarded anyway — and
+warns on every connection, putting a line in your log for something you asked
+for.
+
+It is deliberately **not** `ANSIBLE_HOST_KEY_CHECKING` in the environment. That
+variable is per-process: forcing it would override your own `ansible.cfg`, which
+Terrapod reserves for things that are not negotiable, and it would sit *above* a
+per-host override rather than below one — so the exception the setting exists to
+permit would be unreachable.
+
+### What beats what
+
+Three levels, outermost last:
+
+1. **An inventory host variable wins.** A host that sets
+   `ansible_ssh_common_args` itself overrides the workspace-level relaxation, so
+   a single host can keep verification on while the rest of the fleet does not.
+2. **Your own `all`-level `ansible_ssh_common_args` wins too.** If your
+   inventory already declares that variable on `all`, Terrapod leaves it exactly
+   as written and **logs that it did** — a setting that silently does nothing is
+   worse than one that refuses.
+3. **Your `ansible.cfg` is never overridden.** Terrapod writes none and forces
+   no host-key setting, so a `host_key_checking` you have set there is read
+   normally.
+
+**Ansible replaces `ansible_ssh_common_args` rather than merging it** — measured.
+That is the whole reason level 1 works at all, and it has a consequence that
+surprises people: a host-level override must restate the *entire* argument
+string, not just the part it wants to change. A host that needs a `ProxyJump`
+*and* the group's known-hosts file writes both:
+
+```yaml
+hosts:
+  bastioned.example.com:
+    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts} -o ProxyJump=bastion"
+```
+
 ## A play that targets the execution environment itself
 
 `connection: local`, `hosts: localhost`, or anything driving a cloud API from the

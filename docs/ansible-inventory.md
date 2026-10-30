@@ -250,6 +250,17 @@ non-conflicting variable from the repository survives alongside a declared one.
 An operator's existing mental model of `-i` ordering transfers exactly, because
 that is literally what this is.
 
+**A variable is replaced, never merged into.** Measured: a host variable
+*replaces* the value the same variable carries on a group, including on `all`.
+That is ordinary ansible and it is usually invisible, because most connection
+variables hold one thing — but it bites on the ones that hold an argument
+*string*. A host overriding `ansible_ssh_common_args` has to restate the whole
+string, options it did not want to change included, or those options are simply
+gone for that host. It is also what makes a per-host exception to a
+workspace-wide setting possible at all; see [Host-key verification, and how to
+satisfy it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it),
+where the workspace's relaxation arrives as exactly such a variable on `all`.
+
 ---
 
 ## Which ansible resolves it
