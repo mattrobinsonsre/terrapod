@@ -114,6 +114,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "ansible_version": ws.ansible_version,
         "ansible_execution_environment": ws.ansible_execution_environment,
         "ansible_collections": list(ws.ansible_collections or []),
+        "ansible_host_key_checking": ws.ansible_host_key_checking,
         # Which operations the workspace had (#1966). Snapshotted because the
         # restore path is one of the sites a new declaration is easiest to miss:
         # omit them and restoring a configure-only workspace brings it back as
@@ -514,6 +515,20 @@ def _restored_configure(settings: dict) -> bool:
     return settings.get("configure_enabled") is True
 
 
+def _restored_host_key_checking(settings: dict) -> bool:
+    """`is not False`, like `_restored_plan_apply` and unlike the two opt-in
+    siblings, because this column defaults TRUE (#2318).
+
+    The direction is what matters. An absent key means a marker written before
+    the column existed, and every such workspace verified host keys, so TRUE is
+    the faithful reading. And a truthiness fallback (`or True`) would discard a
+    deliberate False -- restoring a workspace whose operator had relaxed
+    verification for a reason, into one that refuses every host it has no key
+    for. That failure arrives as `Host key verification failed` on a workspace
+    nobody changed, which points at the hosts rather than at the restore."""
+    return settings.get("ansible_host_key_checking") is not False
+
+
 async def restore_workspace(
     db: AsyncSession,
     storage: ObjectStore,
@@ -685,6 +700,7 @@ async def restore_workspace(
         # never asked for -- and unlike a wrong size, that changes which ansible
         # runs its playbooks.
         ansible_execution_environment=settings.get("ansible_execution_environment") or "",
+        ansible_host_key_checking=_restored_host_key_checking(settings),
         # `[]` for a snapshot predating the column, which is also the
         # correct meaning: that workspace declared none.
         ansible_collections=list(settings.get("ansible_collections") or []),
