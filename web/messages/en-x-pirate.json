@@ -3991,6 +3991,8 @@
     "becomeMethod": "Manner o' risin'",
     "becomeUser": "Rise to deckhand",
     "becomePassword": "Risin' watchword",
-    "replaceHint": "Savin' swaps out the whole o' the papers, so fill in every field she needs — not only the one ye be changin'. Leave 'em all empty an' the stowed papers stay as they be."
+    "replaceHint": "Savin' swaps out the whole o' the papers, so fill in every field she needs — not only the one ye be changin'. Leave 'em all empty an' the stowed papers stay as they be.",
+    "knownHosts": "Known ports o'' call",
+    "knownHostsHint": "The public host keys o'' the vessels this credential boards, one per line in known_hosts riggin''. Point an inventory variable at her path to come alongside without slackenin'' host-key verification, arr. Not hidden: a host''s public key be public, an'' it be what ye compare when a key don''t match."
   }
 }

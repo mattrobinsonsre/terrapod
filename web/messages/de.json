@@ -3991,6 +3991,8 @@
     "becomeMethod": "Methode der Rechteerweiterung",
     "becomeUser": "Erweitern auf Benutzer",
     "becomePassword": "Passwort für Rechteerweiterung",
-    "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert."
+    "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert.",
+    "knownHosts": "Bekannte Hosts",
+    "knownHostsHint": "Die öffentlichen Hostschlüssel der Maschinen, die dieses Anmeldedatum erreicht, einer pro Zeile im known_hosts-Format. Richte eine Inventarvariable auf diesen Pfad, um ohne Abschwächung der Hostschlüsselprüfung zu verbinden. Nicht verborgen: Der öffentliche Schlüssel eines Hosts ist öffentlich und genau das, was du vergleichst, wenn ein Schlüssel nicht übereinstimmt."
   }
 }

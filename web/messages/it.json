@@ -3991,6 +3991,8 @@
     "becomeMethod": "Metodo di elevazione",
     "becomeUser": "Eleva all'utente",
     "becomePassword": "Password di elevazione",
-    "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata."
+    "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata.",
+    "knownHosts": "Host noti",
+    "knownHostsHint": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts. Punta una variabile di inventario al suo percorso per connetterti senza allentare la verifica della chiave host. Non nascosta: la chiave pubblica di un host è pubblica ed è proprio ciò che confronti quando una chiave non corrisponde."
   }
 }

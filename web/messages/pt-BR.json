@@ -3991,6 +3991,8 @@
     "becomeMethod": "Método de elevação",
     "becomeUser": "Elevar para o usuário",
     "becomePassword": "Senha de elevação",
-    "replaceHint": "Salvar substitui a credencial inteira, então preencha todos os campos necessários — não apenas o que está sendo alterado. Deixar todos em branco mantém a credencial armazenada como está."
+    "replaceHint": "Salvar substitui a credencial inteira, então preencha todos os campos necessários — não apenas o que está sendo alterado. Deixar todos em branco mantém a credencial armazenada como está.",
+    "knownHosts": "Hosts conhecidos",
+    "knownHostsHint": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para conectar sem afrouxar a verificação da chave de host. Não é oculta: a chave pública de um host é pública e é exatamente o que você compara quando uma chave não corresponde."
   }
 }

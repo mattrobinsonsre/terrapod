@@ -3991,6 +3991,8 @@
     "becomeMethod": "Metode for rettighetsheving",
     "becomeUser": "Hev til bruker",
     "becomePassword": "Passord for rettighetsheving",
-    "replaceHint": "Lagring erstatter hele legitimasjonen, så fyll ut hvert felt den trenger — ikke bare det du endrer. Lar du alle stå tomme, beholdes den lagrede legitimasjonen som den er."
+    "replaceHint": "Lagring erstatter hele legitimasjonen, så fyll ut hvert felt den trenger — ikke bare det du endrer. Lar du alle stå tomme, beholdes den lagrede legitimasjonen som den er.",
+    "knownHosts": "Kjente verter",
+    "knownHostsHint": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format. Pek en inventarvariabel mot stien dens for å koble til uten å svekke verifiseringen av vertsnøkkelen. Skjules ikke: en verts offentlige nøkkel er offentlig og er nettopp det du sammenligner når en nøkkel ikke stemmer."
   }
 }

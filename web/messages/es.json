@@ -3991,6 +3991,8 @@
     "becomeMethod": "Método de elevación",
     "becomeUser": "Elevar al usuario",
     "becomePassword": "Contraseña de elevación",
-    "replaceHint": "Al guardar se reemplaza la credencial completa, así que rellene todos los campos que necesite, no solo el que está cambiando. Si los deja todos vacíos, la credencial almacenada se mantiene tal cual."
+    "replaceHint": "Al guardar se reemplaza la credencial completa, así que rellene todos los campos que necesite, no solo el que está cambiando. Si los deja todos vacíos, la credencial almacenada se mantiene tal cual.",
+    "knownHosts": "Hosts conocidos",
+    "knownHostsHint": "Las claves públicas de host de las máquinas que alcanza esta credencial, una por línea en formato known_hosts. Apunta una variable de inventario a su ruta para conectar sin relajar la verificación de la clave de host. No se oculta: la clave pública de un host es pública y es justo lo que comparas cuando una clave no coincide."
   }
 }

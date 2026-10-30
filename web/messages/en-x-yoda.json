@@ -3991,6 +3991,8 @@
     "becomeMethod": "Method, escalation",
     "becomeUser": "To user, escalate",
     "becomePassword": "Password, escalation",
-    "replaceHint": "The whole credential, saving replaces — so every field it needs, fill in; not only the one being changed. Empty, leaving all of them keeps the stored credential as it is."
+    "replaceHint": "The whole credential, saving replaces — so every field it needs, fill in; not only the one being changed. Empty, leaving all of them keeps the stored credential as it is.",
+    "knownHosts": "Hosts, known",
+    "knownHostsHint": "Of the machines this credential reaches, the public host keys, one per line in known_hosts format. At its path, an inventory variable point, to connect without relaxing host-key verification. Hidden, not: public, a host's public key is, and what you compare when a key does not match, it is."
   }
 }

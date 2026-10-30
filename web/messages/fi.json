@@ -3991,6 +3991,8 @@
     "becomeMethod": "Korotustapa",
     "becomeUser": "Korota käyttäjäksi",
     "becomePassword": "Korotuksen salasana",
-    "replaceHint": "Tallennus korvaa koko tunnistetiedon, joten täytä jokainen tarvittava kenttä — ei vain sitä, jota muutat. Jos jätät kaikki tyhjiksi, tallennettu tunnistetieto säilyy ennallaan."
+    "replaceHint": "Tallennus korvaa koko tunnistetiedon, joten täytä jokainen tarvittava kenttä — ei vain sitä, jota muutat. Jos jätät kaikki tyhjiksi, tallennettu tunnistetieto säilyy ennallaan.",
+    "knownHosts": "Tunnetut isännät",
+    "knownHostsHint": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa. Osoita inventaariomuuttuja tähän polkuun, jotta voit yhdistää ilman isäntäavaimen tarkistuksen löysentämistä. Ei piiloteta: isännän julkinen avain on julkinen ja juuri sitä verrataan, kun avain ei täsmää."
   }
 }

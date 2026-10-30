@@ -3991,6 +3991,8 @@
     "becomeMethod": "Modus auctionis",
     "becomeUser": "Auge ad usorem",
     "becomePassword": "Tessera auctionis",
-    "replaceHint": "Conservatio totum testimonium substituit; itaque omnem campum necessarium comple, non solum eum quem mutas. Si omnes vacuos relinquis, testimonium conditum manet ut est."
+    "replaceHint": "Conservatio totum testimonium substituit; itaque omnem campum necessarium comple, non solum eum quem mutas. Si omnes vacuos relinquis, testimonium conditum manet ut est.",
+    "knownHosts": "Hospites noti",
+    "knownHostsHint": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts. Variabilem inventarii ad eius semitam dirige ut sine relaxatione probationis clavis hospitis coniungas. Non occultatur: clavis publica hospitis publica est, atque id ipsum est quod comparas cum clavis non congruit."
   }
 }

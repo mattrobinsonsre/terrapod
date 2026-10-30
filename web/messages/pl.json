@@ -3991,6 +3991,8 @@
     "becomeMethod": "Metoda podniesienia uprawnień",
     "becomeUser": "Podnieś do użytkownika",
     "becomePassword": "Hasło podniesienia uprawnień",
-    "replaceHint": "Zapis zastępuje całe dane uwierzytelniające, więc wypełnij każde potrzebne pole, a nie tylko to zmieniane. Pozostawienie wszystkich pustych zachowuje zapisane dane bez zmian."
+    "replaceHint": "Zapis zastępuje całe dane uwierzytelniające, więc wypełnij każde potrzebne pole, a nie tylko to zmieniane. Pozostawienie wszystkich pustych zachowuje zapisane dane bez zmian.",
+    "knownHosts": "Znane hosty",
+    "knownHostsHint": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts. Wskaż zmiennej inwentarza tę ścieżkę, aby połączyć się bez osłabiania weryfikacji klucza hosta. Nie jest ukrywany: publiczny klucz hosta jest publiczny i to właśnie go porównujesz, gdy klucz się nie zgadza."
   }
 }

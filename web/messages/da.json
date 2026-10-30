@@ -3991,6 +3991,8 @@
     "becomeMethod": "Metode til rettighedsforøgelse",
     "becomeUser": "Forøg til bruger",
     "becomePassword": "Adgangskode til rettighedsforøgelse",
-    "replaceHint": "Når du gemmer, erstattes hele legitimationen, så udfyld hvert felt den har brug for — ikke kun det, du ændrer. Lader du dem alle stå tomme, bevares den gemte legitimation, som den er."
+    "replaceHint": "Når du gemmer, erstattes hele legitimationen, så udfyld hvert felt den har brug for — ikke kun det, du ændrer. Lader du dem alle stå tomme, bevares den gemte legitimation, som den er.",
+    "knownHosts": "Kendte værter",
+    "knownHostsHint": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format. Peg en inventarvariabel på dens sti for at forbinde uden at løsne verifikationen af værtsnøglen. Skjules ikke: en værts offentlige nøgle er offentlig og er netop det, du sammenligner, når en nøgle ikke passer."
   }
 }

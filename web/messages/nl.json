@@ -3991,6 +3991,8 @@
     "becomeMethod": "Escalatiemethode",
     "becomeUser": "Escaleren naar gebruiker",
     "becomePassword": "Escalatiewachtwoord",
-    "replaceHint": "Opslaan vervangt de volledige inloggegevens, dus vul elk veld in dat nodig is — niet alleen het veld dat je wijzigt. Laat je ze allemaal leeg, dan blijven de opgeslagen inloggegevens ongewijzigd."
+    "replaceHint": "Opslaan vervangt de volledige inloggegevens, dus vul elk veld in dat nodig is — niet alleen het veld dat je wijzigt. Laat je ze allemaal leeg, dan blijven de opgeslagen inloggegevens ongewijzigd.",
+    "knownHosts": "Bekende hosts",
+    "knownHostsHint": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat. Laat een inventarisvariabele naar dit pad verwijzen om te verbinden zonder de hostsleutelverificatie te versoepelen. Niet verborgen: de publieke sleutel van een host is openbaar en is precies wat je vergelijkt als een sleutel niet overeenkomt."
   }
 }

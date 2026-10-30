@@ -3982,6 +3982,8 @@
     "vaultLabel": "Vault ID label",
     "vaultLabelHint": "Letters, digits, underscore, dot and hyphen only. The label is interpolated into the vault identity list, where a comma and an at sign separate the entries.",
     "privateKey": "SSH private key",
+    "knownHosts": "Known hosts",
+    "knownHostsHint": "The public host keys of the machines this credential reaches, one per line in known_hosts format. Point an inventory variable at its path to connect without relaxing host-key verification. Not hidden: a host's public key is public, and it is what you compare when a key does not match.",
     "password": "Password",
     "user": "User",
     "become": "Privilege escalation",

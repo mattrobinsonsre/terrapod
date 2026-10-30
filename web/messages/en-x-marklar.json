@@ -3991,6 +3991,8 @@
     "becomeMethod": "Marklar marklar",
     "becomeUser": "Escalate to marklar",
     "becomePassword": "Marklar marklar",
-    "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is."
+    "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is.",
+    "knownHosts": "Marklar marklar",
+    "knownHostsHint": "The marklar marklar marklar of the marklar this marklar marklar, one per marklar in known_hosts marklar. Point an marklar marklar at its marklar to connect without relaxing marklar-marklar marklar. Not hidden: a marklar marklar marklar is public, and it is what you compare when a marklar does not match."
   }
 }

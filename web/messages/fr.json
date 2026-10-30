@@ -3991,6 +3991,8 @@
     "becomeMethod": "Méthode d'élévation",
     "becomeUser": "Élever vers l'utilisateur",
     "becomePassword": "Mot de passe d'élévation",
-    "replaceHint": "L'enregistrement remplace l'intégralité des identifiants : renseignez donc tous les champs nécessaires, pas seulement celui que vous modifiez. Si vous les laissez tous vides, les identifiants stockés restent inchangés."
+    "replaceHint": "L'enregistrement remplace l'intégralité des identifiants : renseignez donc tous les champs nécessaires, pas seulement celui que vous modifiez. Si vous les laissez tous vides, les identifiants stockés restent inchangés.",
+    "knownHosts": "Hôtes connus",
+    "knownHostsHint": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts. Pointez une variable d''inventaire sur son chemin pour vous connecter sans assouplir la vérification de la clé d''hôte. Non masquée : la clé publique d''un hôte est publique, et c''est précisément ce que vous comparez lorsqu''une clé ne correspond pas."
   }
 }

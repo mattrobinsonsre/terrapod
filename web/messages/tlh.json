@@ -3991,6 +3991,8 @@
     "becomeMethod": "nIvmoHghach mIw",
     "becomeUser": "lo'wI'Daq yInIvmoH",
     "becomePassword": "nIvmoHghach mu'qaD",
-    "replaceHint": "QaDmeH ngaQHa'wI' naQ chollu'; vaj poQbogh Hoch yav yIbuy'moH, choHbogh yav neH yIbuy'moHQo'. Hoch chIm DalIHchugh, ngaQHa'wI' pollu'bogh choHbe'lu'."
+    "replaceHint": "QaDmeH ngaQHa'wI' naQ chollu'; vaj poQbogh Hoch yav yIbuy'moH, choHbogh yav neH yIbuy'moHQo'. Hoch chIm DalIHchugh, ngaQHa'wI' pollu'bogh choHbe'lu'.",
+    "knownHosts": "Sovbogh wIjwI'",
+    "knownHostsHint": "DaH ngaQHa'moHwI' DIvI' Dochvetlh retlh jonta' ghaj, wa' per jIHmey known_hosts mo'. inventory choHbogh He'etlh DaH ghoS, ngaQHa'moHwI' tob Hoch lajQo'. So'be': wIjwI' DIvI' ngaQHa'moHwI' DIvI' ghaH, 'ej ngaQHa'moHwI' motlh chu'Ha'lu'chugh Dochvetlh Daghov."
   }
 }
