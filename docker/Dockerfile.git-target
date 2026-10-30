@@ -1,0 +1,94 @@
+# A throwaway git-over-SSH server for exercising a real role clone.
+#
+# This is a TEST FIXTURE, not a product image. It exists because
+# `ansible-galaxy role install` of a git-sourced role had never once been run
+# against a server that requires a credential (#2320): every exercise in the
+# tree used a public `git+https://` or asserted on an environment variable, so
+# the credential path -- the one an in-house role actually takes -- was
+# implemented and never executed.
+#
+# WHY IT IS A SEPARATE IMAGE FROM `Dockerfile.ssh-target`. That one is the
+# fixture a configure CONNECTS to, and the two answer different questions: this
+# server is the host a clone authenticates to, which is a different connection,
+# a different credential and a different `known_hosts` entry. Adding git to the
+# other image would couple two gates whose failures mean unrelated things.
+#
+# It runs sshd as ROOT for the same reason `Dockerfile.ssh-target` does and
+# documented there: OpenSSH's privilege separation requires it to accept a login
+# as a different user than itself. `StrictModes no` likewise, so a mounted
+# `authorized_keys` is readable without an init container to re-own it.
+#
+# NO KEY MATERIAL IS BAKED IN. The host key is generated at build time, so a
+# test can capture it the way `git_auth` captures a real host's;
+# `authorized_keys` is mounted, never committed, because a private key in a
+# public repository is a secret-scanner finding whatever its intended lifetime.
+FROM alpine:3.21
+
+RUN apk add --no-cache openssh-server git \
+ && ssh-keygen -A
+
+# The login user. `git` rather than a name of our own, because that is the user
+# every real git host expects in `git@host:org/repo.git` -- so the fixture
+# exercises the SCP-form `src:` the acceptance names, verbatim, rather than a
+# shape no operator would write.
+#
+# Deliberately NOT uid 1000: the EE runs as 1000, and a fixture that happens to
+# share the caller's uid can mask a permissions defect.
+RUN adduser -D -u 2001 -s /usr/bin/git-shell git \
+ && mkdir -p /home/git/.ssh \
+ && chown -R git:git /home/git \
+ && sed -i 's/^git:!/git:*/' /etc/shadow
+
+# A bare repository holding a minimal but REAL role, so `ansible-galaxy role
+# install` has something it will actually accept: `tasks/main.yml` is what makes
+# it a role rather than a directory, and `meta/main.yml` is what stops galaxy
+# warning about one. The task is `debug`, because this fixture proves the CLONE
+# happened -- whether the role then RUNS is the SSH gate's question.
+RUN mkdir -p /tmp/role/tasks /tmp/role/meta \
+ && printf '%s\n' \
+      '---' \
+      '- name: a task that only exists if the clone succeeded' \
+      '  ansible.builtin.debug:' \
+      '      msg: TERRAPOD_ROLE_CLONED' \
+      > /tmp/role/tasks/main.yml \
+ && printf '%s\n' \
+      '---' \
+      'galaxy_info:' \
+      '  author: terrapod-git-gate' \
+      '  description: a fixture role, cloned over SSH with a credential' \
+      '  license: MPL-2.0' \
+      '  min_ansible_version: "2.12"' \
+      'dependencies: []' \
+      > /tmp/role/meta/main.yml \
+ && git init -q --bare /srv/role.git \
+ && cd /tmp/role \
+ && git init -q -b main \
+ && git -c user.email=gate@invalid -c user.name=gate add -A \
+ && git -c user.email=gate@invalid -c user.name=gate commit -q -m "the fixture role" \
+ && git push -q /srv/role.git main \
+ # `git init --bare` points HEAD at the name git's own default says, which on
+ # this base is `master`. The push creates `refs/heads/main` and leaves HEAD
+ # dangling, so a clone SUCCEEDS -- authenticating correctly -- and then warns
+ # "remote HEAD refers to nonexistent ref, unable to checkout" and produces an
+ # empty worktree. That reads as the role being missing from the repository
+ # rather than as a fixture defect, which is the wrong direction for a gate
+ # whose whole subject is whether the clone worked.
+ && git -C /srv/role.git symbolic-ref HEAD refs/heads/main \
+ && rm -rf /tmp/role \
+ && chown -R git:git /srv/role.git
+
+# `git-shell` is the login shell above, which refuses everything except git's
+# own commands. That is the posture a real git host holds, and it is also what
+# makes a successful clone evidence about GIT rather than about ssh in general:
+# the credential cannot be proven by running `id`, only by fetching a ref.
+RUN printf '%s\n' \
+      'PermitRootLogin no' \
+      'PasswordAuthentication no' \
+      'PubkeyAuthentication yes' \
+      'StrictModes no' \
+      'AuthorizedKeysFile /etc/ssh/authorized_keys.d/%u' \
+      > /etc/ssh/sshd_config.d/10-terrapod-fixture.conf \
+ && mkdir -p /etc/ssh/authorized_keys.d
+
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

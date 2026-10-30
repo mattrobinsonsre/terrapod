@@ -103,6 +103,18 @@ _EE_ENDPOINT = f"http://{_EE_LISTEN}"
 #: providing any particular writable path of its own.
 _EE_TMPDIR = f"{_EE_SHARED_DIR}/tmp"
 _EE_COLLECTIONS_DIR = f"{_EE_SHARED_DIR}/collections"
+#: Where `git_auth` materialises its config, keys and known_hosts FOR THE EE
+#: (#2320). It is on the shared volume rather than under either container's HOME
+#: for the reason the whole directory exists: the two share a network namespace
+#: and not a filesystem, so the orchestrator's `$HOME/.config/terrapod-git` --
+#: where this material used to live alone -- is unreachable from the container
+#: that actually clones a git-sourced role.
+#:
+#: Absolute paths inside the generated gitconfig resolve in BOTH containers
+#: because the volume is mounted at the same path in each, which is what makes
+#: one copy serve both rather than needing a rewrite.
+_EE_GIT_DIR = f"{_EE_SHARED_DIR}/git"
+_EE_GITCONFIG = f"{_EE_GIT_DIR}/gitconfig"
 _EE_ROLES_DIR = f"{_EE_SHARED_DIR}/roles"
 _EE_HOME = f"{_EE_SHARED_DIR}/home"
 #: The EE's PASSWD home, which is a different thing from `$HOME` above and is why
@@ -406,6 +418,18 @@ def _ee_env(auth_secret_name: str) -> list[dict]:
         {"name": "ANSIBLE_REMOTE_TEMP", "value": "~/.ansible/tmp"},
         {"name": "ANSIBLE_COLLECTIONS_PATH", "value": _EE_COLLECTIONS_DIR},
         {"name": "ANSIBLE_ROLES_PATH", "value": _EE_ROLES_DIR},
+        # So a git-sourced role or collection clones with the workspace's own
+        # credential (#2320). The orchestrator writes this file; the EE reads
+        # it. Set unconditionally and pointed at a file the init container
+        # touches, because the alternative -- setting it only when a credential
+        # exists -- would mean the listener deciding something only the
+        # orchestrator knows.
+        #
+        # GIT_CONFIG_GLOBAL *replaces* the user's global config rather than
+        # layering over it, which is what keeps a custom EE's own git settings
+        # from being clobbered by ours: there are none to clobber, because the
+        # file is ours alone.
+        {"name": "GIT_CONFIG_GLOBAL", "value": _EE_GITCONFIG},
         {
             "name": _EE_TOKEN_ENV,
             "valueFrom": {"secretKeyRef": {"name": auth_secret_name, "key": _EE_TOKEN_SECRET_KEY}},
@@ -501,6 +525,11 @@ def _add_execution_environment(
             {"name": "TP_EE_CREDENTIALS_DIR", "value": _EE_CREDENTIALS_DIR},
             {"name": "TP_EE_CALLBACK_DIR", "value": _EE_CALLBACK_DIR},
             {"name": "TP_EE_OIDC_DIR", "value": _EE_OIDC_DIR},
+            # Where `git_auth` writes for a configure (#2320). Set on the
+            # ORCHESTRATOR, which does the writing; the EE reads the result
+            # through `GIT_CONFIG_GLOBAL` above. Its presence is also how the
+            # orchestrator knows a second container needs to see the material.
+            {"name": "TP_EE_GIT_DIR", "value": _EE_GIT_DIR},
             {
                 "name": _EE_TOKEN_ENV,
                 "valueFrom": {
@@ -525,7 +554,15 @@ def _add_execution_environment(
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
                 f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} {_EE_CALLBACK_DIR} "
-                f"{_EE_OIDC_DIR} "
+                f"{_EE_OIDC_DIR} {_EE_GIT_DIR} "
+                # Touched so it always EXISTS. `GIT_CONFIG_GLOBAL` is set
+                # unconditionally below, and a run that declares no git
+                # credential writes nothing here -- git tolerates a missing
+                # config for a clone, but `git config --list` answers
+                # "fatal: unable to read config file", which turns a diagnostic
+                # into a false alarm. An empty file costs nothing and removes
+                # the whole wrinkle.
+                f"&& touch {_EE_GITCONFIG} "
                 f"&& cp {_EE_AGENT_SRC} {_EE_AGENT_PATH}",
             ],
             "securityContext": {

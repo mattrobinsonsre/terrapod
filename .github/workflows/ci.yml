@@ -3965,6 +3965,44 @@ jobs:
       - name: A configure connects over SSH, and refuses an unknown host key
         run: scripts/ssh-target-gate.sh
 
+  # ── Git Source Gate ────────────────────────────────────
+  # Can the execution environment clone a git-sourced Ansible role with the
+  # workspace's own credential, and does host-key verification survive it?
+  #
+  # Separate from `ssh-target-gate` because the two answer different questions:
+  # that one is the host a configure CONNECTS to, this one is the host a role
+  # clone AUTHENTICATES to -- a different connection, a different credential and
+  # a different `known_hosts` entry. Coupling them would make either failure
+  # ambiguous.
+  #
+  # It drives the real `git_auth` phase rather than a fixture gitconfig, so
+  # `structlog` is installed: that one import is the whole of the phase's
+  # closure, and asserting on a transcription of its output would test the
+  # transcription (#2320).
+  git-source-gate:
+    name: Git Source Gate
+    needs: [prepare]
+    if: |
+      always()
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+
+      - name: Install the git_auth phase's only dependency
+        run: pip install structlog
+
+      - name: An in-house role clones with the workspace credential, verification on
+        run: scripts/git-source-gate.sh
+
   # ── E2E Report (merge shard blob reports) ──────────────
   # Merges the per-shard Playwright blob reports into a single HTML report, so
   # a failure anywhere in the matrix is triaged from one artifact. Runs even
@@ -5516,6 +5554,7 @@ jobs:
       - oci-conformance
       - airgap-gate
       - ssh-target-gate
+      - git-source-gate
       - create-manifests
       - release-create
       - release-images
@@ -5553,6 +5592,7 @@ jobs:
             "${{ needs.oci-conformance.result }}"
             "${{ needs.airgap-gate.result }}"
             "${{ needs.ssh-target-gate.result }}"
+            "${{ needs.git-source-gate.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"
