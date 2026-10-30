@@ -2887,6 +2887,10 @@
               "type": "integer",
               "minimum": 0
             },
+            "config_versions_keep": {
+              "type": "integer",
+              "minimum": 0
+            },
             "provider_cache_retention_days": {
               "type": "integer",
               "minimum": 0

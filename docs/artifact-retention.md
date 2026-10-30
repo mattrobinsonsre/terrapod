@@ -41,6 +41,7 @@ api:
       state_versions_keep: 20              # state versions to keep per workspace
       run_artifacts_retention_days: 90     # days before run logs/plans are deleted
       config_versions_retention_days: 90   # days before config tarballs are deleted (age-based)
+      config_versions_keep: 50             # CVs to keep per workspace (count-based; 0 disables)
       provider_cache_retention_days: 30    # days since last access before provider cache entry is deleted
       binary_cache_retention_days: 30      # days since last access before binary cache entry is deleted
       package_cache_retention_days: 30     # days since last access before a cached package artifact is deleted
@@ -50,12 +51,19 @@ api:
       archive_cache_retention_days: 7      # days before a cached VCS archive tarball is deleted (age-based)
 ```
 
-> **`config_versions_keep` is not a chart value.** The count-based config-version
-> sweep in the table above is a server setting with a default of 50, and the chart
-> neither declares nor renders it. `values.schema.json` sets
-> `additionalProperties: false`, so putting it under `api.config.artifact_retention`
-> fails `helm lint` and `helm upgrade` outright rather than being quietly ignored.
-> The default applies, and there is currently no supported way to change it.
+> **`config_versions_keep` became a chart value in 2.0 (#2316).** It was a server
+> setting the chart neither declared nor rendered, so — because
+> `values.schema.json` sets `additionalProperties: false` — setting it under
+> `api.config.artifact_retention` failed `helm lint` and `helm upgrade` outright
+> rather than being quietly ignored, and the default was the only reachable value.
+> All three legs are now wired, so the key above works like any other. On a 1.x
+> release line it is still unreachable and the 50 default applies.
+>
+> `services/tests/helm/test_retention_settings_are_chart_reachable.py` now derives
+> this block's keys from `ArtifactRetentionConfig` itself, so the next setting
+> added to the model cannot reach a release without its chart legs — the three
+> gates that already watched this block all derived from a place that presupposed
+> the key was reachable, which is why none of them saw this one.
 
 ### Enabled by Default
 
