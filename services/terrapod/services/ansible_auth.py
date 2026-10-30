@@ -125,7 +125,15 @@ CREDENTIAL_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 #: Envelope field -> nothing; the field names are the placeholder's second half.
 #: `MACHINE_FILE_FIELDS` is the one place that says a field's value is delivered
 #: as a FILE, so a placeholder naming it substitutes that file's path.
-MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key"})
+#: `known_hosts` is here and deliberately NOT in `MACHINE_SECRET_FIELDS`: a
+#: host's PUBLIC key is public, so registering it with the log redactor would
+#: corrupt the run's log -- replacing a value an operator needs to read when a
+#: host key does not match -- in exchange for hiding nothing. It is a file
+#: because that is what `-o UserKnownHostsFile=` takes, which is the whole
+#: reason the field exists: without it, the only route past an unknown host is
+#: to disable verification, and a correct default nobody can satisfy becomes a
+#: default everybody turns off (#2318).
+MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key", "known_hosts"})
 
 #: The fields whose value a placeholder substitutes verbatim.
 MACHINE_VALUE_FIELDS: frozenset[str] = frozenset(

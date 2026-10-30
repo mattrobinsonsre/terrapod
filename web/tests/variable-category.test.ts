@@ -174,12 +174,35 @@ function pythonSetMembers(source: string, name: string): string[] {
 /**
  * The envelope fields a slice of the panel writes.
  *
- * `secret(...)` and `text(...)` are the two field renderers, and `set(...)` is
- * the writer the `become` select calls directly — between them they are every
- * field the form can put in the envelope.
+ * The field renderers are DERIVED from the component rather than listed here,
+ * because listing them is how this went wrong: the docstring said "`secret(...)`
+ * and `text(...)` are the two field renderers" and a third, `multiline(...)`,
+ * was added for `known_hosts` — a public host key, which must not be masked.
+ * The regex matched neither it nor the new field, so the gate reported the form
+ * as missing a field the form had (#2318).
+ *
+ * `set(...)` is included explicitly: it is the writer the `become` select calls
+ * directly rather than a `(field: string, …)` helper, so no derivation finds it.
  */
+function fieldRenderers(): string[] {
+  // Every `const name = (field: string, …) =>` in the component. A renderer
+  // takes the envelope field as its first argument, which is what makes it one.
+  const found = [...PANEL.matchAll(/const\s+([a-zA-Z_$][\w$]*)\s*=\s*\(field: string/g)].map(
+    (m) => m[1],
+  )
+  assert.ok(
+    found.length >= 2,
+    `found only ${found.length} field renderer(s) in the panel; this matcher has stopped matching`,
+  )
+  return [...new Set([...found, 'set'])]
+}
+
 function formFields(slice: string): string[] {
-  const names = [...slice.matchAll(/\b(?:secret|text|set)\('([a-z_]+)'/g)].map((m) => m[1])
+  const alternation = fieldRenderers()
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')
+  const re = new RegExp(`\\b(?:${alternation})\\('([a-z_]+)'`, 'g')
+  const names = [...slice.matchAll(re)].map((m) => m[1])
   return [...new Set(names)].sort()
 }
 

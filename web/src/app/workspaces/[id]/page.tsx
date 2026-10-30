@@ -124,6 +124,11 @@ interface WorkspaceAttrs {
   // where the answer is the column default -- false.
   'dynamic-inventory-enabled'?: boolean
   'inventory-scripts-enabled'?: boolean
+  // Whether a configure verifies the SSH host key of the hosts it targets
+  // (#2318). Absent from an older API, where the answer is the column default
+  // -- TRUE, unlike the two above, because verification on is ansible's own
+  // behaviour rather than something Terrapod added.
+  'ansible-host-key-checking'?: boolean
   'default-playbook'?: string
   'default-limit'?: string
   locked: boolean
@@ -520,6 +525,7 @@ function WorkspaceDetailContent() {
   const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
   const [editDynamicInventoryEnabled, setEditDynamicInventoryEnabled] = useState(false)
   const [editInventoryScriptsEnabled, setEditInventoryScriptsEnabled] = useState(false)
+  const [editAnsibleHostKeyChecking, setEditAnsibleHostKeyChecking] = useState(true)
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
   const [editBindPlan, setEditBindPlan] = useState(false)
@@ -1388,6 +1394,7 @@ function WorkspaceDetailContent() {
     setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
     setEditDynamicInventoryEnabled(workspace.attributes['dynamic-inventory-enabled'] ?? false)
     setEditInventoryScriptsEnabled(workspace.attributes['inventory-scripts-enabled'] ?? false)
+    setEditAnsibleHostKeyChecking(workspace.attributes['ansible-host-key-checking'] ?? true)
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
     setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
@@ -1479,6 +1486,7 @@ function WorkspaceDetailContent() {
               'inventory-paths': editInventoryPaths.filter((entry) => entry !== ''),
               'dynamic-inventory-enabled': editDynamicInventoryEnabled,
               'inventory-scripts-enabled': editInventoryScriptsEnabled,
+              'ansible-host-key-checking': editAnsibleHostKeyChecking,
               'default-playbook': editDefaultPlaybook,
               'default-limit': editDefaultLimit,
               'var-files': editVarFiles,
@@ -2602,6 +2610,7 @@ function WorkspaceDetailContent() {
         'inventory-paths': editInventoryPaths,
         'dynamic-inventory-enabled': editDynamicInventoryEnabled,
         'inventory-scripts-enabled': editInventoryScriptsEnabled,
+        'ansible-host-key-checking': editAnsibleHostKeyChecking,
         'agent-pool-ids': editPoolIds,
         'owner-email': editOwner,
         labels: editLabels,
@@ -2628,6 +2637,7 @@ function WorkspaceDetailContent() {
     'inventory-paths': 'fields.inventoryPathsHint',
     'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabledHint',
     'inventory-scripts-enabled': 'fields.inventoryScriptsEnabledHint',
+    'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
     'oidc-audiences': 'fields.oidcAudiencesHint',
@@ -2688,6 +2698,7 @@ function WorkspaceDetailContent() {
     'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
     'dynamic-inventory-enabled': (v) => setEditDynamicInventoryEnabled(Boolean(v)),
     'inventory-scripts-enabled': (v) => setEditInventoryScriptsEnabled(Boolean(v)),
+    'ansible-host-key-checking': (v) => setEditAnsibleHostKeyChecking(Boolean(v)),
     'agent-pool-ids': (v) => setEditPoolIds(v as string[]),
     'owner-email': (v) => setEditOwner(String(v)),
     labels: (v) => setEditLabels(v as Record<string, string>),
@@ -3581,6 +3592,19 @@ function WorkspaceDetailContent() {
                     kind="checkbox"
                     display={toggleDisplay('inventory-scripts-enabled', false)}
                     control={settingsToggle('inventory-scripts-enabled')}
+                  />
+                  {/* Whether a configure verifies the host key of the hosts
+                      it targets (#2318). The `toggleDisplay` fallback is TRUE,
+                      unlike every other boolean in this card: on is ansible's
+                      own behaviour, so a workspace from an API predating the
+                      attribute is verifying, and `false` here would read it as
+                      accepting any host key. */}
+                  <Field
+                    attr="ansible-host-key-checking"
+                    ctx={ansibleCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('ansible-host-key-checking', true)}
+                    control={settingsToggle('ansible-host-key-checking')}
                   />
                 </Group>
 

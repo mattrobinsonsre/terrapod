@@ -66,6 +66,7 @@ below.
 | Field | Typical target variable | Notes |
 |---|---|---|
 | `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
+| `known_hosts` | `ansible_ssh_common_args`, as `-o UserKnownHostsFile=…` | the **path** to a file holding the host keys this credential's hosts present. See [the `known_hosts` field](#the-known_hosts-field) |
 | `password` | `ansible_password` | |
 | `user` | `ansible_user` | |
 | `become` | `ansible_become` | a boolean. `true`/`yes`/`1`/`on` and `false`/`no`/`0`/`off` are accepted; anything else is refused, because a value ansible cannot read as true would read as false and silently drop privilege escalation |
@@ -75,7 +76,60 @@ below.
 
 **At least one of `private_key` or `password` is required.** With neither,
 ansible has no way to authenticate and the credential does nothing, so it is
-refused rather than stored.
+refused rather than stored. `known_hosts` is not an authentication field and does
+not count towards that pair.
+
+### The `known_hosts` field
+
+Host-key verification is **on** for a configure, and has always been — see
+[Host-key verification, and how to satisfy
+it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it). This field
+is how you satisfy it rather than withdraw it: put the host keys your fleet
+presents in it, point ssh at the file Terrapod writes, and the hosts connect with
+verification left in place.
+
+```yaml
+all:
+  vars:
+    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts}"
+```
+
+The value is whatever `ssh-keyscan` or your own records give you — one key per
+line, in `known_hosts` format:
+
+```hcl
+resource "terrapod_variable" "web_key" {
+  workspace_id = terrapod_workspace.fleet.id
+  key          = "web-key"
+  category     = "ansible_machine_auth"
+  sensitive    = true
+  value = jsonencode({
+    user        = "deploy"
+    private_key = file("~/.ssh/fleet")
+    known_hosts = <<-EOT
+      web1.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
+      web2.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
+    EOT
+  })
+}
+```
+
+Two things about it differ from every other field, and both are deliberate.
+
+**It is a file, like `private_key`** — a placeholder naming it substitutes the
+*path*, never the content. That is not a convenience: `-o UserKnownHostsFile=`
+takes a path, so a field delivered any other way could not be used for this at
+all. A trailing newline is added if you omit one, because an unterminated final
+entry is not read — which presents as the host key simply not being trusted,
+naming nothing.
+
+**It is NOT redacted in the run's log**, where every other credential field is. A
+host's **public** key is public; it is what the host hands to anyone who
+connects. Registering it with the log redactor would replace it in the log with a
+marker and hide nothing — while destroying the one value you need to read when a
+host key does not match, which is the moment you are most likely to be reading
+that log. The private key, the passwords and the vault passphrases are redacted
+exactly as before.
 
 ### `key` is the credential's name, and the inventory says where it is used
 
@@ -436,6 +490,10 @@ than the backstop:
   a vault password — is additionally **registered with the redactor before the
   file exists**, so there is no window in which ansible could print one
   unredacted.
+- **The secret fields, not every field.** `known_hosts` is a file like
+  `private_key` and is deliberately left unredacted, because a host's public key
+  is public and hiding it would cost you the one value worth reading when a key
+  does not match. See [the `known_hosts` field](#the-known_hosts-field).
 
 ### Both of a configure's streams are covered
 
@@ -530,6 +588,40 @@ host does not have, or escalation the playbook needs and the envelope omits.
 A reference naming a credential that was not delivered does **not** reach this
 point: the configure refuses before running, and that is
 [its own entry](#a-configure-refuses-with-an-unresolvable-credential-reference).
+
+A failure naming the **host key** rather than the credential is a different
+cause and has its own entry below.
+
+### Every host fails with `Host key verification failed`
+
+```
+fatal: [web1.example.com]: UNREACHABLE! => {"changed": false,
+  "msg": "Failed to connect to the host via ssh: Host key verification failed.",
+  "unreachable": true}
+```
+
+Nothing is wrong with the credential: ssh refused before authentication, because
+it has never seen these hosts' keys. Host-key verification is on by default and
+the execution environment ships no `known_hosts`, so this is what first contact
+looks like — and it is deliberate, because the alternatives are hanging on a
+prompt nobody can answer or trusting whatever key answered.
+
+The message is the real one, not a redaction artefact: a host's public key is
+left unredacted precisely so this is readable.
+
+Two fixes, in order of preference:
+
+* put the keys in the credential's
+  [`known_hosts` field](#the-known_hosts-field) and point
+  `ansible_ssh_common_args` at the file — verification stays on;
+* or set the workspace's `ansible-host-key-checking` to `false`, which relaxes it
+  for every host the workspace configures. See [Host-key verification, and how to
+  satisfy it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
+
+If you have done one of those and the message persists, check the
+**resolved inventory** for the host: an `ansible_ssh_common_args` set on that
+host *replaces* the one on `all` rather than merging with it, so a host-level
+value that omits the known-hosts option drops it.
 
 ### The credential is configured but ansible is not using it
 

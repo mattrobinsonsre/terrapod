@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Plugin di inventario dinamico",
       "dynamicInventoryEnabledHint": "Consente i plugin di inventario dichiarati — una sorgente YAML con una chiave plugin di primo livello — quando il runner risolve l''inventario. Terrapod non ne esegue mai uno direttamente, in nessuno dei due stati. Finché questa opzione è disattivata, una sorgente plugin viene rifiutata per nome anziché risolversi in un insieme di host parziale; finché è attiva, l''inventario mostrato qui è esplicitamente parziale per sorgente, e l''insieme risolto dal runner è quello che fa fede.",
       "inventoryScriptsEnabled": "Script di inventario",
-      "inventoryScriptsEnabledHint": "Consente gli script di inventario eseguibili quando il runner risolve l''inventario. Separato dai plugin di inventario dinamico, in modo che le configurazioni di plugin dichiarate, che nominano una collection e possono essere lette prima di essere eseguite, possano essere consentite senza consentire anche eseguibili arbitrari."
+      "inventoryScriptsEnabledHint": "Consente gli script di inventario eseguibili quando il runner risolve l''inventario. Separato dai plugin di inventario dinamico, in modo che le configurazioni di plugin dichiarate, che nominano una collection e possono essere lette prima di essere eseguite, possano essere consentite senza consentire anche eseguibili arbitrari.",
+      "ansibleHostKeyChecking": "Verifica della chiave host SSH",
+      "ansibleHostKeyCheckingHint": "Attiva per impostazione predefinita, che è il comportamento proprio di Ansible: una configurazione rifiuta un host di cui non conosce già la chiave. Disattivandola, viene accettata qualsiasi chiave presentata da un host, così la connessione può essere intercettata — meglio fornire la chiave pubblica dell''host con la credenziale macchina e lasciare attiva la verifica. Una variabile Ansible definita per host prevale comunque su questa impostazione."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Metodo di elevazione",
     "becomeUser": "Eleva all'utente",
     "becomePassword": "Password di elevazione",
-    "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata."
+    "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata.",
+    "knownHosts": "Host noti",
+    "knownHostsHint": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts. Punta una variabile di inventario al suo percorso per connetterti senza allentare la verifica della chiave host. Non nascosta: la chiave pubblica di un host è pubblica ed è proprio ciò che confronti quando una chiave non corrisponde."
   }
 }

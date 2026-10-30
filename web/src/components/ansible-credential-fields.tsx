@@ -142,6 +142,23 @@ export function AnsibleCredentialFields({
     />
   )
 
+  // Multi-line and NOT masked, which is the point rather than an oversight: a
+  // host's PUBLIC key is public, and hiding it behind a reveal would hide the
+  // one value an operator needs to read when a host key does not match. The
+  // server makes the same distinction -- `known_hosts` is a machine-credential
+  // FILE field but deliberately not a SECRET one, so the log redactor leaves it
+  // alone too (#2318).
+  const multiline = (field: string, rows: number, placeholder?: string) => (
+    <textarea
+      id={`${idPrefix}-ansible-${field}`}
+      value={fields[field] ?? ''}
+      onChange={(e) => set(field, e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className={`${INPUT} ${MONO} resize-y`}
+    />
+  )
+
   const text = (field: string, placeholder?: string) => (
     <input
       id={`${idPrefix}-ansible-${field}`}
@@ -171,15 +188,25 @@ export function AnsibleCredentialFields({
   return (
     <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
       <p className="text-xs text-slate-400">{t('machineHint')}</p>
-      {/* One column on a phone, two from `sm` up: seven fields stacked at
-          412px is a long form, but a two-column grid there puts an escalation
-          password beside a key and neither is wide enough to read. */}
+      {/* One column on a phone, two from `sm` up. Stacked at 412px this is a
+          long form, but a two-column grid there would put an escalation
+          password beside a key and neither is wide enough to read. The two
+          multi-line fields span both columns for the same reason. (This comment
+          used to count the fields; a count in a comment has nothing keeping it
+          true, and gaining `known_hosts` falsified it.) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="sm:col-span-2">
           <label htmlFor={`${idPrefix}-ansible-private_key`} className={LABEL}>
             {t('privateKey')}
           </label>
           {secret('private_key', 4, '-----BEGIN OPENSSH PRIVATE KEY-----')}
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor={`${idPrefix}-ansible-known_hosts`} className={LABEL}>
+            {t('knownHosts')}
+          </label>
+          {multiline('known_hosts', 3, 'host.example.com ssh-ed25519 AAAAC3Nza...')}
+          <p className="mt-1 text-xs text-slate-400">{t('knownHostsHint')}</p>
         </div>
         <div>
           <label htmlFor={`${idPrefix}-ansible-password`} className={LABEL}>

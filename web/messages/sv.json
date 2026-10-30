@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamiska inventarie-plugins",
       "dynamicInventoryEnabledHint": "Tillåter deklarerade inventarie-plugins — en YAML-källa med en plugin-nyckel på toppnivå — när runnern löser upp inventariet. Terrapod kör aldrig något själv, i inget av de två lägena. Så länge detta är av avvisas en pluginkälla med namn i stället för att lösas upp till en ofullständig värdlista; så länge det är på är inventariet som visas här uttryckligen ofullständigt per källa, och den uppsättning runnern löser upp är den som gäller.",
       "inventoryScriptsEnabled": "Inventarie-skript",
-      "inventoryScriptsEnabledHint": "Tillåter körbara inventarie-skript när runnern löser upp inventariet. Åtskilt från dynamiska inventarie-plugins så att deklarerade pluginkonfigurationer, som namnger en collection och kan läsas innan de körs, kan tillåtas utan att även godta godtyckliga körbara filer."
+      "inventoryScriptsEnabledHint": "Tillåter körbara inventarie-skript när runnern löser upp inventariet. Åtskilt från dynamiska inventarie-plugins så att deklarerade pluginkonfigurationer, som namnger en collection och kan läsas innan de körs, kan tillåtas utan att även godta godtyckliga körbara filer.",
+      "ansibleHostKeyChecking": "Kontroll av SSH-värdnyckel",
+      "ansibleHostKeyCheckingHint": "På som standard, vilket är Ansibles eget beteende: en konfigurationskörning avvisar en värd vars nyckel den inte redan litar på. Stänger du av den accepteras vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas — bättre är att ange värdens publika nyckel i maskinuppgifterna och låta kontrollen vara på. En Ansible-variabel per värd går ändå före den här inställningen."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Metod för behörighetshöjning",
     "becomeUser": "Höj till användare",
     "becomePassword": "Lösenord för behörighetshöjning",
-    "replaceHint": "Att spara ersätter hela uppgiften, så fyll i varje fält som behövs — inte bara det du ändrar. Lämnar du alla tomma behålls de lagrade uppgifterna som de är."
+    "replaceHint": "Att spara ersätter hela uppgiften, så fyll i varje fält som behövs — inte bara det du ändrar. Lämnar du alla tomma behålls de lagrade uppgifterna som de är.",
+    "knownHosts": "Kända värdar",
+    "knownHostsHint": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format. Låt en inventarievariabel peka på dess sökväg för att ansluta utan att mjuka upp verifieringen av värdnyckeln. Döljs inte: en värds publika nyckel är offentlig och är precis det du jämför när en nyckel inte stämmer."
   }
 }

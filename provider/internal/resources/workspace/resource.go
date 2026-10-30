@@ -743,6 +743,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"ansible_host_key_checking": schema.BoolAttribute{
+				MarkdownDescription: "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: `known_hosts` on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"dynamic_inventory_enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether ansible's `auto` inventory plugin — a **declared plugin config**, a YAML file with a top-level `plugin:` key — may run, and it runs **on the runner**. **Defaults to false.** The API never executes a plugin in either state; what this decides is what becomes of such a source when an inventory is resolved.\n\nOff, a plugin source is **refused by name** rather than resolving partially — a short host set read as the truth is the failure the inventory surface exists to prevent. On, the API **skips** it and says so per source, and the **runner re-resolves the inventory and is authoritative** for the hosts a configure reaches.\n\nSeparate from `inventory_scripts_enabled` so declared plugin configs can be permitted without also permitting arbitrary executables.",
 				Optional:            true,
@@ -1520,6 +1528,16 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
+	// Host-key verification (#2318). A pointer for the reason the booleans above
+	// give, and here that reason bites hardest, because the server default is
+	// TRUE: "I did not say" and "stop verifying" have to be different requests.
+	// A plain bool would send `false` for an attribute the configuration never
+	// mentions -- standing verification down on every workspace it creates, and
+	// silently relaxing an existing one on every apply.
+	if !m.AnsibleHostKeyChecking.IsNull() && !m.AnsibleHostKeyChecking.IsUnknown() {
+		v := m.AnsibleHostKeyChecking.ValueBool()
+		req.AnsibleHostKeyChecking = &v
+	}
 	// #2033's pair. Pointers for the same reason as the booleans above: a
 	// plain bool would make "I did not say" and "refuse these sources" the
 	// same request, so an omitted attribute would keep resetting a
@@ -1773,6 +1791,16 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
+	// Host-key verification (#2318). A pointer for the reason the booleans above
+	// give, and here that reason bites hardest, because the server default is
+	// TRUE: "I did not say" and "stop verifying" have to be different requests.
+	// A plain bool would send `false` for an attribute the configuration never
+	// mentions -- standing verification down on every workspace it creates, and
+	// silently relaxing an existing one on every apply.
+	if !m.AnsibleHostKeyChecking.IsNull() && !m.AnsibleHostKeyChecking.IsUnknown() {
+		v := m.AnsibleHostKeyChecking.ValueBool()
+		req.AnsibleHostKeyChecking = &v
+	}
 	// #2033's pair. Pointers for the same reason as the booleans above: a
 	// plain bool would make "I did not say" and "refuse these sources" the
 	// same request, so an omitted attribute would keep resetting a
@@ -2015,6 +2043,16 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.AutoConfigureEnabled = types.BoolValue(ws.AutoConfigureEnabled)
 	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
 	m.ConfigureAllHosts = types.BoolValue(ws.ConfigureAllHosts)
+	// Host-key verification (#2318), read side. Unconditional like the five
+	// above: Optional+Computed over a non-nullable column, so a null read-back is
+	// the inconsistent-result shape and `false` is a real value rather than an
+	// absence. The SDK holds it as a plain bool with no `omitempty`, which is
+	// what lets an explicit `false` survive the round trip -- and a
+	// default-TRUE attribute is where that visibly matters: if the write leg
+	// dropped the false the server would answer `true` and the apply would FAIL,
+	// where on a false-defaulting sibling the same bug agrees with itself and
+	// goes unnoticed.
+	m.AnsibleHostKeyChecking = types.BoolValue(ws.AnsibleHostKeyChecking)
 	// #2033's pair, same shape: Optional+Computed over a non-nullable
 	// column the SDK holds as a plain bool, so a false survives the round
 	// trip and a null read-back is never the right answer.

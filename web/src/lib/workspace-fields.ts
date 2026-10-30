@@ -268,6 +268,17 @@ export const FIELDS: readonly FieldSpec[] = [
     group: 'ansible',
     dependsOn: 'configure-enabled',
   },
+  // Whether a configure verifies the SSH host key of the hosts it targets
+  // (#2318). The only boolean in this group whose default is TRUE, which is
+  // why both forms seed it rather than letting an absent value read as off:
+  // on IS ansible's own behaviour, so an unchecked box would misreport a
+  // workspace nobody has touched as accepting any host key.
+  {
+    attr: 'ansible-host-key-checking',
+    id: 'ws-ansible-host-key-checking',
+    group: 'ansible',
+    dependsOn: 'configure-enabled',
+  },
   { attr: 'ansible-version', id: 'ws-ansible-version', group: 'ansible', dependsOn: 'configure-enabled' },
   {
     attr: 'ansible-execution-environment',
@@ -590,6 +601,7 @@ export const LABEL_KEY: Record<string, string> = {
   'inventory-paths': 'fields.inventoryPaths',
   'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabled',
   'inventory-scripts-enabled': 'fields.inventoryScriptsEnabled',
+  'ansible-host-key-checking': 'fields.ansibleHostKeyChecking',
   'ansible-version': 'fields.ansibleVersion',
   'ansible-execution-environment': 'fields.ansibleExecutionEnvironment',
   'ansible-collections': 'fields.ansibleCollections',

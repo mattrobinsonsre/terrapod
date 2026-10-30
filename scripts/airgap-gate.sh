@@ -363,6 +363,41 @@ surface "Ansible Galaxy" tp-airgap-ansible:local "
   test -d /tmp/w/collections/ansible_collections/ansible/posix
 "
 
+# A collection's own PYTHON requirements, which `ansible-galaxy` does NOT install
+# (#2318). This is the chain `install_python_requirements` performs in the
+# execution environment, and it crosses BOTH proxies in one row: Galaxy for the
+# collection, PyPI for what the collection declares. Until this existed, every
+# test of that path used a `mkdir` + `write_text` fake collection with the EE
+# client patched out -- so a real collection's requirements had never been
+# installed, and the two proxies had never been exercised in sequence.
+#
+# `kubernetes.core` rather than `amazon.aws`, which is the example the docs and
+# the accepted-risk register both name. Measured: `amazon.aws` 12.0.0 declares
+# `botocore`, `boto3` and `aiobotocore[botocore]`, around 40 MB of wheels, and
+# this row runs twice. `kubernetes.core` declares `kubernetes`,
+# `requests-oauthlib` and `jsonpatch` -- a real collection with a real
+# requirements.txt at a fraction of the transfer. The property under test is the
+# chain, not which collection exercises it.
+#
+# The `test -s` on the requirements file is a CONTROL, not decoration: if
+# upstream ever stops shipping one, `pip install -r` on an absent file would make
+# this row pass while proving nothing at all.
+surface "Ansible collection Python requirements" tp-airgap-ansible:local "
+  mkdir -p /tmp/r && cd /tmp/r
+  printf '%s\n' '[galaxy]' 'server_list = terrapod' '' \
+    '[galaxy_server.terrapod]' \
+    'url = http://web:3000$PREFIX/galaxy/' \
+    'token = $TOKEN' > ansible.cfg
+  ANSIBLE_CONFIG=/tmp/r/ansible.cfg ansible-galaxy collection install kubernetes.core \
+    -p /tmp/r/collections --force --no-cache
+  REQ=/tmp/r/collections/ansible_collections/kubernetes/core/requirements.txt
+  test -s \"\$REQ\"
+  pip install --no-cache-dir --quiet --disable-pip-version-check \
+    --index-url 'http://tp:$TOKEN@web:3000$PREFIX/pypi/simple/' \
+    --trusted-host web -r \"\$REQ\"
+  python -c 'import kubernetes, jsonpatch, requests_oauthlib; print(kubernetes.__version__)'
+"
+
 # The Pulumi row is the sharpest of these. An override pattern that matches
 # nothing makes the CLI fall back to get.pulumi.com SILENTLY — the install
 # succeeds and the failure only surfaces for someone with no route out, which is

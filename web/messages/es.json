@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Plugins de inventario dinámico",
       "dynamicInventoryEnabledHint": "Permite plugins de inventario declarados — una fuente YAML con una clave plugin de primer nivel — cuando el runner resuelve el inventario. Terrapod no ejecuta nunca ninguno por sí mismo, en ninguno de los dos estados. Mientras esto está desactivado, una fuente de plugin se rechaza por su nombre en lugar de resolverse en un conjunto de hosts parcial; mientras está activado, el inventario que se muestra aquí es explícitamente parcial por fuente, y el conjunto que resuelve el runner es el que manda.",
       "inventoryScriptsEnabled": "Scripts de inventario",
-      "inventoryScriptsEnabledHint": "Permite scripts de inventario ejecutables cuando el runner resuelve el inventario. Separado de los plugins de inventario dinámico para que las configuraciones de plugin declaradas, que nombran una colección y pueden leerse antes de ejecutarse, puedan permitirse sin permitir también ejecutables arbitrarios."
+      "inventoryScriptsEnabledHint": "Permite scripts de inventario ejecutables cuando el runner resuelve el inventario. Separado de los plugins de inventario dinámico para que las configuraciones de plugin declaradas, que nombran una colección y pueden leerse antes de ejecutarse, puedan permitirse sin permitir también ejecutables arbitrarios.",
+      "ansibleHostKeyChecking": "Comprobación de la clave de host SSH",
+      "ansibleHostKeyCheckingHint": "Activada de forma predeterminada, que es lo que hace Ansible por sí mismo: una configuración rechaza un host cuya clave aún no conoce. Si la desactivas, se acepta cualquier clave que presente un host, por lo que la conexión puede ser interceptada; es mejor aportar la clave pública del host con la credencial de máquina y dejar la comprobación activada. Una variable de Ansible definida por host prevalece de todos modos sobre este ajuste."
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Método de elevación",
     "becomeUser": "Elevar al usuario",
     "becomePassword": "Contraseña de elevación",
-    "replaceHint": "Al guardar se reemplaza la credencial completa, así que rellene todos los campos que necesite, no solo el que está cambiando. Si los deja todos vacíos, la credencial almacenada se mantiene tal cual."
+    "replaceHint": "Al guardar se reemplaza la credencial completa, así que rellene todos los campos que necesite, no solo el que está cambiando. Si los deja todos vacíos, la credencial almacenada se mantiene tal cual.",
+    "knownHosts": "Hosts conocidos",
+    "knownHostsHint": "Las claves públicas de host de las máquinas que alcanza esta credencial, una por línea en formato known_hosts. Apunta una variable de inventario a su ruta para conectar sin relajar la verificación de la clave de host. No se oculta: la clave pública de un host es pública y es justo lo que comparas cuando una clave no coincide."
   }
 }

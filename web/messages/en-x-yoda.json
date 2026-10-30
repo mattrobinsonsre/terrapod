@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "plugins, Dynamic inventory",
       "dynamicInventoryEnabledHint": "Declared inventory plugins — a YAML source carrying a top-level plugin key — permit, when the runner resolves the inventory. One, Terrapod itself never runs, in either state. While off this is, refused by name a plugin source is, rather than resolved to a partial host set; while on it is, explicitly partial per source the inventory shown here is, and the authoritative one is the set the runner resolves.",
       "inventoryScriptsEnabled": "scripts, Inventory",
-      "inventoryScriptsEnabledHint": "Executable inventory scripts, permit, when the runner resolves the inventory. From dynamic inventory plugins, separate it is, so that declared plugin configs — which name a collection and can be read before they run — allowed can be, without arbitrary executables also being allowed."
+      "inventoryScriptsEnabledHint": "Executable inventory scripts, permit, when the runner resolves the inventory. From dynamic inventory plugins, separate it is, so that declared plugin configs — which name a collection and can be read before they run — allowed can be, without arbitrary executables also being allowed.",
+      "ansibleHostKeyChecking": "Checking, SSH host key",
+      "ansibleHostKeyCheckingHint": "On by default, it is — Ansible's own way, this is. A host whose key it does not already trust, a configure refuses. Off turn it, and any key a host presents, accepted it is; intercepted, the connection can be. The host's public key with the machine credential, supply, and on the verification stays instead. Over this setting, a per-host Ansible variable still wins, either way, hmm."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Method, escalation",
     "becomeUser": "To user, escalate",
     "becomePassword": "Password, escalation",
-    "replaceHint": "The whole credential, saving replaces — so every field it needs, fill in; not only the one being changed. Empty, leaving all of them keeps the stored credential as it is."
+    "replaceHint": "The whole credential, saving replaces — so every field it needs, fill in; not only the one being changed. Empty, leaving all of them keeps the stored credential as it is.",
+    "knownHosts": "Hosts, known",
+    "knownHostsHint": "Of the machines this credential reaches, the public host keys, one per line in known_hosts format. At its path, an inventory variable point, to connect without relaxing host-key verification. Hidden, not: public, a host's public key is, and what you compare when a key does not match, it is."
   }
 }

@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamische Inventar-Plugins",
       "dynamicInventoryEnabledHint": "Erlaubt deklarierte Inventar-Plugins — eine YAML-Quelle mit einem plugin-Schlüssel auf oberster Ebene —, wenn der Runner das Inventar auflöst. Terrapod selbst führt in keinem der beiden Zustände eines aus. Solange dies aus ist, wird eine Plugin-Quelle namentlich abgelehnt, statt zu einer unvollständigen Hostliste aufzulösen; solange es an ist, ist das hier gezeigte Inventar je Quelle ausdrücklich unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
       "inventoryScriptsEnabled": "Inventar-Skripte",
-      "inventoryScriptsEnabledHint": "Erlaubt ausführbare Inventar-Skripte, wenn der Runner das Inventar auflöst. Getrennt von dynamischen Inventar-Plugins, damit deklarierte Plugin-Konfigurationen, die eine Collection benennen und vor der Ausführung gelesen werden können, erlaubt werden können, ohne auch beliebige ausführbare Dateien zu erlauben."
+      "inventoryScriptsEnabledHint": "Erlaubt ausführbare Inventar-Skripte, wenn der Runner das Inventar auflöst. Getrennt von dynamischen Inventar-Plugins, damit deklarierte Plugin-Konfigurationen, die eine Collection benennen und vor der Ausführung gelesen werden können, erlaubt werden können, ohne auch beliebige ausführbare Dateien zu erlauben.",
+      "ansibleHostKeyChecking": "SSH-Hostschlüsselprüfung",
+      "ansibleHostKeyCheckingHint": "Standardmäßig an, und das ist Ansibles eigenes Verhalten: Ein Konfigurationslauf weist einen Host ab, dessen Schlüssel er nicht schon kennt. Schaltet man sie aus, wird jeder Schlüssel akzeptiert, den ein Host vorzeigt, sodass die Verbindung abgehört werden kann — besser ist es, den öffentlichen Schlüssel des Hosts mit den Maschinen-Zugangsdaten mitzugeben und die Prüfung an zu lassen. Eine Ansible-Variable pro Host hat in beiden Fällen Vorrang vor dieser Einstellung."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Methode der Rechteerweiterung",
     "becomeUser": "Erweitern auf Benutzer",
     "becomePassword": "Passwort für Rechteerweiterung",
-    "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert."
+    "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert.",
+    "knownHosts": "Bekannte Hosts",
+    "knownHostsHint": "Die öffentlichen Hostschlüssel der Maschinen, die dieses Anmeldedatum erreicht, einer pro Zeile im known_hosts-Format. Richte eine Inventarvariable auf diesen Pfad, um ohne Abschwächung der Hostschlüsselprüfung zu verbinden. Nicht verborgen: Der öffentliche Schlüssel eines Hosts ist öffentlich und genau das, was du vergleichst, wenn ein Schlüssel nicht übereinstimmt."
   }
 }

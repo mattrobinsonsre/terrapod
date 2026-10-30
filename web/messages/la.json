@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Interpolamenta inventarii dynamici",
       "dynamicInventoryEnabledHint": "Interpolamenta inventarii declarata permittit — fontem YAML clavem plugin in summo gradu ferentem — cum cursor inventarium resolvit. Terrapod ipse nullum umquam exsequitur, in neutro statu. Dum hoc exstinctum est, fons interpolamenti nominatim recusatur potius quam in partem hospitum resolvitur; dum accensum est, inventarium hic ostensum per singulos fontes aperte partiale est, et copia quam cursor resolvit auctoritatem habet.",
       "inventoryScriptsEnabled": "Scripta inventarii",
-      "inventoryScriptsEnabledHint": "Scripta inventarii exsecutabilia permittit cum cursor inventarium resolvit. Ab interpolamentis inventarii dynamici separatum est, ut configurationes interpolamenti declaratae, quae collectionem nominant et ante exsecutionem legi possunt, permitti queant sine licentia quorumlibet exsecutabilium."
+      "inventoryScriptsEnabledHint": "Scripta inventarii exsecutabilia permittit cum cursor inventarium resolvit. Ab interpolamentis inventarii dynamici separatum est, ut configurationes interpolamenti declaratae, quae collectionem nominant et ante exsecutionem legi possunt, permitti queant sine licentia quorumlibet exsecutabilium.",
+      "ansibleHostKeyChecking": "Inspectio clavis hospitis SSH",
+      "ansibleHostKeyCheckingHint": "Praedefinite accensa, quod est mos ipsius Ansible: configuratio hospitem respuit cuius clavi nondum confidit. Si eam exstinxeris, quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest — melius est clavem publicam hospitis cum credentiali machinae praebere et inspectionem accensam relinquere. Variabilis Ansible pro singulis hospitibus huic optioni utroque modo praevalet."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Modus auctionis",
     "becomeUser": "Auge ad usorem",
     "becomePassword": "Tessera auctionis",
-    "replaceHint": "Conservatio totum testimonium substituit; itaque omnem campum necessarium comple, non solum eum quem mutas. Si omnes vacuos relinquis, testimonium conditum manet ut est."
+    "replaceHint": "Conservatio totum testimonium substituit; itaque omnem campum necessarium comple, non solum eum quem mutas. Si omnes vacuos relinquis, testimonium conditum manet ut est.",
+    "knownHosts": "Hospites noti",
+    "knownHostsHint": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts. Variabilem inventarii ad eius semitam dirige ut sine relaxatione probationis clavis hospitis coniungas. Non occultatur: clavis publica hospitis publica est, atque id ipsum est quod comparas cum clavis non congruit."
   }
 }

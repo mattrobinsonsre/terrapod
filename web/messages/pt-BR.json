@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Plugins de inventário dinâmico",
       "dynamicInventoryEnabledHint": "Permite plugins de inventário declarados — uma fonte YAML com uma chave plugin de primeiro nível — quando o runner resolve o inventário. O próprio Terrapod nunca executa nenhum, em nenhum dos dois estados. Enquanto isto estiver desligado, uma fonte de plugin é recusada pelo nome em vez de resolver para um conjunto de hosts parcial; enquanto estiver ligado, o inventário mostrado aqui é explicitamente parcial por fonte, e o conjunto que o runner resolve é o que vale.",
       "inventoryScriptsEnabled": "Scripts de inventário",
-      "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plugins de inventário dinâmico para que configurações de plugin declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários."
+      "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plugins de inventário dinâmico para que configurações de plugin declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários.",
+      "ansibleHostKeyChecking": "Verificação da chave de host SSH",
+      "ansibleHostKeyCheckingHint": "Ativada por padrão, que é o que o Ansible faz por conta própria: uma configuração recusa um host cuja chave ela ainda não conhece. Se você desativar, qualquer chave que um host apresente é aceita, de modo que a conexão pode ser interceptada — é melhor fornecer a chave pública do host com a credencial de máquina e deixar a verificação ativada. Uma variável do Ansible definida por host prevalece de qualquer forma sobre esta opção."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Método de elevação",
     "becomeUser": "Elevar para o usuário",
     "becomePassword": "Senha de elevação",
-    "replaceHint": "Salvar substitui a credencial inteira, então preencha todos os campos necessários — não apenas o que está sendo alterado. Deixar todos em branco mantém a credencial armazenada como está."
+    "replaceHint": "Salvar substitui a credencial inteira, então preencha todos os campos necessários — não apenas o que está sendo alterado. Deixar todos em branco mantém a credencial armazenada como está.",
+    "knownHosts": "Hosts conhecidos",
+    "knownHostsHint": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para conectar sem afrouxar a verificação da chave de host. Não é oculta: a chave pública de um host é pública e é exatamente o que você compara quando uma chave não corresponde."
   }
 }

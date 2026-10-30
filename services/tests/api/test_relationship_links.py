@@ -90,6 +90,10 @@ class TestAutodiscoveryRule:
             # and on a SimpleNamespace it raises -- which is how this failed.
             dynamic_inventory_enabled=False,
             inventory_scripts_enabled=False,
+            # #2318's, set for the same reason as the pair above and to its real
+            # default. On a SimpleNamespace an unset attribute RAISES rather than
+            # reading as truthy, which is how this one announced itself.
+            ansible_host_key_checking=True,
             resource_cpu="1",
             parallelism=10,
             resource_memory="2Gi",

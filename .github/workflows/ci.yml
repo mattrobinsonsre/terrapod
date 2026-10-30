@@ -264,7 +264,7 @@ jobs:
       # Checks itself along with the rest, which is what makes the set closed
       # rather than merely one longer.
 
-      - name: (docs-audit) Every docs-audit gate is run by this job
+      - name: (docs-audit) Every gate in the repository is run by some job
         run: python3 scripts/docs-audit/check_docs_audit_wiring.py
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
@@ -328,6 +328,16 @@ jobs:
       # version of this step failed in CI while passing locally.
       - name: (docs-audit) The Pulumi plugin name the cache parses is the one published
         run: python3 scripts/docs-audit/check_pulumi_plugin_naming.py
+
+      # Stdlib only. `docs/runners.md` listed `ANSIBLE_HOST_KEY_CHECKING` among
+      # the variables a configure forces, with a connection-time reason, and the
+      # configure phase has never set it -- so the page implied a control that
+      # does not exist and omitted `ANSIBLE_FORCE_COLOR`, which is forced.
+      # `llms.txt` repeated both halves. The forced set is read out of
+      # `configure.py` by `ast` rather than imported, for the same reason as the
+      # step above.
+      - name: (docs-audit) The forced-environment prose names the real set
+        run: python3 scripts/docs-audit/check_forced_env.py
 
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher

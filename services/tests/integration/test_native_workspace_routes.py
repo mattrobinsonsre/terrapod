@@ -139,6 +139,13 @@ class TestTheNativeSurfaceServesEveryEngine:
         "inventory-scripts-enabled": (
             "an Ansible concept; the TFE surface serves Terraform alone (#2033)"
         ),
+        # Whether a configure verifies the SSH host key of each host it targets
+        # (#2318). Native-only for the same two reasons as its neighbours: it
+        # governs an Ansible connection, and no `terraform`/`tofu`/`tfci`
+        # invocation makes one.
+        "ansible-host-key-checking": (
+            "an Ansible connection setting; the TFE surface serves Terraform alone (#2318)"
+        ),
     }
 
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):

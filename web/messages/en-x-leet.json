@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dyn4m1c 1nv3n70ry plug1n5",
       "dynamicInventoryEnabledHint": "P3rm17 d3cl4r3d 1nv3n70ry plug1n5 — 4 Y4ML 50urc3 c4rry1ng 4 70p-l3v3l plug1n k3y — wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 73rr4p0d 1753lf n3v3r run5 0n3, 1n 317h3r 57473. Wh1l3 7h15 15 0ff, 4 plug1n 50urc3 15 r3fu53d by n4m3 r47h3r 7h4n r350lv1ng 70 4 p4r714l h057 537; wh1l3 17 15 0n, 7h3 1nv3n70ry 5h0wn h3r3 15 3xpl1c17ly p4r714l p3r 50urc3 4nd 7h3 537 7h3 runn3r r350lv35 15 7h3 4u7h0r17471v3 0n3.",
       "inventoryScriptsEnabled": "1nv3n70ry 5cr1p75",
-      "inventoryScriptsEnabledHint": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 53p4r473 fr0m dyn4m1c 1nv3n70ry plug1n5 50 7h47 d3cl4r3d plug1n c0nf1g5, wh1ch n4m3 4 c0ll3c710n 4nd c4n b3 r34d b3f0r3 7h3y run, c4n b3 4ll0w3d w17h0u7 4l50 4ll0w1ng 4rb17r4ry 3x3cu74bl35."
+      "inventoryScriptsEnabledHint": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 53p4r473 fr0m dyn4m1c 1nv3n70ry plug1n5 50 7h47 d3cl4r3d plug1n c0nf1g5, wh1ch n4m3 4 c0ll3c710n 4nd c4n b3 r34d b3f0r3 7h3y run, c4n b3 4ll0w3d w17h0u7 4l50 4ll0w1ng 4rb17r4ry 3x3cu74bl35.",
+      "ansibleHostKeyChecking": "55H h057 k3y ch3ck1ng",
+      "ansibleHostKeyCheckingHint": "0n by d3f4ul7, wh1ch 15 wh47 4n51bl3 d035 0n 175 0wn: 4 c0nf1gur3 r3fu535 4 h057 wh053 k3y 17 d035 n07 4lr34dy 7ru57. 7urn 17 0ff 4nd 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d — 5upply1ng 7h3 h057'5 publ1c k3y w17h 7h3 m4ch1n3 cr3d3n714l k33p5 v3r1f1c4710n 0n 1n5734d. 4 p3r-h057 4n51bl3 v4r14bl3 571ll 0v3rr1d35 7h15 53771ng 317h3r w4y."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "35c4l4710n m37h0d",
     "becomeUser": "35c4l473 70 u53r",
     "becomePassword": "35c4l4710n p455w0rd",
-    "replaceHint": "54v1ng r3pl4c35 7h3 wh0l3 cr3d3n714l, 50 f1ll 1n 3v3ry f13ld 17 n33d5 — n07 0nly 7h3 0n3 b31ng ch4ng3d. L34v1ng 4ll 0f 7h3m 3mp7y k33p5 7h3 570r3d cr3d3n714l 45 17 15."
+    "replaceHint": "54v1ng r3pl4c35 7h3 wh0l3 cr3d3n714l, 50 f1ll 1n 3v3ry f13ld 17 n33d5 — n07 0nly 7h3 0n3 b31ng ch4ng3d. L34v1ng 4ll 0f 7h3m 3mp7y k33p5 7h3 570r3d cr3d3n714l 45 17 15.",
+    "knownHosts": "Kn0wn h0575",
+    "knownHostsHint": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47. P01n7 4n 1nv3n70ry v4r14bl3 47 175 p47h 70 c0nn3c7 w17h0u7 r3l4x1ng h057-k3y v3r1f1c4710n. N07 h1dd3n: 4 h057'5 publ1c k3y 15 publ1c, 4nd 17 15 wh47 y0u c0mp4r3 wh3n 4 k3y d035 n07 m47ch."
   }
 }

@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamic marklar marklars",
       "dynamicInventoryEnabledHint": "Permit declared marklar marklars — a YAML marklar carrying a top-level plugin marklar — when the marklar resolves the marklar. Terrapod itself never runs one, in either marklar. While this is off, a marklar marklar is refused by marklar rather than resolving to a partial marklar marklar; while it is on, the marklar shown here is explicitly partial per marklar and the marklar the marklar resolves is the authoritative one.",
       "inventoryScriptsEnabled": "Marklar marklars",
-      "inventoryScriptsEnabledHint": "Permit executable marklar marklars when the marklar resolves the marklar. Separate from dynamic marklar marklars so that declared plugin marklars, which name a marklar and can be read before they run, can be allowed without also allowing arbitrary marklars."
+      "inventoryScriptsEnabledHint": "Permit executable marklar marklars when the marklar resolves the marklar. Separate from dynamic marklar marklars so that declared plugin marklars, which name a marklar and can be read before they run, can be allowed without also allowing arbitrary marklars.",
+      "ansibleHostKeyChecking": "SSH marklar marklar marklar",
+      "ansibleHostKeyCheckingHint": "On by marklar, which is what Ansible does on its own: a marklar refuses a marklar whose marklar it does not already trust. Turn it off and any marklar a marklar presents is accepted, so the marklar can be intercepted — supplying the marklar's public marklar with the marklar marklar keeps marklar on instead. A per-marklar Ansible marklar still overrides this marklar either marklar."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Marklar marklar",
     "becomeUser": "Escalate to marklar",
     "becomePassword": "Marklar marklar",
-    "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is."
+    "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is.",
+    "knownHosts": "Marklar marklar",
+    "knownHostsHint": "The marklar marklar marklar of the marklar this marklar marklar, one per marklar in known_hosts marklar. Point an marklar marklar at its marklar to connect without relaxing marklar-marklar marklar. Not hidden: a marklar marklar marklar is public, and it is what you compare when a marklar does not match."
   }
 }

@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "動態清單外掛",
       "dynamicInventoryEnabledHint": "允許 runner 解析清單時使用已宣告的清單外掛，也就是帶有頂層 plugin 鍵的 YAML 來源。Terrapod 本身在兩種狀態下都不會執行外掛。關閉時，外掛來源會被指名拒絕，而不是解析成不完整的主機集合；開啟時，此處顯示的清單會按來源明確標示為不完整，由 runner 解析出的集合才是權威結果。",
       "inventoryScriptsEnabled": "清單指令碼",
-      "inventoryScriptsEnabledHint": "允許 runner 解析清單時使用可執行的清單指令碼。與動態清單外掛分開設定，這樣便可只允許已宣告的外掛設定——它們指明了一個集合，且在執行前可以讀取——而不必同時允許任意可執行檔。"
+      "inventoryScriptsEnabledHint": "允許 runner 解析清單時使用可執行的清單指令碼。與動態清單外掛分開設定，這樣便可只允許已宣告的外掛設定——它們指明了一個集合，且在執行前可以讀取——而不必同時允許任意可執行檔。",
+      "ansibleHostKeyChecking": "SSH 主機金鑰檢查",
+      "ansibleHostKeyCheckingHint": "預設開啟，這也是 Ansible 自身的行為：設定會拒絕其金鑰尚未受信任的主機。關閉後，主機出示的任何金鑰都會被接受，連線因而可能被攔截——較好的做法是隨機器憑證一併提供主機的公開金鑰，並維持檢查開啟。無論哪種情況，針對單一主機的 Ansible 變數都優先於此設定。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "提升方式",
     "becomeUser": "提升至的使用者",
     "becomePassword": "提升密碼",
-    "replaceHint": "儲存會取代整份憑證，因此請填寫它需要的每個欄位，而不只是正在變更的那一個。全部留空則會保留已儲存的憑證不變。"
+    "replaceHint": "儲存會取代整份憑證，因此請填寫它需要的每個欄位，而不只是正在變更的那一個。全部留空則會保留已儲存的憑證不變。",
+    "knownHosts": "已知主機",
+    "knownHostsHint": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。將清查變數指向其路徑，即可在不放寬主機金鑰驗證的情況下建立連線。不會隱藏：主機的公開金鑰本就是公開的，金鑰不相符時比對的正是它。"
   }
 }

@@ -293,8 +293,11 @@ function createDefaults(engine: string): Record<string, unknown> {
     parallelism: 10,
     'resource-cpu': '1',
     'resource-memory': '2Gi',
-    // operations — the one boolean pair whose defaults differ
+    // operations
     'plan-apply-enabled': true,
+    // ansible — verification on is ansible's own behaviour, so the column
+    // defaults TRUE and the box has to show that (#2318).
+    'ansible-host-key-checking': true,
     // pools
     'agent-pool-ids': [],
     // vcs
@@ -1075,6 +1078,8 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.dynamicInventoryEnabledHint'))
       case 'inventory-scripts-enabled':
         return hintText(tDetail('fields.inventoryScriptsEnabledHint'))
+      case 'ansible-host-key-checking':
+        return hintText(tDetail('fields.ansibleHostKeyCheckingHint'))
       case 'ansible-collections':
         return hintText(tDetail('fields.ansibleCollectionsHint'))
       case 'agent-pool-ids':
@@ -1395,6 +1400,10 @@ function WorkspacesPageInner() {
             (#2033). Terrapod itself never runs either kind, in either state. */}
         <Field attr="dynamic-inventory-enabled" ctx={createCtx} kind="checkbox" />
         <Field attr="inventory-scripts-enabled" ctx={createCtx} kind="checkbox" />
+        {/* Whether a configure verifies the host key of the hosts it targets
+            (#2318). On is ansible's own behaviour; `createDefaults` seeds it
+            so the box shows that rather than reading as off. */}
+        <Field attr="ansible-host-key-checking" ctx={createCtx} kind="checkbox" />
         <Field
           attr="ansible-version"
           ctx={createCtx}

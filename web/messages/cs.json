@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamické pluginy inventáře",
       "dynamicInventoryEnabledHint": "Povolí deklarované pluginy inventáře — zdroj YAML s klíčem plugin na nejvyšší úrovni — když runner vyhodnocuje inventář. Terrapod sám nikdy žádný nespouští, ani v jednom z obou stavů. Dokud je toto vypnuté, je zdroj pluginu odmítnut jmenovitě, místo aby se vyhodnotil na neúplnou množinu hostů; když je zapnuté, je zde zobrazený inventář výslovně částečný pro každý zdroj a množina, kterou vyhodnotí runner, je rozhodující.",
       "inventoryScriptsEnabled": "Skripty inventáře",
-      "inventoryScriptsEnabledHint": "Povolí spustitelné skripty inventáře, když runner vyhodnocuje inventář. Odděleno od dynamických pluginů inventáře, aby bylo možné povolit deklarované konfigurace pluginů, které pojmenovávají kolekci a lze je přečíst před spuštěním, bez povolení libovolných spustitelných souborů."
+      "inventoryScriptsEnabledHint": "Povolí spustitelné skripty inventáře, když runner vyhodnocuje inventář. Odděleno od dynamických pluginů inventáře, aby bylo možné povolit deklarované konfigurace pluginů, které pojmenovávají kolekci a lze je přečíst před spuštěním, bez povolení libovolných spustitelných souborů.",
+      "ansibleHostKeyChecking": "Kontrola klíče hostitele SSH",
+      "ansibleHostKeyCheckingHint": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible: konfigurace odmítne hostitele, jehož klíč dosud nezná. Když to vypnete, přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout — lépe je zadat veřejný klíč hostitele spolu s přihlašovacími údaji ke stroji a kontrolu nechat zapnutou. Proměnná Ansible nastavená pro jednotlivého hostitele má nad tímto nastavením tak či tak přednost."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Metoda zvýšení oprávnění",
     "becomeUser": "Zvýšit na uživatele",
     "becomePassword": "Heslo pro zvýšení oprávnění",
-    "replaceHint": "Uložení nahradí celé přihlašovací údaje, vyplňte proto každé potřebné pole, ne jen to, které měníte. Když necháte všechna prázdná, uložené údaje zůstanou beze změny."
+    "replaceHint": "Uložení nahradí celé přihlašovací údaje, vyplňte proto každé potřebné pole, ne jen to, které měníte. Když necháte všechna prázdná, uložené údaje zůstanou beze změny.",
+    "knownHosts": "Známí hostitelé",
+    "knownHostsHint": "Veřejné klíče hostitelů strojů, na které toto přihlašovací údaje dosáhne, jeden na řádek ve formátu known_hosts. Nasměruj proměnnou inventáře na tuto cestu, abys se připojil bez oslabení ověření klíče hostitele. Není skrytý: veřejný klíč hostitele je veřejný a je to právě to, co porovnáváš, když klíč nesouhlasí."
   }
 }

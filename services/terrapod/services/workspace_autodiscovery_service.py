@@ -397,6 +397,11 @@ async def find_or_autocreate_workspace(
         ansible_version=rule.ansible_version,
         ansible_execution_environment=rule.ansible_execution_environment,
         ansible_collections=list(rule.ansible_collections or []),
+        # Host-key verification, templated like the rest of the ansible cluster
+        # (#2318). It defaults TRUE on the rule, so a rule written before this
+        # materialises a workspace that verifies -- which is the direction a
+        # default must fail in, since relaxing it is what needs a decision.
+        ansible_host_key_checking=rule.ansible_host_key_checking,
         # Which operations the materialised workspace has, and the roots each
         # one uses (#1966, #1929). `configure_enabled` defaults FALSE on the
         # rule, so every rule that existed before this goes on producing

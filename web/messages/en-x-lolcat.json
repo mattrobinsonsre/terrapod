@@ -2701,7 +2701,9 @@
       "dynamicInventoryEnabled": "Dynamik Inventoree Pluginz",
       "dynamicInventoryEnabledHint": "Letz teh runnr uze inventoree pluginz wot r deklaird — a YAML sors wif a top-levul plugin key — when it figgerz out teh inventoree. Terrapod itself NEVR runz wun, no mattr wot. Wen dis iz off, a plugin sors getz refuzed by naym insted ov figgerin out haff teh hostz; wen itz on, teh inventoree shown heer iz offishully inkomplete per sors an teh set teh runnr figgerz out iz teh reel wun. srsly",
       "inventoryScriptsEnabled": "Inventoree Skriptz",
-      "inventoryScriptsEnabledHint": "Letz teh runnr uze runnabul inventoree skriptz when it figgerz out teh inventoree. Kept apart from dynamik inventoree pluginz so deklaird plugin konfigz, wot naym a collekshun an can be red b4 dey run, can be allowd wifout allowin enny randum runnabul fingz too."
+      "inventoryScriptsEnabledHint": "Letz teh runnr uze runnabul inventoree skriptz when it figgerz out teh inventoree. Kept apart from dynamik inventoree pluginz so deklaird plugin konfigz, wot naym a collekshun an can be red b4 dey run, can be allowd wifout allowin enny randum runnabul fingz too.",
+      "ansibleHostKeyChecking": "SSH Host Key Chekin",
+      "ansibleHostKeyCheckingHint": "On by defalt, wich is wot Ansible duz all by itself: a konfigur sez NO to a host wen it dont trust teh key yet. Turn it off an any key teh host showz u getz accepted, so sumwun can lissen in on teh konekshun — betta 2 giv teh hostz publik key wif teh masheen kredenshul an leev teh chekin on. A per-host Ansible varybul still beets dis setting enyway. srsly"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
@@ -3989,6 +3991,8 @@
     "becomeMethod": "Eskalayshun methud",
     "becomeUser": "Eskalate to usr",
     "becomePassword": "Eskalayshun passwurd",
-    "replaceHint": "Saving swapz out da hole kredenshul, so fil in evry feeld it needz — not just da wun u iz changin. Leeving dem all emptee keepz da kept kredenshul liek it iz."
+    "replaceHint": "Saving swapz out da hole kredenshul, so fil in evry feeld it needz — not just da wun u iz changin. Leeving dem all emptee keepz da kept kredenshul liek it iz.",
+    "knownHosts": "Noed hostz",
+    "knownHostsHint": "Da publik host keyz ov da masheenz dis credenshul reechez, wan per line in known_hosts formatz. Point an inventry variabul at itz path to connekt wifout relaxin host-key verifikashun. Not hidd: a host publik key iz publik, an itz wot u compare when a key no match. srsly."
   }
 }

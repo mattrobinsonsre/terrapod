@@ -95,6 +95,10 @@ def _mock_workspace(
     ws.inventory_paths = []
     ws.default_playbook = ""
     ws.default_limit = ""
+    # #2318's, set explicitly for the same reason as #2033's pair above -- and
+    # to its REAL default, TRUE, so a test that reads it off this fixture reads
+    # what a workspace actually has rather than whatever a mock would coerce to.
+    ws.ansible_host_key_checking = True
     ws.locked = locked
     ws.lock_id = lock_id
     ws.lock_reason = lock_reason

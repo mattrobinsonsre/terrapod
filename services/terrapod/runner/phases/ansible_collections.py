@@ -16,9 +16,24 @@ both remain available either way:
 * **Roles are usually in-house and come from git**, which is already solved: an
   operator declares the credential once as a `git_http_auth` / `git_ssh_auth`
   workspace variable and `runner/phases/git_auth.py` materialises it into git's
-  own config, with `insteadOf` rewrites, *before* anything fetches. A role whose
-  requirement names a git source is an ordinary clone and inherits all of that,
-  needing nothing from this phase.
+  own config, with `insteadOf` rewrites, *before* anything fetches.
+
+  **A git-sourced role is an ordinary clone, and it inherits NONE of that --
+  corrected 2026-10-30, having claimed the opposite (#2318).** Measured: a
+  PUBLIC git-sourced role installs in the execution environment, so the claim
+  held for the case anyone would test first. A PRIVATE one cannot, because
+  `git_auth` writes its config, its keys and its known_hosts under the
+  ORCHESTRATOR's `$HOME`, and the EE mounts a different `/home` on a separate
+  volume; `_ee_env` sets six variables and no `GIT_*` of any kind, and
+  `galaxy_env` is an allow-list that does not carry `GIT_CONFIG_GLOBAL`. So an
+  operator whose roles live in a private repository reads this paragraph, sees
+  that git auth is "already solved", and meets a clone failure with no
+  credential in sight.
+
+  Plumbing git_auth's config into the EE is a real change rather than a fix for
+  a wrong sentence -- it widens what the EE can see, which is a security
+  question -- so it is recorded on #2318 as a measured gap and this paragraph
+  now says what is true instead of implying it is served.
 * **A Galaxy-HOSTED role is the one corner not served.** `ansible-galaxy role
   install ns.name` uses the v1 roles API, which Terrapod does not implement
   (`docs/galaxy-cli-surface.md`), so such a role reaches upstream directly where
@@ -530,8 +545,23 @@ def install(
         # Roles first, and unconditionally: a file with no `roles:` section
         # prints "Skipping install, no requirements found" and exits 0, so this
         # costs one process rather than a YAML parser the runner does not have.
-        # A git-sourced role clones with the credentials `git_auth` has already
-        # written into git's own config.
+        # A git-sourced role clones with NO credentials -- corrected 2026-10-30,
+        # having claimed `git_auth`'s config applies here (#2318, and #2320 is
+        # the fix). It does not: `git_auth` writes under the ORCHESTRATOR's
+        # $HOME, the EE mounts a different /home, `_ee_env` carries no `GIT_*`
+        # and `galaxy_env` is an allow-list without `GIT_CONFIG_GLOBAL`.
+        #
+        # Measured against the published EE image. Every failure below is the
+        # CLONE failing for want of a credential, which is one problem and not
+        # several:
+        #   * `git+https://` to a public repo installs
+        #   * `git+ssh://git@host/org/role.git` fails the clone
+        #   * `git@host:org/role.git` WITH `scm: git` fails the clone -- so the
+        #     SCP form IS a git reference to ansible, contrary to what this
+        #     comment said for one revision
+        #   * `git@host:org/role.git` WITHOUT `scm:` is guessed as a Galaxy name
+        #     and looked up on galaxy.ansible.com. That is ansible's documented
+        #     contract for a src with no scheme, not a gap of ours
         logger.info("installing the configuration's roles", requirements=str(path))
         _run_install(
             ["role", "install", "-r", str(path), "-p", str(roles)],
