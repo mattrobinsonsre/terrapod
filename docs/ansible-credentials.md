@@ -720,7 +720,10 @@ reason this is a feature rather than a gap:
 - [Ansible inventory](ansible-inventory.md) — the hosts, groups and variables a placeholder is written into,
   and the variable precedence a credential sits inside
 - [Private module source authentication](module-auth.md) — the same credential
-  mechanism, for private git module sources
+  mechanism, for private git module sources **and for a git-sourced Ansible
+  role**; see [It covers a git-sourced Ansible role
+  too](module-auth.md#it-covers-a-git-sourced-ansible-role-too) for the `scm:
+  git` the SCP form needs
 - [OpenBao/Vault as a variable value source](vault.md) — the *other* Vault, and
   the one `value_source: "vault"` means
 - [Per-workspace cloud identity](cloud-identity.md#every-collection-takes-it-from-the-environment)

@@ -29,6 +29,33 @@ many workspaces (define-once, assign-many, least-privilege). Multiple entries
 Values are always sensitive: the API forces `sensitive=true` for these categories
 and never returns the stored value.
 
+### It covers a git-sourced Ansible role too
+
+The same two categories, the same entries, the same precedence — a role declared
+in a `requirements.yml` with a git `src:` clones with the workspace's own
+credential, because `ansible-galaxy` shells out to `git` like anything else.
+
+The only thing to get right is ansible's own contract for the `src:` field:
+
+| `src:` | what ansible does |
+|---|---|
+| `git+https://host/org/role.git` | a git reference — clones |
+| `git+ssh://git@host/org/role.git` | a git reference — clones |
+| `git@host:org/role.git` **with `scm: git`** | a git reference — clones |
+| `git@host:org/role.git` **without `scm:`** | **looked up on galaxy.ansible.com** as a role name |
+
+The last row is ansible's documented behaviour for a `src:` carrying no scheme,
+not a Terrapod limitation. If a private role gives you a confusing Galaxy error
+— a 404 for a name you never published — add `scm: git` to that entry.
+
+Host-key verification is **not** relaxed to make the clone work. The generated
+ssh config sets `StrictHostKeyChecking yes` and points at the `known_hosts` your
+`git_ssh_auth` entry supplies, so a host whose key you have not supplied is
+refused rather than trusted. That is the same posture as a module clone, and it
+is separate from [a configure's SSH connection to the hosts it
+targets](ansible-configure.md#host-key-verification-and-how-to-satisfy-it),
+which has its own credential and its own `known_hosts`.
+
 ### Which entry is used
 
 An entry keyed to `host/org` covers every repository **under** that org —
