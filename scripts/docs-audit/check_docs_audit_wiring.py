@@ -43,7 +43,7 @@ WORKFLOW = Path(".github/workflows/ci.yml")
 #: floor PER FAMILY: a single combined floor would let a broken glob take its
 #: own family to zero while the other family carried the count.
 MIN_GATES = 8
-MIN_SHELL_GATES = 2
+MIN_SHELL_GATES = 3
 
 
 def main() -> int:
