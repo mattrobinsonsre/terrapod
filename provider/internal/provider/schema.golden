@@ -263,9 +263,9 @@ resource terrapod_catalog_item.configure_enabled required=false optional=true co
 resource terrapod_catalog_item.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.default_limit required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.default_playbook required=false optional=true computed=true sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.default_version_pin required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.display_name required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.default_version_pin required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.description required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.display_name required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_catalog_item.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_item.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]

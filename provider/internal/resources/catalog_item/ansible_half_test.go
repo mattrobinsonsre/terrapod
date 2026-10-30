@@ -30,11 +30,10 @@ import (
 func TestTheAnsibleAttributesTakeThisResourcesOwnRequiredness(t *testing.T) {
 	// Requiredness is DERIVED from the siblings it has to match rather than
 	// restated, because restating it is how the two come apart. The bool must
-	// look like `enabled` (Optional+Computed: the server always answers with a
-	// concrete boolean, so an Optional-only attribute plans null against it and
-	// fails every apply that omits it) and the three strings must look like
-	// `display_name` (Optional-only: the server answers "" when unset and
-	// optString maps that back to null, so null plans against null).
+	// look like `enabled` and the strings like `display_name` -- both
+	// Optional+Computed, because the server always answers concretely, so an
+	// Optional-only attribute plans null against a concrete result and fails
+	// every apply that omits it.
 	var resp resource.SchemaResponse
 	NewResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	if resp.Diagnostics.HasError() {
@@ -64,29 +63,26 @@ func TestTheAnsibleAttributesTakeThisResourcesOwnRequiredness(t *testing.T) {
 		t.Errorf("configure_enabled is %+v, want %+v to match `enabled`", got, boolSibling)
 	}
 
-	// The three strings are Optional+COMPUTED, which DIVERGES from this
-	// resource's own Optional-only strings (`display_name`, `description`,
-	// `default_version_pin`). That is deliberate and it is the cross-product
-	// convention winning over the local one, for two reasons:
+	// The strings derive from a sibling the same way, and that is new. Before
+	// #2307 they could not: this resource's own strings were Optional-only with
+	// an ""-collapsing read-back, so these three took `terrapod_workspace`'s
+	// convention instead and diverged from their siblings deliberately. #2307
+	// brought the siblings onto the same shape, so the derivation is symmetric
+	// now and the cross-product convention and the local one agree.
 	//
-	//  1. `default_playbook` and `default_limit` are the SAME attribute names on
-	//     `terrapod_workspace`, where they are Optional+Computed. One name
-	//     behaving two ways across two resources is worse for a practitioner
-	//     than two shapes inside one file.
-	//  2. Optional-only plus this file's `optString` read-back ships the
-	//     "Provider produced inconsistent result after apply" defect on an
-	//     explicit `= ""` — the class this provider has already closed six times
-	//     (#684, #732, #1634, #1748, #1771, #2110). Computed alone does not fix
-	//     it; the concrete read-back is the other half, pinned below.
-	//
-	// The three Optional-only strings keep their shape and their defect, which is
-	// pre-existing and tracked in #2307. Matching them here would have been local
-	// consistency bought with a seventh instance.
-	wantString := shape{false, true, true}
+	// Optional+Computed is only half of it; the concrete read-back is the other,
+	// pinned below and in empty_string_test.go. Computed alone does not fix the
+	// "Provider produced inconsistent result after apply" defect this provider
+	// has closed seven times (#684, #732, #1634, #1748, #1771, #2110, #2307).
+	stringSibling := of("display_name")
+	if stringSibling != (shape{false, true, true}) {
+		t.Fatalf("`display_name` is %+v, not Optional+Computed — this test derives "+
+			"the string convention from it, so re-derive before trusting the rest",
+			stringSibling)
+	}
 	for _, name := range []string{"ansible_directory", "default_playbook", "default_limit"} {
-		if got := of(name); got != wantString {
-			t.Errorf("%s is %+v, want %+v (Optional+Computed, as on terrapod_workspace)",
-				name, got, wantString)
+		if got := of(name); got != stringSibling {
+			t.Errorf("%s is %+v, want %+v to match `display_name`", name, got, stringSibling)
 		}
 	}
 
@@ -292,9 +288,11 @@ func TestTheReadBackKeepsTheServersEmptyStringConcrete(t *testing.T) {
 func TestTheThreeStringsRoundTripAnExplicitEmptyString(t *testing.T) {
 	// The defect itself, end to end: config "" -> wire "" -> state "".
 	//
-	// This is the test the Optional-only shape could not pass, and it is why
-	// these three diverge from this resource's other strings. It drives the
-	// write leg and the read leg together, because the defect lives in their
+	// This is the test the Optional-only shape could not pass. It used to be the
+	// reason these three diverged from this resource's other strings; #2307
+	// brought those onto the same shape, so the divergence is gone and the
+	// sibling test for them lives in empty_string_test.go. It drives the write
+	// leg and the read leg together, because the defect lives in their
 	// disagreement rather than in either one.
 	m := catalogItemModel{
 		Name:             types.StringValue("x"),
