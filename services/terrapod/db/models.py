@@ -507,6 +507,28 @@ class Workspace(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
+    #: Whether a configure run verifies the SSH host key of the hosts it
+    #: targets. TRUE is verification on, and that is the EXISTING behaviour
+    #: rather than a new restriction: measured against the published EE image,
+    #: ansible's own `HOST_KEY_CHECKING` defaults to true, the configure phase
+    #: forces nothing about it, and no `known_hosts` file ships -- so first
+    #: contact with an unseen host already fails closed with `Host key
+    #: verification failed`. What was missing was any way to express an
+    #: exception, which this and the machine credential's `known_hosts` field
+    #: supply between them (#2318).
+    #:
+    #: Setting it false makes the resolver emit `ansible_ssh_common_args` as a
+    #: variable on `all`, NOT an environment variable. That is the whole of why
+    #: a host can still beat it: measured, a host variable REPLACES a group
+    #: `all` variable, so a host may re-enable verification over a
+    #: workspace-level relaxation. Forcing `ANSIBLE_HOST_KEY_CHECKING` into the
+    #: environment would have overridden the operator's own `ansible.cfg` --
+    #: which this project reserves for non-negotiables -- and would have sat
+    #: ABOVE the per-host override rather than below it.
+    ansible_host_key_checking: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true", default=True
+    )
+
     #: Permit ansible's `auto` inventory plugin -- a declared plugin config, a
     #: YAML file carrying a top-level `plugin:` key -- ON THE RUNNER (#2033).
     #:
@@ -2013,6 +2035,31 @@ class AutodiscoveryRule(Base):
     )
     configure_after_apply: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false", default=False
+    )
+
+    #: Whether a configure run verifies the SSH host key of the hosts it
+    #: targets. TRUE is verification on, and that is the EXISTING behaviour
+    #: rather than a new restriction: measured against the published EE image,
+    #: ansible's own `HOST_KEY_CHECKING` defaults to true, the configure phase
+    #: forces nothing about it, and no `known_hosts` file ships -- so first
+    #: contact with an unseen host already fails closed with `Host key
+    #: verification failed`. What was missing was any way to express an
+    #: exception, which this and the machine credential's `known_hosts` field
+    #: supply between them (#2318).
+    #:
+    #: Templated onto the workspaces this rule materialises, like every other
+    #: setting here, so a rule that says nothing creates workspaces that verify.
+    #:
+    #: Setting it false makes the resolver emit `ansible_ssh_common_args` as a
+    #: variable on `all`, NOT an environment variable. That is the whole of why
+    #: a host can still beat it: measured, a host variable REPLACES a group
+    #: `all` variable, so a host may re-enable verification over a
+    #: workspace-level relaxation. Forcing `ANSIBLE_HOST_KEY_CHECKING` into the
+    #: environment would have overridden the operator's own `ansible.cfg` --
+    #: which this project reserves for non-negotiables -- and would have sat
+    #: ABOVE the per-host override rather than below it.
+    ansible_host_key_checking: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true", default=True
     )
 
     #: Templated onto the workspaces this rule materialises, like every other

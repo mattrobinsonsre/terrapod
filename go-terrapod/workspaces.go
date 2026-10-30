@@ -152,6 +152,17 @@ type Workspace struct {
 	// This flag is the override and it WIDENS. That direction is deliberate:
 	// a flag someone forgets leaves them configuring more, not less.
 	ConfigureAllHosts bool `json:"configure-all-hosts"`
+
+	// AnsibleHostKeyChecking is whether a configure verifies the SSH host key
+	// of the hosts it targets (#2318). True is verification ON, and that is the
+	// existing behaviour rather than a new restriction: ansible's own default
+	// is on and the configure phase forces nothing, so first contact with an
+	// unseen host already fails closed.
+	//
+	// Relaxing it emits `ansible_ssh_common_args` as a variable on `all`, never
+	// an environment variable, so an inventory HOST variable still beats it --
+	// measured, a host variable REPLACES a group variable rather than merging.
+	AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
 	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin -- a
 	// declared plugin config, a YAML file with a top-level `plugin:` key -- ON
 	// THE RUNNER (#2033). The API never runs one in either state.
@@ -409,6 +420,10 @@ type CreateWorkspaceRequest struct {
 	// inventory change affected (#2229). A POINTER for the reason the pair
 	// above gives; the server-side default is FALSE, which narrows.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// AnsibleHostKeyChecking sets host-key verification on the new workspace
+	// (#2318). A POINTER for the reason the pair above gives; the server-side
+	// default is TRUE, which verifies.
+	AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin on the
 	// runner for the new workspace (#2033). A POINTER for the reason the pair
 	// above gives; the server-side default is FALSE, which refuses.
@@ -577,6 +592,9 @@ type UpdateWorkspaceRequest struct {
 	// ConfigureAllHosts turns the narrowing off or back on (#2229). A POINTER
 	// so nil leaves the stored value alone.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// AnsibleHostKeyChecking turns host-key verification off or back on
+	// (#2318). A POINTER so nil leaves the stored value alone.
+	AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 	// DynamicInventoryEnabled turns the `auto` inventory plugin on or off for
 	// this workspace's runs (#2033). A POINTER so nil leaves it alone.
 	DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
@@ -955,6 +973,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
 	}
+	if req.AnsibleHostKeyChecking != nil {
+		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
+	}
 	if req.DynamicInventoryEnabled != nil {
 		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
 	}
@@ -1140,6 +1161,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
+	}
+	if req.AnsibleHostKeyChecking != nil {
+		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
 	}
 	if req.DynamicInventoryEnabled != nil {
 		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
@@ -1357,6 +1381,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
 		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
 		ConfigureAllHosts:             GetBoolAttr(res, "configure-all-hosts"),
+		AnsibleHostKeyChecking:        GetBoolAttr(res, "ansible-host-key-checking"),
 		DynamicInventoryEnabled:       GetBoolAttr(res, "dynamic-inventory-enabled"),
 		InventoryScriptsEnabled:       GetBoolAttr(res, "inventory-scripts-enabled"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),

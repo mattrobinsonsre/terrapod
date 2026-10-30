@@ -300,9 +300,20 @@ def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[
         material = envelope.get(field)
         if not material:
             continue
-        exec_subprocess.register_secret(material)
-        # A private key must end in a newline or ssh refuses it with "invalid
-        # format", which names neither the key nor the missing byte.
+        if field in MACHINE_SECRET_FIELDS:
+            # Only the SECRET file fields, which is not the same as all of them
+            # since `known_hosts` joined the set (#2318). A host's public key is
+            # public, and registering it would replace it in the run's log with a
+            # redaction marker -- destroying the one value an operator needs to
+            # read when a host key does not match, in exchange for hiding
+            # nothing. The loop registered every file field when `private_key`
+            # was the only one, which was correct then and silently wrong now.
+            exec_subprocess.register_secret(material)
+        # Both file fields must end in a newline, for different reasons that land
+        # in the same place: ssh refuses a private key without one with "invalid
+        # format", naming neither the key nor the missing byte, and an
+        # unterminated final `known_hosts` entry is not read at all -- which
+        # presents as the host key simply not being trusted.
         body = material if material.endswith("\n") else material + "\n"
         written = _write_secret_file(
             directory, f"{_safe_name(MACHINE_CATEGORY, key)}.{field}", body

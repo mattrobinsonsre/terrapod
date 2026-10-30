@@ -781,6 +781,7 @@ def _workspace_json(
                 # which is exactly what it has.
                 "auto-configure-enabled": ws.auto_configure_enabled,
                 "configure-all-hosts": ws.configure_all_hosts,
+                "ansible-host-key-checking": ws.ansible_host_key_checking,
                 "dynamic-inventory-enabled": ws.dynamic_inventory_enabled,
                 "inventory-scripts-enabled": ws.inventory_scripts_enabled,
                 "configure-after-apply": ws.configure_after_apply,
@@ -1009,6 +1010,7 @@ def _workspace_json(
             "configure-enabled",
             "auto-configure-enabled",
             "configure-all-hosts",
+            "ansible-host-key-checking",
             "dynamic-inventory-enabled",
             "inventory-scripts-enabled",
             "configure-after-apply",
@@ -1650,6 +1652,21 @@ async def _create_workspace_impl(
             )
             if "configure-all-hosts" in attrs
             else False
+        ),
+        # Whether a configure verifies the SSH host key of the hosts it targets
+        # (#2318). Defaulting TRUE, which is the existing behaviour rather than a
+        # new restriction -- ansible's own default is on and the configure phase
+        # forces nothing -- so a new workspace verifies and an operator opts out
+        # per workspace or, more narrowly, per host.
+        ansible_host_key_checking=(
+            _422(
+                lambda: workspace_settings.validate_bool(
+                    attrs["ansible-host-key-checking"],
+                    "ansible-host-key-checking",
+                )
+            )
+            if "ansible-host-key-checking" in attrs
+            else True
         ),
         dynamic_inventory_enabled=(
             _422(
@@ -2452,6 +2469,16 @@ async def update_workspace(
             lambda: workspace_settings.validate_bool(
                 attrs["configure-all-hosts"],
                 "configure-all-hosts",
+            )
+        )
+    # Whether a configure verifies the SSH host key of the hosts it targets
+    # (#2318). No cross-field invariant: relaxing it on a workspace with no
+    # configure operation is inert rather than incoherent.
+    if "ansible-host-key-checking" in attrs:
+        ws.ansible_host_key_checking = _422(
+            lambda: workspace_settings.validate_bool(
+                attrs["ansible-host-key-checking"],
+                "ansible-host-key-checking",
             )
         )
     if "dynamic-inventory-enabled" in attrs:

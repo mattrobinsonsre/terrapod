@@ -375,6 +375,7 @@ field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
+field CreateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1254,6 +1255,7 @@ field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field UpdateWorkspaceRequest.AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
+field UpdateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
@@ -1469,6 +1471,7 @@ field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
+field Workspace.AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
