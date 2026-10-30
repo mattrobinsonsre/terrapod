@@ -566,7 +566,7 @@ async def delete_manifest(
 
     Nothing frees storage here. Layers are shared, so whether a blob can go
     depends on what *else* references it — a question only the collector can
-    answer, on its next cycle. `POST .../admin/oci/collect` runs it now for
+    answer, on its next cycle. `POST /api/v1/oci/collect` runs it now for
     someone who has just deleted something large and wants the space back.
 
     **Deleting a mirrored image is a cache purge, not a deletion.** The next pull

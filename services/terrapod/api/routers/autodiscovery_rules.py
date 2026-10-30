@@ -490,8 +490,11 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
 
     # Security scanning and the AI plan summary (#1763). The rules are the
     # workspace's own, from `services.workspace_settings`, so a rule cannot
-    # template a value the workspace endpoint would reject. No engine argument:
-    # a rule has no engine, and everything it materialises is scannable.
+    # template a value the workspace endpoint would reject. No engine argument
+    # HERE, which is a different claim from the one this comment used to make: a
+    # rule DOES carry an engine, and a Pulumi rule refuses a scan setting
+    # outright with a 422 further down. This loop validates the SHAPE of each
+    # value; whether the engine admits it at all is that later check's job.
     for key, attr, rule_fn in (
         ("security-scan-engine", "security_scan_engine", workspace_settings.validate_scan_engine),
         (

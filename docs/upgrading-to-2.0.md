@@ -115,9 +115,13 @@ logs and proxies.
 **Affects:** every deployment using OIDC or SAML. **This one will lock you out of
 the UI if you skip it**, so it is listed first deliberately.
 
-In 2.0.0 the default for `api.config.auth.legacy_callback_url` flips from `true`
-to `false`, and Terrapod starts building its IdP-facing URLs on the canonical
-`/api/v1` prefix:
+`api.config.auth.legacy_callback_url` selects which prefix Terrapod builds its
+IdP-facing URLs on, and **its default has not flipped yet** — it is `true`
+today, so those URLs are still built on the deprecated `/api/terrapod/v1`
+prefix. 2.0.0 is where it becomes `false` and they move to the canonical
+`/api/v1`; the setting's own description says so ("The default flips in
+2.0.0"), which is why this is listed as a change to prepare for rather than one
+you can already see. When it flips:
 
 ```
 before:  {callback_base_url}/api/terrapod/v1/auth/callback
