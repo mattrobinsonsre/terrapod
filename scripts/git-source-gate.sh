@@ -42,6 +42,16 @@ TARGET="tp-gitgate-target-$$"
 WORK="$REPO_ROOT/.gitgate-$$"
 FAILURES=0
 
+# `chown -R 1000:1000` below makes the materialised tree unremovable by the
+# caller: a GitHub runner is uid 1001, so `rm -rf` on it dies `Permission
+# denied`. On macOS the container mount does not enforce that boundary, so a
+# plain `rm` passes locally and fails in CI -- which is exactly how this gate
+# first went red. One producer, used by the trap and by row 5.
+rm_as_root() {
+  docker run --rm -v "$1:/t" --entrypoint sh alpine:3.21 \
+    -c 'rm -rf /t/..?* /t/.[!.]* /t/*' >/dev/null 2>&1 || true
+}
+
 cleanup() {
   docker stop "$TARGET" >/dev/null 2>&1 || true
   docker container rm "$TARGET" >/dev/null 2>&1 || true
@@ -49,7 +59,7 @@ cleanup() {
   # Owned by uid 1000 after the chown below, so remove it as that uid rather
   # than failing half-way and leaving material behind.
   if [ -d "$WORK" ]; then
-    docker run --rm -v "$WORK:/w" --entrypoint sh alpine:3.21 -c 'rm -rf /w/..?* /w/.[!.]* /w/*' >/dev/null 2>&1 || true
+    rm_as_root "$WORK"
     rmdir "$WORK" 2>/dev/null || true
   fi
 }
@@ -197,7 +207,8 @@ note "row 5/5: host-key verification is still ON -- a WRONG known_hosts must ref
 # the one thing the acceptance forbids.
 ssh-keygen -q -t ed25519 -N '' -f "$WORK/wrong" -C wrong
 WRONGKEY="$TARGET $(awk '{print $1" "$2}' "$WORK/wrong.pub")"
-rm -rf "$WORK/tp"
+rm_as_root "$WORK/tp"
+rmdir "$WORK/tp" 2>/dev/null || true
 REPO_ROOT="$REPO_ROOT" "$PY" - "$GIT_DIR" "$TARGET" "$WRONGKEY" <<'PYEOF' >/dev/null
 import json, os, sys
 from pathlib import Path
