@@ -365,7 +365,7 @@ jobs:
   # hence the slim install plus PYTHONPATH rather than a dependency-free script.
   # It gates a release through `quality-gate`: shipping a version whose artifact
   # does not exist is the failure this exists to prevent.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
       - run: pip install pytest
@@ -1242,7 +1242,7 @@ jobs:
           go-version-file: go-terrapod/go.mod
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -1293,7 +1293,7 @@ jobs:
           done
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           category: codeql-${{ matrix.language }}
 
@@ -3291,7 +3291,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
@@ -4225,7 +4225,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (amd64)
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-amd64.sarif
           category: trivy-${{ matrix.image }}-amd64
@@ -4281,7 +4281,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (arm64)
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-arm64.sarif
           category: trivy-${{ matrix.image }}-arm64
