@@ -221,7 +221,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		registryProviderRes.NewResource,
 		moduleWorkspaceLinkRes.NewResource,
 		gpgKeyRes.NewResource,
-		// Ansible inventory: the eight structures an inventory has, one
+		// Ansible inventory: the seven structures an inventory has, one
 		// resource each (#1968), so a second concern can contribute a host to
 		// a group, or a variable to a host, without owning the thing it
 		// attaches to.

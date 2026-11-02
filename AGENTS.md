@@ -514,11 +514,15 @@ multi-language implementation ships in the same PR**:
   Terraform fixture that plans offline against a deliberately-stale checked-in
   state, so a real plan yields creates, an update, a replace and destroys. A
   reimplementation of it got as far as a pull request before anyone noticed,
-  and it was *worse*: it captured at 1440px, where the original captures at
-  1280 because GitHub renders README images at roughly 850px regardless of
-  source, so a 1440px capture displays at ~59% and takes 13px UI text down to
-  about 8px. That reasoning is written down at the top of `capture.mjs`, where
-  it had been for months.
+  and it was *worse* on an axis nobody had considered: it framed each shot to
+  its own content height, so the set came out at a dozen different sizes.
+  Whatever the capture width, uniformity across the set is what makes a
+  documentation page look composed rather than assembled, and
+  `scripts/docs-audit/check_screenshot_dimensions.py` now enforces equality
+  with `capture.mjs`'s own `VIEWPORT` rather than any number written here --
+  deliberately, because an earlier version of this paragraph named a width,
+  the width then changed, and the paragraph became a confident argument for
+  re-capturing at the wrong one.
 
   Two pipelines for one job is worse than either alone: the next person picks
   one at random, and half the time it is the one that is wrong.

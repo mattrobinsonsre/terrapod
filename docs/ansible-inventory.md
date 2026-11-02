@@ -15,18 +15,25 @@ and the expansion of `--limit`. There is no second implementation of any of it.
 *A workspace's inventory in the web UI — hosts, the groups they belong to, and
 the variables set at each level.*
 
-> ## Status: the inventory exists; configure operations do not
+> ## What this page is, and where a configure fits
 >
-> **This release delivers the inventory — its structures, its two sources, what
-> they resolve to, and the surfaces that make all of it observable. It does not
-> run playbooks.** A workspace can *declare* that it has a configure operation,
-> with `configure_enabled`, and name the playbook one would run by default — but
-> nothing executes ansible yet.
+> **This page is the inventory** — its structures, its two sources, what they
+> resolve to, and the surfaces that make all of it observable. The thing that
+> *consumes* it is a **configure operation**, which runs playbooks: a workspace
+> declares it with `configure_enabled`, names a default playbook, and the runner
+> fetches the run's resolved inventory and executes against it in an
+> execution-environment container. See
+> [ansible-configure.md](ansible-configure.md).
 >
-> What you can do now is **build** an inventory and **see what it resolves to**,
-> including which hosts a `--limit` pattern would select. That ordering is
-> deliberate rather than partial: an operator has to be able to answer "what
-> would a configure target" before anything is able to target it.
+> This box used to say configure operations did not exist, which was true when
+> the inventory landed ahead of the executor and stopped being true in the same
+> release line. If anything else still reads that way, it is stale.
+>
+> The useful thing to know about the ordering is why it was that way round: an
+> operator has to be able to answer "what would a configure target" before
+> anything targets it, which is why **build an inventory and see what it
+> resolves to** — including which hosts a `--limit` would select — is a surface
+> in its own right rather than a debugging aid.
 >
 > A workspace that declares nothing and binds no repository carries no inventory
 > rows at all, so a terraform/tofu-only deployment pays nothing for any of this

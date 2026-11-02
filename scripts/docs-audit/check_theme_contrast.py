@@ -77,6 +77,20 @@ def hex_to_rgb(h: str) -> tuple[int, int, int]:
     return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
 
 
+def _sources() -> list[pathlib.Path]:
+    """Every file in `web/src` that can hold a Tailwind class string.
+
+    `.ts` AS WELL AS `.tsx`, and the omission was real rather than theoretical:
+    this read `*.tsx` only while 23 bg/text pairings lived in `web/src/lib/`
+    --- `host-status.ts`, `workspace-status.ts`, `workspace-fields.ts` --- and
+    two of those three were edited by the very release this gate was written
+    for. A badge table is exactly the shape the second axis exists to measure,
+    and it was the one place the gate could not see. `globals.css` claimed this
+    read "every className in `web/src`", which was false until now.
+    """
+    return sorted([*SRC.rglob("*.tsx"), *SRC.rglob("*.ts")])
+
+
 def light_palette() -> dict[str, dict[int, tuple[int, int, int]]]:
     """The light theme, read from the `:root:not(.dark)` block in globals.css."""
     css = CSS.read_text()
@@ -133,7 +147,7 @@ def main() -> int:
         )
 
     worst: dict[tuple[str, str], tuple[float, str, str]] = {}
-    for path in sorted(SRC.rglob("*.tsx")):
+    for path in sorted(_sources()):
         text = path.read_text()
         for m in cls_re.finditer(text):
             s = m.group(1)
@@ -172,6 +186,70 @@ def main() -> int:
                     if prev is None or low < prev[0]:
                         worst[key] = (low, where, str(path.relative_to(ROOT)))
 
+    # The FOURTH axis: AN INK OUTSIDE AN INTERPOLATION, A FILL INSIDE IT.
+    #
+    # The pair axis above requires the fill and the ink in the SAME quoted run,
+    # which a template literal splits apart:
+    #
+    #   className={`... text-white ... ${cond ? 'bg-red-600' : 'bg-amber-900/40'}`}
+    #
+    # `text-white` is in the literal part and each fill is in its own branch, so
+    # three separate matches and no pair is ever formed. That is not theoretical:
+    # the state-version rollback button shipped `text-white` over
+    # `bg-amber-900/40`, which on light is 40% of `#ffb900` -- 1.33:1, an
+    # invisible label -- and this gate reported OK over 94 pairs while it did.
+    #
+    # Pooling the whole expression would be wrong in the other direction: the two
+    # arms of a ternary are mutually exclusive, so pairing one arm's fill with the
+    # other arm's ink invents a combination that never renders. So the rule is
+    # narrower and matches what the browser does -- an ink in the literal part
+    # applies to EVERY branch, an ink inside a branch applies to that branch only.
+    tmpl_re = re.compile(r"className=\{`([^`]{8,2000})`\}", re.S)
+    interp_re = re.compile(r"\$\{(.*?)\}", re.S)
+    quoted_re = re.compile(r"""['"]([^'"]{4,300})['"]""")
+    for path in sorted(_sources()):
+        for m in tmpl_re.finditer(path.read_text()):
+            body = m.group(1)
+            shared = interp_re.sub(" ", body)  # the literal parts only
+            shared_inks = [(f, int(s), None) for f, s in txt_re.findall(shared)] + [
+                (None, None, w) for w in plain_re.findall(shared)
+            ]
+            if not shared_inks:
+                continue
+            for im in interp_re.finditer(body):
+                for branch in quoted_re.findall(im.group(1)):
+                    fills = [(f, s, a, False) for f, s, a in bg_re.findall(branch)] + [
+                        (f, s, a, True) for f, s, a in hov_re.findall(branch)
+                    ]
+                    # An ink in the branch itself wins, and the pair axis has
+                    # already judged that case.
+                    if not fills or txt_re.search(branch) or plain_re.search(branch):
+                        continue
+                    for bfam, bstop, balpha, hov in fills:
+                        bg = pal.get(bfam, {}).get(int(bstop))
+                        if bg is None:
+                            continue
+                        alpha = int(balpha) / 100 if balpha else 1.0
+                        for tfam, tstop, plain in shared_inks:
+                            fg = PLAIN[plain] if plain else pal.get(tfam, {}).get(tstop)
+                            if fg is None:
+                                continue
+                            key = (
+                                ("hover:" if hov else "")
+                                + f"bg-{bfam}-{bstop}"
+                                + (f"/{balpha}" if balpha else ""),
+                                f"text-{plain}" if plain else f"text-{tfam}-{tstop}",
+                            )
+                            low, where = None, ""
+                            for pname, parent in parents.items():
+                                painted = composite(bg, alpha, parent) if alpha < 1 else bg
+                                c = contrast(fg, painted)
+                                if low is None or c < low:
+                                    low, where = c, pname
+                            prev = worst.get(key)
+                            if prev is None or low < prev[0]:
+                                worst[key] = (low, where, str(path.relative_to(ROOT)))
+
     problems = []
     if len(worst) < MIN_PAIRS:
         problems.append(
@@ -200,7 +278,7 @@ def main() -> int:
     # they stay out of this; and an inverted pill like `bg-slate-100
     # text-slate-900` declares its fill on the element and is covered above.
     bare: dict[int, str] = {}
-    for path in sorted(SRC.rglob("*.tsx")):
+    for path in sorted(_sources()):
         for m in cls_re.finditer(path.read_text()):
             s = m.group(1)
             if bg_re.search(s):

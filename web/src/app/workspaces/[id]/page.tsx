@@ -5510,7 +5510,22 @@ function WorkspaceDetailContent() {
                     className={`px-3 py-1.5 rounded text-xs font-medium text-white transition-colors ${
                       confirmStateAction.action === 'delete'
                         ? 'bg-red-600 hover:bg-red-500'
-                        : 'bg-amber-900/40 hover:bg-amber-900/60'
+                        // Solid, not a /40 tint. amber-900 is #ffb900 on light --
+                        // a pale yellow -- so 40% of it under the text-white in the
+                        // outer segment above measured 1.33:1 and the label was
+                        // effectively invisible. The hover goes DOWN a stop, which
+                        // looks wrong and is right: the light ramp puts the dark
+                        // inks at the low stops (amber-400 is #7b3306) and the pale
+                        // fills at the high ones, so 600 -> 400 darkens. 5.03:1 and
+                        // 9.06:1 against the worst of the three surfaces.
+                        //
+                        // NO BACKTICKS IN HERE. This is inside a template literal,
+                        // and check_theme_contrast's matcher delimits on the
+                        // backtick -- the first version of this comment quoted the
+                        // token names and blinded the gate to the very fill it was
+                        // explaining. The matcher now brace-matches instead, so this
+                        // is belt and braces rather than the only thing holding it.
+                        : 'bg-amber-600 hover:bg-amber-400'
                     }`}
                   >
                     {stateActionLoading ? t('actions.processing') : confirmStateAction.action === 'delete' ? t('state.confirmDelete') : t('state.confirmRollback')}

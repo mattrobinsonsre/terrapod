@@ -1718,7 +1718,12 @@ function RunDetailPageInner() {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
       case 'planned': case 'confirmed': return 'bg-indigo-900/50 text-indigo-300'
-      case 'planning': case 'applying': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
+      // `configuring` belongs here and was missed when the live-configure work
+      // landed: without it a RUNNING configure falls to `default`, which is the
+      // same grey as `canceled` and `discarded`, so the chip reads as finished
+      // while the activity card above it correctly pulses. Two views of one run
+      // disagreeing, on the page that shows both.
+      case 'planning': case 'applying': case 'configuring': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
       case 'pending': return 'bg-slate-700 text-slate-300'

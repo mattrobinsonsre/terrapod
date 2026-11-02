@@ -54,7 +54,7 @@ runs. The run's `GET /api/v1/runs/{run_id}/security-scan` says so in
 
 ## Configuration
 
-Set these per workspace (via the API, the `terraform_workspace` provider
+Set these per workspace (via the API, the `terrapod_workspace` provider
 resource, or `terrapod-migrate`):
 
 | Attribute | Values | Default | Meaning |
