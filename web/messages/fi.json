@@ -165,7 +165,8 @@
     "canceled": "Peruttu",
     "discarded": "Hylätty",
     "pendingDeletion": "Odottaa poistoa",
-    "archived": "Arkistoitu"
+    "archived": "Arkistoitu",
+    "configuring": "Määritetään"
   },
   "auth": {
     "loading": "Ladataan...",
@@ -2105,7 +2106,8 @@
       "errored": "Virhe",
       "canceled": "Peruttu",
       "discarded": "Hylätty",
-      "awaitingDecision": "Odottaa päätöstä"
+      "awaitingDecision": "Odottaa päätöstä",
+      "configuring": "Määritetään"
     },
     "activity": {
       "pending": "Valmistellaan ajoa",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Pakollinen käytäntöjoukko epäonnistui – ohita se tai hylkää ajo",
       "heldBySecurityScan": "Turvatarkistus löysi estäviä havaintoja – ohita se tai hylkää ajo",
       "heldByAiPolicy": "Tekoälykäytäntöportti hylkäsi tämän ajon – ohita se tai hylkää ajo",
-      "awaitingAiPolicy": "Odotetaan tekoälykäytännön päätöstä"
+      "awaitingAiPolicy": "Odotetaan tekoälykäytännön päätöstä",
+      "configuring": "Suoritetaan playbookeja inventaariota vastaan"
     },
     "badge": {
       "destroy": "tuhoa",
@@ -2251,7 +2254,8 @@
       "confirmed": "Vahvistettu",
       "errored": "Virhe",
       "canceled": "Peruttu",
-      "discarded": "Hylätty"
+      "discarded": "Hylätty",
+      "configuring": "Määritys aloitettu"
     },
     "log": {
       "color": "Väri",

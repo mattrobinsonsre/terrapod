@@ -165,7 +165,8 @@
     "canceled": "Annulé",
     "discarded": "Abandonné",
     "pendingDeletion": "Suppression en attente",
-    "archived": "Archivé"
+    "archived": "Archivé",
+    "configuring": "Configuration"
   },
   "auth": {
     "loading": "Chargement...",
@@ -2105,7 +2106,8 @@
       "errored": "En erreur",
       "canceled": "Annulé",
       "discarded": "Abandonné",
-      "awaitingDecision": "En attente de décision"
+      "awaitingDecision": "En attente de décision",
+      "configuring": "Configuration"
     },
     "activity": {
       "pending": "Préparation de l'exécution",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Un ensemble de politiques obligatoire a échoué — contournez-le ou abandonnez l'exécution",
       "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution",
       "heldByAiPolicy": "La barrière de politique IA a refusé cette exécution — contournez-la ou abandonnez l''exécution",
-      "awaitingAiPolicy": "En attente du verdict de la politique IA"
+      "awaitingAiPolicy": "En attente du verdict de la politique IA",
+      "configuring": "Exécution des playbooks sur l’inventaire"
     },
     "badge": {
       "destroy": "destruction",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confirmé",
       "errored": "En erreur",
       "canceled": "Annulé",
-      "discarded": "Abandonné"
+      "discarded": "Abandonné",
+      "configuring": "Configuration démarrée"
     },
     "log": {
       "color": "Couleur",

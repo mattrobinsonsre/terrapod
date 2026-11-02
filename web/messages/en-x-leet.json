@@ -165,7 +165,8 @@
     "canceled": "C4nc3l3d",
     "discarded": "D15c4rd3d",
     "pendingDeletion": "P3nd1ng d3l3710n",
-    "archived": "4rch1v3d"
+    "archived": "4rch1v3d",
+    "configuring": "C0nf1gur1ng"
   },
   "auth": {
     "loading": "L04d1ng...",
@@ -2105,7 +2106,8 @@
       "errored": "3rr0r3d",
       "canceled": "C4nc3l3d",
       "discarded": "D15c4rd3d",
-      "awaitingDecision": "4w4171ng d3c1510n"
+      "awaitingDecision": "4w4171ng d3c1510n",
+      "configuring": "C0nf1gur1ng"
     },
     "activity": {
       "pending": "Pr3p4r1ng 7h3 run",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "4 m4nd470ry p0l1cy 537 f41l3d — 0v3rr1d3 17 0r d15c4rd 7h3 run",
       "heldBySecurityScan": "7h3 53cur17y 5c4n f0und bl0ck1ng 155u35 — 0v3rr1d3 17 0r d15c4rd 7h3 run",
       "heldByAiPolicy": "7h3 41 p0l1cy g473 d3n13d 7h15 run — 0v3rr1d3 17 0r d15c4rd 7h3 run",
-      "awaitingAiPolicy": "W4171ng f0r 7h3 41 p0l1cy v3rd1c7"
+      "awaitingAiPolicy": "W4171ng f0r 7h3 41 p0l1cy v3rd1c7",
+      "configuring": "Runn1ng 7h3 pl4yb00k5 4g41n57 7h3 1nv3n70ry"
     },
     "badge": {
       "destroy": "d357r0y",
@@ -2251,7 +2254,8 @@
       "confirmed": "C0nf1rm3d",
       "errored": "3rr0r3d",
       "canceled": "C4nc3l3d",
-      "discarded": "D15c4rd3d"
+      "discarded": "D15c4rd3d",
+      "configuring": "C0nf1gur3 574r73d"
     },
     "log": {
       "color": "C0l0r",

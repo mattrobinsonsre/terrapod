@@ -165,7 +165,8 @@
     "canceled": "İptal Edildi",
     "discarded": "İptal Edildi",
     "pendingDeletion": "Silinmeyi bekliyor",
-    "archived": "Arşivlendi"
+    "archived": "Arşivlendi",
+    "configuring": "Yapılandırılıyor"
   },
   "auth": {
     "loading": "Yükleniyor...",
@@ -2105,7 +2106,8 @@
       "errored": "Hata Verdi",
       "canceled": "İptal Edildi",
       "discarded": "İptal Edildi",
-      "awaitingDecision": "Karar bekleniyor"
+      "awaitingDecision": "Karar bekleniyor",
+      "configuring": "Yapılandırılıyor"
     },
     "activity": {
       "pending": "Çalıştırma hazırlanıyor",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Zorunlu bir politika seti başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
       "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin",
       "heldByAiPolicy": "AI politika kapısı bu çalıştırmayı reddetti — geçersiz kılın veya çalıştırmayı iptal edin",
-      "awaitingAiPolicy": "AI politika kararı bekleniyor"
+      "awaitingAiPolicy": "AI politika kararı bekleniyor",
+      "configuring": "Playbook’lar envantere karşı çalıştırılıyor"
     },
     "badge": {
       "destroy": "yok et",
@@ -2251,7 +2254,8 @@
       "confirmed": "Onaylandı",
       "errored": "Hata Verdi",
       "canceled": "İptal Edildi",
-      "discarded": "İptal Edildi"
+      "discarded": "İptal Edildi",
+      "configuring": "Yapılandırma başladı"
     },
     "log": {
       "color": "Renk",

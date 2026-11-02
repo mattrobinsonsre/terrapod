@@ -165,7 +165,8 @@
     "canceled": "Canceled",
     "discarded": "Discarded",
     "pendingDeletion": "Pendin'' send t'' Davy Jones",
-    "archived": "Archived in th'' hold"
+    "archived": "Archived in th'' hold",
+    "configuring": "Riggin''"
   },
   "auth": {
     "loading": "Loadin''...",
@@ -2105,7 +2106,8 @@
       "errored": "Squalled",
       "canceled": "Canceled",
       "discarded": "Discarded",
-      "awaitingDecision": "Awaitin'' the cap''n''s word"
+      "awaitingDecision": "Awaitin'' the cap''n''s word",
+      "configuring": "Riggin''"
     },
     "activity": {
       "pending": "Preparin'' th'' run",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "A mandatory policy set be sunk — override it or scuttle the run",
       "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run",
       "heldByAiPolicy": "The AI articles gate refused this run — override it or scuttle the run",
-      "awaitingAiPolicy": "Awaitin'' the AI articles ruling"
+      "awaitingAiPolicy": "Awaitin'' the AI articles ruling",
+      "configuring": "Runnin'' the playbooks against the manifest"
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confirmed",
       "errored": "Squalled",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "configuring": "Riggin'' started"
     },
     "log": {
       "color": "Color",

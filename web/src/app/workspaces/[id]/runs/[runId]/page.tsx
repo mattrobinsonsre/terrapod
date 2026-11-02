@@ -280,7 +280,9 @@ function RunActivityHeader({
   const word = (name: string) => engineWord(tPhase, engine, name)
   // A run held after its plan is waiting for a person, not doing anything: no
   // pulse, no ticking timer (#1725).
-  const live = !gate && ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
+  const live =
+    !gate &&
+    ['pending', 'queued', 'planning', 'confirmed', 'applying', 'configuring', 'canceling'].includes(status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!live) return
@@ -307,6 +309,13 @@ function RunActivityHeader({
     confirmed: { label: t('status.confirmed'), activity: word('activityConfirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
     applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
+    // Plain `t()` rather than `phase()`: planning and applying take the
+    // engine's word because Terraform and Pulumi name them differently, but a
+    // configure is always Ansible, so there is no per-engine wording to pick.
+    // Active yellow and `configuring-at`, matching `applying` -- without the
+    // entry this status fell through to the raw string and a grey dot, so a
+    // running configure read as inert and finished.
+    configuring: { label: t('status.configuring'), activity: t('activity.configuring'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'configuring-at' },
     applied:
       hasChanges === false
         ? {
@@ -1433,7 +1442,19 @@ function RunDetailPageInner() {
     if (event.event === 'log_updated' && event.run_id === bareId) {
       if (event.phase === 'plan') loadPlanLog()
       else if (event.phase === 'apply') loadApplyLog()
-      else if (event.phase === 'configure') loadConfigureLog()
+      else if (event.phase === 'configure') {
+        loadConfigureLog()
+        // `last-output-at` is on the run document, recomputed per read from the
+        // progress marker in Redis (`runs.py`'s `last_output_at`), so the log
+        // refresh alone left it frozen at whatever it said on mount -- and
+        // because the relative time re-renders, it then counted UPWARD while
+        // output was actively arriving. The listener answers the reconciler's
+        // `stream_logs` every cycle whether or not ansible produced anything,
+        // so this fires about every ten seconds for the life of a configure,
+        // which is the cadence the indicator needs. Nothing extra is published
+        // server-side for the same reason.
+        loadRun()
+      }
     }
     // Any of the summary-lifecycle events should trigger a refetch
     // (pending, ready, errored, skipped, message_posted). The
@@ -2539,6 +2560,7 @@ function RunDetailPageInner() {
               ['confirmed-at', t('timeline.confirmed')],
               ['applying-at', word('timelineApplyingStarted')],
               ['applied-at', word('timelineApplied')],
+              ['configuring-at', t('timeline.configuring')],
               ['errored-at', t('timeline.errored')],
               ['canceled-at', t('timeline.canceled')],
               ['discarded-at', t('timeline.discarded')],

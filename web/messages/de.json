@@ -165,7 +165,8 @@
     "canceled": "Abgebrochen",
     "discarded": "Verworfen",
     "pendingDeletion": "Löschung ausstehend",
-    "archived": "Archiviert"
+    "archived": "Archiviert",
+    "configuring": "Konfiguriert"
   },
   "auth": {
     "loading": "Wird geladen...",
@@ -2105,7 +2106,8 @@
       "errored": "Fehlgeschlagen",
       "canceled": "Abgebrochen",
       "discarded": "Verworfen",
-      "awaitingDecision": "Wartet auf Entscheidung"
+      "awaitingDecision": "Wartet auf Entscheidung",
+      "configuring": "Konfiguriert"
     },
     "activity": {
       "pending": "Ausführung wird vorbereitet",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Ein verpflichtender Richtliniensatz ist fehlgeschlagen – überschreiben oder die Ausführung verwerfen",
       "heldBySecurityScan": "Der Sicherheits-Scan hat blockierende Funde – überschreiben oder die Ausführung verwerfen",
       "heldByAiPolicy": "Das KI-Richtlinien-Gate hat diesen Lauf abgelehnt – überschreiben oder die Ausführung verwerfen",
-      "awaitingAiPolicy": "Warten auf das Urteil der KI-Richtlinie"
+      "awaitingAiPolicy": "Warten auf das Urteil der KI-Richtlinie",
+      "configuring": "Playbooks werden gegen das Inventar ausgeführt"
     },
     "badge": {
       "destroy": "Zerstören",
@@ -2251,7 +2254,8 @@
       "confirmed": "Bestätigt",
       "errored": "Fehlgeschlagen",
       "canceled": "Abgebrochen",
-      "discarded": "Verworfen"
+      "discarded": "Verworfen",
+      "configuring": "Konfiguration gestartet"
     },
     "log": {
       "color": "Farbe",

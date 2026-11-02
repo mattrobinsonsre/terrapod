@@ -165,7 +165,8 @@
     "canceled": "Geannuleerd",
     "discarded": "Verworpen",
     "pendingDeletion": "In afwachting van verwijdering",
-    "archived": "Gearchiveerd"
+    "archived": "Gearchiveerd",
+    "configuring": "Configureren"
   },
   "auth": {
     "loading": "Bezig met laden...",
@@ -2105,7 +2106,8 @@
       "errored": "Mislukt",
       "canceled": "Geannuleerd",
       "discarded": "Verworpen",
-      "awaitingDecision": "Wacht op beslissing"
+      "awaitingDecision": "Wacht op beslissing",
+      "configuring": "Configureren"
     },
     "activity": {
       "pending": "Uitvoering voorbereiden",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Een verplichte beleidsset is mislukt — overschrijf deze of verwerp de uitvoering",
       "heldBySecurityScan": "De beveiligingsscan vond blokkerende bevindingen — overschrijf deze of verwerp de uitvoering",
       "heldByAiPolicy": "De AI-beleidspoort weigerde deze uitvoering — overschrijf deze of verwerp de uitvoering",
-      "awaitingAiPolicy": "Wachten op het oordeel van het AI-beleid"
+      "awaitingAiPolicy": "Wachten op het oordeel van het AI-beleid",
+      "configuring": "Playbooks uitvoeren tegen de inventaris"
     },
     "badge": {
       "destroy": "vernietigen",
@@ -2251,7 +2254,8 @@
       "confirmed": "Bevestigd",
       "errored": "Mislukt",
       "canceled": "Geannuleerd",
-      "discarded": "Verworpen"
+      "discarded": "Verworpen",
+      "configuring": "Configuratie gestart"
     },
     "log": {
       "color": "Kleur",
