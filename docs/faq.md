@@ -13,7 +13,7 @@ OpenTofu (`tofu`) as pluggable execution backends, and runs **Pulumi** programs
 and **Ansible** playbooks through that same model. It is **not** a fork of any
 engine — it orchestrates them. Deployed via a Helm chart on
 Kubernetes. License: MPL-2.0. The stable line is **1.x**; **2.0 is in
-pre-release**, so the newest published release may be a `2.0.0-alpha`. See
+pre-release**, so the newest published release may be a 2.0 pre-release. See
 [Releases](https://github.com/mattrobinsonsre/terrapod/releases) for what is
 current and [Upgrading to 2.0](upgrading-to-2.0.md) for what changes.
 
@@ -122,11 +122,11 @@ compatibility contract enforced in CI across every public surface (API, wire
 protocol, config, Helm values, DB schema, SDK, provider). A minor never breaks
 any of them.
 
-**2.0 is in pre-release.** A `2.0.0-alpha` is published for people who want to
-try it and is **not** recommended for production: it is where the breaking
+**2.0 is in pre-release.** A 2.0 pre-release is published for people who want
+to try it and is **not** recommended for production: it is where the breaking
 changes land, and a pre-release carries no promise that the next one keeps its
 shape. Run the newest **1.x** release in production until 2.0 reaches a stable
-tag. Because GitHub picks "Latest" by publish time, an alpha can hold that badge
+tag. Because GitHub picks "Latest" by publish time, a pre-release can hold that badge
 while 1.x remains the production line — so read the version, not the badge.
 
 See [Versioning & support](versioning-and-support.md),
