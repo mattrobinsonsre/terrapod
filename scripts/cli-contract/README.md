@@ -52,6 +52,42 @@ port-forward with it, and installs the CA where the Go client will find it. The
 chart and `values-eval.yaml` are untouched: that profile is gated, must stay
 batteries-included, and this job's TLS is its own concern.
 
+### Terminating TLS is not enough — the terminator has to report the scheme
+
+This is the part that cost a day, so it is written down rather than left to be
+rediscovered. The first version of the job used `socat OPENSSL-LISTEN:443 ...
+TCP:18080`, which terminates TLS perfectly well and forwards bytes. Discovery,
+`init` and `plan` all passed. Then every **state** operation hung: `tofu apply`
+for its whole timeout, and `state pull` and `state list` after it, because the
+killed apply had left the workspace locked.
+
+The cause is that a state content URL is generated **by the server**, from
+`X-Forwarded-Proto` and `X-Forwarded-Host` — deliberately, so a deployment with
+an internal ingress hands each caller a hostname it can actually reach
+(`tfe_v2._request_base`). A TCP tunnel cannot set a header, so the BFF saw a
+plain-HTTP connection from loopback and reported `http`:
+`web/src/lib/bff-proxy.ts` preserves an incoming `x-forwarded-proto` and
+otherwise falls back to its own connection. The server then correctly handed
+`tofu` a `http://` URL, on a port where nothing was listening.
+
+Measured against the real API with crafted headers, which is how this was
+settled rather than guessed:
+
+| sent | URL the server returns |
+|---|---|
+| `X-Forwarded-Proto: http` | `http://terrapod.test/...` |
+| `X-Forwarded-Proto: https` | `https://terrapod.test/...` |
+
+The product is right; the harness was lying to it. So the front end is a
+**reverse proxy** that sets those headers, which is what a real deployment has
+in front of the BFF and why this suite passes against a Traefik-fronted dev
+stack. Do not swap it back for a tunnel.
+
+It deliberately does **not** listen on port 80, and the job asserts that with
+`curl` rather than claiming it: if the scheme is ever reported wrongly again,
+the run has to fail loudly instead of quietly succeeding over `http` and
+silently stopping testing what it says it tests.
+
 ## `tofu login` is exercised as a protocol, not as a browser
 
 The interactive flow completes in a browser. This drives the **same** OAuth2 +
