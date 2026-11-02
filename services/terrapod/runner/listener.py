@@ -41,6 +41,10 @@ logger = get_logger(__name__)
 # Shutdown flag
 _shutdown = asyncio.Event()
 
+#: Authoritative auth rejections before `_rejoin` fires. Not 1: a single 401
+#: can be a flap, and a re-join consumes a join-token use.
+_REJOIN_THRESHOLD = 3
+
 # SSE tuning lives on RunnerConfig (sse_read_timeout / sse_max_age), layered
 # from runners.yaml + env. The listener reads them via self._sse_read_timeout /
 # self._sse_max_age (set in __init__) rather than module-level env constants.
@@ -70,6 +74,17 @@ class RunnerListener:
         self._sse_read_timeout = self.runner_config.sse_read_timeout
         self._sse_max_age = self.runner_config.sse_max_age
         self._identity_ready = False
+        # Authoritative auth rejections since the last successful connection or
+        # re-join. Shared by the SSE loop and the renewal loop because both
+        # learn the same fact -- the API no longer accepts this cert -- and
+        # there must be exactly one re-join trigger between them.
+        self._auth_failures = 0
+        # `_rejoin` deletes the credentials Secret, and now has two reporters,
+        # so it is serialised. The generation counter lets a caller that waited
+        # on the lock see that someone else already re-joined and skip, rather
+        # than burning a second join-token use for nothing.
+        self._rejoin_lock = asyncio.Lock()
+        self._rejoin_generation = 0
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
         # Real running-Job count from K8s, refreshed each heartbeat (#749).
@@ -202,9 +217,64 @@ class RunnerListener:
             namespace=namespace,
             cert_validity_seconds=cert_validity_seconds,
             splay_seconds=pod_splay_seconds(),
+            # The renewal loop holds the authoritative signal: a 401 from
+            # /renew is a non-retried API decision, where an SSE failure may
+            # be transport. Three docstrings already said the caller re-joins
+            # on a refused renewal; this is the caller that does it.
+            on_cert_rejected=lambda: self._note_auth_failure(source="renew"),
         )
 
+    async def _note_auth_failure(self, *, source: str) -> bool:
+        """Record one authoritative auth rejection; re-join at the threshold.
+
+        Returns True when a re-join actually happened, so the caller can retry
+        immediately against the new identity.
+
+        The count is cleared only by a successful connection or a successful
+        re-join. It deliberately survives transport failures: the SSE loop's
+        counter used to mean "uninterrupted by any error at all", so a single
+        refused connection reset it and a listener whose cert had expired never
+        reached the threshold while its connections were also failing. That is
+        measured, not hypothetical -- it took a listener out of service with 2
+        auth failures recorded against 22 transport failures, no re-join
+        attempted, and no run dispatchable until its Secret was deleted by hand.
+        """
+        self._auth_failures += 1
+        if self._auth_failures < _REJOIN_THRESHOLD:
+            logger.error(
+                "Auth rejected by API",
+                source=source,
+                auth_failures=self._auth_failures,
+                threshold=_REJOIN_THRESHOLD,
+            )
+            return False
+        try:
+            await self._rejoin()
+        except Exception as rejoin_err:
+            logger.error("Re-join failed", error=str(rejoin_err), source=source)
+            return False
+        return True
+
     async def _rejoin(self) -> None:
+        """Serialise re-joins so two reporters cannot each consume a token use.
+
+        The mechanism is in `_rejoin_unlocked`; this is the gate. A caller that
+        waited on the lock checks the generation it saw on entry: if another
+        loop re-joined meanwhile, there is nothing left to recover and joining
+        again would spend a second join-token use. On a pool whose token has
+        `max_uses: 1` that is the difference between a recovered listener and
+        one that can never join again.
+        """
+        gen = self._rejoin_generation
+        async with self._rejoin_lock:
+            if self._rejoin_generation != gen:
+                logger.info("Re-join already completed by another loop; skipping")
+                return
+            await self._rejoin_unlocked()
+            self._rejoin_generation += 1
+            self._auth_failures = 0
+
+    async def _rejoin_unlocked(self) -> None:
         """Force a fresh join by clearing the credentials Secret and re-establishing.
 
         Called when the listener receives persistent 401s, indicating its
@@ -413,13 +483,11 @@ class RunnerListener:
         Detects persistent 401s (stale cert / expired Redis registration)
         and triggers a re-join to recover without pod restart.
         """
-        consecutive_401s = 0
-        _REJOIN_THRESHOLD = 3  # re-join after 3 consecutive 401s
 
         while not _shutdown.is_set():
             try:
                 await self._sse_connect()
-                consecutive_401s = 0  # successful connection resets counter
+                self._auth_failures = 0  # a successful connection clears the count
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
                     # API doesn't recognise our listener-id: Redis TTL expired
@@ -430,31 +498,20 @@ class RunnerListener:
                         listener_id=str(self.identity.listener_id),
                     )
                     try:
+                        # `_rejoin` clears the auth-failure count itself.
                         await self._rejoin()
-                        consecutive_401s = 0
                         continue
                     except Exception as rejoin_err:
                         logger.error("Re-join failed", error=str(rejoin_err))
                 elif e.response.status_code == 401:
-                    consecutive_401s += 1
-                    if consecutive_401s >= _REJOIN_THRESHOLD:
-                        try:
-                            await self._rejoin()
-                            consecutive_401s = 0
-                            continue  # retry SSE immediately with new identity
-                        except Exception as rejoin_err:
-                            logger.error("Re-join failed", error=str(rejoin_err))
-                    else:
-                        logger.error(
-                            "SSE auth failed",
-                            error=str(e),
-                            consecutive_401s=consecutive_401s,
-                        )
+                    # One authoritative rejection. `_note_auth_failure` owns the
+                    # threshold and the re-join, so the renewal loop's rejections
+                    # count towards the same recovery rather than a second one.
+                    if await self._note_auth_failure(source="sse"):
+                        continue  # retry SSE immediately with the new identity
                 else:
-                    consecutive_401s = 0
                     logger.error("SSE connection failed", error=str(e))
             except Exception as e:
-                consecutive_401s = 0
                 logger.error("SSE connection failed", error=str(e))
 
             if _shutdown.is_set():
