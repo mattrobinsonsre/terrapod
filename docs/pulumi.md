@@ -11,18 +11,20 @@ parity.
 *A Pulumi workspace — `project / stack`, carrying its engine badge, with the
 same runs, variables, state and RBAC as any other workspace.*
 
-Pulumi is off until an operator turns it on:
+**There is nothing to turn on.** Pulumi needs no Helm value and no capability
+flag — a workspace declares `engine = "pulumi"` and that is the whole of it, the
+same way Ansible needs no switch (see
+[ansible.md](ansible.md#a-terraform-only-deployment-pays-nothing-for-any-of-this)).
+A deployment where nobody has made a Pulumi workspace has no Pulumi in it,
+because the surfaces adapt at run time rather than being configured off.
 
-```yaml
-api:
-  config:
-    engines:
-      pulumi:
-        enabled: true
-```
-
-With it off, nothing Pulumi-related is registered, and Terraform and OpenTofu
-are untouched either way.
+> **This section used to say the opposite, and following it broke the install.**
+> It gave an `api.config.engines.pulumi.enabled: true` block to paste into
+> `values.yaml`. That switch was withdrawn before 2.0 (#1986), and because
+> `values.schema.json` sets `additionalProperties: false` the schema *refuses*
+> the key — so the snippet failed `helm lint` and `helm upgrade` rather than
+> being harmlessly ignored. If you have that block in your values, remove it:
+> [Upgrading to 2.0 → The engine on/off switch is removed](upgrading-to-2.0.md#the-engine-onoff-switch-is-removed).
 
 ## A workspace is a stack
 

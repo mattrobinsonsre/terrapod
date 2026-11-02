@@ -65,8 +65,8 @@ const BASE = `https://${HOST}`
 const ONLY = typeof args.only === 'string' ? new Set(args.only.split(',')) : null
 const wanted = (name) => !ONLY || ONLY.has(name)
 
-// Wide enough for the app's own layout to breathe, narrow enough that its text
-// survives GitHub's downscale to ~850px.
+// See the header: uniformity across the set is what governs this number, not
+// the downscale argument an earlier version of this comment made.
 const VIEWPORT = { width: 1440, height: 900 }
 
 const shots = []

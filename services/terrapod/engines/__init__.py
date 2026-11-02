@@ -1,9 +1,11 @@
 """The engine seam: which IaC system a workspace, run and config version belong to.
 
-#1407 phase 1. Terraform is the only implementation, and its behaviour is
-preserved exactly — the point of this package is that the seam exists and is
-exercised by the one caller there is, not that it anticipates what Pulumi or
-Ansible will need. Guessed extension points are how an abstraction ends up
+#1407 phase 1 opened this seam when Terraform was the only implementation, and
+its behaviour is preserved exactly. `pulumi.py` now sits beside it, so a grep
+for "which engines are there" lands here and must not be told there is one:
+the registry below is the answer. Ansible is deliberately NOT here — it is a
+configure operation a workspace carries alongside plan/apply, not an engine.
+What phase 1 refused to do was guess at extension points no caller needed. Guessed extension points are how an abstraction ends up
 fitting nothing.
 
 **`engine` is not `execution_backend`.** They sit next to each other on the same

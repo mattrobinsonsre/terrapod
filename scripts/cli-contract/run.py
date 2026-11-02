@@ -174,9 +174,14 @@ def discovery(ctx: Ctx) -> None:
     code, doc = ctx.api("GET", "/.well-known/terraform.json")
     if code != 200:
         raise Fail(f"/.well-known/terraform.json answered {code}")
-    # These three are what the cloud backend and `tofu login` read. A missing
-    # one does not error -- the CLI simply behaves as if the feature is absent.
-    for key in ("tfe.v2", "login.v1"):
+    # A missing service does not error -- the CLI simply behaves as if the
+    # feature is absent, which is why this is checked at all. The comment here
+    # used to say "these three" above a loop over TWO, so the two registry
+    # protocols were advertised as covered and were not: dropping `modules.v1`
+    # would make every `registry.<host>/...` module source resolve nowhere,
+    # silently. Verified against a live document, which carries exactly these
+    # four plus `tfe.v2.1`, `tfe.v2.2` and `terrapod-version`.
+    for key in ("tfe.v2", "login.v1", "modules.v1", "providers.v1"):
         if key not in doc:
             raise Fail(f"the discovery document carries no {key!r}: {sorted(doc)}")
     login = doc["login.v1"]

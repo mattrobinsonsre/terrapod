@@ -32,7 +32,10 @@ import pathlib
 import re
 import sys
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:
+    sys.exit("FAIL: PyYAML is required; the docs-audit job installs it")
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CI = ROOT / ".github" / "workflows" / "ci.yml"
@@ -41,17 +44,24 @@ CI = ROOT / ".github" / "workflows" / "ci.yml"
 #: rather than on a job name is what makes a new job covered automatically.
 BOOTS = re.compile(r"scripts/eval\.sh")
 
-#: Steps that put an image where the cluster can reach it. `ghcr-login` is listed
-#: because a pull without it is anonymous and rate-limited, so the two travel
-#: together on the branch/tag path.
-DELIVERS = (
+#: Steps that actually MOVE AN IMAGE. Authentication is deliberately NOT in this
+#: list, and that distinction is the whole correctness of this check: the first
+#: version included `ghcr-login`, so deleting the `docker pull` and keeping the
+#: login PASSED -- the gate written to catch "no images were delivered" could not
+#: catch exactly that. A login delivers nothing. Mutation-proven both ways.
+MOVES = (
     "download-artifact",
-    "ghcr-login",
     "docker pull",
     "docker load",
     "docker tag",
     "docker push",
 )
+
+#: Authentication, which a branch/tag pull needs but which is not delivery. An
+#: anonymous GHCR pull is rate-limited per source IP and runners share egress,
+#: so a pull without this is a flake waiting for a busy afternoon -- reported
+#: separately rather than counted as a delivery.
+AUTHENTICATES = ("ghcr-login",)
 
 #: A floor, so a matcher that stops matching fails here instead of passing on
 #: nothing. Two jobs boot the eval stack today.
@@ -88,12 +98,15 @@ def main() -> int:
         )
 
     for name, steps in sorted(booting.items()):
-        pr_half, tag_half = [], []
+        pr_half, tag_half, tag_auth = [], [], []
         for s in steps:
             cond = str(s.get("if") or "")
-            if not any(d in step_text(s) for d in DELIVERS):
-                continue
+            text = step_text(s)
             label = s.get("name") or s.get("uses") or "(unnamed)"
+            if any(a in text for a in AUTHENTICATES) and NOT_PR in cond:
+                tag_auth.append(label)
+            if not any(d in text for d in MOVES):
+                continue
             if PR_ONLY in cond:
                 pr_half.append(label)
             elif NOT_PR in cond:
@@ -105,9 +118,18 @@ def main() -> int:
             )
         if not tag_half:
             problems.append(
-                f"[{name}] delivers no images on the BRANCH/TAG path (no delivery "
-                f"step gated `{NOT_PR}`). This job will be green on every pull "
-                f"request and red on main, which is how it shipped the first time."
+                f"[{name}] delivers no images on the BRANCH/TAG path (no step that "
+                f"MOVES an image, gated `{NOT_PR}`). This job will be green on "
+                f"every pull request and red on main, which is how it shipped the "
+                f"first time. Note a GHCR login does not count: it authenticates "
+                f"a pull, it does not perform one."
+            )
+        elif not tag_auth:
+            problems.append(
+                f"[{name}] pulls images on the branch/tag path ({', '.join(tag_half)}) "
+                f"with no GHCR login gated `{NOT_PR}`. An anonymous pull is "
+                f"rate-limited per source IP and runners share egress, so this is "
+                f"a flake waiting for a busy afternoon."
             )
 
     if problems:
