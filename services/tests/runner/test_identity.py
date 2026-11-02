@@ -3,6 +3,8 @@
 import base64
 import os
 import uuid
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -104,8 +106,14 @@ class TestCallRenewWithRetries:
         assert result == new_data
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_401(self):
-        """401 means cert is rejected — no retries, return None so caller can fall back."""
+    async def test_raises_cert_rejected_on_401(self):
+        """401 means the cert is refused outright — raise, do not return None.
+
+        This used to return None, which is also what a transient failure
+        returned, so the caller could not tell "retry later" from "this cert
+        will never work again" and retried a rejected cert for ever. The part
+        of the original reasoning that still holds is below: no retries.
+        """
         ident = _identity()
 
         mock_response = MagicMock()
@@ -117,9 +125,9 @@ class TestCallRenewWithRetries:
         mock_client.post.return_value = mock_response
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await identity_mod._call_renew_with_retries(ident)
+            with pytest.raises(identity_mod._CertRejected):
+                await identity_mod._call_renew_with_retries(ident)
 
-        assert result is None
         # Single call — no retries on auth failure
         assert mock_client.post.call_count == 1
 
@@ -327,12 +335,16 @@ class TestEstablishIdentity:
 class TestAnUnusableKeyDoesNotCrashRenewal:
     """A corrupt stored key must leave the join-token fallback reachable.
 
-    `_call_renew_with_retries` promises "the new cert, or None if every attempt
-    failed", and the caller answers None by re-joining — which issues a fresh key
-    and is exactly the right recovery for a corrupt one. If signing raised out of
-    here instead, that self-healing case would become a crash loop, so the signing
-    is best-effort and an unsigned request is sent (which an API requiring proof of
-    possession then refuses, giving the same None).
+    The caller recovers from a refused renewal by re-joining, which issues a
+    fresh key and is exactly the right recovery for a corrupt one. If signing
+    raised out of here instead, that self-healing case would become a crash
+    loop — so signing is best-effort and an unsigned request is sent, which an
+    API requiring proof of possession refuses with the 401 that drives the
+    re-join.
+
+    The refusal is now `_CertRejected` rather than a None return. The part of
+    the original reasoning that still holds is the part being tested: signing
+    must not be what raises out of here.
     """
 
     @pytest.mark.asyncio
@@ -350,11 +362,97 @@ class TestAnUnusableKeyDoesNotCrashRenewal:
         cm.__aexit__ = AsyncMock(return_value=False)
 
         with patch("httpx.AsyncClient", return_value=cm):
-            result = await identity_mod._call_renew_with_retries(ident)
+            with pytest.raises(identity_mod._CertRejected):
+                await identity_mod._call_renew_with_retries(ident)
 
-        assert result is None, "a refused renewal returns None so the caller re-joins"
         sent = client.post.await_args.kwargs["headers"]
         assert "X-Terrapod-Client-Cert" in sent
         assert "X-Terrapod-Listener-Signature" not in sent, (
             "a key that will not load must not leave a half-built signature behind"
         )
+
+
+# ── renew_loop: what happens when the API refuses the cert ──────────
+
+
+async def _drive_renew_loop(*, on_cert_rejected, second_cycle_error):
+    """Run one `renew_loop` cycle that is refused, then break out on the next.
+
+    The loop is a `while True`, so the exit is an unexpected exception from the
+    second `/renew` — which also proves the loop came back round rather than
+    sleeping on the rejection for ever.
+    """
+    holder = SimpleNamespace(identity=_identity())
+    calls = {"n": 0}
+
+    async def fake_renew(cert):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise identity_mod._CertRejected("renew returned 401")
+        raise second_cycle_error
+
+    sleeper = AsyncMock()
+    with (
+        patch.object(identity_mod, "_call_renew_with_retries", side_effect=fake_renew),
+        patch.object(identity_mod, "_read_secret", return_value=None),
+        # An already-expired cert, which is the case that cannot renew itself.
+        patch.object(identity_mod, "cert_not_after", return_value=datetime.now(UTC)),
+        patch("asyncio.sleep", sleeper),
+    ):
+        with pytest.raises(type(second_cycle_error), match="second cycle"):
+            await identity_mod.renew_loop(
+                holder,
+                secret_name="s",
+                namespace="n",
+                cert_validity_seconds=300,
+                splay_seconds=0,
+                on_cert_rejected=on_cert_rejected,
+            )
+    return calls, sleeper
+
+
+class TestTheRenewLoopReportsARefusedCert:
+    @pytest.mark.asyncio
+    async def test_a_rejection_is_reported_and_the_loop_retries_at_once(self):
+        """A reported rejection that led to a re-join must not also sleep.
+
+        The listener has replaced its identity by then, so the next cycle has
+        something new to try. Sleeping first is what left a listener wedged for
+        25 minutes with an expired cert it could never renew.
+        """
+        reported = []
+
+        async def on_rejected():
+            reported.append(True)
+            return True  # a re-join happened
+
+        calls, sleeper = await _drive_renew_loop(
+            on_cert_rejected=on_rejected,
+            second_cycle_error=RuntimeError("second cycle"),
+        )
+        assert reported == [True], "the refusal must reach the listener"
+        assert calls["n"] == 2, "the loop must come back round, not sleep"
+        assert sleeper.await_count == 0
+
+    @pytest.mark.asyncio
+    async def test_with_no_reporter_wired_it_sleeps_and_retries(self):
+        """`renew_loop` stays usable on its own, so the callback is optional."""
+        calls, sleeper = await _drive_renew_loop(
+            on_cert_rejected=None,
+            second_cycle_error=RuntimeError("second cycle"),
+        )
+        assert calls["n"] == 2
+        assert sleeper.await_count == 1, (
+            "with nobody to report to, back off rather than hot-looping on a "
+            "cert the API has already refused"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_reported_rejection_that_did_not_re_join_still_backs_off(self):
+        """Below the threshold there is no new identity, so do not hot-loop."""
+        calls, sleeper = await _drive_renew_loop(
+            on_cert_rejected=AsyncMock(return_value=False),
+            second_cycle_error=RuntimeError("second cycle"),
+        )
+        assert calls["n"] == 2
+        assert sleeper.await_count == 1
