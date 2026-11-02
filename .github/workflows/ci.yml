@@ -3064,10 +3064,29 @@ jobs:
           rc=0
           for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
           [ "$rc" -eq 0 ] || { echo "an image failed to push to the eval registry" >&2; exit 1; }
+          # The same environment helm-eval-boot gives eval.sh, and every key
+          # here is one this job got wrong on its first run:
+          #
+          #   TERRAPOD_VERSION          eval.sh defaults to `latest`, which is
+          #                             not what was pushed above -- the
+          #                             migrations pod sat in ImagePullBackOff
+          #   EVAL_NO_PORT_FORWARD      eval.sh otherwise ends in
+          #                             `exec kubectl port-forward` and never
+          #                             returns; this job does its own below
+          #   TERRAPOD_EVAL_HELM_TIMEOUT  fail fast -- without it the install
+          #                             waited 580s before reporting a problem
+          #                             visible in the first 30
+          #   TERRAPOD_EVAL_TOOL        the runner ships a pre-installed kind,
+          #                             so auto-detection picks the wrong one
+          CI=1 \
+          EVAL_NO_PORT_FORWARD=1 \
+          TERRAPOD_EVAL_TOOL=k3d \
+          TERRAPOD_VERSION="sha-${sha}-amd64" \
+          TERRAPOD_EVAL_HELM_TIMEOUT=300s \
           TERRAPOD_EVAL_CLUSTER=terrapod-cli \
           TERRAPOD_EVAL_NAMESPACE=terrapod-cli \
           TERRAPOD_EVAL_IMAGE_REGISTRY="k3d-eval-registry.localhost:${reg_port}" \
-            scripts/eval.sh
+            scripts/eval.sh up
 
       # THE CLI FORCES HTTPS FOR SERVICE DISCOVERY. Measured against a plain
       # port-forward, which is how Eval Boot reaches the stack:

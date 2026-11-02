@@ -421,8 +421,17 @@ def main() -> int:
         return 2
 
     base = f"https://{args.host}"
+    # The third and last subprocess call in this file, and suppressed for the
+    # same reason as the two above: `TOFU` is `shutil.which("tofu")`, so semgrep
+    # taints it as PATH-derived -- which is exactly what this suite is for. It
+    # drives the real binary an operator has installed; resolving it from PATH
+    # is the feature, not a lapse. The argv is a literal.
+    # nosemgrep: dangerous-subprocess-use-tainted-env-args
     ver = subprocess.run([TOFU, "version"], capture_output=True, text=True, check=False)
-    print(f"  tofu:   {ver.stdout.splitlines()[0]}")
+    # `version` on a broken binary can print nothing at all, and an IndexError
+    # here would report as a suite crash rather than as "tofu does not run".
+    first = ver.stdout.splitlines()
+    print(f"  tofu:   {first[0] if first else f'(no version output, rc={ver.returncode})'}")
     print(f"  target: {base}")
 
     # scripts/mint-token.py, as a subprocess through its documented interface
