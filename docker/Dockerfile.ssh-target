@@ -27,7 +27,7 @@
 # captures a real host's -- and `authorized_keys` is mounted, never committed,
 # because a private key in a public repository is a secret-scanner finding
 # whatever its intended lifetime.
-FROM alpine:3.21
+FROM alpine:3.24
 
 # `python3` is here so a real ansible MODULE can be staged on this target, not
 # just `ansible.builtin.raw`. It is the one line that makes this a managed node
