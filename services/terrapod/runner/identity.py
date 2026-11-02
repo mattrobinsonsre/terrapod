@@ -47,6 +47,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from terrapod.config import RunnerConfig
 
 from cryptography import x509
@@ -429,6 +431,7 @@ async def renew_loop(
     namespace: str,
     cert_validity_seconds: int,
     splay_seconds: int,
+    on_cert_rejected: Callable[[], Awaitable[bool]] | None = None,
 ) -> None:
     """Keep `identity_holder.identity` fresh.
 
@@ -489,9 +492,30 @@ async def renew_loop(
             current_resource_version = None
 
         # ── Step 2: we're the renewer
-        new_cert = await _call_renew_with_retries(cert)
+        try:
+            new_cert = await _call_renew_with_retries(cert)
+        except _CertRejected as e:
+            # The API has refused this cert outright, so there is nothing to
+            # retry. `on_cert_rejected` is the listener, which owns the re-join
+            # because it must also rebuild its HTTP clients against the new
+            # identity; it applies the same threshold the SSE path does. With
+            # no reporter wired, fall through to the bounded sleep so this
+            # function stays usable on its own.
+            rejoined = False
+            if on_cert_rejected is not None:
+                rejoined = await on_cert_rejected()
+            if rejoined:
+                continue  # identity_holder.identity is new -- re-read it
+            sleep_for = min(max(remaining, 0), 60) + 30
+            logger.warning(
+                "Renewal rejected; will retry",
+                error=str(e),
+                sleep_seconds=int(sleep_for),
+            )
+            await asyncio.sleep(sleep_for)
+            continue
         if new_cert is None:
-            # Transient failure (rate limit, 5xx, network). The Secret may
+            # Genuinely transient (rate limit, 5xx, network). The Secret may
             # still hold a valid-ish cert; keep using it and try again on the
             # next cycle. Sleep a bounded interval — never go negative when
             # we're already past expiry, and never burn-loop on rate limits.
@@ -543,6 +567,17 @@ async def renew_loop(
 # ── HTTP helpers ────────────────────────────────────────────────────
 
 
+class _CertRejected(Exception):
+    """Raised when /renew answers 401/403 — the API will not accept this cert.
+
+    Distinct from a transient failure on purpose. Both outcomes used to be the
+    same `None`, while this module's own docstring said the caller could
+    "decide whether to fall back to join token" — a decision the caller could
+    not make, because it could not tell the two apart. So the documented
+    fallback never happened and a rejected cert retried for ever.
+    """
+
+
 class _JoinTokenExhausted(Exception):
     """Raised when /join returns 401/403 because max_uses is exhausted."""
 
@@ -588,9 +623,13 @@ async def _call_join(api_url: str, join_token: str, name: str) -> dict:
 async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     """Try `/listeners/{id}/renew` up to 3 times with backoff.
 
-    Returns the new cert dict on success, or None if all attempts failed.
-    A 401/403 from the API is *not* retried — the cert is rejected, return
-    None so the caller can decide whether to fall back to join token.
+    Returns the new cert dict on success, or None if every attempt failed for
+    a transient reason (rate limit, 5xx, network).
+
+    A 401/403 is *not* retried and raises `_CertRejected`: the API has refused
+    this cert outright, so retrying it is futile — an expired cert in
+    particular can never renew itself — and the caller must re-join instead.
+    Returning None for both is what made that distinction unexpressible.
     """
     import httpx
 
@@ -645,7 +684,7 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
                     status=r.status_code,
                     body=r.text[:200],
                 )
-                return None
+                raise _CertRejected(f"renew returned {r.status_code}")
             # 429 deserves a longer wait — rate limits are per-minute so 1s
             # backoff just hot-loops. Honor Retry-After if present.
             if r.status_code == 429:
