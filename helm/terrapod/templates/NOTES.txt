@@ -18,8 +18,8 @@ Access the UI:
 {{- else }}
 
 To access the UI, set up port forwarding:
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "terrapod.fullname" . }}-web 3000:80
-  Then open: http://localhost:3000
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "terrapod.fullname" . }}-web 8080:3000
+  Then open: http://localhost:8080
 
 {{- end }}
 
@@ -30,7 +30,7 @@ To enable the UI, set web.enabled=true and optionally configure ingress.
 
 {{- end }}
 
-{{- if .Values.bootstrap }}
+{{- if .Values.bootstrap.enabled }}
 
 An admin user has been bootstrapped. Log in with the credentials from your
 bootstrap configuration.

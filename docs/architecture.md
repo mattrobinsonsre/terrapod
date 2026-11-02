@@ -494,7 +494,7 @@ Incoming request
 2. Return 401 Unauthorized
 ```
 
-Runner tokens are checked first because verification is purely computational (HMAC comparison) with no database or Redis calls, making it the fastest path for the high-volume runner traffic.
+Runner tokens are checked first because the HMAC comparison is purely computational and rejects a forged token before any lookup. A token that verifies is then checked for revocation — a Redis marker, falling back to one indexed read of the run's status on a miss (GHSA-xmrf-hxq9-m59m) — so a valid runner token costs one cached lookup rather than none. The diagram above shows that step.
 
 ---
 
