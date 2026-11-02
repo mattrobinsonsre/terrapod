@@ -108,6 +108,14 @@ class Ctx:
         env["TF_CLI_CONFIG_FILE"] = str(self.creds)
         env["TF_IN_AUTOMATION"] = "1"
         env["CHECKPOINT_DISABLE"] = "1"
+        # The command is `tofu` resolved from PATH by shutil.which and the
+        # arguments are literals from the checks above; the env is this
+        # process's own with TF_* stripped and four keys set. Nothing here
+        # comes from a request, a file or a remote. The rule is right in
+        # general -- a tainted argv or env reaching a subprocess is how a
+        # command injection lands -- and this is a CI harness whose whole
+        # job is to invoke a known binary.
+        # nosemgrep: dangerous-subprocess-use-tainted-env-args
         p = subprocess.run(
             [TOFU, *args, "-no-color"] if args[0] != "version" else [TOFU, *args],
             cwd=cwd,
@@ -421,6 +429,10 @@ def main() -> int:
     # -- it is a CLI that prints the raw token on stdout and nothing else, not
     # an importable module. Reused rather than reimplemented so a break in the
     # PKCE login path surfaces here instead of being masked by a shortcut.
+    # sys.executable running this repository's own scripts/mint-token.py,
+    # with arguments this function built. SSL_CERT_FILE is the only env key
+    # added, from an explicit --ca flag.
+    # nosemgrep: dangerous-subprocess-use-tainted-env-args
     mint = subprocess.run(
         [
             sys.executable,
