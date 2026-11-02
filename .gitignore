@@ -87,6 +87,14 @@ query/terrapod-query-bin
 .terraform/
 *.tfstate
 *.tfstate.backup
+
+# ...except the documentation fixture's, which is not a real state file but
+# test data: five fake AWS resources, deliberately out of step with the .tf
+# beside it so a plan yields creates, an update, a replace and destroys. The
+# blanket rule above had been swallowing it, so `scripts/demo/seed.py` raised
+# FileNotFoundError for everyone but the one machine that generated it -- while
+# the fixture's own README said it was checked in.
+!scripts/demo/fixture/demo.tfstate
 terraform.tfvars
 ANNOUNCEMENT.md
 smoke-*

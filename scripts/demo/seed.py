@@ -367,6 +367,160 @@ def seed_policy_set(api: Api):
     print(f"  + policy set {POLICY_SET} (advisory, scoped to env=prod)")
 
 
+def seed_vcs_connections(api: Api):
+    """VCS connections, so the admin page shows the feature rather than its absence.
+
+    The screenshot of this page went out reading "No VCS connections
+    configured." -- clean, correct, and worthless to a reader, because the
+    seeder never made one. That is the whole reason `assertClean` now refuses
+    an empty state.
+
+    GitLab rather than GitHub: a GitHub connection requires an App id, an
+    installation id and a private key, and a PEM committed to a public
+    repository looks exactly like a leaked key whether or not it is one. A
+    GitLab connection needs a name and a token, so the fixture can be obviously
+    fake. The tokens below are not credentials and are never used -- nothing in
+    the demo estate polls these connections -- but they are deliberately not in
+    the shape of a real `glpat-` token either, so no secret scanner has to
+    decide.
+    """
+    wanted = [
+        ("platform-monorepo", "https://gitlab.com"),
+        ("service-templates", "https://gitlab.com"),
+    ]
+    existing = {
+        c["attributes"].get("name") for c in api.get("/api/v1/vcs-connections").get("data", [])
+    }
+    for name, server in wanted:
+        if name in existing:
+            print(f"  = vcs connection {name} (exists)")
+            continue
+        api.post(
+            "/api/v1/vcs-connections",
+            {
+                "data": {
+                    "type": "vcs-connections",
+                    "attributes": {
+                        "name": name,
+                        "provider": "gitlab",
+                        "server-url": server,
+                        "token": "demo-seed-value-not-a-real-token",
+                    },
+                }
+            },
+        )
+        print(f"  + vcs connection {name} (gitlab)")
+
+
+def seed_registry(api: Api):
+    """A module and a provider, so the two registry pages show the registry.
+
+    Both went out reading "No modules yet." / "No providers yet." -- the pages
+    existed, rendered correctly and documented nothing. Neither needs an
+    artifact to list: the module and provider rows are the namespace, and
+    versions are published to them separately (a provider version needs
+    client-side GPG signing, which a seeder has no business doing).
+    """
+    for path, kind, attrs in (
+        ("/api/v1/registry-modules", "registry-modules", {"name": "vpc", "provider": "aws"}),
+        (
+            "/api/v1/registry-modules",
+            "registry-modules",
+            {"name": "ecs-service", "provider": "aws"},
+        ),
+        ("/api/v1/registry-providers", "registry-providers", {"name": "acme"}),
+    ):
+        label = attrs["name"] + (f"/{attrs['provider']}" if "provider" in attrs else "")
+        existing = api.get(path).get("data", [])
+        if any(
+            e["attributes"].get("name") == attrs["name"]
+            and e["attributes"].get("provider", attrs.get("provider"))
+            == attrs.get("provider", e["attributes"].get("provider"))
+            for e in existing
+        ):
+            print(f"  = registry {kind.split('-')[1]} {label} (exists)")
+            continue
+        api.post(path, {"data": {"type": kind, "attributes": attrs}})
+        print(f"  + registry {kind.split('-')[1]} {label}")
+
+
+def seed_autodiscovery(api: Api):
+    """One autodiscovery rule, which needs a VCS connection to point at."""
+    conns = api.get("/api/v1/vcs-connections").get("data", [])
+    if not conns:
+        print("  ! no VCS connection, skipping autodiscovery rule")
+        return
+    existing = api.get("/api/v1/autodiscovery-rules").get("data", [])
+    if any(r["attributes"].get("name") == "prod-monorepo" for r in existing):
+        print("  = autodiscovery rule prod-monorepo (exists)")
+        return
+    api.post(
+        "/api/v1/autodiscovery-rules",
+        {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "prod-monorepo",
+                    "vcs-connection-id": conns[0]["id"],
+                    "repo-url": "https://gitlab.com/example/platform-monorepo",
+                    "branch": "main",
+                    "pattern": "environments/*/*",
+                },
+            }
+        },
+    )
+    print("  + autodiscovery rule prod-monorepo")
+
+
+def seed_workspace_integrations(api: Api, ws_id: str):
+    """A notification and a run task on the hero workspace.
+
+    Both tabs photographed as "No ... configured for this workspace." The URLs
+    are example.com on purpose: nothing in the demo estate delivers to them,
+    and a reachable endpoint in a committed fixture is a request somebody else
+    eventually receives.
+    """
+    notifs = api.get(f"/api/v1/workspaces/{ws_id}/notification-configurations")
+    if not any(n["attributes"].get("name") == "slack-prod" for n in notifs.get("data", [])):
+        api.post(
+            f"/api/v1/workspaces/{ws_id}/notification-configurations",
+            {
+                "data": {
+                    "type": "notification-configurations",
+                    "attributes": {
+                        "name": "slack-prod",
+                        "destination-type": "slack",
+                        "url": "https://hooks.example.com/services/demo",
+                        "triggers": ["run:errored", "run:needs_attention"],
+                    },
+                }
+            },
+        )
+        print("  + notification slack-prod")
+    else:
+        print("  = notification slack-prod (exists)")
+
+    tasks = api.get(f"/api/v1/workspaces/{ws_id}/run-tasks")
+    if not any(r["attributes"].get("name") == "compliance-check" for r in tasks.get("data", [])):
+        api.post(
+            f"/api/v1/workspaces/{ws_id}/run-tasks",
+            {
+                "data": {
+                    "type": "run-tasks",
+                    "attributes": {
+                        "name": "compliance-check",
+                        "url": "https://tasks.example.com/compliance",
+                        "stage": "post_plan",
+                        "enforcement-level": "advisory",
+                    },
+                }
+            },
+        )
+        print("  + run task compliance-check")
+    else:
+        print("  = run task compliance-check (exists)")
+
+
 def seed_variables(api: Api, ws_id: str):
     """Credentials the way a real user supplies them: workspace env vars.
 
@@ -649,6 +803,13 @@ def main() -> int:
     pool_id = None if args.no_run else pick_pool(api)
     print(f"Seeding the demo estate on {args.host}:")
 
+    # Before the workspaces, and before the --no-run early return below: this
+    # is estate furniture rather than run state, and the admin page that shows
+    # it is captured whether or not a run is queued.
+    seed_vcs_connections(api)
+    seed_registry(api)
+    seed_autodiscovery(api)
+
     hero_id = None
     to_run: list[tuple[str, str, str]] = []  # (name, ws_id, variant)
     for name, labels, opts in ESTATE:
@@ -682,6 +843,11 @@ def main() -> int:
     for name, ws_id, variant in to_run:
         print(f"\n{name}:")
         seed_variables(api, ws_id)
+        # Only the hero: the notifications and run-tasks tabs are photographed
+        # on it, and putting a webhook on every workspace would make the estate
+        # read as more configured than a new deployment ever is.
+        if name == HERO:
+            seed_workspace_integrations(api, ws_id)
         upload_state(api, ws_id)
         cv_id = upload_config(api, ws_id, variant)
         rid = queue_run(api, ws_id, cv_id, MESSAGES.get(name, "Scheduled reconcile"))

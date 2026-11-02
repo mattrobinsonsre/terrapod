@@ -53,9 +53,7 @@ def main() -> int:
         sys.exit(f"FAIL: {CAPTURE.relative_to(ROOT)} is missing; this gate reads it")
     src = CAPTURE.read_text()
 
-    m = re.search(
-        r"const VIEWPORT\s*=\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}", src
-    )
+    m = re.search(r"const VIEWPORT\s*=\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}", src)
     if not m:
         sys.exit(
             "FAIL: could not read VIEWPORT out of capture.mjs. Teach this "
@@ -78,9 +76,7 @@ def main() -> int:
             f"rather than lowering the floor."
         )
     if len(phone) < MIN_PHONE:
-        problems.append(
-            f"only {len(phone)} phone shot(s) matched, below the floor of {MIN_PHONE}."
-        )
+        problems.append(f"only {len(phone)} phone shot(s) matched, below the floor of {MIN_PHONE}.")
 
     for name in sorted(desktop):
         f = IMAGES / f"{name}.png"

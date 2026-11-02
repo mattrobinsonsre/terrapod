@@ -77,6 +77,24 @@ const phoneShots = []
 const phoneShot = (name, fn) => phoneShots.push({ name, fn })
 const shot = (name, fn) => shots.push({ name, fn })
 
+//: A page whose whole content is "nothing here yet" teaches a reader nothing,
+//: so it is refused -- except where the empty view IS the subject. One shot
+//: qualifies: a docs page explaining the runs tab wants the populated view and
+//: the empty one side by side, which is why `checkout-staging` is seeded with
+//: `run: None`. Anything else showing an EmptyState is a seeding gap.
+const EMPTY_STATE_IS_THE_POINT = new Set(['workspace-runs'])
+
+//: Characters of rendered text, counting a same-origin iframe's own document,
+//: below which a page rendered nothing at all.
+//:
+//: A BACKSTOP, not the main check -- the empty-state and blank-iframe tests
+//: above are exact, and this only has to catch a page that produced no content
+//: whatsoever. It is low on purpose: the sign-in page is a heading and two
+//: fields, 71 characters in English, and it is a perfectly good screenshot. A
+//: floor set high enough to have an opinion about a page like that produces
+//: findings that are mostly wrong, which is how a gate gets ignored.
+const SUBSTANCE_FLOOR = 50
+
 /**
  * Refuse to publish a page that is not showing the product.
  *
@@ -177,6 +195,99 @@ async function assertClean(page, name) {
     process.exitCode = 1
     return false
   }
+
+  // Does the page actually SHOW anything?
+  //
+  // EMPTY, not WRONG -- and the difference is worth knowing before trusting
+  // this. A broken <redoc> element spilled the tail of its own theme JSON into
+  // the page as text; that cleared the floor below and the frame was not blank,
+  // so this passed a page showing nothing but a fragment of its own markup.
+  // Looking at the image is what caught it. These checks remove the failures
+  // that are invisible to a glance; they do not replace the glance.
+  //
+  // The checks above all ask "is something WRONG" -- an error, a spinner, the
+  // dev badge. None of them asks the prior question, and a page can be
+  // perfectly clean and still be worthless as documentation. Two shipped:
+  //
+  //   admin-vcs-connections  "No VCS connections configured." -- the seed never
+  //                          made one, so the image taught a reader nothing
+  //   api-docs-swagger       a toolbar above a blank rectangle -- the page is an
+  //                          <iframe src="/api/docs"> and the shot was taken
+  //                          before the embed rendered
+  //
+  // They are different failures and both read as success to every other check.
+  // The empty state is matched on the COMPONENT's test id rather than on its
+  // words, so it holds in all 32 locales; the iframe is measured through its
+  // own document, because its text is not in `main.innerText` at all.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const c = await page.evaluate(() => {
+      const main = document.querySelector('main') || document.body
+      const visible = (el) => {
+        const r = el.getBoundingClientRect()
+        return r.width > 0 && r.height > 0
+      }
+      const empty = [...main.querySelectorAll('[data-testid="empty-state"]')]
+        .filter(visible)
+        .map((e) => (e.textContent || '').trim().slice(0, 60))
+      let framed = 0
+      let blankFrames = 0
+      for (const f of document.querySelectorAll('iframe')) {
+        if (!visible(f) || f.getBoundingClientRect().height < 80) continue
+        // `contentDocument` returns NULL, without throwing, for a frame the
+        // page cannot read -- so an earlier version of this caught nothing: the
+        // `catch` was unreachable and `if (!body) continue` skipped the one
+        // case it existed to find. A frame we cannot read is a frame we cannot
+        // vouch for, so it counts as blank. That is what let a blank Swagger UI
+        // through this very check.
+        let body = null
+        try {
+          body = f.contentDocument && f.contentDocument.body
+        } catch {
+          body = null
+        }
+        if (!body) {
+          blankFrames++
+          continue
+        }
+        const n = (body.innerText || '').trim().length
+        framed += n
+        if (n < 40) blankFrames++
+      }
+      // `main` falls back to <body> on a page that has none -- /api-docs is one
+      // -- and <body> includes the nav, which is ~180 characters of chrome on
+      // every page. Counting that is how a page showing nothing but its own
+      // navigation clears a floor meant to catch exactly that, so the nav's
+      // text is excluded when the fallback is in play.
+      const chrome = document.querySelector('main')
+        ? 0
+        : [...document.querySelectorAll('nav, header')]
+            .reduce((n, el) => n + (el.innerText || '').trim().length, 0)
+      const len = Math.max(0, (main.innerText || '').trim().length - chrome)
+      return { len, framed, blankFrames, empty }
+    })
+
+    // An empty state does not become populated by waiting -- it is a seeding
+    // gap -- so this refuses at once rather than spending 8 seconds first.
+    if (c.empty.length && !EMPTY_STATE_IS_THE_POINT.has(name)) {
+      console.error(`  ! ${name}: empty state -- ${JSON.stringify(c.empty[0])}`)
+      process.exitCode = 1
+      return false
+    }
+
+    const substance = c.len + c.framed
+    if (!c.blankFrames && substance >= SUBSTANCE_FLOOR) break
+
+    if (attempt === 7) {
+      const why = c.blankFrames
+        ? `${c.blankFrames} embedded frame(s) still blank`
+        : `only ${substance} characters of content`
+      console.error(`  ! ${name}: nothing meaningful on the page -- ${why}`)
+      process.exitCode = 1
+      return false
+    }
+    await page.waitForTimeout(1000)
+  }
+
   return true
 }
 
