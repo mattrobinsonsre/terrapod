@@ -163,7 +163,7 @@ function KeysView() {
                   {entry['entity-counts'][t] ?? 0}
                 </td>
               ))}
-              <td className="px-2 text-slate-600">
+              <td className="px-2 text-slate-500">
                 <ChevronRight size={16} className="rtl:-scale-x-100" />
               </td>
             </tr>
@@ -232,7 +232,7 @@ function ValuesView({ labelKey }: { labelKey: string }) {
                       {entry['entity-counts'][t] ?? 0}
                     </td>
                   ))}
-                  <td className="px-2 text-slate-600">
+                  <td className="px-2 text-slate-500">
                     <ChevronRight size={16} className="rtl:-scale-x-100" />
                   </td>
                 </tr>
@@ -353,7 +353,7 @@ function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight size={14} className="text-slate-600 rtl:-scale-x-100" />}
+            {!isLast && <ChevronRight size={14} className="text-slate-500 rtl:-scale-x-100" />}
           </span>
         )
       })}

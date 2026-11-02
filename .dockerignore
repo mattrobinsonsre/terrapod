@@ -15,6 +15,15 @@
 .git
 .github
 
+# Agent and tooling state. `.claude/worktrees/` accumulates a full
+# checkout per past agent run -- 11 GB on this machine -- and nothing in
+# any Dockerfile reads it, so without this line every image build
+# uploads it. It is also what the recorded `grep -r` caveat is about:
+# those checkouts are not the tree being built.
+.claude
+.conformance
+scratchpad/
+
 # Python build/test droppings
 **/__pycache__
 **/*.pyc

@@ -144,6 +144,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | Workspaces | Isolate state, variables, and runs per workspace |
+| Works on a phone | The whole UI, not a subset — tables become cards, tabs become a picker, destructive actions are confirm-guarded on touch. Gated in CI at a Pixel 7 viewport on every PR |
 | Remote state | Versioned state with locking and rollback; encrypted at rest by your object store, with optional app-layer BYOK envelope encryption |
 | CLI-driven runs | `terraform` / `tofu` plan / apply via the `cloud` backend (both verified) |
 | Terraform / OpenTofu provider | **Manage Terrapod itself as code** — [`terraform-provider-terrapod`](docs/terraform-provider.md) ships **35 `terrapod_*` resources + 14 data sources** (`terrapod_workspace`, `terrapod_variable`, `terrapod_role`, `terrapod_vcs_connection`, `terrapod_agent_pool`, `terrapod_run_task`, `terrapod_catalog_item`, `terrapod_execution_hook`, `terrapod_inventory_host`, …), served per-instance from `<host>/default/terrapod` and GPG-signed |
@@ -246,6 +247,25 @@ Everything below is implemented and shipped today.
 *The impact graph — a plan clustered by module, with a resource's downstream blast radius highlighted.*
 </details>
 
+### It works on a phone
+
+Not a cut-down companion app and not a desktop page you pinch at — the same UI,
+adapted. A table becomes a list of cards, the run's tab bar becomes a picker,
+and every control stays a real tap target.
+
+<p>
+<img src="docs/images/mobile-workspaces.png" alt="The workspace list on a phone: each workspace a card with its labels, mode, pool and status" width="300">
+<img src="docs/images/mobile-run-overview.png" alt="A run overview on a phone: status, then changes, cost, AI analysis, policy checks, security scan and runner resources as cards" width="300">
+</p>
+
+*The estate, and a run's whole verdict — changes, cost, AI analysis, policy,
+security scan and runner headroom — on a 412px screen.*
+
+This is **enforced, not asserted**: the Playwright suite runs the responsive
+specs at a Pixel 7 viewport on every PR, so a change that breaks phone layout
+fails CI. Those two screenshots are captured at that exact width, and the
+capture refuses to publish either one if the page scrolls sideways.
+
 ---
 
 ## Architecture
@@ -288,7 +308,7 @@ runner protocol — is in [docs/architecture.md](docs/architecture.md).
 
 - **API-first** — every UI action is backed by a public API endpoint
 - **BFF pattern** — the Next.js frontend is the single ingress entry point; the browser never talks to the API directly
-- **Responsive, mobile-first web UI** — the whole UI adapts from desktop tables to touch-friendly card layouts on phones; one DRY viewport-driven implementation, no separate mobile app
+- **Responsive, mobile-first web UI** — the whole UI adapts from desktop tables to touch-friendly card layouts on phones; one DRY viewport-driven implementation, no separate mobile app ([see it](#it-works-on-a-phone))
 - **Kubernetes-native** — deployed exclusively via the Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** — the listener creates Jobs on demand (like GitHub Actions Runner Controller)
 - **OpenTofu-first** — [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported

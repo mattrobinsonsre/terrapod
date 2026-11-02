@@ -27,6 +27,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # [text](target) — target stops at whitespace so an optional "title" is dropped.
 LINK = re.compile(r'!?\[(?:[^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)')
+# <img src="target">. Markdown cannot size an image, so any doc that needs to —
+# a phone screenshot shown beside another, say — reaches for raw HTML, and that
+# target was checked by nothing: this file already parses `<a id=>` for anchors
+# but had no notion of an image source. A renamed or moved asset referenced that
+# way would 404 on the rendered page with every gate green.
+IMG_SRC = re.compile(r'<img\s[^>]*?\bsrc="([^"]+)"', re.I)
 # CommonMark fence rules, not a naive toggle. A block opened with ```json can
 # only be closed by a bare fence of the same character and at least the same
 # length — so a ```json line appearing INSIDE a block is content, not a close.
@@ -110,7 +116,7 @@ def links_of(path: Path) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for i, line in strip_fenced(lines):
-        for target in LINK.findall(line):
+        for target in LINK.findall(line) + IMG_SRC.findall(line):
             out.append((i, target))
     return out
 

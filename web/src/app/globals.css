@@ -183,10 +183,10 @@ body {
 :root:not(.dark) {
     /* slate */
     --color-slate-100: #020618;
-    --color-slate-200: #0f172b;
-    --color-slate-300: #1d293d;
-    --color-slate-400: #314158;
-    --color-slate-500: #45556c;
+    --color-slate-200: #020618;
+    --color-slate-300: #020618;
+    --color-slate-400: #0f172b;
+    --color-slate-500: #1d293d;
     --color-slate-600: #cad5e2;
     --color-slate-700: #e2e8f0;
     --color-slate-800: #f1f5f9;

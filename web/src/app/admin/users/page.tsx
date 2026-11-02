@@ -509,7 +509,7 @@ export default function UsersPage() {
                             </button>
                           </div>
                         ) : (
-                          a['display-name'] || <span className="text-slate-600">-</span>
+                          a['display-name'] || <span className="text-slate-500">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3">

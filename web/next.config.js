@@ -143,6 +143,23 @@ const nextConfig = {
     // NOT added: script-src and style-src. The App Router emits inline
     // bootstrap scripts, so either would need 'unsafe-inline' without nonce
     // plumbing — which is the "worth nothing" case above, not a tightening.
+    // The two documentation endpoints the console frames. `frame-src 'self'`
+    // below grants the PARENT page the right to embed a frame; it says nothing
+    // about whether the FRAMED document consents, and `frame-ancestors 'none'`
+    // plus `X-Frame-Options: DENY` on the catch-all refuse that consent for
+    // every path -- including these two, which are served through this same BFF.
+    //
+    // So /api-docs was blank from the day the CSP landed (#1767, 2026-09-22)
+    // until it was noticed on 2026-11-02, with the comment beside `frame-src`
+    // asserting it "keeps that page working". It did not. Nothing caught it:
+    // the headers were asserted in isolation, and the committed screenshot of
+    // the page predated the CSP by six months -- so the only evidence it
+    // rendered was an image taken before the thing that broke it.
+    //
+    // The API already decided this. `add_security_headers` in api/app.py sets
+    // SAMEORIGIN for exactly these two paths; the BFF was overriding it.
+    const FRAMEABLE = ['/api/docs', '/api/redoc']
+
     const csp = [
       "frame-ancestors 'none'",
       "img-src 'self' data: blob:",
@@ -160,6 +177,25 @@ const nextConfig = {
         { key: 'Content-Security-Policy', value: csp },
       ],
     })
+
+    // Same-origin framing for those two, and nothing else moves: every other
+    // directive is the catch-all's, and `frame-ancestors 'self'` still refuses
+    // a remote embed. A dedicated rule rather than a negative lookahead on the
+    // source above, so the blanket policy stays readable as a blanket policy.
+    for (const source of FRAMEABLE) {
+      headers.push({
+        source,
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Content-Security-Policy',
+            value: csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+          },
+        ],
+      })
+    }
     if (hstsValue) {
       headers.push({
         source: '/:path*',
