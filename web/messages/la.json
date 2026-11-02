@@ -165,7 +165,8 @@
     "canceled": "Abrogatum",
     "discarded": "Reiectum",
     "pendingDeletion": "Deletio pendens",
-    "archived": "In Tabulario Repositum"
+    "archived": "In Tabulario Repositum",
+    "configuring": "Configuratur"
   },
   "auth": {
     "loading": "Oneratur...",
@@ -2105,7 +2106,8 @@
       "errored": "Erratum",
       "canceled": "Abrogatum",
       "discarded": "Reiectum",
-      "awaitingDecision": "Decretum exspectat"
+      "awaitingDecision": "Decretum exspectat",
+      "configuring": "Configuratur"
     },
     "activity": {
       "pending": "Exsecutio praeparatur",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Copia regularum necessaria defecit — supersede aut exsecutionem reice",
       "heldBySecurityScan": "Perscrutatio securitatis inventa impedientia repperit — supersede aut exsecutionem reice",
       "heldByAiPolicy": "Porta regulae AI hanc executionem negavit — supersede aut exsecutionem reice",
-      "awaitingAiPolicy": "Sententia regulae AI exspectatur"
+      "awaitingAiPolicy": "Sententia regulae AI exspectatur",
+      "configuring": "libelli contra inventarium curruntur"
     },
     "badge": {
       "destroy": "destructio",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confirmatum",
       "errored": "Erratum",
       "canceled": "Abrogatum",
-      "discarded": "Reiectum"
+      "discarded": "Reiectum",
+      "configuring": "Configuratio incepta"
     },
     "log": {
       "color": "Color",

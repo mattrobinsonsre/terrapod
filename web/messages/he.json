@@ -165,7 +165,8 @@
     "canceled": "בוטל",
     "discarded": "נזנח",
     "pendingDeletion": "ממתין למחיקה",
-    "archived": "בארכיון"
+    "archived": "בארכיון",
+    "configuring": "מגדיר תצורה"
   },
   "auth": {
     "loading": "טוען...",
@@ -2105,7 +2106,8 @@
       "errored": "נכשל",
       "canceled": "בוטל",
       "discarded": "נדחה",
-      "awaitingDecision": "ממתין להחלטה"
+      "awaitingDecision": "ממתין להחלטה",
+      "configuring": "מגדיר תצורה"
     },
     "activity": {
       "pending": "מכין את ההרצה",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "מערך מדיניות חובה נכשל — עקוף אותו או דחה את ההרצה",
       "heldBySecurityScan": "סריקת האבטחה מצאה ממצאים חוסמים — עקוף אותה או דחה את ההרצה",
       "heldByAiPolicy": "שער מדיניות ה-AI דחה הרצה זו — עקוף אותו או דחה את ההרצה",
-      "awaitingAiPolicy": "ממתין לפסיקת מדיניות ה-AI"
+      "awaitingAiPolicy": "ממתין לפסיקת מדיניות ה-AI",
+      "configuring": "מריץ את ה-playbooks מול המלאי"
     },
     "badge": {
       "destroy": "השמדה",
@@ -2251,7 +2254,8 @@
       "confirmed": "אושר",
       "errored": "נכשל",
       "canceled": "בוטל",
-      "discarded": "נדחה"
+      "discarded": "נדחה",
+      "configuring": "התצורה החלה"
     },
     "log": {
       "color": "צבע",

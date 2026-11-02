@@ -165,7 +165,8 @@
     "canceled": "Canceld",
     "discarded": "Discardd",
     "pendingDeletion": "Pendin deleshun",
-    "archived": "Arkived"
+    "archived": "Arkived",
+    "configuring": "Konfigurin"
   },
   "auth": {
     "loading": "Loadin...",
@@ -2105,7 +2106,8 @@
       "errored": "Errurd",
       "canceled": "Canceld",
       "discarded": "Discardd",
-      "awaitingDecision": "Waitin fer decizun"
+      "awaitingDecision": "Waitin fer decizun",
+      "configuring": "Konfigurin"
     },
     "activity": {
       "pending": "Preparin teh run",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "A mandatoree polisee set faild — overryd it or discard teh run",
       "heldBySecurityScan": "Teh sekurity scan findz blockin problemz — overryd it or discard teh run",
       "heldByAiPolicy": "Teh AI polisy gate sez no to dis run — overryd it or discard teh run",
-      "awaitingAiPolicy": "Waitin for teh AI polisy verdikt"
+      "awaitingAiPolicy": "Waitin for teh AI polisy verdikt",
+      "configuring": "Runnin teh playbookz at teh invntory"
     },
     "badge": {
       "destroy": "destroy",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confurmd",
       "errored": "Errurd",
       "canceled": "Canceld",
-      "discarded": "Discardd"
+      "discarded": "Discardd",
+      "configuring": "Konfigur startd"
     },
     "log": {
       "color": "Colur",

@@ -165,7 +165,8 @@
     "canceled": "취소됨",
     "discarded": "폐기됨",
     "pendingDeletion": "삭제 대기 중",
-    "archived": "보관됨"
+    "archived": "보관됨",
+    "configuring": "구성 중"
   },
   "auth": {
     "loading": "불러오는 중...",
@@ -2105,7 +2106,8 @@
       "errored": "오류",
       "canceled": "취소됨",
       "discarded": "폐기됨",
-      "awaitingDecision": "결정 대기 중"
+      "awaitingDecision": "결정 대기 중",
+      "configuring": "구성 중"
     },
     "activity": {
       "pending": "실행 준비 중",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "필수 정책 집합이 실패했습니다 — 재정의하거나 실행을 폐기하세요",
       "heldBySecurityScan": "보안 스캔에서 차단 발견이 나왔습니다 — 재정의하거나 실행을 폐기하세요",
       "heldByAiPolicy": "AI 정책 게이트가 이 실행을 거부했습니다 — 재정의하거나 실행을 폐기하세요",
-      "awaitingAiPolicy": "AI 정책 판정을 기다리는 중"
+      "awaitingAiPolicy": "AI 정책 판정을 기다리는 중",
+      "configuring": "인벤토리에 대해 플레이북 실행 중"
     },
     "badge": {
       "destroy": "삭제",
@@ -2251,7 +2254,8 @@
       "confirmed": "확인됨",
       "errored": "오류",
       "canceled": "취소됨",
-      "discarded": "폐기됨"
+      "discarded": "폐기됨",
+      "configuring": "구성 시작됨"
     },
     "log": {
       "color": "색상",

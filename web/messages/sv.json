@@ -165,7 +165,8 @@
     "canceled": "Avbruten",
     "discarded": "Kasserad",
     "pendingDeletion": "Väntar på borttagning",
-    "archived": "Arkiverad"
+    "archived": "Arkiverad",
+    "configuring": "Konfigurerar"
   },
   "auth": {
     "loading": "Laddar...",
@@ -2105,7 +2106,8 @@
       "errored": "Fel",
       "canceled": "Avbruten",
       "discarded": "Kasserad",
-      "awaitingDecision": "Väntar på beslut"
+      "awaitingDecision": "Väntar på beslut",
+      "configuring": "Konfigurerar"
     },
     "activity": {
       "pending": "Förbereder körningen",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "En obligatorisk policyuppsättning misslyckades — åsidosätt den eller kassera körningen",
       "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen",
       "heldByAiPolicy": "AI-policygrinden nekade den här körningen — åsidosätt den eller kassera körningen",
-      "awaitingAiPolicy": "Väntar på AI-policyns utlåtande"
+      "awaitingAiPolicy": "Väntar på AI-policyns utlåtande",
+      "configuring": "Kör playbooks mot inventariet"
     },
     "badge": {
       "destroy": "förstör",
@@ -2251,7 +2254,8 @@
       "confirmed": "Bekräftad",
       "errored": "Fel",
       "canceled": "Avbruten",
-      "discarded": "Kasserad"
+      "discarded": "Kasserad",
+      "configuring": "Konfigurering startad"
     },
     "log": {
       "color": "Färg",

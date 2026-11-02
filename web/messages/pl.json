@@ -165,7 +165,8 @@
     "canceled": "Anulowane",
     "discarded": "Odrzucone",
     "pendingDeletion": "Oczekuje na usunięcie",
-    "archived": "Zarchiwizowane"
+    "archived": "Zarchiwizowane",
+    "configuring": "Konfigurowanie"
   },
   "auth": {
     "loading": "Wczytywanie...",
@@ -2105,7 +2106,8 @@
       "errored": "Błąd",
       "canceled": "Anulowane",
       "discarded": "Odrzucone",
-      "awaitingDecision": "Oczekuje na decyzję"
+      "awaitingDecision": "Oczekuje na decyzję",
+      "configuring": "Konfigurowanie"
     },
     "activity": {
       "pending": "Przygotowywanie przebiegu",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Obowiązkowy zestaw zasad nie powiódł się — nadpisz go lub odrzuć przebieg",
       "heldBySecurityScan": "Skan bezpieczeństwa wykrył blokujące problemy — nadpisz go lub odrzuć przebieg",
       "heldByAiPolicy": "Bramka zasad AI odrzuciła ten przebieg — nadpisz ją lub odrzuć przebieg",
-      "awaitingAiPolicy": "Oczekiwanie na werdykt zasad AI"
+      "awaitingAiPolicy": "Oczekiwanie na werdykt zasad AI",
+      "configuring": "Uruchamianie playbooków na inwentarzu"
     },
     "badge": {
       "destroy": "niszczenie",
@@ -2251,7 +2254,8 @@
       "confirmed": "Potwierdzone",
       "errored": "Błąd",
       "canceled": "Anulowane",
-      "discarded": "Odrzucone"
+      "discarded": "Odrzucone",
+      "configuring": "Rozpoczęto konfigurację"
     },
     "log": {
       "color": "Kolor",

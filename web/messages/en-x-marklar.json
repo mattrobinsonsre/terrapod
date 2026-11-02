@@ -165,7 +165,8 @@
     "canceled": "Canceled",
     "discarded": "Discarded",
     "pendingDeletion": "Pending marklar",
-    "archived": "Archived"
+    "archived": "Archived",
+    "configuring": "Configuring"
   },
   "auth": {
     "loading": "Loading...",
@@ -2105,7 +2106,8 @@
       "errored": "Errored",
       "canceled": "Canceled",
       "discarded": "Discarded",
-      "awaitingDecision": "Awaiting marklar"
+      "awaitingDecision": "Awaiting marklar",
+      "configuring": "Configuring"
     },
     "activity": {
       "pending": "Preparing the marklar",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "A mandatory marklar failed — override it or discard the marklar",
       "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar",
       "heldByAiPolicy": "The marklar marklar denied this marklar — override it or discard the marklar",
-      "awaitingAiPolicy": "Waiting for the marklar marklar"
+      "awaitingAiPolicy": "Waiting for the marklar marklar",
+      "configuring": "Running the marklars against the marklar"
     },
     "badge": {
       "destroy": "destroy",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confirmed",
       "errored": "Errored",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "configuring": "Configure started"
     },
     "log": {
       "color": "Marklar",

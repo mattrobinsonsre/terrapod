@@ -165,7 +165,8 @@
     "canceled": "Cancelado",
     "discarded": "Descartado",
     "pendingDeletion": "Eliminação pendente",
-    "archived": "Arquivado"
+    "archived": "Arquivado",
+    "configuring": "A configurar"
   },
   "auth": {
     "loading": "A carregar...",
@@ -2105,7 +2106,8 @@
       "errored": "Com Erro",
       "canceled": "Cancelado",
       "discarded": "Descartado",
-      "awaitingDecision": "A aguardar decisão"
+      "awaitingDecision": "A aguardar decisão",
+      "configuring": "A configurar"
     },
     "activity": {
       "pending": "A preparar a execução",
@@ -2127,7 +2129,8 @@
       "heldByPolicy": "Um conjunto de políticas obrigatório falhou — substitua-o ou descarte a execução",
       "heldBySecurityScan": "A análise de segurança encontrou resultados bloqueantes — substitua-a ou descarte a execução",
       "heldByAiPolicy": "A porta de política de IA negou esta execução — substitua-a ou descarte a execução",
-      "awaitingAiPolicy": "A aguardar o veredicto da política de IA"
+      "awaitingAiPolicy": "A aguardar o veredicto da política de IA",
+      "configuring": "A executar os playbooks no inventário"
     },
     "badge": {
       "destroy": "destroy",
@@ -2251,7 +2254,8 @@
       "confirmed": "Confirmado",
       "errored": "Com Erro",
       "canceled": "Cancelado",
-      "discarded": "Descartado"
+      "discarded": "Descartado",
+      "configuring": "Configuração iniciada"
     },
     "log": {
       "color": "Cor",
