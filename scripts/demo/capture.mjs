@@ -8,11 +8,19 @@
  * Two things decide whether the output is any good, and both are set here
  * rather than left to whoever runs it:
  *
- *   VIEWPORT — GitHub renders README images at roughly 850px wide regardless
- *   of source size. A 1440px capture is therefore shown at ~59%, taking 13px
- *   UI text down to about 8px, which is unreadable. Capturing narrower keeps
- *   text legible at the size it is actually displayed. deviceScaleFactor 2
- *   then keeps it crisp on high-density screens.
+ *   VIEWPORT — 1440x900 at deviceScaleFactor 1, so the committed file is
+ *   exactly 1440x900 and every desktop image is the same shape. Maintainer's
+ *   instruction, 2026-11-02, after a run shipped 2560-wide files whose heights
+ *   ranged from 640 to 1800: a set of images at one width and a dozen
+ *   different aspect ratios renders badly in a README, where they sit one
+ *   above another and the tall ones dominate.
+ *
+ *   An earlier version of this comment argued for 1280 at 2x on the grounds
+ *   that GitHub renders at roughly 850px and a narrower capture survives the
+ *   downscale better. That reasoning is not wrong about downscaling and it is
+ *   not what governs here: uniformity across the set matters more than the
+ *   last few percent of text legibility in any one image, and the phone shots
+ *   below are the deliberate exception.
  *
  *   FRAMING — the viewport, not the page and not an element. A full-page
  *   capture of a mostly-empty dark page wastes half the frame on background;
@@ -59,7 +67,7 @@ const wanted = (name) => !ONLY || ONLY.has(name)
 
 // Wide enough for the app's own layout to breathe, narrow enough that its text
 // survives GitHub's downscale to ~850px.
-const VIEWPORT = { width: 1280, height: 900 }
+const VIEWPORT = { width: 1440, height: 900 }
 
 const shots = []
 // A separate list because it is a separate browser context, and because the two
@@ -518,7 +526,9 @@ const main = async () => {
   })
   const ctx = await browser.newContext({
     viewport: VIEWPORT,
-    deviceScaleFactor: 2,
+    // 1, not 2: the committed file is then exactly VIEWPORT, which is what
+    // makes "every desktop image is 1440x900" checkable by looking at it.
+    deviceScaleFactor: 1,
     ignoreHTTPSErrors: true, // terrapod.local uses a local CA
   })
   const page = await ctx.newPage()
@@ -526,7 +536,7 @@ const main = async () => {
   // The signed-out pass, before anything signs in.
   if (anonShots.length) {
     const anonCtx = await browser.newContext({
-      viewport: VIEWPORT, deviceScaleFactor: 2, ignoreHTTPSErrors: true,
+      viewport: VIEWPORT, deviceScaleFactor: 1, ignoreHTTPSErrors: true,
     })
     const anon = await anonCtx.newPage()
     for (const { name, fn } of anonShots) {
@@ -571,26 +581,23 @@ const main = async () => {
     await fn(page, ws, run)
     if (!(await assertClean(page, name))) continue
     const file = path.join(OUT, `${name}.png`)
-    // Full width from the very top, so the nav and its version number are in
-    // frame, down to wherever the page's content actually stops — capped at the
-    // viewport. A fixed-height viewport shot of a short page (the run overview
-    // is about half a screen) spends the rest of the frame on empty
-    // background; a long page (the workspace list) simply fills it.
+    // THE VIEWPORT. Not the page, not an element, and not the content height.
+    //
+    // This clipped to wherever `<main>` stopped for one run, to avoid spending
+    // the lower half of a short page's frame on empty background. The cost was
+    // not obvious until the whole set was regenerated: 31 images at one width
+    // and heights from 640 to 1800, which is how a README full of screenshots
+    // comes to look like a pile of offcuts. Uniform shape beats tight cropping
+    // every time here, and the empty background it was avoiding is cheap.
     //
     // page.screenshot with an explicit clip, not locator.screenshot: the latter
     // waits for its target to stop moving, and the impact graph's force
     // simulation never fully does.
-    const height = await page.evaluate((vh) => {
-      const m = document.querySelector('main')
-      if (!m) return vh
-      const bottom = m.getBoundingClientRect().bottom + window.scrollY
-      return Math.min(Math.max(Math.ceil(bottom) + 24, 320), vh)
-    }, VIEWPORT.height)
     await page.screenshot({
       path: file,
-      clip: { x: 0, y: 0, width: VIEWPORT.width, height },
+      clip: { x: 0, y: 0, ...VIEWPORT },
     })
-    console.log(`  + ${file} (${VIEWPORT.width}x${height})`)
+    console.log(`  + ${file} (${VIEWPORT.width}x${VIEWPORT.height})`)
   }
 
   // ── The phone pass ──────────────────────────────────────────────────

@@ -365,6 +365,17 @@ jobs:
       - name: (docs-audit) Light-theme colour contrast clears WCAG AA
         run: python3 scripts/docs-audit/check_theme_contrast.py
 
+      # Every committed screenshot is the capture viewport, so the set is one
+      # shape. A run that framed to the content height instead shipped 31
+      # images at one width and heights from 640 to 1800, which renders as a
+      # pile of offcuts in a README and was caught only by a human looking at
+      # the page. The expected size is DERIVED from capture.mjs's own VIEWPORT
+      # and shot registrations, so there is no ledger to go stale and an image
+      # the script does not produce (the GitHub App walkthrough, the Slack
+      # icon) is correctly none of its business.
+      - name: (docs-audit) Screenshots are all the capture viewport
+        run: python3 scripts/docs-audit/check_screenshot_dimensions.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
