@@ -269,6 +269,13 @@ jobs:
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+
+      # Needs PyYAML, installed above, like the artifact-dependency gate. A job
+      # that boots the eval stack delivers images by one route on a pull request
+      # and another on a push, so a job implementing only the first is green on
+      # every PR and red on main -- which is how `cli-contract` shipped.
+      - name: (docs-audit) An eval-booting job delivers images on both paths
+        run: python3 scripts/docs-audit/check_eval_image_delivery.py
       # The EE contract is asserted twice on purpose -- at build time and
       # against the pushed digest -- and dropping either half leaves the other
       # green. Stdlib only, so it needs nothing installed above.
@@ -3024,6 +3031,35 @@ jobs:
           echo "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0  ./k3d" | sha256sum -c - \
             || { echo "k3d checksum mismatch -- bump the version and the checksum together"; exit 1; }
           chmod +x ./k3d && sudo mv ./k3d /usr/local/bin/k3d
+
+      # The branch/tag half of the pattern, which this job shipped WITHOUT. The
+      # two PR steps below deliver images from the build's artifacts; on a push
+      # to main they are skipped, so `Boot the stack` had nothing to push into
+      # the eval registry and died on
+      #   No such image: .../terrapod-api:sha-<short>-amd64
+      # Green on the PR and red on main, because the PR is the half that was
+      # covered.
+      #
+      # Copied from `helm-eval-boot` verbatim rather than written again, which is
+      # the whole lesson of this job's short history: its image tag, `socat`, its
+      # credentials and now this were each taken from somewhere they were true,
+      # and three of the four were ONE HALF of a pattern whose other half was
+      # sitting in that job all along.
+      - name: Log in to GHCR (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Pull images (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        run: |
+          set -euo pipefail
+          sha="${{ needs.prepare.outputs.sha_short }}"
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            docker pull "$REGISTRY/$i:sha-${sha}-amd64"
+          done
 
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
