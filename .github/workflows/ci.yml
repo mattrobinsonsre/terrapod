@@ -3125,8 +3125,13 @@ jobs:
           for i in $(seq 1 30); do
             curl -fsS -o /dev/null "http://127.0.0.1:18080/login" && break || sleep 2
           done
-          # socat rather than a reverse proxy: it is already on the runner and
-          # this needs TLS termination, not routing.
+          # socat rather than a reverse proxy, because this needs TLS
+          # termination and not routing. It is NOT preinstalled on the runner --
+          # the first version of this step asserted it was, and the step died on
+          # `sudo: socat: command not found`. Installed explicitly rather than
+          # probed, so a runner image change cannot silently reintroduce that.
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq socat >/dev/null
           sudo socat OPENSSL-LISTEN:443,reuseaddr,fork,cert=/tmp/tls/leaf.pem,verify=0 \
             TCP:127.0.0.1:18080 >/tmp/tls/socat.log 2>&1 &
           for i in $(seq 1 30); do

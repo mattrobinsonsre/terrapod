@@ -115,7 +115,6 @@ class Ctx:
         # general -- a tainted argv or env reaching a subprocess is how a
         # command injection lands -- and this is a CI harness whose whole
         # job is to invoke a known binary.
-        # nosemgrep: dangerous-subprocess-use-tainted-env-args
         p = subprocess.run(
             [TOFU, *args, "-no-color"] if args[0] != "version" else [TOFU, *args],
             cwd=cwd,
@@ -426,7 +425,6 @@ def main() -> int:
     # taints it as PATH-derived -- which is exactly what this suite is for. It
     # drives the real binary an operator has installed; resolving it from PATH
     # is the feature, not a lapse. The argv is a literal.
-    # nosemgrep: dangerous-subprocess-use-tainted-env-args
     ver = subprocess.run([TOFU, "version"], capture_output=True, text=True, check=False)
     # `version` on a broken binary can print nothing at all, and an IndexError
     # here would report as a suite crash rather than as "tofu does not run".
@@ -441,8 +439,15 @@ def main() -> int:
     # sys.executable running this repository's own scripts/mint-token.py,
     # with arguments this function built. SSL_CERT_FILE is the only env key
     # added, from an explicit --ca flag.
-    # nosemgrep: dangerous-subprocess-use-tainted-env-args
+    #
+    # The directive sits immediately above the ARGV LIST rather than above the
+    # call, because that is the line semgrep anchors the finding to -- and a
+    # directive one line too high registers no suppression at all while reading
+    # exactly like one that does. Measured with the gate's own pinned image:
+    # this is the only one of the three subprocess calls in this file that the
+    # rule matches, so the other two carry the reasoning and no directive.
     mint = subprocess.run(
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         [
             sys.executable,
             str(ROOT / "scripts" / "mint-token.py"),
