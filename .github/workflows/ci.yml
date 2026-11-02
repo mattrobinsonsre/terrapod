@@ -3146,8 +3146,23 @@ jobs:
       - name: Drive the CLI
         run: |
           set -euo pipefail
+          # DERIVED from eval.sh, not written here. eval.sh `--set`s the bootstrap
+          # credentials from these two assignments, so it is authoritative over
+          # values-eval.yaml -- and a third copy in this job is a third thing to
+          # drift. The first version of this step passed `admin/admin`, which is
+          # the TILT profile's password carried over from where the suite was
+          # tested, and the mint failed 401 with the stack perfectly healthy.
+          email=$(grep -m1 '^ADMIN_EMAIL=' scripts/eval.sh | cut -d'"' -f2)
+          pw=$(grep -m1 '^ADMIN_PASSWORD=' scripts/eval.sh | cut -d'"' -f2)
+          # An empty read here would mint with no credential and report as a
+          # confusing 401 rather than as "the grep stopped matching".
+          [ -n "$email" ] && [ -n "$pw" ] || {
+            echo "FAIL: could not read the bootstrap credentials out of scripts/eval.sh"
+            grep -nE '^ADMIN_(EMAIL|PASSWORD)=' scripts/eval.sh || true
+            exit 1
+          }
           python3 scripts/cli-contract/run.py --host terrapod.test \
-            --email admin --password admin
+            --email "$email" --password "$pw"
 
       - name: Diagnostics on failure
         if: failure() || cancelled()
