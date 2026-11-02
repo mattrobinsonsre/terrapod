@@ -22,6 +22,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
@@ -94,7 +95,17 @@ class Ctx:
             return e.code, e.read()[:400].decode(errors="replace")
 
     def tofu(
-        self, *args: str, cwd: pathlib.Path, expect_ok: bool = True, timeout: int = 900
+        self,
+        *args: str,
+        cwd: pathlib.Path,
+        expect_ok: bool = True,
+        # 240s, not the 900s this started with. The whole suite finishes in about
+        # two minutes against a live stack, so a single call past four minutes is
+        # stuck rather than slow -- and at 900s one such call ate 15 of the CI
+        # job's 25-minute budget, so the job was CANCELLED and the suite never
+        # got to report anything at all. A timeout that outlives its caller's
+        # budget cannot fail; it can only hide.
+        timeout: int = 240,
     ) -> subprocess.CompletedProcess:
         """Run tofu with OUR credentials file and no inherited TF_* settings.
 
@@ -120,6 +131,14 @@ class Ctx:
             cwd=cwd,
             env=env,
             capture_output=True,
+            # The structural half of the no-prompt rule. `capture_output` makes
+            # stdout a pipe but leaves stdin INHERITED, so a tofu that decides to
+            # prompt blocks on a read that never returns -- no network traffic,
+            # no output, nothing to see. That is consistent with the first CI
+            # hang: 28 connections through the forward, then fourteen minutes of
+            # silence. `-input=false` on each call states the intent; this makes
+            # a prompt impossible whether or not someone remembers the flag.
+            stdin=subprocess.DEVNULL,
             text=True,
             errors="replace",  # tofu writes non-UTF-8 bytes; never crash on output
             timeout=timeout,
@@ -211,7 +230,7 @@ def _make_workspace(ctx: Ctx, name: str) -> str:
 def cloud_init(ctx: Ctx) -> None:
     d = ctx.work / "lifecycle"
     ctx.workspace(ctx.ws_name, d, FIXTURE)
-    out = ctx.tofu("init", cwd=d).stdout
+    out = ctx.tofu("init", "-input=false", cwd=d).stdout
     if "Initializing" not in out:
         raise Fail(f"init produced no recognisable output:\n{out}")
 
@@ -276,7 +295,7 @@ def saved_plan(ctx: Ctx) -> None:
 
     d = ctx.work / "savedplan"
     ctx.workspace(ctx.agent_ws_name, d, FIXTURE)
-    ctx.tofu("init", cwd=d)
+    ctx.tofu("init", "-input=false", cwd=d)
     try:
         ctx.tofu("plan", "-input=false", "-out=saved.tfplan", cwd=d, timeout=120, expect_ok=False)
     except (subprocess.TimeoutExpired, UnicodeDecodeError):
@@ -392,7 +411,7 @@ def cli_import(ctx: Ctx) -> None:
     """`import` has no automated coverage anywhere else."""
     d = ctx.work / "import"
     ctx.workspace(ctx.import_ws_name, d, FIXTURE)
-    ctx.tofu("init", cwd=d)
+    ctx.tofu("init", "-input=false", cwd=d)
     p = ctx.tofu(
         "import", "-input=false", "terraform_data.probe", "imported-id", cwd=d, expect_ok=False
     )
@@ -414,6 +433,15 @@ def main() -> int:
     ap.add_argument("--ca", help="PEM bundle to trust, for a stack whose CA python does not carry")
     ap.add_argument("--only", help="comma-separated check names to run")
     args = ap.parse_args()
+
+    # Line-buffered, and done HERE rather than left to a `python3 -u` in the
+    # caller, so it holds however the suite is invoked. Python block-buffers
+    # stdout when it is not a tty, so on a CI runner nothing is flushed until
+    # exit -- and a run that is CANCELLED never exits. The first hang in CI
+    # therefore reported absolutely nothing: 22 minutes, no output, no clue
+    # which check was stuck. The tell, visible in the run before it, was a
+    # stderr FATAL appearing ABOVE the stdout banner that is printed first.
+    sys.stdout.reconfigure(line_buffering=True)
 
     if not TOFU:
         print("FATAL: `tofu` is not on PATH. This suite drives the real binary.", file=sys.stderr)
@@ -507,18 +535,50 @@ def main() -> int:
 
     failures: list[tuple[str, str, str]] = []
     ran = 0
+    # A wall-clock budget, because being CANCELLED is strictly worse than
+    # failing: the job's timeout kills the process, so nothing is reported at
+    # all and the next person has a red check and no verdict. That is exactly
+    # what happened on the first CI hang. The per-call timeout cannot prevent
+    # it -- 15 tofu calls at 240s each outlive any sane job budget -- so the
+    # suite bounds ITSELF and always gets to print.
+    #
+    # 12 minutes is absurdly generous and deliberately so: measured against a
+    # live stack the nine checks total ELEVEN SECONDS, slowest 4.2s. Anything
+    # approaching this budget is stuck, not slow.
+    budget = 720.0
+    started = time.monotonic()
+    skipped = 0
     for fn in fns:
         if wanted and fn._name not in wanted:
             continue
+        spent = time.monotonic() - started
+        if spent > budget:
+            skipped += 1
+            print(f"  BUDGET [{fn._section}] {fn._name}  (not run -- {spent:.0f}s elapsed)")
+            failures.append(
+                (
+                    fn._section,
+                    fn._name,
+                    f"not run: the suite passed its {budget:.0f}s budget after "
+                    f"{ran} check(s). Something before this hung. The suite stops "
+                    f"itself rather than letting the job time out with no verdict.",
+                )
+            )
+            continue
         ran += 1
+        # The name goes out BEFORE the check runs, and is flushed, so a hang
+        # names the check it is hanging in. Printing only the verdict afterwards
+        # is what made the first CI hang undiagnosable.
+        print(f"  .... [{fn._section}] {fn._name}")
+        t0 = time.monotonic()
         try:
             fn(ctx)
-            print(f"  PASS  [{fn._section}] {fn._name}")
+            print(f"  PASS  [{fn._section}] {fn._name}  ({time.monotonic() - t0:.1f}s)")
         except Fail as e:
-            print(f"  FAIL  [{fn._section}] {fn._name}")
+            print(f"  FAIL  [{fn._section}] {fn._name}  ({time.monotonic() - t0:.1f}s)")
             failures.append((fn._section, fn._name, str(e)))
         except Exception as e:
-            print(f"  ERROR [{fn._section}] {fn._name}")
+            print(f"  ERROR [{fn._section}] {fn._name}  ({time.monotonic() - t0:.1f}s)")
             failures.append((fn._section, fn._name, f"{type(e).__name__}: {e}"))
 
     # Best effort cleanup. A leftover workspace on a dev stack is untidy;
@@ -535,7 +595,13 @@ def main() -> int:
 
     print()
     if failures:
-        print(f"CLI CONTRACT: {len(failures)} of {ran} check(s) failed\n")
+        if skipped:
+            print(
+                f"CLI CONTRACT: {len(failures) - skipped} of {ran} check(s) failed, "
+                f"and {skipped} never ran -- the suite hit its own budget\n"
+            )
+        else:
+            print(f"CLI CONTRACT: {len(failures)} of {ran} check(s) failed\n")
         for section, name, detail in failures:
             print(f"  [{section}] {name}")
             for line in detail.splitlines()[:12]:
