@@ -635,7 +635,7 @@ export default function RolesPage() {
       case 'admin': return 'bg-red-900/50 text-red-300'
       case 'write': return 'bg-orange-900/50 text-orange-300'
       case 'use': return 'bg-orange-900/50 text-orange-300'
-      case 'plan': return 'bg-blue-900/50 text-blue-300'
+      case 'plan': return 'bg-indigo-900/50 text-indigo-300'
       case 'read': return 'bg-green-900/50 text-green-300'
       case 'custom': return 'bg-purple-900/50 text-purple-300'
       default: return 'bg-slate-700 text-slate-400'

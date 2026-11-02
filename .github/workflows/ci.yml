@@ -351,6 +351,20 @@ jobs:
       - name: (docs-audit) Every local-action call passes its required inputs
         run: python3 scripts/docs-audit/check_local_action_inputs.py
 
+      # Colour contrast on the light theme (#2337). Nothing else in the repo
+      # looks at a colour -- not tsc, not ESLint, not the unit tests, not the
+      # e2e suite -- so a class written for the old dark ground can land on a
+      # light surface and lose its contrast in silence. Three real failures
+      # while the theme was being built were invisible to every other check:
+      # every status badge's FILL measured 1.006:1 against its card while its
+      # text read 5.57:1, `bg-red-600 text-white` sat at 3.20:1, and
+      # `hover:bg-amber-500 text-white` at 3.20:1 -- the last two hidden by the
+      # checker's own blind spots before they were closed. Reads the light
+      # values out of globals.css itself, so it cannot disagree with the
+      # stylesheet the app serves.
+      - name: (docs-audit) Light-theme colour contrast clears WCAG AA
+        run: python3 scripts/docs-audit/check_theme_contrast.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:

@@ -1887,7 +1887,7 @@ function WorkspacesPageInner() {
                           className={
                             'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-start border-s-2 ' +
                             (i === suggestIndex
-                              ? 'bg-brand-600/40 text-white border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
+                              ? 'bg-brand-900 text-brand-100 border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
                               : 'border-transparent text-slate-300 hover:bg-slate-700/40')
                           }
                         >

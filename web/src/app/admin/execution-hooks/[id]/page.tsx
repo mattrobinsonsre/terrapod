@@ -353,7 +353,7 @@ export default function ExecutionHookDetailPage() {
                 </div>
                 {!showDeleteConfirm ? (
                   <button onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors">
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">
                     {t('actions.delete')}
                   </button>
                 ) : (
@@ -373,7 +373,7 @@ export default function ExecutionHookDetailPage() {
         {/* Workspaces Tab */}
         {activeTab === 'workspaces' && (
           <div>
-            <div className="mb-4 p-3 bg-blue-900/20 text-blue-300 rounded-lg text-sm border border-blue-800/50">
+            <div className="mb-4 p-3 bg-indigo-900/20 text-indigo-300 rounded-lg text-sm border border-indigo-800/50">
               {t('workspaces.scopeNote')}
             </div>
             <div className="flex justify-end mb-4">

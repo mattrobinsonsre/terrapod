@@ -40,6 +40,12 @@ export default function GlobalError({
     }
   }, [error]);
 
+  // The colours below are LITERALS on purpose and must stay that way: this
+  // component renders its own <html>, so globals.css is never loaded and a
+  // `var(--color-...)` here resolves to nothing. They are hand-mapped to the
+  // same Tailwind stops the light block in globals.css uses -- ground slate-50,
+  // ink slate-900, secondary slate-600, accent blue-800 -- so the two cannot
+  // disagree about what the ground is. Update both together.
   return (
     <html lang="en">
       <body
@@ -49,8 +55,8 @@ export default function GlobalError({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0f172a',
-          color: '#e2e8f0',
+          background: '#f8fafc',
+          color: '#0f172b',
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
         }}
@@ -62,7 +68,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>
             This page couldn&rsquo;t load{/* i18n-ignore: renders outside next-intl */}
           </h1>
-          <p style={{ fontSize: 14, color: '#94a3b8', margin: '0 0 24px' }}>
+          <p style={{ fontSize: 14, color: '#45556c', margin: '0 0 24px' }}>
             Reload to try again, or go back.{/* i18n-ignore: renders outside next-intl */}
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -72,8 +78,8 @@ export default function GlobalError({
                 padding: '8px 16px',
                 borderRadius: 8,
                 border: 'none',
-                background: '#e2e8f0',
-                color: '#0f172a',
+                background: '#193cb8',
+                color: '#ffffff',
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -86,9 +92,9 @@ export default function GlobalError({
               style={{
                 padding: '8px 16px',
                 borderRadius: 8,
-                border: '1px solid #334155',
+                border: '1px solid #cad5e2',
                 background: 'transparent',
-                color: '#e2e8f0',
+                color: '#0f172b',
                 fontSize: 14,
                 fontWeight: 500,
                 cursor: 'pointer',

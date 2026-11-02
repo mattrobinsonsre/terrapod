@@ -44,7 +44,7 @@ export default async function RootLayout({
   // page?" prompt and stops a machine-translation layer from fighting — and
   // degrading — our own next-intl strings. Users switch language in-app.
   return (
-    <html lang={locale} dir={dir} translate="no" className="dark">
+    <html lang={locale} dir={dir} translate="no">
       <body className={inter.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

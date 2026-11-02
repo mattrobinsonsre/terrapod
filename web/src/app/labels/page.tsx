@@ -152,7 +152,7 @@ function KeysView() {
               <td className="px-4 py-3">
                 <Link
                   href={`/labels?key=${encodeURIComponent(entry.key)}`}
-                  className="font-mono text-slate-100 hover:text-blue-400"
+                  className="font-mono text-slate-100 hover:text-indigo-400"
                 >
                   {entry.key}
                 </Link>
@@ -221,7 +221,7 @@ function ValuesView({ labelKey }: { labelKey: string }) {
                   <td className="px-4 py-3">
                     <Link
                       href={`/labels?key=${encodeURIComponent(labelKey)}&value=${encodeURIComponent(entry.value)}`}
-                      className="font-mono text-slate-100 hover:text-blue-400"
+                      className="font-mono text-slate-100 hover:text-indigo-400"
                     >
                       {entry.value}
                     </Link>
@@ -312,7 +312,7 @@ function EntitiesView({ labelKey, labelValue }: { labelKey: string; labelValue: 
                                   className={
                                     'inline-flex items-center rounded px-1.5 py-0.5 text-xs font-mono ' +
                                     (k === labelKey && v === labelValue
-                                      ? 'bg-blue-900/40 text-blue-200'
+                                      ? 'bg-indigo-900/40 text-indigo-200'
                                       : 'bg-slate-800 text-slate-400')
                                   }
                                 >
