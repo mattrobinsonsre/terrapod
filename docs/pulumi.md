@@ -7,6 +7,10 @@ what you reviewed, under the same RBAC, notifications, run triggers and audit
 trail. Where Pulumi genuinely differs, this page says so rather than implying
 parity.
 
+![A Pulumi workspace in Terrapod: the engine badge beside the project and stack name, with the same run lifecycle as a Terraform workspace](images/workspace-pulumi.png)
+*A Pulumi workspace — `project / stack`, carrying its engine badge, with the
+same runs, variables, state and RBAC as any other workspace.*
+
 Pulumi is off until an operator turns it on:
 
 ```yaml

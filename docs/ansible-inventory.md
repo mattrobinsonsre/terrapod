@@ -11,6 +11,10 @@ Terrapod stores those structures and renders them. **Ansible performs the
 merge**, the precedence, the group DAG, the derivation of `all` and `ungrouped`,
 and the expansion of `--limit`. There is no second implementation of any of it.
 
+![The Inventory tab of a workspace: hosts listed with their groups and variable counts, and the groups they belong to](images/workspace-inventory.png)
+*A workspace's inventory in the web UI — hosts, the groups they belong to, and
+the variables set at each level.*
+
 > ## Status: the inventory exists; configure operations do not
 >
 > **This release delivers the inventory — its structures, its two sources, what
