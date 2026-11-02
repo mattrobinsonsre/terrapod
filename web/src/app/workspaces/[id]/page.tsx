@@ -4213,7 +4213,7 @@ function WorkspaceDetailContent() {
                         onClick={handleDismissDrift}
                         disabled={dismissingDrift}
                         title={t('drift.dismissTitle')}
-                        className="text-xs text-slate-400 hover:text-slate-200 disabled:text-slate-600 transition-colors"
+                        className="text-xs text-slate-400 hover:text-slate-200 disabled:text-slate-500 transition-colors"
                       >
                         {dismissingDrift ? t('drift.dismissing') : t('drift.dismiss')}
                       </button>
@@ -4329,7 +4329,7 @@ function WorkspaceDetailContent() {
                 <div className="sm:col-span-2 min-w-0">
                   <dt className="text-xs text-slate-500">
                     {t('aiSummary.contextLabel')}
-                    <span className="ms-2 text-slate-600">{t('aiSummary.contextLabelSuffix')}</span>
+                    <span className="ms-2 text-slate-500">{t('aiSummary.contextLabelSuffix')}</span>
                   </dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
@@ -4424,7 +4424,7 @@ function WorkspaceDetailContent() {
                 <div className="sm:col-span-2 min-w-0">
                   <dt className="text-xs text-slate-500">
                     {t('securityScan.skipRules')}
-                    <span className="ms-2 text-slate-600">{t('securityScan.skipRulesSuffix')}</span>
+                    <span className="ms-2 text-slate-500">{t('securityScan.skipRulesSuffix')}</span>
                   </dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
@@ -4912,7 +4912,7 @@ function WorkspaceDetailContent() {
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -4981,7 +4981,7 @@ function WorkspaceDetailContent() {
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('variables.emptyValue')}</span>)}
                         </div>
                         {perms['can-update-variable'] && (
                           <div className="flex gap-2">
@@ -5345,7 +5345,7 @@ function WorkspaceDetailContent() {
                               engine={workspace?.attributes.engine}
                             />
                           ) : (
-                            <span className="text-slate-600">&mdash;</span>
+                            <span className="text-slate-500">&mdash;</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
@@ -5356,7 +5356,7 @@ function WorkspaceDetailContent() {
                           ) : run.attributes.source}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">
-                          {run.attributes['created-by'] || <span className="text-slate-600">&mdash;</span>}
+                          {run.attributes['created-by'] || <span className="text-slate-500">&mdash;</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
                           {run.attributes['created-at'] ? new Date(run.attributes['created-at']).toLocaleString() : ''}
@@ -5823,7 +5823,7 @@ function WorkspaceDetailContent() {
                                   {t('actions.download')}
                                 </button>
                               ) : (
-                                <span className="text-slate-600 text-sm">—</span>
+                                <span className="text-slate-500 text-sm">—</span>
                               )}
                             </td>
                           </tr>
@@ -5864,7 +5864,7 @@ function WorkspaceDetailContent() {
                         ]}
                         actions={
                           <>
-                            <label className={`flex items-center gap-1.5 text-xs ${canDownload ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <label className={`flex items-center gap-1.5 text-xs ${canDownload ? 'text-slate-400' : 'text-slate-500'}`}>
                               <input
                                 type="checkbox"
                                 aria-label={t('configurations.selectForCompare', { id: cv.id })}
@@ -6116,7 +6116,7 @@ function WorkspaceDetailContent() {
                                 </span>
                                 <span className="text-slate-400">{t('notifications.http', { status: r.status })}</span>
                                 <span className="text-slate-500 truncate flex-1">{r.body}</span>
-                                <span className="text-slate-600 shrink-0">{r.delivered_at ? new Date(r.delivered_at).toLocaleString() : ''}</span>
+                                <span className="text-slate-500 shrink-0">{r.delivered_at ? new Date(r.delivered_at).toLocaleString() : ''}</span>
                               </div>
                             ))}
                           </div>

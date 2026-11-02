@@ -914,7 +914,7 @@ export default function VariableSetDetailPage() {
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
                               ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                              : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                              : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('detail.empty')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -977,7 +977,7 @@ export default function VariableSetDetailPage() {
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('detail.empty')}</span>)}
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('detail.edit')}</button>

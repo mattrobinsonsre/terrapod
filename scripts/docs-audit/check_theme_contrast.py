@@ -39,6 +39,8 @@ CSS = ROOT / "web" / "src" / "app" / "globals.css"
 SRC = ROOT / "web" / "src"
 
 AA = 4.5  # WCAG AA for normal-size text
+MIN_BARE_INKS = 4  # neutral ink stops used with no fill; a floor so a
+#: broken matcher fails here instead of passing on nothing
 FILL_FLOOR = 1.10  # a badge fill must be distinguishable from its card; this is
 # the dark theme's own measured floor, so it is the bar the
 # app already meets rather than a number invented here.
@@ -182,6 +184,48 @@ def main() -> int:
             problems.append(
                 f"{ratio:5.2f}:1  {bg_cls} + {fg_cls}  (worst on the {where})  first seen {path}"
             )
+
+    # The third axis: BARE INK -- a neutral text colour with no fill of its own.
+    #
+    # The pair check above only ever looks at a `bg-*` and a `text-*` declared
+    # on the SAME element, so text that simply inherits the page or a card --
+    # which is most text -- was never checked at all. `text-slate-600` shipped
+    # at 1.42:1 through that hole, invisible, on the workspaces list and the
+    # sortable headers, because slate-600 is a border colour on light and the
+    # ramp made it do double duty as ink.
+    #
+    # A slate ink carries no fill with it, so it has to be legible wherever the
+    # app happens to put it: on the ground, on a card, and on an input. Tinted
+    # inks (red/green/amber) are badge text and travel with their own fill, so
+    # they stay out of this; and an inverted pill like `bg-slate-100
+    # text-slate-900` declares its fill on the element and is covered above.
+    bare: dict[int, str] = {}
+    for path in sorted(SRC.rglob("*.tsx")):
+        for m in cls_re.finditer(path.read_text()):
+            s = m.group(1)
+            if bg_re.search(s):
+                continue  # has its own fill; the pair axis owns it
+            for fam, stop in txt_re.findall(s):
+                if fam != "slate":
+                    continue
+                bare.setdefault(int(stop), str(path.relative_to(ROOT)))
+    if len(bare) < MIN_BARE_INKS:
+        problems.append(
+            f"only {len(bare)} bare slate ink stops matched, below the floor "
+            f"of {MIN_BARE_INKS}. The matcher has stopped matching; fix it "
+            f"rather than lowering the floor."
+        )
+    for stop, path in sorted(bare.items()):
+        fg = pal["slate"].get(stop)
+        if fg is None:
+            continue
+        for pname, parent in parents.items():
+            c = contrast(fg, parent)
+            if c < AA:
+                problems.append(
+                    f"{c:5.2f}:1  text-slate-{stop} on the bare {pname} "
+                    f"({parent})  first seen {path}"
+                )
 
     # The second axis: a badge fill has to be visible against its card. Derived
     # from the fills the source pairs with tinted ink, which is what a badge is.

@@ -412,7 +412,7 @@ function SummaryCard({
     <>
       <div className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
         <span>{label}</span>
-        {onClick && <span className="text-slate-600" aria-hidden="true">›</span>}
+        {onClick && <span className="text-slate-500" aria-hidden="true">›</span>}
       </div>
       <div className={`text-sm font-semibold ${CARD_TONE[tone]}`}>{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-0.5">{sub}</div>}

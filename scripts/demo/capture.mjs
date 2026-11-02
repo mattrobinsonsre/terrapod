@@ -47,6 +47,16 @@ const HOST = args.host || 'terrapod.local'
 const OUT = args.out || 'docs/images'
 const BASE = `https://${HOST}`
 
+// `--only a,b` re-shoots just those names.
+//
+// A guard refusing ONE page is the normal outcome of a run -- that is what
+// the guards are for -- and without this the only way to retry it was to
+// redo all 34, which takes minutes and spends the `/api/v1/auth/*` bucket
+// (10/min) on logins it does not need. The exit code still reports the
+// refusal, so a filtered run is a retry and not a way to hide one.
+const ONLY = typeof args.only === 'string' ? new Set(args.only.split(',')) : null
+const wanted = (name) => !ONLY || ONLY.has(name)
+
 // Wide enough for the app's own layout to breathe, narrow enough that its text
 // survives GitHub's downscale to ~850px.
 const VIEWPORT = { width: 1280, height: 900 }
@@ -520,6 +530,7 @@ const main = async () => {
     })
     const anon = await anonCtx.newPage()
     for (const { name, fn } of anonShots) {
+      if (!wanted(name)) continue
       await fn(anon)
       if (!(await assertClean(anon, name))) continue
       const file = path.join(OUT, `${name}.png`)
@@ -556,6 +567,7 @@ const main = async () => {
   })
 
   for (const { name, fn } of shots) {
+    if (!wanted(name)) continue
     await fn(page, ws, run)
     if (!(await assertClean(page, name))) continue
     const file = path.join(OUT, `${name}.png`)
@@ -604,6 +616,7 @@ const main = async () => {
   console.log(`  phone ${devices['Pixel 7'].viewport.width}px @2x (the width CI gates on)`)
 
   for (const { name, fn } of phoneShots) {
+    if (!wanted(name)) continue
     await fn(phone, ws, run)
     if (!(await assertClean(phone, name))) continue
 
