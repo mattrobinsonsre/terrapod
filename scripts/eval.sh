@@ -134,6 +134,16 @@ up() {
   # of the flaky `k3d image import`), redirect all five images via
   # global.imageRegistry. Empty by default, so a normal `make eval` — which loads
   # images straight into the node — is unaffected.
+  # `${a[@]+"${a[@]}"}` rather than a bare `"${a[@]}"`: bash 3.2 treats
+  # expanding an EMPTY array as an unbound variable under `set -u`, and
+  # /bin/bash on macOS is 3.2.57. reg_args is empty on every documented
+  # invocation -- it fills only when TERRAPOD_EVAL_IMAGE_REGISTRY is set, which
+  # nothing in the docs does -- so the failing case was exactly `make eval`, the
+  # headline command, on every stock Mac, dying AFTER creating the cluster with
+  # a message naming a shell variable.
+  #
+  # Nothing caught it: CI is Ubuntu (bash 5), and its k3d leg sets that very
+  # variable, so even a bash-3.2 runner would have passed.
   local reg_args=()
   if [[ -n "${TERRAPOD_EVAL_IMAGE_REGISTRY:-}" ]]; then
     reg_args+=(--set "global.imageRegistry=${TERRAPOD_EVAL_IMAGE_REGISTRY}")
@@ -152,7 +162,7 @@ up() {
   helm --kube-context "$ctx" upgrade --install "$RELEASE" "$CHART_DIR" \
     --namespace "$NS" --create-namespace \
     -f "${CHART_DIR}/values-eval.yaml" \
-    "${reg_args[@]}" \
+    ${reg_args[@]+"${reg_args[@]}"} \
     --set "api.image.tag=${VERSION}" \
     --set "web.image.tag=${VERSION}" \
     --set "migrations.image.tag=${VERSION}" \

@@ -86,11 +86,18 @@ The options for the Ansible half, described neutrally:
 | **Semaphore UI** | A lightweight open-source web UI and scheduler for running playbooks | Runs `ansible-playbook` from its own server | A much smaller surface, and correspondingly easy to run — a UI over playbooks rather than a governance platform. |
 | **Plain `ansible-playbook` in CI** | Playbooks as a pipeline step | Your existing CI runners | No inventory model, and no run history beyond pipeline logs; access control is whatever your CI gives you. |
 
-**No tool appears in both this table and the TACOS table above.** That is
-checkable from the two tables rather than a claim about anyone's roadmap: the
-TACOS platforms do not run playbooks against an inventory, and the Ansible
-controllers do not hold Terraform state, serve the `cloud`-block CLI surface or
-run a module registry. Terrapod is the one entry in both, which is what it is
+**The two halves are converging, and the honest claim is narrower than "no
+overlap".** Spacelift runs Ansible playbooks against an inventory — including a
+dynamic `aws_ec2` inventory — with a plan-then-confirm flow, and env0 has an
+Ansible template type. So the commercial TACOS platforms are not absent from
+the second table's territory, and an earlier version of this paragraph said
+they were.
+
+What still differs is the *shape* of the plan. Those flows are `--check`-based,
+and `--check` is not a plan: it needs connectivity to every host, it is not a
+saved artefact, and a module that does not implement it reports nothing. The
+Ansible controllers, for their part, do not hold Terraform state, serve the
+`cloud`-block CLI surface or run a module registry. Terrapod is the one entry in both, which is what it is
 *for* — not a claim that it does either half better than a tool built only for
 that half. On the Ansible side in particular, AWX has years of production use, a
 large ecosystem of collections and integrations around it, and a feature surface

@@ -37,8 +37,17 @@ web UI. Other open-source options include Terrakube and Digger; see
 
 Yes, with minimal change. Terrapod is API-compatible with the `terraform`/`tofu`
 **`cloud` (and `remote`) backend** — you repoint the hostname in your `cloud {}`
-block and run `plan`/`apply` as usual; `terraform login` and `go-tfe`-based
-automation work too. Bulk-migrate an existing platform with
+block and run `plan`/`apply` as usual; `terraform login` works too.
+
+**`go-tfe`-based automation is a different question, and the answer is "only
+the part the CLI uses".** Terrapod implements the slice of the TFE V2 API that
+`terraform`/`tofu` consume, so `go-tfe` calls within that slice work — but it
+is deliberately **not** a drop-in for arbitrary `go-tfe` automation, the
+`hashicorp/tfe` provider, or Backstage TFC plugins, which assume teams,
+multi-org and projects that Terrapod does not have. The catalogue of what is
+covered is [`tfe-cli-surface.md`](tfe-cli-surface.md); for anything beyond it,
+use Terrapod's own API or the
+[Terraform provider](terraform-provider.md). Bulk-migrate an existing platform with
 [`terrapod-migrate`](migration.md).
 
 ## Does Terrapod support OpenTofu?
