@@ -22,7 +22,7 @@
 # test can capture it the way `git_auth` captures a real host's;
 # `authorized_keys` is mounted, never committed, because a private key in a
 # public repository is a secret-scanner finding whatever its intended lifetime.
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache openssh-server git \
  && ssh-keygen -A
