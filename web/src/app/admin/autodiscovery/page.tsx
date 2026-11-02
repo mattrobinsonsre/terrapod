@@ -1719,7 +1719,7 @@ export default function AutodiscoveryPage() {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => openPreview(r.id, r.attributes.name)}
-                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-brand-300 transition-colors"
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-brand-100 transition-colors"
                         title={t('table.previewTitle')}
                       >
                         {t('actions.preview')}
@@ -1761,7 +1761,7 @@ export default function AutodiscoveryPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(deleteId)}
-                  className="px-4 py-2 rounded bg-red-700 hover:bg-red-600 text-white text-sm"
+                  className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-sm"
                 >
                   {t('actions.delete')}
                 </button>

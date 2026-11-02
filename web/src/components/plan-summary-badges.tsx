@@ -95,7 +95,7 @@ export function PlanSummaryBadges({ summary, size = 'md', engine }: Props) {
         </span>
       )}
       {imports > 0 && (
-        <span className={`${cls} bg-blue-900/40 text-blue-300`} title={t('badges.toImport', { count: imports })}>
+        <span className={`${cls} bg-indigo-900/40 text-indigo-300`} title={t('badges.toImport', { count: imports })}>
           ↓{imports}
         </span>
       )}

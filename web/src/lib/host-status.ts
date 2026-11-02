@@ -37,7 +37,7 @@ export function hostStatusBadge(status: string): string {
     case "ignored-failure":
       return "bg-amber-900/40 text-amber-300";
     case "changed":
-      return "bg-blue-900/40 text-blue-300";
+      return "bg-indigo-900/40 text-indigo-300";
     case "not-reached":
       return "bg-slate-700/60 text-slate-300";
     default:

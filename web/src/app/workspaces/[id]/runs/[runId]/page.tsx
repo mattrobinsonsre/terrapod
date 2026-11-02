@@ -302,11 +302,11 @@ function RunActivityHeader({
         : planOnly
           ? word('activityPlannedSpeculative')
           : word('activityPlannedComplete'),
-      dot: 'bg-blue-400',
-      card: isConfirmable ? 'border-blue-800/40 bg-blue-900/10' : 'border-slate-700/50 bg-slate-800/40',
+      dot: 'bg-indigo-400',
+      card: isConfirmable ? 'border-indigo-800/40 bg-indigo-900/10' : 'border-slate-700/50 bg-slate-800/40',
       sinceKey: 'planned-at',
     },
-    confirmed: { label: t('status.confirmed'), activity: word('activityConfirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
+    confirmed: { label: t('status.confirmed'), activity: word('activityConfirmed'), dot: 'bg-indigo-400', card: 'border-indigo-800/40 bg-indigo-900/10', sinceKey: 'confirmed-at' },
     applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
     // Plain `t()` rather than `phase()`: planning and applying take the
@@ -389,7 +389,7 @@ const CARD_TONE: Record<CardTone, string> = {
   good: 'text-green-300',
   warn: 'text-amber-300',
   bad: 'text-red-300',
-  active: 'text-blue-300',
+  active: 'text-indigo-300',
 }
 
 // One at-a-glance summary card on Overview. When `onClick` is set the whole
@@ -1102,7 +1102,7 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {indexedLines.map((line, i) => (
               <div
@@ -1119,14 +1119,14 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
         ) : (
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {plainContent}
           </pre>
@@ -1717,7 +1717,7 @@ function RunDetailPageInner() {
   function statusColor(status: string): string {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
-      case 'planned': case 'confirmed': return 'bg-blue-900/50 text-blue-300'
+      case 'planned': case 'confirmed': return 'bg-indigo-900/50 text-indigo-300'
       case 'planning': case 'applying': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
@@ -1846,7 +1846,7 @@ function RunDetailPageInner() {
         { k: 'change', sym: '~', n: ps.change, cls: 'text-amber-400', word: t('changes.toChange') },
         { k: 'destroy', sym: '−', n: ps.destroy, cls: 'text-red-400', word: t('changes.toDestroy') },
         { k: 'replace', sym: '±', n: ps.replace, cls: 'text-orange-400', word: t('changes.toReplace') },
-        { k: 'import', sym: '↓', n: ps.import, cls: 'text-blue-400', word: t('changes.toImport') },
+        { k: 'import', sym: '↓', n: ps.import, cls: 'text-indigo-400', word: t('changes.toImport') },
       ].filter((s) => s.n > 0)
       if (segs.length === 0) return { value: t('changes.noChanges'), tone: 'neutral' }
       return {
@@ -2780,7 +2780,7 @@ function PolicyPanel({
             <button
               onClick={override}
               disabled={overriding}
-              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 transition-colors"
+              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
             >
               {overriding ? t('policyPanel.overriding') : t('policyPanel.overrideContinue')}
             </button>

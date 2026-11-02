@@ -26,7 +26,7 @@ import type { WorkspaceStatusDef } from '@/lib/workspace-status'
 const badgeColors: Record<string, string> = {
   amber: 'bg-amber-900/50 text-amber-300',
   red: 'bg-red-900/50 text-red-300',
-  blue: 'bg-blue-900/50 text-blue-300',
+  blue: 'bg-indigo-900/50 text-indigo-300',
   green: 'bg-green-900/50 text-green-300',
   slate: 'bg-slate-700/50 text-slate-400',
   gray: 'text-slate-500',

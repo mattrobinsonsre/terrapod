@@ -28,7 +28,7 @@ function ToggleBtn({ v, label, view, onClick }: { v: View; label: string; view: 
       onClick={() => onClick(v)}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
         view === v
-          ? 'bg-brand-500/25 text-brand-300 outline outline-1 outline-brand-500/50'
+          ? 'bg-brand-500/25 text-brand-100 outline outline-1 outline-brand-500/50'
           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
       }`}
     >

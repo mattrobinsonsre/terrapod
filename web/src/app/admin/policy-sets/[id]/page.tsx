@@ -363,16 +363,16 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
         </form>
 
         {ps.attributes.source === 'vcs' && (
-          <div className="rounded-md bg-blue-900/30 border border-blue-700/50 p-4 mb-4">
+          <div className="rounded-md bg-indigo-900/30 border border-indigo-700/50 p-4 mb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-200">
-                  {t('vcsBanner.syncedFrom')} <span className="font-mono text-blue-300">{ps.attributes['vcs-repo-url']}</span>
+                <p className="text-sm text-indigo-200">
+                  {t('vcsBanner.syncedFrom')} <span className="font-mono text-indigo-300">{ps.attributes['vcs-repo-url']}</span>
                   {ps.attributes['vcs-branch'] && <> ({ps.attributes['vcs-branch']})</>}
                   {ps.attributes['policy-path'] && <> {t('vcsBanner.at')} <span className="font-mono">{ps.attributes['policy-path']}/</span></>}
                 </p>
                 {ps.attributes['vcs-last-synced-at'] && (
-                  <p className="text-xs text-blue-400 mt-1">
+                  <p className="text-xs text-indigo-400 mt-1">
                     {t('vcsBanner.lastSynced', { time: new Date(ps.attributes['vcs-last-synced-at']).toLocaleString() })}
                     {ps.attributes['vcs-last-commit-sha'] && <> {t('vcsBanner.commit', { sha: ps.attributes['vcs-last-commit-sha'].slice(0, 8) })}</>}
                   </p>
@@ -388,7 +388,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
                     if (res.ok) load()
                   } catch {}
                 }}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-700 hover:bg-blue-600 text-white transition-colors"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-700 hover:bg-indigo-600 text-white transition-colors"
               >
                 {t('actions.syncNow')}
               </button>

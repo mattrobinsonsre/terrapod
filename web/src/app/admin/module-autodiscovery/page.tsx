@@ -143,7 +143,7 @@ const STATUS_COLOURS: Record<string, string> = {
   empty: 'bg-slate-700/50 text-slate-400',
   'no-branch': 'bg-amber-900/50 text-amber-300',
   'out-of-scope': 'bg-slate-700/50 text-slate-400',
-  covered: 'bg-blue-900/50 text-blue-300',
+  covered: 'bg-indigo-900/50 text-indigo-300',
   error: 'bg-red-900/50 text-red-300',
 }
 
@@ -270,7 +270,7 @@ export default function ModuleAutodiscoveryPage() {
   }
 
   function originPill(origin: string) {
-    const colour = origin === 'new' ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700/50 text-slate-400'
+    const colour = origin === 'new' ? 'bg-indigo-900/50 text-indigo-300' : 'bg-slate-700/50 text-slate-400'
     return <span className={`${PILL} ${colour}`}>{originLabel(origin)}</span>
   }
 

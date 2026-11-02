@@ -2405,7 +2405,7 @@ function WorkspaceDetailContent() {
   function statusColor(status: string): string {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
-      case 'planned': return 'bg-blue-900/50 text-blue-300'
+      case 'planned': return 'bg-indigo-900/50 text-indigo-300'
       case 'planning': case 'applying': case 'configuring': case 'canceling': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
@@ -2445,7 +2445,7 @@ function WorkspaceDetailContent() {
   function stageBadge(s: string): string {
     switch (s) {
       case 'pre_plan': return 'bg-amber-900/50 text-amber-300'
-      case 'post_plan': return 'bg-blue-900/50 text-blue-300'
+      case 'post_plan': return 'bg-indigo-900/50 text-indigo-300'
       case 'pre_apply': return 'bg-purple-900/50 text-purple-300'
       default: return 'bg-slate-700 text-slate-400'
     }
@@ -2461,7 +2461,7 @@ function WorkspaceDetailContent() {
 
   function destTypeBadge(t: string): string {
     switch (t) {
-      case 'generic': return 'bg-blue-900/50 text-blue-300'
+      case 'generic': return 'bg-indigo-900/50 text-indigo-300'
       case 'slack': return 'bg-purple-900/50 text-purple-300'
       case 'email': return 'bg-cyan-900/50 text-cyan-300'
       default: return 'bg-slate-700 text-slate-400'
@@ -3104,7 +3104,7 @@ function WorkspaceDetailContent() {
                 )}
               </div>
               {nameChanged && (
-                <div className="mb-4 rounded-lg border border-blue-500/50 bg-blue-500/10 p-3 text-sm text-blue-300">
+                <div className="mb-4 rounded-lg border border-indigo-500/50 bg-indigo-500/10 p-3 text-sm text-indigo-300">
                   {t.rich('settings.renamedNotice', {
                     name: () => <code className="bg-slate-700 px-1 rounded">name</code>,
                     cloud: () => <code className="bg-slate-700 px-1 rounded">cloud {'{'}{'}' }</code>,
@@ -4136,7 +4136,7 @@ function WorkspaceDetailContent() {
                     onClick={handleLockToggle}
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       attrs.locked
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                        ? 'bg-amber-900/40 hover:bg-amber-900/60 text-amber-300'
                         : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
                     }`}
                   >
@@ -4591,7 +4591,7 @@ function WorkspaceDetailContent() {
                   {!showDeleteConfirm ? (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                     >
                       {t('actions.delete')}
                     </button>
@@ -5023,7 +5023,7 @@ function WorkspaceDetailContent() {
                     <button
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                       title={attrs.locked ? t('common.workspaceLocked') : phaseWord('queueDestroyTitle')}
                     >
                       {t('runs.queueDestroy')}
@@ -5066,7 +5066,7 @@ function WorkspaceDetailContent() {
                       // forces those runs plan-only. Leaving it enabled would
                       // promise an apply and quietly deliver a plan.
                       disabled={queueingPlan || attrs.locked || !!vcsRef}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900/40 disabled:text-amber-600/70 text-white transition-colors"
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-900/40 hover:bg-amber-900/60 disabled:bg-amber-900/20 disabled:text-amber-600/70 text-amber-300 transition-colors"
                       title={
                         attrs.locked
                           ? t('common.workspaceLocked')
@@ -5510,7 +5510,7 @@ function WorkspaceDetailContent() {
                     className={`px-3 py-1.5 rounded text-xs font-medium text-white transition-colors ${
                       confirmStateAction.action === 'delete'
                         ? 'bg-red-600 hover:bg-red-500'
-                        : 'bg-amber-600 hover:bg-amber-500'
+                        : 'bg-amber-900/40 hover:bg-amber-900/60'
                     }`}
                   >
                     {stateActionLoading ? t('actions.processing') : confirmStateAction.action === 'delete' ? t('state.confirmDelete') : t('state.confirmRollback')}
@@ -5757,7 +5757,7 @@ function WorkspaceDetailContent() {
                   type="button"
                   onClick={compareSelectedCvs}
                   disabled={cvSelected.size !== 2 || cvDiffLoading}
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {cvDiffLoading ? t('configurations.comparing') : t('configurations.compare')}
                 </button>
@@ -5789,7 +5789,7 @@ function WorkspaceDetailContent() {
                         const isSelected = cvSelected.has(cv.id)
                         const canDownload = cv.attributes.status === 'uploaded'
                         return (
-                          <tr key={cv.id} className={isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-900/30 transition-colors'}>
+                          <tr key={cv.id} className={isSelected ? 'bg-indigo-900/20' : 'hover:bg-slate-900/30 transition-colors'}>
                             <td className="px-2 py-3 align-middle">
                               <input
                                 type="checkbox"
@@ -5818,7 +5818,7 @@ function WorkspaceDetailContent() {
                                 <button
                                   type="button"
                                   onClick={() => downloadCv(cv.id)}
-                                  className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                                  className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
                                 >
                                   {t('actions.download')}
                                 </button>
@@ -5934,7 +5934,7 @@ function WorkspaceDetailContent() {
                             (f.type === 'added' ? 'bg-green-900/50 text-green-300' :
                              f.type === 'removed' ? 'bg-red-900/50 text-red-300' :
                              f.type === 'binary-changed' ? 'bg-slate-700 text-slate-300' :
-                             'bg-blue-900/50 text-blue-300')
+                             'bg-indigo-900/50 text-indigo-300')
                           }
                         >
                           {t(`configurations.diffType.${f.type}`)}
