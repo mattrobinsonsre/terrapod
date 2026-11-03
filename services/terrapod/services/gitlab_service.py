@@ -381,7 +381,7 @@ async def list_open_merge_requests_for_repo(
     Keyset pagination, ordered by id, following the `Link: rel="next"` the
     server returns — which an instance that ignores the keyset request also
     returns for offset pagination, so either way the walk is the same. That is
-    the same shape `_list_group_projects` uses.
+    the same shape `list_group_projects` uses.
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
