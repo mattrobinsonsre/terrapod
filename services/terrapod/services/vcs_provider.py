@@ -135,9 +135,17 @@ class PullRequest:
 class OpenPullRequests:
     """Every open PR/MR on a repository, whatever branch it targets.
 
-    `complete` is False when the listing stopped short — at the page cap, or
-    on an error partway — so that **nothing may be concluded from a PR's
-    absence**, exactly as for `RepositoryListing` above.
+    `complete` is False when the walk stopped short at the page cap, so that
+    **nothing may be concluded from a PR's absence**, in the spirit of
+    `RepositoryListing` above.
+
+    Unlike that type, the cap is the ONLY way to get `complete=False` here: a
+    provider error mid-walk propagates and abandons the whole poll rather than
+    yielding a partial listing. An earlier version of this docstring said "or
+    on an error partway", which was not implemented — and the obvious reading
+    of it is the dangerous one, since catching the error and returning
+    `complete=True` would hand the reconciler a half-walked list to conclude
+    from. If that path is ever wanted it must set `complete=False`.
 
     That caution is load-bearing rather than general here. The caller closes a
     `PRSession` on absence and cancels its runs (#2349), so reconciling

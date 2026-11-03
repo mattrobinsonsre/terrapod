@@ -1110,7 +1110,7 @@ This usually means **the runner image is from before policy-as-code support / do
 A poll cycle costs roughly two calls per **distinct** repository + tracked branch (branch head, open PRs/MRs) — deduplicated within the cycle, so a twenty-workspace monorepo costs the same as one workspace. Pushes add an archive download; autodiscovery adds a tree listing.
 
 ```
-calls per hour = (3600 / poll_interval_seconds) x 2 x distinct repo+branch pairs
+calls per hour = (3600 / poll_interval_seconds) x (distinct repo+branch pairs + sum of ceil(open_prs / 100) over distinct repos)
 ```
 
 ### Diagnosis

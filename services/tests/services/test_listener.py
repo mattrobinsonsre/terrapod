@@ -452,3 +452,83 @@ class TestLaunchNamespace:
         assert mock_create.await_args.kwargs["namespace"] == "custom-runner-ns"
         mock_uid.assert_awaited_once()
         assert mock_uid.await_args.kwargs["namespace"] == "custom-runner-ns"
+
+
+class TestReJoinAttemptsAreRateLimited:
+    """The runaway, bounded without losing prompt recovery (#2352).
+
+    `_auth_failures` deliberately survives a failed re-join -- see
+    `test_a_failed_re_join_reports_false_and_does_not_clear_the_count`, whose
+    reason still holds: `_rejoin_unlocked` clears the credentials Secret before
+    it re-establishes, so a listener whose re-join failed has no identity at
+    all and making it wait for another three rejections prolongs an outage it
+    cannot otherwise leave.
+
+    What was unbounded was the consequence. Every later rejection -- one every
+    30-90s -- re-entered the path, each time deleting the Secret and spending
+    another join-token use, so on a `max_uses: 1` pool the first failed re-join
+    made the listener permanently unjoinable. A floor on the interval keeps the
+    prompt first retry and bounds the rest.
+    """
+
+    async def test_the_counter_still_survives_a_failed_rejoin(self, fresh_shutdown_event):
+        """The pre-existing property, asserted here too so this change cannot
+        quietly take it away."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is False
+        assert listener._auth_failures == listener_module._REJOIN_THRESHOLD
+
+    async def test_a_second_rejoin_is_refused_inside_the_interval(self, fresh_shutdown_event):
+        """The fix. Before it, every rejection after a failed re-join deleted
+        the Secret and spent another join-token use."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1
+
+        for _ in range(5):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1, (
+            "five further rejections spent five more join-token uses"
+        )
+
+    async def test_it_is_attempted_again_once_the_interval_has_passed(self, fresh_shutdown_event):
+        """Bounded, not disabled -- otherwise the fix would be an outage of its
+        own, since a listener that cannot re-join cannot recover at all."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1
+
+        # Wind the clock past the floor rather than sleeping through it.
+        listener._last_rejoin_attempt -= listener_module._REJOIN_MIN_INTERVAL_SECONDS + 1
+        await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 2
+
+    async def test_a_successful_rejoin_still_clears_the_count(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock()
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is True
+        assert listener._auth_failures == 0
+        assert listener._rejoin_generation == 1
+
+    def test_the_interval_and_threshold_are_the_values_we_chose(self):
+        """Literals, not re-derivations. Winding the clock by the constant
+        proves the gate consults it and nothing about whether it is sane: 0
+        would disable the bound entirely, and an hour would delay every real
+        recovery by an hour."""
+        assert listener_module._REJOIN_MIN_INTERVAL_SECONDS == 60.0
+        assert listener_module._REJOIN_THRESHOLD == 3

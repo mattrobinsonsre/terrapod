@@ -295,7 +295,11 @@ async def _list_open_prs(
             head_ref=pr["head_ref"],
             title=pr["title"],
             from_fork=bool(pr["from_fork"]),
-            base_ref=pr.get("base_ref", ""),
+            # Indexed, not `.get(..., "")`. The provider always emits this key
+            # now, and a silent "" is the one value that matches no branch --
+            # so a missing key should fail here rather than quietly remove the
+            # pull request from whatever filters on it.
+            base_ref=pr["base_ref"],
         )
         for pr in prs
     ]
@@ -322,12 +326,86 @@ async def _list_all_open_prs(
     """
     if meta is not None:
         return await meta.get_or_fetch(
-            (str(conn.id), owner, repo, "prs:*"),
+            # NOT "prs:*" -- the branch-scoped key is `f"prs:{base_branch}"`,
+            # so a workspace tracking a branch literally named `*` would
+            # collide with this one, and the two keys hold different TYPES
+            # (`list[PullRequest]` against `OpenPullRequests`). Any key that
+            # cannot be produced by that f-string is safe; this one has no
+            # colon at all.
+            (str(conn.id), owner, repo, "prs-repo-wide"),
             lambda: _list_all_open_prs(conn, owner, repo, meta=None),
         )
     if conn.provider == "gitlab":
         return await gitlab_service.list_open_merge_requests_for_repo(conn, owner, repo)
     return await github_service.list_open_pull_requests_for_repo(conn, owner, repo)
+
+
+async def _confirm_pr_is_closed(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> bool | None:
+    """Ask the provider directly whether one pull request has closed.
+
+    True closed or merged, False still open, **None when we could not tell** --
+    and the caller must treat None as "leave it alone".
+
+    This exists because absence from a listing is not the same question as
+    closure, and the gap between them is a race the listing cannot close.
+    Page-based pagination walks a collection that is *shrinking*: `state=open`
+    loses a pull request the moment someone merges it, which shifts every later
+    item back one position, so the first item of the next page is never
+    returned. Ordering by creation keeps the ORDER stable -- that is what the
+    listers do, and it is why an opened pull request is harmless -- but nothing
+    stabilises MEMBERSHIP. The walk then reports `complete=True` having silently
+    skipped a pull request that is still open, and reconciling on that absence
+    closes its session and cancels its runs. That is the reported symptom
+    (#2349) reintroduced by its own fix, as a narrow race rather than every
+    cycle.
+
+    GitHub offers no keyset pagination on `/pulls`, so the gap cannot be closed
+    in the listing; it is closed here instead, at the only point where absence
+    is about to become a decision. One call per candidate closure, and a pull
+    request closes once, so the steady-state cost is nil.
+
+    It also makes the answer truthful rather than inferred: `merged` was only
+    ever written when Terrapod performed the merge itself, so a pull request a
+    human merged in the web UI -- the common case -- was stamped `closed`.
+    """
+    from terrapod.services import github_service, gitlab_service
+
+    try:
+        if conn.provider == "gitlab":
+            pr = await gitlab_service.get_pull_request(conn, owner, repo, pr_number)
+        else:
+            pr = await github_service.get_pull_request(conn, owner, repo, pr_number)
+    except Exception as e:
+        # Fail closed: an unreachable provider must not be read as "closed".
+        logger.warning(
+            "Could not confirm whether a pull request closed; leaving its session",
+            repo=f"{owner}/{repo}",
+            pr_number=pr_number,
+            error=str(e),
+        )
+        return None
+
+    if pr is None:
+        # 404 — the pull request is gone entirely, which is as closed as it gets.
+        return True
+    if pr.merged:
+        return True
+    # Provider-native states: GitHub says open/closed, GitLab adds
+    # opened/merged/locked. Anything unrecognised is an answer we do not
+    # understand, and `None` is how that is said.
+    if pr.state in ("closed", "merged"):
+        return True
+    if pr.state in ("open", "opened"):
+        return False
+    logger.warning(
+        "Unrecognised pull request state from the provider; leaving its session",
+        repo=f"{owner}/{repo}",
+        pr_number=pr_number,
+        state=pr.state,
+    )
+    return None
 
 
 # --- Shared logic ---
@@ -957,9 +1035,28 @@ async def _reconcile_closed_pr_sessions(
         ws.id for ws in scoped.scalars().all() if _provider_workspace_repo_is(ws, repo)
     ]
 
+    owner, _, repo_name = repo.partition("/")
+
     for sess in sessions.scalars().all():
         if sess.pr_number in open_pr_numbers:
             continue
+        # Absent from the listing is a CANDIDATE for closure, not a verdict.
+        # Confirm it with the provider before acting, because the listing's
+        # absence and the pull request's closure are different questions and
+        # the gap between them is a race -- see `_confirm_pr_is_closed`. The
+        # reported requirement was exactly this: "a session should only close
+        # when the provider reports the PR closed or merged".
+        if repo_name:
+            confirmed = await _confirm_pr_is_closed(conn, owner, repo_name, sess.pr_number)
+            if confirmed is not True:
+                logger.info(
+                    "Leaving an open PR session alone; the provider does not "
+                    "report its pull request closed",
+                    repo=repo,
+                    pr_number=sess.pr_number,
+                    provider_says_closed=confirmed,
+                )
+                continue
         # PR no longer in the open list — cancel the runs still in flight,
         # close the session.
         #
@@ -1034,7 +1131,12 @@ async def _poll_workspace_prs(
     meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
 ) -> None:
-    """Check open PRs/MRs targeting the tracked branch for speculative plans."""
+    """Reconcile PR sessions across the repository, then plan the PRs/MRs
+    targeting the tracked branch.
+
+    Two halves at two different scopes, which is the whole of #2349 — see the
+    comment below.
+    """
     # One repo-wide listing serves both halves of this function, and they need
     # DIFFERENT scopes (#2349):
     #
@@ -1050,9 +1152,19 @@ async def _poll_workspace_prs(
     # leaving `terrapod ...` commands answering "not tracking this pull
     # request" on a PR that was still open.
     #
-    # Fewer provider calls than it replaces, not more: N workspaces sharing a
-    # repository made N branch-scoped listings, where this makes one that the
-    # per-cycle `meta` cache serves to all of them.
+    # The call cost moves in BOTH directions, and an earlier version of this
+    # comment claimed only the favourable one ("fewer provider calls than it
+    # replaces, not more"). That was wrong: `_list_open_prs` has been memoised
+    # per `(conn, owner, repo, "prs:<branch>")` since #1096, so the old cost
+    # was one call per distinct tracked BRANCH, not per workspace.
+    #
+    # Against that, this listing is one call per distinct REPOSITORY — so it is
+    # cheaper for an estate whose workspaces track several branches of one
+    # repository — but it is paginated, so it costs `ceil(open_prs / 100)`
+    # where the branch-scoped call always cost exactly one. A single-branch
+    # repository with 350 open pull requests therefore goes from 1 call per
+    # cycle to 4. `docs/vcs-integration.md` carries the corrected arithmetic,
+    # because that is the page an operator sizes an estate from.
     listing = await _list_all_open_prs(conn, owner, repo, meta=meta)
 
     # Hook-and-poll fallbacks (#282).
@@ -1075,17 +1187,31 @@ async def _poll_workspace_prs(
     if listing.complete:
         open_pr_numbers = {pr.number for pr in listing.prs}
         await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+        # The planning half, scoped back to this workspace's own branch.
+        # Without this filter the widened listing would have every workspace
+        # plan every PR on the repository — a worse fault than the one being
+        # fixed.
+        prs = [pr for pr in listing.prs if pr.base_ref == branch]
     else:
         logger.warning(
             "Skipping PR-session reconciliation: the open-PR listing is incomplete",
             repo=f"{owner}/{repo}",
             listed=len(listing.prs),
         )
-
-    # The planning half, scoped back to this workspace's own branch. Without
-    # this filter the widened listing above would have every workspace plan
-    # every PR on the repository — a worse fault than the one being fixed.
-    prs = [pr for pr in listing.prs if pr.base_ref == branch]
+        # And plan from the BRANCH-SCOPED listing instead, which the provider
+        # filters server-side and which is therefore complete for this branch
+        # however many open pull requests the repository has.
+        #
+        # Filtering the truncated repo-wide list would have been the quiet
+        # fault here. The walk is ordered by creation ASCENDING — correct for
+        # the absence question, because nothing shifts when a pull request is
+        # opened mid-walk — so a truncated listing holds the OLDEST pull
+        # requests and drops the newest. A developer opening a pull request on
+        # a repository past the walk's bound would have got no speculative
+        # plan at all, on any cycle, which is the core loop this product
+        # exists to serve. The branch-scoped call is what v1.11.2 used for
+        # planning, so this path is exactly its behaviour.
+        prs = await _list_open_prs(conn, owner, repo, branch, meta=meta)
 
     if ws.vcs_workflow == "apply_then_merge":
         # Comment polling stays apply-then-merge only: it dispatches
