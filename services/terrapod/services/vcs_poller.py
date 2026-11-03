@@ -341,7 +341,12 @@ async def _list_all_open_prs(
 
 
 async def _confirm_pr_is_closed(
-    conn: VCSConnection, owner: str, repo: str, pr_number: int
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    pr_number: int,
+    *,
+    meta: VCSMetadataCache | None = None,
 ) -> bool | None:
     """Ask the provider directly whether one pull request has closed.
 
@@ -366,11 +371,26 @@ async def _confirm_pr_is_closed(
     is about to become a decision. One call per candidate closure, and a pull
     request closes once, so the steady-state cost is nil.
 
-    It also makes the answer truthful rather than inferred: `merged` was only
-    ever written when Terrapod performed the merge itself, so a pull request a
-    human merged in the web UI -- the common case -- was stamped `closed`.
+    It deliberately does NOT distinguish merged from closed: both answer the
+    only question the caller asks, and the caller writes `closed` either way.
+    An earlier version of this docstring claimed the opposite -- that it made
+    the merged/closed answer "truthful rather than inferred" -- which the code
+    does not do. That distinction is supplied elsewhere, by the merge-commit
+    attribution that writes `state = "merged"`.
     """
     from terrapod.services import github_service, gitlab_service
+
+    # Memoised per cycle for the same reason the listing is: this runs once per
+    # WORKSPACE, and workspaces on one repository are polled concurrently, so
+    # without it the cost is (workspaces x candidate sessions) rather than
+    # (candidate sessions). A session the provider cannot answer for is
+    # re-queried on every cycle, so the unmemoised form leaks calls for as long
+    # as that lasts rather than once.
+    if meta is not None:
+        return await meta.get_or_fetch(
+            (str(conn.id), owner, repo, f"pr-closed:{pr_number}"),
+            lambda: _confirm_pr_is_closed(conn, owner, repo, pr_number, meta=None),
+        )
 
     try:
         if conn.provider == "gitlab":
@@ -397,7 +417,11 @@ async def _confirm_pr_is_closed(
     # understand, and `None` is how that is said.
     if pr.state in ("closed", "merged"):
         return True
-    if pr.state in ("open", "opened"):
+    if pr.state in ("open", "opened", "locked"):
+        # `locked` is GitLab's transient state while a merge is in flight. It is
+        # an answer -- the merge request has not closed yet -- not an unknown, so
+        # it must not reach the warning below: that would log "unrecognised"
+        # every cycle for an ordinary merge and spend a call each time.
         return False
     logger.warning(
         "Unrecognised pull request state from the provider; leaving its session",
@@ -1002,6 +1026,8 @@ async def _reconcile_closed_pr_sessions(
     conn: VCSConnection,
     repo: str,
     open_pr_numbers: set[int],
+    *,
+    meta: VCSMetadataCache | None = None,
 ) -> None:
     """Detect PRs that have been closed since the last poll and clean up.
 
@@ -1046,17 +1072,30 @@ async def _reconcile_closed_pr_sessions(
         # the gap between them is a race -- see `_confirm_pr_is_closed`. The
         # reported requirement was exactly this: "a session should only close
         # when the provider reports the PR closed or merged".
-        if repo_name:
-            confirmed = await _confirm_pr_is_closed(conn, owner, repo_name, sess.pr_number)
-            if confirmed is not True:
-                logger.info(
-                    "Leaving an open PR session alone; the provider does not "
-                    "report its pull request closed",
-                    repo=repo,
-                    pr_number=sess.pr_number,
-                    provider_says_closed=confirmed,
-                )
-                continue
+        if not repo_name:
+            # Fail CLOSED. This was `if repo_name:`, which skipped the
+            # confirmation altogether on a malformed "owner/" and closed the
+            # session with no provider answer at all -- the exact inverse of
+            # the invariant. Not reachable today (an empty repo segment makes
+            # the listing 404 and abandon the poll first), but the guard must
+            # not be the one written in the unsafe direction.
+            logger.warning(
+                "Cannot confirm a pull request's state without a repository name; "
+                "leaving its session",
+                repo=repo,
+                pr_number=sess.pr_number,
+            )
+            continue
+        confirmed = await _confirm_pr_is_closed(conn, owner, repo_name, sess.pr_number, meta=meta)
+        if confirmed is not True:
+            logger.info(
+                "Leaving an open PR session alone; the provider does not "
+                "report its pull request closed",
+                repo=repo,
+                pr_number=sess.pr_number,
+                provider_says_closed=confirmed,
+            )
+            continue
         # PR no longer in the open list — cancel the runs still in flight,
         # close the session.
         #
@@ -1186,7 +1225,7 @@ async def _poll_workspace_prs(
     # somebody is waiting for.
     if listing.complete:
         open_pr_numbers = {pr.number for pr in listing.prs}
-        await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+        await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers, meta=meta)
         # The planning half, scoped back to this workspace's own branch.
         # Without this filter the widened listing would have every workspace
         # plan every PR on the repository — a worse fault than the one being
