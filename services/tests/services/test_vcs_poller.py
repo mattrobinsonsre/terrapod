@@ -1799,7 +1799,14 @@ class TestClosedPRCancelIsScopedToItsRepository:
         from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions
 
         db = self._db([self._session()], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
 
         # Assert on the WHERE clause, not the rendered statement: `select(Run)`
         # names workspace_id among its SELECT columns, so checking the whole
@@ -1827,7 +1834,14 @@ class TestClosedPRCancelIsScopedToItsRepository:
 
         sess = self._session()
         db = self._db([sess], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
         assert sess.state == "closed"
 
     async def test_a_still_open_pr_is_left_alone(self):
@@ -1943,7 +1957,14 @@ class TestClosedPRSessionsAreReconciledInBothModes:
 
         sess = self._session()
         db = self._db([sess], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
         assert sess.state == "closed"
 
     async def test_a_still_open_pr_is_left_alone(self):

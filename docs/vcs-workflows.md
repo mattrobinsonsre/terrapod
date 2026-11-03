@@ -179,11 +179,18 @@ one of these was cancelled, including the finished speculative plans, and with
 no reason recorded — so a plan that disappeared when its PR merged was
 indistinguishable from a failure.
 
-**A pull request is treated as closed only when the provider's complete,
-repository-wide list of open pull requests no longer contains it.** Terrapod
-infers closure from the absence rather than asking the provider why the pull
-request left that list, which is why the list's *scope* and *completeness* are
-what matter.
+**A pull request is treated as closed only when the provider says it is.**
+Being absent from the repository-wide list of open pull requests makes it a
+candidate; Terrapod then asks the provider about that pull request directly and
+acts only on a definite closed or merged. A pull request the provider still
+reports open is left alone, and so is one whose state cannot be established at
+all — an unreachable provider never reads as a closure.
+
+That second step is not belt-and-braces. A listing is walked a page at a time
+over a collection that shrinks: a pull request merged mid-walk shifts every
+later one back a position, so one can be skipped while the walk still believes
+it saw everything. Acting on that absence would close a live session — the very
+fault this section describes — so absence alone is never enough.
 
 Several workspaces may share one VCS connection and one repository while
 tracking different base branches, and every one of them reconciles against the

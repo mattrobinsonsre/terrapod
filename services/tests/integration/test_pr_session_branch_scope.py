@@ -85,8 +85,13 @@ def _pr(number, base_ref):
     )
 
 
-async def _poll(conn_id, ws_id, branch, *, open_on_repo):
-    """Poll one workspace, with only the provider mocked."""
+async def _poll(conn_id, ws_id, branch, *, open_on_repo, provider_says_closed=True):
+    """Poll one workspace, with only the provider mocked.
+
+    `provider_says_closed` is what `_confirm_pr_is_closed` answers for a
+    candidate closure: True closed/merged, False still open, None could not be
+    established. The sweep acts only on True.
+    """
     async with get_db_session() as db:
         conn = await db.get(VCSConnection, conn_id)
         ws = await db.get(Workspace, ws_id)
@@ -105,6 +110,10 @@ async def _poll(conn_id, ws_id, branch, *, open_on_repo):
             patch("terrapod.services.vcs_poller._upsert_pr_session", new=AsyncMock()),
             patch("terrapod.services.vcs_poller.enqueue_trigger", new=AsyncMock()),
             patch("terrapod.services.vcs_poller._poll_pr_comments", new=AsyncMock()),
+            patch(
+                "terrapod.services.vcs_poller._confirm_pr_is_closed",
+                new=AsyncMock(return_value=provider_says_closed),
+            ),
         ):
             await _poll_workspace_prs(db, ws, conn, "org", "repo", branch, meta=None)
         await db.commit()
@@ -172,3 +181,41 @@ class TestAGenuinelyClosedPRIsStillReconciled:
         assert state == "closed"
         assert status == "canceled", "an apply-capable planned run must not keep holding the lock"
         assert reason == run_service.pr_closed_cancel_reason(PR_ON_DEVELOP)
+
+    async def test_a_pr_absent_from_the_listing_but_still_open_is_left_alone(self):
+        """Absence is a CANDIDATE, not a verdict (#2352).
+
+        Page-based pagination walks a shrinking collection: a pull request
+        merged mid-walk shifts every later item back one position, so one can
+        be skipped while the walk still reports itself complete. Acting on that
+        absence closes a live session and cancels its runs -- the reported
+        symptom, reintroduced by its own fix as a race. The provider is asked
+        before anything is acted on.
+        """
+        conn_id, made = await _seed()
+        await _poll(
+            conn_id,
+            made["a"]["ws"],
+            "main",
+            open_on_repo=[_pr(PR_ON_MAIN, "main")],
+            provider_says_closed=False,
+        )
+
+        state, status, reason = await _state(made["b"])
+        assert state == "open", "closed a session for a pull request still open"
+        assert status == "planned", "cancelled the run of a pull request still open"
+        assert reason is None
+
+    async def test_a_pr_whose_state_cannot_be_established_is_left_alone(self):
+        """Fail closed. An unreachable provider must not read as "closed"."""
+        conn_id, made = await _seed()
+        await _poll(
+            conn_id,
+            made["a"]["ws"],
+            "main",
+            open_on_repo=[_pr(PR_ON_MAIN, "main")],
+            provider_says_closed=None,
+        )
+
+        assert (await _state(made["b"]))[0] == "open"
+        assert (await _state(made["b"]))[1] == "planned"

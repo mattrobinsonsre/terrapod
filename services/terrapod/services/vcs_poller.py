@@ -452,6 +452,74 @@ async def _list_all_open_prs(
     return await github_service.list_open_pull_requests_for_repo(conn, owner, repo)
 
 
+async def _confirm_pr_is_closed(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> bool | None:
+    """Ask the provider directly whether one pull request has closed.
+
+    True closed or merged, False still open, **None when we could not tell** --
+    and the caller must treat None as "leave it alone".
+
+    This exists because absence from a listing is not the same question as
+    closure, and the gap between them is a race the listing cannot close.
+    Page-based pagination walks a collection that is *shrinking*: `state=open`
+    loses a pull request the moment someone merges it, which shifts every later
+    item back one position, so the first item of the next page is never
+    returned. Ordering by creation keeps the ORDER stable -- that is what the
+    listers do, and it is why an opened pull request is harmless -- but nothing
+    stabilises MEMBERSHIP. The walk then reports `complete=True` having silently
+    skipped a pull request that is still open, and reconciling on that absence
+    closes its session and cancels its runs. That is the reported symptom
+    (#2349) reintroduced by its own fix, as a narrow race rather than every
+    cycle.
+
+    GitHub offers no keyset pagination on `/pulls`, so the gap cannot be closed
+    in the listing; it is closed here instead, at the only point where absence
+    is about to become a decision. One call per candidate closure, and a pull
+    request closes once, so the steady-state cost is nil.
+
+    It also makes the answer truthful rather than inferred: `merged` was only
+    ever written when Terrapod performed the merge itself, so a pull request a
+    human merged in the web UI -- the common case -- was stamped `closed`.
+    """
+    from terrapod.services import github_service, gitlab_service
+
+    try:
+        if conn.provider == "gitlab":
+            pr = await gitlab_service.get_pull_request(conn, owner, repo, pr_number)
+        else:
+            pr = await github_service.get_pull_request(conn, owner, repo, pr_number)
+    except Exception as e:
+        # Fail closed: an unreachable provider must not be read as "closed".
+        logger.warning(
+            "Could not confirm whether a pull request closed; leaving its session",
+            repo=f"{owner}/{repo}",
+            pr_number=pr_number,
+            error=str(e),
+        )
+        return None
+
+    if pr is None:
+        # 404 — the pull request is gone entirely, which is as closed as it gets.
+        return True
+    if pr.merged:
+        return True
+    # Provider-native states: GitHub says open/closed, GitLab adds
+    # opened/merged/locked. Anything unrecognised is an answer we do not
+    # understand, and `None` is how that is said.
+    if pr.state in ("closed", "merged"):
+        return True
+    if pr.state in ("open", "opened"):
+        return False
+    logger.warning(
+        "Unrecognised pull request state from the provider; leaving its session",
+        repo=f"{owner}/{repo}",
+        pr_number=pr_number,
+        state=pr.state,
+    )
+    return None
+
+
 # --- Shared logic ---
 
 
@@ -1255,9 +1323,28 @@ async def _reconcile_closed_pr_sessions(
         ws.id for ws in scoped.scalars().all() if _provider_workspace_repo_is(ws, repo)
     ]
 
+    owner, _, repo_name = repo.partition("/")
+
     for sess in sessions.scalars().all():
         if sess.pr_number in open_pr_numbers:
             continue
+        # Absent from the listing is a CANDIDATE for closure, not a verdict.
+        # Confirm it with the provider before acting, because the listing's
+        # absence and the pull request's closure are different questions and
+        # the gap between them is a race -- see `_confirm_pr_is_closed`. The
+        # reported requirement was exactly this: "a session should only close
+        # when the provider reports the PR closed or merged".
+        if repo_name:
+            confirmed = await _confirm_pr_is_closed(conn, owner, repo_name, sess.pr_number)
+            if confirmed is not True:
+                logger.info(
+                    "Leaving an open PR session alone; the provider does not "
+                    "report its pull request closed",
+                    repo=repo,
+                    pr_number=sess.pr_number,
+                    provider_says_closed=confirmed,
+                )
+                continue
         # PR no longer in the open list — cancel the runs still in flight,
         # close the session.
         #
