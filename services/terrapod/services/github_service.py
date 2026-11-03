@@ -611,15 +611,25 @@ async def list_open_pull_requests_for_repo(
     Paginated, unlike the branch-scoped listing. That is not polish — one page
     holds 100 PRs, and a truncated list reaching the reconciler closes live
     sessions, so the walk is followed to the end and `complete` says whether it
-    got there.
+    got there. Repositories well past one page are ordinary: a live check
+    against a large public repository reported `rel="last"` at page 134.
+
+    Ordered by `created` ASCENDING rather than by `updated` as the
+    branch-scoped sibling is. That one takes a single page, so its ordering is
+    a presentation choice; here it is correctness. `updated` is mutable, so an
+    item can move between pages while the walk is in progress, and an item
+    missed on an otherwise complete walk reads as a closed pull request --
+    which is the defect this function exists to fix. `created` is immutable,
+    and ascending means a PR opened mid-walk appends to the end, shifting
+    nothing and carrying no session to close.
     """
     token = await _api_call_token(conn)
     api_url = _api_url(conn)
     url: str | None = f"{api_url}/repos/{owner}/{repo}/pulls"
     params: dict | None = {
         "state": "open",
-        "sort": "updated",
-        "direction": "desc",
+        "sort": "created",
+        "direction": "asc",
         "per_page": _LISTING_PAGE_SIZE,
     }
 

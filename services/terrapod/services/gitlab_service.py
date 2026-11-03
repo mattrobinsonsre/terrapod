@@ -378,17 +378,33 @@ async def list_open_merge_requests_for_repo(
     `complete` is what lets the caller decline to conclude anything from an
     absence.
 
-    Keyset pagination, ordered by id, following the `Link: rel="next"` the
+    Ordered by `created_at` ASCENDING, following the `Link: rel="next"` the
     server returns — which an instance that ignores the keyset request also
     returns for offset pagination, so either way the walk is the same. That is
-    the same shape `list_group_projects` uses.
+    the same shape `list_group_projects` uses, with one difference that is not
+    cosmetic:
+
+    **`order_by=id` is what that sibling passes and it is INVALID here.**
+    Measured against gitlab.com: the merge-requests endpoint answers
+    `400 {"error": "order_by does not have a valid value"}`, where the projects
+    endpoint accepts it. Shipped that way this function would have failed on
+    every GitLab deployment, and the mocked tests could not see it because they
+    mock the request — the recorded rule about driving the tool rather than
+    describing its arguments.
+
+    `created_at` is also the ordering this needs rather than merely one that is
+    accepted. It is immutable, so an item cannot move between pages while the
+    walk is in progress; `updated_at` can, and a missed item on an otherwise
+    complete walk reads as a closed pull request, which is the whole defect.
+    Ascending for the same reason: a merge request opened mid-walk appends to
+    the end and shifts nothing, and it has no session to close yet.
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
     url: str | None = f"{api}/projects/{project}/merge_requests"
     params: dict | None = {
         "state": "opened",
-        "order_by": "id",
+        "order_by": "created_at",
         "sort": "asc",
         "pagination": "keyset",
         "per_page": 100,

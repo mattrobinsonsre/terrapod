@@ -268,3 +268,55 @@ class TestTheRepoWideListingIsPaginatedAndSaysSo:
         assert [p.number for p in got.prs] == [1, 2]
         assert [p.base_ref for p in got.prs] == ["develop", "develop"]
         assert got.complete is True
+
+    async def test_gitlab_orders_by_created_at_because_id_is_refused(self):
+        """Measured against gitlab.com, not reasoned about.
+
+        `order_by=id` is what the keyset-paginating sibling
+        (`list_group_projects`) passes, and the merge-requests endpoint answers
+        `400 {"error": "order_by does not have a valid value"}` for it. Copying
+        it here would have failed on every GitLab deployment, and no mocked
+        test can see that -- which is exactly why this one pins the value the
+        live call established rather than asserting the request succeeds.
+
+        `created_at` is also the ordering this needs rather than merely one
+        that is accepted: it is immutable, so nothing moves between pages while
+        the walk is in progress.
+        """
+        from terrapod.services import gitlab_service
+
+        page = MagicMock()
+        page.status_code = 200
+        page.raise_for_status = MagicMock()
+        page.headers = {}
+        page.links = {}
+        page.json.return_value = []
+
+        with patch.object(
+            gitlab_service, "_gitlab_request", new=AsyncMock(return_value=page)
+        ) as req:
+            await gitlab_service.list_open_merge_requests_for_repo(_conn(), "org", "repo")
+
+        params = req.await_args.kwargs["params"]
+        assert params["order_by"] == "created_at", f"GitLab 400s on {params['order_by']!r}"
+        assert params["order_by"] != "id"
+        assert params["sort"] == "asc"
+
+    async def test_github_orders_by_an_immutable_key(self):
+        """`updated` is mutable, so under page-based pagination an item can move
+        between pages mid-walk -- and an item missed on an otherwise complete
+        walk reads as a closed pull request, which is the defect being fixed.
+        The branch-scoped sibling may keep `updated` because it takes one page.
+        """
+        page = self._page([])
+        with (
+            patch.object(github_service, "get_installation_token", new=AsyncMock(return_value="t")),
+            patch.object(
+                github_service, "_github_request", new=AsyncMock(return_value=page)
+            ) as req,
+        ):
+            await github_service.list_open_pull_requests_for_repo(_conn(), "org", "repo")
+
+        params = req.await_args.kwargs["params"]
+        assert params["sort"] == "created", "a mutable sort key reorders pages mid-walk"
+        assert params["direction"] == "asc"
