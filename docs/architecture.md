@@ -520,6 +520,7 @@ The `VCSProvider` protocol (`services/terrapod/services/vcs_provider.py`) define
 | Get default branch | GitHub API | GitLab API |
 | Download archive | GitHub API (tarball) | GitLab API (tarball) |
 | List open PRs/MRs | GitHub API (pulls) | GitLab API (merge requests) |
+| List open PRs/MRs across the repository | GitHub API (pulls, paginated) | GitLab API (merge requests, paginated) |
 | Parse repo URL | github.com/org/repo | gitlab.com/group/project |
 
 For detailed setup instructions, see [vcs-integration.md](vcs-integration.md).
