@@ -81,6 +81,7 @@ class PullRequest:
         "state",
         "merged",
         "from_fork",
+        "base_ref",
     )
 
     def __init__(
@@ -95,6 +96,7 @@ class PullRequest:
         author_login: str = "",
         state: str = "",
         merged: bool = False,
+        base_ref: str = "",
     ) -> None:
         self.number = number
         self.head_sha = head_sha
@@ -121,6 +123,31 @@ class PullRequest:
         # path within an existing one, cannot omit it by accident — the same
         # reasoning as the optional-parameter trap recorded in AGENTS.md.
         self.from_fork = from_fork
+        # The branch this PR/MR targets — GitHub's `base.ref`, GitLab's
+        # `target_branch`. Populated on every construction site, not just the
+        # one that needs it: a half-populated field reads as "this PR targets
+        # no branch", and the caller that filters on it (#2349) would then
+        # quietly consider nothing.
+        self.base_ref = base_ref
+
+
+@dataclass(frozen=True)
+class OpenPullRequests:
+    """Every open PR/MR on a repository, whatever branch it targets.
+
+    `complete` is False when the listing stopped short — at the page cap, or
+    on an error partway — so that **nothing may be concluded from a PR's
+    absence**, exactly as for `RepositoryListing` above.
+
+    That caution is load-bearing rather than general here. The caller closes a
+    `PRSession` on absence and cancels its runs (#2349), so reconciling
+    against a truncated listing would close live sessions and cancel work
+    somebody is waiting for — a quieter instance of the very defect this type
+    was introduced to fix.
+    """
+
+    prs: list[PullRequest]
+    complete: bool
 
 
 @dataclass(frozen=True)
