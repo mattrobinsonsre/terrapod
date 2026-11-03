@@ -106,7 +106,13 @@ class TestAClosureCancelIsLegible:
 
     async def test_the_workspace_sweep_passes_a_reason(self):
         db, _ = self._session_db([_run("planning", plan_only=True)])
-        with patch.object(run_service, "cancel_run", AsyncMock()) as cancel:
+        with (
+            patch.object(run_service, "cancel_run", AsyncMock()) as cancel,
+            # The sweep now confirms a candidate closure with the provider
+            # before acting (#2352), so these scenarios -- whose premise is a
+            # pull request that really did close -- have to say so.
+            patch.object(vcs_poller, "_confirm_pr_is_closed", AsyncMock(return_value=True)),
+        ):
             await vcs_poller._reconcile_closed_pr_sessions(
                 db, MagicMock(id="conn-1"), "org/repo", set()
             )
@@ -140,6 +146,7 @@ class TestAClosureCancelIsLegible:
         with (
             patch.object(run_service, "cancel_run", boom),
             patch.object(vcs_poller, "logger") as log,
+            patch.object(vcs_poller, "_confirm_pr_is_closed", AsyncMock(return_value=True)),
         ):
             await vcs_poller._reconcile_closed_pr_sessions(
                 db, MagicMock(id="conn-1"), "org/repo", set()

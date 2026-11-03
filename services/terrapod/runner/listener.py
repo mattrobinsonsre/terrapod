@@ -52,6 +52,12 @@ _shutdown = asyncio.Event()
 #: can be a flap, and a re-join consumes a join-token use.
 _REJOIN_THRESHOLD = 3
 
+#: Floor on the interval between re-join ATTEMPTS. The threshold above debounces
+#: the first one; this bounds the rest, because the failure counter survives a
+#: failed re-join on purpose and would otherwise let every later rejection spend
+#: another join-token use.
+_REJOIN_MIN_INTERVAL_SECONDS = 60.0
+
 # SSE tuning lives on RunnerConfig (sse_read_timeout / sse_max_age), layered
 # from runners.yaml + env. The listener reads them via self._sse_read_timeout /
 # self._sse_max_age (set in __init__) rather than module-level env constants.
@@ -92,6 +98,10 @@ class RunnerListener:
         # than burning a second join-token use for nothing.
         self._rejoin_lock = asyncio.Lock()
         self._rejoin_generation = 0
+        #: Monotonic clock of the last re-join ATTEMPT, successful or not, so the
+        #: rate is bounded even though the failure counter deliberately survives a
+        #: failed one. 0.0 means never attempted.
+        self._last_rejoin_attempt = 0.0
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
         # Real running-Job count from K8s, refreshed each heartbeat (#749).
@@ -317,6 +327,34 @@ class RunnerListener:
             if self._rejoin_generation != gen:
                 logger.info("Re-join already completed by another loop; skipping")
                 return
+            # Rate-limit the ATTEMPT rather than clearing the counter.
+            #
+            # The counter deliberately survives a failed re-join
+            # (`test_a_failed_re_join_reports_false_and_does_not_clear_the_count`)
+            # because `_rejoin_unlocked` clears the credentials Secret before it
+            # re-establishes: a listener whose re-join failed has no identity at
+            # all, so making it wait for another full threshold of rejections
+            # prolongs an outage it cannot otherwise leave.
+            #
+            # The cost of that, left unbounded, is that EVERY later rejection
+            # re-entered this path -- one every 30-90s -- each time deleting the
+            # Secret and spending another join-token use. On a pool whose token
+            # has `max_uses: 1` the first failed re-join then made the listener
+            # permanently unjoinable.
+            #
+            # A floor on the interval keeps both properties: recovery is still
+            # attempted promptly rather than after another three rejections, and
+            # the attempt rate is bounded however fast rejections arrive.
+            now = time.monotonic()
+            since = now - self._last_rejoin_attempt
+            if self._last_rejoin_attempt and since < _REJOIN_MIN_INTERVAL_SECONDS:
+                logger.warning(
+                    "Skipping re-join; one was attempted too recently",
+                    seconds_since_last=round(since, 1),
+                    min_interval=_REJOIN_MIN_INTERVAL_SECONDS,
+                )
+                return
+            self._last_rejoin_attempt = now
             await self._rejoin_unlocked()
             self._rejoin_generation += 1
             self._auth_failures = 0

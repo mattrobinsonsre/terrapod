@@ -76,7 +76,7 @@ async def _list_open_prs(
             head_ref=pr["head_ref"],
             title=pr["title"],
             from_fork=bool(pr["from_fork"]),
-            base_ref=pr.get("base_ref", ""),
+            base_ref=pr["base_ref"],
         )
         for pr in prs
     ]

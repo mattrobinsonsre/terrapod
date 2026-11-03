@@ -189,10 +189,28 @@ protected nobody — it only let an agent read a setting it could not set, which
 an invitation to describe a change it cannot make.
 
 Risk is therefore signalled by **annotation** — `readOnly`, `mutating`,
-`destructive` — never by absence, and a client that respects those annotations is
-what puts a human in front of a consequential call. If a setting should not be
-flipped by anyone, that is a question about the setting, and the answer belongs in
-RBAC or in the feature rather than in which clients can see it.
+`destructive` — never by absence. If a setting should not be flipped by anyone,
+that is a question about the setting, and the answer belongs in RBAC or in the
+feature rather than in which clients can see it.
+
+**Be precise about what the annotation buys here, because an earlier version of
+this page was not.** `terrapod_workspace_update` is annotated `mutating`, not
+`destructive`, and that is accurate: it writes a workspace record and does not
+itself change or destroy infrastructure. But it means a host configured to
+confirm only `destructive` calls **will not prompt** before an agent sets
+`auto-merge`, `debug-mode` or `security-scan-enforcement` — and those three do
+have consequences past the record. `auto-merge` arms Terrapod to merge through
+the provider's own API after a successful apply; `debug-mode` keeps a run's
+token and decrypted variables alive for inspection; relaxing
+`security-scan-enforcement` lowers a gate on later runs. Each tool field says so
+in its own description, which is where per-attribute risk can live at all, since
+an annotation applies to the whole tool.
+
+So if you want a human in front of those, **configure your MCP host to confirm
+`terrapod_workspace_update`** rather than relying on the annotation to single
+them out. Annotating the whole tool `destructive` instead would be the blunt
+alternative: accurate for nothing it does, and a confirmation prompt on every
+workspace rename.
 
 ### Ground (read-only) — write correct config against *your* estate
 
