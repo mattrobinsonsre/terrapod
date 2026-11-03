@@ -109,7 +109,10 @@ async def _cycle(ws, *, open_on_repo, complete=True, repo_wide_override=None, pr
     reconciled: dict[str, set[int]] = {}
     planned: list[int] = []
 
-    async def _reconcile(db, conn, repo, open_pr_numbers):
+    async def _reconcile(db, conn, repo, open_pr_numbers, **_):
+        # `**_` for the same reason as `_create` below: the stub has no opinion
+        # about the keywords the real function grows, and enumerating them makes
+        # it break whenever one is added.
         reconciled["numbers"] = set(open_pr_numbers)
 
     async def _create(*a, **k):
