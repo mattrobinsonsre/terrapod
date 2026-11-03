@@ -55,6 +55,7 @@ from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_metadata_cache import VCSMetadataCache
 from terrapod.services.vcs_provider import (
+    OpenPullRequests,
     PRComment,
     PullRequest,
 )
@@ -406,9 +407,39 @@ async def _list_open_prs(
             head_ref=pr["head_ref"],
             title=pr["title"],
             from_fork=bool(pr["from_fork"]),
+            base_ref=pr.get("base_ref", ""),
         )
         for pr in prs
     ]
+
+
+async def _list_all_open_prs(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    *,
+    meta: VCSMetadataCache | None,
+) -> OpenPullRequests:
+    """Every open PR/MR on the repository, whatever branch it targets (#2349).
+
+    `_list_open_prs` above asks the provider to filter to one base branch,
+    which is right for deciding what THIS workspace should plan and wrong for
+    deciding which PRs are still open: the session table is keyed on
+    (connection, repo, pr_number), so a branch-scoped answer made every PR
+    targeting another branch indistinguishable from a closed one.
+
+    `meta` is keyword-only and required, as for `_list_open_prs`. Its key space
+    is distinct from the branch-scoped one — these are different questions with
+    different answers, and one cycle may well ask both.
+    """
+    if meta is not None:
+        return await meta.get_or_fetch(
+            (str(conn.id), owner, repo, "prs:*"),
+            lambda: _list_all_open_prs(conn, owner, repo, meta=None),
+        )
+    if conn.provider == "gitlab":
+        return await gitlab_service.list_open_merge_requests_for_repo(conn, owner, repo)
+    return await github_service.list_open_pull_requests_for_repo(conn, owner, repo)
 
 
 # --- Shared logic ---
@@ -1293,7 +1324,25 @@ async def _poll_workspace_prs(
     fetch_paths: list[str] | None = None,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
-    prs = await _list_open_prs(conn, owner, repo, branch, meta=meta)
+    # One repo-wide listing serves both halves of this function, and they need
+    # DIFFERENT scopes (#2349):
+    #
+    #   - reconciliation asks "which PRs are still open on this repository",
+    #     because that is the scope of the session rows it closes;
+    #   - the planning loop asks "which open PRs target the branch THIS
+    #     workspace tracks", which is this listing filtered locally on
+    #     `base_ref`.
+    #
+    # It used to ask the provider for the branch-scoped list and hand that to
+    # both. Two workspaces on one repository tracking different branches then
+    # closed each other's sessions every cycle — cancelling the planned run and
+    # leaving `terrapod ...` commands answering "not tracking this pull
+    # request" on a PR that was still open.
+    #
+    # Fewer provider calls than it replaces, not more: N workspaces sharing a
+    # repository made N branch-scoped listings, where this makes one that the
+    # per-cycle `meta` cache serves to all of them.
+    listing = await _list_all_open_prs(conn, owner, repo, meta=meta)
 
     # Hook-and-poll fallbacks (#282).
     #
@@ -1307,8 +1356,25 @@ async def _poll_workspace_prs(
     # repository whose PR closed. Without it, reaching this code from every
     # workspace rather than only apply-then-merge ones turns a latent
     # cross-repository collision into a likely one.
-    open_pr_numbers = {pr.number for pr in prs}
-    await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+    #
+    # Gated on a COMPLETE listing. Reconciliation concludes from an absence, so
+    # a truncated list is not a smaller answer to the same question — it is a
+    # wrong one, in the direction that closes live sessions and cancels work
+    # somebody is waiting for.
+    if listing.complete:
+        open_pr_numbers = {pr.number for pr in listing.prs}
+        await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+    else:
+        logger.warning(
+            "Skipping PR-session reconciliation: the open-PR listing is incomplete",
+            repo=f"{owner}/{repo}",
+            listed=len(listing.prs),
+        )
+
+    # The planning half, scoped back to this workspace's own branch. Without
+    # this filter the widened listing above would have every workspace plan
+    # every PR on the repository — a worse fault than the one being fixed.
+    prs = [pr for pr in listing.prs if pr.base_ref == branch]
 
     if ws.vcs_workflow == "apply_then_merge":
         # Comment polling stays apply-then-merge only: it dispatches
