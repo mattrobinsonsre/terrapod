@@ -395,3 +395,90 @@ class TestTheRenewLoopReportsARefusedCert:
         )
         assert calls["n"] == 2
         assert sleeper.await_count == 1
+
+
+class TestA403OnRenewIsTransientNotARejection:
+    """#2352. A 403 used to raise `_CertRejected`, and that was destructive.
+
+    Traced against the route rather than assumed: `get_listener_identity`
+    answers 401 for every authentication failure and never 403, and the renew
+    handler's only 403 is "Certificate does not match the listener id in the
+    path" -- which a listener cannot provoke, because it builds that path from
+    its own `identity.listener_id`. So every 403 a listener can actually see on
+    this endpoint comes from outside the API: an ingress, a WAF, a mesh, an
+    auth sidecar.
+
+    Treating one as a certificate rejection made the listener delete its
+    credentials Secret and spend a join-token use, against a certificate that
+    was still perfectly valid. On a pool whose token has `max_uses: 1` that is
+    unrecoverable -- an infrastructure blip permanently removing a listener.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_403_is_retried_and_the_cert_survives(self):
+        ident = _identity()
+        new_data = {"certificate": "PEM", "private_key": "K", "ca_certificate": "CA"}
+
+        forbidden = MagicMock()
+        forbidden.status_code = 403
+        forbidden.text = "blocked by proxy"
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.json.return_value = {"data": new_data}
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.post.side_effect = [forbidden, ok]
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
+            result = await identity_mod._call_renew_with_retries(ident)
+
+        assert result == new_data, "a proxy 403 must not end the renewal"
+        assert mock_client.post.call_count == 2, "the 403 was not retried"
+
+    @pytest.mark.asyncio
+    async def test_a_403_never_raises_cert_rejected(self):
+        """The property, stated separately from the retry: `_CertRejected` is
+        what drives Secret deletion and a join-token use, so a 403 must not
+        produce one even when every attempt returns 403."""
+        ident = _identity()
+
+        forbidden = MagicMock()
+        forbidden.status_code = 403
+        forbidden.text = "blocked by proxy"
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.post.return_value = forbidden
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
+            result = await identity_mod._call_renew_with_retries(ident)
+
+        assert result is None, "exhausted retries report transient failure, not rejection"
+        assert mock_client.post.call_count > 1, "403 was treated as terminal"
+
+    @pytest.mark.asyncio
+    async def test_a_401_still_raises_so_a_real_rejection_still_recovers(self):
+        """The control. Narrowing to 401 must not have disarmed the mechanism
+        that recovers a genuinely expired certificate."""
+        ident = _identity()
+
+        unauthorized = MagicMock()
+        unauthorized.status_code = 401
+        unauthorized.text = "expired"
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.post.return_value = unauthorized
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(identity_mod._CertRejected):
+                await identity_mod._call_renew_with_retries(ident)
+
+        assert mock_client.post.call_count == 1

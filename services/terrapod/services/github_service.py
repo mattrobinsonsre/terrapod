@@ -517,7 +517,7 @@ async def list_open_pull_requests(
     """List open pull requests targeting a specific base branch.
 
     Returns a list of dicts with keys: number, head_sha, head_ref, title,
-    from_fork.
+    from_fork, base_ref.
 
     `from_fork` compares the head repository to the base one rather than
     reading `head.repo.fork`: that flag says the head repo is *itself* a fork
@@ -578,7 +578,10 @@ async def list_open_pull_requests_for_repo(
     holds 100 PRs, and a truncated list reaching the reconciler closes live
     sessions, so the walk is followed to the end and `complete` says whether it
     got there. Repositories well past one page are ordinary: a live check
-    against a large public repository reported `rel="last"` at page 134.
+    against a large public repository reported `rel="last"` at page 134 **at
+    `per_page=10`**, i.e. about 1,340 open pull requests, or 14 pages at the
+    100 this uses. Stating the page size matters — without it the figure reads
+    as ten times larger and as evidence that the cap below is routinely hit.
 
     Ordered by `created` ASCENDING rather than by `updated` as the
     branch-scoped sibling is. That one takes a single page, so its ordering is
