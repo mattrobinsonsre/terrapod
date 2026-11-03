@@ -39,7 +39,7 @@ semgrep/semgrep:1.117
 localstack/localstack:4
 moby/buildkit:buildx-stable-1
 
-# Not on Docker Hub — the source registry is part of the reference. The eight
+# Not on Docker Hub — the source registry is part of the reference. The five
 # E2E shards each pull this, and at 0.91GB compressed that is the largest single
 # thing CI fetches. Playwright publishes no browser-specific variant (18,570
 # tags, none Chromium-only), so this mirrors the image as published rather than
