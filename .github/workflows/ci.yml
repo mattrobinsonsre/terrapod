@@ -396,6 +396,15 @@ jobs:
       - name: (docs-audit) the CLI surface catalogue is covered
         run: python3 scripts/docs-audit/check_cli_surface_covered.py
 
+      # An image we mirror, then pull from the registry we mirrored it away
+      # from, is the mirror paying its cost and buying nothing -- and a
+      # successful upstream pull is indistinguishable from a successful mirror
+      # pull, so nothing reports it. Two release lines fetched 0.91GB of
+      # Playwright from mcr.microsoft.com on every run for exactly that long
+      # (#2361).
+      - name: (docs-audit) mirrored images are pulled from the mirror
+        run: python3 scripts/docs-audit/check_mirror_consumption.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
