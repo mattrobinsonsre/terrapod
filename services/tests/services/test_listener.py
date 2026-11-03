@@ -576,3 +576,62 @@ class TestLaunchNamespace:
         assert mock_create.await_args.kwargs["namespace"] == "custom-runner-ns"
         mock_uid.assert_awaited_once()
         assert mock_uid.await_args.kwargs["namespace"] == "custom-runner-ns"
+
+
+class TestTheAuthFailureCounterReArms:
+    """The three-strike debounce must survive a FAILED re-join (#2352).
+
+    `_rejoin` used to clear `_auth_failures` only after `_rejoin_unlocked()`
+    returned, and nothing else ever lowered it. So once the counter reached the
+    threshold and the re-join raised — an exhausted join token, a Secret the
+    service account cannot delete — it stayed at the threshold for the life of
+    the pod, and every subsequent auth failure satisfied the gate immediately.
+    Each one deleted the credentials Secret and spent another join-token use.
+
+    On a pool whose token has `max_uses: 1`, which `_rejoin`'s own docstring
+    names, that turns one transient failure into a listener that can never join
+    again — the precise outcome the debounce exists to prevent.
+    """
+
+    async def test_a_failed_rejoin_still_clears_the_counter(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("join token exhausted"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is False, "a raising re-join must not report success"
+        assert listener._rejoin_unlocked.await_count == 1
+        assert listener._auth_failures == 0, (
+            "the counter stayed at the threshold, so the next single auth failure "
+            "would spend another join-token use with no debounce"
+        )
+
+    async def test_the_next_failure_after_a_failed_rejoin_does_not_rejoin_again(
+        self, fresh_shutdown_event
+    ):
+        """The consequence, stated as behaviour rather than as a counter value."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("join token exhausted"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1
+
+        await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1, (
+            "one auth failure after a failed re-join triggered another re-join"
+        )
+
+    async def test_a_successful_rejoin_clears_it_too(self, fresh_shutdown_event):
+        """The pre-existing behaviour, kept — otherwise the `finally` could be
+        satisfied by never resetting at all."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock()
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is True
+        assert listener._auth_failures == 0
+        assert listener._rejoin_generation == 1

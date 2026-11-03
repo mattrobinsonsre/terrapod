@@ -626,10 +626,14 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     Returns the new cert dict on success, or None if every attempt failed for
     a transient reason (rate limit, 5xx, network).
 
-    A 401/403 is *not* retried and raises `_CertRejected`: the API has refused
-    this cert outright, so retrying it is futile — an expired cert in
-    particular can never renew itself — and the caller must re-join instead.
-    Returning None for both is what made that distinction unexpressible.
+    A 401 is *not* retried and raises `_CertRejected`: the API has refused this
+    cert outright, so retrying it is futile — an expired cert in particular can
+    never renew itself — and the caller must re-join instead. Returning None
+    for both is what made that distinction unexpressible.
+
+    A **403 is retried**, not treated as a rejection: no reachable API path
+    emits one here, so it can only come from an intermediary. See the branch
+    below for the measurement.
     """
     import httpx
 
@@ -671,20 +675,45 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
         try:
             async with httpx.AsyncClient(base_url=identity.api_url, timeout=30) as client:
                 # This function already owns a bounded retry loop (3 attempts with
-                # backoff + renew-specific dispatch: 429 Retry-After, 401/403 → give
+                # backoff + renew-specific dispatch: 429 Retry-After, 401 → give
                 # up, 200 → adopt new cert). Don't wrap the call in the shared retry
                 # helper too — that would nest retries (3×3). The outer loop here is
                 # this client call's retry.
                 r = await client.post(renew_path, headers=headers)
             if r.status_code == 200:
                 return r.json()["data"]
-            if r.status_code in (401, 403):
+            if r.status_code == 401:
                 logger.warning(
                     "Renew rejected by API — cert may be revoked or listener gone",
                     status=r.status_code,
                     body=r.text[:200],
                 )
                 raise _CertRejected(f"renew returned {r.status_code}")
+            # A 403 is deliberately NOT a certificate rejection, and this used
+            # to be `in (401, 403)`.
+            #
+            # Measured against the route: `get_listener_identity` answers 401
+            # for every authentication failure and never 403, and the renew
+            # handler's only 403 is "Certificate does not match the listener id
+            # in the path" — which the listener cannot provoke, because it
+            # builds that path from its own `identity.listener_id`. So every
+            # 403 a listener can actually observe on this endpoint originates
+            # OUTSIDE the API: an ingress, a WAF, a service mesh, an auth
+            # sidecar.
+            #
+            # Treating one as a rejection deleted the credentials Secret and
+            # spent a join-token use on what is an infrastructure error against
+            # a cert that is still perfectly valid — on a `max_uses: 1` pool,
+            # unrecoverably. Falling through retries it instead, which is what
+            # a transient proxy failure deserves.
+            if r.status_code == 403:
+                logger.warning(
+                    "Renew returned 403; treating as transient rather than a "
+                    "certificate rejection (no API path emits 403 here)",
+                    status=r.status_code,
+                    body=r.text[:200],
+                    attempt=attempt + 1,
+                )
             # 429 deserves a longer wait — rate limits are per-minute so 1s
             # backoff just hot-loops. Honor Retry-After if present.
             if r.status_code == 429:

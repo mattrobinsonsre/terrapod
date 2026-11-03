@@ -407,7 +407,11 @@ async def _list_open_prs(
             head_ref=pr["head_ref"],
             title=pr["title"],
             from_fork=bool(pr["from_fork"]),
-            base_ref=pr.get("base_ref", ""),
+            # Indexed, not `.get(..., "")`. The provider always emits this key
+            # now, and a silent "" is the one value that matches no branch --
+            # so a missing key should fail here rather than quietly remove the
+            # pull request from whatever filters on it.
+            base_ref=pr["base_ref"],
         )
         for pr in prs
     ]
@@ -434,7 +438,13 @@ async def _list_all_open_prs(
     """
     if meta is not None:
         return await meta.get_or_fetch(
-            (str(conn.id), owner, repo, "prs:*"),
+            # NOT "prs:*" -- the branch-scoped key is `f"prs:{base_branch}"`,
+            # so a workspace tracking a branch literally named `*` would
+            # collide with this one, and the two keys hold different TYPES
+            # (`list[PullRequest]` against `OpenPullRequests`). Any key that
+            # cannot be produced by that f-string is safe; this one has no
+            # colon at all.
+            (str(conn.id), owner, repo, "prs-repo-wide"),
             lambda: _list_all_open_prs(conn, owner, repo, meta=None),
         )
     if conn.provider == "gitlab":
@@ -1323,7 +1333,12 @@ async def _poll_workspace_prs(
     meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
 ) -> None:
-    """Check open PRs/MRs targeting the tracked branch for speculative plans."""
+    """Reconcile PR sessions across the repository, then plan the PRs/MRs
+    targeting the tracked branch.
+
+    Two halves at two different scopes, which is the whole of #2349 — see the
+    comment below.
+    """
     # One repo-wide listing serves both halves of this function, and they need
     # DIFFERENT scopes (#2349):
     #
@@ -1339,9 +1354,19 @@ async def _poll_workspace_prs(
     # leaving `terrapod ...` commands answering "not tracking this pull
     # request" on a PR that was still open.
     #
-    # Fewer provider calls than it replaces, not more: N workspaces sharing a
-    # repository made N branch-scoped listings, where this makes one that the
-    # per-cycle `meta` cache serves to all of them.
+    # The call cost moves in BOTH directions, and an earlier version of this
+    # comment claimed only the favourable one ("fewer provider calls than it
+    # replaces, not more"). That was wrong: `_list_open_prs` has been memoised
+    # per `(conn, owner, repo, "prs:<branch>")` since #1096, so the old cost
+    # was one call per distinct tracked BRANCH, not per workspace.
+    #
+    # Against that, this listing is one call per distinct REPOSITORY — so it is
+    # cheaper for an estate whose workspaces track several branches of one
+    # repository — but it is paginated, so it costs `ceil(open_prs / 100)`
+    # where the branch-scoped call always cost exactly one. A single-branch
+    # repository with 350 open pull requests therefore goes from 1 call per
+    # cycle to 4. `docs/vcs-integration.md` carries the corrected arithmetic,
+    # because that is the page an operator sizes an estate from.
     listing = await _list_all_open_prs(conn, owner, repo, meta=meta)
 
     # Hook-and-poll fallbacks (#282).
@@ -1364,17 +1389,31 @@ async def _poll_workspace_prs(
     if listing.complete:
         open_pr_numbers = {pr.number for pr in listing.prs}
         await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+        # The planning half, scoped back to this workspace's own branch.
+        # Without this filter the widened listing would have every workspace
+        # plan every PR on the repository — a worse fault than the one being
+        # fixed.
+        prs = [pr for pr in listing.prs if pr.base_ref == branch]
     else:
         logger.warning(
             "Skipping PR-session reconciliation: the open-PR listing is incomplete",
             repo=f"{owner}/{repo}",
             listed=len(listing.prs),
         )
-
-    # The planning half, scoped back to this workspace's own branch. Without
-    # this filter the widened listing above would have every workspace plan
-    # every PR on the repository — a worse fault than the one being fixed.
-    prs = [pr for pr in listing.prs if pr.base_ref == branch]
+        # And plan from the BRANCH-SCOPED listing instead, which the provider
+        # filters server-side and which is therefore complete for this branch
+        # however many open pull requests the repository has.
+        #
+        # Filtering the truncated repo-wide list would have been the quiet
+        # fault here. The walk is ordered by creation ASCENDING — correct for
+        # the absence question, because nothing shifts when a pull request is
+        # opened mid-walk — so a truncated listing holds the OLDEST pull
+        # requests and drops the newest. A developer opening a pull request on
+        # a repository past the walk's bound would have got no speculative
+        # plan at all, on any cycle, which is the core loop this product
+        # exists to serve. The branch-scoped call is what v1.11.2 used for
+        # planning, so this path is exactly its behaviour.
+        prs = await _list_open_prs(conn, owner, repo, branch, meta=meta)
 
     if ws.vcs_workflow == "apply_then_merge":
         # Comment polling stays apply-then-merge only: it dispatches

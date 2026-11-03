@@ -316,10 +316,28 @@ class RunnerListener:
         async with self._rejoin_lock:
             if self._rejoin_generation != gen:
                 logger.info("Re-join already completed by another loop; skipping")
+                # Another loop recovered the identity, so this loop's tally is
+                # about an identity that no longer exists. Leaving it standing
+                # meant the next single auth failure re-entered the re-join
+                # path with no debounce at all.
+                self._auth_failures = 0
                 return
-            await self._rejoin_unlocked()
-            self._rejoin_generation += 1
-            self._auth_failures = 0
+            try:
+                await self._rejoin_unlocked()
+                self._rejoin_generation += 1
+            finally:
+                # Re-arm the debounce whether or not the join succeeded.
+                #
+                # Resetting only on success left the counter AT the threshold
+                # after a failed re-join, and nothing else ever lowered it --
+                # so every subsequent auth failure satisfied the threshold
+                # immediately, and each one deleted the credentials Secret and
+                # spent another join-token use. On a pool whose token has
+                # `max_uses: 1` -- the configuration this method's own
+                # docstring calls out -- one transient failure then made the
+                # listener permanently unjoinable, which is the outcome the
+                # three-strike debounce exists to prevent.
+                self._auth_failures = 0
 
     async def _rejoin_unlocked(self) -> None:
         """Force a fresh join by clearing the credentials Secret and re-establishing.
