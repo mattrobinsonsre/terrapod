@@ -192,8 +192,16 @@ def _unknown_verb_body(verb: str) -> str:
     return f"Terrapod does not recognise `{_inline_code(verb)}`.\n\n{_HELP_BODY}"
 
 
-# The acknowledgement emoji. Spelled without colons, which is what both
-# GitHub's reactions API and GitLab's award-emoji API expect.
+# The acknowledgement emoji, in Terrapod's provider-neutral vocabulary, which
+# is GitLab's spelling because GitLab's award-emoji API is the one that takes
+# names for all three.
+#
+# This comment used to assert the spelling was "what both GitHub's reactions
+# API and GitLab's award-emoji API expect". It is not: GitHub takes a closed
+# set that spells the thumbs `+1`/`-1`, so for several releases a finished
+# command got its 👀 and never its 👍 or 👎 (#2350). The translation lives in
+# `github_service.github_reaction_content`, at the boundary that knows GitHub's
+# dialect — do not spell GitHub's names here, or GitLab breaks instead.
 ACK_RECEIVED = "eyes"
 ACK_DONE = "thumbsup"
 ACK_REJECTED = "thumbsdown"

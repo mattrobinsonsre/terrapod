@@ -22,6 +22,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services import vcs_rate_limit
 from terrapod.services.vcs_provider import (
     MergeabilityStatus,
+    OpenPullRequests,
     PRComment,
     PRMergeResult,
     PRReview,
@@ -584,9 +585,66 @@ async def list_open_pull_requests(
             "head_ref": pr["head"]["ref"],
             "title": pr["title"],
             "from_fork": _is_fork(pr),
+            "base_ref": pr["base"]["ref"],
         }
         for pr in resp.json()
     ]
+
+
+# 100 is the API maximum per page, so this caps the walk at 2,000 open PRs.
+# A repository with more than that is not a shape we need to serve correctly,
+# only safely: the cap sets `complete=False` and the caller then concludes
+# nothing from an absence.
+_OPEN_PR_PAGE_CAP = 20
+
+
+async def list_open_pull_requests_for_repo(
+    conn: VCSConnection, owner: str, repo: str
+) -> OpenPullRequests:
+    """Every open PR on the repository, whatever branch it targets.
+
+    Distinct from `list_open_pull_requests`, which filters server-side to one
+    base branch. The caller that closes PR sessions needs the whole repository
+    (#2349): its own predicate is scoped to (connection, repo), so handing it a
+    branch-scoped list made every PR targeting another branch look closed.
+
+    Paginated, unlike the branch-scoped listing. That is not polish — one page
+    holds 100 PRs, and a truncated list reaching the reconciler closes live
+    sessions, so the walk is followed to the end and `complete` says whether it
+    got there.
+    """
+    token = await _api_call_token(conn)
+    api_url = _api_url(conn)
+    url: str | None = f"{api_url}/repos/{owner}/{repo}/pulls"
+    params: dict | None = {
+        "state": "open",
+        "sort": "updated",
+        "direction": "desc",
+        "per_page": _LISTING_PAGE_SIZE,
+    }
+
+    prs: list[PullRequest] = []
+    for _ in range(_OPEN_PR_PAGE_CAP):
+        resp = await _github_request("GET", url, token, conn=conn, params=params)
+        resp.raise_for_status()
+        for pr in resp.json():
+            prs.append(
+                PullRequest(
+                    number=pr["number"],
+                    head_sha=pr["head"]["sha"],
+                    head_ref=pr["head"]["ref"],
+                    title=pr["title"],
+                    from_fork=_is_fork(pr),
+                    base_ref=pr["base"]["ref"],
+                )
+            )
+        url = (resp.links.get("next") or {}).get("url")
+        if not url:
+            return OpenPullRequests(prs, complete=True)
+        # The next link carries every query parameter itself.
+        params = None
+
+    return OpenPullRequests(prs, complete=False)
 
 
 async def list_repo_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
@@ -823,10 +881,54 @@ async def update_pr_comment(
     resp.raise_for_status()
 
 
+# GitHub's reactions API takes a CLOSED set of names, and it is not the set
+# GitLab's award-emoji API takes. Documented at
+# https://docs.github.com/en/rest/reactions/reactions, confirmed against the
+# live docs: `+1`, `-1`, `laugh`, `confused`, `heart`, `hooray`, `rocket`,
+# `eyes` — and nothing else.
+GITHUB_REACTION_CONTENTS = frozenset(
+    {"+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"}
+)
+
+# Terrapod's provider-neutral emoji vocabulary is GitLab's spelling, because
+# GitLab's award-emoji API is the one that takes names for all of them. The two
+# APIs agree on `eyes` and disagree on the thumbs, so only the thumbs need
+# translating here (#2350).
+#
+# They were sent to GitHub unmapped for several releases. The failure was
+# invisible from the outside and nearly invisible from the inside: GitHub 422s
+# the name, `_react` swallows the exception by design (an acknowledgement must
+# never be the thing that stops a command running), so the 👍/👎 on a finished
+# command simply never appeared while 👀 did.
+_GITHUB_REACTION_CONTENT = {
+    "thumbsup": "+1",
+    "thumbsdown": "-1",
+}
+
+
+def github_reaction_content(content: str) -> str:
+    """Translate a provider-neutral emoji name into GitHub's own spelling.
+
+    Refuses a name GitHub cannot take rather than posting it and relying on
+    the 422 — the caller swallows errors, so an unmappable name would be
+    silently dropped exactly as the thumbs were.
+    """
+    mapped = _GITHUB_REACTION_CONTENT.get(content, content)
+    if mapped not in GITHUB_REACTION_CONTENTS:
+        raise ValueError(
+            f"GitHub does not accept the reaction {content!r}; "
+            f"accepted contents are {sorted(GITHUB_REACTION_CONTENTS)}"
+        )
+    return mapped
+
+
 async def add_comment_reaction(
     conn: VCSConnection, owner: str, repo: str, comment_id: int, content: str
 ) -> int:
     """React to a PR comment. Returns the reaction ID, for later removal.
+
+    `content` is the provider-neutral name; it is translated to GitHub's
+    spelling here, at the boundary that knows GitHub's dialect.
 
     PR comments are Issues-API objects on GitHub, so this needs the same
     permission the App already holds to post them — reacting adds no new
@@ -839,7 +941,7 @@ async def add_comment_reaction(
         "POST",
         f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",
         token,
-        json={"content": content},
+        json={"content": github_reaction_content(content)},
         conn=conn,
     )
     resp.raise_for_status()
@@ -915,6 +1017,7 @@ async def get_pull_request(
         author_login=(pr.get("user") or {}).get("login", ""),
         state=pr.get("state", ""),
         merged=bool(pr.get("merged", False) or pr.get("merged_at")),
+        base_ref=(pr.get("base") or {}).get("ref", ""),
     )
 
 
