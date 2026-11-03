@@ -2973,6 +2973,24 @@ jobs:
             -v "$PWD/scripts/migration_smoke.py:/app/scripts/migration_smoke.py:ro" \
             --entrypoint python tp-migrations:ci scripts/migration_smoke.py
 
+
+      # Every fenced Helm-values snippet in the docs is something an operator
+      # PASTES, so a key the schema refuses does not quietly no-op -- it fails
+      # `helm lint` AND `helm upgrade`, and the page breaks the install it is
+      # describing. `docs/pulumi.md` shipped exactly that for the whole 2.0
+      # development line, telling operators to set an `engines:` block that was
+      # withdrawn in #1986, while `docs/upgrading-to-2.0.md` told them to remove
+      # it. A cold read of the repo found it; no gate could, because they all
+      # read prose, counts or links.
+      #
+      # HERE rather than beside the prose gates because it needs `helm` on PATH:
+      # it runs the real lint instead of reimplementing 122
+      # `additionalProperties` clauses across ten `$defs`. ~14s for 161
+      # snippets. A block an upgrade guide prints in order to say "delete this"
+      # is expected to be REFUSED, and that expectation is inverted -- if it
+      # lints clean the key still exists and the upgrade note is wrong.
+      - name: (helm-lint) Every Helm snippet in the docs can actually be applied
+        run: python3 scripts/docs-audit/check_doc_helm_values.py
   # ── Dependency Audit (Python) ─────────────────────────
 
   # ── The CLI contract (#2341) ────────────────────────────────────────────────

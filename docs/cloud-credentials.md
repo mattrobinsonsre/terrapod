@@ -477,10 +477,11 @@ the same style as the IAM resources in
 
 ```yaml
 # values-aws.yaml
-serviceAccount:
-  create: true
-  name: "terrapod"
-  # No annotations. Under Pod Identity the association does the binding.
+api:
+  serviceAccount:
+    create: true
+    name: "terrapod"
+    # No annotations. Under Pod Identity the association does the binding.
 
 listener:
   enabled: true
@@ -688,8 +689,8 @@ api:
     storage:
       backend: azure
       azure:
-        account_url: "https://mystorageacct.blob.core.windows.net"
-        container: terrapod-storage
+        account_name: mystorageacct
+        container_name: terrapod-storage
 
 runners:
   serviceAccount:
