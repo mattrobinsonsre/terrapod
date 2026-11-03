@@ -217,3 +217,103 @@ class TestTheTwoAPIsDoNotShareASpelling:
                 )
 
         req.assert_not_awaited()
+
+
+class TestTheDispatcherLayerItself:
+    """`_react`'s body was executed by no test in the repository.
+
+    That matters more after #2350 than before it: `github_reaction_content`
+    now RAISES on a name GitHub cannot take, where the old code posted and let
+    GitHub answer 422. The only thing between that raise and a lost
+    `terrapod ...` command is `_react`'s `except Exception` — so narrowing that
+    handler would turn a cosmetic missing emoji into a dropped apply, and
+    nothing would have failed.
+
+    The provider branch is the other untested half: inverting it sends GitHub
+    connections to GitLab's function (wrong arity, swallowed `TypeError`) and
+    no acknowledgement appears on either provider. And translating inside
+    `_react` for both branches would simply move #2350 to GitLab — which the
+    direct-call tests above cannot see, because they never go through here.
+    """
+
+    def _conn_obj(self, provider):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            provider=provider,
+            server_url="",
+            token="t",
+            github_app_id="1",
+            github_installation_id="2",
+        )
+
+    async def test_github_goes_through_githubs_function_with_the_translated_name(self):
+        from terrapod.services import vcs_command_dispatcher as disp
+
+        with patch.object(
+            github_service, "add_comment_reaction", new=AsyncMock(return_value=99)
+        ) as gh:
+            got = await disp._react(self._conn_obj("github"), "org/repo", 7, "4242", disp.ACK_DONE)
+
+        assert got == 99
+        # Provider-neutral name in; GitHub's own function does the translating.
+        assert gh.await_args.args[-1] == disp.ACK_DONE
+
+    async def test_gitlab_goes_through_gitlabs_function_and_keeps_the_bare_name(self):
+        from terrapod.services import vcs_command_dispatcher as disp
+
+        with patch.object(
+            gitlab_service, "add_comment_reaction", new=AsyncMock(return_value=77)
+        ) as gl:
+            got = await disp._react(self._conn_obj("gitlab"), "org/repo", 7, "4242", disp.ACK_DONE)
+
+        assert got == 77
+        assert gl.await_args.args[-1] == "thumbsup", (
+            "translating here would move #2350 to GitLab, which takes no `+1`"
+        )
+
+    async def test_an_unmappable_name_is_swallowed_rather_than_losing_the_command(self):
+        """The property the raise depends on. `_react` is called before the
+        command is routed, so an escaping exception drops the command."""
+        from terrapod.services import vcs_command_dispatcher as disp
+
+        with (
+            patch.object(github_service, "get_installation_token", new=AsyncMock(return_value="t")),
+            patch.object(github_service, "_github_request", new=AsyncMock(return_value=_resp())),
+        ):
+            got = await disp._react(self._conn_obj("github"), "org/repo", 7, "4242", "partyparrot")
+
+        assert got is None, "the ValueError escaped _react and would lose the command"
+
+
+def test_every_acknowledgement_constant_is_covered_not_just_the_three_we_listed():
+    """Derived, with a floor — so a FOURTH `ACK_*` cannot recur #2350.
+
+    The class above iterates a literal tuple of three names. That is a
+    fixed-arity check wearing the shape of a completeness check: adding
+    `ACK_QUEUED = "hourglass"` (a valid GitLab award name, absent from
+    GitHub's set) and using it would 422 on GitHub, be swallowed, and fail
+    nothing.
+    """
+    from terrapod.services import vcs_command_dispatcher as disp
+
+    names = {v for k, v in vars(disp).items() if k.startswith("ACK_") and isinstance(v, str)}
+    assert len(names) >= 3, f"the matcher stopped finding the constants: {names}"
+    for name in sorted(names):
+        sent = github_service.github_reaction_content(name)
+        assert sent in github_service.GITHUB_REACTION_CONTENTS, f"{name!r} -> {sent!r}"
+
+
+def test_our_accepted_set_is_githubs_documented_set():
+    """The production frozenset was never compared to the independent
+    transcription, so shrinking it would refuse a legitimate future reaction
+    while every other test passed."""
+    assert github_service.GITHUB_REACTION_CONTENTS == {
+        "+1",
+        "-1",
+        "laugh",
+        "confused",
+        "heart",
+        "hooray",
+        "rocket",
+        "eyes",
+    }
