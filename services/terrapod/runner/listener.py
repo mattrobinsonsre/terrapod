@@ -259,14 +259,32 @@ class RunnerListener:
             )
             return False
         try:
-            await self._rejoin()
+            rejoined = await self._rejoin()
         except Exception as rejoin_err:
             logger.error("Re-join failed", error=str(rejoin_err), source=source)
             return False
-        return True
+        # False here means the cooldown refused the attempt, so the caller must
+        # back off rather than retry against an identity that did not change.
+        return rejoined
 
-    async def _rejoin(self) -> None:
+    async def _rejoin(self) -> bool:
         """Serialise re-joins so two reporters cannot each consume a token use.
+
+        Returns True when the identity was re-established, or when another loop
+        had already done it -- both mean a caller may retry immediately against
+        a new identity. Returns **False** when this call was refused by the
+        cooldown below, which means nothing happened and an immediate retry
+        would be a hot loop.
+
+        That distinction is load-bearing and its absence was a defect: the skip
+        used to return `None`, indistinguishable from success, so
+        `_note_auth_failure` reported True and `_sse_loop`'s two `continue`s
+        jumped past their backoff. A listener in the cooldown window therefore
+        reconnected at full network speed -- one HTTPS request and one warning
+        per iteration -- for up to the whole interval. Before the cooldown
+        existed those `continue`s were self-throttling, because each was
+        preceded by a real re-join doing network and Secret work; adding the
+        cooldown removed the work and left the `continue`.
 
         The mechanism is in `_rejoin_unlocked`; this is the gate. A caller that
         waited on the lock checks the generation it saw on entry: if another
@@ -279,7 +297,9 @@ class RunnerListener:
         async with self._rejoin_lock:
             if self._rejoin_generation != gen:
                 logger.info("Re-join already completed by another loop; skipping")
-                return
+                # A re-join DID happen, just not ours, so the caller's immediate
+                # retry is against a fresh identity and is correct.
+                return True
             # Rate-limit the ATTEMPT rather than clearing the counter.
             #
             # The counter deliberately survives a failed re-join
@@ -306,11 +326,14 @@ class RunnerListener:
                     seconds_since_last=round(since, 1),
                     min_interval=_REJOIN_MIN_INTERVAL_SECONDS,
                 )
-                return
+                # Nothing happened -- say so, or the caller retries immediately
+                # and spins for the rest of the interval.
+                return False
             self._last_rejoin_attempt = now
             await self._rejoin_unlocked()
             self._rejoin_generation += 1
             self._auth_failures = 0
+            return True
 
     async def _rejoin_unlocked(self) -> None:
         """Force a fresh join by clearing the credentials Secret and re-establishing.
@@ -536,9 +559,12 @@ class RunnerListener:
                         listener_id=str(self.identity.listener_id),
                     )
                     try:
-                        # `_rejoin` clears the auth-failure count itself.
-                        await self._rejoin()
-                        continue
+                        # `_rejoin` clears the auth-failure count itself, and
+                        # reports False when its cooldown refused the attempt --
+                        # in which case fall through to the backoff below rather
+                        # than reconnecting straight into the same 404.
+                        if await self._rejoin():
+                            continue
                     except Exception as rejoin_err:
                         logger.error("Re-join failed", error=str(rejoin_err))
                 elif e.response.status_code == 401:
