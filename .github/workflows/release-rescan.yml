@@ -46,7 +46,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io/mattrobinsonsre
-  SEMGREP_IMAGE: semgrep/semgrep:1.117
+  SEMGREP_IMAGE: ghcr.io/mattrobinsonsre/mirror/semgrep-semgrep:1.117
 
 jobs:
   discover:
