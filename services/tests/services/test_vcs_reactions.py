@@ -124,11 +124,96 @@ class TestGitLabAwardEmoji:
         rec.assert_awaited_once()
 
 
-def test_the_emoji_names_are_spelled_the_way_both_apis_want_them():
-    """Both APIs take a bare name. A `:eyes:` here is accepted by neither,
-    and the failure is swallowed, so pin the spelling."""
-    from terrapod.services import vcs_command_dispatcher as disp
+class TestTheTwoAPIsDoNotShareASpelling:
+    """#2350. The thumbs never appeared on GitHub for several releases.
 
-    for name in (disp.ACK_RECEIVED, disp.ACK_DONE, disp.ACK_REJECTED):
-        assert ":" not in name, name
-        assert name.islower()
+    This class replaces a test called
+    `test_the_emoji_names_are_spelled_the_way_both_apis_want_them`, which
+    asserted `":" not in name` and `name.islower()` — properties `thumbsup`
+    and `+1` both have. So it passed on the defect while its NAME claimed to
+    check what the APIs accept, which is why the gap survived review: the
+    weaker question looked like the stronger one.
+
+    The honest question is membership in the set GitHub documents, so that is
+    what these assert.
+    """
+
+    # GitHub's documented `content` enum, transcribed from
+    # https://docs.github.com/en/rest/reactions/reactions rather than from the
+    # implementation -- a copy of our own mapping would agree with itself.
+    GITHUB_ACCEPTS = {"+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"}
+
+    def test_every_acknowledgement_reaches_github_as_a_name_it_accepts(self):
+        from terrapod.services import vcs_command_dispatcher as disp
+
+        for name in (disp.ACK_RECEIVED, disp.ACK_DONE, disp.ACK_REJECTED):
+            sent = github_service.github_reaction_content(name)
+            assert sent in self.GITHUB_ACCEPTS, f"GitHub would 422 {name!r} (sent as {sent!r})"
+
+    def test_the_thumbs_are_translated_and_the_eyes_are_not(self):
+        assert github_service.github_reaction_content("thumbsup") == "+1"
+        assert github_service.github_reaction_content("thumbsdown") == "-1"
+        assert github_service.github_reaction_content("eyes") == "eyes"
+
+    async def test_the_translation_happens_on_the_wire_not_just_in_a_helper(self):
+        """Driven through the request, because a helper nothing calls is the
+        shape of defect this file now carries two of."""
+        with (
+            patch.object(github_service, "get_installation_token", new=AsyncMock(return_value="t")),
+            patch.object(
+                github_service, "_github_request", new=AsyncMock(return_value=_resp())
+            ) as req,
+        ):
+            from terrapod.services import vcs_command_dispatcher as disp
+
+            await github_service.add_comment_reaction(_conn(), "org", "repo", 4242, disp.ACK_DONE)
+
+        assert req.await_args.kwargs["json"] == {"content": "+1"}
+
+    async def test_gitlab_still_receives_the_bare_name(self):
+        """The other direction. GitLab's award-emoji API takes `thumbsup` and
+        does NOT take `+1`, so translating centrally would have moved the bug
+        rather than fixed it."""
+        captured = {}
+
+        class _Client:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                captured["json"] = json
+                return _resp()
+
+        with (
+            patch.object(gitlab_service.httpx, "AsyncClient", _Client),
+            patch.object(gitlab_service.vcs_rate_limit, "record", new=AsyncMock()),
+        ):
+            from terrapod.services import vcs_command_dispatcher as disp
+
+            await gitlab_service.add_comment_reaction(
+                _conn("gitlab"), "org", "repo", 7, 4242, disp.ACK_DONE
+            )
+
+        assert captured["json"] == {"name": "thumbsup"}
+
+    async def test_a_name_github_cannot_take_is_refused_rather_than_posted(self):
+        """Refusing beats posting-and-hoping, because `_react` swallows the
+        error either way: a 422 is invisible, and that invisibility is the
+        whole reason this went unnoticed."""
+        import pytest
+
+        with (
+            patch.object(github_service, "get_installation_token", new=AsyncMock(return_value="t")),
+            patch.object(
+                github_service, "_github_request", new=AsyncMock(return_value=_resp())
+            ) as req,
+        ):
+            with pytest.raises(ValueError, match="does not accept"):
+                await github_service.add_comment_reaction(
+                    _conn(), "org", "repo", 4242, "partyparrot"
+                )
+
+        req.assert_not_awaited()

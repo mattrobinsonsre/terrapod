@@ -173,6 +173,17 @@ one of these was cancelled, including the finished speculative plans, and with
 no reason recorded — so a plan that disappeared when its PR merged was
 indistinguishable from a failure.
 
+**A pull request is only ever treated as closed because the provider says so.**
+Several workspaces may share one VCS connection and one repository while
+tracking different base branches, and each one's polling considers the whole
+repository when deciding which pull requests are still open — so a workspace
+tracking `main` does not affect a session for a pull request into `develop`,
+and a workspace whose tracked branch has no open pull requests (or does not
+exist) closes nothing. Where Terrapod cannot establish the full list of open
+pull requests — a repository with more open than one listing can return, or a
+provider error partway through — it leaves every session alone for that cycle
+rather than concluding anything from an absence.
+
 ### Stale-plan handling
 
 `tofu apply tfplan` refuses to apply if state drifted between plan and apply (e.g. a sibling PR applied and changed state). Terrapod surfaces that on the PR comment with a prompt to comment `terrapod plan` to refresh. No bespoke staleness logic — we lean on the tool.
@@ -332,6 +343,8 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 **Comment didn't trigger anything** — look at the reaction first. **No reaction at all** means the comment never reached the dispatcher: check that it starts with `terrapod` at the beginning of a line (a command inside a code fence is ignored by design), that the GitHub App has Issues permission accepted, and the API pod logs for `vcs_comment_dispatch` events. **👎 with a reply** means it arrived and the reply says why. **👀 that never changes** means dispatch started and did not finish — check the API pod logs. If reactions are absent everywhere but replies still appear, the App has not accepted the permission that lets Terrapod react; that is cosmetic and nothing else is affected.
 
 **Workflow flip rejected** — you can't change `vcs_workflow` while PR runs are in flight on the workspace. Cancel or merge those PR runs first.
+
+**"Pull request #N is no longer open" on a PR that is open**, or `terrapod ...` answering that Terrapod is not tracking a live pull request — on v1.11.2, v1.10.7 and earlier this happened when another workspace shared the connection and repository but tracked a different base branch: that workspace's poll considered only its own branch's pull requests and closed the rest. It is fixed — there is nothing to configure, and a session closed by it is reopened by the next command on the pull request. The release notes for the patch on your line name it.
 
 ## See also
 
