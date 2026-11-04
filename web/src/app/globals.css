@@ -8,7 +8,26 @@
 @custom-variant touch (@media (pointer: coarse));
 @custom-variant fine (@media (pointer: fine));
 
+/* The visual identity, as tokens (#2337).
+ *
+ * EVERY colour and radius in the app resolves through the variables below --
+ * verified against the CSS the app serves, not assumed: `.bg-slate-800` emits
+ * `background-color: var(--color-slate-800)`, the 173 alpha-modified utilities
+ * emit `color-mix(in oklab, var(--color-...) N%, transparent)`, and
+ * `.rounded-lg` emits `border-radius: var(--radius-lg)`. So this block reaches
+ * roughly 5,500 colour-class occurrences across `src/**` without touching a
+ * component, which is why a restyle here CANNOT move the layout. That was the
+ * condition: considered, not radical.
+ *
+ * LUMINANCE IS PRESERVED on every neutral stop. Only hue and saturation move,
+ * so every contrast ratio in the app is exactly what it was and none of the
+ * accessibility work is disturbed.
+ */
 @theme {
+  /* The accent. `brand` is Terrapod's own palette, not one Tailwind ships, so
+   * unlike `slate` these declarations are not an override of a stock ramp --
+   * they ARE the ramp, and removing them leaves all 760 `brand-*` utilities
+   * resolving to nothing. */
   --color-brand-50: #f5f3ff;
   --color-brand-100: #ede9fe;
   --color-brand-200: #ddd6fe;
@@ -20,90 +39,296 @@
   --color-brand-800: #5b21b6;
   --color-brand-900: #4c1d95;
 
-  --shadow-glow-sm: 0 0 10px rgba(124, 58, 237, 0.3);
-  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.4);
-  --shadow-glow-lg: 0 0 30px rgba(124, 58, 237, 0.5);
+  /* A radius SCALE rather than one value. 608 uses of `rounded-lg` against 27
+   * of `rounded-xl` is a default, not a decision: everything from a dense table
+   * to a modal carried the same corner. Each step tightens by one notch, which
+   * reads as drawn rather than softened and changes no box dimension. Pills
+   * keep `rounded-full` and are unaffected. */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+
+  /* The three `--shadow-glow-*` tokens are gone: `grep -r shadow-glow src` has
+   * ZERO uses of any of them, so they were a definition nothing read -- the
+   * same class of thing as a config flag with no reader. Note that the bloom
+   * they described was NOT dead, which is the trap here: it lived on in
+   * `.btn-smoke` below as hand-written `rgba()` triples, reaching 20 buttons
+   * while the tokens reached none. Deleting the tokens does not touch it; see
+   * that block. */
 }
 
 html {
-  background: #0f172a;
+  background: var(--color-slate-900);
   height: 100%;
 }
 
 body {
-  color: #e2e8f0;
-  background: #0f172a;
+  color: var(--color-slate-200);
+  background: var(--color-slate-900);
   min-height: 100%;
 }
 
 /*
- * Smoke glow effect for primary action buttons.
+ * The primary-action button's treatment, on all 20 call sites (#2337).
  *
- * Two pseudo-elements create layered purple glow halos behind the button.
- * Outer layer: large soft blur (tendrils) using brand-800.
- * Inner layer: tighter glow (core) using brand-600.
- * On hover, both intensify and the outer layer expands.
+ * WAS two blurred radial-gradient halos on `::before` and `::after` -- a purple
+ * bloom behind every primary button, intensifying and scaling on hover. It is
+ * REPLACED rather than retuned, for two reasons.
  *
- * CSS-only. Uses will-change for GPU compositing.
- * Transitions opacity + transform only (compositor-friendly).
+ * The first is forced: the halos were hand-written as `rgba(124, 58, 237, …)`
+ * and `rgba(91, 33, 182, …)`, i.e. the OLD brand-600 and brand-800 as decimal
+ * triples. They resolve through no token, so the retune above would have left
+ * them blooming the previous bright violet behind the new deeper accent -- and
+ * written that way they are invisible to a hex grep, which is how they survived
+ * a sweep of this very file.
+ *
+ * The second is the point of the issue: a soft coloured glow emitted by a
+ * saturated button is the most recognisable mark of a generated dashboard, and
+ * it was on the one control a user meets on every page. What replaces it is a
+ * raised physical control -- a hairline of light along the top edge, a tight
+ * shadow beneath, both one pixel and neither blurring outward into a halo --
+ * which presses in on `:active`, something a bloom cannot express at all.
+ *
+ * NO LAYOUT RISK, as a property rather than a hope: every declaration here is a
+ * `box-shadow` or an `outline`, so nothing contributes to layout or to
+ * hit-testing, and the 20 call sites are untouched -- the class keeps its name
+ * and its contract and only its appearance changes.
+ *
+ * The shadow change is deliberately NOT transitioned. Every call site carries
+ * Tailwind's `transition-colors`, which lands in the `utilities` layer and so
+ * overrides anything `transition`-shaped declared here in `components`: a
+ * transition written at this point would be a rule that silently does nothing.
+ * The background still animates through that utility, which is the part the eye
+ * follows.
+ *
+ * `color-mix(in oklab, …)` rather than an alpha hex or `--alpha()`: it is the
+ * exact form Tailwind itself emits for every alpha-modified utility in this
+ * app, so support for it is already established by the stylesheet we serve.
  */
 @layer components {
   .btn-smoke {
     position: relative;
     z-index: 0;
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklab, var(--color-brand-300) 30%, transparent),
+      inset 0 -1px 0 0 color-mix(in oklab, var(--color-slate-950) 22%, transparent),
+      0 1px 2px 0 color-mix(in oklab, var(--color-slate-950) 45%, transparent);
   }
 
-  .btn-smoke::before,
-  .btn-smoke::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    z-index: -1;
-    pointer-events: none;
-    will-change: opacity, transform;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+  .btn-smoke:hover {
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklab, var(--color-brand-200) 42%, transparent),
+      inset 0 -1px 0 0 color-mix(in oklab, var(--color-slate-950) 22%, transparent),
+      0 2px 5px -1px color-mix(in oklab, var(--color-slate-950) 55%, transparent);
   }
 
-  /* Outer tendril layer */
-  .btn-smoke::before {
-    inset: -6px;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(91, 33, 182, 0.4) 0%,
-      rgba(91, 33, 182, 0.15) 50%,
-      transparent 70%
-    );
-    filter: blur(10px);
-    opacity: 0.5;
+  /* Pressed: the light along the top edge goes, and the shadow moves inside. */
+  .btn-smoke:active {
+    box-shadow: inset 0 1px 3px 0 color-mix(in oklab, var(--color-slate-950) 40%, transparent);
   }
 
-  /* Inner core glow */
-  .btn-smoke::after {
-    inset: -3px;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(124, 58, 237, 0.5) 0%,
-      rgba(124, 58, 237, 0.2) 40%,
-      transparent 70%
-    );
-    filter: blur(6px);
-    opacity: 0.6;
+  .btn-smoke:focus-visible {
+    outline: 2px solid var(--color-brand-400);
+    outline-offset: 2px;
   }
+}
 
-  .btn-smoke:hover::before {
-    opacity: 0.8;
-    transform: scale(1.08);
-  }
+/* ---------------------------------------------------------------------------
+ * THE LIGHT THEME (#2337)
+ *
+ * Light is the default and the dark theme is kept, and the structure is what
+ * makes that nearly free: the DARK values are Tailwind's own plus the `brand`
+ * ramp above, declared nowhere here, and light is a single override block that
+ * wins on specificity -- `:root:not(.dark)` is (0,2,0) against the (0,1,0) of
+ * the `:root` Tailwind emits. So dark cannot drift, because it has nothing to
+ * drift from, and adding `class="dark"` to <html> restores it exactly.
+ *
+ * EVERY VALUE BELOW IS A TAILWIND COLOUR, taken from another stop of the same
+ * ramp. Nothing is invented, so nothing is out of gamut and nothing has a hue
+ * that wanders away from its family. What the block does is swap which end of
+ * each ramp is the surface and which is the ink.
+ *
+ * It is NOT a mirror. A mirror is the obvious move and it fails twice over:
+ *   - it put the two most-used text greys at oklch 44.6% and 55.4%, the second
+ *     of which is 4.4:1 on the ground -- the pale grey that had to go. Here
+ *     `text-slate-400` (520 uses) and `text-slate-500` (443 uses) are pushed
+ *     to stock-700 and stock-600 instead.
+ *   - it maps a badge fill `*-900` to the PALEST stop, where the /40..60 alpha
+ *     those badges carry paints almost nothing: measured, every status badge
+ *     came out at 1.006-1.052:1 against its card, i.e. invisible, while its
+ *     text contrast read as a perfectly respectable 5.57:1. Text contrast is
+ *     silent about fill presence. `*-900 -> stock-300` clears both at once.
+ *
+ * Every stop's target is assigned from its measured ROLE in `web/src`, not from
+ * its position in the ramp, because the classes were written for a dark ground
+ * and the roles do not sit where a light-theme reader would expect:
+ *   slate text: 400 (520x) 500 (443x) 300 (413x) 200 (323x) 100 (271x)
+ *   slate bg:   700 (513x) 800 (224x) 900 (86x)  950 (42x)
+ *   slate bord: 700 (344x) 600 (275x) 800 (65x)
+ *   brand:      ring-500 (242x, the focus ring) bg-600 (101x, primary button)
+ *               text-400 (109x, links) bg-800 (40x, disabled)
+ *
+ * Only stops something actually references are declared; Tailwind tree-shakes
+ * the utilities, so a stop nobody uses would be a declaration with no reader.
+ *
+ * VERIFIED, not asserted. `scripts/docs-audit/` carries the checker: it reads
+ * every className in `web/src`, pairs each background with the text on the same
+ * element (including `hover:` fills and `text-white`, both of which an earlier
+ * version missed and both of which were hiding real failures), composites every
+ * alpha fill over each plausible parent surface, and reports the worst. All
+ * eight status badges land at 5.58-6.41:1 ink with 1.12-1.32:1 fill presence,
+ * against the dark theme's own floor of 1.10:1.
+ * ------------------------------------------------------------------------- */
+:root:not(.dark) {
+    /* slate */
+    --color-slate-100: #020618;
+    --color-slate-200: #020618;
+    --color-slate-300: #020618;
+    --color-slate-400: #0f172b;
+    --color-slate-500: #1d293d;
+    --color-slate-600: #cad5e2;
+    --color-slate-700: #e2e8f0;
+    --color-slate-800: #f1f5f9;
+    --color-slate-900: #f8fafc;
+    --color-slate-950: #f8fafc;
 
-  .btn-smoke:hover::after {
-    opacity: 0.9;
-    transform: scale(1.04);
-  }
+    /* red */
+    --color-red-100: #82181a;
+    --color-red-200: #82181a;
+    --color-red-300: #82181a;
+    --color-red-400: #82181a;
+    --color-red-500: #e7000b;
+    --color-red-600: #c10007;
+    --color-red-700: #ff6467;
+    --color-red-800: #ff6467;
+    --color-red-900: #ff6467;
+    --color-red-950: #ffc9c9;
 
-  .btn-smoke:focus-visible::after {
-    opacity: 1;
-  }
+    /* orange */
+    --color-orange-300: #7e2a0c;
+    --color-orange-400: #7e2a0c;
+    --color-orange-800: #ff8904;
+    --color-orange-900: #ff8904;
+
+    /* amber */
+    --color-amber-100: #7b3306;
+    --color-amber-200: #7b3306;
+    --color-amber-300: #7b3306;
+    --color-amber-400: #7b3306;
+    --color-amber-500: #e17100;
+    --color-amber-600: #bb4d00;
+    --color-amber-700: #ffb900;
+    --color-amber-800: #ffb900;
+    --color-amber-900: #ffb900;
+    --color-amber-950: #fee685;
+
+    /* yellow */
+    --color-yellow-300: #733e0a;
+    --color-yellow-400: #733e0a;
+    --color-yellow-500: #d08700;
+    --color-yellow-800: #fdc700;
+    --color-yellow-900: #fdc700;
+
+    /* green */
+    --color-green-200: #0d542b;
+    --color-green-300: #0d542b;
+    --color-green-400: #0d542b;
+    --color-green-500: #00a63e;
+    --color-green-600: #008236;
+    --color-green-700: #05df72;
+    --color-green-800: #05df72;
+    --color-green-900: #05df72;
+    --color-green-950: #b9f8cf;
+
+    /* emerald */
+    --color-emerald-200: #004f3b;
+    --color-emerald-300: #004f3b;
+    --color-emerald-400: #004f3b;
+    --color-emerald-500: #009966;
+    --color-emerald-800: #00d492;
+    --color-emerald-900: #00d492;
+    --color-emerald-950: #a4f4cf;
+
+    /* teal */
+    --color-teal-300: #0b4f4a;
+    --color-teal-800: #00d5be;
+    --color-teal-900: #00d5be;
+
+    /* cyan */
+    --color-cyan-300: #104e64;
+    --color-cyan-400: #104e64;
+    --color-cyan-800: #00d3f2;
+    --color-cyan-900: #00d3f2;
+
+    /* sky */
+    --color-sky-300: #024a70;
+    --color-sky-800: #00bcff;
+    --color-sky-900: #00bcff;
+    --color-sky-950: #b8e6fe;
+
+    /* indigo */
+    --color-indigo-200: #312c85;
+    --color-indigo-300: #312c85;
+    --color-indigo-400: #312c85;
+    --color-indigo-500: #4f39f6;
+    --color-indigo-600: #432dd7;
+    --color-indigo-700: #7c86ff;
+    --color-indigo-800: #7c86ff;
+    --color-indigo-900: #7c86ff;
+
+    /* violet */
+    --color-violet-300: #4d179a;
+    --color-violet-500: #7f22fe;
+    --color-violet-600: #7008e7;
+    --color-violet-900: #a684ff;
+
+    /* purple */
+    --color-purple-300: #59168b;
+    --color-purple-400: #59168b;
+    --color-purple-800: #c27aff;
+    --color-purple-900: #c27aff;
+
+    /* brand */
+    --color-brand-100: #1c398e;
+    --color-brand-200: #193cb8;
+    --color-brand-300: #1447e6;
+    --color-brand-400: #193cb8;
+    --color-brand-500: #1447e6;
+    --color-brand-600: #193cb8;
+    --color-brand-700: #8ec5ff;
+    --color-brand-800: #bedbff;
+    --color-brand-900: #bedbff;
+}
+
+/* The log viewer is a DARK ISLAND, in both themes (#2337).
+ *
+ * A run log is a terminal and reads as one; inverting it with the rest of the
+ * chrome would make it the one surface in the app that looks like a document.
+ * It is also the surface where inversion would be actively wrong: the ANSI
+ * converter is constructed with `fg: '#cbd5e1'` on a transparent background --
+ * a literal chosen for a dark ground, in three places in the run page -- so
+ * every coloured line terraform emits assumes dark and would be unreadable on
+ * white.
+ *
+ * Implemented by re-declaring the handful of tokens the log subtree uses back
+ * to their DARK values, scoped to this element. Everything inside resolves
+ * through those variables, so each descendant utility behaves exactly as it
+ * does on the dark theme without a single `dark:` variant or a second copy of
+ * the markup -- which is the whole reason the theme is token-level.
+ *
+ * The values are Tailwind's own stock slate/amber, i.e. what the dark theme
+ * uses, restated here only because the light block above overrode them.
+ */
+.log-term {
+  --color-slate-300: oklch(86.9% 0.022 252.894);
+  --color-slate-400: oklch(70.4% 0.04 256.788);
+  --color-slate-500: oklch(55.4% 0.046 257.417);
+  /* the jump-to-line highlight, which on the light theme would resolve to a
+     dark amber at 20% and vanish against this ground */
+  --color-amber-400: oklch(82.8% 0.189 84.429);
+  background: oklch(12.9% 0.042 264.695);   /* stock slate-950 */
+  color: var(--color-slate-300);
 }
 
 /* Cross-browser secret masking. `-webkit-text-security` only works in

@@ -165,7 +165,8 @@
     "canceled": "Zrušeno",
     "discarded": "Zahozeno",
     "pendingDeletion": "Čeká na smazání",
-    "archived": "Archivováno"
+    "archived": "Archivováno",
+    "configuring": "Konfigurování"
   },
   "auth": {
     "loading": "Načítání...",
@@ -2120,7 +2121,8 @@
       "errored": "Chyba",
       "canceled": "Zrušeno",
       "discarded": "Zahozeno",
-      "awaitingDecision": "Čeká na rozhodnutí"
+      "awaitingDecision": "Čeká na rozhodnutí",
+      "configuring": "Konfigurování"
     },
     "activity": {
       "pending": "Příprava běhu",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Povinná sada zásad selhala — přepište ji, nebo běh zahoďte",
       "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte",
       "heldByAiPolicy": "Brána zásad AI tento běh zamítla — přepište ji, nebo běh zahoďte",
-      "awaitingAiPolicy": "Čeká se na verdikt zásad AI"
+      "awaitingAiPolicy": "Čeká se na verdikt zásad AI",
+      "configuring": "Spouštění playbooků na inventáři"
     },
     "badge": {
       "destroy": "zničit",
@@ -2266,7 +2269,8 @@
       "confirmed": "Potvrzeno",
       "errored": "Chyba",
       "canceled": "Zrušeno",
-      "discarded": "Zahozeno"
+      "discarded": "Zahozeno",
+      "configuring": "Konfigurace zahájena"
     },
     "log": {
       "color": "Barva",

@@ -468,7 +468,7 @@ export default function OnboardingPage() {
                         onClick={() => setShowRaw(true)}
                         className={`px-3 py-1.5 text-xs font-medium ${
                           !usePolished
-                            ? 'bg-slate-600 text-white'
+                            ? 'bg-slate-100 text-slate-900'
                             : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                         }`}
                       >
@@ -539,7 +539,7 @@ export default function OnboardingPage() {
 function StatusBar({ status, t }: { status: string; t: ReturnType<typeof useTranslations> }) {
   const tone: Record<string, string> = {
     pending: 'bg-slate-700 text-slate-300',
-    schema_ready: 'bg-blue-900/50 text-blue-300',
+    schema_ready: 'bg-indigo-900/50 text-indigo-300',
     querying: 'bg-amber-900/50 text-amber-300',
     config_ready: 'bg-green-900/50 text-green-300',
     errored: 'bg-red-900/50 text-red-300',

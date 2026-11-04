@@ -157,7 +157,7 @@ function WorkspaceGroupRows({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                   <span className="text-sm text-slate-400">{group.key === LOCAL_GROUP_KEY ? t('group.local') : group.label}/</span>
-                  <span className="text-xs text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded-full">{count}</span>
+                  <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full">{count}</span>
                 </button>
               </td>
             </tr>
@@ -1887,7 +1887,7 @@ function WorkspacesPageInner() {
                           className={
                             'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-start border-s-2 ' +
                             (i === suggestIndex
-                              ? 'bg-brand-600/40 text-white border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
+                              ? 'bg-brand-900 text-brand-100 border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
                               : 'border-transparent text-slate-300 hover:bg-slate-700/40')
                           }
                         >
@@ -1969,7 +1969,7 @@ function WorkspacesPageInner() {
                             </span>
                             <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
                             <span className="flex-1 text-start">{ts(opt.filter)}</span>
-                            <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
+                            <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-500')}>{count}</span>
                           </button>
                         )
                       })}

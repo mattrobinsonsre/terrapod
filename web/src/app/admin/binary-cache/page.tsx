@@ -395,7 +395,7 @@ export default function CachePage() {
                   <button
                     onClick={handleBulkWarm}
                     disabled={warming}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600/30 hover:bg-violet-600/50 disabled:opacity-50 text-violet-200 transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-900/40 hover:bg-violet-900/60 disabled:opacity-50 text-violet-300 transition-colors"
                   >
                     {warming ? t('warm.warming') : t('warm.warm')}
                   </button>
@@ -420,7 +420,7 @@ export default function CachePage() {
                 <button
                   onClick={handleBatchPurgeBinaries}
                   disabled={purging}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
                 >
                   {purging ? t('batchPurge.purging') : t('batchPurge.purgeSelected', { count: selectedBinaries.size })}
                 </button>
@@ -479,7 +479,7 @@ export default function CachePage() {
                 <button
                   onClick={handleBatchPurgeProviders}
                   disabled={purging}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
                 >
                   {purging ? t('batchPurge.purging') : t('batchPurge.purgeSelected', { count: selectedProviders.size })}
                 </button>

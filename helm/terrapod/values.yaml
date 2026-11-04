@@ -667,8 +667,9 @@ api:
           # plugin to a host that does not have it. Assets live under their
           # release tag, so the version is a path segment.
           first_party_url: https://github.com/mattrobinsonsre/terrapod/releases/download
-        # Go module proxy. Pulumi-only (Go SDK programs), so it disappears with
-        # engines.pulumi.enabled: false. Point the toolchain at it with GOPROXY.
+        # Go module proxy. Pulumi-only (Go SDK programs). There is no engine
+        # switch to disable it with -- that was withdrawn (#1986) -- so turn this
+        # off here if no Pulumi program uses the Go SDK. Point GOPROXY at it.
         go:
           enabled: true
           upstream: https://proxy.golang.org
@@ -788,7 +789,7 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.21.4"
+        opa_version: "1.22.0"
         trivy_version: "0.76.1"
         checkov_version: "3.3.30"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"

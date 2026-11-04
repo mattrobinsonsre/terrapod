@@ -165,7 +165,8 @@
     "canceled": "أُلغي",
     "discarded": "مُهمَل",
     "pendingDeletion": "بانتظار الحذف",
-    "archived": "مؤرشف"
+    "archived": "مؤرشف",
+    "configuring": "جارٍ التهيئة"
   },
   "auth": {
     "loading": "جارٍ التحميل...",
@@ -2120,7 +2121,8 @@
       "errored": "حدث خطأ",
       "canceled": "تم الإلغاء",
       "discarded": "تم التجاهل",
-      "awaitingDecision": "بانتظار قرار"
+      "awaitingDecision": "بانتظار قرار",
+      "configuring": "جارٍ التهيئة"
     },
     "activity": {
       "pending": "جارٍ تجهيز التشغيل",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "فشلت مجموعة سياسات إلزامية — تجاوزها أو تجاهل التشغيل",
       "heldBySecurityScan": "وجد فحص الأمان مشكلات حاجبة — تجاوزه أو تجاهل التشغيل",
       "heldByAiPolicy": "رفضت بوابة سياسة الذكاء الاصطناعي هذا التشغيل — تجاوزها أو تجاهل التشغيل",
-      "awaitingAiPolicy": "في انتظار حكم سياسة الذكاء الاصطناعي"
+      "awaitingAiPolicy": "في انتظار حكم سياسة الذكاء الاصطناعي",
+      "configuring": "جارٍ تشغيل الكتيبات على المخزون"
     },
     "badge": {
       "destroy": "تدمير",
@@ -2266,7 +2269,8 @@
       "confirmed": "تم التأكيد",
       "errored": "حدث خطأ",
       "canceled": "تم الإلغاء",
-      "discarded": "تم التجاهل"
+      "discarded": "تم التجاهل",
+      "configuring": "بدأت التهيئة"
     },
     "log": {
       "color": "اللون",

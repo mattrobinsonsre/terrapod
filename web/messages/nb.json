@@ -165,7 +165,8 @@
     "canceled": "Avbrutt",
     "discarded": "Forkastet",
     "pendingDeletion": "Venter på sletting",
-    "archived": "Arkivert"
+    "archived": "Arkivert",
+    "configuring": "Konfigurerer"
   },
   "auth": {
     "loading": "Laster …",
@@ -2120,7 +2121,8 @@
       "errored": "Feilet",
       "canceled": "Avbrutt",
       "discarded": "Forkastet",
-      "awaitingDecision": "Venter på beslutning"
+      "awaitingDecision": "Venter på beslutning",
+      "configuring": "Konfigurerer"
     },
     "activity": {
       "pending": "Forbereder kjøringen",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Et obligatorisk regelsett feilet — overstyr det eller forkast kjøringen",
       "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen",
       "heldByAiPolicy": "AI-policyporten avviste denne kjøringen — overstyr den eller forkast kjøringen",
-      "awaitingAiPolicy": "Venter på AI-policyens kjennelse"
+      "awaitingAiPolicy": "Venter på AI-policyens kjennelse",
+      "configuring": "Kjører playbookene mot inventaret"
     },
     "badge": {
       "destroy": "riv ned",
@@ -2266,7 +2269,8 @@
       "confirmed": "Bekreftet",
       "errored": "Feilet",
       "canceled": "Avbrutt",
-      "discarded": "Forkastet"
+      "discarded": "Forkastet",
+      "configuring": "Konfigurasjon startet"
     },
     "log": {
       "color": "Farge",

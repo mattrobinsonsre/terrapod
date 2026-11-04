@@ -165,7 +165,8 @@
     "canceled": "Cancelado",
     "discarded": "Descartado",
     "pendingDeletion": "Pendiente de eliminación",
-    "archived": "Archivado"
+    "archived": "Archivado",
+    "configuring": "Configurando"
   },
   "auth": {
     "loading": "Cargando...",
@@ -2120,7 +2121,8 @@
       "errored": "Con error",
       "canceled": "Cancelado",
       "discarded": "Descartado",
-      "awaitingDecision": "Esperando una decisión"
+      "awaitingDecision": "Esperando una decisión",
+      "configuring": "Configurando"
     },
     "activity": {
       "pending": "Preparando la ejecución",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Falló un conjunto de políticas obligatorio: anúlelo o descarte la ejecución",
       "heldBySecurityScan": "El análisis de seguridad encontró hallazgos bloqueantes: anúlelo o descarte la ejecución",
       "heldByAiPolicy": "La puerta de política de IA denegó esta ejecución: anúlela o descarte la ejecución",
-      "awaitingAiPolicy": "Esperando el veredicto de la política de IA"
+      "awaitingAiPolicy": "Esperando el veredicto de la política de IA",
+      "configuring": "Ejecutando los playbooks contra el inventario"
     },
     "badge": {
       "destroy": "destruir",
@@ -2266,7 +2269,8 @@
       "confirmed": "Confirmado",
       "errored": "Con error",
       "canceled": "Cancelado",
-      "discarded": "Descartado"
+      "discarded": "Descartado",
+      "configuring": "Configuración iniciada"
     },
     "log": {
       "color": "Color",

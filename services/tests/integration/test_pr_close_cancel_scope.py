@@ -26,6 +26,7 @@ What the predicate has to get right, in both directions:
 """
 
 import uuid
+from unittest.mock import AsyncMock, patch
 
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db_session
@@ -178,7 +179,13 @@ class TestTheSweepsThemselvesLeaveTheFinishedPlanAlone:
 
         async with get_db_session() as db:
             conn = await db.get(VCSConnection, conn_id)
-            await _reconcile_closed_pr_sessions(db, conn, "org/repo", set())
+            # The sweep confirms with the provider before closing (#2352);
+            # this scenario's premise is a pull request that really closed.
+            with patch(
+                "terrapod.services.vcs_poller._confirm_pr_is_closed",
+                new=AsyncMock(return_value=True),
+            ):
+                await _reconcile_closed_pr_sessions(db, conn, "org/repo", set())
             await db.commit()
 
         async with get_db_session() as db:

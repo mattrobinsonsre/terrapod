@@ -165,7 +165,8 @@
     "canceled": "Canceled",
     "discarded": "Discarded",
     "pendingDeletion": "Deletion, pending",
-    "archived": "Archived"
+    "archived": "Archived",
+    "configuring": "Configuring"
   },
   "auth": {
     "loading": "Loading, it is...",
@@ -2120,7 +2121,8 @@
       "errored": "Errored",
       "canceled": "Canceled",
       "discarded": "Discarded",
-      "awaitingDecision": "A decision, awaiting"
+      "awaitingDecision": "A decision, awaiting",
+      "configuring": "Configuring"
     },
     "activity": {
       "pending": "The run, preparing it",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Failed, a mandatory policy set has — override it or discard the run, you must",
       "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must",
       "heldByAiPolicy": "Denied this run, the AI policy gate has — override it or discard the run, you must",
-      "awaitingAiPolicy": "For the AI policy verdict, waiting we are"
+      "awaitingAiPolicy": "For the AI policy verdict, waiting we are",
+      "configuring": "Against the inventory, the playbooks run"
     },
     "badge": {
       "destroy": "destroy",
@@ -2266,7 +2269,8 @@
       "confirmed": "Confirmed",
       "errored": "Errored",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "configuring": "started, Configure"
     },
     "log": {
       "color": "Color",

@@ -714,7 +714,7 @@ export default function VariableSetDetailPage() {
                 </div>
                 {!showDeleteConfirm ? (
                   <button onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors">
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">
                     {t('detail.delete')}
                   </button>
                 ) : (
@@ -914,7 +914,7 @@ export default function VariableSetDetailPage() {
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
                               ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                              : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                              : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('detail.empty')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -977,7 +977,7 @@ export default function VariableSetDetailPage() {
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
-                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-500 italic">{t('detail.empty')}</span>)}
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('detail.edit')}</button>
@@ -1008,7 +1008,7 @@ export default function VariableSetDetailPage() {
             )}
 
             {varset.attributes.global && (
-              <div className="mb-4 p-3 bg-blue-900/20 text-blue-300 rounded-lg text-sm border border-blue-800/50">
+              <div className="mb-4 p-3 bg-indigo-900/20 text-indigo-300 rounded-lg text-sm border border-indigo-800/50">
                 {t('detail.globalBanner')}
               </div>
             )}

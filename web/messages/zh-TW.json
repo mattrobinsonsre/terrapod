@@ -165,7 +165,8 @@
     "canceled": "已取消",
     "discarded": "已丟棄",
     "pendingDeletion": "待刪除",
-    "archived": "已歸檔"
+    "archived": "已歸檔",
+    "configuring": "設定中"
   },
   "auth": {
     "loading": "正在載入...",
@@ -2120,7 +2121,8 @@
       "errored": "已出錯",
       "canceled": "已取消",
       "discarded": "已丟棄",
-      "awaitingDecision": "等待決定"
+      "awaitingDecision": "等待決定",
+      "configuring": "設定中"
     },
     "activity": {
       "pending": "正在準備執行",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "必要的策略集失敗 — 覆蓋它或丟棄此執行",
       "heldBySecurityScan": "安全掃描發現阻斷性問題 — 覆蓋它或丟棄此執行",
       "heldByAiPolicy": "AI 政策閘門拒絕了此執行 — 覆蓋它或丟棄此執行",
-      "awaitingAiPolicy": "正在等待 AI 政策裁定"
+      "awaitingAiPolicy": "正在等待 AI 政策裁定",
+      "configuring": "正在對清單執行 Playbook"
     },
     "badge": {
       "destroy": "銷毀",
@@ -2266,7 +2269,8 @@
       "confirmed": "已確認",
       "errored": "已出錯",
       "canceled": "已取消",
-      "discarded": "已丟棄"
+      "discarded": "已丟棄",
+      "configuring": "設定已開始"
     },
     "log": {
       "color": "顏色",

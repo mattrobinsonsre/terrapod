@@ -165,7 +165,8 @@
     "canceled": "Canslwyd",
     "discarded": "Taflwyd",
     "pendingDeletion": "Yn aros i'w ddileu",
-    "archived": "Archifwyd"
+    "archived": "Archifwyd",
+    "configuring": "Cyflunio"
   },
   "auth": {
     "loading": "Wrthi'n llwytho...",
@@ -2120,7 +2121,8 @@
       "errored": "Gwallodd",
       "canceled": "Canslwyd",
       "discarded": "Taflwyd",
-      "awaitingDecision": "Yn aros am benderfyniad"
+      "awaitingDecision": "Yn aros am benderfyniad",
+      "configuring": "Cyflunio"
     },
     "activity": {
       "pending": "Wrthi'n paratoi'r rhediad",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Methodd set polisi orfodol — diystyrwch hi neu taflwch y rhediad",
       "heldBySecurityScan": "Canfu'r sgan diogelwch broblemau rhwystro — diystyrwch ef neu taflwch y rhediad",
       "heldByAiPolicy": "Gwrthododd y giât polisi AI y rhediad hwn — diystyrwch ef neu taflwch y rhediad",
-      "awaitingAiPolicy": "Aros am ddyfarniad polisi AI"
+      "awaitingAiPolicy": "Aros am ddyfarniad polisi AI",
+      "configuring": "Wrthi'n rhedeg y llyfrau chwarae yn erbyn y rhestr"
     },
     "badge": {
       "destroy": "dinistrio",
@@ -2266,7 +2269,8 @@
       "confirmed": "Cadarnhawyd",
       "errored": "Gwallodd",
       "canceled": "Canslwyd",
-      "discarded": "Taflwyd"
+      "discarded": "Taflwyd",
+      "configuring": "Dechreuodd y cyflunio"
     },
     "log": {
       "color": "Lliw",

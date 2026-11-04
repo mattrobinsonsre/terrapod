@@ -165,7 +165,8 @@
     "canceled": "Annulleret",
     "discarded": "Kasseret",
     "pendingDeletion": "Afventer sletning",
-    "archived": "Arkiveret"
+    "archived": "Arkiveret",
+    "configuring": "Konfigurerer"
   },
   "auth": {
     "loading": "Indlæser...",
@@ -2120,7 +2121,8 @@
       "errored": "Fejlet",
       "canceled": "Annulleret",
       "discarded": "Kasseret",
-      "awaitingDecision": "Afventer beslutning"
+      "awaitingDecision": "Afventer beslutning",
+      "configuring": "Konfigurerer"
     },
     "activity": {
       "pending": "Forbereder kørslen",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Et obligatorisk politiksæt mislykkedes — tilsidesæt det eller kassér kørslen",
       "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen",
       "heldByAiPolicy": "AI-politikporten afviste denne kørsel — tilsidesæt den eller kassér kørslen",
-      "awaitingAiPolicy": "Venter på AI-politikkens kendelse"
+      "awaitingAiPolicy": "Venter på AI-politikkens kendelse",
+      "configuring": "Kører playbooks mod inventaret"
     },
     "badge": {
       "destroy": "nedriv",
@@ -2266,7 +2269,8 @@
       "confirmed": "Bekræftet",
       "errored": "Fejlet",
       "canceled": "Annulleret",
-      "discarded": "Kasseret"
+      "discarded": "Kasseret",
+      "configuring": "Konfiguration startet"
     },
     "log": {
       "color": "Farve",

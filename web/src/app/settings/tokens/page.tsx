@@ -312,7 +312,7 @@ export default function TokensPage() {
                   onClick={() => { setShowAll(!showAll); setSelected(new Set()) }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     showAll
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                      ? 'bg-amber-900/40 hover:bg-amber-900/60 text-amber-300'
                       : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                   }`}
                 >

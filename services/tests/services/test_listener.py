@@ -576,3 +576,152 @@ class TestLaunchNamespace:
         assert mock_create.await_args.kwargs["namespace"] == "custom-runner-ns"
         mock_uid.assert_awaited_once()
         assert mock_uid.await_args.kwargs["namespace"] == "custom-runner-ns"
+
+
+class TestReJoinAttemptsAreRateLimited:
+    """The runaway, bounded without losing prompt recovery (#2352).
+
+    `_auth_failures` deliberately survives a failed re-join -- see
+    `test_a_failed_re_join_reports_false_and_does_not_clear_the_count`, whose
+    reason still holds: `_rejoin_unlocked` clears the credentials Secret before
+    it re-establishes, so a listener whose re-join failed has no identity at
+    all and making it wait for another three rejections prolongs an outage it
+    cannot otherwise leave.
+
+    What was unbounded was the consequence. Every later rejection -- one every
+    30-90s -- re-entered the path, each time deleting the Secret and spending
+    another join-token use, so on a `max_uses: 1` pool the first failed re-join
+    made the listener permanently unjoinable. A floor on the interval keeps the
+    prompt first retry and bounds the rest.
+    """
+
+    async def test_the_counter_still_survives_a_failed_rejoin(self, fresh_shutdown_event):
+        """The pre-existing property, asserted here too so this change cannot
+        quietly take it away."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is False
+        assert listener._auth_failures == listener_module._REJOIN_THRESHOLD
+
+    async def test_a_second_rejoin_is_refused_inside_the_interval(self, fresh_shutdown_event):
+        """The fix. Before it, every rejection after a failed re-join deleted
+        the Secret and spent another join-token use."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1
+
+        for _ in range(5):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1, (
+            "five further rejections spent five more join-token uses"
+        )
+
+    async def test_it_is_attempted_again_once_the_interval_has_passed(self, fresh_shutdown_event):
+        """Bounded, not disabled -- otherwise the fix would be an outage of its
+        own, since a listener that cannot re-join cannot recover at all."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock(side_effect=RuntimeError("no"))
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 1
+
+        # Wind the clock past the floor rather than sleeping through it.
+        listener._last_rejoin_attempt -= listener_module._REJOIN_MIN_INTERVAL_SECONDS + 1
+        await listener._note_auth_failure(source="sse")
+        assert listener._rejoin_unlocked.await_count == 2
+
+    async def test_a_successful_rejoin_still_clears_the_count(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock()
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            rejoined = await listener._note_auth_failure(source="sse")
+
+        assert rejoined is True
+        assert listener._auth_failures == 0
+        assert listener._rejoin_generation == 1
+
+    def test_the_interval_and_threshold_are_the_values_we_chose(self):
+        """Literals, not re-derivations. Winding the clock by the constant
+        proves the gate consults it and nothing about whether it is sane: 0
+        would disable the bound entirely, and an hour would delay every real
+        recovery by an hour."""
+        assert listener_module._REJOIN_MIN_INTERVAL_SECONDS == 60.0
+        assert listener_module._REJOIN_THRESHOLD == 3
+
+    async def test_a_refused_rejoin_reports_FALSE_so_the_caller_backs_off(
+        self, fresh_shutdown_event
+    ):
+        """The cooldown's return value, which is what the loops act on.
+
+        `test_a_second_rejoin_is_refused_inside_the_interval` above asserts only
+        that `_rejoin_unlocked` is not called again — and that passed while the
+        skip returned `None`, indistinguishable from success. `_sse_loop` acts on
+        the RETURN VALUE: both its `continue`s jump past the
+        `wait_for(_shutdown.wait(), timeout=sse_retry_interval)` backoff, so a
+        skip reported as success made the listener reconnect at full network
+        speed — one HTTPS request and one warning per iteration — for the rest
+        of the interval. Before the cooldown those `continue`s were
+        self-throttling, because each was preceded by a real re-join doing
+        network and Secret work.
+        """
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock()
+
+        assert await listener._rejoin() is True, "a real re-join must report True"
+        assert await listener._rejoin() is False, (
+            "the cooldown skip reported success, so the SSE loop would retry "
+            "immediately instead of backing off"
+        )
+        assert listener._rejoin_unlocked.await_count == 1
+
+    async def test_note_auth_failure_passes_the_refusal_through(self, fresh_shutdown_event):
+        """The 401 site reads this, not `_rejoin`, so the signal has to survive
+        the hop."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._rejoin_unlocked = AsyncMock()
+
+        for _ in range(listener_module._REJOIN_THRESHOLD):
+            first = await listener._note_auth_failure(source="sse")
+        assert first is True
+
+        # Still past the threshold, still inside the interval.
+        listener._auth_failures = listener_module._REJOIN_THRESHOLD
+        assert await listener._note_auth_failure(source="sse") is False, (
+            "a cooldown refusal was reported as a successful re-join"
+        )
+
+    async def test_another_loop_having_rejoined_still_reports_true(self, fresh_shutdown_event):
+        """The one case where immediate retry IS right: somebody else got a
+        fresh identity, so the caller should use it rather than back off.
+
+        Driven as a real race -- `_rejoin_unlocked` awaits, so the two calls
+        genuinely interleave and the loser observes the generation move while it
+        waited on the lock. A sequential version cannot reach that branch at
+        all: it reads the generation after the bump, so it matches and a second
+        real re-join happens (which is how I first wrote this, and it failed).
+        """
+        listener = _make_listener(fresh_shutdown_event)
+        ran = {"n": 0}
+
+        async def _slow_rejoin():
+            ran["n"] += 1
+            await asyncio.sleep(0)
+
+        listener._rejoin_unlocked = AsyncMock(side_effect=_slow_rejoin)
+        first, second = await asyncio.gather(listener._rejoin(), listener._rejoin())
+
+        assert ran["n"] == 1, "both callers performed a re-join"
+        assert first is True and second is True, (
+            "the caller that lost the race must still be told an identity is "
+            "available, or it backs off from a fresh one"
+        )
+        assert listener._rejoin_generation == 1

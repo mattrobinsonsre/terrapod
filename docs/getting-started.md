@@ -18,16 +18,31 @@ Redis (deployed by the chart), filesystem storage, and a local admin — with no
 cloud account and no external dependencies:
 
 ```sh
+git clone https://github.com/mattrobinsonsre/terrapod.git
+cd terrapod
 make eval          # create a local cluster + install Terrapod, then port-forward
 # → open http://localhost:8080  (login: admin / terrapod)
+```
+
+`make eval` installs the chart from the clone, so you need the repository — and
+it does not return: it ends in a `kubectl port-forward`, so leave it running and
+use a second terminal. When you are finished:
+
+```sh
 make eval-down     # delete it all
 ```
 
-Prerequisites: Docker, `kubectl`, `helm`, and either `kind` or `k3d`. This is an
+Expect **5–10 minutes** on a first run, nearly all of it image pulls.
+
+Prerequisites: `git`, `make`, Docker, `kubectl`, `helm`, and either `kind` or
+`k3d`. Give the machine at least **4 GB of RAM free** for the cluster — the API
+pod alone requests 2Gi, and a queued plan starts a runner Job that asks for
+another 2Gi. This is an
 **evaluation** profile (single-replica datastores, a known password, no
 HA/backups) — for a real deployment, continue below. Agent execution (server-side
-plan/apply) is off in the eval to keep it small; create an agent pool and set
-`listener.enabled=true` to try it.
+plan/apply) is **on** in the eval and the agent pool is seeded for you, so you
+can queue a plan in the UI and watch it run on a Kubernetes Job. The first one
+pulls the runner image and a `tofu` binary, so give it a few minutes.
 
 ---
 
@@ -37,7 +52,7 @@ plan/apply) is off in the eval to keep it small; create an agent pool and set
 |---|---|
 | A Kubernetes cluster (1.29+) | Any conformant cluster. No cluster? Spin up [k3s](https://k3s.io/) on a single VM (below). |
 | Helm 3.x | `brew install helm` |
-| PostgreSQL 14+ and Redis 7+ | **External** — the chart does not bundle them. Provide a connection URL for each (a managed service, or run them on the cluster/VM). See [Deployment → Database Setup](deployment.md#database-setup). |
+| PostgreSQL 14+ and Redis 7+ | **External for production** — provide a connection URL for each (a managed service, or run them on the cluster/VM). For evaluation and development the chart can deploy both itself with `postgresql.deploy=true` / `redis.deploy=true` (single replica, no HA or backups — what `make eval` uses). See [Deployment → Database Setup](deployment.md#database-setup). |
 | Storage | Defaults to a PVC-backed filesystem (no extra setup). For S3/Azure/GCS see [Deployment → Storage Backend Setup](deployment.md#storage-backend-setup). |
 | `tofu` (recommended) or `terraform` | Infrastructure CLI — [opentofu.org](https://opentofu.org/) or [terraform.io](https://www.terraform.io/). |
 
@@ -218,10 +233,15 @@ tofu init
 You should see output confirming that OpenTofu is using Terrapod as its backend:
 
 ```
-Initializing Terraform Cloud...
-...
-Terraform Cloud has been successfully initialized!
+Initializing cloud backend...
+
+Initializing provider plugins...
+
+Cloud backend has been successfully initialized!
 ```
+
+(Measured with OpenTofu v1.13.1. Terraform prints `Initializing Terraform
+Cloud...` instead — the wording differs by engine, the meaning does not.)
 
 ---
 

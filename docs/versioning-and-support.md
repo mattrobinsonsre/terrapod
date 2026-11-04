@@ -101,7 +101,7 @@ so a breaking change cannot merge by accident.
 
 | Surface | What's frozen | CI gate |
 |---|---|---|
-| **`/api/v2/` CLI API** | The routes + response attributes the `terraform`/`tofu` `cloud` backend and `go-tfe` consume ([`tfe-cli-surface.md`](tfe-cli-surface.md)) | route + attribute snapshots |
+| **`/api/tfe/v2/` CLI API** | The routes + response attributes the `terraform`/`tofu` `cloud` backend and `go-tfe` consume ([`tfe-cli-surface.md`](tfe-cli-surface.md)) | route + attribute snapshots |
 | **`/api/v1/` runner + listener wire protocol** | Every route, the `runs/next` attributes, the SSE event names, and the runner artifact/body keys (`has_changes`, `policy-results`, `job-status`, …) | route + attribute snapshots |
 | **go-terrapod SDK** | Exported methods + struct JSON tags | SDK ↔ server contract test |
 | **terraform-provider-terrapod** | Resource/data-source attribute schema | provider schema |
@@ -243,8 +243,9 @@ migration convention in [`AGENTS.md`](../AGENTS.md).
 ## Supported releases
 
 - The **latest minor** is fully supported (bug + security fixes).
-- The **previous minor** receives **security backports** until the next minor
-  ships.
+- The **previous minor** receives **security fixes and obvious bug fixes**
+  (matching [`SECURITY.md`](../SECURITY.md)) for as long as it is the previous
+  minor.
 - Older minors are best-effort. Because Terrapod ships as a single Helm chart and
   every migration is reversible, upgrading forward one minor at a time is the
   supported upgrade path.

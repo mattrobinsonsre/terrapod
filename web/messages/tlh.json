@@ -165,7 +165,8 @@
     "canceled": "qIlpu'",
     "discarded": "woDlu'pu'",
     "pendingDeletion": "Qaw' loStaH",
-    "archived": "polpu'"
+    "archived": "polpu'",
+    "configuring": "QumtaH"
   },
   "auth": {
     "loading": "gheltaH...",
@@ -2120,7 +2121,8 @@
       "errored": "Qaghpu'",
       "canceled": "qIlpu'",
       "discarded": "woDlu'pu'",
-      "awaitingDecision": "wuq loS"
+      "awaitingDecision": "wuq loS",
+      "configuring": "QumtaH"
     },
     "activity": {
       "pending": "Sar ghuHmoHtaH",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "chut Segh ramtaHbe'bogh luj — DIvI'moH pagh Sar woD",
       "heldBySecurityScan": "Hurgh QaD wanI' QaD botlh tu' — DIvI'moH pagh Sar woD",
       "heldByAiPolicy": "AI chut lojmIt wanI''vam lajQo'' — DIvI''moH pagh Sar woD",
-      "awaitingAiPolicy": "AI chut wuq loStaH"
+      "awaitingAiPolicy": "AI chut wuq loStaH",
+      "configuring": "playbook-mey QumtaH"
     },
     "badge": {
       "destroy": "Qaw'",
@@ -2266,7 +2269,8 @@
       "confirmed": "tobpu'",
       "errored": "Qaghpu'",
       "canceled": "qIlpu'",
-      "discarded": "woDlu'pu'"
+      "discarded": "woDlu'pu'",
+      "configuring": "Qum taghpu'"
     },
     "log": {
       "color": "rItlh",

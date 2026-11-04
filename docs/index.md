@@ -123,6 +123,11 @@ Browser / CLI  ──▶  Ingress  ──▶  Next.js (BFF)  ──▶  FastAPI 
 - **API-first** -- every UI action is backed by a public API endpoint
 - **BFF pattern** -- Next.js is the single ingress entry point; browser never talks to the API directly
 - **Responsive, mobile-first web UI** -- every surface adapts from desktop tables to touch-friendly card layouts on phones (one viewport-driven implementation, no separate mobile app)
+
+<img src="images/mobile-run-overview.png" alt="A run overview on a phone: status, then changes, cost, AI analysis, policy checks, security scan and runner resources as cards" width="280">
+
+*A run's whole verdict at 412px -- the width the Playwright responsive suite
+gates on every PR, which is also the width this screenshot is captured at.*
 - **Kubernetes-native** -- deployed exclusively via Helm chart
 - **ARC-pattern execution** -- listener receives events via SSE, creates ephemeral K8s Jobs; API reconciler owns all run state
 

@@ -31,7 +31,7 @@ export interface WorkspaceVarset {
 
 const SOURCE_STYLES: Record<string, string> = {
   explicit: 'bg-slate-700 text-slate-200',
-  global: 'bg-blue-900/40 text-blue-300',
+  global: 'bg-indigo-900/40 text-indigo-300',
   rule: 'bg-violet-900/40 text-violet-300',
 }
 

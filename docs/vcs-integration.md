@@ -71,6 +71,7 @@ The `VCSProvider` protocol defines the interface for VCS operations. The poller 
 | `get_default_branch()` | Get the repository's default branch name |
 | `download_archive()` | Download a tarball of the repository at a specific SHA |
 | `list_open_prs()` | List open pull requests / merge requests targeting a branch |
+| `list_open_prs_for_repo()` | Every open pull request / merge request on the repository, whatever branch it targets; paginated, and reports whether the walk completed |
 | `parse_repo_url()` | Extract owner/repo from a repository URL |
 
 **Source files:**
@@ -729,10 +730,13 @@ worth knowing how Terrapod spends its VCS API budget and which knobs adjust it.
 
 **Terrapod polls economically by design.** Three things keep the cost down:
 
-- **Lookups are deduplicated per cycle.** The cost is per *distinct* repository +
-  tracked branch, not per workspace. Twenty workspaces on twenty directories of one
-  monorepo cost the same as one workspace, because they share the same branch-head
-  and PR lookups.
+- **Lookups are deduplicated per cycle.** The branch-head lookup costs one call per
+  distinct repository + tracked branch, not per workspace. The open-PR/MR listing is
+  **repository-wide** and costs one call per distinct repository per 100 open pull
+  requests, shared by every workspace on that repository whatever branch each one
+  tracks. Twenty workspaces on twenty directories of one monorepo therefore cost the
+  same as one workspace, and so do twenty workspaces tracking twenty *different*
+  branches of it.
 - **Module repositories poll on their own, longer interval.** Module repos are far
   more numerous than they are active, so they default to 300s while workspace repos
   default to 60s.
@@ -741,13 +745,20 @@ worth knowing how Terrapod spends its VCS API budget and which knobs adjust it.
   safety net for an undelivered event — so a long interval costs nothing in
   responsiveness.
 
-A cycle costs roughly two calls per distinct repository + branch (the branch head,
-and the list of open PRs/MRs). A push adds an archive download; autodiscovery adds
-a tree listing. So:
+A cycle costs one call per distinct repository + branch (the branch head) plus the
+repository-wide open-PR/MR listing, which is paginated at 100 per page. A push adds
+an archive download; autodiscovery adds a tree listing. So:
 
 ```
-calls per hour ≈ (3600 / poll_interval_seconds) × 2 × distinct repo+branch pairs
+calls per hour ≈ (3600 / poll_interval_seconds)
+                 × ( distinct repo+branch pairs
+                   + Σ ceil(open_prs / 100) over distinct repos )
 ```
+
+The PR term became repository-wide in v1.11.3 / v1.10.8, which lowered it for an
+estate whose workspaces track several branches of one repository and raised it for a
+repository carrying more than 100 open pull requests. If your consumption moved after
+that upgrade, this is why.
 
 You should not have to rely on that arithmetic, though: **Terrapod measures the
 real consumption and shows it per connection**, on **Admin → VCS connections**.

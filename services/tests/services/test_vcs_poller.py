@@ -8,6 +8,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest  # noqa: F401  # used by tests appended later via @pytest.mark.asyncio
 
+from terrapod.services.vcs_provider import OpenPullRequests
+
+
+def _listing(prs, *, complete=True):
+    """What `_list_all_open_prs` returns (#2349).
+
+    The repo-wide listing reports whether it got to the end, because the
+    reconciler concludes from an absence and must decline to do so on a
+    truncated list.
+    """
+    return OpenPullRequests(list(prs), complete=complete)
+
 
 def _mock_workspace(**overrides):
     ws = MagicMock()
@@ -1391,7 +1403,7 @@ class TestPollWorkspacePassesMetadataCacheCorrectly:
     argument binding is exercised.
     """
 
-    @patch("terrapod.services.vcs_poller.github_service.list_open_pull_requests")
+    @patch("terrapod.services.vcs_poller.github_service.list_open_pull_requests_for_repo")
     @patch("terrapod.services.vcs_poller._provider_get_branch_sha")
     @patch("terrapod.services.vcs_poller._parse_repo_url")
     async def test_poll_with_meta_and_fetch_paths_does_not_error(
@@ -1404,8 +1416,14 @@ class TestPollWorkspacePassesMetadataCacheCorrectly:
         conn = _mock_connection()
         mock_parse.return_value = ("org", "repo")
         # No new commit and no open PRs: the poll should be a clean no-op.
+        #
+        # Mocked at the REPO-WIDE provider boundary, which is what the PR half
+        # of a poll calls since #2349. Mocking the branch-scoped lister instead
+        # leaves the real one reachable, and it fails on the MagicMock
+        # connection's key -- recorded on the workspace rather than raised,
+        # which is precisely the shape this test exists to catch.
         mock_sha.return_value = "aaa111"
-        mock_prs.return_value = []
+        mock_prs.return_value = _listing([])
 
         mock_db = AsyncMock()
         mock_db.get.return_value = conn
@@ -1508,6 +1526,12 @@ class TestFilteredPRIsDecidedOnce:
         # a bare attribute reads as "from a fork", and these tests would then
         # pass only because the workspace mock's opt-in is truthy too.
         pr.from_fork = False
+        # The branch the PR targets. Stated rather than left to MagicMock for
+        # the same reason as `from_fork` above: `_poll_workspace_prs` filters
+        # the repo-wide listing on `base_ref == branch` (#2349), and an
+        # auto-mock attribute matches no branch, so the PR would simply vanish
+        # from the planning loop and every assertion here would pass vacuously.
+        pr.base_ref = "main"
         return [pr]
 
     def _db_with_no_existing_run(self):
@@ -1532,14 +1556,14 @@ class TestFilteredPRIsDecidedOnce:
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_the_second_cycle_costs_no_provider_call(
         self, mock_prs, mock_changed, mock_create
     ):
         """The defect itself, driven end to end: two cycles, one compare call."""
         redis = _FakeRedis()
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_changed.return_value = ["frontend/app.tsx"]  # no prefix match
 
         await self._cycle(ws, redis, mock_prs)
@@ -1554,14 +1578,14 @@ class TestFilteredPRIsDecidedOnce:
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_editing_the_prefixes_re_evaluates(self, mock_prs, mock_changed, mock_create):
         """#1332: widening a prefix is exactly what an operator does when a PR
         is not planning, so it must dislodge the skip rather than be swallowed
         by it for the TTL."""
         redis = _FakeRedis()
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_changed.return_value = ["frontend/app.tsx"]
         mock_create.return_value = MagicMock(id=uuid.uuid4())
 
@@ -1578,12 +1602,12 @@ class TestFilteredPRIsDecidedOnce:
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_a_new_head_sha_is_evaluated_afresh(self, mock_prs, mock_changed, mock_create):
         """A PR update is a new head SHA, so it must not inherit the old skip."""
         redis = _FakeRedis()
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_changed.return_value = ["frontend/app.tsx"]
         mock_create.return_value = MagicMock(id=uuid.uuid4())
 
@@ -1591,7 +1615,7 @@ class TestFilteredPRIsDecidedOnce:
         assert mock_changed.await_count == 1
 
         # The author pushes a commit that does touch the watched subtree.
-        mock_prs.return_value = self._prs(head_sha="ddd444")
+        mock_prs.return_value = _listing(self._prs(head_sha="ddd444"))
         mock_changed.return_value = ["terraform/auth0/main.tf"]
 
         await self._cycle(ws, redis, mock_prs)
@@ -1600,7 +1624,7 @@ class TestFilteredPRIsDecidedOnce:
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_the_marker_carries_a_bounded_ttl(self, mock_prs, mock_changed, mock_create):
         """A marker that never expired would make a rewound tracked branch a
         permanent suppression rather than a temporary one."""
@@ -1608,7 +1632,7 @@ class TestFilteredPRIsDecidedOnce:
 
         redis = _FakeRedis()
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_changed.return_value = ["frontend/app.tsx"]
 
         await self._cycle(ws, redis, mock_prs)
@@ -1621,14 +1645,14 @@ class TestFilteredPRIsDecidedOnce:
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_a_redis_outage_fails_open(self, mock_prs, mock_changed, mock_create):
         """Losing Redis must cost a repeated provider call, never a lost run —
         the pre-#1330 behaviour, which was wasteful but correct."""
         from terrapod.services.vcs_poller import _poll_workspace_prs
 
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_changed.return_value = ["terraform/auth0/main.tf"]  # matches: must run
         mock_create.return_value = MagicMock(id=uuid.uuid4())
 
@@ -1645,7 +1669,7 @@ class TestFilteredPRIsDecidedOnce:
     @patch("terrapod.services.vcs_poller._pr_decision_is_remembered")
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
+    @patch("terrapod.services.vcs_poller._list_all_open_prs")
     async def test_workspaces_without_prefixes_are_untouched(
         self, mock_prs, mock_changed, mock_create, mock_remembered
     ):
@@ -1656,7 +1680,7 @@ class TestFilteredPRIsDecidedOnce:
         from terrapod.services.vcs_poller import _poll_workspace_prs
 
         ws = _mock_workspace(trigger_prefixes=[], working_directory="")
-        mock_prs.return_value = self._prs()
+        mock_prs.return_value = _listing(self._prs())
         mock_create.return_value = MagicMock(id=uuid.uuid4())
 
         await _poll_workspace_prs(
@@ -1716,6 +1740,7 @@ class TestAutodiscoverySharesTheCycleCache:
         from terrapod.services.vcs_poller import (
             _get_branch_sha,
             _get_default_branch,
+            _list_all_open_prs,
             _list_open_prs,
         )
 
@@ -1724,6 +1749,7 @@ class TestAutodiscoverySharesTheCycleCache:
             lambda: _get_default_branch(conn, "org", "repo"),
             lambda: _get_branch_sha(conn, "org", "repo", "main"),
             lambda: _list_open_prs(conn, "org", "repo", "main"),
+            lambda: _list_all_open_prs(conn, "org", "repo"),
         ):
             with pytest.raises(TypeError, match="meta"):
                 await call()
@@ -1773,7 +1799,14 @@ class TestClosedPRCancelIsScopedToItsRepository:
         from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions
 
         db = self._db([self._session()], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
 
         # Assert on the WHERE clause, not the rendered statement: `select(Run)`
         # names workspace_id among its SELECT columns, so checking the whole
@@ -1801,7 +1834,14 @@ class TestClosedPRCancelIsScopedToItsRepository:
 
         sess = self._session()
         db = self._db([sess], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
         assert sess.state == "closed"
 
     async def test_a_still_open_pr_is_left_alone(self):
@@ -1831,6 +1871,7 @@ class TestPRSessionIsCreatedInBothModes:
         pr.head_ref = "feature/x"
         pr.title = "add a thing"
         pr.from_fork = False
+        pr.base_ref = "main"  # must match the polled branch -- see #2349
         return pr
 
     def _db(self):
@@ -1853,8 +1894,8 @@ class TestPRSessionIsCreatedInBothModes:
 
         with (
             patch(
-                "terrapod.services.vcs_poller._list_open_prs",
-                AsyncMock(return_value=[self._pr()]),
+                "terrapod.services.vcs_poller._list_all_open_prs",
+                AsyncMock(return_value=_listing([self._pr()])),
             ),
             patch("terrapod.services.vcs_poller._create_vcs_run", AsyncMock(return_value=run)),
             patch(
@@ -1916,7 +1957,14 @@ class TestClosedPRSessionsAreReconciledInBothModes:
 
         sess = self._session()
         db = self._db([sess], [])
-        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        # The sweep confirms a candidate closure with the provider before
+        # acting (#2352); this scenario's premise is a pull request that
+        # really did close.
+        with patch(
+            "terrapod.services.vcs_poller._confirm_pr_is_closed",
+            new=AsyncMock(return_value=True),
+        ):
+            await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
         assert sess.state == "closed"
 
     async def test_a_still_open_pr_is_left_alone(self):
@@ -1940,7 +1988,10 @@ class TestClosedPRSessionsAreReconciledInBothModes:
         db.execute.return_value = result
 
         with (
-            patch("terrapod.services.vcs_poller._list_open_prs", AsyncMock(return_value=[])),
+            patch(
+                "terrapod.services.vcs_poller._list_all_open_prs",
+                AsyncMock(return_value=_listing([])),
+            ),
             patch(
                 "terrapod.services.vcs_poller._reconcile_closed_pr_sessions", AsyncMock()
             ) as reconcile,
@@ -2086,6 +2137,7 @@ class TestForkPullRequestsDoNotPlanByDefault:
         pr.number, pr.head_sha = 11, "fff999"
         pr.head_ref, pr.title = "contrib", "a contribution"
         pr.from_fork = from_fork
+        pr.base_ref = "main"  # must match the polled branch -- see #2349
         return pr
 
     def _db(self):
@@ -2099,7 +2151,10 @@ class TestForkPullRequestsDoNotPlanByDefault:
     async def _cycle(self, ws, pr):
         from terrapod.services.vcs_poller import _poll_workspace_prs
 
-        with patch("terrapod.services.vcs_poller._list_open_prs", new=AsyncMock(return_value=[pr])):
+        with patch(
+            "terrapod.services.vcs_poller._list_all_open_prs",
+            new=AsyncMock(return_value=_listing([pr])),
+        ):
             await _poll_workspace_prs(self._db(), ws, _mock_connection(), "org", "repo", "main")
 
     @patch("terrapod.services.vcs_poller._create_vcs_run")

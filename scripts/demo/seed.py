@@ -54,6 +54,10 @@ FIXTURE = pathlib.Path(__file__).resolve().parent / "fixture"
 #            "broken"   execute a real plan that fails, because a real estate
 #                       always has one, and an errored row is worth showing
 #            None       never run
+# `engine` and `extra` are optional. A Pulumi workspace MUST be created on the
+# NATIVE surface: `_create_workspace_impl(..., engine=TERRAFORM)` pins the TFE
+# route to Terraform by design, so a `pulumi` engine posted there is silently
+# ignored. See `create_workspace` below.
 ESTATE = [
     (
         "checkout-prod-eu-west-1",
@@ -114,6 +118,33 @@ ESTATE = [
         "sandbox-dev-eu-west-1",
         {"team": "platform", "env": "dev"},
         {"agent": False, "cpu": "1", "mem": "2Gi", "run": None},
+    ),
+    # ── The other two engines ────────────────────────────────────────────
+    #
+    # A documentation estate that is all Terraform cannot show what 2.0 is
+    # about. These two exist so the workspace list carries an engine badge and
+    # so the Ansible and Pulumi surfaces have something to photograph at all.
+    (
+        # Pulumi names a workspace `project::stack`, and the project half is
+        # matched against `name:` in Pulumi.yaml -- an ordinary name cannot
+        # select a stack.
+        "edge-cdn::prod",
+        {"team": "platform", "env": "prod"},
+        {"agent": True, "cpu": "2", "mem": "4Gi", "run": None, "engine": "pulumi"},
+    ),
+    (
+        # `config-directory` is what makes a Configure operation exist. NULL
+        # means no configure and "" means the repository root, so the two are
+        # not interchangeable.
+        "fleet-config-prod-eu-west-1",
+        {"team": "platform", "env": "prod"},
+        {
+            "agent": True,
+            "cpu": "2",
+            "mem": "4Gi",
+            "run": None,
+            "extra": {"config-directory": "ansible", "configure-enabled": True},
+        },
     ),
 ]
 
@@ -247,7 +278,12 @@ def pick_pool(api: Api) -> str:
 
 
 def find_workspace(api: Api, name: str):
-    ws = api.get("/api/v2/organizations/default/workspaces?page%5Bsize%5D=200").get("data", [])
+    # The NATIVE list, not the TFE one. `/api/v2` is engine-filtered by design
+    # (#1905), so a Pulumi or Ansible workspace is invisible there -- and an
+    # existence check that cannot see a workspace reports it as absent, then
+    # tries to create it and gets a 422 naming the workspace it just failed to
+    # find. The native surface serves every engine.
+    ws = api.get("/api/v1/workspaces?page%5Bsize%5D=0").get("data", [])
     return next((w for w in ws if w["attributes"]["name"] == name), None)
 
 
@@ -273,9 +309,18 @@ def create_workspace(api: Api, name: str, labels: dict, opts: dict, pool_id: str
                 "execution-backend": "tofu",
             }
         )
+    attrs.update(opts.get("extra") or {})
     body = {"data": {"type": "workspaces", "attributes": attrs}}
-    ws = api.post("/api/v2/organizations/default/workspaces", body)
-    print(f"  + {name}")
+    engine = opts.get("engine")
+    if engine and engine != "terraform":
+        # The TFE create route pins the engine to Terraform deliberately, so a
+        # non-Terraform workspace has to be created natively or it comes back
+        # as Terraform with no error.
+        attrs["engine"] = engine
+        ws = api.post("/api/v1/workspaces", body)
+    else:
+        ws = api.post("/api/v2/organizations/default/workspaces", body)
+    print(f"  + {name}" + (f" ({engine})" if engine else ""))
     return ws["data"]["id"]
 
 
@@ -320,6 +365,160 @@ def seed_policy_set(api: Api):
         )
         print(f"  + policy {rego.stem.replace('_', '-')}")
     print(f"  + policy set {POLICY_SET} (advisory, scoped to env=prod)")
+
+
+def seed_vcs_connections(api: Api):
+    """VCS connections, so the admin page shows the feature rather than its absence.
+
+    The screenshot of this page went out reading "No VCS connections
+    configured." -- clean, correct, and worthless to a reader, because the
+    seeder never made one. That is the whole reason `assertClean` now refuses
+    an empty state.
+
+    GitLab rather than GitHub: a GitHub connection requires an App id, an
+    installation id and a private key, and a PEM committed to a public
+    repository looks exactly like a leaked key whether or not it is one. A
+    GitLab connection needs a name and a token, so the fixture can be obviously
+    fake. The tokens below are not credentials and are never used -- nothing in
+    the demo estate polls these connections -- but they are deliberately not in
+    the shape of a real `glpat-` token either, so no secret scanner has to
+    decide.
+    """
+    wanted = [
+        ("platform-monorepo", "https://gitlab.com"),
+        ("service-templates", "https://gitlab.com"),
+    ]
+    existing = {
+        c["attributes"].get("name") for c in api.get("/api/v1/vcs-connections").get("data", [])
+    }
+    for name, server in wanted:
+        if name in existing:
+            print(f"  = vcs connection {name} (exists)")
+            continue
+        api.post(
+            "/api/v1/vcs-connections",
+            {
+                "data": {
+                    "type": "vcs-connections",
+                    "attributes": {
+                        "name": name,
+                        "provider": "gitlab",
+                        "server-url": server,
+                        "token": "demo-seed-value-not-a-real-token",
+                    },
+                }
+            },
+        )
+        print(f"  + vcs connection {name} (gitlab)")
+
+
+def seed_registry(api: Api):
+    """A module and a provider, so the two registry pages show the registry.
+
+    Both went out reading "No modules yet." / "No providers yet." -- the pages
+    existed, rendered correctly and documented nothing. Neither needs an
+    artifact to list: the module and provider rows are the namespace, and
+    versions are published to them separately (a provider version needs
+    client-side GPG signing, which a seeder has no business doing).
+    """
+    for path, kind, attrs in (
+        ("/api/v1/registry-modules", "registry-modules", {"name": "vpc", "provider": "aws"}),
+        (
+            "/api/v1/registry-modules",
+            "registry-modules",
+            {"name": "ecs-service", "provider": "aws"},
+        ),
+        ("/api/v1/registry-providers", "registry-providers", {"name": "acme"}),
+    ):
+        label = attrs["name"] + (f"/{attrs['provider']}" if "provider" in attrs else "")
+        existing = api.get(path).get("data", [])
+        if any(
+            e["attributes"].get("name") == attrs["name"]
+            and e["attributes"].get("provider", attrs.get("provider"))
+            == attrs.get("provider", e["attributes"].get("provider"))
+            for e in existing
+        ):
+            print(f"  = registry {kind.split('-')[1]} {label} (exists)")
+            continue
+        api.post(path, {"data": {"type": kind, "attributes": attrs}})
+        print(f"  + registry {kind.split('-')[1]} {label}")
+
+
+def seed_autodiscovery(api: Api):
+    """One autodiscovery rule, which needs a VCS connection to point at."""
+    conns = api.get("/api/v1/vcs-connections").get("data", [])
+    if not conns:
+        print("  ! no VCS connection, skipping autodiscovery rule")
+        return
+    existing = api.get("/api/v1/autodiscovery-rules").get("data", [])
+    if any(r["attributes"].get("name") == "prod-monorepo" for r in existing):
+        print("  = autodiscovery rule prod-monorepo (exists)")
+        return
+    api.post(
+        "/api/v1/autodiscovery-rules",
+        {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "prod-monorepo",
+                    "vcs-connection-id": conns[0]["id"],
+                    "repo-url": "https://gitlab.com/example/platform-monorepo",
+                    "branch": "main",
+                    "pattern": "environments/*/*",
+                },
+            }
+        },
+    )
+    print("  + autodiscovery rule prod-monorepo")
+
+
+def seed_workspace_integrations(api: Api, ws_id: str):
+    """A notification and a run task on the hero workspace.
+
+    Both tabs photographed as "No ... configured for this workspace." The URLs
+    are example.com on purpose: nothing in the demo estate delivers to them,
+    and a reachable endpoint in a committed fixture is a request somebody else
+    eventually receives.
+    """
+    notifs = api.get(f"/api/v1/workspaces/{ws_id}/notification-configurations")
+    if not any(n["attributes"].get("name") == "slack-prod" for n in notifs.get("data", [])):
+        api.post(
+            f"/api/v1/workspaces/{ws_id}/notification-configurations",
+            {
+                "data": {
+                    "type": "notification-configurations",
+                    "attributes": {
+                        "name": "slack-prod",
+                        "destination-type": "slack",
+                        "url": "https://hooks.example.com/services/demo",
+                        "triggers": ["run:errored", "run:needs_attention"],
+                    },
+                }
+            },
+        )
+        print("  + notification slack-prod")
+    else:
+        print("  = notification slack-prod (exists)")
+
+    tasks = api.get(f"/api/v1/workspaces/{ws_id}/run-tasks")
+    if not any(r["attributes"].get("name") == "compliance-check" for r in tasks.get("data", [])):
+        api.post(
+            f"/api/v1/workspaces/{ws_id}/run-tasks",
+            {
+                "data": {
+                    "type": "run-tasks",
+                    "attributes": {
+                        "name": "compliance-check",
+                        "url": "https://tasks.example.com/compliance",
+                        "stage": "post_plan",
+                        "enforcement-level": "advisory",
+                    },
+                }
+            },
+        )
+        print("  + run task compliance-check")
+    else:
+        print("  = run task compliance-check (exists)")
 
 
 def seed_variables(api: Api, ws_id: str):
@@ -374,6 +573,109 @@ def seed_variables(api: Api, ws_id: str):
     )
 
 
+def seed_inventory(api: Api, ws_id: str):
+    """Give the configure workspace an inventory worth photographing.
+
+    The Hosts and Inventory surfaces are the ones that distinguish a configure
+    from a plan, and an empty one shows nothing. Modelled as the structures
+    Ansible actually has -- hosts, groups, group membership, and variables at
+    host, group and `all` level -- rather than as one flat list, because that is
+    what the UI renders and what the resolved inventory merges.
+    """
+
+    def post(path, typ, attrs=None, rels=None):
+        # A link to another resource is a JSON:API RELATIONSHIP here, not an
+        # `*-id` attribute -- the house style, and the membership routes refuse
+        # an attribute with a 422 that spells out the shape they want.
+        data = {"type": typ}
+        if attrs:
+            data["attributes"] = attrs
+        if rels:
+            data["relationships"] = rels
+        r = api.post(path, {"data": data}, conflict_ok=True)
+        return r["data"]["id"] if r else None
+
+    hosts = {
+        "web-01.eu-west-1.internal": {"ansible_host": "10.20.1.11", "role": "web"},
+        "web-02.eu-west-1.internal": {"ansible_host": "10.20.1.12", "role": "web"},
+        "web-03.eu-west-1.internal": {"ansible_host": "10.20.1.13", "role": "web"},
+        "cache-01.eu-west-1.internal": {"ansible_host": "10.20.2.21", "role": "cache"},
+        "db-01.eu-west-1.internal": {"ansible_host": "10.20.3.31", "role": "db"},
+    }
+    groups = {"web": ["web-01", "web-02", "web-03"], "cache": ["cache-01"], "db": ["db-01"]}
+
+    # Resolve what is ALREADY there before creating anything. A create that
+    # conflicts returns None, and the first version of this took that as "skip
+    # the host" -- so on any re-run `host_ids` stayed empty, the membership loop
+    # below iterated over nothing, and the seeder reported success having
+    # created five hosts in no groups. Idempotent has to mean converges, not
+    # "does nothing the second time".
+    existing = {
+        h["attributes"]["name"]: h["id"]
+        for h in api.get(f"/api/v1/workspaces/{ws_id}/inventory/hosts").get("data", [])
+    }
+    host_ids, made = dict(existing), 0
+    for name, hvars in hosts.items():
+        if name in host_ids:
+            continue
+        hid = post(f"/api/v1/workspaces/{ws_id}/inventory/hosts", "inventory-hosts", {"name": name})
+        if hid is None:
+            continue
+        host_ids[name] = hid
+        made += 1
+        for k, v in hvars.items():
+            post(
+                f"/api/v1/inventory-hosts/{hid}/vars", "inventory-host-vars", {"key": k, "value": v}
+            )
+
+    group_ids = {
+        g["attributes"]["name"]: g["id"]
+        for g in api.get(f"/api/v1/workspaces/{ws_id}/inventory/groups").get("data", [])
+    }
+    for g in groups:
+        if g in group_ids:
+            continue
+        gid = post(f"/api/v1/workspaces/{ws_id}/inventory/groups", "inventory-groups", {"name": g})
+        if gid:
+            group_ids[g] = gid
+
+    for g, prefixes in groups.items():
+        gid = group_ids.get(g)
+        if not gid:
+            continue
+        for name, hid in host_ids.items():
+            if any(name.startswith(pfx) for pfx in prefixes):
+                post(
+                    f"/api/v1/inventory-groups/{gid}/hosts",
+                    "inventory-host-groups",
+                    rels={"host": {"data": {"id": hid, "type": "inventory-hosts"}}},
+                )
+        post(
+            f"/api/v1/inventory-groups/{gid}/vars",
+            "inventory-group-vars",
+            {"key": "service_tier", "value": g},
+        )
+
+    # `group_vars/all`, which is parented on the workspace because `all` cannot
+    # be a declared group.
+    for k, v in (("ansible_user", "deploy"), ("environment", "prod")):
+        post(
+            f"/api/v1/workspaces/{ws_id}/inventory/vars",
+            "inventory-global-vars",
+            {"key": k, "value": v},
+        )
+
+    links = sum(
+        len(api.get(f"/api/v1/inventory-groups/{gid}/hosts").get("data", []))
+        for gid in group_ids.values()
+    )
+    print(
+        f"  · inventory: {len(host_ids)} hosts, {len(group_ids)} groups, {links} membership link(s)"
+    )
+    if not links:
+        print("    WARNING: no host is in a group -- the Inventory tab will look empty")
+
+
 def upload_state(api: Api, ws_id: str):
     """The state is what gives the plan its destroys and its in-place update."""
     raw = (FIXTURE / "demo.tfstate").read_bytes()
@@ -392,10 +694,25 @@ def upload_state(api: Api, ws_id: str):
     if sv is None:
         print(f"  · state already at serial {doc['serial']}")
         return
-    sv_id = sv["data"]["id"]
+    # Upload to the URL the API HANDS BACK, never to one built from the id.
+    #
+    # The content endpoint takes no Authorization header -- go-tfe PUTs it
+    # without one -- so a bare id would let anyone who learned it overwrite a
+    # workspace's state. It therefore carries a signed capability in place of
+    # the id (`cap-...` rather than `sv-...`), minted into
+    # `hosted-state-upload-url` at create time. This function constructed the
+    # path from `sv["data"]["id"]` and had been answering 401 ever since that
+    # hardening landed, which is why the screenshots could not be regenerated.
+    attrs = sv["data"]["attributes"]
+    upload = attrs.get("hosted-state-upload-url")
+    if not upload:
+        raise SystemExit(
+            "the state-version create response carries no hosted-state-upload-url; "
+            "the upload contract has moved again and this seeder needs updating"
+        )
     api._req(
         "PUT",
-        f"/api/v2/state-versions/{sv_id}/content",
+        upload,
         raw,
         ctype="application/octet-stream",
         auth=False,
@@ -486,12 +803,23 @@ def main() -> int:
     pool_id = None if args.no_run else pick_pool(api)
     print(f"Seeding the demo estate on {args.host}:")
 
+    # Before the workspaces, and before the --no-run early return below: this
+    # is estate furniture rather than run state, and the admin page that shows
+    # it is captured whether or not a run is queued.
+    seed_vcs_connections(api)
+    seed_registry(api)
+    seed_autodiscovery(api)
+
     hero_id = None
     to_run: list[tuple[str, str, str]] = []  # (name, ws_id, variant)
     for name, labels, opts in ESTATE:
         ws_id = create_workspace(api, name, labels, opts, pool_id)
         if name == HERO:
             hero_id = ws_id
+        # The configure workspace needs an inventory before its Hosts and
+        # Inventory surfaces show anything at all.
+        if (opts.get("extra") or {}).get("config-directory") is not None:
+            seed_inventory(api, ws_id)
         if opts["run"]:
             to_run.append((name, ws_id, opts["run"]))
 
@@ -515,6 +843,11 @@ def main() -> int:
     for name, ws_id, variant in to_run:
         print(f"\n{name}:")
         seed_variables(api, ws_id)
+        # Only the hero: the notifications and run-tasks tabs are photographed
+        # on it, and putting a webhook on every workspace would make the estate
+        # read as more configured than a new deployment ever is.
+        if name == HERO:
+            seed_workspace_integrations(api, ws_id)
         upload_state(api, ws_id)
         cv_id = upload_config(api, ws_id, variant)
         rid = queue_run(api, ws_id, cv_id, MESSAGES.get(name, "Scheduled reconcile"))

@@ -269,6 +269,13 @@ jobs:
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+
+      # Needs PyYAML, installed above, like the artifact-dependency gate. A job
+      # that boots the eval stack delivers images by one route on a pull request
+      # and another on a push, so a job implementing only the first is green on
+      # every PR and red on main -- which is how `cli-contract` shipped.
+      - name: (docs-audit) An eval-booting job delivers images on both paths
+        run: python3 scripts/docs-audit/check_eval_image_delivery.py
       # The EE contract is asserted twice on purpose -- at build time and
       # against the pushed digest -- and dropping either half leaves the other
       # green. Stdlib only, so it needs nothing installed above.
@@ -351,6 +358,53 @@ jobs:
       - name: (docs-audit) Every local-action call passes its required inputs
         run: python3 scripts/docs-audit/check_local_action_inputs.py
 
+      # Colour contrast on the light theme (#2337). Nothing else in the repo
+      # looks at a colour -- not tsc, not ESLint, not the unit tests, not the
+      # e2e suite -- so a class written for the old dark ground can land on a
+      # light surface and lose its contrast in silence. Three real failures
+      # while the theme was being built were invisible to every other check:
+      # every status badge's FILL measured 1.006:1 against its card while its
+      # text read 5.57:1, `bg-red-600 text-white` sat at 3.20:1, and
+      # `hover:bg-amber-500 text-white` at 3.20:1 -- the last two hidden by the
+      # checker's own blind spots before they were closed. Reads the light
+      # values out of globals.css itself, so it cannot disagree with the
+      # stylesheet the app serves.
+      - name: (docs-audit) Light-theme colour contrast clears WCAG AA
+        run: python3 scripts/docs-audit/check_theme_contrast.py
+
+      # Every committed screenshot is the capture viewport, so the set is one
+      # shape. A run that framed to the content height instead shipped 31
+      # images at one width and heights from 640 to 1800, which renders as a
+      # pile of offcuts in a README and was caught only by a human looking at
+      # the page. The expected size is DERIVED from capture.mjs's own VIEWPORT
+      # and shot registrations, so there is no ledger to go stale and an image
+      # the script does not produce (the GitHub App walkthrough, the Slack
+      # icon) is correctly none of its business.
+      - name: (docs-audit) Screenshots are all the capture viewport
+        run: python3 scripts/docs-audit/check_screenshot_dimensions.py
+
+      # ci-pass is the only required status check, and it builds its verdict
+      # from a hand-written results=() array. A job in `needs` but absent
+      # from that array is waited for and then ignored -- it can fail while
+      # CI reports green, which is the worst shape a gate can take.
+      - name: (docs-audit) ci-pass judges every job it waits for
+        run: python3 scripts/docs-audit/check_ci_pass_wiring.py
+
+      # The CLI-surface catalogue is also the CLI-contract test list: a
+      # section added there is a promise, and this is where it gets a check
+      # or an explicit reason not to have one.
+      - name: (docs-audit) the CLI surface catalogue is covered
+        run: python3 scripts/docs-audit/check_cli_surface_covered.py
+
+      # An image we mirror, then pull from the registry we mirrored it away
+      # from, is the mirror paying its cost and buying nothing -- and a
+      # successful upstream pull is indistinguishable from a successful mirror
+      # pull, so nothing reports it. Two release lines fetched 0.91GB of
+      # Playwright from mcr.microsoft.com on every run for exactly that long
+      # (#2361).
+      - name: (docs-audit) mirrored images are pulled from the mirror
+        run: python3 scripts/docs-audit/check_mirror_consumption.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
@@ -365,7 +419,7 @@ jobs:
   # hence the slim install plus PYTHONPATH rather than a dependency-free script.
   # It gates a release through `quality-gate`: shipping a version whose artifact
   # does not exist is the failure this exists to prevent.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
       - run: pip install pytest
@@ -1242,7 +1296,7 @@ jobs:
           go-version-file: go-terrapod/go.mod
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -1293,7 +1347,7 @@ jobs:
           done
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           category: codeql-${{ matrix.language }}
 
@@ -2976,7 +3030,333 @@ jobs:
             -v "$PWD/scripts/migration_smoke.py:/app/scripts/migration_smoke.py:ro" \
             --entrypoint python tp-migrations:ci scripts/migration_smoke.py
 
+
+      # Every fenced Helm-values snippet in the docs is something an operator
+      # PASTES, so a key the schema refuses does not quietly no-op -- it fails
+      # `helm lint` AND `helm upgrade`, and the page breaks the install it is
+      # describing. `docs/pulumi.md` shipped exactly that for the whole 2.0
+      # development line, telling operators to set an `engines:` block that was
+      # withdrawn in #1986, while `docs/upgrading-to-2.0.md` told them to remove
+      # it. A cold read of the repo found it; no gate could, because they all
+      # read prose, counts or links.
+      #
+      # HERE rather than beside the prose gates because it needs `helm` on PATH:
+      # it runs the real lint instead of reimplementing 122
+      # `additionalProperties` clauses across ten `$defs`. ~14s for 161
+      # snippets. A block an upgrade guide prints in order to say "delete this"
+      # is expected to be REFUSED, and that expectation is inverted -- if it
+      # lints clean the key still exists and the upgrade note is wrong.
+      - name: (helm-lint) Every Helm snippet in the docs can actually be applied
+        run: python3 scripts/docs-audit/check_doc_helm_values.py
   # ── Dependency Audit (Python) ─────────────────────────
+
+  # ── The CLI contract (#2341) ────────────────────────────────────────────────
+  # Drives the REAL `tofu` binary against a booted stack.
+  #
+  # Nothing else in CI does. `docs/tfe-cli-surface.md` catalogues 69 endpoints
+  # and calls them a stable contract for terraform/tofu; the only automated
+  # coverage was `tests/api/test_route_contract.py`, which pins that a path
+  # exists and cannot see a route that is served perfectly and does the wrong
+  # thing. This repository has shipped that twice -- #1903 (`save-plan` read off
+  # the create body by nobody, so `tofu plan -out` silently made an ordinary
+  # run) and the state-upload capability URL, which answered 401 for months
+  # because its only caller was a script nobody ran.
+  #
+  # Its own job rather than a step inside Eval Boot, deliberately: that job asks
+  # "does the quickstart boot", this one asks "does the contract hold", and
+  # mixing them makes a red result ambiguous about which failed.
+  #
+  # On every PR, because the CLI is the one consumer that cannot be fixed
+  # forward -- a go-tfe baked into the binary on somebody's laptop does not take
+  # our next release.
+  #
+  # OPENTOFU ONLY. The terraform binary is BUSL-1.1 and Terrapod is a TFE
+  # replacement, so running it here to validate our own TFE-compatible surface
+  # touches the competitive-offering restriction. OpenTofu is MPL-2.0 and is the
+  # engine this project's prose puts first; Terraform compatibility stays
+  # asserted through the shared go-tfe both binaries embed.
+  cli-contract:
+    name: CLI Contract (tofu)
+    needs: [prepare, build-images-amd64]
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Pinned AND checksummed, like kind/k3d above: a version pin says which
+      # URL to fetch, not which bytes arrive.
+      - name: Install OpenTofu
+        run: |
+          set -euo pipefail
+          ver=1.13.1
+          sha=8ccbc6f8ee21d2827715f3c6e08a9b3e0209b1e62057c05067ef117e047c1a80
+          curl -fsSLo tofu.zip \
+            "https://github.com/opentofu/opentofu/releases/download/v${ver}/tofu_${ver}_linux_amd64.zip"
+          echo "${sha}  tofu.zip" | sha256sum -c - \
+            || { echo "tofu checksum mismatch -- bump the version and the checksum together"; exit 1; }
+          unzip -q tofu.zip tofu
+          sudo install -m 0755 tofu /usr/local/bin/tofu
+          tofu version
+
+      - name: Install k3d
+        run: |
+          set -euo pipefail
+          curl -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
+          echo "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0  ./k3d" | sha256sum -c - \
+            || { echo "k3d checksum mismatch -- bump the version and the checksum together"; exit 1; }
+          chmod +x ./k3d && sudo mv ./k3d /usr/local/bin/k3d
+
+      # The branch/tag half of the pattern, which this job shipped WITHOUT. The
+      # two PR steps below deliver images from the build's artifacts; on a push
+      # to main they are skipped, so `Boot the stack` had nothing to push into
+      # the eval registry and died on
+      #   No such image: .../terrapod-api:sha-<short>-amd64
+      # Green on the PR and red on main, because the PR is the half that was
+      # covered.
+      #
+      # Copied from `helm-eval-boot` verbatim rather than written again, which is
+      # the whole lesson of this job's short history: its image tag, `socat`, its
+      # credentials and now this were each taken from somewhere they were true,
+      # and three of the four were ONE HALF of a pattern whose other half was
+      # sitting in that job all along.
+      - name: Log in to GHCR (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Pull images (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        run: |
+          set -euo pipefail
+          sha="${{ needs.prepare.outputs.sha_short }}"
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            docker pull "$REGISTRY/$i:sha-${sha}-amd64"
+          done
+
+      - name: Download image artifacts (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: image-*-amd64
+          path: /tmp/images
+          merge-multiple: true
+
+      - name: Load images into docker (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: |
+          set -euo pipefail
+          pids=()
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            ( set -o pipefail; gunzip -c "/tmp/images/$i-amd64.tar.gz" | docker load ) &
+            pids+=("$!")
+          done
+          rc=0
+          for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
+          [ "$rc" -eq 0 ] || { echo "at least one image failed to load" >&2; exit 1; }
+
+      - name: Boot the stack
+        run: |
+          set -euo pipefail
+          sha="${{ needs.prepare.outputs.sha_short }}"
+          reg_port=5111
+          k3d registry create eval-registry.localhost --port "$reg_port" --image "${K3D_REGISTRY_IMAGE}"
+          k3d cluster create terrapod-cli \
+            --registry-use "k3d-eval-registry.localhost:${reg_port}" --wait --timeout 120s
+          pids=()
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            dst="localhost:${reg_port}/mattrobinsonsre/${i}:sha-${sha}-amd64"
+            docker tag "$REGISTRY/${i}:sha-${sha}-amd64" "$dst"
+            docker push "$dst" &
+            pids+=("$!")
+          done
+          rc=0
+          for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
+          [ "$rc" -eq 0 ] || { echo "an image failed to push to the eval registry" >&2; exit 1; }
+          # The same environment helm-eval-boot gives eval.sh, and every key
+          # here is one this job got wrong on its first run:
+          #
+          #   TERRAPOD_VERSION          eval.sh defaults to `latest`, which is
+          #                             not what was pushed above -- the
+          #                             migrations pod sat in ImagePullBackOff
+          #   EVAL_NO_PORT_FORWARD      eval.sh otherwise ends in
+          #                             `exec kubectl port-forward` and never
+          #                             returns; this job does its own below
+          #   TERRAPOD_EVAL_HELM_TIMEOUT  fail fast -- without it the install
+          #                             waited 580s before reporting a problem
+          #                             visible in the first 30
+          #   TERRAPOD_EVAL_TOOL        the runner ships a pre-installed kind,
+          #                             so auto-detection picks the wrong one
+          CI=1 \
+          EVAL_NO_PORT_FORWARD=1 \
+          TERRAPOD_EVAL_TOOL=k3d \
+          TERRAPOD_VERSION="sha-${sha}-amd64" \
+          TERRAPOD_EVAL_HELM_TIMEOUT=300s \
+          TERRAPOD_EVAL_CLUSTER=terrapod-cli \
+          TERRAPOD_EVAL_NAMESPACE=terrapod-cli \
+          TERRAPOD_EVAL_IMAGE_REGISTRY="k3d-eval-registry.localhost:${reg_port}" \
+            scripts/eval.sh up
+
+      # THE CLI FORCES HTTPS FOR SERVICE DISCOVERY. Measured against a plain
+      # port-forward, which is how Eval Boot reaches the stack:
+      #
+      #   Error: Failed to request discovery document:
+      #   Get "https://localhost:18080/.well-known/terraform.json":
+      #   http: server gave HTTP response to HTTPS client
+      #
+      # So this terminates TLS itself and installs the CA where the Go client
+      # looks. The chart and values-eval.yaml are untouched: that profile is
+      # gated, must stay batteries-included, and this job's TLS is its own
+      # concern rather than a property of the quickstart.
+      - name: Front the stack with TLS the CLI will trust
+        run: |
+          set -euo pipefail
+          host=terrapod.test
+          echo "127.0.0.1 $host" | sudo tee -a /etc/hosts >/dev/null
+          mkdir -p /tmp/tls && cd /tmp/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout ca.key -out ca.crt -subj "/CN=terrapod-cli-contract-ca" \
+            -addext "basicConstraints=critical,CA:TRUE" 2>/dev/null
+          openssl req -newkey rsa:2048 -nodes -keyout leaf.key -out leaf.csr \
+            -subj "/CN=$host" 2>/dev/null
+          printf 'subjectAltName=DNS:%s\nbasicConstraints=CA:FALSE\n' "$host" > leaf.ext
+          openssl x509 -req -in leaf.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+            -out leaf.crt -days 1 -extfile leaf.ext 2>/dev/null
+          cat leaf.crt leaf.key > leaf.pem
+          # Go reads the system store on Linux, so this is what makes tofu trust it.
+          sudo cp ca.crt /usr/local/share/ca-certificates/terrapod-cli-contract.crt
+          sudo update-ca-certificates >/dev/null
+          ctx=k3d-terrapod-cli
+          kubectl --context "$ctx" -n terrapod-cli wait --for=condition=available \
+            deploy/terrapod-web deploy/terrapod-api --timeout=180s
+          kubectl --context "$ctx" -n terrapod-cli port-forward svc/terrapod-web 18080:3000 \
+            >/tmp/tls/pf.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null "http://127.0.0.1:18080/login" && break || sleep 2
+          done
+          # A REVERSE PROXY, not a TCP tunnel, and the difference is load-bearing.
+          #
+          # This started as `socat OPENSSL-LISTEN:443 ... TCP:18080`, which
+          # terminates TLS and forwards bytes. Every state operation then hung:
+          # `tofu apply` for the full per-call timeout, and `state pull`/`state
+          # list` after it because the killed apply left the workspace locked.
+          #
+          # The cause is that the state content URL is generated BY THE SERVER,
+          # from `X-Forwarded-Proto`/`X-Forwarded-Host` (tfe_v2`_request_base`,
+          # so an internal-ingress deployment hands each caller a hostname it
+          # can actually reach). A TCP tunnel cannot set a header, so the BFF saw
+          # a plain-HTTP connection from 127.0.0.1 and reported `http` --
+          # `web/src/lib/bff-proxy.ts` preserves an incoming x-forwarded-proto
+          # and falls back to its own. The server therefore handed tofu
+          # `http://terrapod.test/...`, port 80, where nothing was listening.
+          # Measured against the real API with crafted headers: XFP=http gives
+          # `http://terrapod.test`, XFP=https gives `https://terrapod.test`. The
+          # product is right; the harness was lying to it.
+          #
+          # So terminate TLS the way a real deployment does -- Traefik or
+          # ingress-nginx in front of the BFF -- and say so in the headers. This
+          # deliberately does NOT listen on port 80: if the scheme is ever
+          # reported wrongly again, the run must fail loudly rather than quietly
+          # succeed over http and stop testing what it claims to.
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq nginx >/dev/null
+          cat > /tmp/tls/nginx.conf <<'NGINX'
+          error_log /tmp/tls/nginx-error.log warn;
+          pid       /tmp/tls/nginx.pid;
+          events {}
+          http {
+            access_log /tmp/tls/nginx-access.log;
+            server {
+              listen 443 ssl;
+              server_name terrapod.test;
+              ssl_certificate     /tmp/tls/leaf.crt;
+              ssl_certificate_key /tmp/tls/leaf.key;
+              # 0 = no limit. A state blob or a config tarball is tens of MB and
+              # nginx's 1m default would truncate it -- the same hazard the BFF
+              # documents for Next.js middleware.
+              client_max_body_size 0;
+              location / {
+                proxy_pass              http://127.0.0.1:18080;
+                proxy_http_version      1.1;
+                proxy_set_header        Host terrapod.test;
+                proxy_set_header        X-Forwarded-Host terrapod.test;
+                proxy_set_header        X-Forwarded-Proto https;
+                # Stream both ways, so this hop does not re-introduce the
+                # buffering the BFF exists to avoid.
+                proxy_buffering         off;
+                proxy_request_buffering off;
+                proxy_read_timeout      300s;
+              }
+            }
+          }
+          NGINX
+          # The apt package starts a DEFAULT instance on port 80, which would
+          # quietly falsify the paragraph above: a wrongly-reported scheme would
+          # then reach nginx's welcome page instead of nothing. Stop it, then
+          # ASSERT the result rather than trusting it.
+          # Best effort: if there is no unit to stop, the assertion below is
+          # what enforces the property, so this must not fail the step.
+          sudo systemctl disable --now nginx || echo "note: no systemd nginx unit to stop"
+          sudo nginx -t -c /tmp/tls/nginx.conf
+          sudo nginx -c /tmp/tls/nginx.conf
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://$host/login" || true)
+            [ "$code" = "200" ] && break || sleep 2
+          done
+          [ "$code" = "200" ] || { echo "FAIL: TLS front end did not serve /login (got $code)"; cat /tmp/tls/nginx-error.log 2>/dev/null; exit 1; }
+          # ASSERT the port-80 property rather than claiming it, and do it with
+          # curl rather than `ss`, both because it needs no extra command and
+          # because it tests the thing that actually matters: can anything be
+          # served over http. curl exits 7 when nothing is listening.
+          http_rc=0
+          curl -s -o /dev/null --max-time 5 "http://$host/" || http_rc=$?
+          [ "$http_rc" -ne 0 ] || {
+            echo "FAIL: something served http://$host/. This job depends on nothing"
+            echo "      being on port 80, so that a server-generated http:// URL -- the"
+            echo "      defect this step's proxy exists to prevent -- fails loudly"
+            echo "      instead of being quietly served over the wrong scheme."
+            exit 1; }
+          echo "port 80 is closed (curl exit $http_rc), so a wrong scheme cannot pass silently"
+          # The real check: the CLI's own discovery, over TLS it verifies.
+          curl -fsS "https://$host/.well-known/terraform.json" >/dev/null
+          echo "TLS front end serving $host, CA trusted by the system store"
+
+      - name: Drive the CLI
+        run: |
+          set -euo pipefail
+          # DERIVED from eval.sh, not written here. eval.sh `--set`s the bootstrap
+          # credentials from these two assignments, so it is authoritative over
+          # values-eval.yaml -- and a third copy in this job is a third thing to
+          # drift. The first version of this step passed `admin/admin`, which is
+          # the TILT profile's password carried over from where the suite was
+          # tested, and the mint failed 401 with the stack perfectly healthy.
+          email=$(grep -m1 '^ADMIN_EMAIL=' scripts/eval.sh | cut -d'"' -f2)
+          pw=$(grep -m1 '^ADMIN_PASSWORD=' scripts/eval.sh | cut -d'"' -f2)
+          # An empty read here would mint with no credential and report as a
+          # confusing 401 rather than as "the grep stopped matching".
+          [ -n "$email" ] && [ -n "$pw" ] || {
+            echo "FAIL: could not read the bootstrap credentials out of scripts/eval.sh"
+            grep -nE '^ADMIN_(EMAIL|PASSWORD)=' scripts/eval.sh || true
+            exit 1
+          }
+          python3 scripts/cli-contract/run.py --host terrapod.test \
+            --email "$email" --password "$pw"
+
+      - name: Diagnostics on failure
+        if: failure() || cancelled()
+        run: |
+          ctx=k3d-terrapod-cli
+          kubectl --context "$ctx" -n terrapod-cli get pods -o wide || true
+          kubectl --context "$ctx" -n terrapod-cli logs -l app.kubernetes.io/component=api --tail=120 || true
+          echo "--- nginx error"; cat /tmp/tls/nginx-error.log 2>/dev/null || true
+          echo "--- nginx access"; tail -40 /tmp/tls/nginx-access.log 2>/dev/null || true
+          echo "--- port-forward"; cat /tmp/tls/pf.log 2>/dev/null || true
+
+      - name: Teardown
+        if: always()
+        run: k3d cluster delete terrapod-cli || true
 
   helm-eval-boot:
     name: Eval Boot (${{ matrix.tool }})
@@ -3339,7 +3719,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
@@ -4273,7 +4653,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (amd64)
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-amd64.sarif
           category: trivy-${{ matrix.image }}-amd64
@@ -4329,7 +4709,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (arm64)
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-arm64.sarif
           category: trivy-${{ matrix.image }}-arm64
@@ -5601,6 +5981,7 @@ jobs:
       - dependency-review
       - host-checks
       - helm-eval-boot
+      - cli-contract
       - sast
       - build-images-amd64
       - build-images-arm64
@@ -5650,6 +6031,7 @@ jobs:
             "${{ needs.dependency-review.result }}"
             "${{ needs.host-checks.result }}"
             "${{ needs.helm-eval-boot.result }}"
+            "${{ needs.cli-contract.result }}"
             "${{ needs.sast.result }}"
             "${{ needs.build-images-amd64.result }}"
             "${{ needs.build-images-arm64.result }}"

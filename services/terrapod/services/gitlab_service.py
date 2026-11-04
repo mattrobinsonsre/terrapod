@@ -16,6 +16,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services import vcs_rate_limit
 from terrapod.services.vcs_provider import (
     MergeabilityStatus,
+    OpenPullRequests,
     PRComment,
     PRMergeResult,
     PRReview,
@@ -356,9 +357,81 @@ async def list_open_prs(
             head_ref=mr["source_branch"],
             title=mr["title"],
             from_fork=_is_fork(mr),
+            base_ref=mr["target_branch"],
         )
         for mr in resp.json()
     ]
+
+
+# 100 per page, so the walk is capped at 2,000 open MRs — see the GitHub
+# sibling for why the cap reports incompleteness rather than raising.
+_OPEN_MR_PAGE_CAP = 20
+
+
+async def list_open_merge_requests_for_repo(
+    conn: VCSConnection, owner: str, repo: str
+) -> OpenPullRequests:
+    """Every open MR on the project, whatever branch it targets.
+
+    The repo-wide counterpart of `list_open_prs` (#2349). Paginated, because a
+    truncated list reaching the PR-session reconciler closes live sessions;
+    `complete` is what lets the caller decline to conclude anything from an
+    absence.
+
+    Ordered by `created_at` ASCENDING, following the `Link: rel="next"` the
+    server returns — which an instance that ignores the keyset request also
+    returns for offset pagination, so either way the walk is the same. That is
+    the same shape `list_group_projects` uses, with one difference that is not
+    cosmetic:
+
+    **`order_by=id` is what that sibling passes and it is INVALID here.**
+    Measured against gitlab.com: the merge-requests endpoint answers
+    `400 {"error": "order_by does not have a valid value"}`, where the projects
+    endpoint accepts it. Shipped that way this function would have failed on
+    every GitLab deployment, and the mocked tests could not see it because they
+    mock the request — the recorded rule about driving the tool rather than
+    describing its arguments.
+
+    `created_at` is also the ordering this needs rather than merely one that is
+    accepted. It is immutable, so an item cannot move between pages while the
+    walk is in progress; `updated_at` can, and a missed item on an otherwise
+    complete walk reads as a closed pull request, which is the whole defect.
+    Ascending for the same reason: a merge request opened mid-walk appends to
+    the end and shifts nothing, and it has no session to close yet.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    url: str | None = f"{api}/projects/{project}/merge_requests"
+    params: dict | None = {
+        "state": "opened",
+        "order_by": "created_at",
+        "sort": "asc",
+        "pagination": "keyset",
+        "per_page": 100,
+    }
+
+    prs: list[PullRequest] = []
+    for _ in range(_OPEN_MR_PAGE_CAP):
+        resp = await _gitlab_request("GET", url, conn, params=params)
+        resp.raise_for_status()
+        for mr in resp.json() or []:
+            prs.append(
+                PullRequest(
+                    number=mr["iid"],
+                    head_sha=mr["sha"],
+                    head_ref=mr["source_branch"],
+                    title=mr["title"],
+                    from_fork=_is_fork(mr),
+                    base_ref=mr["target_branch"],
+                )
+            )
+        url = (resp.links.get("next") or {}).get("url")
+        if not url:
+            return OpenPullRequests(prs, complete=True)
+        # The next link carries every query parameter itself.
+        params = None
+
+    return OpenPullRequests(prs, complete=False)
 
 
 async def list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
@@ -631,8 +704,16 @@ async def add_comment_reaction(
 ) -> int:
     """Award an emoji to an MR note. Returns the award ID, for later removal.
 
-    GitLab names its emoji without colons (`eyes`, `thumbsup`), the same
-    spelling GitHub's reactions API uses, so callers pass one name for both.
+    GitLab names its emoji without colons (`eyes`, `thumbsup`), and Terrapod's
+    provider-neutral vocabulary is this spelling, so the name arrives here
+    ready to use and nothing is translated.
+
+    This docstring used to add "the same spelling GitHub's reactions API uses,
+    so callers pass one name for both". That was false, and being a stated
+    reason rather than a bare value it read as considered: GitHub's API takes a
+    closed set that spells the thumbs `+1`/`-1`, so every 👍 and 👎 Terrapod
+    tried to leave on a GitHub comment was rejected for several releases
+    (#2350). GitHub's side translates; see `github_reaction_content`.
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
@@ -718,6 +799,7 @@ async def get_pull_request(
         author_login=(mr.get("author") or {}).get("username", ""),
         state=mr_state,
         merged=mr_state == "merged" or bool(mr.get("merged_at")),
+        base_ref=mr.get("target_branch") or "",
     )
 
 

@@ -266,7 +266,7 @@ export default function AuditLogPage() {
                             {new Date(a.timestamp).toLocaleString()}
                           </td>
                           <td className="px-4 py-2.5 text-sm text-slate-300">
-                            {a['actor-email'] || <span className="text-slate-600">-</span>}
+                            {a['actor-email'] || <span className="text-slate-500">-</span>}
                           </td>
                           <td className="px-4 py-2.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-slate-700/50 text-slate-300">
@@ -307,14 +307,14 @@ export default function AuditLogPage() {
                   <button
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page <= 1}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-200 transition-colors"
                   >
                     {t('pagination.previous')}
                   </button>
                   <button
                     onClick={() => setPage(page + 1)}
                     disabled={page >= pagination['total-pages']}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-200 transition-colors"
                   >
                     {t('pagination.next')}
                   </button>

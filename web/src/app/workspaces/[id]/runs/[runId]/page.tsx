@@ -280,7 +280,9 @@ function RunActivityHeader({
   const word = (name: string) => engineWord(tPhase, engine, name)
   // A run held after its plan is waiting for a person, not doing anything: no
   // pulse, no ticking timer (#1725).
-  const live = !gate && ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
+  const live =
+    !gate &&
+    ['pending', 'queued', 'planning', 'confirmed', 'applying', 'configuring', 'canceling'].includes(status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!live) return
@@ -300,13 +302,20 @@ function RunActivityHeader({
         : planOnly
           ? word('activityPlannedSpeculative')
           : word('activityPlannedComplete'),
-      dot: 'bg-blue-400',
-      card: isConfirmable ? 'border-blue-800/40 bg-blue-900/10' : 'border-slate-700/50 bg-slate-800/40',
+      dot: 'bg-indigo-400',
+      card: isConfirmable ? 'border-indigo-800/40 bg-indigo-900/10' : 'border-slate-700/50 bg-slate-800/40',
       sinceKey: 'planned-at',
     },
-    confirmed: { label: t('status.confirmed'), activity: word('activityConfirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
+    confirmed: { label: t('status.confirmed'), activity: word('activityConfirmed'), dot: 'bg-indigo-400', card: 'border-indigo-800/40 bg-indigo-900/10', sinceKey: 'confirmed-at' },
     applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
+    // Plain `t()` rather than `phase()`: planning and applying take the
+    // engine's word because Terraform and Pulumi name them differently, but a
+    // configure is always Ansible, so there is no per-engine wording to pick.
+    // Active yellow and `configuring-at`, matching `applying` -- without the
+    // entry this status fell through to the raw string and a grey dot, so a
+    // running configure read as inert and finished.
+    configuring: { label: t('status.configuring'), activity: t('activity.configuring'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'configuring-at' },
     applied:
       hasChanges === false
         ? {
@@ -380,7 +389,7 @@ const CARD_TONE: Record<CardTone, string> = {
   good: 'text-green-300',
   warn: 'text-amber-300',
   bad: 'text-red-300',
-  active: 'text-blue-300',
+  active: 'text-indigo-300',
 }
 
 // One at-a-glance summary card on Overview. When `onClick` is set the whole
@@ -403,7 +412,7 @@ function SummaryCard({
     <>
       <div className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
         <span>{label}</span>
-        {onClick && <span className="text-slate-600" aria-hidden="true">›</span>}
+        {onClick && <span className="text-slate-500" aria-hidden="true">›</span>}
       </div>
       <div className={`text-sm font-semibold ${CARD_TONE[tone]}`}>{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-0.5">{sub}</div>}
@@ -1093,7 +1102,7 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {indexedLines.map((line, i) => (
               <div
@@ -1110,14 +1119,14 @@ function LogPanel({
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
         ) : (
           <pre
             ref={setPre}
             data-testid={`log-pre-${phase}`}
-            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
+            className="log-term rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words fine:max-h-[var(--log-avail)] fine:overflow-y-auto"
           >
             {plainContent}
           </pre>
@@ -1433,7 +1442,19 @@ function RunDetailPageInner() {
     if (event.event === 'log_updated' && event.run_id === bareId) {
       if (event.phase === 'plan') loadPlanLog()
       else if (event.phase === 'apply') loadApplyLog()
-      else if (event.phase === 'configure') loadConfigureLog()
+      else if (event.phase === 'configure') {
+        loadConfigureLog()
+        // `last-output-at` is on the run document, recomputed per read from the
+        // progress marker in Redis (`runs.py`'s `last_output_at`), so the log
+        // refresh alone left it frozen at whatever it said on mount -- and
+        // because the relative time re-renders, it then counted UPWARD while
+        // output was actively arriving. The listener answers the reconciler's
+        // `stream_logs` every cycle whether or not ansible produced anything,
+        // so this fires about every ten seconds for the life of a configure,
+        // which is the cadence the indicator needs. Nothing extra is published
+        // server-side for the same reason.
+        loadRun()
+      }
     }
     // Any of the summary-lifecycle events should trigger a refetch
     // (pending, ready, errored, skipped, message_posted). The
@@ -1696,8 +1717,13 @@ function RunDetailPageInner() {
   function statusColor(status: string): string {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
-      case 'planned': case 'confirmed': return 'bg-blue-900/50 text-blue-300'
-      case 'planning': case 'applying': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
+      case 'planned': case 'confirmed': return 'bg-indigo-900/50 text-indigo-300'
+      // `configuring` belongs here and was missed when the live-configure work
+      // landed: without it a RUNNING configure falls to `default`, which is the
+      // same grey as `canceled` and `discarded`, so the chip reads as finished
+      // while the activity card above it correctly pulses. Two views of one run
+      // disagreeing, on the page that shows both.
+      case 'planning': case 'applying': case 'configuring': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
       case 'pending': return 'bg-slate-700 text-slate-300'
@@ -1825,7 +1851,7 @@ function RunDetailPageInner() {
         { k: 'change', sym: '~', n: ps.change, cls: 'text-amber-400', word: t('changes.toChange') },
         { k: 'destroy', sym: '−', n: ps.destroy, cls: 'text-red-400', word: t('changes.toDestroy') },
         { k: 'replace', sym: '±', n: ps.replace, cls: 'text-orange-400', word: t('changes.toReplace') },
-        { k: 'import', sym: '↓', n: ps.import, cls: 'text-blue-400', word: t('changes.toImport') },
+        { k: 'import', sym: '↓', n: ps.import, cls: 'text-indigo-400', word: t('changes.toImport') },
       ].filter((s) => s.n > 0)
       if (segs.length === 0) return { value: t('changes.noChanges'), tone: 'neutral' }
       return {
@@ -2539,6 +2565,7 @@ function RunDetailPageInner() {
               ['confirmed-at', t('timeline.confirmed')],
               ['applying-at', word('timelineApplyingStarted')],
               ['applied-at', word('timelineApplied')],
+              ['configuring-at', t('timeline.configuring')],
               ['errored-at', t('timeline.errored')],
               ['canceled-at', t('timeline.canceled')],
               ['discarded-at', t('timeline.discarded')],
@@ -2758,7 +2785,7 @@ function PolicyPanel({
             <button
               onClick={override}
               disabled={overriding}
-              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 transition-colors"
+              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
             >
               {overriding ? t('policyPanel.overriding') : t('policyPanel.overrideContinue')}
             </button>

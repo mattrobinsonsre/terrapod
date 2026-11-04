@@ -165,7 +165,8 @@
     "canceled": "Annullato",
     "discarded": "Scartato",
     "pendingDeletion": "Eliminazione in attesa",
-    "archived": "Archiviato"
+    "archived": "Archiviato",
+    "configuring": "Configurazione"
   },
   "auth": {
     "loading": "Caricamento...",
@@ -2120,7 +2121,8 @@
       "errored": "In errore",
       "canceled": "Annullato",
       "discarded": "Scartato",
-      "awaitingDecision": "In attesa di decisione"
+      "awaitingDecision": "In attesa di decisione",
+      "configuring": "Configurazione"
     },
     "activity": {
       "pending": "Preparazione dell''esecuzione",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "Un set di criteri obbligatorio non è riuscito: sovrascrivilo o scarta l'esecuzione",
       "heldBySecurityScan": "L'analisi di sicurezza ha trovato risultati bloccanti: sovrascrivila o scarta l'esecuzione",
       "heldByAiPolicy": "Il gate della policy IA ha negato questa esecuzione: sovrascrivilo o scarta l''esecuzione",
-      "awaitingAiPolicy": "In attesa del verdetto della policy IA"
+      "awaitingAiPolicy": "In attesa del verdetto della policy IA",
+      "configuring": "Esecuzione dei playbook sull’inventario"
     },
     "badge": {
       "destroy": "distruggi",
@@ -2266,7 +2269,8 @@
       "confirmed": "Confermato",
       "errored": "In errore",
       "canceled": "Annullato",
-      "discarded": "Scartato"
+      "discarded": "Scartato",
+      "configuring": "Configurazione avviata"
     },
     "log": {
       "color": "Colore",

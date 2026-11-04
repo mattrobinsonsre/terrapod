@@ -197,7 +197,7 @@ export default function VariableSetsPage() {
                         {/* Below md the SCOPE column is hidden — reflow the Global/Priority badges
                             inline so a phone still sees a varset's reach/precedence (#719). */}
                         {vs.attributes.global && (
-                          <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">{t('scope.global')}</span>
+                          <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/50 text-indigo-300">{t('scope.global')}</span>
                         )}
                         {vs.attributes.priority && (
                           <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('scope.priority')}</span>
@@ -210,7 +210,7 @@ export default function VariableSetsPage() {
                     <td className="px-4 py-3 hidden md:table-cell">
                       <div className="flex gap-1">
                         {vs.attributes.global && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">{t('scope.global')}</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/50 text-indigo-300">{t('scope.global')}</span>
                         )}
                         {vs.attributes.priority && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('scope.priority')}</span>

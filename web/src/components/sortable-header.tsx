@@ -34,7 +34,7 @@ export function SortableHeader<K extends string>({
     >
       <span className="inline-flex items-center gap-1">
         {label}
-        <Icon className={`w-3 h-3 ${isActive ? 'text-brand-400' : 'text-slate-600'}`} />
+        <Icon className={`w-3 h-3 ${isActive ? 'text-brand-400' : 'text-slate-500'}`} />
       </span>
     </th>
   )

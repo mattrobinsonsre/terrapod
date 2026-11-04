@@ -165,7 +165,8 @@
     "canceled": "キャンセル済み",
     "discarded": "破棄済み",
     "pendingDeletion": "削除保留中",
-    "archived": "アーカイブ済み"
+    "archived": "アーカイブ済み",
+    "configuring": "構成中"
   },
   "auth": {
     "loading": "読み込み中...",
@@ -2120,7 +2121,8 @@
       "errored": "エラー",
       "canceled": "キャンセル済み",
       "discarded": "破棄済み",
-      "awaitingDecision": "判断待ち"
+      "awaitingDecision": "判断待ち",
+      "configuring": "構成中"
     },
     "activity": {
       "pending": "実行を準備中",
@@ -2142,7 +2144,8 @@
       "heldByPolicy": "必須のポリシーセットが失敗しました — オーバーライドするか実行を破棄してください",
       "heldBySecurityScan": "セキュリティスキャンでブロック検出がありました — オーバーライドするか実行を破棄してください",
       "heldByAiPolicy": "AI ポリシーゲートがこの実行を拒否しました — オーバーライドするか実行を破棄してください",
-      "awaitingAiPolicy": "AI ポリシーの判定を待っています"
+      "awaitingAiPolicy": "AI ポリシーの判定を待っています",
+      "configuring": "インベントリに対して Playbook を実行中"
     },
     "badge": {
       "destroy": "破棄",
@@ -2266,7 +2269,8 @@
       "confirmed": "確認済み",
       "errored": "エラー",
       "canceled": "キャンセル済み",
-      "discarded": "破棄済み"
+      "discarded": "破棄済み",
+      "configuring": "構成開始"
     },
     "log": {
       "color": "カラー",

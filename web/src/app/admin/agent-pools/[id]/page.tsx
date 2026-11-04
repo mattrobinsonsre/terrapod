@@ -432,7 +432,7 @@ export default function AgentPoolDetailPage() {
                   <dd className="mt-1">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       poolPerm === 'admin' ? 'bg-purple-900/50 text-purple-300' :
-                      poolPerm === 'write' ? 'bg-blue-900/50 text-blue-300' :
+                      poolPerm === 'write' ? 'bg-indigo-900/50 text-indigo-300' :
                       'bg-slate-700/50 text-slate-300'
                     }`}>{t(`settings.permissions.${poolPerm}`)}</span>
                   </dd>
@@ -459,7 +459,7 @@ export default function AgentPoolDetailPage() {
                   </div>
                   {!showDeleteConfirm ? (
                     <button onClick={() => setShowDeleteConfirm(true)}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors">
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">
                       {t('actions.delete')}
                     </button>
                   ) : (

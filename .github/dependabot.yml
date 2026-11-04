@@ -75,6 +75,48 @@ updates:
       # still arrive.
       - dependency-name: python-hcl2
         versions: [">=8"]
+      # litellm from 1.104.0 up declares `filelock<4.0` -- a precautionary major
+      # cap it added a fortnight after filelock cut 4.0.0, not a response to
+      # anything broken. Taking it drags filelock from 4.2.4 down to 3.x and
+      # reintroduces six CVEs fixed only in 4.2.1: CVE-2026-112908,
+      # CVE-2026-112911, CVE-2026-112912, CVE-2026-112915, CVE-2026-112935 and
+      # CVE-2026-112939. pyproject caps litellm `<1.104` for that reason, and
+      # dependabot's proposal was to WIDEN that cap to `<1.107` (#2329, closed
+      # unmerged) -- the same shape as the starlette hold above: not "take
+      # 1.106", but "allow anything below 1.107", i.e. exactly the drift the cap
+      # exists to prevent.
+      #
+      # As with starlette, test_dependency_pins.py only asserts that SOME upper
+      # bound exists, so the widened cap passed CI. Python Audit caught it, by
+      # way of the CVEs rather than the cap -- hence holding it here as well as
+      # in pyproject.
+      #
+      # Version-scoped rather than blanket so 1.103.x patches -- security fixes
+      # inside our supported range -- still come through.
+      #
+      # EXIT: litellm relaxes `filelock<4.0`. Checkable in one call:
+      #
+      #   curl -s https://pypi.org/pypi/litellm/json \
+      #     | jq -r '.info.requires_dist[]' | grep '^filelock'
+      - dependency-name: litellm
+        versions: [">=1.104"]
+      # python-dateutil 3.x cannot be installed into any Terrapod image, because
+      # botocore declares `python-dateutil<3.0.0,>=2.1` and botocore is how the
+      # storage backends speak to S3. pip refuses outright, so the major fails
+      # four checks rather than one: Python Audit cannot build the environment
+      # (ResolutionImpossible against requirements-migrations.txt) and both
+      # `Build terrapod-migrations` legs fail the same way under
+      # --require-hashes (#2330, closed unmerged).
+      #
+      # Nothing in this repository can unblock it -- the exit is upstream.
+      # Version-scoped so 2.x patches still arrive.
+      #
+      # EXIT: botocore allows dateutil 3.x. Checkable in one call:
+      #
+      #   curl -s https://pypi.org/pypi/botocore/json \
+      #     | jq -r '.info.requires_dist[]' | grep '^python-dateutil'
+      - dependency-name: python-dateutil
+        versions: [">=3"]
 
   - package-ecosystem: npm
     directory: /web

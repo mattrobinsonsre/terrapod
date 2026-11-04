@@ -3184,8 +3184,8 @@ DELETE /api/v1/agent-pools/{id}
 ### Pool Tokens
 
 ```
-POST /api/v1/agent-pools/{id}/authentication-tokens
-GET  /api/v1/agent-pools/{id}/authentication-tokens
+POST /api/v1/agent-pools/{id}/tokens
+GET  /api/v1/agent-pools/{id}/tokens
 ```
 
 ### Listener Join
@@ -5986,7 +5986,7 @@ POST /api/v1/catalog-instances/{wsId}/confirm
 POST /api/v1/catalog-instances/{wsId}/discard
 ```
 
-Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/tfe/v2/runs/{id}/actions/confirm` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
+Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/tfe/v2/runs/{id}/actions/apply` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
 
 ### Orphan Catalog Instance (discouraged)
 

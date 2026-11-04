@@ -494,7 +494,7 @@ Incoming request
 2. Return 401 Unauthorized
 ```
 
-Runner tokens are checked first because verification is purely computational (HMAC comparison) with no database or Redis calls, making it the fastest path for the high-volume runner traffic.
+Runner tokens are checked first because the HMAC comparison is purely computational and rejects a forged token before any lookup. A token that verifies is then checked for revocation — a Redis marker, falling back to one indexed read of the run's status on a miss (GHSA-xmrf-hxq9-m59m) — so a valid runner token costs one cached lookup rather than none. The diagram above shows that step.
 
 ---
 
@@ -542,6 +542,7 @@ The `VCSProvider` protocol (`services/terrapod/services/vcs_provider.py`) define
 | Get default branch | GitHub API | GitLab API |
 | Download archive | GitHub API (tarball) | GitLab API (tarball) |
 | List open PRs/MRs | GitHub API (pulls) | GitLab API (merge requests) |
+| List open PRs/MRs across the repository | GitHub API (pulls, paginated) | GitLab API (merge requests, paginated) |
 | Parse repo URL | github.com/org/repo | gitlab.com/group/project |
 
 For detailed setup instructions, see [vcs-integration.md](vcs-integration.md).

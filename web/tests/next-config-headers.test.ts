@@ -50,6 +50,51 @@ test('the CSP carries the no-compatibility-cost directives', async () => {
   assert.equal(directives.get('form-action'), "'self'")
 })
 
+// The regression this file did not catch, and the reason it could not.
+//
+// /api-docs frames the API's own ReDoc and Swagger UI. `frame-src 'self'`
+// above grants the PARENT the right to embed; it says nothing about whether
+// the FRAMED document consents, and the catch-all's `frame-ancestors 'none'`
+// plus `X-Frame-Options: DENY` refused that consent for every path -- those
+// two included, since they are served through this same BFF. The page was
+// blank from #1767 (2026-09-22) until 2026-11-02.
+//
+// Asserting the catch-all in isolation is what let it through: every
+// assertion above was true, and the page was broken. So this asserts the
+// RELATIONSHIP -- that the documents the console frames are allowed to be
+// framed by it, while everything else is not.
+test('the framed documentation endpoints consent to same-origin framing', async () => {
+  const entries = await nextConfig.headers()
+  const framed = ['/api/docs', '/api/redoc']
+
+  for (const source of framed) {
+    const rule = entries.find((e: { source: string }) => e.source === source)
+    assert.ok(rule, `${source} has no header rule, so the catch-all's DENY applies and the page is blank`)
+    const byKey = new Map(
+      rule.headers.map((h: { key: string; value: string }) => [h.key, h.value]),
+    )
+    assert.equal(byKey.get('X-Frame-Options'), 'SAMEORIGIN', `${source} must consent to same-origin framing`)
+    const csp = String(byKey.get('Content-Security-Policy'))
+    assert.match(csp, /frame-ancestors 'self'/, `${source} must allow a same-origin ancestor`)
+    assert.doesNotMatch(csp, /frame-ancestors 'none'/)
+    // Everything the catch-all forbids and the console does not do stays
+    // forbidden here too -- this is an exception about framing, nothing else.
+    for (const d of ["object-src 'none'", "base-uri 'self'", "form-action 'self'"]) {
+      assert.ok(csp.includes(d), `${source} dropped ${d}`)
+    }
+  }
+
+  // And the exception is exactly those two: anything else framed by the
+  // console would be a new decision, not an oversight.
+  const sameOrigin = entries
+    .filter((e: { headers: { key: string; value: string }[] }) =>
+      e.headers.some((h) => h.key === 'X-Frame-Options' && h.value === 'SAMEORIGIN'),
+    )
+    .map((e: { source: string }) => e.source)
+    .sort()
+  assert.deepEqual(sameOrigin, framed.slice().sort())
+})
+
 // frame-src is 'self', NOT 'none': /api-docs frames the API's own ReDoc and
 // Swagger UI at /api/redoc and /api/docs, both same-origin through the BFF.
 // 'none' would leave that page showing an empty frame, with nothing failing in

@@ -309,7 +309,7 @@ export default function ModulesPage() {
             {mod.attributes.status}
           </span>
           {mod.attributes.source === 'vcs' && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/50 text-indigo-300">
               VCS
             </span>
           )}

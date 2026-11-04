@@ -289,7 +289,7 @@ export default function PolicySetsPage() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {ps.attributes['global-scope'] ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">{t('badges.global')}</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-900/50 text-indigo-300">{t('badges.global')}</span>
                       ) : (
                         <span className="text-xs text-slate-500">{t('badges.labelScoped')}</span>
                       )}
