@@ -30,6 +30,10 @@ class TestCatalogInstance:
             catalog_item_id=item,
             catalog_version_pin="1.0.0",
             catalog_update_block=None,
+            # A SimpleNamespace raises AttributeError rather than leaking a
+            # mock, so these are required rather than merely tidy (#2372).
+            execution_backend="tofu",
+            engine_version="1.12.4",
             # The pool set is a relationship (#1087), not a column.
             agent_pool_links=(
                 [SimpleNamespace(agent_pool_id=pool, ordinal=0, agent_pool=None)] if pool else []

@@ -224,6 +224,15 @@ def _instance_json(ws: Workspace) -> dict:
                 f"apool-{_ws_pools[0]}" if (_ws_pools := pool_set.workspace_pool_ids(ws)) else None
             ),
             "owner-email": ws.owner_email or "",
+            # The engine this instance runs, echoed because provision and
+            # reconfigure ACCEPT both and nothing read them back (#2372). A
+            # consumer that can set a value and never see it cannot detect
+            # drift: the Terraform provider in particular writes the server's
+            # response into state, so without these it could model the inputs
+            # only as write-only and an out-of-band reconfigure onto another
+            # engine would stay invisible to a plan.
+            "execution-backend": ws.execution_backend,
+            "engine-version": ws.engine_version,
             "labels": dict(ws.labels or {}),
         },
         # JSON:API house style (#1063): links belong in `relationships`. The

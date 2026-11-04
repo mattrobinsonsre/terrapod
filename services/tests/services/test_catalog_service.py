@@ -1113,6 +1113,10 @@ class TestVersionedReconfigure:
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
         ws.catalog_version_pin = None
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.execution_backend = "tofu"
         ws.engine_version = "1.12"
         mv = SimpleNamespace(

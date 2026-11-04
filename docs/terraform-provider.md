@@ -42,7 +42,13 @@ that assumes one engine),
 `terrapod_vcs_connection`, `terrapod_catalog_instances`
 (each entry, and the `terrapod_catalog_instance` resource, exposes computed
 `update_block_version` / `update_block_reason` when a floating self-contained
-publish cannot safely queue a run),
+publish cannot safely queue a run; the resource also takes
+`execution_backend` and `engine_version`, which a catalog item constrained to
+one engine may require, because its range is validated against the
+deployment's defaults as well as against a value you name — note the server
+resolves a partial version to an exact offered binary, so the resource keeps
+what you configured and reports the resolved one only when you configure
+nothing, which means drift of a configured version is not detected),
 `terrapod_catalog_item_interface` (the inputs and outputs of the module version
 a catalog item resolves to, with a computed `interface_error` that is non-null
 when the module could not be parsed), `terrapod_module_autodiscovery_rule_repositories`

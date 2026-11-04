@@ -357,6 +357,10 @@ class TestSelfContainedModulePR:
         root = _non_vcs_workspace()
         root.catalog_item_id = uuid.uuid4()
         root.catalog_version_pin = pin
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        root.execution_backend = "tofu"
+        root.engine_version = "1.12.4"
         root.catalog_update_block = {"version": "2.0.0", "reason": "inputs"}
         root.allow_fork_pr_plans = root_allowed
         root.name = "root-consumer"
@@ -1217,6 +1221,10 @@ class TestSelfContainedPublish:
         ws = _non_vcs_workspace()
         ws.catalog_item_id = uuid.uuid4()
         ws.catalog_version_pin = pin
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.catalog_update_block = {"version": "1.9.0", "reason": previous_block_reason}
         module = MagicMock(id=uuid.uuid4(), name="root", provider="aws")
         item = MagicMock(

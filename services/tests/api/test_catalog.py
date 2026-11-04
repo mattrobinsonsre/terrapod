@@ -875,6 +875,10 @@ class TestProvision:
         ws.name = "smoke"
         ws.catalog_item_id = uuid.uuid4()
         ws.catalog_version_pin = None
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.catalog_update_block = None
         ws.agent_pool_links = [SimpleNamespace(agent_pool_id=pool_uuid, ordinal=0, agent_pool=None)]
         ws.owner_email = "u@test.com"
@@ -1035,6 +1039,10 @@ def _catalog_ws(catalog_item_id=None):
     ws.id = uuid.uuid4()
     ws.catalog_item_id = catalog_item_id or uuid.uuid4()
     ws.catalog_version_pin = None
+    # Set explicitly: an unset attribute on a MagicMock reaches
+    # json.dumps as a MagicMock and raises (#2372).
+    ws.execution_backend = "tofu"
+    ws.engine_version = "1.12.4"
     ws.catalog_update_block = None
     return ws
 
@@ -1257,6 +1265,10 @@ class TestInstanceLifecycle:
         ws.name, ws.owner_email, ws.labels, ws.agent_pool_links = "instance", "", {}, []
         ws.created_at = datetime(2026, 1, 2, tzinfo=UTC)
         ws.catalog_version_pin = None if case == "floating" else "1.0.0"
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.catalog_input_values = {
             "safe": "public",
             "secret": "private",
@@ -1659,6 +1671,10 @@ class TestInstanceLifecycle:
         app, db = _make_app(_user(roles=["everyone"]))
         ws = _catalog_ws()
         ws.catalog_version_pin = None
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.catalog_input_values = {"kept": "saved", "removed": "old"}
         item = MagicMock(name="vpc", labels={}, owner_email="")
         db.get = AsyncMock(side_effect=[ws, item])
@@ -2262,6 +2278,10 @@ class TestProvisionConsultsTheSelfJoinGuard:
         ws.name = "smoke"
         ws.catalog_item_id = uuid.uuid4()
         ws.catalog_version_pin = None
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         ws.catalog_update_block = None
         ws.agent_pool_links = [SimpleNamespace(agent_pool_id=pool_uuid, ordinal=0, agent_pool=None)]
         ws.owner_email = "u@test.com"
