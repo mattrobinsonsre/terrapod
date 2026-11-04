@@ -203,16 +203,32 @@ When a task fires, Terrapod sends an HTTP POST to the configured URL:
   "stage": "pre_apply",
   "access_token": "result-id:timestamp:signature",
   "task_result_callback_url": "https://terrapod.local/api/v1/task-stage-results/tsr-id/callback",
+  "run_app_url": "https://terrapod.local/workspaces/ws-uuid/runs/run-uuid",
   "run_id": "run-uuid",
-  "run_status": "planning",
+  "run_message": "Triggered via PR #418",
   "run_created_at": "2025-01-01T12:00:00Z",
+  "run_created_by": "someone@example.com",
   "workspace_id": "ws-uuid",
   "workspace_name": "production",
+  "workspace_app_url": "https://terrapod.local/workspaces/ws-uuid",
   "organization_name": "default",
   "task_name": "cost-check",
+  "task_id": "task-uuid",
   "is_speculative": false
 }
 ```
+
+Notes on three of those:
+
+- **`is_speculative`** is true when the run's configuration version is
+  speculative — a plan that can never be applied, which is what a pull
+  request produces. A gating task that should only comment, never block,
+  keys on this.
+- **`run_app_url`** and **`workspace_app_url`** are empty strings when the
+  deployment has no `api.config.external_url` set, because there is no
+  address to link to. They are always present.
+- **`organization_name`** is always `default`: Terrapod is single-organization
+  by design.
 
 If an HMAC key is configured, the payload is signed with HMAC-SHA512 and the signature is sent in the `X-TFE-Task-Signature` header.
 

@@ -35,3 +35,20 @@ def run_url(workspace_id: object, run_id: object) -> str | None:
 
     base = (settings.external_url or "").rstrip("/")
     return f"{base}/workspaces/{workspace_id}/runs/{run_id}" if base else None
+
+
+def workspace_url(workspace_id: object) -> str | None:
+    """The workspace's page in the web UI, or None when `external_url` is unset.
+
+    Same contract as `run_url` above, for the same reasons -- including the
+    `None`-rather-than-`""` return and the deliberate pass-through of ids.
+
+    Added for the run task payload's `workspace_app_url` (#2367), which had
+    been a hardcoded empty string. It lives here rather than inline there
+    because this module exists precisely to stop a sixth caller inventing the
+    string again, and `run_app_url` beside it is that sixth caller.
+    """
+    from terrapod.config import settings
+
+    base = (settings.external_url or "").rstrip("/")
+    return f"{base}/workspaces/{workspace_id}" if base else None
