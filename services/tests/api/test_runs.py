@@ -45,6 +45,10 @@ def _mock_run(
     run.status = status
     run.message = message
     run.is_destroy = False
+    # The plan document reads this column rather than deriving the answer from
+    # the run status (#2368), so an unset MagicMock reaches `json.dumps` and the
+    # response 500s on a TypeError naming the attribute and nothing of the cause.
+    run.has_changes = True
     run.auto_apply = auto_apply
     # #1274: the mode snapshotted at creation, and the reason a conditional
     # auto-apply declined. Defaults mirror the flat boolean so every existing
@@ -1833,7 +1837,9 @@ class TestPlanJsonAttribute:
 
         attrs = resp.json()["data"]["attributes"]
         assert "json-output" in attrs
-        assert attrs["json-output"].endswith(f"/api/v2/plans/{run.id}/json-output")
+        # Canonical prefix, though the request above used the deprecated alias:
+        # a URL we hand a client has to outlive that alias (#2368).
+        assert attrs["json-output"].endswith(f"/api/tfe/v2/plans/{run.id}/json-output")
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

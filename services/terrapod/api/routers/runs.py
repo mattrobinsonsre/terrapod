@@ -52,7 +52,7 @@ from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
-from terrapod.api.prefixes import is_tfe_path
+from terrapod.api.prefixes import TFE_PREFIX, is_tfe_path
 from terrapod.api.serialization import engine_version_attr
 from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls
@@ -558,7 +558,7 @@ def _run_json(
                 },
             },
             "links": {
-                "self": f"/api/v2/runs/{run_id}",
+                "self": f"{TFE_PREFIX}/runs/{run_id}",
             },
         }
     }
@@ -1581,9 +1581,15 @@ def _plan_status(run: Run) -> str:
         # it `running` kept go-tfe's plan log reader polling, so `tofu apply`
         # hung on a held run until something else ended it.
         return "finished" if run_service.is_held_at_gate(run) else "running"
-    if s in ("planned", "confirmed", "applying", "canceling", "applied"):
+    if s in ("planned", "confirmed", "applying", "canceling", "configuring", "applied"):
         # `canceling` only arises from `applying`, by which point the
         # plan phase is finished — report it accordingly.
+        #
+        # `configuring` likewise — it is the post-apply phase, so the plan is
+        # long finished. It is listed for the reason `_apply_status` records
+        # below: this function ends in `return s`, so an unlisted status is
+        # handed to `go-tfe` verbatim, and `configuring` is not a value it can
+        # switch on.
         return "finished"
     if s == "errored":
         # Errored during plan phase (plan never finished)
@@ -2110,11 +2116,21 @@ def _plan_json(run: Run, request: Request | None = None) -> dict:
     log_cap = capability_urls.mint(capability_urls.KIND_PLAN_LOG, str(run.id))
     attrs: dict = {
         "status": _plan_status(run),
-        "log-read-url": f"{base}/api/v2/plans/{log_cap}/log",
-        "has-changes": run.status in ("planned", "confirmed", "applying", "applied"),
+        "log-read-url": f"{base}{TFE_PREFIX}/plans/{log_cap}/log",
+        # The run carries the real answer. Deriving it from the status made a
+        # no-change run report `true`, because such a run short-circuits
+        # `planned -> applied` and every one of those statuses is in the list.
+        # `Run.has-changes` was always correct -- only the Plan resource lied,
+        # and `backend_show.go` reads this one to tag a shown plan `NoChanges`.
+        # The status fallback stays for a row written before the column existed.
+        "has-changes": (
+            run.has_changes
+            if run.has_changes is not None
+            else run.status in ("planned", "confirmed", "applying", "applied")
+        ),
     }
     if run.has_json_output:
-        attrs["json-output"] = f"{base}/api/v2/plans/{run.id}/json-output"
+        attrs["json-output"] = f"{base}{TFE_PREFIX}/plans/{run.id}/json-output"
     # TFE-named counts on the Plan resource (additions / changes /
     # destructions / imports). Replacements have no TFE-equivalent so
     # the UI gets that from the Run resource instead. Surfaced only
@@ -2137,7 +2153,7 @@ def _plan_json(run: Run, request: Request | None = None) -> dict:
             "type": "plans",
             "attributes": attrs,
             "links": {
-                "self": f"/api/v2/plans/plan-{run.id}",
+                "self": f"{TFE_PREFIX}/plans/plan-{run.id}",
             },
         }
     }
@@ -3166,10 +3182,10 @@ def _apply_json(run: Run, request: Request | None = None) -> dict:
             "type": "applies",
             "attributes": {
                 "status": _apply_status(run),
-                "log-read-url": f"{base}/api/v2/applies/{log_cap}/log",
+                "log-read-url": f"{base}{TFE_PREFIX}/applies/{log_cap}/log",
             },
             "links": {
-                "self": f"/api/v2/applies/apply-{run.id}",
+                "self": f"{TFE_PREFIX}/applies/apply-{run.id}",
             },
         }
     }

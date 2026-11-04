@@ -486,6 +486,16 @@ async def get_module_download_url(
         select(RegistryModuleVersion).where(
             RegistryModuleVersion.module_id == module.id,
             RegistryModuleVersion.version == version,
+            # The versions LIST filters on this and the download did not, so a
+            # version whose tarball never finished uploading answered 204 with a
+            # presigned URL to an object that is not there -- `init` then fails
+            # inside go-getter with an opaque storage error rather than the
+            # "module version not found" the protocol asks for.
+            #
+            # Only here: `confirm_module_upload` has to find a row that is NOT
+            # yet uploaded, and `delete_module_version` has to be able to remove
+            # one, so neither may take this filter.
+            RegistryModuleVersion.upload_status == "uploaded",
         )
     )
     mod_version = result.scalars().first()

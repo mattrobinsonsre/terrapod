@@ -9,28 +9,39 @@ UX CONTRACT: Workspace endpoints are consumed by the web frontend:
   Changes to response shapes, attribute names, or status codes here MUST be
   matched by corresponding updates to those frontend pages.
 
-Endpoints:
-    GET  /api/v2/ping — API version handshake
-    GET  /api/v2/account/details — current user info
-    GET  /api/v2/organizations/default — organization details
-    GET  /api/v2/organizations/default/entitlement-set — feature entitlements
-    GET  /api/v2/organizations/default/projects — 422 (Terrapod has no projects; see #279)
-    POST /api/v2/organizations/default/projects — 422 (Terrapod has no projects; see #279)
-    GET  /api/v2/organizations/default/workspaces — list workspaces
-    GET  /api/v2/organizations/default/workspaces/{name} — workspace by name
-    POST /api/v2/organizations/default/workspaces — create workspace
-    GET  /api/v2/workspaces/{id} — workspace by ID
-    PATCH /api/v2/workspaces/{id} — update workspace
-    DELETE /api/v2/workspaces/{id} — delete workspace
-    POST /api/v2/workspaces/{id}/actions/lock — lock workspace
-    POST /api/v2/workspaces/{id}/actions/unlock — unlock workspace
-    GET  /api/v2/workspaces/{id}/state-versions — list state versions
-    GET  /api/v2/workspaces/{id}/current-state-version — latest state
-    POST /api/v2/workspaces/{id}/state-versions — create state version
-    GET  /api/v2/state-versions/{id} — show state version
-    GET  /api/v2/state-versions/{id}/download — download raw state
-    PUT  /api/v2/state-versions/{id}/content — upload raw state
-    PUT  /api/v2/state-versions/{id}/json-content — upload JSON state
+Endpoints (canonical prefix; `/api/v2` is a deprecated alias -- see
+docs/deprecations.md -- so nothing in a RESPONSE BODY may hardcode it,
+which `tests/api/test_tfe_link_prefixes.py` enforces):
+
+    GET    /api/tfe/v2/ping
+    GET    /api/tfe/v2/account/details
+    GET    /api/tfe/v2/organizations/default
+    GET    /api/tfe/v2/organizations/default/entitlement-set
+    GET    /api/tfe/v2/organizations/default/projects
+    POST   /api/tfe/v2/organizations/default/projects
+    GET    /api/tfe/v2/organizations/default/workspaces
+    GET    /api/tfe/v2/organizations/default/workspaces/{workspace_name}
+    POST   /api/tfe/v2/organizations/default/workspaces
+    GET    /api/tfe/v2/workspaces/{workspace_id}
+    GET    /api/tfe/v2/workspaces/{workspace_id}/tag-bindings
+    GET    /api/tfe/v2/workspaces/{workspace_id}/effective-tag-bindings
+    POST   /api/tfe/v2/workspaces/{workspace_id}/relationships/tags
+    DELETE /api/tfe/v2/workspaces/{workspace_id}/relationships/tags
+    PATCH  /api/tfe/v2/workspaces/{workspace_id}
+    GET    /api/tfe/v2/workspaces/{workspace_id}/state-versions  [also /api/v1]
+    GET    /api/tfe/v2/workspaces/{workspace_id}/current-state-version  [also /api/v1]
+    GET    /api/tfe/v2/state-versions/{state_version_id}/download  [also /api/v1]
+    GET    /api/tfe/v2/state-versions/{state_version_id}  [also /api/v1]
+    POST   /api/tfe/v2/workspaces/{workspace_id}/state-versions
+    PUT    /api/tfe/v2/state-versions/{state_version_id}/content
+    PUT    /api/tfe/v2/state-versions/{state_version_id}/json-content
+    POST   /api/tfe/v2/workspaces/{workspace_id}/actions/lock  [also /api/v1]
+    POST   /api/tfe/v2/workspaces/{workspace_id}/actions/unlock  [also /api/v1]
+    POST   /api/tfe/v2/workspaces/{workspace_id}/actions/force-unlock  [also /api/v1]
+
+`DELETE /workspaces/{id}` is deliberately NOT here: the by-id delete is
+admin/UI-only and lives on the native API. The only DELETE on this surface
+is the no-op tags relationship above.
 """
 
 import asyncio
@@ -3110,8 +3121,8 @@ def _state_version_json(
                 },
             },
             "links": {
-                "self": f"/api/v2/state-versions/{sv_id}",
-                "download": f"/api/v2/state-versions/{sv_id}/download",
+                "self": f"{TFE_PREFIX}/state-versions/{sv_id}",
+                "download": f"{TFE_PREFIX}/state-versions/{sv_id}/download",
             },
         }
     }

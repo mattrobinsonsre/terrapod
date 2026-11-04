@@ -1073,7 +1073,8 @@ GET /api/tfe/v2/state-versions/{id}/download
 GET /api/v1/state-versions/{id}/download
 ```
 
-Returns a redirect to a presigned URL for the raw state file.
+Returns the raw state bytes inline. (`go-tfe`'s `Download` follows a redirect if
+one is sent, so either shape works for it — but this one does not redirect.)
 
 **Required permission:** `plan` on the workspace.
 
@@ -1085,7 +1086,12 @@ For **agent-mode runs** reading another workspace's state via `data "terraform_r
 PUT /api/tfe/v2/state-versions/{id}/content
 ```
 
-Binary upload of raw state bytes. No auth required (presigned-style -- the state version UUID acts as a capability token). This matches `go-tfe` behavior.
+Binary upload of raw state bytes, sent with **no Authorization header** — `go-tfe`'s
+`doForeignPUTRequest` strips it, which is what makes this endpoint unauthenticated
+by necessity rather than by choice. The capability is a **signed segment** in the
+URL the create response hands back, not the state-version UUID: a bare id would let
+anyone who learned it overwrite the workspace's state (the path taking a plain id
+is authenticated instead).
 
 ### Upload JSON State Content
 

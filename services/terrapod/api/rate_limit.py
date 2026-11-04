@@ -255,6 +255,26 @@ def _credential_bucket(auth_header: str, listener_cert: str) -> str | None:
     return "cred:" + hashlib.sha256(cred.encode("utf-8")).hexdigest()[:20]
 
 
+def _throttle_headers(retry_after: int) -> dict[str, str]:
+    """The headers a 429 carries, for a client that will back off correctly.
+
+    `Retry-After` alone is not enough. `go-tfe`'s `rateLimitBackoff` reads
+    **`X-RateLimit-Reset`** and ignores `Retry-After` entirely; with neither it
+    falls back to its own 100-400ms range with `RetryMax: 30`, so a throttled
+    client spends ~30 rapid retries inside the same 60-second window, gets 429
+    every time, and then hard-fails. Emitting the reset is what turns that into
+    one wait -- which is as much our problem as the caller's, since those are
+    thirty requests we serve for nothing.
+
+    Both headers are sent: `Retry-After` is the HTTP-standard one that proxies
+    and browsers understand, and the reset is what this client reads.
+    """
+    return {
+        "Retry-After": str(retry_after),
+        "X-RateLimit-Reset": str(int(time.time()) + retry_after),
+    }
+
+
 class RateLimitMiddleware:
     """Sliding window rate limiter using Redis.
 
@@ -485,7 +505,7 @@ class RateLimitMiddleware:
                 response = JSONResponse(
                     status_code=429,
                     content={"errors": [{"status": "429", "title": "Rate limit exceeded"}]},
-                    headers={"Retry-After": str(retry_after)},
+                    headers=_throttle_headers(retry_after),
                 )
                 await response(scope, receive, send)
                 return
@@ -495,7 +515,7 @@ class RateLimitMiddleware:
             response = JSONResponse(
                 status_code=429,
                 content={"errors": [{"status": "429", "title": "Rate limit exceeded"}]},
-                headers={"Retry-After": str(retry_after)},
+                headers=_throttle_headers(retry_after),
             )
             await response(scope, receive, send)
             return
