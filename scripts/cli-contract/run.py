@@ -217,6 +217,18 @@ variable "value" {
 output "probe" {
   value = terraform_data.probe.output
 }
+
+# Sensitive on purpose. `tofu output` fetches a sensitive value through a
+# SECOND route -- the per-output one -- so without this the suite would only
+# ever exercise the collection, and a reveal route that 403'd would pass.
+# Derived from the VARIABLE, not from the resource: the `import` check drives
+# this same configuration in a directory with no applied state, where
+# `terraform_data.probe.output` is null and interpolating it into a string is a
+# hard error. A variable always has its default.
+output "probe_secret" {
+  value     = "secret-${var.value}"
+  sensitive = true
+}
 """
 
 
@@ -384,6 +396,67 @@ def state_push(ctx: Ctx) -> None:
     got = (back.get("outputs") or {}).get("cli_contract", {}).get("value")
     if got != marker:
         raise Fail(f"the pushed state did not round-trip: output is {got!r}, pushed {marker!r}")
+
+
+@check("State Versions", "output reads the state-version outputs", needs=_LIFECYCLE)
+def state_version_outputs(ctx: Ctx) -> None:
+    """`tofu output` was exit 1 against every cloud-block workspace (#2376).
+
+        Error: could not read state version outputs: resource not found
+
+    `GetRootOutputValues` has no fallback on error, so the command failed
+    outright rather than degrading to the full state -- and nothing noticed,
+    because every other check here reads outputs out of the state document
+    instead of asking the CLI for them.
+
+    Two routes, driven in one call: the CLI reads the collection, then fetches
+    each output it was told is SENSITIVE through the per-output route. So a
+    reveal route that refused would fail this, where an API test asserting the
+    collection alone would not.
+    """
+    d = ctx.work / "lifecycle"
+    raw = ctx.tofu("output", "-json", cwd=d).stdout
+    try:
+        outs = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise Fail(f"output -json did not produce JSON ({exc}):\n{raw}") from exc
+
+    probe = outs.get("probe")
+    if not isinstance(probe, dict):
+        raise Fail(f"output -json carries no `probe`: {sorted(outs)}")
+    if probe.get("value") != "contract":
+        raise Fail(f"`probe` is {probe.get('value')!r}, expected 'contract'")
+    # The cty type, which is what `detailed-type` carries. A nil on ANY one
+    # output makes the CLI abandon the whole path and fall back to the full
+    # state, so getting it wrong looks like success here unless it is asserted.
+    if probe.get("type") != "string":
+        raise Fail(f"`probe` reports type {probe.get('type')!r}, expected 'string'")
+
+    secret = outs.get("probe_secret")
+    if not isinstance(secret, dict):
+        raise Fail(f"output -json carries no `probe_secret`: {sorted(outs)}")
+    if not secret.get("sensitive"):
+        raise Fail("`probe_secret` did not come back marked sensitive")
+    if secret.get("value") != "secret-contract":
+        raise Fail(
+            f"`probe_secret` is {secret.get('value')!r}, expected 'secret-contract' -- "
+            "the per-output reveal route did not serve it"
+        )
+
+    # And the other half of the split, asserted at the API because the CLI
+    # cannot show it: the COLLECTION withholds a sensitive value. If it served
+    # one, a read-tier principal would get it from the route that is gated at
+    # the read tier rather than at the plan tier.
+    code, body = ctx.api("GET", f"/api/tfe/v2/workspaces/{ctx.ws_id}/current-state-version-outputs")
+    if code != 200:
+        raise Fail(f"current-state-version-outputs answered {code}: {body}")
+    by_name = {d["attributes"]["name"]: d["attributes"] for d in body["data"]}
+    if "probe_secret" not in by_name:
+        raise Fail(f"the collection omits `probe_secret` entirely: {sorted(by_name)}")
+    if "value" in by_name["probe_secret"]:
+        raise Fail("the collection served a sensitive value; it must omit it")
+    if by_name.get("probe", {}).get("value") != "contract":
+        raise Fail(f"the collection withheld a NON-sensitive value: {by_name.get('probe')}")
 
 
 @check("Workspaces", "lock, unlock and force-unlock", needs=_LIFECYCLE)
