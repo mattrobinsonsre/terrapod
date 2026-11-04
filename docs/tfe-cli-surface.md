@@ -165,7 +165,7 @@ attribute `go-tfe`'s `RunCreateOptions` defines that Terrapod consumes:
 | `replace-addrs` | `ReplaceAddrs` | `-replace` |
 | `allow-empty-apply` | `AllowEmptyApply` | `-allow-empty-apply` |
 | `terraform-version` / `engine-version` | `TerraformVersion` | Pins the engine version for this run (#1559) |
-| `variables` | `Variables` | `-var` / `-var-file` for THIS run (#2377). Higher precedence than the workspace's own variables; a key pinned by a **priority** variable set is refused with a 422 naming it, rather than silently dropped. An empty array is a no-op, which matters because the CLI sends the key on every run. Stored encrypted and never echoed back — the run document reports `run-variable-keys`, the keys alone |
+| `variables` | `Variables` | `-var` / `-var-file` for THIS run (#2377). **Each `value` is an HCL expression, not a literal** — `-var msg=x` arrives as `"x"`, quotes included, which is what lets `-var 'l=["a"]'` work. Higher precedence than the workspace's own variables; a key pinned by a **priority** variable set is refused with a 422 naming it rather than silently dropped. Terraform/OpenTofu only, because an HCL expression has no meaning to Pulumi — a truthy value on a Pulumi workspace is refused 422. An empty array is a no-op, which matters because the CLI sends the key on every run. Stored encrypted and never echoed back; the run document reports `run-variable-keys`, the keys alone |
 
 Terrapod-native attributes on the same route (`vcs-ref`, `is-drift-detection`)
 are not part of this contract and are documented in

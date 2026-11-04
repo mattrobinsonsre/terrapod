@@ -130,8 +130,32 @@ class TestRunVariablePrecedence:
         )
         entry = {r.key: r for r in out}["region"]
         assert entry.sensitive is False
-        assert entry.structured is False
         assert entry.category == "native"
+
+    async def test_the_value_is_delivered_as_an_HCL_EXPRESSION(self, mock_list, mock_sets):
+        """Measured, not assumed: `-var msg=OVERRIDE` arrives as '"OVERRIDE"'.
+
+        OpenTofu's cloud backend sends the HCL SOURCE TEXT of the value, quotes
+        included -- that is `go-tfe`'s `RunVariable` contract, and what lets
+        `-var 'list=["a"]'` work at all. So the entry must be `structured`, or
+        `render_tfvars` JSON-quotes it a second time and the run plans against a
+        value WITH the quotes in it -- wrong, and it plans and applies cleanly,
+        which is why only a live run found it.
+        """
+        mock_sets.side_effect = [[], []]
+        mock_list.return_value = []
+
+        out = await resolve_variables(
+            AsyncMock(spec=AsyncSession),
+            uuid.uuid4(),
+            run_variables=[{"key": "msg", "value": '"OVERRIDE"'}],
+        )
+        entry = {r.key: r for r in out}["msg"]
+        assert entry.structured is True, (
+            "a run variable is an HCL expression; delivered unstructured it is "
+            "quoted a second time and the run plans against the wrong value"
+        )
+        assert entry.value == '"OVERRIDE"'
 
 
 class TestValidatedRunVariables:

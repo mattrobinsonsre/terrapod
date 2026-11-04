@@ -124,6 +124,76 @@ class TestRunVariablesOnTheCreatePath:
         assert "region" in resp.text
 
 
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+class TestRunVariablesAreTerraformOnly:
+    """The refusal is about the VALUE, not the name.
+
+    A run variable carries an HCL EXPRESSION -- `go-tfe`'s `RunVariable`
+    contract -- and Pulumi has no HCL. Its own equivalent is `pulumi config
+    set`, which is the workspace's variables rather than a per-run flag.
+
+    This needs a route test rather than a unit one because the TFE surface
+    already 404s a non-Terraform workspace, so the gap is only reachable
+    NATIVELY: `POST /runs` is mounted on both, and without the refusal a native
+    caller hands a Pulumi run an HCL string that `pulumi_config` then treats as
+    a `--path` nested key.
+    """
+
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_pulumi_workspace_refuses_them(self, mock_resolve, *_m):
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.engine = "pulumi"
+
+        async with AsyncClient(transport=ASGITransport(app=_app_for(ws)), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/runs",
+                json={
+                    "data": {
+                        "attributes": {"variables": [{"key": "region", "value": '"us-1"'}]},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        assert "variables" in resp.text
+
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_an_EMPTY_list_is_not_refused_on_pulumi(
+        self, mock_resolve, mock_create, mock_queue, *_m
+    ):
+        """Only a truthy value is refused, which is the map's own rule.
+
+        A client that serialises every field sends `variables: []` on every run;
+        422ing that would break run creation on every Pulumi workspace for a
+        caller asking for nothing.
+        """
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.engine = "pulumi"
+        run = _mock_run(ws_id=ws.id, status="queued")
+        mock_create.return_value = run
+        mock_queue.return_value = run
+
+        async with AsyncClient(transport=ASGITransport(app=_app_for(ws)), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/runs",
+                json={
+                    "data": {
+                        "attributes": {"variables": []},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201, resp.text
+
+
 class TestTheRunDocumentNeverCarriesAValue:
     """Keys yes, values never.
 

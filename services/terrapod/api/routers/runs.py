@@ -705,6 +705,17 @@ _ENGINE_SPECIFIC_RUN_ATTRS: dict[str, tuple[str, str]] = {
     # `-allow-empty-apply` is an OpenTofu/Terraform apply flag. `pulumi up` has
     # no equivalent — it carries out whatever the preview produced, empty or not.
     "allow-empty-apply": (TERRAFORM, "the terraform/tofu apply flag of the same name"),
+    # `-var` / `-var-file`, and the reason is the VALUE rather than the name:
+    # a run variable carries an HCL EXPRESSION (`go-tfe`'s `RunVariable`
+    # contract, measured -- see `_RunVariableRow`), and Pulumi has no HCL.
+    # Its own equivalent is `pulumi config set`, which is the workspace's
+    # variables, not a per-run CLI flag.
+    #
+    # The TFE surface already 404s a non-Terraform workspace, but `POST
+    # /runs` is mounted natively too, so without this a native caller could
+    # hand a Pulumi run an HCL string that `pulumi_config` would then treat
+    # as a `--path` nested key.
+    "variables": (TERRAFORM, "the terraform/tofu -var / -var-file flags"),
 }
 
 
