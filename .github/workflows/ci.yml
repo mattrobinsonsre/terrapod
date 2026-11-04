@@ -405,6 +405,14 @@ jobs:
       - name: (docs-audit) mirrored images are pulled from the mirror
         run: python3 scripts/docs-audit/check_mirror_consumption.py
 
+      # The run task webhook body is something we SEND, so no route,
+      # attribute or response snapshot describes it, and the doc example is
+      # the only thing an integrator can build against. It had drifted both
+      # ways at once: advertising a `run_status` we have never sent, and
+      # omitting five fields we do (#2367).
+      - name: (docs-audit) the documented run task payload is the one we send
+        run: python3 scripts/docs-audit/check_run_task_payload_doc.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
