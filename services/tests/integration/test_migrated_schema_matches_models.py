@@ -320,6 +320,7 @@ async def test_historical_archive_upgrade_preserves_unknown_and_enforces_immutab
             with pytest.raises(DBAPIError, match="configuration archive provenance is immutable"):
                 async with engine.begin() as conn:
                     await conn.execute(
+                        # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                         text(f"UPDATE configuration_versions SET {column} = :value WHERE id = :id"),
                         {"value": value, "id": protected_id},
                     )
