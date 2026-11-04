@@ -89,6 +89,24 @@ class TestWriteTerraformRc:
         assert '"providers.v1" = "http://terrapod-api:8000/api/v2/registry/providers/"' in text
         assert 'credentials "terrapod.local"' in text
 
+    def test_dev_web_bff_redirect_over_http(self, tmp_path) -> None:
+        out = tmp_path / "terraform.rc"
+        result = mirror_config.write_terraform_rc(
+            api_url="http://terrapod-web.terrapod.svc.cluster.local:3000",
+            auth_token="tok",
+            public_api_url="https://terrapod.local",
+            config_path=out,
+        )
+        text = out.read_text()
+        assert result.public_host_redirect is True
+        assert result.mirror_configured is False
+        assert 'host "terrapod.local"' in text
+        assert (
+            '"providers.v1" = "http://terrapod-web.terrapod.svc.cluster.local:3000/'
+            'api/v2/registry/providers/"'
+        ) in text
+        assert 'credentials "terrapod.local"' in text
+
     def test_same_public_and_internal_host_no_redirect(self, tmp_path) -> None:
         out = tmp_path / "terraform.rc"
         result = mirror_config.write_terraform_rc(

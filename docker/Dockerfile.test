@@ -27,6 +27,10 @@ COPY alembic ./alembic
 # `engines/` must be COPYed into the listener image or the listener crashes on
 # import at startup — a failure no source-only test could see (#1487).
 COPY docker ./docker
+COPY Tiltfile ./Tiltfile
+# The Tilt Go image guard compares these module floors with the container tags.
+COPY query/go.mod ./query/go.mod
+COPY ee-agent/go.mod ./ee-agent/go.mod
 
 # The message catalogues, so a test can check that an engine's declared
 # vocabulary namespace actually exists in them (#1521). Just the JSON — the

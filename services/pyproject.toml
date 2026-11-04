@@ -57,6 +57,8 @@ asyncpg = ">=0.31,<0.33"
 alembic = "^1.14.0"
 # HCL parsing (module interface extraction)
 python-hcl2 = "^7.0.0"
+# Catalog execution-backend version ranges (SpecifierSet / Version).
+packaging = ">=26,<27"
 # Redis
 redis = ">=7.4,<9.0"
 # Auth

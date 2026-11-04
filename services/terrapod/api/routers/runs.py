@@ -1515,6 +1515,7 @@ async def retry_run(
         new_run.vcs_branch = run.vcs_branch
         new_run.vcs_pull_request_number = run.vcs_pull_request_number
         new_run.module_overrides = run.module_overrides
+        new_run.module_impact_module_id = run.module_impact_module_id
     except ansible_ee_service.UnknownExecutionEnvironment as exc:
         # Its own docstring asks for exactly this -- "so a router can answer 422
         # naming the field" -- and no router did, so a workspace whose EE label

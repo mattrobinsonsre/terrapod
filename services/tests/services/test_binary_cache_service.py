@@ -220,6 +220,7 @@ class TestConcurrentCacheMissRace:
 
         db = AsyncMock()
         # Simulate the unique-constraint violation when flushing the INSERT.
+        db.add = MagicMock()
         db.flush.side_effect = IntegrityError("INSERT", {}, Exception("uq_cached_binaries"))
 
         storage = AsyncMock()
@@ -272,6 +273,7 @@ class TestTerragruntBinary:
         mock_fetch.return_value = ("cafef00d" * 8, "c" * 128, 45_000_000)
 
         db = AsyncMock()
+        db.add = MagicMock()
         storage = AsyncMock()
         presigned = MagicMock()
         presigned.url = "https://example/presigned"
@@ -516,6 +518,7 @@ class TestPlatformToolsShareTheCache:
         from terrapod.services import binary_cache_service as svc
 
         db, storage = AsyncMock(), AsyncMock()
+        db.add = MagicMock()
         with (
             patch.object(svc, "_get_cached", AsyncMock(return_value=None)),
             patch.object(svc, "_sealed", return_value=False),

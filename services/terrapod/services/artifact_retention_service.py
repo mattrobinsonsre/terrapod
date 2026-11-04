@@ -12,7 +12,7 @@ Safety invariants:
     to apply outright (#1396) and so can never need its plan files again.
     Never a run that is pending/queued/planning, nor an apply-capable
     `planned` run whose plan someone may still confirm.
-  - Only clean config versions not referenced by any non-terminal run.
+  - Keep active-run CVs and each non-VCS workspace's last runnable CV.
   - Cache entries are cleaned based on last_accessed_at, not cached_at.
   - All storage deletes are best-effort (catch + log, continue).
   - Each category is independently try/excepted.
@@ -389,12 +389,14 @@ async def _cleanup_config_versions(
         .distinct()
         .scalar_subquery()
     )
+    protected_cv_ids = _latest_non_vcs_uploaded_cv_ids()
 
     result = await db.execute(
         select(ConfigurationVersion)
         .where(
             ConfigurationVersion.created_at < cutoff,
             ConfigurationVersion.id.notin_(active_cv_ids),
+            ConfigurationVersion.id.notin_(protected_cv_ids),
         )
         .limit(batch_size)
     )
@@ -417,6 +419,29 @@ async def _cleanup_config_versions(
         RETENTION_DELETED.labels(category="config_versions").inc(deleted)
 
     return deleted
+
+
+def _latest_non_vcs_uploaded_cv_ids():
+    """Keep each non-VCS workspace's last configuration that can actually run."""
+    ranked = (
+        select(
+            ConfigurationVersion.id.label("id"),
+            func.row_number()
+            .over(
+                partition_by=ConfigurationVersion.workspace_id,
+                order_by=(ConfigurationVersion.created_at.desc(), ConfigurationVersion.id.desc()),
+            )
+            .label("rank"),
+        )
+        .join(Workspace, ConfigurationVersion.workspace_id == Workspace.id)
+        .where(
+            Workspace.vcs_connection_id.is_(None),
+            ConfigurationVersion.status == "uploaded",
+            ConfigurationVersion.speculative.is_(False),
+        )
+        .subquery()
+    )
+    return select(ranked.c.id).where(ranked.c.rank == 1).scalar_subquery()
 
 
 async def _cleanup_config_versions_count(
@@ -473,6 +498,7 @@ async def _cleanup_config_versions_count(
         .distinct()
         .scalar_subquery()
     )
+    protected_cv_ids = _latest_non_vcs_uploaded_cv_ids()
 
     for ws_id in workspace_ids:
         if deleted >= batch_size:
@@ -486,6 +512,7 @@ async def _cleanup_config_versions_count(
             .where(
                 ConfigurationVersion.workspace_id == ws_id,
                 ConfigurationVersion.id.notin_(active_cv_ids),
+                ConfigurationVersion.id.notin_(protected_cv_ids),
             )
             .order_by(ConfigurationVersion.created_at.desc())
             .offset(keep)
@@ -650,7 +677,7 @@ async def _cleanup_module_overrides(
     retention_days: int,
     batch_size: int,
 ) -> int:
-    """Delete module override tarballs for old runs that can do nothing further.
+    """Release old run references; delete shared tarballs after the last one.
 
     `REAPABLE_RUN`, not `TERMINAL_STATES`: the only run that carries
     `module_overrides` is the module-impact run, and it is created
@@ -676,8 +703,19 @@ async def _cleanup_module_overrides(
 
     for run in runs:
         overrides = run.module_overrides or {}
-        for _coord, storage_path in overrides.items():
+        remaining = {}
+        for coord, storage_path in overrides.items():
             try:
+                referenced = await db.execute(
+                    select(Run.id)
+                    .where(
+                        Run.id != run.id,
+                        Run.module_overrides[coord].astext == storage_path,
+                    )
+                    .limit(1)
+                )
+                if referenced.scalar_one_or_none() is not None:
+                    continue
                 await storage.delete(storage_path)
             except Exception:
                 logger.warning(
@@ -686,12 +724,17 @@ async def _cleanup_module_overrides(
                     path=storage_path,
                     exc_info=True,
                 )
+                remaining[coord] = storage_path
+                continue
             deleted += 1
 
-        run.module_overrides = None
+        run.module_overrides = remaining or None
+        # The next reference query must see this release even without autoflush.
+        await db.flush()
 
-    if deleted:
+    if runs:
         await db.commit()
+    if deleted:
         RETENTION_DELETED.labels(category="module_overrides").inc(deleted)
 
     return deleted

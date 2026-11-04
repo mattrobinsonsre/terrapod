@@ -63,13 +63,15 @@ var (
 type catalogInstanceModel struct {
 	ID types.String `tfsdk:"id"`
 
-	CatalogItemID types.String `tfsdk:"catalog_item_id"`
-	Name          types.String `tfsdk:"name"`
-	AgentPoolID   types.String `tfsdk:"agent_pool_id"`
-	InputValues   types.Map    `tfsdk:"input_values"`
-	VersionPin    types.String `tfsdk:"version_pin"`
-	AutoApply     types.Bool   `tfsdk:"auto_apply"`
-	Labels        types.Map    `tfsdk:"labels"`
+	CatalogItemID      types.String `tfsdk:"catalog_item_id"`
+	Name               types.String `tfsdk:"name"`
+	AgentPoolID        types.String `tfsdk:"agent_pool_id"`
+	InputValues        types.Map    `tfsdk:"input_values"`
+	VersionPin         types.String `tfsdk:"version_pin"`
+	AutoApply          types.Bool   `tfsdk:"auto_apply"`
+	Labels             types.Map    `tfsdk:"labels"`
+	UpdateBlockVersion types.String `tfsdk:"update_block_version"`
+	UpdateBlockReason  types.String `tfsdk:"update_block_reason"`
 }
 
 type catalogInstanceResource struct {
@@ -152,6 +154,14 @@ func (r *catalogInstanceResource) Schema(_ context.Context, _ resource.SchemaReq
 					mapplanmodifier.RequiresReplace(),
 				},
 			},
+			"update_block_version": schema.StringAttribute{
+				Description: "Version whose publish requires attention; null when no update is blocked.",
+				Computed:    true,
+			},
+			"update_block_reason": schema.StringAttribute{
+				Description: "Non-sensitive reason code for a blocked catalog publish.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -191,6 +201,8 @@ func (r *catalogInstanceResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	plan.ID = types.StringValue(inst.ID)
+	plan.UpdateBlockVersion = types.StringNull()
+	plan.UpdateBlockReason = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -238,6 +250,8 @@ func (r *catalogInstanceResource) Update(ctx context.Context, req resource.Updat
 	// The reconfigure response is a run reference, not the instance; carry the
 	// provisioned id forward and persist the planned configuration.
 	plan.ID = state.ID
+	plan.UpdateBlockVersion = types.StringNull()
+	plan.UpdateBlockReason = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -312,6 +326,12 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 	var diags diag.Diagnostics
 
 	m.ID = types.StringValue(inst.ID)
+	m.UpdateBlockVersion = types.StringNull()
+	m.UpdateBlockReason = types.StringNull()
+	if inst.UpdateBlock != nil {
+		m.UpdateBlockVersion = types.StringValue(inst.UpdateBlock["version"])
+		m.UpdateBlockReason = types.StringValue(inst.UpdateBlock["reason"])
+	}
 
 	if name := attrString(inst.Attributes, "name"); name != "" {
 		m.Name = types.StringValue(name)

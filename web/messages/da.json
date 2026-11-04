@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Beskrivelse",
       "descriptionPlaceholder": "Hvad dette katalogelement klargør…",
       "enabled": "Aktiveret (synlig i gennemsynskataloget)",
+      "selfContained": "Selvstændigt rodarkiv",
+      "selfContainedHint": "Brug det uploadede modularkiv som arbejdsområdets rodkonfiguration.",
+      "restrictBackends": "Begræns eksekveringsmotorer",
+      "backendRangesHint": "Vælg understøttede motorer, og angiv PEP 440-versionsintervaller (f.eks. >=1.12,<2).",
+      "backendRange": "Versionsinterval for {backend}",
       "providerTemplates": "Providerskabeloner",
+      "templatesRemoved": "Når du gemmer, fjernes eksisterende tilknytninger til providerskabeloner.",
+      "templatesUnavailable": "Providerskabeloner bruges ikke med selvstændige elementer.",
       "noProviderTemplates": "Ingen providerskabeloner defineret.",
       "restrictPools": "Begræns til bestemte agentpuljer",
       "noAgentPools": "Ingen agentpuljer tilgængelige.",
@@ -1497,6 +1504,7 @@
       "actions": "Handlinger"
     },
     "badge": {
+      "selfContained": "selvstændig",
       "enabled": "aktiveret",
       "disabled": "deaktiveret"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Katalogelement slettet"
     },
     "errors": {
+      "backendRequired": "Vælg mindst én eksekveringsmotor.",
+      "backendRangeRequired": "Angiv et versionsinterval for hver valgt motor.",
       "load": "Kunne ikke indlæse katalogelementer",
       "save": "Kunne ikke gemme katalogelement",
       "createStatus": "Kunne ikke oprette katalogelement ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Slet katalogposten uden at nedrive dens infrastruktur (frarådes)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version} skal omkonfigureres, før den kan køres.",
+      "updateBlockedArchive": "Version {version} kan ikke køres, fordi arkivet mangler eller er ugyldigt. Bed katalogejeren om at rette det.",
+      "updateBlockedRuntime": "Version {version} kan ikke køre med dette arbejdsområdes backend og version. Vælg en kompatibel version via API, og konfigurer igen.",
+      "removedInputs": "Bruges ikke længere af denne version",
+      "removedHint": "Disse input fjernes, når du sætter omkonfigurationen i kø. Gennemgå de nye felter, før du fortsætter.",
       "title": "Omkonfigurér {name}",
       "description": "Opdater input og/eller version, og sæt derefter en kørsel i kø.",
       "currentOption": "{version} (nuværende)",

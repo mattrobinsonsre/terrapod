@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Descrizione",
       "descriptionPlaceholder": "Ciò che questo elemento del catalogo provisiona…",
       "enabled": "Attivato (visibile nel catalogo sfogliabile)",
+      "selfContained": "Archivio radice autonomo",
+      "selfContainedHint": "Usa l''archivio del modulo caricato come configurazione radice dello spazio di lavoro.",
+      "restrictBackends": "Limita i motori di esecuzione",
+      "backendRangesHint": "Seleziona i motori supportati e inserisci intervalli di versioni PEP 440 (ad esempio >=1.12,<2).",
+      "backendRange": "Intervallo di versioni di {backend}",
       "providerTemplates": "Template di provider",
+      "templatesRemoved": "Il salvataggio rimuove le associazioni esistenti ai template dei provider.",
+      "templatesUnavailable": "I template dei provider non vengono usati con gli elementi autonomi.",
       "noProviderTemplates": "Nessun template di provider definito.",
       "restrictPools": "Limita a specifici pool di agenti",
       "noAgentPools": "Nessun pool di agenti disponibile.",
@@ -1497,6 +1504,7 @@
       "actions": "Azioni"
     },
     "badge": {
+      "selfContained": "autonomo",
       "enabled": "attivato",
       "disabled": "disattivato"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Elemento del catalogo eliminato"
     },
     "errors": {
+      "backendRequired": "Seleziona almeno un motore di esecuzione.",
+      "backendRangeRequired": "Inserisci un intervallo di versioni per ogni motore selezionato.",
       "load": "Impossibile caricare gli elementi del catalogo",
       "save": "Impossibile salvare l''elemento del catalogo",
       "createStatus": "Impossibile creare l''elemento del catalogo ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Elimina il record del catalogo senza distruggere la sua infrastruttura (sconsigliato)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "La versione {version} richiede una riconfigurazione prima di poter essere eseguita.",
+      "updateBlockedArchive": "La versione {version} non può essere eseguita: l'archivio non è disponibile o è invalido. Chiedi al responsabile del catalogo di correggerlo.",
+      "updateBlockedRuntime": "La versione {version} non può usare il motore e la versione di questo spazio di lavoro. Scegli una versione compatibile tramite API, poi riconfigura.",
+      "removedInputs": "Non più utilizzati da questa versione",
+      "removedHint": "Questi input saranno rimossi quando accoderai questa riconfigurazione. Controlla i nuovi campi prima di continuare.",
       "title": "Riconfigura {name}",
       "description": "Aggiorna gli input e/o la versione, poi accoda un''esecuzione.",
       "currentOption": "{version} (attuale)",

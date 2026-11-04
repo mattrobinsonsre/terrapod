@@ -32,6 +32,8 @@ scratchpad/
 **/.venv
 
 # Local-only output
+# Local provider build artifacts and signing keys must stay out of image contexts.
+provider/.dev-build/
 reports/
 dist/
 *.tfstate

@@ -21,6 +21,8 @@ interface CatalogItem {
     'display-name': string
     description: string
     enabled: boolean
+    'self-contained': boolean
+    'execution-backend-constraints': Record<string, string> | null
     'module-id': string
     'module-name': string
     'module-provider': string
@@ -62,6 +64,12 @@ const EMPTY_FORM = {
   displayName: '',
   description: '',
   enabled: true,
+  selfContained: false,
+  restrictBackends: false,
+  tofuEnabled: false,
+  tofuRange: '',
+  terraformEnabled: false,
+  terraformRange: '',
   defaultVersionPin: '',
   providerTemplateIds: [] as string[],
   // null sentinel: "any pool". An empty array means "explicitly none allowed".
@@ -144,8 +152,13 @@ export default function AdminCatalogPage() {
     setError(''); setSuccess('')
   }
 
-  function startEdit(item: CatalogItem) {
-    const a = item.attributes
+  async function startEdit(item: CatalogItem) {
+    setError(''); setSuccess('')
+    const res = await apiFetch(`/api/terrapod/v1/catalog-items/${item.id}?include-sensitive-values=true`).catch(() => null)
+    if (!res?.ok) { setError(t('errors.load')); return }
+    const data = await res.json().catch(() => null)
+    if (!data?.data?.attributes) { setError(t('errors.load')); return }
+    const a = data.data.attributes as CatalogItem['attributes']
     setEditId(item.id)
     setF({
       name: a.name,
@@ -153,6 +166,12 @@ export default function AdminCatalogPage() {
       displayName: a['display-name'] || '',
       description: a.description || '',
       enabled: a.enabled,
+      selfContained: a['self-contained'],
+      restrictBackends: a['execution-backend-constraints'] !== null,
+      tofuEnabled: a['execution-backend-constraints']?.tofu !== undefined,
+      tofuRange: a['execution-backend-constraints']?.tofu ?? '',
+      terraformEnabled: a['execution-backend-constraints']?.terraform !== undefined,
+      terraformRange: a['execution-backend-constraints']?.terraform ?? '',
       defaultVersionPin: a['default-version-pin'] || '',
       providerTemplateIds: a['provider-template-ids'] || [],
       allowedPoolIds: a['allowed-agent-pool-ids'],
@@ -168,7 +187,6 @@ export default function AdminCatalogPage() {
     })
     setRestrictPools(a['allowed-agent-pool-ids'] !== null)
     setShowForm(true)
-    setError(''); setSuccess('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -203,12 +221,27 @@ export default function AdminCatalogPage() {
         throw new Error(t('errors.configureNeedsDirectory'))
       }
 
+      const constraints: Record<string, string> = {}
+      if (f.restrictBackends || f.selfContained) {
+        if (f.tofuEnabled) {
+          if (!f.tofuRange.trim()) throw new Error(t('errors.backendRangeRequired'))
+          constraints.tofu = f.tofuRange.trim()
+        }
+        if (f.terraformEnabled) {
+          if (!f.terraformRange.trim()) throw new Error(t('errors.backendRangeRequired'))
+          constraints.terraform = f.terraformRange.trim()
+        }
+        if (Object.keys(constraints).length === 0) throw new Error(t('errors.backendRequired'))
+      }
+
       const attrs: Record<string, unknown> = {
         'display-name': f.displayName,
         description: f.description,
         enabled: f.enabled,
+        'self-contained': f.selfContained,
+        'execution-backend-constraints': f.restrictBackends || f.selfContained ? constraints : null,
         'default-version-pin': f.defaultVersionPin || null,
-        'provider-template-ids': f.providerTemplateIds,
+        'provider-template-ids': f.selfContained ? [] : f.providerTemplateIds,
         'allowed-agent-pool-ids': restrictPools ? (f.allowedPoolIds ?? []) : null,
         'variable-options': variableOptions,
         // Sent verbatim -- no trim, no case fold. The server validates and
@@ -372,8 +405,48 @@ export default function AdminCatalogPage() {
                   <span className="text-sm text-slate-300">{t('form.enabled')}</span>
                 </label>
 
-                {/* Provider templates multi-select */}
+                <label className="flex items-center gap-2 min-h-11 cursor-pointer">
+                  <input type="checkbox" checked={f.selfContained}
+                    onChange={(e) => setF({ ...f, selfContained: e.target.checked })}
+                    className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                  <span className="text-sm text-slate-300">{t('form.selfContained')}</span>
+                </label>
+                <p className="text-sm text-slate-400">{t('form.selfContainedHint')}</p>
+
                 <div>
+                  <label className="flex items-center gap-2 min-h-11 cursor-pointer">
+                    <input type="checkbox" checked={f.restrictBackends || f.selfContained} disabled={f.selfContained}
+                      onChange={(e) => setF({ ...f, restrictBackends: e.target.checked })}
+                      className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500 disabled:opacity-60" />
+                    <span className="text-sm text-slate-300">{t('form.restrictBackends')}</span>
+                  </label>
+                  {(f.restrictBackends || f.selfContained) && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-sm text-slate-400">{t('form.backendRangesHint')}</p>
+                      {(['tofu', 'terraform'] as const).map((backend) => (
+                        <div key={backend} className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                          <label className="flex items-center gap-2 min-h-11 cursor-pointer">
+                            <input type="checkbox" checked={backend === 'tofu' ? f.tofuEnabled : f.terraformEnabled}
+                              onChange={(e) => setF({ ...f, [backend === 'tofu' ? 'tofuEnabled' : 'terraformEnabled']: e.target.checked })}
+                              className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                            <span className="text-sm text-slate-300">{backend === 'tofu' ? 'OpenTofu' : 'Terraform'}</span>
+                          </label>
+                          <input id={`cat-${backend}-range`} type="text" aria-label={t('form.backendRange', { backend: backend === 'tofu' ? 'OpenTofu' : 'Terraform' })}
+                            value={backend === 'tofu' ? f.tofuRange : f.terraformRange}
+                            disabled={backend === 'tofu' ? !f.tofuEnabled : !f.terraformEnabled}
+                            onChange={(e) => setF({ ...f, [backend === 'tofu' ? 'tofuRange' : 'terraformRange']: e.target.value })}
+                            placeholder=">=1.12,<2"
+                            className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-base sm:text-sm disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Provider templates multi-select */}
+                {f.selfContained ? (
+                  <p className="text-sm text-slate-400">{f.providerTemplateIds.length > 0 ? t('form.templatesRemoved') : t('form.templatesUnavailable')}</p>
+                ) : <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">{t('form.providerTemplates')}</label>
                   {templates.length === 0 ? (
                     <p className="text-xs text-slate-500">{t('form.noProviderTemplates')}</p>
@@ -391,7 +464,7 @@ export default function AdminCatalogPage() {
                       })}
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {/* Allowed agent pools */}
                 <div>
@@ -529,6 +602,7 @@ export default function AdminCatalogPage() {
                             {item.attributes['display-name'] || item.attributes.name}
                           </Link>
                           <span className="block text-xs text-slate-500">{item.attributes.name}</span>
+                          {item.attributes['self-contained'] && <span className="text-xs text-slate-400">{t('badge.selfContained')}</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                           {item.attributes['module-name']}{item.attributes['module-provider'] ? `/${item.attributes['module-provider']}` : ''}

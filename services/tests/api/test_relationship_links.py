@@ -29,6 +29,7 @@ class TestCatalogInstance:
             name="inst",
             catalog_item_id=item,
             catalog_version_pin="1.0.0",
+            catalog_update_block=None,
             # The pool set is a relationship (#1087), not a column.
             agent_pool_links=(
                 [SimpleNamespace(agent_pool_id=pool, ordinal=0, agent_pool=None)] if pool else []

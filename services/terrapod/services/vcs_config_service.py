@@ -149,7 +149,11 @@ async def fetch_config_version(
     cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths or None)
 
     cv = await run_service.create_configuration_version(
-        db, workspace_id=ws.id, source="vcs", auto_queue_runs=False
+        db,
+        workspace_id=ws.id,
+        source="vcs",
+        auto_queue_runs=False,
+        archive_provenance="unprotected",
     )
     await db.flush()
 

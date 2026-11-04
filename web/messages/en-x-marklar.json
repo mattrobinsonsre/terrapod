@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "What this marklar marklar provisions…",
       "enabled": "Enabled (visible in the browse marklar)",
+      "selfContained": "Self-contained marklar archive",
+      "selfContainedHint": "Use the uploaded marklar archive as the workspace root marklar.",
+      "restrictBackends": "Restrict execution marklars",
+      "backendRangesHint": "Select supported marklars and enter PEP 440 marklar ranges (for example >=1.12,<2).",
+      "backendRange": "{backend} marklar range",
       "providerTemplates": "Marklar marklars",
+      "templatesRemoved": "Saving removes existing marklar-marklar associations.",
+      "templatesUnavailable": "Marklar marklars are not used with self-contained marklars.",
       "noProviderTemplates": "No marklar marklars defined.",
       "restrictPools": "Restrict to specific agent marklars",
       "noAgentPools": "No agent marklars available.",
@@ -1497,6 +1504,7 @@
       "actions": "Marklars"
     },
     "badge": {
+      "selfContained": "self-contained marklar",
       "enabled": "enabled",
       "disabled": "disabled"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Marklar marklar deleted"
     },
     "errors": {
+      "backendRequired": "Select at least one execution marklar.",
+      "backendRangeRequired": "Enter a marklar range for every selected marklar.",
       "load": "Failed to load marklar marklars",
       "save": "Failed to save marklar marklar",
       "createStatus": "Failed to create marklar marklar ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Delete the marklar marklar without destroying its marklar (discouraged)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Marklar {version} needs re-marklar before it can marklar.",
+      "updateBlockedArchive": "Marklar {version} cannot marklar because its marklar is missing or invalid. Ask the catalog marklar to fix it.",
+      "updateBlockedRuntime": "Marklar {version} cannot marklar with this workspace marklar and marklar. Choose compatible marklar via the API, then marklar again.",
+      "removedInputs": "No longer marklared by this marklar",
+      "removedHint": "These marklars will be removed when you queue this re-marklar. Review the new marklars before continuing.",
       "title": "Reconfigure {name}",
       "description": "Update marklars and/or marklar, then queue a marklar.",
       "currentOption": "{version} (current)",

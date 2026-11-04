@@ -17,6 +17,9 @@
 //	"display-name"           -> display_name            (string, optional)
 //	"description"            -> description             (string, optional)
 //	"enabled"                -> enabled                 (bool, optional)
+//	"self-contained"         -> self_contained          (bool, optional)
+//	"execution-backend-constraints" -> execution_backend_constraints
+//	    (map[string]string, optional; null -> no constraints)
 //	"default-version-pin"    -> default_version_pin     (string, optional)
 //	"provider-template-ids"  -> provider_template_ids   (list(string), optional)
 //	"allowed-agent-pool-ids" -> allowed_agent_pool_ids  (list(string), optional;
@@ -42,6 +45,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -64,16 +68,18 @@ var (
 type catalogItemModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name                types.String `tfsdk:"name"`
-	ModuleID            types.String `tfsdk:"module_id"`
-	DisplayName         types.String `tfsdk:"display_name"`
-	Description         types.String `tfsdk:"description"`
-	Enabled             types.Bool   `tfsdk:"enabled"`
-	DefaultVersionPin   types.String `tfsdk:"default_version_pin"`
-	ProviderTemplateIDs types.List   `tfsdk:"provider_template_ids"`
-	AllowedAgentPoolIDs types.List   `tfsdk:"allowed_agent_pool_ids"`
-	VariableOptionsJSON types.String `tfsdk:"variable_options_json"`
-	Labels              types.Map    `tfsdk:"labels"`
+	Name                        types.String `tfsdk:"name"`
+	ModuleID                    types.String `tfsdk:"module_id"`
+	DisplayName                 types.String `tfsdk:"display_name"`
+	Description                 types.String `tfsdk:"description"`
+	Enabled                     types.Bool   `tfsdk:"enabled"`
+	SelfContained               types.Bool   `tfsdk:"self_contained"`
+	ExecutionBackendConstraints types.Map    `tfsdk:"execution_backend_constraints"`
+	DefaultVersionPin           types.String `tfsdk:"default_version_pin"`
+	ProviderTemplateIDs         types.List   `tfsdk:"provider_template_ids"`
+	AllowedAgentPoolIDs         types.List   `tfsdk:"allowed_agent_pool_ids"`
+	VariableOptionsJSON         types.String `tfsdk:"variable_options_json"`
+	Labels                      types.Map    `tfsdk:"labels"`
 
 	// The Ansible half this item provisions (#2019): a workspace that is
 	// primarily Ansible, carrying only as much Terraform as it takes to declare
@@ -191,6 +197,16 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "Whether the catalog item is available for provisioning.",
 				Optional:    true,
 				Computed:    true,
+			},
+			"self_contained": schema.BoolAttribute{
+				Description: "Use the module archive as the root configuration rather than generating a wrapper. Requires execution_backend_constraints and cannot use provider templates.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"execution_backend_constraints": schema.MapAttribute{
+				Description: "Version ranges for allowed execution backends (tofu and/or terraform). Required for self-contained items; omit for wrapper items. Set to null to clear on update.",
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 			"default_version_pin": schema.StringAttribute{
 				Description: "Default module version pin offered when provisioning (e.g. \"~> 1.0\").",
@@ -322,7 +338,7 @@ func (r *catalogItemResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	attrs, diags := buildCatalogItemAttrs(&plan)
+	attrs, diags := buildCatalogItemAttrs(&plan, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -331,6 +347,11 @@ func (r *catalogItemResource) Create(ctx context.Context, req resource.CreateReq
 	ci, err := r.tc.CreateCatalogItem(ctx, attrs)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create catalog item", err.Error())
+		return
+	}
+	ci, err = r.readAuthoring(ctx, ci.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read created catalog item", err.Error())
 		return
 	}
 
@@ -345,7 +366,7 @@ func (r *catalogItemResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	ci, err := r.tc.GetCatalogItem(ctx, state.ID.ValueString())
+	ci, err := r.readAuthoring(ctx, state.ID.ValueString())
 	if err != nil {
 		if terrapod.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -372,7 +393,7 @@ func (r *catalogItemResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	attrs, diags := buildCatalogItemAttrs(&plan)
+	attrs, diags := buildCatalogItemAttrs(&plan, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -381,6 +402,11 @@ func (r *catalogItemResource) Update(ctx context.Context, req resource.UpdateReq
 	ci, err := r.tc.UpdateCatalogItem(ctx, state.ID.ValueString(), attrs)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update catalog item", err.Error())
+		return
+	}
+	ci, err = r.readAuthoring(ctx, ci.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read updated catalog item", err.Error())
 		return
 	}
 
@@ -405,9 +431,30 @@ func (r *catalogItemResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+func (r *catalogItemResource) readAuthoring(ctx context.Context, id string) (*terrapod.CatalogItem, error) {
+	// The ordinary SDK read masks defaults; state must reflect the managed value.
+	data, err := r.tc.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"?include-sensitive-values=true")
+	if err != nil {
+		return nil, err
+	}
+	res, err := terrapod.ParseResource(data)
+	if err != nil {
+		return nil, err
+	}
+	attrs := map[string]any{}
+	for key, raw := range res.Attributes {
+		var value any
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, fmt.Errorf("parse catalog item attribute %q: %w", key, err)
+		}
+		attrs[key] = value
+	}
+	return &terrapod.CatalogItem{ID: res.ID, Attributes: attrs, CreatedAt: attrString(attrs, "created-at"), UpdatedAt: attrString(attrs, "updated-at")}, nil
+}
+
 // buildCatalogItemAttrs converts the Terraform model into JSON:API
 // attributes for create/update. Computed-only attributes are omitted.
-func buildCatalogItemAttrs(m *catalogItemModel) (map[string]any, diag.Diagnostics) {
+func buildCatalogItemAttrs(m *catalogItemModel, onUpdate bool) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	attrs := map[string]any{
@@ -423,6 +470,35 @@ func buildCatalogItemAttrs(m *catalogItemModel) (map[string]any, diag.Diagnostic
 	}
 	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
 		attrs["enabled"] = m.Enabled.ValueBool()
+	}
+	if !m.SelfContained.IsNull() && !m.SelfContained.IsUnknown() {
+		attrs["self-contained"] = m.SelfContained.ValueBool()
+	}
+	if !m.ExecutionBackendConstraints.IsNull() && !m.ExecutionBackendConstraints.IsUnknown() {
+		if len(m.ExecutionBackendConstraints.Elements()) == 0 {
+			diags.AddError("Invalid execution_backend_constraints", "execution_backend_constraints must be a non-empty map of tofu and/or terraform version ranges; use null to clear it")
+			return nil, diags
+		}
+		constraints := map[string]string{}
+		for k, v := range m.ExecutionBackendConstraints.Elements() {
+			if k != "tofu" && k != "terraform" {
+				diags.AddError("Invalid execution_backend_constraints", fmt.Sprintf("Unsupported backend %q: use tofu or terraform", k))
+				return nil, diags
+			}
+			version, ok := v.(types.String)
+			if !ok || version.IsNull() || version.IsUnknown() {
+				diags.AddError("Invalid execution_backend_constraints", fmt.Sprintf("The version range for %s must be a known string", k))
+				return nil, diags
+			}
+			constraints[k] = version.ValueString()
+		}
+		attrs["execution-backend-constraints"] = constraints
+	} else if onUpdate && m.ExecutionBackendConstraints.IsNull() {
+		attrs["execution-backend-constraints"] = nil
+	}
+	if m.SelfContained.ValueBool() && m.ExecutionBackendConstraints.IsNull() {
+		diags.AddError("Missing execution_backend_constraints", "Self-contained catalog items require execution_backend_constraints")
+		return nil, diags
 	}
 	if !m.DefaultVersionPin.IsNull() && !m.DefaultVersionPin.IsUnknown() {
 		attrs["default-version-pin"] = m.DefaultVersionPin.ValueString()
@@ -510,6 +586,19 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 		}
 	} else {
 		m.Enabled = types.BoolNull()
+	}
+	if b, ok := ci.Attributes["self-contained"].(bool); ok {
+		m.SelfContained = types.BoolValue(b)
+	} else {
+		m.SelfContained = types.BoolNull()
+	}
+	constraints := attrStringMap(ci.Attributes, "execution-backend-constraints")
+	if len(constraints) > 0 {
+		mv, d := types.MapValueFrom(ctx, types.StringType, constraints)
+		diags.Append(d...)
+		m.ExecutionBackendConstraints = mv
+	} else {
+		m.ExecutionBackendConstraints = types.MapNull(types.StringType)
 	}
 
 	m.DefaultVersionPin = types.StringValue(attrString(ci.Attributes, "default-version-pin"))

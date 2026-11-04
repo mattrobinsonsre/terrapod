@@ -310,6 +310,31 @@ class TestThePerHostPartition:
         assert '"web1"' in web1 and '"web2"' not in web1
         assert '"web2"' in web2 and '"web1"' not in web2
 
+    async def test_more_hosts_than_open_handles_keep_every_event_in_order(self):
+        active = []
+        real = host_results_service._Partitioner
+
+        class _Spy(real):
+            def add(self, host, raw):
+                super().add(host, raw)
+                active.append(len(self._open_handles))
+
+        records = [
+            {"kind": "ok", "host": host, "seq": seq}
+            for seq, host in enumerate(("web1", "web2", "web3", "web1", "web2", "web3"))
+        ]
+        with (
+            patch.object(host_results_service, "MAX_OPEN_PARTITION_FILES", 2),
+            patch.object(host_results_service, "_Partitioner", _Spy),
+        ):
+            _, run, puts = await _ingest_capturing(records)
+
+        assert max(active) == 2
+        assert len(puts) == 3
+        for host in ("web1", "web2", "web3"):
+            expected = "".join(json.dumps(r) + "\n" for r in records if r["host"] == host)
+            assert _partition(puts, run, host) == expected.encode()
+
     async def test_the_partition_is_NOT_only_the_failures(self):
         """The trap. Rows hold `failed`/`unreachable`; the partition holds all.
 
@@ -414,8 +439,8 @@ class TestThePerHostPartition:
 class TestEveryHandleAndTheTempDirectoryAreReleased:
     """The partitioner's lifetime is a `with`, not a `try` around `flush` alone.
 
-    It opens one handle per host inside the streaming loop, so a cleanup that
-    guarded only `flush` left every handle open and the temp directory behind
+    It opens handles inside the streaming loop, so a cleanup that
+    guarded only `flush` left those handles open and the temp directory behind
     whenever anything between the two raised -- a storage error mid-stream, or a
     failing `db.flush`. That is one descriptor per host plus a full copy of the
     stream split by host: exactly the PVC-filling failure the cleanup exists to

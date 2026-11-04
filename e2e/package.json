@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
+    "@types/node": "26.6.3",
     "typescript": "^5"
   }
 }

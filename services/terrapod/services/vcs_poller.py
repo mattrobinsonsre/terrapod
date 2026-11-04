@@ -800,6 +800,7 @@ async def _create_vcs_run(
             source="vcs",
             auto_queue_runs=False,
             speculative=speculative,
+            archive_provenance="unprotected",
         )
         await db.flush()
 

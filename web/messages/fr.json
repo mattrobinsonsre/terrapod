@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Ce que provisionne cet élément de catalogue…",
       "enabled": "Activé (visible dans le catalogue parcourable)",
+      "selfContained": "Archive racine autonome",
+      "selfContainedHint": "Utilisez l''archive du module téléversée comme configuration racine de l''espace de travail.",
+      "restrictBackends": "Limiter les moteurs d''exécution",
+      "backendRangesHint": "Sélectionnez les moteurs compatibles et saisissez des plages de versions PEP 440 (par exemple >=1.12,<2).",
+      "backendRange": "Plage de versions de {backend}",
       "providerTemplates": "Modèles de fournisseur",
+      "templatesRemoved": "L''enregistrement supprime les associations existantes aux modèles de fournisseur.",
+      "templatesUnavailable": "Les modèles de fournisseur ne sont pas utilisés avec les éléments autonomes.",
       "noProviderTemplates": "Aucun modèle de fournisseur défini.",
       "restrictPools": "Restreindre à des pools d'agents spécifiques",
       "noAgentPools": "Aucun pool d'agents disponible.",
@@ -1497,6 +1504,7 @@
       "actions": "Actions"
     },
     "badge": {
+      "selfContained": "autonome",
       "enabled": "activé",
       "disabled": "désactivé"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Élément de catalogue supprimé"
     },
     "errors": {
+      "backendRequired": "Sélectionnez au moins un moteur d''exécution.",
+      "backendRangeRequired": "Saisissez une plage de versions pour chaque moteur sélectionné.",
       "load": "Échec du chargement des éléments de catalogue",
       "save": "Échec de l'enregistrement de l'élément de catalogue",
       "createStatus": "Échec de la création de l'élément de catalogue ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Supprimer l'enregistrement de catalogue sans détruire son infrastructure (déconseillé)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "La version {version} doit être reconfigurée avant de pouvoir s'exécuter.",
+      "updateBlockedArchive": "La version {version} ne peut pas s'exécuter : son archive est indisponible ou invalide. Demandez au responsable du catalogue de la corriger.",
+      "updateBlockedRuntime": "La version {version} ne peut pas utiliser le moteur et la version de cet espace de travail. Choisissez un moteur compatible via l''API, puis reconfigurez.",
+      "removedInputs": "Plus utilisés par cette version",
+      "removedHint": "Ces entrées seront supprimées lorsque vous mettrez cette reconfiguration en file d'attente. Vérifiez les nouveaux champs avant de continuer.",
       "title": "Reconfigurer {name}",
       "description": "Mettez à jour les entrées et/ou la version, puis mettez une exécution en file d'attente.",
       "currentOption": "{version} (actuelle)",

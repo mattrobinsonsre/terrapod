@@ -1144,12 +1144,39 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('catalog admin editor fits a phone with backend constraints and template warning', async ({ page }) => {
+    const item = { id: 'cat-0198e2e0-0000-7000-8000-00000000c030', type: 'catalog-items', attributes: {
+      name: 'phone-catalog-item', 'display-name': 'Phone catalog item', description: '', enabled: true,
+      'self-contained': false, 'execution-backend-constraints': null,
+      'module-id': 'mod-phone', 'module-name': 'network', 'module-provider': 'aws',
+      'default-version-pin': null, 'provider-template-ids': ['template-phone'],
+      'allowed-agent-pool-ids': null, 'variable-options': [], labels: {}, 'owner-email': '',
+    } };
+    await page.route((url) => url.pathname === '/api/terrapod/v1/catalog-items', (route) => route.fulfill({ json: {
+      data: [item],
+    } }));
+    await page.route(
+      (url) => url.pathname === `/api/terrapod/v1/catalog-items/${item.id}` && url.searchParams.get('include-sensitive-values') === 'true',
+      (route) => route.fulfill({ json: { data: item } }),
+    );
+    await page.goto('/admin/catalog');
+    await expect(page.getByRole('heading', { name: 'Catalog Admin' })).toBeVisible();
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByLabel('Self-contained root archive').check();
+    await page.getByLabel('OpenTofu', { exact: true }).check();
+    await page.locator('#cat-tofu-range').fill('>=1.12,<2');
+    await expect(page.getByText('Saving removes existing provider-template associations.')).toBeVisible();
+    await expect(page.locator('#cat-tofu-range')).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('a catalog item page fits a phone: provision form, interface and instances', async ({ page }) => {
     // The item, its form, interface and instances are stubbed so the page has
     // every section populated — including an instances table, which must
     // scroll inside its own container rather than widen the page.
     const itemId = 'cat-0198e2e0-0000-7000-8000-00000000c001';
     const base = `/api/terrapod/v1/catalog-items/${itemId}`;
+    const varsPath = '/api/v1/workspaces/ws-0198e2e0-0000-7000-8000-00000000c002/vars';
     const meta = { pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 } };
     const stubs: Record<string, unknown> = {
       [base]: {
@@ -1177,6 +1204,7 @@ test.describe('Responsive harness (phone viewport)', () => {
             fields: [
               { name: 'cidr_block_for_the_primary_network', type: 'string', description: 'The CIDR block.', required: true, sensitive: false, default: '10.0.0.0/16', options: null, source: 'module' },
               { name: 'environment', type: 'string', description: '', required: false, sensitive: false, default: 'dev', options: ['dev', 'staging', 'prod'], source: 'catalog' },
+              { name: 'terrapod_token', type: 'string', description: '', required: true, sensitive: true, default: null, options: null, source: 'module' },
             ],
           },
         },
@@ -1200,6 +1228,7 @@ test.describe('Responsive harness (phone viewport)', () => {
               name: 'e2e-network-instance-with-a-long-name',
               'catalog-item-id': itemId,
               'catalog-version-pin': '1.2.3',
+              'catalog-update-block': { version: '2.0.0', reason: 'inputs' },
               'agent-pool-id': null,
               'owner-email': 'admin@example.com',
               labels: {},
@@ -1210,8 +1239,29 @@ test.describe('Responsive harness (phone viewport)', () => {
       },
     };
     await page.route(
-      (url) => url.pathname in stubs,
-      (route) => route.fulfill({ json: stubs[new URL(route.request().url()).pathname] }),
+      (url) => url.pathname in stubs || url.pathname === '/api/terrapod/v1/catalog-instances/ws-0198e2e0-0000-7000-8000-00000000c002' || url.pathname === varsPath,
+      (route) => {
+        const url = new URL(route.request().url());
+        if (url.pathname === varsPath) {
+          return route.fulfill({ json: { data: [
+            { id: 'var-cidr', attributes: { key: 'cidr_block_for_the_primary_network', value: '10.1.0.0/16', sensitive: false, category: 'native', 'value-source': 'static' } },
+            { id: 'var-token', attributes: { key: 'terrapod_token', value: null, sensitive: true, category: 'native', 'value-source': 'static' } },
+          ], meta } });
+        }
+        if (url.pathname.endsWith('/catalog-instances/ws-0198e2e0-0000-7000-8000-00000000c002')) {
+          return route.fulfill({ json: { data: { attributes: {
+            'input-values': { cidr_block_for_the_primary_network: '10.0.0.0/16' },
+          } } } });
+        }
+        if (url.pathname === `${base}/form` && url.searchParams.get('version-pin') === 'latest') {
+          return route.fulfill({ json: { data: { attributes: {
+            'resolved-version': '2.0.0', fields: [
+              { name: 'new_network_name', type: 'string', description: '', required: true, sensitive: false, default: null, options: null, source: 'module' },
+            ],
+          } } } });
+        }
+        return route.fulfill({ json: stubs[url.pathname] });
+      },
     );
 
     await page.goto(`/catalog/${itemId}`);
@@ -1219,7 +1269,39 @@ test.describe('Responsive harness (phone viewport)', () => {
       page.getByRole('heading', { name: 'A network with a rather long display name to wrap on a phone' }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#prov-name')).toBeVisible();
+    const describedField = page.locator('#prov-cidr_block_for_the_primary_network');
+    const plainField = page.locator('#prov-environment');
+    await expect(describedField).toBeVisible();
+    await expect(plainField).toBeVisible();
+    await expect(page.locator('label[for="prov-terrapod_token"]')).toContainText('sensitive');
+    const describedBox = await describedField.boundingBox();
+    const plainBox = await plainField.boundingBox();
+    expect(describedBox).not.toBeNull();
+    expect(plainBox).not.toBeNull();
+    expect(plainBox!.y).toBeGreaterThan(describedBox!.y + describedBox!.height);
     await expect(page.getByText('e2e-network-instance-with-a-long-name')).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+    await page.getByRole('button', { name: 'Reconfigure' }).click();
+    await expect(page.getByText('Version 2.0.0 needs reconfiguration before it can run.')).toHaveCount(2);
+    await expect(page.locator('#recfg-cidr_block_for_the_primary_network')).toBeVisible();
+    await expect(page.locator('#recfg-cidr_block_for_the_primary_network')).toHaveValue('10.1.0.0/16');
+    await expect(page.locator('label[for="recfg-terrapod_token"]')).toContainText('sensitive');
+    await expect(page.locator('#recfg-terrapod_token')).toHaveValue('');
+    const input = page.locator('#recfg-cidr_block_for_the_primary_network');
+    await input.focus();
+    await page.keyboard.type('x');
+    await expect(input).toBeFocused();
+    await page.keyboard.type('y');
+    await expect(input).toBeFocused();
+    await page.selectOption('#recfg-version', '');
+    await expect(page.locator('#recfg-new_network_name')).toBeVisible();
+    await expect(page.getByText('No longer used by this version')).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.route((url) => url.pathname === varsPath, (route) => route.fulfill({ status: 403 }));
+    await page.getByRole('button', { name: 'Reconfigure' }).click();
+    await expect(page.locator('#recfg-cidr_block_for_the_primary_network')).toHaveValue('10.0.0.0/16');
+    await expect(page.locator('#recfg-terrapod_token')).toHaveValue('');
     await expectNoHorizontalPageScroll(page);
   });
 

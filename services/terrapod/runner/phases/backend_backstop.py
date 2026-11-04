@@ -30,10 +30,13 @@ def verify_local_backend(strip_dir: Path) -> str:
     unreadable state file)."""
     state_path = strip_dir / ".terraform" / "terraform.tfstate"
     backend_type = "MISSING"
+    state_config = {}
     try:
         with state_path.open() as f:
             data = json.load(f)
-        backend_type = data.get("backend", {}).get("type") or "MISSING"
+        backend = data.get("backend") or {}
+        backend_type = backend.get("type") or "MISSING"
+        state_config = backend.get("config") or {}
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         backend_type = "MISSING"
 
@@ -43,6 +46,12 @@ def verify_local_backend(strip_dir: Path) -> str:
             "A user-supplied override file appears to have displaced the "
             "Terrapod backend override. Remove any committed override.tf / "
             "*_override.tf that declares a 'backend' or 'cloud' block."
+        )
+
+    if state_config.get("path") not in (None, "terraform.tfstate"):
+        raise BackendBackstopError(
+            "the local backend must use terraform.tfstate, the file Terrapod "
+            "downloads and uploads for this workspace"
         )
 
     return backend_type

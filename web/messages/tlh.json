@@ -1472,7 +1472,14 @@
       "descriptionLabel": "QIj",
       "descriptionPlaceholder": "tetlh Doch vam cha'moHbogh…",
       "enabled": "chu'lu'pu' (laDmeH tetlhDaq legh)",
+      "selfContained": "nItebHa''be''bogh ''oHbogh wa''DIch tetlh",
+      "selfContainedHint": "Segh tetlh lI''lu''pu''bogh lo'' ''ej vum Daq wa''DIch De'' mojmoH.",
+      "restrictBackends": "vum Seghmey vuS",
+      "backendRangesHint": "vum Seghmey Qutlh wIv ''ej PEP 440 mI'' poHmey ghItlh (Da >=1.12,<2).",
+      "backendRange": "{backend} mI'' poH",
       "providerTemplates": "nobwI' De'wI'mey",
+      "templatesRemoved": "polDI'' nobwI'' De''wI''mey rarghbogh De'' ngo'' Qaw''lu''.",
+      "templatesUnavailable": "nIteb vumlaHbogh DochmeyvaD nobwI'' De''wI''mey lo''be''lu''.",
       "noProviderTemplates": "nobwI' De'wI' maQbe'.",
       "restrictPools": "Duy bIQ'a'mey papDaq tlhoy'",
       "noAgentPools": "Duy bIQ'a' Hutlh.",
@@ -1497,6 +1504,7 @@
       "actions": "vangmey"
     },
     "badge": {
+      "selfContained": "nIteb vumlaH",
       "enabled": "chu'lu'pu'",
       "disabled": "chu'Ha'lu'pu'"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "tetlh Doch Qaw'lu'pu'"
     },
     "errors": {
+      "backendRequired": "wa'' vum Segh ghap law'' wIv.",
+      "backendRangeRequired": "Hoch vum Segh wIvlu''pu''bogh mI'' poH ghItlh.",
       "load": "tetlh Dochmey ghelmeH lujpu'",
       "save": "tetlh Doch polmeH lujpu'",
       "createStatus": "tetlh Doch chenmoHmeH lujpu' ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "nISwI'Daj Qaw'be'taHvIS tetlh teywI' Qaw' (qeSbe'lu')"
     },
     "reconfigure": {
+      "updateBlockedInputs": "{version} nugh qa' patlh poQ bItaHpa'.",
+      "updateBlockedArchive": "{version} nugh Qay'be' De' ngaSbogh tetlh. tetlh pIn yIja'.",
+      "updateBlockedRuntime": "{version} vumlaHbe' Daqvam vum Segh mI' je lo'taHvIS. API lo' 'ej mI' Qutlh yIwIv, vaj yInumqa'.",
+      "removedInputs": "nughvam lo'be'choH De' chu'",
+      "removedHint": "qa' patlh DacheghDI' De'vam teqlu'. bItaHpa' De' chu' yIlegh.",
       "title": "{name} numtaHqa'",
       "description": "'elmey joq mI' choH, vaj Sar tlham.",
       "currentOption": "{version} (DaHjaj)",

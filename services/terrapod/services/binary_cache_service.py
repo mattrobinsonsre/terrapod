@@ -189,12 +189,13 @@ def _sealed() -> bool:
     return settings.registry.cache_only
 
 
-async def _cached_versions(db: AsyncSession, tool: str) -> list[str]:
+async def _cached_versions(db: AsyncSession, tool: str, os_: str | None = None) -> list[str]:
     """Distinct versions present in the binary cache for a tool, newest first
     (with major.minor shortcuts), shaped like ``list_available_versions``."""
-    result = await db.execute(
-        select(CachedBinary.version).where(CachedBinary.tool == tool).distinct()
-    )
+    query = select(CachedBinary.version).where(CachedBinary.tool == tool)
+    if os_ is not None:
+        query = query.where(CachedBinary.os == os_)
+    result = await db.execute(query.distinct())
     versions = sorted({row[0] for row in result.all()}, key=_version_sort_key, reverse=True)
     shortcuts: list[str] = []
     seen: set[str] = set()

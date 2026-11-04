@@ -70,7 +70,7 @@ dev:                ## Start Tilt development environment (port 10352)
 	tilt up --port 10352
 
 dev-down:           ## Stop Tilt
-	tilt down --port 10352
+	tilt down
 
 doctor:             ## Report container-store health (orphaned layers, free space)
 	@./scripts/doctor.sh
@@ -84,8 +84,14 @@ eval-down:          ## Delete the evaluation cluster
 
 # ── Utility ──────────────────────────────────────────────
 clean:              ## Clean build artifacts
+	@if [ -d provider/.dev-build/gnupg ]; then \
+		printf '%s\n' 'Refusing to remove an unmigrated provider signing key; run make dev first.' >&2; \
+		exit 1; \
+	fi
 	rm -rf services/.pytest_cache services/.coverage services/htmlcov
 	rm -rf dist/
+	$(MAKE) -C provider clean
+	rm -rf provider/.dev-build/
 
 test-down:          ## Tear down test containers
 	docker compose -f docker-compose.test.yml down -v

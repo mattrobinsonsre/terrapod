@@ -28,7 +28,8 @@ Format
 ``dlticket:{resource_kind}:{resource_id}:{user_email_b64}:{ttl}:{ts}:{sig}``
 
 * `resource_kind` — string discriminator the verifier uses to dispatch
-  ("cv" today; pluggable for state versions etc. later).
+  ("cv" for ordinary CVs, "cv-protected" for protected roots,
+  "cv-admin-only" for catalog wrappers containing provider templates).
 * `resource_id` — the resource's UUID (without prefix).
 * `user_email_b64` — the email of the user who minted the ticket.
   We don't *require* it for verification, but the download endpoint
@@ -57,6 +58,10 @@ DEFAULT_TTL_SECONDS = 300
 
 # Hard cap. A caller asking for more is silently clamped.
 MAX_TTL_SECONDS = 1800
+
+# Separate scope prevents pre-policy CV tickets from opening a protected archive.
+PROTECTED_CV_KIND = "cv-protected"
+ADMIN_ONLY_CV_KIND = "cv-admin-only"
 
 
 def _get_signing_key() -> bytes:

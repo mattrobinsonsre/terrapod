@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Opis",
       "descriptionPlaceholder": "Co ta pozycja katalogu udostępnia…",
       "enabled": "Włączone (widoczne w katalogu przeglądania)",
+      "selfContained": "Samodzielne archiwum główne",
+      "selfContainedHint": "Użyj przesłanego archiwum modułu jako konfiguracji głównej obszaru roboczego.",
+      "restrictBackends": "Ogranicz silniki wykonawcze",
+      "backendRangesHint": "Wybierz obsługiwane silniki i podaj zakresy wersji PEP 440 (np. >=1.12,<2).",
+      "backendRange": "Zakres wersji {backend}",
       "providerTemplates": "Szablony dostawców",
+      "templatesRemoved": "Zapisanie usuwa istniejące powiązania z szablonami dostawców.",
+      "templatesUnavailable": "Szablony dostawców nie są używane z samodzielnymi elementami.",
       "noProviderTemplates": "Nie zdefiniowano szablonów dostawców.",
       "restrictPools": "Ogranicz do określonych pul agentów",
       "noAgentPools": "Brak dostępnych pul agentów.",
@@ -1497,6 +1504,7 @@
       "actions": "Akcje"
     },
     "badge": {
+      "selfContained": "samodzielny",
       "enabled": "włączone",
       "disabled": "wyłączone"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Usunięto pozycję katalogu"
     },
     "errors": {
+      "backendRequired": "Wybierz co najmniej jeden silnik wykonawczy.",
+      "backendRangeRequired": "Podaj zakres wersji dla każdego wybranego silnika.",
       "load": "Nie udało się wczytać pozycji katalogu",
       "save": "Nie udało się zapisać pozycji katalogu",
       "createStatus": "Nie udało się utworzyć pozycji katalogu ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Usuń rekord katalogu bez niszczenia jego infrastruktury (odradzane)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Wersja {version} wymaga ponownej konfiguracji przed uruchomieniem.",
+      "updateBlockedArchive": "Wersja {version} nie może zostać uruchomiona, ponieważ archiwum jest niedostępne lub nieprawidłowe. Poproś właściciela katalogu o naprawę.",
+      "updateBlockedRuntime": "Wersja {version} nie może działać z silnikiem i wersją tego obszaru roboczego. Wybierz zgodną wersję przez API i skonfiguruj ponownie.",
+      "removedInputs": "Nie są już używane w tej wersji",
+      "removedHint": "Te dane wejściowe zostaną usunięte po dodaniu rekonfiguracji do kolejki. Przed kontynuowaniem sprawdź nowe pola.",
       "title": "Zmień konfigurację {name}",
       "description": "Zaktualizuj wejścia i/lub wersję, a następnie umieść przebieg w kolejce.",
       "currentOption": "{version} (bieżąca)",

@@ -131,7 +131,7 @@ spec:
               protocol: TCP
           env:
             - name: TERRAPOD_VERSION
-              value: {{ .Chart.AppVersion | quote }}
+              value: {{ .Values.api.devProviderVersion | default .Chart.AppVersion | quote }}
             - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
               valueFrom:
                 secretKeyRef:
@@ -277,8 +277,21 @@ spec:
                   name: {{ .Values.api.config.vcs.github.existingSecret }}
                   key: {{ .Values.api.config.vcs.github.existingSecretKey | default "webhook_secret" }}
             {{- end }}
-            {{- if (.Values.api.config.slack).existingSecret }}
+            {{- if and (.Values.api.config.slack).enabled (.Values.api.config.slack).existingSecret }}
             # Slack integration (#556) — bot/app/signing tokens via secretKeyRef.
+            #
+            # Gated on `enabled` AS WELL AS the Secret name (#2370). Keyed on the
+            # name alone, `enabled: false` left these three rendered, and because
+            # they are not `optional: true` a Secret that does not exist is fatal
+            # at container creation -- so an operator who had turned Slack OFF
+            # still got an API pod stuck in CreateContainerConfigError, and the
+            # obvious way to turn it off did not work.
+            #
+            # The encryption block above looks like the same shape and is not:
+            # its refs ARE `optional: true`, so a missing Secret cannot break
+            # that pod, and gating it on `enabled` would be wrong anyway -- an
+            # operator turning encryption off still needs the key to read what
+            # is already encrypted. Do not "fix" it to match this.
             - name: TERRAPOD_SLACK__BOT_TOKEN
               valueFrom:
                 secretKeyRef:

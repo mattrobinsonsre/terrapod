@@ -25,17 +25,27 @@ constraint rather than the two that happened to break. The second is the
 contrast the first cannot express: a database that stopped at a release line's
 head must reach the same schema as one migrated from nothing, which is the
 property an operator's upgrade actually depends on.
+
+The third test seeds historical CVs before the provenance migration and checks
+the migrated rows and database trigger, which model-created tables cannot test.
 """
 
 import asyncio
 import uuid
 
 import pytest
-from sqlalchemy import UniqueConstraint, make_url, text
-from sqlalchemy.ext.asyncio import create_async_engine
+from fastapi import HTTPException
+from sqlalchemy import UniqueConstraint, make_url, select, text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from terrapod.db.models import Base
+from terrapod.api.routers.config_versions import (
+    _effective_archive_provenance,
+    _require_archive_read,
+)
+from terrapod.db.models import Base, ConfigurationVersion, Run, Workspace
 from tests.db.test_migration_contract import _versions_dir
+from tests.integration.conftest import admin_user
 
 pytestmark = pytest.mark.integration
 
@@ -215,3 +225,119 @@ async def test_a_release_line_database_reaches_the_same_schema_as_a_fresh_one(ap
     assert not differ, (
         f"a database upgraded from the 1.11 head does not match one migrated from nothing: {differ}"
     )
+
+
+@pytest.mark.asyncio
+async def test_historical_archive_upgrade_preserves_unknown_and_enforces_immutability(
+    app, monkeypatch
+):
+    """The real migration leaves old bytes unattributed and installs its DB trigger."""
+    from alembic import command
+
+    url, base = await _throwaway_database(monkeypatch)
+    engine = create_async_engine(url)
+    try:
+        cfg = _alembic(url)
+        await asyncio.to_thread(command.upgrade, cfg, "9f5022744cbf")
+        workspace_id = uuid.uuid4()
+        ordinary_id, catalog_id, module_test_id, run_id = (uuid.uuid4() for _ in range(4))
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("INSERT INTO workspaces (id, name) VALUES (:id, :name)"),
+                {"id": workspace_id, "name": "historical-archive"},
+            )
+            for cv_id, source in (
+                (ordinary_id, "vcs"),
+                (catalog_id, "catalog"),
+                (module_test_id, "module-test"),
+            ):
+                await conn.execute(
+                    text(
+                        "INSERT INTO configuration_versions (id, workspace_id, source) "
+                        "VALUES (:id, :workspace_id, :source)"
+                    ),
+                    {"id": cv_id, "workspace_id": workspace_id, "source": source},
+                )
+            await conn.execute(
+                text(
+                    "INSERT INTO runs (id, workspace_id, source, module_overrides) "
+                    "VALUES (:id, :workspace_id, 'module-test', "
+                    '\'{"default/root/aws": "module_overrides/old.tar.gz"}\'::jsonb)'
+                ),
+                {"id": run_id, "workspace_id": workspace_id},
+            )
+
+        await asyncio.to_thread(command.upgrade, cfg, "head")
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+        async with sessions() as db:
+            ws = await db.get(Workspace, workspace_id)
+            ordinary = await db.get(ConfigurationVersion, ordinary_id)
+            catalog = await db.get(ConfigurationVersion, catalog_id)
+            module_test = await db.get(ConfigurationVersion, module_test_id)
+            run = await db.get(Run, run_id)
+            assert all(obj is not None for obj in (ws, ordinary, catalog, module_test))
+            assert run is not None
+            assert all(
+                cv.archive_provenance == "unknown" and cv.archive_module_id is None
+                for cv in (ordinary, catalog, module_test)
+            )
+            assert run.module_impact_module_id is None
+            assert _effective_archive_provenance(ordinary, ws) == "unprotected"
+            assert _effective_archive_provenance(catalog, ws) == "unknown"
+            assert await _require_archive_read(db, admin_user(), ordinary) == "unprotected"
+            for cv in (catalog, module_test):
+                with pytest.raises(HTTPException) as denied:
+                    await _require_archive_read(db, admin_user(), cv)
+                assert denied.value.status_code == 404
+
+            protected = ConfigurationVersion(
+                workspace_id=workspace_id,
+                source="module-test",
+                archive_provenance="protected",
+                archive_module_id=uuid.uuid4(),
+            )
+            db.add(protected)
+            await db.commit()
+            protected_id = protected.id
+
+        for provenance, module_id in (("protected", None), ("unprotected", uuid.uuid4())):
+            with pytest.raises(DBAPIError, match="ck_configuration_versions_archive_provenance"):
+                async with sessions() as db:
+                    db.add(
+                        ConfigurationVersion(
+                            workspace_id=workspace_id,
+                            archive_provenance=provenance,
+                            archive_module_id=module_id,
+                        )
+                    )
+                    await db.flush()
+
+        for column, value in (
+            ("archive_provenance", "unprotected"),
+            ("archive_module_id", str(uuid.uuid4())),
+        ):
+            # The column names are fixed test literals, never supplied by an HTTP client.
+            with pytest.raises(DBAPIError, match="configuration archive provenance is immutable"):
+                async with engine.begin() as conn:
+                    await conn.execute(
+                        # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                        text(f"UPDATE configuration_versions SET {column} = :value WHERE id = :id"),
+                        {"value": value, "id": protected_id},
+                    )
+
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE configuration_versions SET status = 'uploaded' WHERE id = :id"),
+                {"id": protected_id},
+            )
+        async with sessions() as db:
+            reloaded = await db.scalar(
+                select(ConfigurationVersion).where(ConfigurationVersion.id == protected_id)
+            )
+            assert reloaded is not None
+            assert reloaded.status == "uploaded"
+            assert reloaded.archive_provenance == "protected"
+            assert reloaded.archive_module_id == protected.archive_module_id
+    finally:
+        await engine.dispose()
+        await _drop_database(base, url)

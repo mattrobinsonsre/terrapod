@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Kuvaus",
       "descriptionPlaceholder": "Mitä tämä luettelokohde valmistelee…",
       "enabled": "Käytössä (näkyvissä selausluettelossa)",
+      "selfContained": "Itsenäinen juuritason arkisto",
+      "selfContainedHint": "Käytä ladattua moduuliarkistoa työtilan juurikonfiguraationa.",
+      "restrictBackends": "Rajoita suoritusmoottoreita",
+      "backendRangesHint": "Valitse tuetut moottorit ja anna PEP 440 -versioalueet (esimerkiksi >=1.12,<2).",
+      "backendRange": "Moottorin {backend} versioalue",
       "providerTemplates": "Palveluntarjoajamallit",
+      "templatesRemoved": "Tallentaminen poistaa olemassa olevat yhteydet palveluntarjoajamalleihin.",
+      "templatesUnavailable": "Palveluntarjoajamalleja ei käytetä itsenäisten kohteiden kanssa.",
       "noProviderTemplates": "Ei määritettyjä palveluntarjoajamalleja.",
       "restrictPools": "Rajoita tiettyihin agenttipooleihin",
       "noAgentPools": "Ei saatavilla olevia agenttipooleja.",
@@ -1497,6 +1504,7 @@
       "actions": "Toiminnot"
     },
     "badge": {
+      "selfContained": "itsenäinen",
       "enabled": "käytössä",
       "disabled": "poissa käytöstä"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Luettelokohde poistettu"
     },
     "errors": {
+      "backendRequired": "Valitse vähintään yksi suoritusmoottori.",
+      "backendRangeRequired": "Anna versioalue jokaiselle valitulle moottorille.",
       "load": "Luettelokohteiden lataaminen epäonnistui",
       "save": "Luettelokohteen tallentaminen epäonnistui",
       "createStatus": "Luettelokohteen luominen epäonnistui ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Poista luettelotietue tuhoamatta sen infrastruktuuria (ei suositella)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Versio {version} on määritettävä uudelleen ennen suoritusta.",
+      "updateBlockedArchive": "Versiota {version} ei voi suorittaa, koska arkisto puuttuu tai on virheellinen. Pyydä luettelon omistajaa korjaamaan se.",
+      "updateBlockedRuntime": "Versiota {version} ei voi suorittaa tämän työtilan taustajärjestelmällä ja versiolla. Valitse yhteensopiva versio API:n kautta ja määritä uudelleen.",
+      "removedInputs": "Ei enää käytössä tässä versiossa",
+      "removedHint": "Nämä syötteet poistetaan, kun lisäät uudelleenmäärityksen jonoon. Tarkista uudet kentät ennen jatkamista.",
       "title": "Määritä uudelleen {name}",
       "description": "Päivitä syötteet ja/tai versio ja aseta sitten ajo jonoon.",
       "currentOption": "{version} (nykyinen)",

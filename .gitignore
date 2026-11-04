@@ -72,6 +72,8 @@ reports/
 
 # Provider build artifacts
 provider/terraform-provider-terrapod
+# Local provider build artifacts and dev-only signing keys; never commit.
+provider/.dev-build/
 
 # Migration tool build artifacts
 migrate/terrapod-migrate

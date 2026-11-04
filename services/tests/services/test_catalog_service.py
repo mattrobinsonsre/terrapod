@@ -41,6 +41,24 @@ class TestRegistryHost:
         assert catalog_service._registry_host() == "terrapod.local"
 
 
+@pytest.mark.parametrize(
+    ("backend", "version", "expected"),
+    [
+        ("tofu", "1.13.2", True),
+        ("tofu", "1.14.0", False),
+        ("terraform", "1.13.2", False),
+        ("tofu", "1.13", False),
+        ("tofu", "not-a-version", False),
+    ],
+)
+def test_existing_catalog_runtime_must_match_the_current_constraints(backend, version, expected):
+    item = SimpleNamespace(
+        self_contained=True, execution_backend_constraints={"tofu": ">=1.12,<1.14"}
+    )
+    ws = SimpleNamespace(execution_backend=backend, engine_version=version)
+    assert catalog_service.runtime_matches_item(item, ws) is expected
+
+
 # ── derive_form ────────────────────────────────────────────────────────
 
 
@@ -76,6 +94,42 @@ class TestDeriveForm:
         fields = catalog_service.derive_form(item, inputs, [])
         assert fields[0]["default"] == "172.16.0.0/16"
         assert fields[0]["options"] == ["172.16.0.0/16"]
+
+    def test_sensitive_option_cannot_downgrade_a_module_input(self):
+        inputs = [{"name": "token", "sensitive": True}]
+        item = _item([{"name": "token", "sensitive": False}])
+        assert catalog_service.derive_form(item, inputs, [])[0]["sensitive"] is True
+
+    def test_sensitive_option_marks_a_visible_input(self):
+        inputs = [{"name": "token", "sensitive": False}]
+        item = _item([{"name": "token", "sensitive": True}])
+        assert catalog_service.derive_form(item, inputs, [])[0]["sensitive"] is True
+
+    def test_sensitive_default_is_optional_to_enter_but_remains_sensitive(self):
+        item = _item([{"name": "token", "default": "admin-only", "sensitive": True}])
+        field = catalog_service.derive_form(item, [{"name": "token", "required": True}], [])[0]
+        assert field["required"] is False
+        assert field["sensitive"] is True
+        _, values, sensitive, _ = catalog_service._resolve_inputs(
+            item, [{"name": "token", "required": True}], [], {"token": ""}
+        )
+        assert values["token"] == "admin-only"
+        assert sensitive == {"token"}
+
+
+@pytest.mark.parametrize("module_sensitive", [False, True])
+@pytest.mark.parametrize("option_sensitive", [False, True])
+def test_hidden_sensitive_default_never_enters_the_instance_snapshot(
+    module_sensitive, option_sensitive
+):
+    item = _item(
+        [{"name": "token", "hidden": True, "sensitive": option_sensitive, "default": "demo-only"}]
+    )
+    _, values, sensitive, _ = catalog_service._resolve_inputs(
+        item, [{"name": "token", "sensitive": module_sensitive}], [], {}
+    )
+    assert values == {"token": "demo-only"}
+    assert ("token" in sensitive) is (module_sensitive or option_sensitive)
 
 
 # ── render_wrapper_hcl ─────────────────────────────────────────────────
@@ -191,6 +245,211 @@ class TestInputVarRepr:
         assert catalog_service._input_var_repr(True) == ("true", True)
 
 
+class TestCatalogRuntime:
+    @pytest.mark.asyncio
+    async def test_provision_pins_selected_backend_version_before_creating_workspace(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", False)
+        item = MagicMock()
+        item.id = uuid.uuid4()
+        item.name = "root"
+        item.module = SimpleNamespace(id=uuid.uuid4(), name="root")
+        item.self_contained = True
+        item.execution_backend_constraints = {"terraform": ">=1.9,<2"}
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=MagicMock())
+        db.execute.return_value.scalar_one_or_none.return_value = None
+        db.add = MagicMock()
+        with (
+            patch.object(
+                catalog_service.binary_cache_service,
+                "list_available_versions",
+                AsyncMock(return_value=["1.9.8"]),
+            ) as versions,
+            patch.object(catalog_service, "_materialise", AsyncMock()),
+        ):
+            ws = await catalog_service.provision_instance(
+                db,
+                user_email="u@test.com",
+                item=item,
+                name="my-root",
+                agent_pool_id=uuid.uuid4(),
+                input_values={},
+                version_pin=None,
+                auto_apply=False,
+                labels={},
+                execution_backend="terraform",
+                engine_version="1.9",
+            )
+        assert (ws.execution_backend, ws.engine_version) == ("terraform", "1.9.8")
+        versions.assert_awaited_once_with("terraform")
+
+    @pytest.mark.asyncio
+    async def test_filters_versions_and_ignores_shortcuts(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", False)
+        item = SimpleNamespace(
+            execution_backend_constraints={"tofu": ">=1.12,<2"}, self_contained=True
+        )
+        with patch.object(
+            catalog_service.binary_cache_service,
+            "list_available_versions",
+            AsyncMock(return_value=["2.0", "2.0.0", "1.12", "1.12.6", "1.12.5", "1.11.9"]),
+        ) as versions:
+            result = await catalog_service._select_runtime(AsyncMock(), item, "tofu", "latest")
+        assert result == ("tofu", "1.12.6")
+        versions.assert_awaited_once_with("tofu")
+
+    @pytest.mark.asyncio
+    async def test_explicit_version_must_be_offered_and_compatible(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", False)
+        item = SimpleNamespace(
+            execution_backend_constraints={"terraform": ">=1.9,<2"}, self_contained=True
+        )
+        with patch.object(
+            catalog_service.binary_cache_service,
+            "list_available_versions",
+            AsyncMock(return_value=["1.10.1", "1.9.8", "1.9.7"]),
+        ):
+            assert await catalog_service._select_runtime(AsyncMock(), item, "terraform", "1.9") == (
+                "terraform",
+                "1.9.8",
+            )
+            for requested in ("1.8", "1.9.9"):
+                with pytest.raises(CatalogError, match="No available terraform version"):
+                    await catalog_service._select_runtime(AsyncMock(), item, "terraform", requested)
+
+    @pytest.mark.asyncio
+    async def test_rejects_unsupported_backend_without_looking_up_versions(self):
+        item = SimpleNamespace(
+            execution_backend_constraints={"tofu": ">=1.12"}, self_contained=True
+        )
+        with patch.object(
+            catalog_service.binary_cache_service, "list_available_versions", AsyncMock()
+        ) as versions:
+            with pytest.raises(CatalogError, match="not supported"):
+                await catalog_service._select_runtime(AsyncMock(), item, "terraform", "1.9.8")
+        versions.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sealed_mode_uses_the_current_db_and_cached_versions(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", True)
+        item = SimpleNamespace(
+            execution_backend_constraints={"tofu": ">=1.12,<2"}, self_contained=True
+        )
+        db = AsyncMock()
+        rowset = MagicMock()
+        rowset.all.return_value = [("1.12.6",)]
+        db.execute = AsyncMock(return_value=rowset)
+        with (
+            patch.object(
+                catalog_service.binary_cache_service, "list_available_versions", AsyncMock()
+            ) as versions,
+        ):
+            assert await catalog_service._select_runtime(db, item, "tofu", "1.12") == (
+                "tofu",
+                "1.12.6",
+            )
+        query = db.execute.await_args.args[0]
+        assert "cached_binaries.os = :os_1" in str(query)
+        assert query.compile().params["os_1"] == "linux"
+        versions.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sealed_cache_miss_refuses_before_workspace_is_created(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", True)
+        item = MagicMock()
+        item.module = SimpleNamespace(id=uuid.uuid4(), name="root")
+        item.execution_backend_constraints = {"tofu": ">=1.12"}
+        db = AsyncMock()
+        db.add = MagicMock()
+        rowset = MagicMock()
+        rowset.all.return_value = []
+        db.execute = AsyncMock(return_value=rowset)
+        with pytest.raises(CatalogError, match="No available tofu version"):
+            await catalog_service.provision_instance(
+                db,
+                user_email="u@test.com",
+                item=item,
+                name="my-root",
+                agent_pool_id=uuid.uuid4(),
+                input_values={},
+                version_pin=None,
+                auto_apply=False,
+                labels={},
+                execution_backend="tofu",
+                engine_version="1.12",
+            )
+        db.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_version_index_outage_is_not_silently_pinned(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", False)
+        item = SimpleNamespace(execution_backend_constraints={"tofu": ">=1.12"})
+        with patch.object(
+            catalog_service.binary_cache_service,
+            "list_available_versions",
+            AsyncMock(side_effect=OSError("index down")),
+        ):
+            with pytest.raises(
+                CatalogError, match="Could not check available tofu versions"
+            ) as exc:
+                await catalog_service._select_runtime(AsyncMock(), item, "tofu", "1.12")
+        assert exc.value.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_checks_selected_backend_before_mutating_workspace(self, monkeypatch):
+        monkeypatch.setattr(catalog_service.settings.registry, "cache_only", False)
+        item = SimpleNamespace(
+            execution_backend_constraints={"terraform": ">=1.9,<2"},
+            self_contained=False,
+            name="root",
+        )
+        ws = MagicMock(
+            catalog_item_id=uuid.uuid4(), execution_backend="tofu", engine_version="1.12"
+        )
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=item)
+        run = MagicMock()
+        with (
+            patch.object(
+                catalog_service.binary_cache_service,
+                "list_available_versions",
+                AsyncMock(return_value=["1.9.8"]),
+            ),
+            patch.object(
+                catalog_service, "_materialise", AsyncMock(return_value=run)
+            ) as materialise,
+        ):
+            assert (
+                await catalog_service.reconfigure_instance(
+                    db,
+                    user_email="u@test.com",
+                    ws=ws,
+                    input_values={},
+                    version_pin=None,
+                    auto_apply=False,
+                    execution_backend="terraform",
+                    engine_version="1.9",
+                )
+                is run
+            )
+            assert (ws.execution_backend, ws.engine_version) == ("terraform", "1.9.8")
+            with pytest.raises(CatalogError, match="not supported"):
+                await catalog_service.reconfigure_instance(
+                    db,
+                    user_email="u@test.com",
+                    ws=ws,
+                    input_values={},
+                    version_pin=None,
+                    auto_apply=False,
+                    execution_backend="tofu",
+                    engine_version="1.12",
+                )
+        assert (ws.execution_backend, ws.engine_version) == ("terraform", "1.9.8")
+        materialise.assert_awaited_once()
+
+
 # ── _build_tarball ─────────────────────────────────────────────────────
 
 
@@ -222,6 +481,16 @@ class TestResolveInputsOptions:
             _item(), self._MODULE_INPUTS, [], {"region": "anywhere"}
         )
         assert effective["region"] == "anywhere"
+
+    @pytest.mark.parametrize("value", [None, "  "])
+    def test_null_or_blank_required_input_is_missing(self, value):
+        with pytest.raises(CatalogError, match="Missing required input.*region"):
+            catalog_service._resolve_inputs(
+                _item(),
+                [{"name": "region", "type": "string", "required": True}],
+                [],
+                {"region": value},
+            )
 
 
 class TestBuildTarball:
@@ -313,14 +582,39 @@ class TestDestroyInstance:
 
 class TestReconfigureInstance:
     @pytest.mark.asyncio
-    async def test_replaces_vars_and_queues_catalog_run(self):
+    async def test_self_contained_item_without_uploaded_version_cannot_create_empty_root(self):
+        db = AsyncMock()
+        ws = MagicMock(id=uuid.uuid4())
+        item = MagicMock(self_contained=True, module=SimpleNamespace(id=uuid.uuid4()))
+        item.default_version_pin = None
+        with (
+            patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=None)),
+            patch("terrapod.storage.get_storage", return_value=MagicMock()),
+            pytest.raises(CatalogError, match="no uploaded module version"),
+        ):
+            await catalog_service._materialise(
+                db,
+                ws,
+                item,
+                input_values={},
+                version_pin=None,
+                auto_apply=False,
+                message="Catalog provision",
+                user_email="u@test.com",
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("version_pin", [None, "1.0.0"])
+    async def test_replaces_vars_and_queues_catalog_run(self, version_pin):
         item = MagicMock()
         item.module = SimpleNamespace(
             id=uuid.uuid4(), namespace="default", name="vpc", provider="aws"
         )
         item.provider_template_ids = []
         item.variable_options = []
-        item.default_version_pin = None
+        item.default_version_pin = "0.9.0"
+        item.self_contained = False
+        item.execution_backend_constraints = None
         # Set explicitly, and NOT noise to delete: `_materialise` reads the
         # item's Ansible half (#2019), and on a MagicMock an unset attribute is
         # a truthy auto-mock -- so omitting these makes provisioning try to copy
@@ -334,6 +628,7 @@ class TestReconfigureInstance:
         ws = MagicMock()
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
+        ws.catalog_update_block = {"version": "2.0.0", "reason": "inputs"}
 
         # A sensitive string input and a non-sensitive complex input — both must
         # become workspace terraform variables (the per-run vars Secret delivers
@@ -353,10 +648,17 @@ class TestReconfigureInstance:
         db = AsyncMock()
         db.get = AsyncMock(return_value=item)
         storage = MagicMock()
-        storage.put_stream = AsyncMock()
+        uploaded = []
+
+        async def capture_upload(_key, chunks, *, content_type):
+            uploaded.append(b"".join([chunk async for chunk in chunks]))
+
+        storage.put_stream = AsyncMock(side_effect=capture_upload)
 
         with (
-            patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)),
+            patch.object(
+                catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)
+            ) as resolve,
             patch.object(
                 catalog_service.variable_service,
                 "list_variables",
@@ -385,11 +687,12 @@ class TestReconfigureInstance:
                 user_email="u@test.com",
                 ws=ws,
                 input_values={"cidr": "10.0.0.0/16", "ports": [80, 443]},
-                version_pin="1.0.0",
+                version_pin=version_pin,
                 auto_apply=False,
             )
 
         assert result is run
+        assert ws.catalog_update_block is None
         # Old variable deleted; BOTH inputs recreated as workspace terraform vars.
         mock_del.assert_awaited_once_with(db, old_var)
         created = {c.kwargs["key"]: c.kwargs for c in mock_create_var.await_args_list}
@@ -405,9 +708,121 @@ class TestReconfigureInstance:
         # Only the NON-sensitive input is snapshotted in the plaintext
         # input-values column; the sensitive one is write-only.
         assert ws.catalog_input_values == {"ports": [80, 443]}
-        assert ws.catalog_version_pin == "1.0.0"
+        assert ws.catalog_version_pin == version_pin
+        assert resolve.await_args.args[2] == version_pin
         assert mock_create_run.await_args.kwargs["source"] == "catalog"
         storage.put_stream.assert_awaited_once()
+        with tarfile.open(fileobj=io.BytesIO(uploaded[0]), mode="r:gz") as tar:
+            main = tar.extractfile("main.tf").read().decode()
+        if version_pin is None:
+            assert "version =" not in main
+        else:
+            assert 'version = "1.0.0"' in main
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("old_sensitive", "new_sensitive", "inputs", "implicit", "accepted"),
+        [
+            (True, False, {}, True, False),
+            (True, False, {"token": ""}, False, False),
+            (True, False, {"token": "old-secret"}, False, False),
+            (True, False, {"token": "replacement"}, False, True),
+            (False, True, {"token": "old-secret"}, False, True),
+        ],
+    )
+    async def test_reconfigure_sensitivity_change_requires_fresh_value_on_downgrade(
+        self, old_sensitive, new_sensitive, inputs, implicit, accepted
+    ):
+        item = MagicMock()
+        item.module = SimpleNamespace(
+            id=uuid.uuid4(), namespace="default", name="vpc", provider="aws"
+        )
+        item.self_contained = False
+        item.provider_template_ids = []
+        item.variable_options = []
+        item.configure_enabled = False
+        mv = SimpleNamespace(
+            version="2.0.0",
+            inputs=[
+                {
+                    "name": "token",
+                    "type": "string",
+                    "required": True,
+                    "default": "old-secret",
+                    "sensitive": new_sensitive,
+                }
+            ],
+            outputs=[],
+        )
+        ws = MagicMock(id=uuid.uuid4())
+        old_var = SimpleNamespace(
+            key="token",
+            category="native",
+            value_source="static",
+            sensitive=old_sensitive,
+            value="old-secret",
+        )
+        db = AsyncMock()
+        cv = MagicMock(id=uuid.uuid4())
+        run = MagicMock()
+        storage = MagicMock()
+        storage.put_stream = AsyncMock()
+        with (
+            patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)),
+            patch.object(
+                catalog_service.variable_service,
+                "list_variables",
+                AsyncMock(return_value=[old_var]),
+            ),
+            patch.object(
+                catalog_service.variable_service, "delete_variable", AsyncMock()
+            ) as delete_var,
+            patch.object(
+                catalog_service.variable_service, "create_variable", AsyncMock()
+            ) as create_var,
+            patch.object(
+                catalog_service.run_service,
+                "create_configuration_version",
+                AsyncMock(return_value=cv),
+            ),
+            patch.object(catalog_service.run_service, "mark_configuration_uploaded", AsyncMock()),
+            patch.object(catalog_service.run_service, "create_run", AsyncMock(return_value=run)),
+            patch.object(catalog_service.run_service, "queue_run", AsyncMock(return_value=run)),
+            patch("terrapod.storage.get_storage", return_value=storage),
+        ):
+            if accepted:
+                result = await catalog_service._materialise(
+                    db,
+                    ws,
+                    item,
+                    input_values=inputs,
+                    version_pin="2.0.0",
+                    auto_apply=False,
+                    message="Catalog reconfigure",
+                    user_email="u@test.com",
+                    input_values_implicit=implicit,
+                )
+                assert result is run
+                assert create_var.await_args.kwargs["sensitive"] is new_sensitive
+                assert ws.catalog_input_values == (
+                    {} if new_sensitive else {"token": "replacement"}
+                )
+                delete_var.assert_awaited_once_with(db, old_var)
+            else:
+                with pytest.raises(CatalogError, match="requires a new value"):
+                    await catalog_service._materialise(
+                        db,
+                        ws,
+                        item,
+                        input_values=inputs,
+                        version_pin="2.0.0",
+                        auto_apply=False,
+                        message="Catalog reconfigure",
+                        user_email="u@test.com",
+                        input_values_implicit=implicit,
+                    )
+                delete_var.assert_not_awaited()
+                create_var.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_missing_required_input_rejected(self):
@@ -427,6 +842,8 @@ class TestReconfigureInstance:
         item.ansible_directory = ""
         item.default_playbook = ""
         item.default_limit = ""
+        item.self_contained = False
+        item.execution_backend_constraints = None
         ws = MagicMock()
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
@@ -490,6 +907,8 @@ class TestTheAnsibleHalfACatalogItemProvisions:
         item.variable_options = []
         item.default_version_pin = None
         item.configure_enabled = kw.get("configure_enabled", True)
+        item.self_contained = False
+        item.execution_backend_constraints = None
         item.ansible_directory = kw.get("ansible_directory", "ansible")
         item.default_playbook = kw.get("default_playbook", "site.yml")
         item.default_limit = kw.get("default_limit", "")
@@ -671,3 +1090,99 @@ class TestTheAnsibleHalfACatalogItemProvisions:
             n.startswith("ansible/") or n in {"main.tf", "providers.tf", "outputs.tf"}
             for n in members
         ), sorted(members)
+
+
+class TestVersionedReconfigure:
+    @pytest.mark.asyncio
+    async def test_implicit_saved_inputs_drop_removed_names_but_require_new_ones(self):
+        module = SimpleNamespace(id=uuid.uuid4(), namespace="default", name="root", provider="aws")
+        item = SimpleNamespace(
+            module=module,
+            name="root",
+            provider_template_ids=[],
+            variable_options=[],
+            default_version_pin="1.0.0",
+            self_contained=False,
+            execution_backend_constraints=None,
+            configure_enabled=False,
+            ansible_directory="",
+            default_playbook="",
+            default_limit="",
+        )
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = uuid.uuid4()
+        ws.catalog_version_pin = None
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12"
+        mv = SimpleNamespace(
+            version="2.0.0",
+            inputs=[
+                {"name": "kept", "type": "string", "required": True},
+                {"name": "added", "type": "string", "required": True},
+            ],
+            outputs=[],
+        )
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=item)
+        cv = MagicMock(id=uuid.uuid4())
+        run = MagicMock()
+        storage = MagicMock()
+        storage.put_stream = AsyncMock()
+        with (
+            patch.object(
+                catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)
+            ) as resolve,
+            patch.object(
+                catalog_service.variable_service, "list_variables", AsyncMock(return_value=[])
+            ),
+            patch.object(
+                catalog_service.variable_service, "create_variable", AsyncMock()
+            ) as create_var,
+            patch.object(
+                catalog_service.run_service,
+                "create_configuration_version",
+                AsyncMock(return_value=cv),
+            ) as create_cv,
+            patch.object(catalog_service.run_service, "mark_configuration_uploaded", AsyncMock()),
+            patch.object(catalog_service.run_service, "create_run", AsyncMock(return_value=run)),
+            patch.object(catalog_service.run_service, "queue_run", AsyncMock()),
+            patch("terrapod.storage.get_storage", return_value=storage),
+        ):
+            with pytest.raises(CatalogError, match="Missing required input.*added"):
+                await catalog_service.reconfigure_instance(
+                    db,
+                    user_email="u@test.com",
+                    ws=ws,
+                    input_values={"kept": "saved", "removed": "old"},
+                    input_values_implicit=True,
+                    version_pin=None,
+                    auto_apply=False,
+                )
+            with pytest.raises(CatalogError, match="Unknown input.*removed"):
+                await catalog_service.reconfigure_instance(
+                    db,
+                    user_email="u@test.com",
+                    ws=ws,
+                    input_values={"kept": "saved", "added": "entered", "removed": "old"},
+                    version_pin=None,
+                    auto_apply=False,
+                )
+            create_cv.assert_not_awaited()
+
+            result = await catalog_service.reconfigure_instance(
+                db,
+                user_email="u@test.com",
+                ws=ws,
+                input_values={"kept": "saved", "added": "entered", "removed": "old"},
+                input_values_implicit=True,
+                version_pin=None,
+                auto_apply=False,
+            )
+
+        assert result is run
+        assert ws.catalog_version_pin is None
+        assert resolve.await_args.args[2] is None
+        assert ws.catalog_input_values == {"kept": "saved", "added": "entered"}
+        assert {call.kwargs["key"] for call in create_var.await_args_list} == {"kept", "added"}
+        create_cv.assert_awaited_once()

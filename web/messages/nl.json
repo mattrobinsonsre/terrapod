@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Beschrijving",
       "descriptionPlaceholder": "Wat dit catalogusitem provisioneert…",
       "enabled": "Ingeschakeld (zichtbaar in de bladercatalogus)",
+      "selfContained": "Zelfstandig rootarchief",
+      "selfContainedHint": "Gebruik het geüploade modulearchief als rootconfiguratie van de werkruimte.",
+      "restrictBackends": "Uitvoeringsbackends beperken",
+      "backendRangesHint": "Selecteer ondersteunde backends en voer PEP 440-versiebereiken in (bijvoorbeeld >=1.12,<2).",
+      "backendRange": "Versiebereik voor {backend}",
       "providerTemplates": "Providersjablonen",
+      "templatesRemoved": "Bij opslaan worden bestaande koppelingen met providersjablonen verwijderd.",
+      "templatesUnavailable": "Providersjablonen worden niet gebruikt voor zelfstandige items.",
       "noProviderTemplates": "Geen providersjablonen gedefinieerd.",
       "restrictPools": "Beperken tot specifieke agent-pools",
       "noAgentPools": "Geen agent-pools beschikbaar.",
@@ -1497,6 +1504,7 @@
       "actions": "Acties"
     },
     "badge": {
+      "selfContained": "zelfstandig",
       "enabled": "ingeschakeld",
       "disabled": "uitgeschakeld"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Catalogusitem verwijderd"
     },
     "errors": {
+      "backendRequired": "Selecteer ten minste één uitvoeringsbackend.",
+      "backendRangeRequired": "Voer voor elke geselecteerde backend een versiebereik in.",
       "load": "Kan catalogusitems niet laden",
       "save": "Kan catalogusitem niet opslaan",
       "createStatus": "Kan catalogusitem niet aanmaken ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Verwijder de catalogusregistratie zonder de infrastructuur te vernietigen (afgeraden)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Versie {version} moet opnieuw worden geconfigureerd voordat deze kan draaien.",
+      "updateBlockedArchive": "Versie {version} kan niet draaien omdat het archief ontbreekt of ongeldig is. Vraag de catalogusbeheerder dit te herstellen.",
+      "updateBlockedRuntime": "Versie {version} kan niet draaien met de backend en versie van deze werkruimte. Kies via de API een compatibele runtime en configureer opnieuw.",
+      "removedInputs": "Niet meer gebruikt door deze versie",
+      "removedHint": "Deze invoer wordt verwijderd zodra u deze herconfiguratie in de wachtrij plaatst. Controleer de nieuwe velden voordat u doorgaat.",
       "title": "{name} herconfigureren",
       "description": "Werk inputs en/of versie bij en zet vervolgens een uitvoering in de wachtrij.",
       "currentOption": "{version} (huidig)",

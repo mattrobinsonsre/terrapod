@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "What this catalog item provisions…",
       "enabled": "Enabled (in the browse catalog, visible)",
+      "selfContained": "Root archive, self-contained",
+      "selfContainedHint": "As the workspace root configuration, the uploaded module archive use.",
+      "restrictBackends": "Execution backends, restrict",
+      "backendRangesHint": "Supported backends, select; PEP 440 version ranges, enter (for example >=1.12,<2).",
+      "backendRange": "Version range of {backend}",
       "providerTemplates": "templates, Provider",
+      "templatesRemoved": "Existing provider-template associations, saving removes.",
+      "templatesUnavailable": "With self-contained items, provider templates used they are not.",
       "noProviderTemplates": "No provider templates defined, there are.",
       "restrictPools": "To specific agent pools, restrict",
       "noAgentPools": "No agent pools available, there are.",
@@ -1497,6 +1504,7 @@
       "actions": "Actions"
     },
     "badge": {
+      "selfContained": "self-contained, it is",
       "enabled": "enabled",
       "disabled": "disabled"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Deleted, the catalog item was"
     },
     "errors": {
+      "backendRequired": "At least one execution backend, select you must.",
+      "backendRangeRequired": "For every selected backend, a version range enter you must.",
       "load": "Load the catalog items, it did not",
       "save": "Save the catalog item, it did not",
       "createStatus": "Create the catalog item, it did not ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Without destroying its infrastructure, the catalog record delete (discouraged)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Version {version}, reconfigure it you must before it can run.",
+      "updateBlockedArchive": "Version {version} cannot run; missing or invalid its archive is. Ask the catalog owner to fix it, you must.",
+      "updateBlockedRuntime": "Version {version} run with this workspace''s backend and version cannot. A compatible runtime via the API choose, then reconfigure you must.",
+      "removedInputs": "Used by this version no longer, they are",
+      "removedHint": "Removed when this reconfiguration you queue, these inputs will be. Review the new fields before continuing, you must.",
       "title": "Reconfigure {name}",
       "description": "Inputs and/or version, update, then a run queue.",
       "currentOption": "{version} (current)",

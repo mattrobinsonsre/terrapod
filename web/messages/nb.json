@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Beskrivelse",
       "descriptionPlaceholder": "Hva dette katalogelementet klargjør …",
       "enabled": "Aktivert (synlig i bla-gjennom-katalogen)",
+      "selfContained": "Selvstendig rotarkiv",
+      "selfContainedHint": "Bruk det opplastede modularkivet som rotkonfigurasjon for arbeidsområdet.",
+      "restrictBackends": "Begrens kjøringsmotorer",
+      "backendRangesHint": "Velg støttede motorer og oppgi PEP 440-versjonsområder (for eksempel >=1.12,<2).",
+      "backendRange": "Versjonsområde for {backend}",
       "providerTemplates": "Leverandørmaler",
+      "templatesRemoved": "Lagring fjerner eksisterende koblinger til leverandørmaler.",
+      "templatesUnavailable": "Leverandørmaler brukes ikke med selvstendige elementer.",
       "noProviderTemplates": "Ingen leverandørmaler definert.",
       "restrictPools": "Begrens til bestemte agentpuljer",
       "noAgentPools": "Ingen agentpuljer tilgjengelig.",
@@ -1497,6 +1504,7 @@
       "actions": "Handlinger"
     },
     "badge": {
+      "selfContained": "selvstendig",
       "enabled": "aktivert",
       "disabled": "deaktivert"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Katalogelement slettet"
     },
     "errors": {
+      "backendRequired": "Velg minst én kjøringsmotor.",
+      "backendRangeRequired": "Oppgi et versjonsområde for hver valgt motor.",
       "load": "Kunne ikke laste katalogelementer",
       "save": "Kunne ikke lagre katalogelement",
       "createStatus": "Kunne ikke opprette katalogelement ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Slett katalogposten uten å rive ned infrastrukturen (frarådes)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Versjon {version} må konfigureres på nytt før den kan kjøres.",
+      "updateBlockedArchive": "Versjon {version} kan ikke kjøres fordi arkivet mangler eller er ugyldig. Be katalogeieren rette det.",
+      "updateBlockedRuntime": "Versjon {version} kan ikke kjøres med dette arbeidsområdets backend og versjon. Velg en kompatibel versjon via API-et og konfigurer på nytt.",
+      "removedInputs": "Brukes ikke lenger av denne versjonen",
+      "removedHint": "Disse inndataene fjernes når du legger omkonfigureringen i kø. Se gjennom de nye feltene før du fortsetter.",
       "title": "Rekonfigurer {name}",
       "description": "Oppdater inndata og/eller versjon, og legg deretter en kjøring i kø.",
       "currentOption": "{version} (nåværende)",

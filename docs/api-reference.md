@@ -892,7 +892,7 @@ Workspaces carry two attributes that govern the optional AI plan-summary feature
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
+| `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (summarise when globally enabled), or `"disabled"` (skip ordinary summaries). A mandatory AI policy gate ignores this summary preference: it still calls the model for a verdict and can produce a summary. |
 | `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
 | `ai-policy-mode` | string | `"default"` | Per-workspace override for the AI **policy gate** (#1766). One of `"default"` (follow the deployment setting), `"enabled"`, or `"disabled"`. **`"disabled"` is the only value with an effect**, and it opts out of an **advisory** verdict only — a `mandatory` gate ignores it, so a fleet-wide blocking control cannot be switched off per workspace. `"enabled"` is accepted as a synonym for `"default"` and changes nothing: a workspace cannot opt into a gate the deployment has not enabled, and when the deployment *has* enabled it the level is already either advisory or mandatory, so there is nothing to raise. |
 | `slack-channel` | string | `""` | Opt-in Slack channel (name or ID) this workspace's run notifications post to (#556) — approval requests, applies, errors, drift. Empty = silent (there is no deployment-wide fan-out). Only effective when the Slack app is enabled server-side (`api.config.slack.enabled`). See [slack-integration.md](slack-integration.md). |
@@ -2246,7 +2246,7 @@ No auth required (presigned URL).
 GET /api/tfe/v2/configuration-versions/{cv_id}
 ```
 
-Returns a single CV's metadata.
+Returns a single CV's metadata. Requires workspace `config:read`; lack of access returns `404`. The response does not include internal archive provenance or its originating module ID. Metadata access does not grant access to the archive bytes.
 
 ### List Configuration Versions
 
@@ -2274,7 +2274,9 @@ Streams the tarball bytes back as `application/x-tar` with a `Content-Dispositio
 - 409 — CV exists but bytes haven't been uploaded yet
 - 410 — CV row exists but tarball was swept by retention
 
-**Required permission:** `read` on the owning workspace.
+**Required permission:** workspace `config:read`, plus an archive-specific gate for human byte access. A self-contained catalog root (including module-publish and module-PR copies) also needs `registry:read` on its recorded originating module. A catalog wrapper containing provider templates has verbatim provider HCL and instead needs effective platform `admin` (in addition to `config:read`); catalog `admin`, module `registry:read` and platform `audit` alone are not enough. An ordinary wrapper without provider templates needs only `config:read`. The same rules apply to ticket minting and to **each** side of a diff.
+
+Archive classification is immutable and internal, not inferred from the CV's caller-supplied `source`. The migration does not backfill historical rows: unknown old catalog and module-test archives are denied to human readers, as is a protected archive whose originating module has been deleted. During a mixed-version upgrade, a CV written by an older replica with a known ordinary `source` (`tfe-api`, `cli`, `vcs` or `drift-detection`) on a non-catalog workspace remains directly downloadable and can mint a standard `cv` ticket even with stored unknown provenance; an unknown CV on a catalog-managed workspace does not. These checks do not restrict runner-scoped retrieval of its run's archive or direct registry module downloads.
 
 ### Mint Download Ticket (Terrapod extension)
 
@@ -2305,7 +2307,7 @@ TTL defaults to 300 s, hard-capped at 1800 s. Negative or zero values fall back 
 }
 ```
 
-**Required permission:** `read` on the owning workspace (same gate as the direct download).
+**Required permission:** the same archive-read gate as direct download: workspace `config:read`, plus originating module `registry:read` for self-contained roots, or effective platform `admin` for wrappers with provider templates.
 
 ### Download by Ticket (Terrapod extension)
 
@@ -2313,12 +2315,13 @@ TTL defaults to 300 s, hard-capped at 1800 s. Negative or zero values fall back 
 GET /api/v1/configuration-versions/download-by-ticket/{ticket}
 ```
 
-Streams the tarball — no `Authorization` header. The ticket is the auth: HMAC-SHA256 over the resource id, expiry, and minter email, signed with the same key class as runner tokens. Single-resource (a CV-X ticket cannot fetch CV-Y); short TTL bounds replay.
+Streams the tarball — no `Authorization` header. The ticket is the auth: HMAC-SHA256 over the resource id, expiry, and minter email, signed with the same key class as runner tokens. Single-resource (a CV-X ticket cannot fetch CV-Y); default five-minute TTL, capped at 30 minutes. Protected roots and admin-only provider-template wrappers have **separate signed ticket scopes** from ordinary CVs and from each other; old ordinary `cv` tickets cannot open either. Authorization is checked at mint, after which the new ticket remains a bearer capability until expiry even if the minter loses a grant; keep its URL private. Unknown catalog/module-test archive provenance cannot be redeemed, and the originating module must still exist for a protected ticket.
 
 **Status codes:**
 - 200 — streaming tarball
 - 401 — malformed, expired, or bad-signature ticket
 - 410 — CV bytes swept by retention since mint
+- 410 — protected CV's originating module was deleted after mint
 
 ### Diff Configuration Versions (Terrapod extension)
 
@@ -2327,6 +2330,7 @@ POST /api/v1/configuration-versions/diff
 ```
 
 Compares two CVs in the same workspace and returns per-file unified diffs.
+Both archives must pass the direct-download gate independently: workspace `config:read`, plus module `registry:read` for each protected self-contained side or effective platform `admin` for each provider-template wrapper side. A diff containing unknown historic catalog/module-test provenance or a deleted originating module is refused.
 
 **Request body:**
 ```json
@@ -5711,7 +5715,7 @@ POST /api/v1/runs/{run_id}/cost-summary/messages
 
 ## Service Catalog
 
-No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning it creates an agent-mode, non-VCS, catalog-managed workspace whose configuration is a server-generated wrapper. See [Service Catalog](service-catalog.md) for the full feature doc.
+No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning creates an agent-mode, non-VCS, catalog-managed workspace. By default the configuration is a server-generated wrapper; `self-contained` items use the selected module archive as the root. See [Service Catalog](service-catalog.md) for the full feature doc and current self-contained limitations.
 
 All endpoints below are **gated on `catalog.enabled`** (Helm: `api.config.catalog.enabled`, default `true`). When the catalog is disabled every endpoint returns `404`. The `catalog_permission` role axis is opt-in (default `none`), so the feature being enabled grants no access on its own.
 
@@ -5719,7 +5723,7 @@ Catalog access is governed by a dedicated role axis, `catalog-permission` (`none
 
 ### Provider Templates
 
-Admin-managed parameterised provider configs rendered into the generated `providers.tf`. **Write** requires platform `admin`; **list/show** require platform `admin` or `audit`.
+Admin-managed parameterised provider configs rendered into the generated `providers.tf`. **Write** requires platform `admin`; **list/show** require platform `admin` or `audit`. Ordinary list/show and create/update responses redact the HCL `body` (`null`) and sensitive parameter defaults, options and descriptions, even for platform admins.
 
 #### List Provider Templates
 
@@ -5768,6 +5772,8 @@ PATCH  /api/v1/provider-templates/{id}
 DELETE /api/v1/provider-templates/{id}
 ```
 
+For the complete authoring body and parameters, a **platform admin** must explicitly call `GET /api/v1/provider-templates/{id}?include-sensitive-values=true`. `false` or omission returns the redacted view; other values return `422`. Audit cannot opt in (`403`). This option is show-only, not a way to reveal a list.
+
 ### Catalog Items
 
 A blessed designation over a registry module. **Write** (create/update/delete) requires platform `admin`. **List/show** require catalog `read` and are **filtered per item** to those the caller's role matches.
@@ -5778,7 +5784,7 @@ A blessed designation over a registry module. **Write** (create/update/delete) r
 GET /api/v1/catalog-items
 ```
 
-Returns only items the caller's `catalog-permission` matches.
+Returns only items the caller's `catalog-permission` matches. Entries are always redacted: **every** authored variable option omits `default` and `options`, even if the currently selected module version calls that input non-sensitive. Changing the version pin could change its sensitivity. Ordinary show, create and update responses use the same representation, including for platform admins; they retain only present `name`, `hidden`, `sensitive`, `description`, `type` and `required` fields, not unknown nested authoring metadata. Use the selected-version `/form` to see non-sensitive defaults and choices.
 
 #### Create Catalog Item
 
@@ -5817,7 +5823,9 @@ POST /api/v1/catalog-items
 | `display-name` | Human-facing name shown in the catalog UI. |
 | `description` | Free text. |
 | `enabled` | When `false`, the item is visible but provisioning is rejected with `409`. |
-| `module-id` | The registry module this item wraps. |
+| `module-id` | The registry module this item uses. |
+| `self-contained` | Opt in to using the uploaded module archive as the workspace root (`false` by default). Provider templates are rejected in this mode. |
+| `execution-backend-constraints` | Object mapping supported `tofu` and/or `terraform` backends to PEP 440 version specifiers, e.g. `{"tofu": ">=1.12,<2"}`. Required for self-contained items; absent on existing wrapper items means unrestricted. |
 | `default-version-pin` | Default module-version pin new instances inherit. Omit for **float** (track latest published). |
 | `provider-template-ids` | Provider templates rendered into the generated wrapper. |
 | `allowed-agent-pool-ids` | Pools an instance may bind to. `null` = any pool the provisioner has `write` on. |
@@ -5834,21 +5842,23 @@ DELETE /api/v1/catalog-items/{id}
 
 Delete returns `409` while the item has any instances — destroy or migrate them first.
 
+Only `GET /api/v1/catalog-items/{id}?include-sensitive-values=true` returns the complete `variable-options` for **platform-admin authoring**. `false` or omission redacts all authored defaults and choices; other values return `422`; a non-platform-admin opt-in returns `403` even with catalog `admin` or item ownership. There is no opt-in on the list, `/form`, `/interface` or instance reads. The admin UI and the OpenTofu/Terraform provider request the explicit show form; ordinary go-terrapod GET/list methods return redacted data. `/form` independently resolves the requested version and retains defaults/choices only for non-sensitive visible inputs.
+
 #### Provision Form
 
 ```
-GET /api/v1/catalog-items/{id}/form
+GET /api/v1/catalog-items/{id}/form[?version-pin=latest|1.2.3]
 ```
 
-Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. It also returns `interface-error`, `null` unless the module version's interface could not be read — in which case the form may be missing variables the module needs, and the reason says why. **Required permission:** catalog `read`.
+Returns the resolved provision form: `resolved-version` (the item default when no query is supplied, the latest uploaded version for `version-pin=latest`, or an exact selected upload) and `fields[]` — one field per resolved input (the module's curated variables plus provider-template parameters on wrapper items), with type, description, default, sensitivity, and any enum choices for non-sensitive fields. Hidden fields are absent; sensitive fields have `default: null`, `options: null` and an empty description. Wrapper items read the registry's stored interface. Self-contained items stream and parse the selected root archive on each request, so the fields reflect the code the run would use even when registry interface extraction is disabled; a missing or invalid archive returns `422`/`413` rather than an empty form. The response also returns `interface-error` for registry parse failures on wrapper items. **Required permission:** catalog `read`.
 
 #### Module Interface
 
 ```
-GET /api/v1/catalog-items/{id}/interface
+GET /api/v1/catalog-items/{id}/interface[?version-pin=latest|1.2.3]
 ```
 
-The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. `interface-error` is `null` unless the version's interface could not be read, when it carries the reason. **Required permission:** catalog `read`.
+The inputs and outputs of the module version the item resolves to — its `default-version-pin` or the latest uploaded version when unpinned, overridden by `?version-pin=latest` or an exact uploaded version. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`). Sensitive or hidden inputs retain their names and sensitivity marker, but return `default: null`, `options: null` and an empty description. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read on the catalog surface. The raw **registry** module interface and archive use module `registry:read` instead, and module authors must not commit secrets in source. Wrapper items use the registry's stored interface and return null inputs/outputs when no version exists; `interface-error` carries a stored parse failure. Self-contained items parse the selected archive afresh, return an error when it is missing or invalid, and leave `interface-error` null on success. **Required permission:** catalog `read`.
 
 #### List Item Instances
 
@@ -5858,13 +5868,17 @@ GET /api/v1/catalog-items/{id}/instances
 
 **Required permission:** catalog `read`.
 
+Each instance includes `catalog-update-block`: `null` normally, or an object such as `{"version":"2.0.0","reason":"inputs"}` when a floating self-contained publish could not safely queue a run. `inputs` requires an explicit reconfigure; `archive` means the uploaded archive is unavailable or invalid and the catalog owner must fix it; `runtime` means the workspace backend or version is no longer allowed by the item and must be changed through reconfigure before a publish can run. No reason includes input values. A compatible publish or a successful reconfigure clears the block. Pinned and wrapper instances retain their existing publish behavior except that constrained runtimes cannot run a newly published module version.
+
+For VCS-connected modules, speculative module PR plans on linked self-contained instances use a new plan-only configuration version containing the PR archive as the workspace root. They do not update the instance's version pin, variables, or `catalog-update-block`. Fork PRs require that instance's `allow_fork_pr_plans` opt-in. An invalid candidate archive or missing, removed, changed-sensitivity or mismatched hidden input is refused and reports a failed per-instance PR check instead of creating an unsafe run. Module PR rows and runs are attributed to the originating module, even if another module uses the same PR number.
+
 #### Provision an Instance
 
 ```
 POST /api/v1/catalog-items/{id}/provision
 ```
 
-Creates a catalog-managed, agent-mode, non-VCS workspace, materialises the inputs as Terraform variables, generates the wrapper, and queues the first run (source `catalog`).
+Creates a catalog-managed, agent-mode, non-VCS workspace, materialises the inputs as Terraform variables, generates the wrapper or snapshots the selected root archive, and queues the first run (source `catalog`).
 
 **Request body:**
 ```json
@@ -5888,7 +5902,8 @@ Creates a catalog-managed, agent-mode, non-VCS workspace, materialises the input
 | `name` | yes | Workspace/instance name. |
 | `agent-pool-id` | yes | Pool the instance binds to. Caller must have pool `write`; pool must be in `allowed-agent-pool-ids` when the item restricts it. |
 | `input-values` | yes | Values for the form fields (module inputs + provider-template parameters). |
-| `version-pin` | no | Pin this instance to a module version. Omit to inherit the item's `default-version-pin` (or float when that is unset). |
+| `version-pin` | no | Pin this instance to a module version. Omit to inherit and store the item's `default-version-pin` (or float when unset); explicitly send `null` to float even when the item has a default pin. |
+| `execution-backend` / `engine-version` | no | Select `tofu` or `terraform` and an available runtime version compatible with the item's `execution-backend-constraints`. |
 | `auto-apply` | no | Auto-apply runs for this instance. |
 | `labels` | no | Labels on the created workspace. |
 
@@ -5914,13 +5929,15 @@ GET /api/v1/catalog-instances/{wsId}
 
 **Required permission:** catalog `read`.
 
+`input-values` contains only safely classified non-sensitive, non-hidden saved inputs. Legacy snapshots are checked against the current item and stored variables (and the pinned root archive for self-contained items); if that classification is uncertain, values are withheld. The workspace variable list shows non-sensitive static native catalog inputs only when the current item predates the workspace itself and the last uploaded catalog configuration; it still masks sensitive and hidden values (even hidden values stored as non-sensitive) and their version IDs. An absent item or catalog configuration, or an item edited after the workspace was created, keeps all static native inputs masked even after reconfigure because old fixed hidden values cannot be reconstructed safely. Reconfiguring a sensitive input as non-sensitive requires an explicitly supplied new value different from the old secret; merely changing the module declaration cannot reveal it. A sensitive root input selected through catalog options must also be declared `sensitive = true` in the root HCL; marking only the workspace variable does not make the engine hide it.
+
 #### Reconfigure Instance
 
 ```
 PATCH /api/v1/catalog-instances/{wsId}
 ```
 
-Update the instance's inputs and/or version pin, regenerate the wrapper, and queue a new run (source `catalog`). This is the only supported way to change a catalog instance's configuration — direct configuration-version uploads and custom-CV runs on a catalog-managed workspace are rejected with `409`.
+Update the instance's inputs and/or version pin, regenerate the wrapper or snapshot the root archive, and queue a new run (source `catalog`). This is the only supported way to change a catalog instance's configuration — direct configuration-version uploads and custom-CV runs on a catalog-managed workspace are rejected with `409`.
 
 **Request body:**
 ```json
@@ -5938,8 +5955,9 @@ Update the instance's inputs and/or version pin, regenerate the wrapper, and que
 
 | Attribute | Description |
 |---|---|
-| `input-values` | Partial or full input update. |
-| `version-pin` | New pin, or `null` to **float** (track latest published module version). |
+| `input-values` | When omitted, retain saved non-sensitive inputs whose names exist in the selected version; removed names are dropped, and new required inputs must still be provided. When supplied, it replaces the inputs; unknown names return `422`. Sensitive inputs are write-only: re-enter required inputs without a default, but an optional sensitive input with a stored default may be left blank to use that default again. Blank does not reuse the prior secret. |
+| `version-pin` | Omit to retain the instance pin; send an exact version to pin, or `null` to **float** (select latest even when the item has a default). Existing instances stored with a null pin now float on reconfigure too. |
+| `execution-backend` / `engine-version` | Optional compatible runtime choice; omitted values retain the instance's settings. |
 | `auto-apply` | Toggle auto-apply for this instance. |
 
 Returns a reference to the queued run. **Required permission:** catalog `use`.

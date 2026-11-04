@@ -31,6 +31,7 @@ interface CatalogItem {
     'module-name': string
     'module-provider': string
     'default-version-pin': string | null
+    'variable-options': { name: string; hidden?: boolean }[]
     'allowed-agent-pool-ids': string[] | null
     // Read-only here (#2019): the item admin owns these, and this page shows
     // them so whoever is about to provision can see that the workspace they get
@@ -78,6 +79,7 @@ interface Instance {
     name: string
     'catalog-item-id': string | null
     'catalog-version-pin': string | null
+    'catalog-update-block'?: { version: string; reason: 'inputs' | 'archive' | 'runtime' } | null
     'agent-pool-id': string | null
     'owner-email': string
     labels: Record<string, string>
@@ -107,6 +109,8 @@ export default function CatalogItemPage() {
 
   const [item, setItem] = useState<CatalogItem | null>(null)
   const [form, setForm] = useState<ProvisionForm | null>(null)
+  const [formSelection, setFormSelection] = useState<string | null>(null)
+  const [formError, setFormError] = useState('')
   const [iface, setIface] = useState<ItemInterface | null>(null)
   const [ifaceExpanded, setIfaceExpanded] = useState(false)
   const [instances, setInstances] = useState<Instance[]>([])
@@ -128,6 +132,9 @@ export default function CatalogItemPage() {
   // Reconfigure modal state
   const [reconfigInstance, setReconfigInstance] = useState<Instance | null>(null)
   const [reconfigInputs, setReconfigInputs] = useState<Record<string, string>>({})
+  const [reconfigCurrentInputs, setReconfigCurrentInputs] = useState<Record<string, string | null>>({})
+  const [reconfigForm, setReconfigForm] = useState<ProvisionForm | null>(null)
+  const [reconfigFormSelection, setReconfigFormSelection] = useState<string | null>(null)
   const [reconfigVersion, setReconfigVersion] = useState('')
   const [reconfigAutoApply, setReconfigAutoApply] = useState(false)
   const [reconfigBusy, setReconfigBusy] = useState(false)
@@ -201,9 +208,8 @@ export default function CatalogItemPage() {
 
     async function load() {
       try {
-        const [itemRes, formRes, ifaceRes, poolsList] = await Promise.all([
+        const [itemRes, ifaceRes, poolsList] = await Promise.all([
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}`),
-          apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/form`),
           // Reference material: the page never fails on it.
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/interface`).catch(() => null),
           // pools are non-fatal for the page; page robustly but never fail the load on them
@@ -214,16 +220,7 @@ export default function CatalogItemPage() {
         if (!itemRes.ok) throw new Error(t('errors.loadItem'))
         const itemData = await itemRes.json()
         setItem(itemData.data)
-
-        if (formRes.ok) {
-          const formData = await formRes.json()
-          const f: ProvisionForm = formData.data.attributes
-          setForm(f)
-          // Pre-fill provision inputs with field defaults.
-          const init: Record<string, string> = {}
-          for (const fld of f.fields) init[fld.name] = defaultStr(fld.default)
-          setProvInputs(init)
-        }
+        setProvVersion(itemData.data.attributes['default-version-pin'] || '')
 
         if (ifaceRes?.ok) {
           const ifaceData = await ifaceRes.json()
@@ -245,6 +242,65 @@ export default function CatalogItemPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot fetch; `t` is only used to build an error message, and depending on it would re-fetch whenever the locale changes
   }, [itemId, router, loadInstances])
 
+  useEffect(() => {
+    if (!item) return
+    let cancelled = false
+    setForm(null)
+    setFormSelection(null)
+    setFormError('')
+    const defaultPin = item.attributes['default-version-pin'] || ''
+    const query = provVersion === defaultPin ? '' : `?version-pin=${encodeURIComponent(provVersion || 'latest')}`
+    async function loadForm() {
+      try {
+        const res = await apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/form${query}`)
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.detail || t('errors.loadItem'))
+        if (cancelled) return
+        const selected: ProvisionForm = data.data.attributes
+        setForm(selected)
+        setFormSelection(provVersion)
+        setProvInputs(Object.fromEntries(selected.fields.map((field) => [field.name, defaultStr(field.default)])))
+      } catch (err) {
+        if (!cancelled) setFormError(err instanceof Error ? err.message : t('errors.loadItem'))
+      }
+    }
+    loadForm()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t only formats failures; locale changes do not change the selected version
+  }, [item, itemId, provVersion])
+
+  useEffect(() => {
+    if (!reconfigInstance) return
+    let cancelled = false
+    setReconfigForm(null)
+    setReconfigFormSelection(null)
+    setReconfigError('')
+    async function loadForm() {
+      try {
+        const pin = reconfigVersion || 'latest'
+        const res = await apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/form?version-pin=${encodeURIComponent(pin)}`)
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.detail || t('errors.loadItem'))
+        if (cancelled) return
+        const selected: ProvisionForm = data.data.attributes
+        const saved = reconfigInstance?.attributes['input-values'] || {}
+        setReconfigForm(selected)
+        setReconfigFormSelection(reconfigVersion)
+        setReconfigInputs(Object.fromEntries(selected.fields.map((field) => [
+          field.name,
+          field.sensitive || reconfigCurrentInputs[field.name] === null
+            ? ''
+            : reconfigCurrentInputs[field.name] ?? defaultStr(saved[field.name] ?? field.default),
+        ])))
+      } catch (err) {
+        if (!cancelled) setReconfigError(err instanceof Error ? err.message : t('errors.loadItem'))
+      }
+    }
+    loadForm()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t only formats failures; the saved instance snapshot is fixed while this modal is open
+  }, [reconfigInstance, itemId, reconfigVersion, reconfigCurrentInputs])
+
   // Pools the user may pick: when the item restricts pools, intersect with its
   // allow-list; otherwise any pool the API returned.
   const allowedPools = item?.attributes['allowed-agent-pool-ids'] ?? null
@@ -260,11 +316,16 @@ export default function CatalogItemPage() {
   ) {
     const id = `${idPrefix}-${field.name}`
     return (
-      <div key={field.name}>
+      <div key={field.name} className="flex flex-col">
         <label htmlFor={id} className="block text-sm font-medium text-slate-300 mb-1">
           {field.name}
           {field.required && <span className="text-red-400 ms-0.5">*</span>}
           <span className="ms-2 text-[10px] uppercase tracking-wide text-slate-500">{field.source}</span>
+          {field.sensitive && (
+            <span className="ms-2 rounded-full bg-amber-900/40 px-2 py-0.5 text-[10px] text-amber-300">
+              {tr('moduleDetail.interface.sensitiveBadge')}
+            </span>
+          )}
         </label>
         {field.description && (
           <p className="text-xs text-slate-500 mb-1">{field.description}</p>
@@ -275,7 +336,7 @@ export default function CatalogItemPage() {
             value={value}
             required={field.required}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            className="w-full mt-auto px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           >
             <option value="">{t('field.select')}</option>
             {field.options.map((opt) => (
@@ -289,7 +350,7 @@ export default function CatalogItemPage() {
             value={value}
             required={field.required}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            className="w-full mt-auto px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           />
         )}
       </div>
@@ -298,6 +359,7 @@ export default function CatalogItemPage() {
 
   async function handleProvision(e: React.FormEvent) {
     e.preventDefault()
+    if (!form || formSelection !== provVersion) return
     setProvisioning(true)
     setProvError('')
     try {
@@ -307,7 +369,7 @@ export default function CatalogItemPage() {
         'input-values': provInputs,
         'auto-apply': provAutoApply,
       }
-      if (provVersion) attrs['version-pin'] = provVersion
+      attrs['version-pin'] = provVersion || null
       if (Object.keys(provLabels).length > 0) attrs.labels = provLabels
 
       const res = await apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/provision`, {
@@ -343,44 +405,54 @@ export default function CatalogItemPage() {
     }
   }
 
-  function openReconfigure(inst: Instance) {
+  function openReconfigure(inst: Instance, currentInputs: Record<string, string | null>) {
     setReconfigInstance(inst)
+    setReconfigCurrentInputs(currentInputs)
     setReconfigError('')
     setReconfigAutoApply(false)
     setReconfigVersion(inst.attributes['catalog-version-pin'] || '')
-    // Pre-fill from the instance's stored input-values, falling back to form
-    // defaults for any field not yet set.
-    const init: Record<string, string> = {}
-    for (const fld of form?.fields || []) init[fld.name] = defaultStr(fld.default)
-    const stored = inst.attributes['input-values'] || {}
-    for (const [k, v] of Object.entries(stored)) init[k] = defaultStr(v)
-    setReconfigInputs(init)
+    setReconfigForm(null)
+    setReconfigInputs({})
   }
 
-  // The instances list endpoint omits input-values; fetch the full instance so
-  // the reconfigure modal can pre-fill from current inputs.
+  // The instance snapshot can be empty (notably on floating roots). Workspace
+  // variables provide current values only when this caller already has var:read.
   async function startReconfigure(inst: Instance) {
+    const variables = await fetchAllPages<{
+      attributes: {
+        key: string
+        value: string | null
+        sensitive: boolean
+        category: string
+        'value-source': string
+      }
+    }>(`/api/v1/workspaces/${inst.id}/vars`).catch(() => [])
+    const currentInputs = Object.fromEntries(variables
+      .filter((v) => (v.attributes.category === 'native' || v.attributes.category === 'terraform') && v.attributes['value-source'] === 'static')
+      .map((v) => [v.attributes.key, v.attributes.sensitive ? null : v.attributes.value]))
     try {
       const res = await apiFetch(`/api/terrapod/v1/catalog-instances/${inst.id}`)
       if (res.ok) {
         const data = await res.json()
-        openReconfigure({ ...inst, attributes: { ...inst.attributes, ...data.data.attributes } })
+        openReconfigure({ ...inst, attributes: { ...inst.attributes, ...data.data.attributes } }, currentInputs)
         return
       }
     } catch {
       // fall through to opening with what we have
     }
-    openReconfigure(inst)
+    openReconfigure(inst, currentInputs)
   }
 
   async function handleReconfigure(e: React.FormEvent) {
     e.preventDefault()
-    if (!reconfigInstance) return
+    if (!reconfigInstance || !reconfigForm || reconfigFormSelection !== reconfigVersion) return
     setReconfigBusy(true)
     setReconfigError('')
     try {
       const attrs: Record<string, unknown> = {
-        'input-values': reconfigInputs,
+        'input-values': Object.fromEntries((reconfigForm?.fields || []).map((field) => [
+          field.name, reconfigInputs[field.name] ?? '',
+        ])),
         'auto-apply': reconfigAutoApply,
         // null version-pin => float to latest; value => pin.
         'version-pin': reconfigVersion || null,
@@ -495,6 +567,18 @@ export default function CatalogItemPage() {
   }
 
   const a = item?.attributes
+  const reconfigNames = new Set(reconfigForm?.fields.map((field) => field.name) || [])
+  const hiddenNames = new Set(a?.['variable-options']?.filter((option) => option.hidden).map((option) => option.name) || [])
+  const removedInputs = reconfigForm && reconfigInstance
+    ? Object.keys(reconfigInstance.attributes['input-values'] || {}).filter((name) => !reconfigNames.has(name) && !hiddenNames.has(name))
+    : []
+
+  function updateBlockMessage(block: { version: string; reason: 'inputs' | 'archive' | 'runtime' }) {
+    if (block.reason === 'runtime') return t('reconfigure.updateBlockedRuntime', { version: block.version })
+    return block.reason === 'inputs'
+      ? t('reconfigure.updateBlockedInputs', { version: block.version })
+      : t('reconfigure.updateBlockedArchive', { version: block.version })
+  }
 
   return (
     <>
@@ -597,6 +681,8 @@ export default function CatalogItemPage() {
           <h2 className="text-lg font-semibold text-slate-100 mb-3">{t('provision.title')}</h2>
           <form onSubmit={handleProvision} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 space-y-3">
             {provError && <ErrorBanner message={provError} />}
+            {formError && <ErrorBanner message={formError} />}
+            {!form && !formError && <LoadingSpinner />}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.workspaceName')}<span className="text-red-400 ms-0.5">*</span></label>
@@ -688,7 +774,7 @@ export default function CatalogItemPage() {
 
             <button
               type="submit"
-              disabled={provisioning}
+              disabled={provisioning || !form || formSelection !== provVersion}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors btn-smoke"
             >
               {provisioning ? t('provision.provisioning') : t('provision.submit')}
@@ -766,6 +852,11 @@ export default function CatalogItemPage() {
                           <Link href={`/workspaces/${inst.id}`} className="text-sm font-medium text-brand-400 hover:text-brand-300">
                             {inst.attributes.name}
                           </Link>
+                          {inst.attributes['catalog-update-block'] && (
+                            <p className="mt-1 text-xs text-amber-300 break-words">
+                              {updateBlockMessage(inst.attributes['catalog-update-block'])}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                           {inst.attributes['catalog-version-pin'] || t('info.latest')}
@@ -803,6 +894,11 @@ export default function CatalogItemPage() {
           <div>
             <h3 className="text-lg font-semibold text-slate-100 mb-1">{t('reconfigure.title', { name: reconfigInstance.attributes.name })}</h3>
             <p className="text-sm text-slate-400 mb-4">{t('reconfigure.description')}</p>
+            {reconfigInstance.attributes['catalog-update-block'] && (
+              <p className="mb-3 rounded-lg border border-amber-700/50 bg-amber-900/20 p-3 text-sm text-amber-200 break-words">
+                {updateBlockMessage(reconfigInstance.attributes['catalog-update-block'])}
+              </p>
+            )}
             {reconfigError && <ErrorBanner message={reconfigError} />}
             <form onSubmit={handleReconfigure} className="space-y-3">
               <div>
@@ -825,15 +921,16 @@ export default function CatalogItemPage() {
                   )}
                 </select>
               </div>
-              {form?.['interface-error'] && (
+              {reconfigForm?.['interface-error'] && (
                 <ModuleInterfaceError
-                  reason={form['interface-error']}
+                  reason={reconfigForm['interface-error']}
                   hint={t('provision.interfaceErrorHint')}
                 />
               )}
-              {form && form.fields.length > 0 && (
+              {!reconfigForm && !reconfigError && <LoadingSpinner />}
+              {reconfigForm && reconfigForm.fields.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {form.fields.map((field) =>
+                  {reconfigForm.fields.map((field) =>
                     renderField(
                       field,
                       reconfigInputs[field.name] ?? '',
@@ -841,6 +938,15 @@ export default function CatalogItemPage() {
                       'recfg',
                     ),
                   )}
+                </div>
+              )}
+              {removedInputs.length > 0 && (
+                <div className="rounded-lg border border-amber-700/50 bg-amber-900/20 p-3 text-sm text-amber-200 break-words">
+                  <p className="font-medium">{t('reconfigure.removedInputs')}</p>
+                  <p className="mt-1 text-xs">{t('reconfigure.removedHint')}</p>
+                  <ul className="mt-2 list-disc ps-5 font-mono text-xs">
+                    {removedInputs.map((name) => <li key={name}>{name}</li>)}
+                  </ul>
                 </div>
               )}
               <label className="flex items-center gap-2 cursor-pointer">
@@ -854,7 +960,7 @@ export default function CatalogItemPage() {
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setReconfigInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
-                <button type="submit" disabled={reconfigBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                <button type="submit" disabled={reconfigBusy || !reconfigForm || reconfigFormSelection !== reconfigVersion} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {reconfigBusy ? t('reconfigure.queuing') : t('reconfigure.queueRun')}
                 </button>
               </div>

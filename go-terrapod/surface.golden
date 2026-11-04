@@ -146,6 +146,7 @@ field BulkWarmResponse.Succeeded int `json:"succeeded"`
 field BulkWarmResponse.Total int `json:"total"`
 field CatalogInstance.Attributes map[string]any
 field CatalogInstance.ID string
+field CatalogInstance.UpdateBlock map[string]string
 field CatalogItem.Attributes map[string]any
 field CatalogItem.CreatedAt string
 field CatalogItem.ID string

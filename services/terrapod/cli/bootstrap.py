@@ -471,6 +471,7 @@ async def _bootstrap_sample_workspace(
     cv = ConfigurationVersion(
         workspace_id=workspace.id,
         source="tfe-api",
+        archive_provenance="unprotected",
         status="uploaded",
         auto_queue_runs=False,
     )

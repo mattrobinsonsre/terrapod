@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Popis",
       "descriptionPlaceholder": "Co tato položka katalogu zřizuje…",
       "enabled": "Povoleno (viditelné v procházeném katalogu)",
+      "selfContained": "Samostatný kořenový archiv",
+      "selfContainedHint": "Použijte nahraný archiv modulu jako kořenovou konfiguraci pracovního prostoru.",
+      "restrictBackends": "Omezit spouštěcí backendy",
+      "backendRangesHint": "Vyberte podporované backendy a zadejte rozsahy verzí PEP 440 (například >=1.12,<2).",
+      "backendRange": "Rozsah verzí pro {backend}",
       "providerTemplates": "Šablony providerů",
+      "templatesRemoved": "Uložením se odstraní stávající propojení se šablonami providerů.",
+      "templatesUnavailable": "Šablony providerů se u samostatných položek nepoužívají.",
       "noProviderTemplates": "Nejsou definovány žádné šablony providerů.",
       "restrictPools": "Omezit na konkrétní fondy agentů",
       "noAgentPools": "Nejsou k dispozici žádné fondy agentů.",
@@ -1497,6 +1504,7 @@
       "actions": "Akce"
     },
     "badge": {
+      "selfContained": "samostatný",
       "enabled": "povoleno",
       "disabled": "zakázáno"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Položka katalogu smazána"
     },
     "errors": {
+      "backendRequired": "Vyberte alespoň jeden spouštěcí backend.",
+      "backendRangeRequired": "Zadejte rozsah verzí pro každý vybraný backend.",
       "load": "Nepodařilo se načíst položky katalogu",
       "save": "Nepodařilo se uložit položku katalogu",
       "createStatus": "Nepodařilo se vytvořit položku katalogu ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Smazat záznam katalogu bez zničení jeho infrastruktury (nedoporučeno)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Verzi {version} je před spuštěním nutné znovu nakonfigurovat.",
+      "updateBlockedArchive": "Verzi {version} nelze spustit, protože archiv není dostupný nebo je neplatný. Požádejte vlastníka katalogu o opravu.",
+      "updateBlockedRuntime": "Verzi {version} nelze spustit s backendem a verzí tohoto pracovního prostoru. Vyberte kompatibilní verzi přes API a znovu nastavte konfiguraci.",
+      "removedInputs": "Tato verze je již nepoužívá",
+      "removedHint": "Tyto vstupy budou odebrány po zařazení rekonfigurace do fronty. Než budete pokračovat, zkontrolujte nová pole.",
       "title": "Překonfigurovat {name}",
       "description": "Aktualizujte vstupy a/nebo verzi a poté zařaďte běh do fronty.",
       "currentOption": "{version} (aktuální)",

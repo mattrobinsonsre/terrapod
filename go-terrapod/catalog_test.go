@@ -44,7 +44,7 @@ func newCatalogFixture(t *testing.T) *Client {
 			_, _ = w.Write([]byte(`{"data":{"id":"ci-1","type":"catalog-item-forms","attributes":{
 			  "resolved-version":"1.2.0","fields":[{"name":"cidr","type":"string","required":true}]}}}`))
 		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-items/ci-1/instances":
-			_, _ = w.Write([]byte(`{"data":[{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev"}}]}`))
+			_, _ = w.Write([]byte(`{"data":[{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","catalog-update-block":{"version":"2.0.0","reason":"inputs"}}}]}`))
 		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-items/ci-1/provision":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","catalog-item-id":"ci-1"}}}`))
@@ -57,7 +57,7 @@ func newCatalogFixture(t *testing.T) *Client {
 
 		// Catalog instances
 		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-instances/ws-9":
-			_, _ = w.Write([]byte(`{"data":{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","input-values":{"cidr":"10.0.0.0/16"}}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","input-values":{"cidr":"10.0.0.0/16"},"catalog-update-block":{"version":"2.0.0","reason":"inputs"}}}}`))
 		case r.Method == http.MethodPatch && p == "/api/terrapod/v1/catalog-instances/ws-9":
 			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"queued","is-destroy":false}}}`))
 		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/destroy":
@@ -139,6 +139,71 @@ func TestGetCatalogItem(t *testing.T) {
 	}
 }
 
+func TestCatalogAuthoringReadsRequireExplicitSensitiveQuery(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("include-sensitive-values") != "true" {
+			_, _ = w.Write([]byte(`{"data":{"id":"id","type":"catalog-items","attributes":{"variable-options":[{"name":"token"}]}}}`))
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer admin" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"id":"id","type":"catalog-items","attributes":{"variable-options":[{"name":"token","default":"private"}]}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	admin, err := NewClient(Options{BaseURL: srv.URL, Token: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, err := admin.GetCatalogItem(t.Context(), "id")
+	if err != nil || len(item.Attributes["variable-options"].([]any)[0].(map[string]any)) != 1 {
+		t.Fatalf("ordinary read must be redacted: %v %+v", err, item)
+	}
+	data, err := admin.Get(t.Context(), "/api/terrapod/v1/catalog-items/id?include-sensitive-values=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := ParseResource(data)
+	if err != nil || !strings.Contains(string(res.Attributes["variable-options"]), "private") {
+		t.Fatalf("authoring read must include value: %v %+v", err, res)
+	}
+	user, err := NewClient(Options{BaseURL: srv.URL, Token: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = user.Get(t.Context(), "/api/terrapod/v1/catalog-items/id?include-sensitive-values=true"); err == nil {
+		t.Fatal("non-admin reveal must fail")
+	}
+}
+
+func TestProviderTemplateAuthoringReadIsOptIn(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := "null"
+		if r.URL.Query().Get("include-sensitive-values") == "true" {
+			body = `"private"`
+		}
+		_, _ = w.Write([]byte(`{"data":{"id":"id","type":"provider-templates","attributes":{"body":` + body + `}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	redacted, err := c.GetProviderTemplate(t.Context(), "id")
+	if err != nil || redacted.Attributes["body"] != nil {
+		t.Fatalf("ordinary read: %v %+v", err, redacted)
+	}
+	data, err := c.Get(t.Context(), "/api/terrapod/v1/provider-templates/id?include-sensitive-values=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := ParseResource(data)
+	if err != nil || GetStringAttr(full, "body") != "private" {
+		t.Fatalf("authoring read: %v %+v", err, full)
+	}
+}
+
 func TestCatalogItemCRUDAndForm(t *testing.T) {
 	c := newCatalogFixture(t)
 	item, err := c.CreateCatalogItem(t.Context(), map[string]any{
@@ -184,6 +249,9 @@ func TestCatalogProvisionAndLifecycle(t *testing.T) {
 	if err != nil || len(instances) != 1 {
 		t.Fatalf("list instances: %v %+v", err, instances)
 	}
+	if instances[0].UpdateBlock["version"] != "2.0.0" || instances[0].UpdateBlock["reason"] != "inputs" {
+		t.Errorf("list instance update block: %+v", instances[0].UpdateBlock)
+	}
 
 	got, err := c.GetCatalogInstance(t.Context(), "ws-9")
 	if err != nil {
@@ -191,6 +259,9 @@ func TestCatalogProvisionAndLifecycle(t *testing.T) {
 	}
 	if got.Attributes["name"] != "vpc-dev" {
 		t.Errorf("get instance: %+v", got)
+	}
+	if got.UpdateBlock["version"] != "2.0.0" || got.UpdateBlock["reason"] != "inputs" {
+		t.Errorf("get instance update block: %+v", got.UpdateBlock)
 	}
 
 	run, err := c.ReconfigureCatalogInstance(t.Context(), "ws-9", map[string]any{

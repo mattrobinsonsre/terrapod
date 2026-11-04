@@ -20,6 +20,7 @@ from __future__ import annotations
 import ast
 import importlib.metadata
 import pathlib
+import re
 import sys
 
 import pytest
@@ -84,21 +85,12 @@ NOT_IN_THE_JOB = {
 }
 
 
-#: Non-runner `terrapod.*` modules the Job imports, filled by the walk below.
-#: Separate from the runner set because they live elsewhere in the tree and are
-#: COPIED by their own lines in the Dockerfile.
+# Non-runner modules are copied separately into the runner image.
 _OTHER_TERRAPOD: set[str] = set()
 
 
 def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
-    """Every `terrapod.runner.*` module reachable from `start`, transitively.
-
-    Also records every OTHER `terrapod.*` module seen on the way, in
-    `_OTHER_TERRAPOD`. That second half exists because the first version of this
-    test followed `terrapod.runner.*` only, so a phase importing
-    `terrapod.logging_config` -- which the image does not ship -- was invisible
-    to it. Every runner Job died at import and this gate stayed green.
-    """
+    """Collect reachable runner modules and imports outside `terrapod.runner`."""
     _OTHER_TERRAPOD.clear()
     seen: set[str] = set()
     queue = [start]
@@ -175,70 +167,41 @@ def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
 
 
 def test_every_other_terrapod_module_the_job_imports_is_in_the_runner_image() -> None:
-    """The same check for `terrapod.*` modules that are NOT under `runner/`.
-
-    The Job legitimately imports a few modules from elsewhere in the tree, and
-    the Dockerfile COPIES each by its own line. Nothing checked that, so adding
-    one import was enough to break every Job: a phase took
-    `terrapod.logging_config`, which the image does not ship, and the sibling
-    test above could not see it because it follows `terrapod.runner.*` only.
-    The runner-side convention is `structlog.get_logger(...)` directly, which
-    `debug_linger` spells out and every phase but that one already followed.
-
-    Judged on whether the module is COPIED, not on whether it exists -- the
-    whole point is that it exists in the tree the tests import from.
-    """
+    """Non-runner imports must also be present in the image's COPY list."""
     if ROOT is None or RUNNER is None or ENTRYPOINT is None:
         pytest.skip("this tree has no docker/ or no runner package to check")
     dockerfile = DOCKERFILE.read_text()
-
-    # Populates _OTHER_TERRAPOD as a side effect of the same walk.
     _runner_imports_reachable_from(ENTRYPOINT)
     assert _OTHER_TERRAPOD, (
         "the walk found no non-runner terrapod imports at all, which cannot be "
-        "right -- the Job imports terrapod.http_retry among others. The walk has "
-        "stopped collecting them, so this gate is inert; fix it rather than "
-        "deleting it."
+        "right -- the Job imports terrapod.http_retry among others"
     )
 
     missing = []
     for mod in sorted(_OTHER_TERRAPOD):
         path = mod.replace(".", "/")
-        # A `from terrapod.x import y` where y is a symbol, not a submodule.
         src = RUNNER.parent
         if not (src / f"{path}.py").exists() and not (src / path).is_dir():
             continue
-        # An ancestor directory COPY ships it too: the Dockerfile takes
-        # `services/terrapod/services/cost/` wholesale, so `services.cost.x` is
-        # present without a line of its own. Checking only the exact path made
-        # this gate report `terrapod.services.cost.pricesheet_db` as missing
-        # when it ships -- a gate that is too wide gets weakened or deleted
-        # rather than fixed, so it checks every prefix.
         parts = path.split("/")
         shipped = f"terrapod/{path}.py" in dockerfile or f"terrapod/{path}/" in dockerfile
         for i in range(1, len(parts)):
             if f"terrapod/{'/'.join(parts[:i])}/" in dockerfile:
                 shipped = True
                 break
-        if shipped:
-            continue
-        missing.append(f"terrapod.{mod}")
+        if not shipped:
+            missing.append(f"terrapod.{mod}")
 
     assert not missing, (
         "these non-runner modules are imported by the runner Job but never "
-        f"COPIED into the image, so every Job would die at import: {missing}. "
-        "Either COPY them in docker/Dockerfile.runner, or -- for logging, which "
-        "is the usual case -- use `structlog.get_logger(...)` directly as every "
-        "phase and `debug_linger` do."
+        f"COPIED into the image: {missing}"
     )
 
 
 def test_the_tiltfile_deps_match_the_dockerfile() -> None:
     """Otherwise a local change to the module never rebuilds the image.
 
-    Skipped in the test image, which does not copy the `Tiltfile` — it is a local
-    development concern. It runs in a checkout, which is where someone adds a
-    runner module in the first place.
+    The test image carries the Tiltfile so this also guards the dev image in CI.
     """
     if ROOT is None or not TILTFILE.is_file():
         pytest.skip("Tiltfile is not shipped in the test image")
@@ -254,6 +217,131 @@ def test_the_tiltfile_deps_match_the_dockerfile() -> None:
         "COPIED into the runner image but absent from the Tiltfile's "
         f"build-runner-image deps, so editing it will not rebuild: {missing}"
     )
+
+
+def test_kind_runner_image_is_loaded_before_jobs_start() -> None:
+    """A host-only build fails with ErrImageNeverPull inside kind (#1990)."""
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tiltfile = TILTFILE.read_text()
+    assert "_kind = k8s_context() == 'kind-kind'" in tiltfile
+    assert (
+        "elif _kind:\n    _RUNNER_BUILD = _RUNNER_BUILD + ' && kind load docker-image ' "
+        "+ _RUNNER_TAG + ' --name kind'"
+    ) in tiltfile
+    assert "cmd=QUERY_BUILD + ' && ' + EE_AGENT_BUILD + _RUNNER_BUILD" in tiltfile
+
+
+def test_tilt_go_images_meet_module_minimum_patch_versions() -> None:
+    """A floating Go image tag may lag behind the modules' required patch."""
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tiltfile = TILTFILE.read_text()
+    for build, module in (("QUERY_BUILD", "query"), ("EE_AGENT_BUILD", "ee-agent")):
+        go_mod = ROOT / module / "go.mod"
+        assert go_mod.is_file(), f"{module}/go.mod must be shipped in the test image"
+        required = re.search(r"^go (\d+)\.(\d+)\.(\d+)$", go_mod.read_text(), re.MULTILINE)
+        assert required is not None, f"{module}/go.mod must specify a Go patch version"
+        command = tiltfile.split(f"{build} = (", 1)[1].split("\n)", 1)[0]
+        pinned = re.search(r"golang:(\d+)\.(\d+)\.(\d+)\b", command)
+        assert pinned is not None, f"{build} must pin a Go image with a patch version"
+        assert tuple(map(int, pinned.groups())) >= tuple(map(int, required.groups())), (
+            f"{build} uses Go {pinned.group(0)}, below {module}/go.mod's minimum "
+            f"{required.group(0)}"
+        )
+
+
+def test_tilt_go_builds_do_not_write_into_watched_source() -> None:
+    """A build output inside ee-agent/ retriggers its own local_resource forever."""
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tiltfile = TILTFILE.read_text()
+    for build, source, output in (
+        ("QUERY_BUILD", "query", "query-bin/terrapod-query"),
+        ("EE_AGENT_BUILD", "ee-agent", "ee-agent-bin/terrapod-ee-agent"),
+    ):
+        command = tiltfile.split(f"{build} = (", 1)[1].split("\n)", 1)[0]
+        output_dir, filename = output.split("/", 1)
+        assert f'-v "$PWD/{source}":/src:ro' in command
+        assert f'-v "$PWD/docker/{output_dir}":/out' in command
+        assert f"go build -trimpath -o /out/{filename}" in command
+
+
+def test_tilt_builds_provider_from_local_git_tags_without_watching_its_output() -> None:
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tiltfile = TILTFILE.read_text()
+    assert "str(local(\"git tag --list 'v[0-9]*' --sort=-version:refname\"))" in tiltfile
+    assert "_PROVIDER_TAG = _PROVIDER_TAGS.split('\\n')[0]" in tiltfile
+    assert "gh api repos/mattrobinsonsre/terrapod/releases/latest" not in tiltfile
+    provider_build = tiltfile.split("'build-provider-binary',", 1)[1].split("labels=['build'],", 1)[
+        0
+    ]
+    assert (
+        "cmd='make -C provider dev-package BASE_VERSION=' + shlex.quote(_PROVIDER_TAG[1:])"
+        in provider_build
+    )
+    for dependency in (
+        "provider/GNUmakefile",
+        "provider/dev-package.sh",
+        "provider/main.go",
+        "provider/internal",
+        "go-terrapod",
+    ):
+        assert f"'{dependency}'" in provider_build
+    assert "'provider'" not in provider_build.split("deps=[", 1)[1]
+    assert "api.devProviderVersion=' + _PROVIDER_VERSION" in tiltfile
+    assert "cmd='bash scripts/dev-provider-stage.sh ' + shlex.quote(_PROVIDER_VERSION)" in tiltfile
+    api_resource = tiltfile.split("k8s_resource(\n    'terrapod-api',", 1)[1].split("\n)", 1)[0]
+    assert "'seed-dev-provider-cache'" in api_resource
+
+
+def test_tilt_down_does_not_run_local_setup_or_builds() -> None:
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tree = ast.parse(TILTFILE.read_text())
+    guarded = []
+    for statement in tree.body:
+        if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call):
+            assert (
+                not isinstance(statement.value.func, ast.Name) or statement.value.func.id != "local"
+            )
+        if (
+            isinstance(statement, ast.If)
+            and ast.unparse(statement.test) == "config.tilt_subcommand != 'down'"
+        ):
+            guarded.extend(
+                ast.unparse(child.value.args[0])
+                for child in statement.body
+                if isinstance(child, ast.Expr)
+                and isinstance(child.value, ast.Call)
+                and isinstance(child.value.func, ast.Name)
+                and child.value.func.id == "local"
+            )
+    assert len(guarded) == 4
+    assert any("kubectl create namespace terrapod" in command for command in guarded)
+    assert "QUERY_BUILD" in guarded
+    assert "EE_AGENT_BUILD" in guarded
+    assert any("make -C provider dev-package" in command for command in guarded)
+
+
+def test_existing_dev_certificates_do_not_require_mkcert() -> None:
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    setup = (
+        TILTFILE.read_text().split("'setup-certificates',", 1)[1].split("labels=['setup'],", 1)[0]
+    )
+    assert "if command -v mkcert &> /dev/null; then" in setup
+    assert 'elif [ ! -s "$CERT_DIR/cert.pem" ] || [ ! -s "$CERT_DIR/key.pem" ]; then' in setup
+
+
+def test_seed_dev_provider_waits_for_storage_pvc_before_start() -> None:
+    """The helper pod cannot mount a PVC Tilt has not applied yet (#1990)."""
+    if ROOT is None or not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in this tree")
+    tiltfile = TILTFILE.read_text()
+    seed = tiltfile.split("'seed-dev-provider-cache',", 1)[1].split("labels=['setup'],", 1)[0]
+    assert "resource_deps=['build-provider-binary', 'uncategorized']" in seed
 
 
 def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
@@ -274,14 +362,13 @@ def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
         "test_every_module_the_job_imports_is_in_the_runner_image SKIPS in CI and "
         "the runner-image omission it exists to catch ships unnoticed"
     )
+    assert "COPY Tiltfile" in test_image.read_text() and TILTFILE.is_file(), (
+        "docker/Dockerfile.test must ship Tiltfile, or the kind runner-image "
+        "delivery guard silently skips in CI"
+    )
 
 
-# ── Third-party dependencies, which are the other half of "complete" ─────────
-
-
-#: Where the runner image's own dependency closure is pinned. It is deliberately
-#: minimal -- around twenty packages against the API's hundreds -- so a module
-#: the image ships may still import something the image cannot resolve.
+# Third-party dependencies are the other half of runner-image completeness.
 REQUIREMENTS = (ROOT / "services" / "requirements-runner.txt") if ROOT else None
 
 
@@ -296,17 +383,7 @@ def _terrapod_package_root() -> pathlib.Path | None:
 
 
 def _third_party_imports_reachable_from(start: pathlib.Path) -> dict[str, str]:
-    """Top-level non-stdlib, non-terrapod modules imported, and who imports them.
-
-    Follows BOTH the `terrapod.runner.*` chain and the other `terrapod.*` modules
-    the image COPIES in -- which is the half that matters, because the omission
-    this catches lived in `services/inventory_render.py`, a shipped non-runner
-    module, and a walk that only recorded its NAME never parsed its imports.
-
-    Module-level imports only. A function-local import is a deliberate deferral
-    and may legitimately name something absent, so long as the path that reaches
-    it is not one every run takes.
-    """
+    """Top-level non-stdlib imports from all modules the runner image ships."""
     pkg = _terrapod_package_root()
     if pkg is None:
         return {}
@@ -319,19 +396,12 @@ def _third_party_imports_reachable_from(start: pathlib.Path) -> dict[str, str]:
             continue
         seen.add(f)
         tree = ast.parse(f.read_text(), filename=str(f))
-        for node in tree.body:  # module level only, deliberately
+        for node in tree.body:
             names: list[str] = []
             if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 names.append(node.module)
             elif isinstance(node, ast.Import):
                 names += [a.name for a in node.names]
-            # Each imported NAME as well as the module, because a name may
-            # itself be a submodule: `from terrapod.runner.phases import
-            # configure_inventory` reaches `phases/configure_inventory.py`, and
-            # recording only `phases` stops the walk at an empty `__init__.py`.
-            # The walker at the top of this file says exactly that, and the first
-            # version of THIS one did it anyway -- it stayed green with the
-            # `import yaml` that broke every runner Job put back.
             submodule_names = (
                 [a.name for a in node.names] if isinstance(node, ast.ImportFrom) else []
             )
@@ -350,23 +420,7 @@ def _third_party_imports_reachable_from(start: pathlib.Path) -> dict[str, str]:
 
 
 def test_every_third_party_module_the_job_imports_is_installed_in_the_image() -> None:
-    """A module the image ships is useless if its dependency is not pinned.
-
-    The sibling of the test at the top of this file, and the half it could not
-    see. `services/inventory_render.py` was added to the runner image's COPY list
-    correctly, passed that gate, and carried a module-level `import yaml` --
-    while `requirements-runner.txt` deliberately pins no PyYAML. Every runner Job
-    of every kind then died at import with `ModuleNotFoundError: No module named
-    'yaml'`, so no plan, apply or configure could execute, and only the eval-boot
-    job -- which builds the real image and runs a real Job -- caught it.
-
-    Resolved through `packages_distributions()` rather than by guessing the
-    distribution name, because the import name and the package name differ often
-    enough to make a guess worthless (`yaml` is PyYAML, `kubernetes` is
-    kubernetes). A module that cannot be resolved to a distribution FAILS rather
-    than being skipped: unresolvable means unverifiable, and a gate that skips
-    what it cannot check is the shape this file already records twice.
-    """
+    """Catch transitive imports missing from the runner's pinned requirements."""
     if ROOT is None or ENTRYPOINT is None or not REQUIREMENTS.is_file():
         pytest.skip("no docker/ or requirements-runner.txt in this tree")
 

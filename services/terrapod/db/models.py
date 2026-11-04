@@ -970,6 +970,9 @@ class Workspace(Base):
     )
     catalog_version_pin: Mapped[str | None] = mapped_column(String(63), nullable=True)
     catalog_input_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # A publish that cannot safely update a floating root leaves its inputs unchanged.
+    # Only the version and a non-sensitive reason code are exposed to consumers.
+    catalog_update_block: Mapped[dict[str, str] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
@@ -1261,8 +1264,8 @@ class CatalogItem(Base):
     NOT a copy of the module — a designation + form-constraint overlay. The
     provisioning form derives from the module version's extracted interface
     (RegistryModuleVersion.inputs) plus `variable_options`; provisioning
-    creates an ordinary agent-mode, non-VCS workspace whose config is a
-    server-generated wrapper that calls this module.
+    creates an ordinary agent-mode, non-VCS workspace. Existing items use a
+    server-generated wrapper; self-contained items will use the module as the root.
     """
 
     __tablename__ = "catalog_items"
@@ -1281,6 +1284,12 @@ class CatalogItem(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    self_contained: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # None preserves unrestricted execution for catalog items created before #1990.
+    # A declared map's keys name the supported tofu/terraform backends.
+    execution_backend_constraints: Mapped[dict[str, str] | None] = mapped_column(
+        JSONB, nullable=True
+    )
     # FK lists kept as JSONB (not association tables) — always loaded with the item.
     provider_template_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     # NULL/empty = any pool the consumer can use; else scopes the offered pools.
@@ -2926,6 +2935,14 @@ class ConfigurationVersion(Base):
     source: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tfe-api"
     )  # tfe-api, vcs, cli
+    # Internal, immutable classification of archive bytes, NOT the caller's `source`.
+    # Unknown is unreadable by human download paths; admin-only wrappers can
+    # contain verbatim provider-template HCL with inline credentials.
+    archive_provenance: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unknown", server_default="unknown"
+    )
+    # Keep the originating module ID even if the module is deleted (no FK).
+    archive_module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending"
     )  # pending, uploading, uploaded, errored
@@ -3120,6 +3137,10 @@ class Run(Base):
 
     # Module impact analysis overrides (maps module coords to override storage paths)
     module_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Durable identity for module PR status/cancellation; overrides expire after retention.
+    module_impact_module_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
 
     #: This run carries an Ansible configure operation (#1988, #1973).
     #:

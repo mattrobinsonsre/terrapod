@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Lo que aprovisiona este elemento del catálogo…",
       "enabled": "Habilitado (visible en el catálogo de exploración)",
+      "selfContained": "Archivo raíz autocontenido",
+      "selfContainedHint": "Usa el archivo del módulo cargado como configuración raíz del espacio de trabajo.",
+      "restrictBackends": "Restringir motores de ejecución",
+      "backendRangesHint": "Selecciona los motores compatibles e introduce rangos de versiones PEP 440 (por ejemplo, >=1.12,<2).",
+      "backendRange": "Rango de versiones de {backend}",
       "providerTemplates": "Plantillas de proveedor",
+      "templatesRemoved": "Al guardar se eliminan las asociaciones existentes con plantillas de proveedor.",
+      "templatesUnavailable": "Las plantillas de proveedor no se usan con elementos autocontenidos.",
       "noProviderTemplates": "No hay plantillas de proveedor definidas.",
       "restrictPools": "Restringir a grupos de agentes específicos",
       "noAgentPools": "No hay grupos de agentes disponibles.",
@@ -1497,6 +1504,7 @@
       "actions": "Acciones"
     },
     "badge": {
+      "selfContained": "autocontenido",
       "enabled": "habilitado",
       "disabled": "deshabilitado"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Elemento del catálogo eliminado"
     },
     "errors": {
+      "backendRequired": "Selecciona al menos un motor de ejecución.",
+      "backendRangeRequired": "Introduce un rango de versiones para cada motor seleccionado.",
       "load": "No se pudieron cargar los elementos del catálogo",
       "save": "No se pudo guardar el elemento del catálogo",
       "createStatus": "No se pudo crear el elemento del catálogo ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Eliminar el registro del catálogo sin destruir su infraestructura (no recomendado)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "La versión {version} requiere reconfiguración antes de ejecutarse.",
+      "updateBlockedArchive": "La versión {version} no puede ejecutarse porque su archivo no está disponible o es inválido. Pida al responsable del catálogo que lo corrija.",
+      "updateBlockedRuntime": "La versión {version} no puede ejecutarse con el motor y la versión de este espacio de trabajo. Seleccione una versión compatible mediante la API y vuelva a configurar.",
+      "removedInputs": "Esta versión ya no los utiliza",
+      "removedHint": "Estas entradas se eliminarán al poner en cola esta reconfiguración. Revise los campos nuevos antes de continuar.",
       "title": "Reconfigurar {name}",
       "description": "Actualice las entradas o la versión, luego ponga en cola una ejecución.",
       "currentOption": "{version} (actual)",

@@ -656,17 +656,19 @@ async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -
     )
 
 
-async def _collect_module_rows(db, workspace_ids, pr_number: int) -> list[_Row]:
+async def _collect_module_rows(
+    db, workspace_ids, pr_number: int, module_id: uuid.UUID, head_sha: str | None = None
+) -> list[_Row]:
     """Rows for a module PR: every consuming workspace's module-impact run.
 
     A module PR has no `PRSession` — the poller opens those for workspace
     repositories, and this PR belongs to the module's — so the rows come from
     the runs directly and the comment is found by its marker.
 
-    Scoped to `source == "module-test"` as well as the number. PR numbers are
-    per-repository and nothing on a run records which repository its number
-    came from, so without the source filter a workspace's own PR #7 would
-    appear on a module's PR #7.
+    PR numbers belong to a repository, not a workspace. The durable module id
+    prevents two linked modules' same-numbered PRs from sharing rows, even after
+    override tarballs have been purged. Only poller-created runs establish the
+    PR head: a user retry of an older run has a newer creation time but an old SHA.
     """
     ids = list(workspace_ids or [])
     if not ids:
@@ -677,12 +679,22 @@ async def _collect_module_rows(db, workspace_ids, pr_number: int) -> list[_Row]:
         .where(
             Run.workspace_id.in_(ids),
             Run.source == "module-test",
+            Run.created_by == "module-impact-analysis",
+            Run.module_impact_module_id == module_id,
             Run.vcs_pull_request_number == pr_number,
         )
-        .order_by(Workspace.name, Run.created_at.desc())
+        .order_by(Run.created_at.desc(), Run.id.desc())
     )
+    candidates = result.all()
+    if not candidates:
+        return []
+    newest_sha = candidates[0][0].vcs_commit_sha
+    if head_sha and head_sha != newest_sha:
+        return []  # A late status from an older PR revision must not rewrite the comment.
     latest: dict[uuid.UUID, tuple[Workspace, Run]] = {}
-    for run, ws in result.all():
+    for run, ws in candidates:
+        if run.vcs_commit_sha != newest_sha:
+            continue
         latest.setdefault(ws.id, (ws, run))
     return [
         await _row_for(db, ws, run)
@@ -948,7 +960,13 @@ async def _post_or_update(
 
 
 async def refresh_module_pr_comment(
-    db, conn: VCSConnection, repo: str, pr_number: int, workspace_ids
+    db,
+    conn: VCSConnection,
+    repo: str,
+    pr_number: int,
+    workspace_ids,
+    module_id: uuid.UUID,
+    head_sha: str | None = None,
 ) -> None:
     """Refresh the one Terrapod comment on a module's PR (#1940).
 
@@ -963,7 +981,7 @@ async def refresh_module_pr_comment(
     this runs on the module-impact path and must not fail an analysis run.
     """
     try:
-        rows = await _collect_module_rows(db, workspace_ids, pr_number)
+        rows = await _collect_module_rows(db, workspace_ids, pr_number, module_id, head_sha)
         if not rows:
             return
         await _post_or_update(conn, repo, pr_number, render_comment(rows))

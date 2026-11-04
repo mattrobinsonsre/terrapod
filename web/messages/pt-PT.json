@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Descrição",
       "descriptionPlaceholder": "O que este item de catálogo aprovisiona…",
       "enabled": "Ativado (visível no catálogo de navegação)",
+      "selfContained": "Arquivo raiz autónomo",
+      "selfContainedHint": "Utilize o arquivo do módulo carregado como configuração raiz do espaço de trabalho.",
+      "restrictBackends": "Restringir motores de execução",
+      "backendRangesHint": "Selecione os motores suportados e introduza intervalos de versões PEP 440 (por exemplo, >=1.12,<2).",
+      "backendRange": "Intervalo de versões de {backend}",
       "providerTemplates": "Modelos de provider",
+      "templatesRemoved": "Ao guardar, são removidas as associações existentes a modelos de provider.",
+      "templatesUnavailable": "Os modelos de provider não são utilizados com itens autónomos.",
       "noProviderTemplates": "Nenhum modelo de provider definido.",
       "restrictPools": "Restringir a agent pools específicos",
       "noAgentPools": "Nenhum agent pool disponível.",
@@ -1497,6 +1504,7 @@
       "actions": "Ações"
     },
     "badge": {
+      "selfContained": "autónomo",
       "enabled": "ativado",
       "disabled": "desativado"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Item de catálogo eliminado"
     },
     "errors": {
+      "backendRequired": "Selecione pelo menos um motor de execução.",
+      "backendRangeRequired": "Introduza um intervalo de versões para cada motor selecionado.",
       "load": "Falha ao carregar os itens de catálogo",
       "save": "Falha ao guardar o item de catálogo",
       "createStatus": "Falha ao criar o item de catálogo ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Eliminar o registo do catálogo sem destruir a sua infraestrutura (desaconselhado)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "A versão {version} precisa de ser reconfigurada antes de executar.",
+      "updateBlockedArchive": "A versão {version} não pode executar porque o arquivo não está disponível ou é inválido. Peça ao responsável pelo catálogo que o corrija.",
+      "updateBlockedRuntime": "A versão {version} não pode usar o motor e a versão deste espaço de trabalho. Selecione uma versão compatível através da API e reconfigure.",
+      "removedInputs": "Já não são utilizados por esta versão",
+      "removedHint": "Estas entradas serão removidas ao colocar esta reconfiguração na fila. Reveja os novos campos antes de continuar.",
       "title": "Reconfigurar {name}",
       "description": "Atualize as entradas e/ou a versão, depois coloque uma execução na fila.",
       "currentOption": "{version} (atual)",

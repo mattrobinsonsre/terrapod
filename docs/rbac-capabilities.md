@@ -89,8 +89,8 @@ capabilities).
 | `workspace:read` | GET workspace by id/name; GET org workspaces list (per-row filter); GET tag-bindings / effective-tag-bindings; POST/DELETE relationships/tags (no-op, gated read); GET vcs-refs |
 | `run:read` | GET run; GET workspace runs; GET run-events; GET plan/apply by id; GET plan log / apply log; GET run plan/apply (terrapod); GET+POST plan-summary, regenerate, chat messages (read-tier by design — no infra mutation); GET workspace runs SSE stream |
 | `state:read-metadata` | GET workspace state-versions list; GET current-state-version; GET state-version metadata (mints upload URL) |
-| `var:read` | GET workspace vars (sensitive values masked) |
-| `config:read` | GET configuration-versions list; GET cv download; POST cv download-ticket; GET cv diff |
+| `var:read` | GET workspace vars (sensitive values masked; catalog-managed static native inputs show non-sensitive values only when the item has not changed since workspace creation, while hidden defaults and unclassifiable inputs remain masked) |
+| `config:read` | GET configuration-versions list **and individual CV metadata**; GET CV download; POST CV download-ticket; POST CV diff. Human byte access (download, mint and each diff side) also needs `registry:read` on the originating module for self-contained roots, or effective platform `admin` for wrappers with provider templates. Ordinary wrappers without templates need only `config:read`. Unknown old catalog/module-test provenance or a deleted originating module is denied; a known ordinary-source CV from an older replica on a non-catalog workspace remains directly downloadable and can mint a standard `cv` ticket, even when its stored provenance is unknown. A newly scoped ticket, once minted, is bearer until expiry (at most 30 minutes) even if grants change; an old ordinary CV ticket cannot open a protected or admin-only archive. |
 | `run-task:read` | GET workspace run-tasks; GET run-task; GET task-stages; GET task-stage |
 | `notification:read` | GET workspace notification-configurations; GET notification-configuration |
 | `run-trigger:read` | GET workspace run-triggers; GET run-trigger |
@@ -182,6 +182,8 @@ unchanged, lives in `registry_rbac_service`.)
 | write | `registry:write` | POST module versions; PUT module upload; PUT provider shasums / shasums.sig / platform binary |
 | admin | `registry:admin` | DELETE module/provider/version/platform; PATCH module/provider (labels) — **owner reassignment additionally requires platform admin**; PATCH module vcs; POST/DELETE workspace-links |
 
+Raw registry module downloads and module-interface reads follow **registry** permissions, not catalog permissions, even when a catalog item uses that module. They do not scrub source archives: authors must keep secrets out of module source.
+
 `platform:registry-admin` (not registry-RBAC) covers: binary-cache + provider-cache
 admin endpoints, and registry resource **owner** reassignment.
 
@@ -201,13 +203,21 @@ Hierarchy `read < use < admin`. No `everyone` floor; `none` grants nothing
 
 | Preset | Capability | Gates |
 |---|---|---|
-| read | `catalog:read` | GET catalog-items (filter); GET item; GET item form; GET item instances; GET instance |
+| read | `catalog:read` | GET catalog-items (filter); GET item; GET item form/interface; GET item instances; GET instance. Ordinary item list/show redact **all authored** defaults and choices, regardless of current sensitivity or platform role; the selected-version form still shows non-sensitive defaults and choices. |
 | use | `catalog:use` | POST item provision (also needs `pool:assign`); PATCH instance reconfigure; POST instance destroy/confirm/discard |
 | admin | `catalog:admin` | DELETE catalog-instance (orphan-delete) |
 
 Catalog **item** authoring (POST/PATCH/DELETE catalog-items) and
 **provider-templates** are `require_admin` → `platform:catalog-admin`, not
 catalog-RBAC.
+
+The **only** authoring read of sensitive item options or a template's HCL body
+and parameter details is the corresponding **show GET** with
+`?include-sensitive-values=true`, checked against the platform `admin` role.
+Catalog `admin`, item ownership and platform `audit` are not substitutes.
+Provider-template list/show is otherwise redacted even for admins; there is
+no list opt-in. Catalog form/interface stay redacted, and instance input-values
+hide sensitive/hidden inputs even if older rows stored them without flags.
 
 ---
 

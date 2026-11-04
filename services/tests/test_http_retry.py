@@ -8,6 +8,8 @@ the request provably never reached the server.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import httpx
 import pytest
 
@@ -30,6 +32,88 @@ def _client(handler) -> httpx.Client:
 
 def _aclient(handler) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+_PRIVATE_URL = "https://user:password@mirror.example/index.json?token=index-secret"
+
+
+@pytest.mark.parametrize("failure", ["transport", "status"])
+def test_sync_retry_logs_no_credentials(failure):
+    calls = 0
+
+    def handler(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            if failure == "transport":
+                raise httpx.ReadTimeout(f"failed at {req.url}", request=req)
+            return httpx.Response(503)
+        return httpx.Response(200)
+
+    with patch.object(http_retry.logger, "warning") as warning, _client(handler) as client:
+        assert http_retry.request_with_retry(client, "GET", _PRIVATE_URL).status_code == 200
+
+    assert calls == 2
+    warning.assert_called_once()
+    fields = warning.call_args.kwargs
+    assert fields["method"] == "GET"
+    if failure == "transport":
+        assert fields["err"] == "ReadTimeout"
+    else:
+        assert fields["status"] == 503
+    assert _PRIVATE_URL not in str(warning.call_args)
+    assert "password" not in str(warning.call_args)
+    assert "index-secret" not in str(warning.call_args)
+
+
+@pytest.mark.parametrize("failure", ["transport", "status"])
+async def test_async_retry_logs_no_credentials(failure):
+    calls = 0
+
+    def handler(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            if failure == "transport":
+                raise httpx.ConnectError(f"failed at {req.url}", request=req)
+            return httpx.Response(502)
+        return httpx.Response(200)
+
+    with patch.object(http_retry.logger, "warning") as warning:
+        async with _aclient(handler) as client:
+            resp = await http_retry.arequest_with_retry(client, "GET", _PRIVATE_URL)
+    assert resp.status_code == 200
+
+    assert calls == 2
+    warning.assert_called_once()
+    fields = warning.call_args.kwargs
+    assert fields["method"] == "GET"
+    if failure == "transport":
+        assert fields["err"] == "ConnectError"
+    else:
+        assert fields["status"] == 502
+    assert _PRIVATE_URL not in str(warning.call_args)
+    assert "password" not in str(warning.call_args)
+    assert "index-secret" not in str(warning.call_args)
+
+
+def test_redact_urls_preserves_safe_diagnostics():
+    message = f"tofu 1.9.0: {_PRIVATE_URL} returned 404. Pin a version with an artifact."
+    assert http_retry.redact_urls(message) == (
+        "tofu 1.9.0: [redacted URL] returned 404. Pin a version with an artifact."
+    )
+    assert "it's-secret" not in http_retry.redact_urls(
+        "index https://mirror.example/index.json?token=it's-secret returned 503"
+    )
+
+
+def test_exception_diagnostic_preserves_upstream_status_without_url():
+    request = httpx.Request("GET", _PRIVATE_URL)
+    response = httpx.Response(503, request=request)
+    exc = httpx.HTTPStatusError(
+        f"bad response from {_PRIVATE_URL}", request=request, response=response
+    )
+    assert http_retry.exception_diagnostic(exc) == "HTTPStatusError (upstream HTTP 503)"
 
 
 class TestSyncRetry:

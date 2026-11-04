@@ -1382,6 +1382,40 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: (helm-lint) Helm lint (default values)
+        run: |
+          docker run --rm -v "$PWD:/chart" -w /chart \
+            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            lint helm/terrapod --values helm/terrapod/values.yaml
+
+      - name: (helm-lint) Helm lint (local dev values)
+        run: |
+          docker run --rm -v "$PWD:/chart" -w /chart \
+            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
+
+      - run: scripts/helm-config-contract.sh
+
+  # ── Helm Smoke (render assertions) ─────────────────────
+  # Catches broken chart DEFAULTS that `helm lint` does not — e.g. a stock
+  # install that renders no working stack because a component default is off.
+  # (Directly targets the web.enabled=false class of bug that shipped a
+  # non-working chart: lint passed, but `helm install` produced no web/Ingress.)
+  helm-smoke:
+    name: Helm Smoke
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+
+    # The `(migration-check)` steps below apply the real migration files to a
+    # real Postgres and then query the migrated schema, so this job needs the
+    # service container -- it moved here with those steps when `host-checks`
+    # was split, and the container did not come with it (#2326). The steps
+    # left behind in `host-checks` are helm lint and a shell gate, neither of
+    # which touches a database, so this is a move rather than a second copy.
 
     services:
       postgres:
@@ -1401,31 +1435,43 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: (helm-lint) Helm lint (default values)
+      - name: Dev provider version and public key mount stay local-only
         run: |
-          docker run --rm -v "$PWD:/chart" -w /chart \
-            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
-            lint helm/terrapod --values helm/terrapod/values.yaml
-
-      - name: (helm-lint) Helm lint (local dev values)
-        run: |
-          docker run --rm -v "$PWD:/chart" -w /chart \
-            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
-            lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
-
-  # ── Helm Smoke (render assertions) ─────────────────────
-  # Catches broken chart DEFAULTS that `helm lint` does not — e.g. a stock
-  # install that renders no working stack because a component default is off.
-  # (Directly targets the web.enabled=false class of bug that shipped a
-  # non-working chart: lint passed, but `helm install` produced no web/Ingress.)
-      - run: scripts/helm-config-contract.sh
-
-  # ── Eval quickstart boot (kind + k3d) ──────────────────
-  # Proves `make eval` actually stands up a complete stack (embedded
-  # Postgres/Redis + migrations + API + web) on a throwaway cluster, on both
-  # supported cluster tools. Uses released images, so it exercises the eval
-  # mechanism + chart, not the PR's app code (that's covered by the test job).
+          app_version=$(helm show chart ./helm/terrapod | awk '/^appVersion:/{gsub(/"/, "", $2); print $2}')
+          [ -n "$app_version" ] || { echo "chart appVersion is missing"; exit 1; }
+          for profile in values.yaml values-local.yaml values-eval.yaml; do
+            rendered=$(helm template tp ./helm/terrapod -f "helm/terrapod/$profile" \
+              --show-only templates/deployment-api.yaml) || exit 1
+            [ "$(printf '%s\n' "$rendered" | grep -c 'name: TERRAPOD_VERSION')" = 1 ] \
+              || { echo "$profile: expected exactly one API TERRAPOD_VERSION"; exit 1; }
+            printf '%s\n' "$rendered" | grep -A1 'name: TERRAPOD_VERSION' | grep -Fqx "              value: \"$app_version\"" \
+              || { echo "$profile: default API version must be chart appVersion"; exit 1; }
+            if [ "$profile" = values-local.yaml ]; then
+              printf '%s\n' "$rendered" | grep -Fq 'mountPath: /app/signing-key.asc' \
+                || { echo "local API signing key mount missing"; exit 1; }
+              printf '%s\n' "$rendered" | grep -A3 'mountPath: /app/signing-key.asc' \
+                | grep -Fq 'subPath: cache/provider/terrapod/dev-signing-key.asc' \
+                || { echo "local API signing key subPath missing"; exit 1; }
+              printf '%s\n' "$rendered" | grep -A3 'mountPath: /app/signing-key.asc' \
+                | grep -Fq 'readOnly: true' \
+                || { echo "local API signing key must be read-only"; exit 1; }
+              printf '%s\n' "$rendered" | grep -A3 'mountPath: /app/signing-key.asc' \
+                | grep -Fq 'name: storage' \
+                || { echo "local API signing key must use the existing storage volume"; exit 1; }
+            else
+              if printf '%s\n' "$rendered" | grep -Fq 'mountPath: /app/signing-key.asc'; then
+                echo "$profile: dev signing key mount must not render"; exit 1
+              fi
+            fi
+          done
+          overridden=$(helm template tp ./helm/terrapod -f helm/terrapod/values-local.yaml \
+            --set api.devProviderVersion=1.9.0-dev.123 \
+            --show-only templates/deployment-api.yaml) || exit 1
+          [ "$(printf '%s\n' "$overridden" | grep -c 'name: TERRAPOD_VERSION')" = 1 ] \
+            || { echo "local override duplicated API TERRAPOD_VERSION"; exit 1; }
+          printf '%s\n' "$overridden" | grep -A1 'name: TERRAPOD_VERSION' \
+            | grep -Fqx '              value: "1.9.0-dev.123"' \
+            || { echo "local devProviderVersion did not reach the API pod"; exit 1; }
 
       - name: (helm-smoke) No third-party image is pulled straight from Docker Hub
         run: |
@@ -2217,7 +2263,39 @@ jobs:
           echo "$out" | grep -q "socket_mode: true" || { echo "FAIL: slack config not rendered into config.yaml"; exit 1; }
           echo "$out" | grep -q 'command: "/terrapod"' || { echo "FAIL: slack command not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q 'label: ""' || { echo "FAIL: slack label not rendered into config.yaml (#691)"; exit 1; }
-          echo "$out" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          # The secretKeyRef half is a property of the TEMPLATE, so it is
+          # asserted with the values set explicitly rather than read off
+          # whatever values-local happens to choose. Those two were coupled,
+          # and disabling Slack for local dev (#2370) therefore failed an
+          # assertion about credential delivery -- a dev-profile decision
+          # breaking a security invariant it has nothing to do with.
+          slack=$(helm template ./helm/terrapod \
+            --set api.config.slack.enabled=true \
+            --set api.config.slack.existingSecret=terrapod-slack)
+          echo "$slack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          echo "$slack" | grep -q "TERRAPOD_SLACK__APP_TOKEN" || { echo "FAIL: slack app-token secretKeyRef env missing"; exit 1; }
+          echo "$slack" | grep -q "TERRAPOD_SLACK__SIGNING_SECRET" || { echo "FAIL: slack signing-secret secretKeyRef env missing"; exit 1; }
+          # And the credential must never arrive the other way.
+          if echo "$slack" | grep -qE '^\s*(bot_token|app_token|signing_secret):'; then
+            echo "FAIL: a slack credential rendered into the ConfigMap"; exit 1
+          fi
+          # A deployment that names no Secret must get no such env var, or an
+          # operator with no Slack integration gets a pod that cannot start.
+          noslack=$(helm template ./helm/terrapod --set api.config.slack.existingSecret="")
+          if echo "$noslack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN"; then
+            echo "FAIL: slack secretKeyRef rendered with no Secret named — the pod would not start (#2370)"; exit 1
+          fi
+          # And `enabled: false` must suppress them even WITH a Secret named.
+          # These refs are not `optional: true`, so rendering them for a disabled
+          # integration makes a Secret that may not exist fatal at container
+          # creation -- turning Slack off is exactly when the Secret is likely
+          # to be absent, which is how a dev stack became undeployable (#2370).
+          offslack=$(helm template ./helm/terrapod \
+            --set api.config.slack.enabled=false \
+            --set api.config.slack.existingSecret=terrapod-slack)
+          if echo "$offslack" | grep -q "TERRAPOD_SLACK__"; then
+            echo "FAIL: slack secretKeyRef rendered while slack.enabled=false (#2370)"; exit 1
+          fi
           # Cost estimation (#871): non-secret config renders into config.yaml.
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
@@ -2594,13 +2672,22 @@ jobs:
             su=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
                    template terrapod helm/terrapod -f "helm/terrapod/$f" \
                  | grep 'server_url:' | head -1)
-            case "$su" in
+            case "$f:$su" in
+              values-local.yaml:*http://terrapod-web.terrapod.svc.cluster.local:3000*) ;;
+              values-local.yaml:*) echo "local runner server_url must use the web BFF: $su"; exit 1 ;;
               *.svc.cluster.local:8000*) ;;
               *) echo "$f: server_url is not a cluster-local FQDN: $su"
                  echo "runner Jobs run in listener.runnerNamespace, where a bare Service name does not resolve"
                  exit 1 ;;
             esac
           done
+          local_runner=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+                           template terrapod helm/terrapod -f helm/terrapod/values-local.yaml \
+                           --show-only templates/configmap-runner.yaml)
+          echo "$local_runner" | grep -q 'name: TERRAPOD_ALLOW_INSECURE_TRANSPORT' || {
+            echo "values-local.yaml did not deliver the dev-only HTTP opt-in to runner Jobs"; exit 1; }
+          echo "$local_runner" | grep -q 'value: "1"' || {
+            echo "values-local.yaml did not enable the dev-only HTTP opt-in"; exit 1; }
 
           # 2. With the runners moved out, the API policy must admit them with a
           #    namespaceSelector. A bare podSelector matches only pods in the
@@ -4677,7 +4764,7 @@ jobs:
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, secret-scan, codeql, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, helm-smoke, secret-scan, codeql, sast, scan-images]
     if: |
       always()
       && needs.build-images-amd64.result == 'success'
@@ -4688,6 +4775,7 @@ jobs:
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.python-audit.result == 'success' || needs.python-audit.result == 'skipped')
       && (needs.host-checks.result == 'success' || needs.host-checks.result == 'skipped')
+      && (needs.helm-smoke.result == 'success' || needs.helm-smoke.result == 'skipped')
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
       && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
@@ -4820,6 +4908,7 @@ jobs:
       - python-audit
       - secret-scan
       - host-checks
+      - helm-smoke
       - sast
     runs-on: ubuntu-latest
     steps:
@@ -4836,6 +4925,7 @@ jobs:
             python-audit=${{ needs.python-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
             host-checks=${{ needs.host-checks.result }}
+            helm-smoke=${{ needs.helm-smoke.result }}
             sast=${{ needs.sast.result }}
         run: |
           set -eu
@@ -5940,6 +6030,7 @@ jobs:
       - codeql
       - dependency-review
       - host-checks
+      - helm-smoke
       - helm-eval-boot
       - cli-contract
       - sast
@@ -5990,6 +6081,7 @@ jobs:
             "${{ needs.codeql.result }}"
             "${{ needs.dependency-review.result }}"
             "${{ needs.host-checks.result }}"
+            "${{ needs.helm-smoke.result }}"
             "${{ needs.helm-eval-boot.result }}"
             "${{ needs.cli-contract.result }}"
             "${{ needs.sast.result }}"

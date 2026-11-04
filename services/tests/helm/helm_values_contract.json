@@ -316,6 +316,7 @@
   "api.databaseCA.existingConfigMap",
   "api.databaseCA.inline",
   "api.databaseCA.key",
+  "api.devProviderVersion",
   "api.enabled",
   "api.ephemeralStorage.enabled",
   "api.ephemeralStorage.mountPath",

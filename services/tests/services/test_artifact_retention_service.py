@@ -107,6 +107,9 @@ class _FakeResult:
     def all(self):
         return self._items
 
+    def scalar_one_or_none(self):
+        return self._items[0] if self._items else None
+
 
 class _FakeTupleResult:
     """Mimics SQLAlchemy result for .all() returning tuples."""
@@ -490,12 +493,59 @@ class TestCleanupModuleOverrides:
 
         db = AsyncMock()
         storage = AsyncMock()
-        db.execute.return_value = _FakeResult([run])
+        db.execute.side_effect = [_FakeResult([run]), _FakeResult([]), _FakeResult([])]
 
         deleted = await _cleanup_module_overrides(db, storage, retention_days=14, batch_size=100)
         assert deleted == 2
         assert storage.delete.call_count == 2
         assert run.module_overrides is None
+
+    @pytest.mark.asyncio
+    async def test_old_run_releases_shared_key_without_deleting_newer_runs_archive(self):
+        ws_id = _make_uuid()
+        key = "module_overrides/abc123/default/vpc/aws.tar.gz"
+        old = _make_run(ws_id, module_overrides={"default/vpc/aws": key})
+        active = _make_run(ws_id, status="planning", module_overrides={"default/vpc/aws": key})
+        db = AsyncMock()
+        db.execute.side_effect = [_FakeResult([old]), _FakeResult([active])]
+        storage = AsyncMock()
+
+        assert await _cleanup_module_overrides(db, storage, 14, 100) == 0
+        assert old.module_overrides is None
+        assert active.module_overrides == {"default/vpc/aws": key}
+        storage.delete.assert_not_awaited()
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_shared_key_is_deleted_once_after_last_old_run_releases_it(self):
+        ws_id = _make_uuid()
+        key = "module_overrides/abc123/default/vpc/aws.tar.gz"
+        old = _make_run(ws_id, module_overrides={"default/vpc/aws": key})
+        other = _make_run(ws_id, module_overrides={"default/vpc/aws": key})
+        db = AsyncMock()
+        db.execute.side_effect = [
+            _FakeResult([old, other]),
+            _FakeResult([other]),
+            _FakeResult([]),
+        ]
+        storage = AsyncMock()
+
+        assert await _cleanup_module_overrides(db, storage, 14, 100) == 1
+        storage.delete.assert_awaited_once_with(key)
+        assert old.module_overrides is None
+        assert other.module_overrides is None
+
+    @pytest.mark.asyncio
+    async def test_failed_delete_keeps_override_reference_for_retry(self):
+        key = "module_overrides/abc123/default/vpc/aws.tar.gz"
+        run = _make_run(_make_uuid(), module_overrides={"default/vpc/aws": key})
+        db = AsyncMock()
+        db.execute.side_effect = [_FakeResult([run]), _FakeResult([])]
+        storage = AsyncMock()
+        storage.delete.side_effect = OSError("temporarily unavailable")
+
+        assert await _cleanup_module_overrides(db, storage, 14, 100) == 0
+        assert run.module_overrides == {"default/vpc/aws": key}
 
     @pytest.mark.asyncio
     async def test_no_overrides_returns_zero(self):
@@ -520,6 +570,7 @@ class TestArtifactRetentionCycle:
         cfg.state_versions_keep = 20
         cfg.run_artifacts_retention_days = 90
         cfg.config_versions_retention_days = 90
+        cfg.config_versions_keep = 50
         cfg.provider_cache_retention_days = 30
         cfg.binary_cache_retention_days = 30
         cfg.module_overrides_retention_days = 14
@@ -560,6 +611,10 @@ class TestArtifactRetentionCycle:
                 return_value=0,
             ),
             patch(
+                "terrapod.services.artifact_retention_service._cleanup_config_versions_count",
+                return_value=0,
+            ),
+            patch(
                 "terrapod.services.artifact_retention_service._cleanup_provider_cache",
                 return_value=0,
             ),
@@ -596,6 +651,7 @@ class TestArtifactRetentionCycle:
         cfg.state_versions_keep = 0  # disabled
         cfg.run_artifacts_retention_days = 0  # disabled
         cfg.config_versions_retention_days = 0  # disabled
+        cfg.config_versions_keep = 0  # disabled
         cfg.provider_cache_retention_days = 0  # disabled
         cfg.binary_cache_retention_days = 0  # disabled
         cfg.module_overrides_retention_days = 0  # disabled

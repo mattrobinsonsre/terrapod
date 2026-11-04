@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import WarmBinaryEntry, WarmPlatform, WarmProviderEntry, settings
+from terrapod.http_retry import exception_diagnostic
 from terrapod.logging_config import get_logger
 from terrapod.services import binary_cache_service, platform_tools, provider_cache_service
 from terrapod.storage.protocol import ObjectStore
@@ -141,7 +142,7 @@ async def warm_from_manifest(
             except Exception as e:  # noqa: BLE001 — collect, never abort the batch
                 await db.rollback()  # clear the aborted transaction for the next entry
                 summary.results.append(WarmResult("binary", ref, ok=False, error=str(e)))
-                logger.warning("Failed to warm binary", ref=ref, error=str(e))
+                logger.warning("Failed to warm binary", ref=ref, error=exception_diagnostic(e))
 
     provider_enabled = settings.registry.provider_cache.enabled
     for entry in providers:
@@ -164,6 +165,6 @@ async def warm_from_manifest(
             except Exception as e:  # noqa: BLE001 — collect, never abort the batch
                 await db.rollback()
                 summary.results.append(WarmResult("provider", ref, ok=False, error=str(e)))
-                logger.warning("Failed to warm provider", ref=ref, error=str(e))
+                logger.warning("Failed to warm provider", ref=ref, error=exception_diagnostic(e))
 
     return summary

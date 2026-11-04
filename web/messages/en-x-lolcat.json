@@ -1472,7 +1472,14 @@
       "descriptionLabel": "Descripshun",
       "descriptionPlaceholder": "Wut dis catalog item provishuns…",
       "enabled": "Enabld (visibl in teh browze catalog)",
+      "selfContained": "Self-contain''d root arkyve",
+      "selfContainedHint": "Uz teh upload''d module arkyve az teh workspace root config, plz.",
+      "restrictBackends": "Restrict execution backendz",
+      "backendRangesHint": "Pick support''d backendz an enter PEP 440 vershun rangez (e.g. >=1.12,<2), kthx.",
+      "backendRange": "{backend} vershun range",
       "providerTemplates": "Providr templatez",
+      "templatesRemoved": "Savin'' removez old providr-template linkz. O noes!",
+      "templatesUnavailable": "Providr templatez no work wit self-contain''d itemz.",
       "noProviderTemplates": "No providr templatez defind.",
       "restrictPools": "Restrict ta specifik agent pools",
       "noAgentPools": "No agent pools availabl.",
@@ -1497,6 +1504,7 @@
       "actions": "Akshunz"
     },
     "badge": {
+      "selfContained": "self-contain''d",
       "enabled": "enabld",
       "disabled": "disabld"
     },
@@ -1509,6 +1517,8 @@
       "deleted": "Catalog item deletd"
     },
     "errors": {
+      "backendRequired": "Pick at least wun execution backend, plz.",
+      "backendRangeRequired": "Gib a vershun range fer every pick''d backend.",
       "load": "Faild ta load catalog items",
       "save": "Faild ta save catalog item",
       "createStatus": "Faild ta create catalog item ({status})",
@@ -1878,6 +1888,11 @@
       "orphanTitle": "Delet teh catalog record wifout destroyin its infrastructur (discouragd)"
     },
     "reconfigure": {
+      "updateBlockedInputs": "Vershun {version} needz reconfigur befor it can run.",
+      "updateBlockedArchive": "Vershun {version} can't run becuz its arkyv iz missin or broken. Ask teh catalog ownr ta fix it.",
+      "updateBlockedRuntime": "Vershun {version} can''t run wif dis wurkspace backend an vershun. Pick a compatibl runtime thru teh API, den reconfigure.",
+      "removedInputs": "No longr uzed by dis vershun",
+      "removedHint": "Dese inputz will be removd wen u queue dis reconfigur. Chek teh new fieldz befor continuin.",
       "title": "Reconfigur {name}",
       "description": "Updat inputz an/or vershun, den queue a run.",
       "currentOption": "{version} (currnt)",
