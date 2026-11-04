@@ -122,3 +122,12 @@ junit.xml
 # (GHSA-rgvw-c74c-h75w). The three services/requirements-<image>.txt files are
 # NOT matched by this: those are committed locks for the minimal images.
 /services/requirements.txt
+
+# Scanner output, never source. The SAST job writes `semgrep-results.sarif`
+# at the repo root and the release re-scan writes its own; both are read in
+# the job that produced them and neither belongs in the tree. Two such files
+# (`sg.sarif`, `sg2.sarif`, zero findings each) were committed by accident and
+# made a routine local action unsafe: reproducing the gate means running
+# semgrep with `--output`, and the obvious short names silently overwrote
+# tracked files (#2371).
+*.sarif

@@ -219,6 +219,14 @@ have metadata, so `podman system check --repair` genuinely fixes them.
 - **Never** use `kubectl cp`, `kubectl apply`, or `docker build` against
   Tilt-managed resources — it corrupts Tilt's state. Let Tilt manage its
   resources; use `tilt trigger` to force a rebuild.
+- **The Slack integration is off in the dev stack**, because its tokens come
+  from a Secret you have to create by hand and the stack should come up without
+  one. To work on that surface, create the Secret as
+  [`slack-integration.md`](slack-integration.md) describes, then set
+  `api.config.slack.enabled: true` and `existingSecret: terrapod-slack` in
+  `helm/terrapod/values-local.yaml` — the Secret's name is already written
+  there, so it is a one-line change. Socket Mode means no ingress or tunnel is
+  needed for the dev loop.
 
 ## The SSH target, for driving a real configure
 

@@ -2275,6 +2275,18 @@ jobs:
           echo "$slack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
           echo "$slack" | grep -q "TERRAPOD_SLACK__APP_TOKEN" || { echo "FAIL: slack app-token secretKeyRef env missing"; exit 1; }
           echo "$slack" | grep -q "TERRAPOD_SLACK__SIGNING_SECRET" || { echo "FAIL: slack signing-secret secretKeyRef env missing"; exit 1; }
+          # Every one of the three must be `optional: true` (#2370). Without it
+          # a Secret that does not exist is fatal at container creation, so a
+          # typo in a Secret name takes the whole API down -- state backend,
+          # CLI, UI, every run -- for a chat integration. The application
+          # already degrades properly: the settings default to "" and
+          # `slack_service` logs `slack.enabled_but_tokens_missing` naming the
+          # absent token, so this is a proportionate failure rather than a
+          # silent one.
+          n_slack=$(echo "$slack" | grep -c 'name: TERRAPOD_SLACK__')
+          n_opt=$(echo "$slack" | grep -A5 'name: TERRAPOD_SLACK__' | grep -c 'optional: true')
+          [ "$n_slack" = 3 ] || { echo "FAIL: expected 3 slack env vars, rendered $n_slack"; exit 1; }
+          [ "$n_opt" = 3 ] || { echo "FAIL: $n_opt of 3 slack secretKeyRefs are optional:true — a missing Secret would be fatal (#2370)"; exit 1; }
           # And the credential must never arrive the other way.
           if echo "$slack" | grep -qE '^\s*(bot_token|app_token|signing_secret):'; then
             echo "FAIL: a slack credential rendered into the ConfigMap"; exit 1
