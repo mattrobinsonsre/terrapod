@@ -253,6 +253,8 @@ resource terrapod_autodiscovery_rule.vcs_workflow required=false optional=true c
 resource terrapod_catalog_instance.agent_pool_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_catalog_instance.catalog_item_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_instance.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_catalog_instance.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.input_values required=false optional=true computed=false sensitive=true type=types.MapType[basetypes.StringType]
 resource terrapod_catalog_instance.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]

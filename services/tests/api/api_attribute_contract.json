@@ -199,6 +199,8 @@
     "catalog-item-id",
     "catalog-update-block",
     "catalog-version-pin",
+    "engine-version",
+    "execution-backend",
     "labels",
     "name",
     "owner-email"

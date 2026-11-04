@@ -285,6 +285,10 @@ async def test_floating_root_publish_persists_new_protected_cv(app, monkeypatch)
         ws = await _provision_root(db, item, pool, monkeypatch)
         old_cv = await run_service.get_latest_uploaded_cv(db, ws.id)
         ws.catalog_version_pin = None
+        # Set explicitly: an unset attribute on a MagicMock reaches
+        # json.dumps as a MagicMock and raises (#2372).
+        ws.execution_backend = "tofu"
+        ws.engine_version = "1.12.4"
         new_archive = await _root_version(db, module, "2.0.0", 'output "version" { value = 2 }')
         runs = await module_impact_service.trigger_linked_workspace_runs(db, module, "2.0.0")
         assert len(runs) == 1

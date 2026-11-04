@@ -69,6 +69,8 @@ type catalogInstanceModel struct {
 	InputValues        types.Map    `tfsdk:"input_values"`
 	VersionPin         types.String `tfsdk:"version_pin"`
 	AutoApply          types.Bool   `tfsdk:"auto_apply"`
+	ExecutionBackend   types.String `tfsdk:"execution_backend"`
+	EngineVersion      types.String `tfsdk:"engine_version"`
 	Labels             types.Map    `tfsdk:"labels"`
 	UpdateBlockVersion types.String `tfsdk:"update_block_version"`
 	UpdateBlockReason  types.String `tfsdk:"update_block_reason"`
@@ -145,6 +147,24 @@ func (r *catalogInstanceResource) Schema(_ context.Context, _ resource.SchemaReq
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
+			},
+			"execution_backend": schema.StringAttribute{
+				Description: "The engine this instance runs on — \"tofu\" or \"terraform\". " +
+					"Omit to take the deployment's default; note that a catalog item with " +
+					"execution_backend_constraints validates that default too, so an item " +
+					"whose constraints exclude it cannot be provisioned without naming a " +
+					"permitted backend here.",
+				Optional: true, Computed: true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"engine_version": schema.StringAttribute{
+				Description: "The engine version for this instance. The server RESOLVES this " +
+					"to an exact offered binary version, so a partial value like \"1.12\" is " +
+					"a request rather than the stored result; this attribute keeps what you " +
+					"configured and reports the resolved version only when you configure " +
+					"nothing. Refused when it falls outside the item's declared range.",
+				Optional: true, Computed: true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"labels": schema.MapAttribute{
 				Description: "Labels for the provisioned workspace. Changing this forces a new instance.",
@@ -306,6 +326,14 @@ func addInstanceCommon(m *catalogInstanceModel, attrs map[string]any) {
 	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
 		attrs["auto-apply"] = m.AutoApply.ValueBool()
 	}
+	// Both paths accept these, so they belong in the shared builder rather
+	// than only on provision (#2372).
+	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
+		attrs["execution-backend"] = m.ExecutionBackend.ValueString()
+	}
+	if !m.EngineVersion.IsNull() && !m.EngineVersion.IsUnknown() {
+		attrs["engine-version"] = m.EngineVersion.ValueString()
+	}
 }
 
 // mapToStrings flattens a types.Map of strings into a map[string]string.
@@ -371,6 +399,27 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 	if v, ok := inst.Attributes["auto-apply"]; ok && v != nil {
 		if b, ok := v.(bool); ok {
 			m.AutoApply = types.BoolValue(b)
+		}
+	}
+
+	// The backend is stored as given, so reading it back is safe and is what
+	// detects an out-of-band move onto another engine.
+	if backend := attrString(inst.Attributes, "execution-backend"); backend != "" {
+		m.ExecutionBackend = types.StringValue(backend)
+	}
+
+	// The VERSION is not stored as given: the server resolves a partial like
+	// "1.12" to an exact offered binary. Overwriting a CONFIGURED value with
+	// the resolved one is the "Provider produced inconsistent result after
+	// apply" failure the v1.9.0 advisories were about, so the configured value
+	// stands and the server's answer is reported only when nothing was
+	// configured. The cost, stated rather than hidden: drift of a configured
+	// version is not detected. The workspace resource can read its own
+	// engine_version back because the workspace API stores that string
+	// verbatim -- this path differs, so it does not copy that shape.
+	if m.EngineVersion.IsNull() || m.EngineVersion.IsUnknown() {
+		if version := attrString(inst.Attributes, "engine-version"); version != "" {
+			m.EngineVersion = types.StringValue(version)
 		}
 	}
 
