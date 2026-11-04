@@ -2248,7 +2248,28 @@ jobs:
           echo "$out" | grep -q "socket_mode: true" || { echo "FAIL: slack config not rendered into config.yaml"; exit 1; }
           echo "$out" | grep -q 'command: "/terrapod"' || { echo "FAIL: slack command not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q 'label: ""' || { echo "FAIL: slack label not rendered into config.yaml (#691)"; exit 1; }
-          echo "$out" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          # The secretKeyRef half is a property of the TEMPLATE, so it is
+          # asserted with the values set explicitly rather than read off
+          # whatever values-local happens to choose. Those two were coupled,
+          # and disabling Slack for local dev (#2370) therefore failed an
+          # assertion about credential delivery -- a dev-profile decision
+          # breaking a security invariant it has nothing to do with.
+          slack=$(helm template ./helm/terrapod \
+            --set api.config.slack.enabled=true \
+            --set api.config.slack.existingSecret=terrapod-slack)
+          echo "$slack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          echo "$slack" | grep -q "TERRAPOD_SLACK__APP_TOKEN" || { echo "FAIL: slack app-token secretKeyRef env missing"; exit 1; }
+          echo "$slack" | grep -q "TERRAPOD_SLACK__SIGNING_SECRET" || { echo "FAIL: slack signing-secret secretKeyRef env missing"; exit 1; }
+          # And the credential must never arrive the other way.
+          if echo "$slack" | grep -qE '^\s*(bot_token|app_token|signing_secret):'; then
+            echo "FAIL: a slack credential rendered into the ConfigMap"; exit 1
+          fi
+          # A deployment that names no Secret must get no such env var, or an
+          # operator with no Slack integration gets a pod that cannot start.
+          noslack=$(helm template ./helm/terrapod --set api.config.slack.existingSecret="")
+          if echo "$noslack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN"; then
+            echo "FAIL: slack secretKeyRef rendered with no Secret named — the pod would not start (#2370)"; exit 1
+          fi
           # Cost estimation (#871): non-secret config renders into config.yaml.
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
