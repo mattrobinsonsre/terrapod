@@ -1382,23 +1382,6 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        # Literal for the same reason as `container:` above.
-        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
-        env:
-          POSTGRES_USER: terrapod
-          POSTGRES_PASSWORD: terrapod
-          POSTGRES_DB: terrapod
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U terrapod"
-          --health-interval 3s --health-timeout 3s --health-retries 20
-
-    env:
-      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -1426,6 +1409,30 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+
+    # The `(migration-check)` steps below apply the real migration files to a
+    # real Postgres and then query the migrated schema, so this job needs the
+    # service container -- it moved here with those steps when `host-checks`
+    # was split, and the container did not come with it (#2326). The steps
+    # left behind in `host-checks` are helm lint and a shell gate, neither of
+    # which touches a database, so this is a move rather than a second copy.
+
+    services:
+      postgres:
+        # Literal for the same reason as `container:` above.
+        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
+        env:
+          POSTGRES_USER: terrapod
+          POSTGRES_PASSWORD: terrapod
+          POSTGRES_DB: terrapod
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U terrapod"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Dev provider version and public key mount stay local-only
