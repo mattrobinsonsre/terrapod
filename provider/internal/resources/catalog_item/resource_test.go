@@ -161,7 +161,7 @@ func TestReadCatalogItemUsesAuthoringValuesInsteadOfRedactedState(t *testing.T) 
 	state := tfsdk.State{Schema: sch.Schema, Raw: tftypes.NewValue(obj, values)}
 	if diags := state.Set(ctx, &catalogItemModel{
 		ID: types.StringValue("id"), ProviderTemplateIDs: types.ListNull(types.StringType),
-		AllowedAgentPoolIDs: types.ListNull(types.StringType),
+		AllowedAgentPoolIDs:         types.ListNull(types.StringType),
 		ExecutionBackendConstraints: types.MapNull(types.StringType), Labels: types.MapNull(types.StringType),
 	}); diags.HasError() {
 		t.Fatal(diags)

@@ -149,6 +149,52 @@ def helm_keys() -> set[str]:
     return keys
 
 
+def _unignored(
+    missing: list[tuple[str, int, str]],
+) -> list[tuple[str, int, str]]:
+    """The absent paths that the repository does NOT deliberately ignore.
+
+    A doc may legitimately name a path that cannot exist in a clean checkout
+    because something generates it -- `provider/.dev-build/current-version` is
+    written by the dev provider build, and the paragraph naming it says in as
+    many words that the directory is ignored. Requiring those to exist asks the
+    documentation to describe only the tree and never its outputs, and the first
+    such reference arrived with #2326.
+
+    So the question is not "does this path exist" but "is this a tracked path
+    that has gone missing", and `.gitignore` already answers it. Derived rather
+    than ledgered: an entry in a hand-kept allowlist here would go stale the way
+    the thing it describes does, and ignoring a path to silence this gate is a
+    visible act in a reviewed file.
+
+    One `git check-ignore --stdin` for the whole set, so the cost does not scale
+    with the number of references. It exits 1 when nothing matches, which is the
+    ordinary case and not an error; anything else (no git, not a work tree) is
+    reported by returning the set unfiltered, because a gate that cannot tell
+    must not pass.
+    """
+    if not missing:
+        return []
+    paths = [m[2] for m in missing]
+    try:
+        proc = subprocess.run(
+            ["git", "check-ignore", "--stdin"],
+            cwd=ROOT,
+            input="\n".join(paths),
+            capture_output=True,
+            text=True,
+            # Deliberate: exit 1 means "nothing matched", which is the ordinary
+            # case here, so a raise would turn the common path into an error.
+            check=False,
+        )
+    except OSError:
+        return missing
+    if proc.returncode not in (0, 1):
+        return missing
+    ignored = {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+    return [m for m in missing if m[2] not in ignored]
+
+
 def main() -> int:
     # Three authorities, union: a default in values.yaml, a declaration in the
     # schema, or a read in a template. Any one of them makes the key real.
@@ -163,6 +209,10 @@ def main() -> int:
     ).stdout.split()
 
     problems: list[str] = []
+    # Resolved after the sweep, in one batched `git check-ignore`, because a
+    # path the repository itself ignores is a GENERATED artifact rather than a
+    # repo path that has gone missing -- see `_unignored` below.
+    missing: list[tuple[str, int, str]] = []
     counts = {"make": 0, "helm": 0, "path": 0}
 
     for f in files:
@@ -207,7 +257,10 @@ def main() -> int:
                 ):
                     continue
                 if not (ROOT / p).exists():
-                    problems.append(f"{f}:{lineno}: `{p}` — no such file or directory")
+                    missing.append((f, lineno, p))
+
+    for f, lineno, path in _unignored(missing):
+        problems.append(f"{f}:{lineno}: `{path}` — no such file or directory")
 
     print(
         f"  checked: {counts['make']} make targets, {counts['helm']} helm values, "

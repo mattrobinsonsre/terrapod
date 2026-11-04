@@ -118,7 +118,7 @@ func TestTheAnsibleHalfReachesTheWireVerbatim(t *testing.T) {
 				AnsibleDirectory: types.StringValue(tc.value),
 				DefaultPlaybook:  types.StringValue(tc.value),
 				DefaultLimit:     types.StringValue(tc.value),
-			})
+			}, false)
 			if diags.HasError() {
 				t.Fatalf("buildCatalogItemAttrs: %v", diags)
 			}
@@ -136,7 +136,7 @@ func TestTheAnsibleHalfReachesTheWireVerbatim(t *testing.T) {
 		const limit = "web:&staging:!web03.example.com"
 		attrs, _ := buildCatalogItemAttrs(&catalogItemModel{
 			DefaultLimit: types.StringValue(limit),
-		})
+		}, false)
 		if got := attrs["default-limit"]; got != limit {
 			t.Errorf("default-limit = %#v, want %#v", got, limit)
 		}
@@ -159,7 +159,7 @@ func TestTheBooleanTravelsIncludingAnExplicitFalse(t *testing.T) {
 		{"unknown is not a declaration", types.BoolUnknown(), nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			attrs, _ := buildCatalogItemAttrs(&catalogItemModel{ConfigureEnabled: tc.in})
+			attrs, _ := buildCatalogItemAttrs(&catalogItemModel{ConfigureEnabled: tc.in}, false)
 			got, present := attrs["configure-enabled"]
 			if tc.want == nil {
 				if present {
@@ -187,7 +187,7 @@ func TestAnOmittedStringLeavesTheStoredValueAlone(t *testing.T) {
 		AnsibleDirectory: types.StringNull(),
 		DefaultPlaybook:  types.StringUnknown(),
 		DefaultLimit:     types.StringNull(),
-	})
+	}, false)
 	for _, key := range []string{"ansible-directory", "default-playbook", "default-limit"} {
 		if got, present := attrs[key]; present {
 			t.Errorf("%s = %#v, want the key absent so the stored value survives", key, got)
@@ -211,7 +211,7 @@ func TestTheAnsibleHalfRoundTripsUnchanged(t *testing.T) {
 				AnsibleDirectory: types.StringValue(value),
 				DefaultPlaybook:  types.StringValue(value),
 				DefaultLimit:     types.StringValue(value),
-			})
+			}, false)
 			if diags.HasError() {
 				t.Fatalf("buildCatalogItemAttrs: %v", diags)
 			}
@@ -302,7 +302,7 @@ func TestTheThreeStringsRoundTripAnExplicitEmptyString(t *testing.T) {
 		DefaultPlaybook:  types.StringValue(""),
 		DefaultLimit:     types.StringValue(""),
 	}
-	attrs, d := buildCatalogItemAttrs(&m)
+	attrs, d := buildCatalogItemAttrs(&m, false)
 	if d.HasError() {
 		t.Fatalf("buildCatalogItemAttrs: %v", d)
 	}

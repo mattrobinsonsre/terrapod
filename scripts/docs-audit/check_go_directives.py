@@ -55,10 +55,9 @@ MIN_MODULES = 7
 #: count looks wrong -- and in both, that floor is the only thing standing between
 #: "the finder stopped matching" and a green run over a fraction of the Go code.
 #: CodeQL's Go extractor sees only what the build compiles, so a module left out
-#: of the loop is unanalysed with no signal at all; `host-checks`' own
-#: `(go-audit)` step is the same shape, and its history is the argument -- it used
-#: a hand-kept six-name list, which is how `loadtest` came to have never been
-#: audited.
+#: of the loop is unanalysed with no signal at all; the `(go-audit)` step is the
+#: same shape, and its history is the argument -- it used a hand-kept six-name
+#: list, which is how `loadtest` came to have never been audited.
 #:
 #: These are JOB ids, not the step labels. The second floor lives in a step called
 #: `(go-audit) Audit every Go module`, and reading that label as the job name is
@@ -68,7 +67,16 @@ MIN_MODULES = 7
 #: Both sat at 7 against nine modules (#2275), so either could have silently lost
 #: two. A new module failing this clause is the POINT: it names the sites to
 #: update rather than leaving them to be found by a scanner's silence.
-COVERAGE_FLOOR_JOBS = ("codeql", "host-checks")
+#: The `(go-audit)` step moved from `host-checks` to `helm-smoke` when that
+#: 43-step job was split (#2326), which is the SECOND time a re-carve of the
+#: jobs has moved a floor out from under this tuple. Naming the jobs is still
+#: deliberate -- a floor is only meaningful attributed to the audit it guards,
+#: and an unreadable or absent one must fail rather than be skipped -- so the
+#: cost of keeping it is exactly this: a loud failure naming the site, which is
+#: how it was found both times. Deriving the job set from the workflow instead
+#: would need its own floor on the number of audit jobs, or losing a floor
+#: entirely would hide the job rather than fail it; worth doing, separately.
+COVERAGE_FLOOR_JOBS = ("codeql", "helm-smoke")
 
 #: The floor comparison inside those jobs' shell. Scoped to the `mods` array
 #: rather than any `-lt`, so an unrelated numeric test in the same block is not

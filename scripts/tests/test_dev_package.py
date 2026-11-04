@@ -17,9 +17,7 @@ def package(tmp_path):
     example = provider / "examples/modules/terrapod_self_contained/main.tf"
     example.parent.mkdir(parents=True)
     shutil.copy2(ROOT / "provider/dev-package.sh", provider / "dev-package.sh")
-    shutil.copy2(
-        ROOT / "provider/examples/modules/terrapod_self_contained/main.tf", example
-    )
+    shutil.copy2(ROOT / "provider/examples/modules/terrapod_self_contained/main.tf", example)
 
     commands = tmp_path / "bin"
     commands.mkdir()
