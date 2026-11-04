@@ -11,9 +11,17 @@ import json
 import uuid
 from datetime import UTC
 
-from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
+from terrapod.db.models import (
+    ConfigurationVersion,
+    Run,
+    RunTask,
+    TaskStage,
+    TaskStageResult,
+    Workspace,
+)
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
+from terrapod.services import run_links
 from terrapod.services.outbound_url_guard import validate_outbound_url
 from terrapod.services.run_task_service import resolve_stage
 
@@ -28,33 +36,57 @@ def _rfc3339(dt) -> str:  # type: ignore[no-untyped-def]
 
 def build_task_callback_payload(
     run_id: str,
-    run_status: str,
     run_created_at: str,
+    run_message: str,
+    run_created_by: str,
+    run_app_url: str,
     workspace_id: str,
     workspace_name: str,
+    workspace_app_url: str,
     task_name: str,
+    task_id: str,
     stage: str,
     callback_url: str,
     access_token: str,
+    is_speculative: bool,
 ) -> dict:
-    """Build a TFE V2-compatible run task callback payload."""
+    """Build a TFE V2-compatible run task callback payload.
+
+    **Every field here describes the run, so every field is an argument**
+    (#2367). Six of them used to be hardcoded `""`/`False` while the values
+    sat on rows the caller had already loaded, so an external service
+    received a payload that was well-formed, stably shaped, and wrong about
+    the run it described -- `is_speculative` worst of all, since a run
+    against a speculative configuration version is exactly the one a
+    PR-gating task wants to treat differently.
+
+    **Two constants stay constant, and are not oversights.**
+    `payload_version` is 1 because 1 is the only version defined, and
+    `organization_name` is `"default"` because Terrapod is single-org by
+    design (architecture principle 9) -- there is no other value to report.
+
+    `run_status` used to be a parameter, resolved by the caller and never
+    emitted. It is gone rather than added to the payload: a task's view of
+    the run is the `stage` it was called at, and a new key is a payload
+    addition nobody asked for.
+    """
     return {
         "payload_version": 1,
         "stage": stage,
         "access_token": access_token,
         "task_result_callback_url": callback_url,
-        "run_app_url": "",
+        "run_app_url": run_app_url,
         "run_id": run_id,
-        "run_message": "",
+        "run_message": run_message,
         "run_created_at": run_created_at,
-        "run_created_by": "",
+        "run_created_by": run_created_by,
         "workspace_id": workspace_id,
         "workspace_name": workspace_name,
-        "workspace_app_url": "",
+        "workspace_app_url": workspace_app_url,
         "organization_name": "default",
         "task_name": task_name,
-        "task_id": "",
-        "is_speculative": False,
+        "task_id": task_id,
+        "is_speculative": is_speculative,
     }
 
 
@@ -132,17 +164,44 @@ async def handle_run_task_call(payload: dict) -> None:
         ).rstrip("/")
         callback_url = f"{base}/api/v1/task-stage-results/tsr-{tsr.id}/callback"
 
-        # Build payload
+        # A run against a speculative configuration version is always
+        # plan-only (`routers/runs.py`, for TFE parity), which makes it the
+        # run a PR-gating task most wants to distinguish -- so the flag comes
+        # from the configuration version rather than from `run.plan_only`,
+        # which is true of plan-only runs against ordinary versions too.
+        #
+        # `configuration_version_id` is nullable with `ondelete="SET NULL"`,
+        # so a run whose version has been deleted reports False. That is the
+        # honest answer: the fact is gone, and False is what it was before
+        # any of this was populated.
+        is_speculative = False
+        if run.configuration_version_id is not None:
+            cv = await db.get(ConfigurationVersion, run.configuration_version_id)
+            if cv is not None:
+                is_speculative = bool(cv.speculative)
+
+        # `or ""` at the edge, as `vcs_status_dispatcher` and
+        # `slack_notify_service` already do: `run_links` returns None for an
+        # unset `external_url` because "no link" and "an empty link" are
+        # different facts, but these two are declared string fields an
+        # integration may read directly, and they have been "" since the
+        # payload existed. Omitting the keys would break a reader that does
+        # not expect them to vanish.
         task_payload = build_task_callback_payload(
             run_id=f"run-{run.id}",
-            run_status=run.status,
             run_created_at=_rfc3339(run.created_at),
+            run_message=run.message or "",
+            run_created_by=run.created_by or "",
+            run_app_url=run_links.run_url(ws.id, run.id) or "",
             workspace_id=f"ws-{ws.id}",
             workspace_name=ws.name,
+            workspace_app_url=run_links.workspace_url(ws.id) or "",
             task_name=rt.name,
+            task_id=f"task-{rt.id}",
             stage=ts.stage,
             callback_url=callback_url,
             access_token=tsr.callback_token,
+            is_speculative=is_speculative,
         )
 
         hmac_key: str | None = rt.hmac_key or None
