@@ -100,6 +100,8 @@ trade; see `docs/known-limitations.md`.
 | PUT | `/api/tfe/v2/state-versions/{id}/content` | (raw upload to `upload-url`) | `remote/backend_state.go:129` — **no Authorization header** |
 | PUT | `/api/tfe/v2/state-versions/{id}/json-content` | (raw upload) | same flow, JSON state |
 | GET | `/api/tfe/v2/state-versions/{id}/download` | `StateVersions.Download` | `remote/backend_state.go:49` (follows `download-url` from resource) |
+| GET | `/api/tfe/v2/workspaces/{id}/current-state-version-outputs` | `StateVersionOutputs.ReadCurrent` | `cloud/state.go` `GetRootOutputValues` — **`tofu output` / `terraform output`** |
+| GET | `/api/tfe/v2/state-version-outputs/{id}` | `StateVersionOutputs.Read` | same, once per **sensitive** output |
 
 The `upload-url` and `download-url` returned in JSON:API attributes **must be
 absolute, and Terrapod returns absolute URLs.** Do not "simplify" them to
@@ -108,6 +110,30 @@ all. `Client.doForeignPUTRequest` does `url.Parse(foreignURL)` and PUTs that
 verbatim with no Authorization header, so a relative path has no host to resolve
 against. (This paragraph previously said the opposite on both counts, which is the
 shape of the #1703 regression.)
+
+The two **output** routes are a pair and the split between them is deliberate.
+`GetRootOutputValues` calls `ReadCurrent` first and then `Read` **once per
+sensitive output**, so the collection withholds a sensitive value and the
+per-output route reveals it. That lets the collection gate on
+`state:read-metadata` (the read tier) while the reveal needs `state:read` (the
+plan tier, GHSA-gwwq-5v7q-h3f4) — so a read-only user gets `tofu output` and
+meets a refusal only on an output that is genuinely secret. The collection also
+honours the runner allowlist (#344) that the sibling `current-state-version`
+route does, because a run permitted to read a producer's whole state may read
+its outputs.
+
+Two things about them that are easy to get wrong. **Every output must carry a
+non-nil `detailed-type`**: `GetRootOutputValues` falls back to reading full
+state the moment one is nil, so an empty or stubbed document silently reports
+*no* outputs rather than failing. And the **id is synthesised** —
+`wsout-{state-version-id}:{name}` — because outputs are re-derived from the
+state blob and no row exists; go-tfe's parser drops an entry without an id, so
+the CLI would conclude the workspace has none.
+
+They are TFE-only rather than dual-mounted: the document carries a cty
+`detailed-type` and a Pulumi stack's outputs have no type to put in one. The
+native `GET /api/v1/workspaces/{id}/state-outputs` serves every engine, with
+sensitive values masked.
 
 `GET /api/tfe/v2/workspaces/{id}/state-versions` (the list) is also served, on both
 surfaces, though no CLI calls it.
@@ -224,7 +250,7 @@ pages). **Whether they still belong on the frozen surface is an open question, t
 on #2368** — nothing has moved, and nothing should move without that decision.
 
 The one thing `tfci` genuinely needs that the CLI does not is `workspace output list`,
-which reads `GET /workspaces/{id}/current-state-version-outputs` — **not served, #2376**.
+which reads `GET /workspaces/{id}/current-state-version-outputs` — served since #2376.
 
 | Method | Path | go-tfe method | Caller |
 |---|---|---|---|

@@ -38,6 +38,7 @@ tempfile, so rule 14 doesn't apply here.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -443,6 +444,134 @@ def terraform_outputs(state: dict) -> dict:
             continue
         masked[key] = "(sensitive)" if entry.get("sensitive") else entry.get("value")
     return masked
+
+
+#: go-tfe's coarse `type` string, by the head of the cty type.
+#:
+#: Measured against OpenTofu v1.13.1 rather than assumed, because the obvious
+#: guesses are wrong: an HCL LIST literal is recorded as `["tuple", [...]]`, not
+#: `["list", "string"]`, and a MAP literal as `["object", {...}]`, not
+#: `["map", ...]`. `list`/`set`/`map` still appear when an output or variable
+#: declares an explicit type, so all six heads are handled.
+_COARSE_TYPE: dict[str, str] = {
+    "list": "array",
+    "set": "array",
+    "tuple": "array",
+    "object": "object",
+    "map": "object",
+}
+
+
+@dataclass(frozen=True)
+class StateOutput:
+    """One root output, with everything the TFE output document needs.
+
+    Separate from `terraform_outputs` rather than replacing it: that one masks
+    into the literal string `"(sensitive)"` and drops both the type AND the
+    per-output `sensitive` boolean, and the web stack-outputs panel matches that
+    literal and states that a sensitive value never reaches the browser. Two
+    readers over one blob, each honest about what it is for.
+    """
+
+    name: str
+    value: object
+    sensitive: bool
+    #: The cty type as JSON, verbatim from state -- go-tfe's `detailed-type`.
+    #: `None` only when the state does not record one, which v4 always does;
+    #: the CLI reads a nil here as "fall back to reading full state", a path
+    #: Terrapod serves, so degrading is safe rather than fatal.
+    detailed_type: object | None
+    #: go-tfe's coarse `type`, derived from the above.
+    type: str
+
+
+def typed_terraform_outputs(state: dict) -> list[StateOutput]:
+    """A Terraform state's outputs WITH their types and sensitivity, unmasked.
+
+    Terraform-only by construction: a Pulumi stack's outputs carry no type at
+    all, so there is nothing to put in `detailed-type` for them, which is one of
+    the reasons the TFE output routes are not dual-mounted.
+
+    `sensitive` is read with a default because state v4 OMITS the key entirely
+    for a non-sensitive output -- measured; only the sensitive one carries it.
+    """
+    outputs = state.get("outputs")
+    if not isinstance(outputs, dict):
+        return []
+    out: list[StateOutput] = []
+    for name in sorted(outputs):
+        entry = outputs[name]
+        if not isinstance(entry, dict):
+            # Not a shape state v4 produces; report it as an untyped scalar
+            # rather than dropping the output, which would read as "no such
+            # output" to a caller that can see it in the state file.
+            out.append(
+                StateOutput(name=name, value=entry, sensitive=False, detailed_type=None, type="")
+            )
+            continue
+        detailed = entry.get("type")
+        out.append(
+            StateOutput(
+                name=name,
+                value=entry.get("value"),
+                sensitive=bool(entry.get("sensitive", False)),
+                detailed_type=detailed,
+                type=coarse_output_type(detailed),
+            )
+        )
+    return out
+
+
+def coarse_output_type(detailed: object) -> str:
+    """go-tfe's `type` string for a cty type. Empty when it cannot be named."""
+    if isinstance(detailed, str):
+        return detailed
+    if isinstance(detailed, list) and detailed and isinstance(detailed[0], str):
+        return _COARSE_TYPE.get(detailed[0], detailed[0])
+    return ""
+
+
+async def load_state_document(sv: StateVersion) -> dict | None:
+    """The parsed state document for a state version, or `None`.
+
+    Extracted so the TFE output routes and `derive_state_outputs` share one
+    path through storage, decryption and parsing. `None` for every reason a
+    document cannot be read -- absent blob, undecryptable envelope, unparseable
+    JSON -- because each is the same answer to the caller and each is logged
+    here rather than swallowed, so a deployment where this never works does not
+    look like one with no outputs.
+
+    `json.loads` runs in a thread: a state document is routinely tens of MB and
+    parsing one on the event loop stalls every other request on the replica
+    (architecture rule 13).
+    """
+    if sv.state_size == 0:
+        return None
+    try:
+        data = await get_storage().get(state_key(str(sv.workspace_id), str(sv.id)))
+    except Exception:
+        logger.warning("state_document_blob_missing", state_version_id=str(sv.id))
+        return None
+
+    from terrapod.crypto.state import decrypt_state_bytes
+
+    try:
+        data = await decrypt_state_bytes(data)
+    except Exception:
+        logger.warning("state_document_undecryptable", state_version_id=str(sv.id))
+        return None
+
+    def _parse(raw: bytes) -> dict:
+        import json
+
+        return json.loads(raw)
+
+    try:
+        document = await asyncio.to_thread(_parse, data)
+    except (ValueError, TypeError):
+        logger.warning("state_document_parse_failed", state_version_id=str(sv.id))
+        return None
+    return document if isinstance(document, dict) else None
 
 
 async def derive_state_outputs(
