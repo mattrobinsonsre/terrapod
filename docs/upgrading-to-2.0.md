@@ -1196,3 +1196,45 @@ return the non-sensitive subset explicitly, which is an honest answer rather
 than a masked one. A reconfigure that omits `input_values` keeps the stored
 set, so a round trip through the catalog surface is lossless even for the
 values it does not show you.
+
+### Listing variable sets is filtered by workspace reach
+
+**Affects:** any **non-admin** principal that lists variable sets, reads one by
+id, or lists a set's variables -- a person in the UI, a script, an agent, or a
+`terraform plan` refreshing a `terrapod_variable_set` resource under a non-admin
+token. Platform `admin` and `audit` are unaffected and still see everything, and
+every *write* was already platform `admin`, so nothing a non-admin could change
+has moved.
+
+Until 2.0 these three reads authenticated and then authorized nothing. Any
+principal who could log in could enumerate every variable set in the deployment,
+and through `GET varsets/{id}/relationships/vars` every variable `key` and
+`sensitive` flag in each. Values were masked; the inventory was not -- and for a
+set carrying a credential, the inventory is most of what you would want to know
+before going looking for it.
+
+A set is now visible when it **reaches at least one workspace you hold
+`workspace:read` on**. Reach covers an explicit assignment and an
+`assignment-rule` match, computed by the same function the injector uses, so the
+filter cannot disagree with the matcher about who receives a credential. A
+**global** set reaches the whole estate and stays visible to everyone.
+
+Two consequences worth knowing before you upgrade:
+
+- **A set assigned to nothing is visible only to `admin` and `audit`.** That is
+  the honest reading of the rule rather than an oversight: it reaches no
+  workspace, so no workspace grant can reach it.
+- **`GET varsets/{id}` and `GET varsets/{id}/relationships/vars` answer `404`,
+  not `403`,** on a set you cannot see. A distinguishable `403` would let ids be
+  walked to learn which sets exist, which a filter on the collection alone cannot
+  close.
+
+`meta.pagination.total-count` on the list is now the count of what the caller can
+see, because the filter runs before the page is sliced.
+
+**What to do:** nothing, if your variable sets are assigned to workspaces or are
+global — which is the normal arrangement, and those stay visible to everyone who
+can read a workspace they feed. If you rely on a non-admin seeing a set that is
+assigned to nothing, assign it, make it global, or give that principal `audit`.
+The admin variable-sets page in the UI is already admin-gated, so it is
+unaffected.

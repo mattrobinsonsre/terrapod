@@ -154,6 +154,22 @@ capabilities).
 > capability, not a workspace-admin one. Putting it in the workspace-admin preset
 > would have falsely granted it to workspace-admin roles.
 
+> **Reading a variable set is a different question from managing one**, and it is
+> not a capability either. Writes are platform `admin`; the three reads
+> (`GET organizations/default/varsets`, `GET varsets/{id}`, and
+> `GET varsets/{id}/relationships/vars`) are filtered by **reach** — a set is
+> visible when it reaches at least one workspace you hold `workspace:read` on, a
+> global set is visible to everyone, and `admin`/`audit` see all of them. There is
+> no `varset:read` capability to grant: the answer is derived from the workspace
+> grants you already hold, so narrowing a role's labels narrows which sets it can
+> see, with nothing extra to keep in step. The by-id routes answer `404`, not
+> `403`, so ids cannot be walked to enumerate what exists.
+>
+> The blast-radius view (`GET varsets/{id}/relationships/workspaces`) stays
+> platform `admin`, deliberately: it lists *every* workspace a set reaches, so the
+> reach rule would make it visible because you can read one of them and then name
+> the ones you cannot.
+
 ---
 
 ## Pool axis — gate → capability
