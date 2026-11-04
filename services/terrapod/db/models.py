@@ -3135,6 +3135,24 @@ class Run(Base):
     # never told about it.
     save_plan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    #: The CLI's `-var` / `-var-file` values for THIS run (#2377), as a JSON
+    #: array of `{"key", "value"}`, snapshotted at creation like every other
+    #: run option so a run executes against what it was created with.
+    #:
+    #: `EncryptedText` rather than JSONB, and that is the whole reason this is
+    #: one column holding a document rather than a table: `go-tfe`'s
+    #: `RunVariable` has no `sensitive` flag, so a value a practitioner typed
+    #: after `-var` may be a secret and we cannot tell which. Encrypting the
+    #: blob is the only honest default, and `EncryptedText` is a TEXT
+    #: TypeDecorator -- it cannot wrap JSONB. Nothing queries an individual
+    #: entry (the set is read whole in `next_run`), so losing queryability
+    #: costs nothing.
+    #:
+    #: NOT replicated, and that is inherited rather than overlooked: `Run` is
+    #: absent from `replication_registry`, so a run-scoped column has nothing
+    #: to register against.
+    run_variables: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
+
     # Module impact analysis overrides (maps module coords to override storage paths)
     module_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # Durable identity for module PR status/cancellation; overrides expire after retention.

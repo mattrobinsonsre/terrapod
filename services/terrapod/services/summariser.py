@@ -878,6 +878,7 @@ async def _sensitive_literals(db: AsyncSession, run: Run) -> list[str]:
     there are simply no sensitive variables.
     """
     try:
+        from terrapod.services import variable_service
         from terrapod.services.variable_service import resolve_variables
 
         # Deliberately PHASE-BLIND (#2189). This builds the list of literals
@@ -895,7 +896,23 @@ async def _sensitive_literals(db: AsyncSession, run: Run) -> list[str]:
             error=str(exc),
         )
         return []
-    return [v.value for v in resolved if v.sensitive and v.value]
+    literals = [v.value for v in resolved if v.sensitive and v.value]
+
+    # This run's own `-var` values, scrubbed UNCONDITIONALLY (#2377) -- not
+    # filtered on `sensitive`, which they do not carry. `go-tfe`'s
+    # `RunVariable` has no such flag, so a value a practitioner typed after
+    # `-var` may be a secret and nothing can tell us which; the column
+    # storing them is encrypted for that same reason. Marking them sensitive
+    # on the resolved list instead would have bought this redaction for free
+    # and cost more than it saved: that flag is a DELIVERY instruction, and
+    # `pulumi_config` turns it into `config set --secret`, which writes the
+    # value into the stack's own state -- somewhere a transient per-run
+    # override would outlive the run. So delivery stays unmarked and
+    # redaction is unconditional here, which is also strictly stronger.
+    literals.extend(
+        e["value"] for e in variable_service.decoded_run_variables(run.run_variables) if e["value"]
+    )
+    return literals
 
 
 # --- Daily budget ------------------------------------------------------------

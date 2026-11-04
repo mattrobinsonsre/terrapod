@@ -43,4 +43,9 @@ ENCRYPTED_COLUMNS: list[tuple[str, str]] = [
     ("inventory_host_vars", "value"),
     ("inventory_group_vars", "value"),
     ("inventory_global_vars", "value"),
+    # A run's own `-var` values (#2377). `go-tfe`'s `RunVariable` carries no
+    # sensitive flag, so any of them may be a secret the practitioner typed on
+    # a command line; the column holds the whole JSON document rather than one
+    # value, which is why it is TEXT.
+    ("runs", "run_variables"),
 ]

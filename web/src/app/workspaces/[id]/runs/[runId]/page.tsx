@@ -93,6 +93,10 @@ interface RunAttrs {
   'refresh-only': boolean
   'refresh': boolean
   'allow-empty-apply': boolean
+  // The variables this run overrode with -var / -var-file (#2377). KEYS
+  // ONLY -- the server never echoes a value back, because a value typed on
+  // a command line may be a secret and nothing marks which.
+  'run-variable-keys': string[]
   // Pulumi only (#1553, #1560): whether this update is bound to the plan its
   // preview saved. Null on every other engine, which have no such distinction —
   // so `!= null` is the engine test, not a separate one.
@@ -2520,7 +2524,7 @@ function RunDetailPageInner() {
           </dl>
 
           {/* Run options (only show when non-default) */}
-          {(attrs['target-addrs']?.length > 0 || attrs['replace-addrs']?.length > 0 || attrs['refresh-only'] || !attrs['refresh'] || attrs['allow-empty-apply']) && (
+          {(attrs['target-addrs']?.length > 0 || attrs['replace-addrs']?.length > 0 || attrs['refresh-only'] || !attrs['refresh'] || attrs['allow-empty-apply'] || attrs['run-variable-keys']?.length > 0) && (
             <div className="mt-4 pt-4 border-t border-slate-700/50">
               <h4 className="text-xs text-slate-500 mb-2">{t('details.runOptions')}</h4>
               <div className="flex flex-wrap gap-2">
@@ -2549,6 +2553,15 @@ function RunDetailPageInner() {
                     -allow-empty-apply
                   </span>
                 )}
+                {/* The KEY, with no value: the API never returns one (#2377).
+                    No translated string here on purpose -- a CLI flag and a
+                    variable name are identifiers, not UX copy, exactly like
+                    every sibling chip above. */}
+                {attrs['run-variable-keys']?.map((key: string) => (
+                  <span key={key} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-sky-900/40 text-sky-300 border border-sky-800/50">
+                    -var {key}{/* i18n-ignore: a CLI flag and a variable name, not copy */}
+                  </span>
+                ))}
               </div>
             </div>
           )}

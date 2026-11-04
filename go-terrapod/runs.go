@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -134,6 +135,13 @@ type Run struct {
 	RefreshOnly     bool     `json:"refresh-only"`
 	Refresh         bool     `json:"refresh"`
 	AllowEmptyApply bool     `json:"allow-empty-apply"`
+	// RunVariableKeys names the variables this run overrode with -var /
+	// -var-file. Terrapod-native, and KEYS ONLY: go-tfe's RunVariable has no
+	// sensitive flag, so a value typed on a command line may be a secret and
+	// the server never echoes one back. There is deliberately no Variables
+	// field -- emitting go-tfe's own name with the values omitted would read
+	// as "this run set no variables".
+	RunVariableKeys []string `json:"run-variable-keys,omitempty"`
 	// Terrapod-native observability the MCP most needs.
 	IsDriftDetection bool  `json:"is-drift-detection"`
 	HasChanges       *bool `json:"has-changes,omitempty"`
@@ -221,6 +229,11 @@ type CreateRunRequest struct {
 	// configure rather than ignored.
 	Playbook string
 	Limit    string
+	// Variables are this run's own -var / -var-file values, which take
+	// precedence over the workspace's for this run only. A key pinned by a
+	// PRIORITY variable set is refused with a 422 naming it rather than
+	// silently dropped -- see CreateRun.
+	Variables map[string]string
 }
 
 // CreateRun queues a run. See CreateRunRequest for the intent signals. Returns
@@ -267,6 +280,21 @@ func (c *Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, err
 	}
 	if req.VCSRef != "" {
 		attrs["vcs-ref"] = req.VCSRef
+	}
+	// Sent as the wire's list-of-objects, sorted so one request produces one
+	// body. Omitted entirely when empty: the server treats an empty array as
+	// a no-op, but sending nothing says the same thing without relying on it.
+	if len(req.Variables) > 0 {
+		keys := make([]string, 0, len(req.Variables))
+		for k := range req.Variables {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		vars := make([]map[string]string, 0, len(keys))
+		for _, k := range keys {
+			vars = append(vars, map[string]string{"key": k, "value": req.Variables[k]})
+		}
+		attrs["variables"] = vars
 	}
 	if req.IsConfigure {
 		attrs["is-configure"] = true
@@ -520,6 +548,7 @@ func runFromResource(res *Resource) *Run {
 		RefreshOnly:       GetBoolAttr(res, "refresh-only"),
 		Refresh:           GetBoolAttr(res, "refresh"),
 		AllowEmptyApply:   GetBoolAttr(res, "allow-empty-apply"),
+		RunVariableKeys:   GetListAttr(res, "run-variable-keys"),
 		IsDriftDetection:  GetBoolAttr(res, "is-drift-detection"),
 		HasJSONOutput:     GetBoolAttr(res, "has-json-output"),
 		StateDiverged:     GetBoolAttr(res, "state-diverged"),

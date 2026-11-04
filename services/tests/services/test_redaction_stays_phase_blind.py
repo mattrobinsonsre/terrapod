@@ -53,9 +53,26 @@ class TestRedactionIsPhaseBlind:
         apply-only variable is silently delivered to plans as well -- the
         feature present and inert, which is the defect class this repo keeps
         meeting."""
+        import ast
+
         from terrapod.api.routers import runs
 
-        src = pathlib.Path(runs.__file__).read_text()
-        assert "resolve_variables(db, run.workspace_id, phase=phase)" in src, (
-            "the run-delivery site must narrow by phase"
-        )
+        # Read as a CALL, not as a line of text. This asserted the literal
+        # single-line spelling and broke the moment the call gained a second
+        # keyword and ruff wrapped it (#2377) -- a true property failing on its
+        # own formatting. The keyword is what it means; the layout is not.
+        tree = ast.parse(pathlib.Path(runs.__file__).read_text())
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "resolve_variables"
+        ]
+        assert calls, "no resolve_variables call found in the run-delivery router"
+        for call in calls:
+            kwargs = {kw.arg for kw in call.keywords}
+            assert "phase" in kwargs, (
+                "the run-delivery site must narrow by phase; this call does not: "
+                f"line {call.lineno}"
+            )

@@ -5,6 +5,7 @@ with proper precedence ordering for runner injection.
 """
 
 import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 
@@ -203,6 +204,121 @@ def _validated_env_key(key: str, category: str) -> str:
     return key
 
 
+class RunVariableRejected(ValueError):
+    """A per-run `-var` the platform will not accept (#2377).
+
+    Its own type so a router can answer 422 naming the key rather than 500 --
+    the `UnknownExecutionEnvironment` arrangement one module over, for the same
+    reason: `create_run` is reached by the CLI, run triggers, the VCS poller,
+    drift detection and autodiscovery, and only the first of those has a caller
+    to apologise to.
+    """
+
+
+async def validated_run_variables(
+    db: AsyncSession, workspace_id: uuid.UUID, entries: object
+) -> list[dict[str, str]]:
+    """Normalise and refuse a run's own `-var` values.
+
+    An EMPTY list is a no-op and must stay one: OpenTofu's cloud backend sends
+    `variables` on every `POST /runs`, as an empty array when no `-var` was
+    given, so refusing on presence would 422 every CLI plan in existence.
+
+    A key colliding with a PRIORITY variable set is refused, and that refusal is
+    the whole of why per-run values can sit below priority sets without a silent
+    loss. The two bad answers were available and both are the same defect from
+    opposite ends: letting a `-var` win turns a priority set -- the mechanism an
+    operator uses to pin a region or a role ARN -- into a suggestion for anyone
+    who can queue a run; dropping the `-var` reintroduces exactly the silent
+    discard #2377 exists to remove, just narrowed to the keys a priority set
+    happens to cover. Refusing says no out loud instead.
+
+    A priority set created AFTER the run still wins at resolution time, silently.
+    That is the operator's own later act on a run that was already queued, not a
+    dropped `-var`, and there is nothing to refuse by then.
+    """
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        raise RunVariableRejected("'variables' must be a list of {key, value} objects")
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RunVariableRejected("each entry in 'variables' must be a {key, value} object")
+        key = entry.get("key")
+        value = entry.get("value")
+        if not isinstance(key, str) or not key.strip():
+            raise RunVariableRejected("each entry in 'variables' needs a non-empty string 'key'")
+        if not isinstance(value, str):
+            raise RunVariableRejected(
+                f"the value of run variable {key!r} must be a string; "
+                "a complex value is passed the way the CLI passes it, as its HCL text"
+            )
+        key = key.strip()
+        if key in seen:
+            raise RunVariableRejected(f"run variable {key!r} is given more than once")
+        seen.add(key)
+        out.append({"key": key, "value": value})
+
+    if not out:
+        return []
+
+    pinned = await priority_varset_keys(db, workspace_id)
+    collisions = sorted(k for k in seen if k in pinned)
+    if collisions:
+        raise RunVariableRejected(
+            f"run variable {collisions[0]!r} is pinned by a priority variable set on this "
+            "workspace, which takes precedence over a per-run value. Refused rather than "
+            "silently ignored. Remove it from the command, or ask an administrator to "
+            "change the variable set."
+            + (f" Also pinned: {', '.join(collisions[1:])}." if len(collisions) > 1 else "")
+        )
+    return out
+
+
+def decoded_run_variables(raw: str | None) -> list[dict[str, str]]:
+    """Decode a run's stored `-var` snapshot (#2377). Never raises.
+
+    One producer, because two consumers read it for opposite reasons and a
+    second copy would drift: `next_run` delivers these values to the engine,
+    and the summariser scrubs them from the model prompt. A decode that fails
+    must therefore be safe in both directions -- deliver nothing, redact
+    nothing -- which is why it returns `[]` rather than raising. The column is
+    only ever written by `create_run` through `validated_run_variables`, so an
+    undecodable value means the envelope is unreadable, not that the content
+    was malformed.
+    """
+    if not raw:
+        return []
+    try:
+        entries = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(entries, list):
+        return []
+    return [
+        {"key": e["key"], "value": e["value"]}
+        for e in entries
+        if isinstance(e, dict) and isinstance(e.get("key"), str) and isinstance(e.get("value"), str)
+    ]
+
+
+async def priority_varset_keys(db: AsyncSession, workspace_id: uuid.UUID) -> set[str]:
+    """The `native` keys a priority variable set pins on this workspace.
+
+    Scoped to `native`: precedence is per-category (#1898), so an `env` variable
+    of the same name is a different variable and collides with nothing.
+    """
+    pinned: set[str] = set()
+    for vs in await _get_applicable_varsets(db, workspace_id, priority=True):
+        for row in vs.variables:
+            if canonical_category(row.category) == NATIVE_CATEGORY:
+                pinned.add(row.key)
+    return pinned
+
+
 async def create_variable(
     db: AsyncSession,
     workspace_id: uuid.UUID,
@@ -328,15 +444,50 @@ async def delete_variable(db: AsyncSession, var: Variable) -> None:
     await db.flush()
 
 
+@dataclass(frozen=True)
+class _RunVariableRow:
+    """A per-run `-var`, shaped like a `Variable` row so `_tier` can place it.
+
+    `sensitive` is False deliberately, and it is NOT a claim that the value is
+    harmless -- we cannot know, which is why the column storing it is encrypted.
+    It is False because on this list the flag is a DELIVERY instruction, not a
+    classification: `render_tfvars` ignores it outright, but `pulumi_config`
+    turns it into `config set --secret`, which encrypts the value into the
+    stack's own state. Marking a transient per-run override as a Pulumi secret
+    would write it somewhere it outlives the run.
+
+    Redaction of these values from the AI prompt therefore does not ride on this
+    flag; `summariser._sensitive_literals` scrubs every run-variable value
+    unconditionally instead, which is stronger than the flag could be.
+    """
+
+    key: str
+    value: str
+    category: str = NATIVE_CATEGORY
+    structured: bool = False
+    sensitive: bool = False
+    value_source: str = "static"
+    apply_only: bool = False
+    configure_only: bool = False
+
+
 async def resolve_variables(
-    db: AsyncSession, workspace_id: uuid.UUID, phase: str | None = None
+    db: AsyncSession,
+    workspace_id: uuid.UUID,
+    phase: str | None = None,
+    run_variables: list[dict[str, str]] | None = None,
 ) -> list[ResolvedVariable]:
     """Resolve all variables for a workspace with proper precedence.
 
     Precedence (highest wins):
     1. Priority variable set vars (priority=True)
-    2. Workspace-level variables
-    3. Non-priority variable set vars
+    2. This run's own `-var` values (`run_variables`, #2377)
+    3. Workspace-level variables
+    4. Non-priority variable set vars
+
+    A `-var` sits BELOW a priority set rather than above it because a priority
+    set is how an operator pins a value, and `validated_run_variables` refuses
+    the collision at creation so nothing is silently discarded here.
 
     Precedence applies within a `(category, key)`, never across categories
     (#1898). Keying on `key` alone made a workspace `native:region` *remove* a
@@ -455,6 +606,14 @@ async def resolve_variables(
 
     # Layer 2: Workspace variables (override non-priority sets)
     _tier(await list_variables(db, workspace_id))
+
+    # Layer 2b: this run's own `-var` values (#2377). Through `_tier` rather
+    # than written into `resolved` directly so they take the same phase
+    # filtering and slot keying as every other layer -- a per-run override of a
+    # key that also has an apply-only twin must behave like the workspace
+    # variable it is overriding, not like a special case.
+    if run_variables:
+        _tier(_RunVariableRow(key=e["key"], value=e["value"]) for e in run_variables)
 
     # Layer 3: Priority variable sets (override everything)
     for vs in await _get_applicable_varsets(db, workspace_id, priority=True):

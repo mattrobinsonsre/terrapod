@@ -165,6 +165,7 @@ attribute `go-tfe`'s `RunCreateOptions` defines that Terrapod consumes:
 | `replace-addrs` | `ReplaceAddrs` | `-replace` |
 | `allow-empty-apply` | `AllowEmptyApply` | `-allow-empty-apply` |
 | `terraform-version` / `engine-version` | `TerraformVersion` | Pins the engine version for this run (#1559) |
+| `variables` | `Variables` | `-var` / `-var-file` for THIS run (#2377). Higher precedence than the workspace's own variables; a key pinned by a **priority** variable set is refused with a 422 naming it, rather than silently dropped. An empty array is a no-op, which matters because the CLI sends the key on every run. Stored encrypted and never echoed back — the run document reports `run-variable-keys`, the keys alone |
 
 Terrapod-native attributes on the same route (`vcs-ref`, `is-drift-detection`)
 are not part of this contract and are documented in
@@ -179,7 +180,6 @@ Under that rule, these `RunCreateOptions` fields are **accepted and not consumed
 
 | Attribute | go-tfe field | Status |
 |---|---|---|
-| `variables` | `Variables` | **Not consumed — #2377.** OpenTofu sends this on every `POST /runs`, populated from `-var`/`-var-file`, so a CLI override is silently dropped. The worst of the four by a wide margin |
 | `allow-config-generation` | `AllowConfigGeneration` | Not consumed; `tofu plan -generate-config-out` produces nothing |
 | `policy-paths` | `PolicyPaths` | Not consumed (BETA upstream; neither OpenTofu backend sends it) |
 | `invoke-action-addrs` | `InvokeActionAddrs` | Not consumed; OpenTofu has no actions feature, so nothing sends it today |
