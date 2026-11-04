@@ -138,10 +138,11 @@ func instancesOut(instances []terrapod.CatalogInstance) []catalogInstanceOut {
 // variableOptionIn is one entry in a catalog item's `variable-options`: the
 // item's override of how a module input is presented on the provision form.
 type variableOptionIn struct {
-	Name    string `json:"name" jsonschema:"the module input variable this entry overrides, exactly as the module declares it. An entry naming a variable the module does not have is accepted and simply never matches, so read the module's inputs with terrapod_catalog_item_interface first"`
-	Options []any  `json:"options,omitempty" jsonschema:"restrict the input to a closed list of permitted values, rendered as a picker on the form. Omit for a free-text field"`
-	Hidden  *bool  `json:"hidden,omitempty" jsonschema:"remove the input from the provision form entirely and wire this entry's default instead. A hidden entry MUST carry a default (422 otherwise): it can neither be supplied nor wired without one, and a required module input would then fail opaquely at plan time. This is how an item fixes a value a provisioner must not choose, such as an account id or a region"`
-	Default any    `json:"default,omitempty" jsonschema:"the value to pre-fill on the form, or -- with hidden true -- to wire unconditionally. Overrides the module's own default for this item"`
+	Name      string `json:"name" jsonschema:"the module input variable this entry overrides, exactly as the module declares it. An entry naming a variable the module does not have is accepted and simply never matches, so read the module's inputs with terrapod_catalog_item_interface first"`
+	Options   []any  `json:"options,omitempty" jsonschema:"restrict the input to a closed list of permitted values, rendered as a picker on the form. Omit for a free-text field"`
+	Hidden    *bool  `json:"hidden,omitempty" jsonschema:"remove the input from the provision form entirely and wire this entry's default instead. A hidden entry MUST carry a default (422 otherwise): it can neither be supplied nor wired without one, and a required module input would then fail opaquely at plan time. This is how an item fixes a value a provisioner must not choose, such as an account id or a region"`
+	Default   any    `json:"default,omitempty" jsonschema:"the value to pre-fill on the form, or -- with hidden true -- to wire unconditionally. Overrides the module's own default for this item"`
+	Sensitive *bool  `json:"sensitive,omitempty" jsonschema:"mark this input as a secret, so the provision form masks it and the stored value is not read back. Independent of hidden: hidden removes the input and wires a fixed value the provisioner never sees, while this one is still SUPPLIED by the provisioner and merely not displayed or echoed. Refused 422 if it is not a boolean"`
 }
 
 // providerTemplateParameterIn is one parameter of a provider template. It
@@ -243,6 +244,13 @@ func registerCatalogItems(s *mcp.Server, c *terrapod.Client) {
 		VariableOptions     []variableOptionIn `json:"variable_options,omitempty" jsonschema:"per-input overrides of how the module's variables appear on the provision form: a closed list of permitted values, a different default, or hidden-with-a-fixed-value"`
 		Labels              map[string]string  `json:"labels,omitempty" jsonschema:"key/value labels for catalog RBAC and filtering. Reserved keys are refused (422)"`
 
+		// The self-contained half (#2326). An item is normally a designation
+		// over a module Terrapod generates a wrapper for; a self-contained one
+		// is published as a root archive instead, which is why it can carry no
+		// provider templates.
+		SelfContained               *bool             `json:"self_contained,omitempty" jsonschema:"publish this item as a SELF-CONTAINED root archive rather than as a generated wrapper around the module. DEFAULTS FALSE, so an ordinary item says nothing here. Two refusals come with it, both 422: a self-contained item may NOT carry provider_template_ids (the archive brings its own provider configuration), and it REQUIRES execution_backend_constraints (the archive is written against a particular engine, so the item must say which)"`
+		ExecutionBackendConstraints map[string]string `json:"execution_backend_constraints,omitempty" jsonschema:"restrict which engine, and which versions of it, may run this item: a map of tofu and/or terraform to a PEP440-style version range such as >=1.8,<2.0. Any other key, a non-string range, or a range that does not parse is refused 422. An EMPTY object is refused too -- omit the field instead to leave the item unconstrained. Required on a self-contained item and optional otherwise, and it is enforced at PROVISION: a provision whose backend is not a key here is refused, as is one whose resolved version falls outside the range, including when the backend and version come from the deployment defaults rather than from the caller"`
+
 		// The Ansible half this item provisions (#2019). Two independent
 		// questions, deliberately not folded into one field: #1966 corrected
 		// exactly that on the workspace's own config-directory, where an empty
@@ -289,6 +297,12 @@ func registerCatalogItems(s *mcp.Server, c *terrapod.Client) {
 		if in.Labels != nil {
 			attrs["labels"] = in.Labels
 		}
+		if in.SelfContained != nil {
+			attrs["self-contained"] = *in.SelfContained
+		}
+		if in.ExecutionBackendConstraints != nil {
+			attrs["execution-backend-constraints"] = in.ExecutionBackendConstraints
+		}
 		if in.ConfigureEnabled != nil {
 			attrs["configure-enabled"] = *in.ConfigureEnabled
 		}
@@ -317,18 +331,21 @@ func registerCatalogItems(s *mcp.Server, c *terrapod.Client) {
 	// indistinguishable from "leave it alone", which is the state a caller
 	// changing one other field is in.
 	type itemUpdateIn struct {
-		CatalogItemID       string             `json:"catalog_item_id" jsonschema:"the catalog item's id (a bare UUID)"`
-		Name                *string            `json:"name,omitempty" jsonschema:"rename the item. A 409 means the new name is taken"`
-		ModuleID            *string            `json:"module_id,omitempty" jsonschema:"relink the item to a different registry module, as a bare UUID. Existing instances keep the module they were provisioned from until their next reconfigure, which then moves them"`
-		DisplayName         *string            `json:"display_name,omitempty" jsonschema:"the label shown in the catalog UI; pass empty to clear it and fall back to the name"`
-		Description         *string            `json:"description,omitempty" jsonschema:"what this item provisions; pass empty to clear it"`
-		Enabled             *bool              `json:"enabled,omitempty" jsonschema:"whether the item may be provisioned from. Setting it false retires the item without deleting it: it stays readable, its instances are untouched and still reconfigurable, and a new provision is refused 409"`
-		DefaultVersionPin   *string            `json:"default_version_pin,omitempty" jsonschema:"pin every future provision and reconfigure to this module version. PASS EMPTY TO FLOAT instead, which resolves to the module's latest uploaded version each time -- so empty here is a deliberate change of tracking mode rather than a cleared field"`
-		ProviderTemplateIDs []string           `json:"provider_template_ids,omitempty" jsonschema:"REPLACE the provider templates rendered into future instances, as bare UUIDs. An empty list detaches all of them, which also removes their parameters from the provision form"`
-		AllowedAgentPoolIDs []string           `json:"allowed_agent_pool_ids,omitempty" jsonschema:"REPLACE the agent pools this item may be provisioned onto (apool-... or a bare UUID). An EMPTY LIST permits none, so every provision is then refused 403 -- to LIFT the restriction entirely pass allow_any_agent_pool instead"`
-		AllowAnyAgentPool   bool               `json:"allow_any_agent_pool,omitempty" jsonschema:"lift the pool restriction altogether, permitting any pool the provisioner can assign. This is the only way to express it, because an empty allowed_agent_pool_ids list means the opposite (no pool is permitted). Refused together with allowed_agent_pool_ids"`
-		VariableOptions     []variableOptionIn `json:"variable_options,omitempty" jsonschema:"REPLACE the per-input form overrides. An empty list removes all of them, which returns every module input to the form with the module's own default"`
-		Labels              map[string]string  `json:"labels,omitempty" jsonschema:"REPLACE the item's labels. An empty object clears them, which also removes whatever catalog RBAC was keyed on them. Reserved keys are refused (422)"`
+		CatalogItemID                string             `json:"catalog_item_id" jsonschema:"the catalog item's id (a bare UUID)"`
+		Name                         *string            `json:"name,omitempty" jsonschema:"rename the item. A 409 means the new name is taken"`
+		ModuleID                     *string            `json:"module_id,omitempty" jsonschema:"relink the item to a different registry module, as a bare UUID. Existing instances keep the module they were provisioned from until their next reconfigure, which then moves them"`
+		DisplayName                  *string            `json:"display_name,omitempty" jsonschema:"the label shown in the catalog UI; pass empty to clear it and fall back to the name"`
+		Description                  *string            `json:"description,omitempty" jsonschema:"what this item provisions; pass empty to clear it"`
+		Enabled                      *bool              `json:"enabled,omitempty" jsonschema:"whether the item may be provisioned from. Setting it false retires the item without deleting it: it stays readable, its instances are untouched and still reconfigurable, and a new provision is refused 409"`
+		DefaultVersionPin            *string            `json:"default_version_pin,omitempty" jsonschema:"pin every future provision and reconfigure to this module version. PASS EMPTY TO FLOAT instead, which resolves to the module's latest uploaded version each time -- so empty here is a deliberate change of tracking mode rather than a cleared field"`
+		ProviderTemplateIDs          []string           `json:"provider_template_ids,omitempty" jsonschema:"REPLACE the provider templates rendered into future instances, as bare UUIDs. An empty list detaches all of them, which also removes their parameters from the provision form"`
+		AllowedAgentPoolIDs          []string           `json:"allowed_agent_pool_ids,omitempty" jsonschema:"REPLACE the agent pools this item may be provisioned onto (apool-... or a bare UUID). An EMPTY LIST permits none, so every provision is then refused 403 -- to LIFT the restriction entirely pass allow_any_agent_pool instead"`
+		AllowAnyAgentPool            bool               `json:"allow_any_agent_pool,omitempty" jsonschema:"lift the pool restriction altogether, permitting any pool the provisioner can assign. This is the only way to express it, because an empty allowed_agent_pool_ids list means the opposite (no pool is permitted). Refused together with allowed_agent_pool_ids"`
+		VariableOptions              []variableOptionIn `json:"variable_options,omitempty" jsonschema:"REPLACE the per-input form overrides. An empty list removes all of them, which returns every module input to the form with the module's own default"`
+		SelfContained                *bool              `json:"self_contained,omitempty" jsonschema:"whether this item is published as a SELF-CONTAINED root archive. Turning it ON is refused 422 unless the item has execution_backend_constraints -- already stored or sent in this same call -- and refused if it carries provider templates, so clear those first"`
+		ExecutionBackendConstraints  map[string]string  `json:"execution_backend_constraints,omitempty" jsonschema:"REPLACE the engine constraints: a map of tofu and/or terraform to a PEP440-style version range. An empty object is refused (422) rather than read as a clear -- pass unconstrain_execution_backends instead, exactly as allow_any_agent_pool lifts the pool restriction. Existing instances keep their engine until their next reconfigure, which then re-resolves it against the new range and is refused if their current backend is no longer permitted"`
+		UnconstrainExecutionBackends bool               `json:"unconstrain_execution_backends,omitempty" jsonschema:"remove the engine constraints altogether, so any supported backend and version may run this item. Mutually exclusive with execution_backend_constraints -- they are opposite answers to one question. Refused 422 on a SELF-CONTAINED item, which cannot be unconstrained"`
+		Labels                       map[string]string  `json:"labels,omitempty" jsonschema:"REPLACE the item's labels. An empty object clears them, which also removes whatever catalog RBAC was keyed on them. Reserved keys are refused (422)"`
 
 		ConfigureEnabled *bool   `json:"configure_enabled,omitempty" jsonschema:"whether the workspace this item provisions has an ANSIBLE CONFIGURE operation. This says WHETHER and ansible_directory says WHERE, so clearing the path does not turn the operation off and setting it does not turn it on. Turning it ON needs a directory -- either already stored or sent in this same call -- or the update is refused 422. Turning it OFF leaves existing instances alone until their next reconfigure, which then removes the operation from the workspace rather than leaving a stale directory and a playbook it no longer has"`
 		AnsibleDirectory *string `json:"ansible_directory,omitempty" jsonschema:"the subdirectory OF THE MODULE that holds the Ansible configuration. Its whole subtree is COPIED into each instance's generated configuration version at the same relative path -- not referenced from it, because a composite run's configure Job re-fetches the configuration version and never runs init, so there is no .terraform/modules/ for it to point at -- and that same path becomes the provisioned workspace's config_directory. PASS EMPTY TO CLEAR IT, which is refused (422) while configure_enabled is true: send configure_enabled false in the same call to withdraw the Ansible half. Stored BYTE FOR BYTE: a leading or trailing slash, a '..' segment, leading or trailing whitespace, or more than 255 characters are each refused (422) rather than cleaned up, because the value round-trips through the Terraform provider and silently storing a different one than you sent fails the apply with 'Provider produced inconsistent result after apply'"`
@@ -372,6 +389,15 @@ func registerCatalogItems(s *mcp.Server, c *terrapod.Client) {
 		}
 		if in.ProviderTemplateIDs != nil {
 			attrs["provider-template-ids"] = in.ProviderTemplateIDs
+		}
+		if in.SelfContained != nil {
+			attrs["self-contained"] = *in.SelfContained
+		}
+		switch {
+		case in.UnconstrainExecutionBackends:
+			attrs["execution-backend-constraints"] = nil
+		case in.ExecutionBackendConstraints != nil:
+			attrs["execution-backend-constraints"] = in.ExecutionBackendConstraints
 		}
 		switch {
 		case in.AllowAnyAgentPool:
@@ -447,6 +473,9 @@ func variableOptionAttrs(opts []variableOptionIn) []map[string]any {
 		if o.Default != nil {
 			entry["default"] = o.Default
 		}
+		if o.Sensitive != nil {
+			entry["sensitive"] = *o.Sensitive
+		}
 		out = append(out, entry)
 	}
 	return out
@@ -481,7 +510,7 @@ func registerProviderTemplates(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_provider_template_get",
-		Description: "Get one provider template by id — its provider type, its HCL body, and the parameters that body interpolates. " +
+		Description: "Get one provider template by id — its provider type and the parameters its body interpolates. The BODY ITSELF IS NOT RETURNED HERE: it is authoring data gated on platform admin behind an explicit include-sensitive-values read, and an ordinary read gets null for it, so do not report its absence as an empty template (#2372). " +
 			"The parameters are the load-bearing part: each one becomes a field on the provision form of every catalog item referencing this template, so changing them changes what a provision must supply. " +
 			"Admin or audit.",
 		Annotations: readOnly,
@@ -640,6 +669,13 @@ func registerCatalogInstances(s *mcp.Server, c *terrapod.Client) {
 		VersionPin    string            `json:"version_pin,omitempty" jsonschema:"pin THIS instance to a module version, overriding the item's own pin. Omit to take the item's pin, or the module's latest uploaded version when the item floats"`
 		AutoApply     bool              `json:"auto_apply,omitempty" jsonschema:"apply the first run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits, and you confirm it with terrapod_catalog_instance_confirm after showing the plan. Setting this true creates real cloud resources with no review"`
 		Labels        map[string]string `json:"labels,omitempty" jsonschema:"labels for the new workspace. Reserved keys are refused (422), and so is a label set that would pull the workspace into a variable set the caller cannot already reach -- provisioning needs only catalog use plus pool write, so an unchecked label here would be a path to another team's secrets (GHSA-49q6-pm68-3xgw)"`
+
+		// Which engine this instance runs. Omit both on an unconstrained item
+		// and the deployment's defaults apply; on a CONSTRAINED item those
+		// defaults are validated too, so an item whose range excludes them
+		// cannot be provisioned without naming one here (#2372).
+		ExecutionBackend string `json:"execution_backend,omitempty" jsonschema:"run this instance on tofu or terraform. Anything else is refused 422. OMIT to take the deployment's default -- but note that an item with execution_backend_constraints validates that default too, so if the item does not permit the deployment's default backend the provision is refused until you name a permitted one. Read the item's constraints from terrapod_catalog_item_get"`
+		EngineVersion    string `json:"engine_version,omitempty" jsonschema:"the engine version for this instance, resolved to an exact offered binary. Omit to take the deployment's default for the chosen backend. Refused 422 if supplied empty, if it falls outside the item's declared range, or if no offered version satisfies that range; a 503 asking you to retry means the available-versions lookup failed rather than that the version is wrong"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_catalog_provision",
@@ -673,6 +709,12 @@ func registerCatalogInstances(s *mcp.Server, c *terrapod.Client) {
 		}
 		if in.Labels != nil {
 			attrs["labels"] = in.Labels
+		}
+		if in.ExecutionBackend != "" {
+			attrs["execution-backend"] = in.ExecutionBackend
+		}
+		if in.EngineVersion != "" {
+			attrs["engine-version"] = in.EngineVersion
 		}
 		inst, err := c.ProvisionCatalogItem(ctx, in.CatalogItemID, attrs)
 		if err != nil {
@@ -713,7 +755,7 @@ func registerCatalogInstances(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_catalog_instance_get",
-		Description: "Get one catalog instance by its workspace id — its name, originating item, version pin, agent pool, labels, and `input-values`, the inputs it was last provisioned or reconfigured with. " +
+		Description: "Get one catalog instance by its workspace id — its name, originating item, version pin, agent pool, labels, and `input-values`, WHICH ARE THE NON-SENSITIVE SUBSET of the inputs it was last provisioned or reconfigured with: an input the item marked sensitive is omitted rather than returned masked (#2372). That does not make a reconfigure lossy -- omitting `input_values` entirely keeps the stored set, including the omitted ones -- but a payload BUILT from this output would drop them, so send the whole set only when you are deliberately replacing it. Also its `input-values`, the inputs it was last provisioned or reconfigured with. " +
 			"`input-values` is the set to start from for a reconfigure, because that call REPLACES the stored values rather than merging into them. " +
 			"This is the catalog view; terrapod_workspace_get on the same id gives the workspace view (runs, state, drift, lock). Needs catalog read on the ORIGINATING ITEM, which is a different permission from read on the workspace. " +
 			"A 404 means there is no catalog instance there: either no such workspace, or a workspace that was never provisioned from an item.",
@@ -735,10 +777,12 @@ func registerCatalogInstances(s *mcp.Server, c *terrapod.Client) {
 	// differ on both: an absent `input_values` keeps the stored set, and an
 	// empty `version_pin` moves the instance from a pin to floating.
 	type reconfigureIn struct {
-		WorkspaceID string          `json:"workspace_id" jsonschema:"the instance's workspace id (ws-... or a bare UUID)"`
-		InputValues *map[string]any `json:"input_values,omitempty" jsonschema:"REPLACE the instance's inputs with this WHOLE set -- it is not a patch. Read the current ones from terrapod_catalog_instance_get and send them back with your change applied: a required field left out is refused 422 rather than keeping its stored value, and a key that is not a form field is refused too. Omit the field entirely to keep the stored set unchanged, which is how a version-pin-only reconfigure is expressed"`
-		VersionPin  *string         `json:"version_pin,omitempty" jsonschema:"pin this instance to a module version. OMIT to keep its current pin; pass EMPTY to make it FLOAT, which resolves to the module's latest uploaded version now and at every later reconfigure. So empty is a change of tracking mode rather than a cleared field"`
-		AutoApply   bool            `json:"auto_apply,omitempty" jsonschema:"apply the resulting run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits for terrapod_catalog_instance_confirm. Setting it true changes real infrastructure with no review"`
+		WorkspaceID      string          `json:"workspace_id" jsonschema:"the instance's workspace id (ws-... or a bare UUID)"`
+		InputValues      *map[string]any `json:"input_values,omitempty" jsonschema:"REPLACE the instance's inputs with this WHOLE set -- it is not a patch. Read the current ones from terrapod_catalog_instance_get and send them back with your change applied: a required field left out is refused 422 rather than keeping its stored value, and a key that is not a form field is refused too. Omit the field entirely to keep the stored set unchanged, which is how a version-pin-only reconfigure is expressed"`
+		VersionPin       *string         `json:"version_pin,omitempty" jsonschema:"pin this instance to a module version. OMIT to keep its current pin; pass EMPTY to make it FLOAT, which resolves to the module's latest uploaded version now and at every later reconfigure. So empty is a change of tracking mode rather than a cleared field"`
+		AutoApply        bool            `json:"auto_apply,omitempty" jsonschema:"apply the resulting run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits for terrapod_catalog_instance_confirm. Setting it true changes real infrastructure with no review"`
+		ExecutionBackend string          `json:"execution_backend,omitempty" jsonschema:"MOVE this instance to tofu or terraform. Omit to keep the engine it already runs on. Anything else is refused 422, as is a backend the item's execution_backend_constraints do not permit -- which is how an item narrowed after provisioning refuses a reconfigure until the instance is moved to a permitted engine"`
+		EngineVersion    string          `json:"engine_version,omitempty" jsonschema:"the engine version to move this instance to, resolved to an exact offered binary. Omit to keep its current version when the backend is unchanged; CHANGING THE BACKEND WITHOUT THIS RESOLVES TO LATEST for the new one, which is a version change you did not ask for, so name it explicitly when that matters"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_catalog_instance_reconfigure",
@@ -758,6 +802,12 @@ func registerCatalogInstances(s *mcp.Server, c *terrapod.Client) {
 		}
 		if in.VersionPin != nil {
 			attrs["version-pin"] = *in.VersionPin
+		}
+		if in.ExecutionBackend != "" {
+			attrs["execution-backend"] = in.ExecutionBackend
+		}
+		if in.EngineVersion != "" {
+			attrs["engine-version"] = in.EngineVersion
 		}
 		run, err := c.ReconfigureCatalogInstance(ctx, in.WorkspaceID, attrs)
 		if err != nil {
