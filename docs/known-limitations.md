@@ -166,6 +166,13 @@ are off by default. What they do **not** do:
 Terrapod orchestrates `terraform`/`tofu`; it does not reimplement them, and it
 deliberately does not attempt:
 
+- **Deleting a workspace from the CLI.** `terraform/tofu workspace delete` against
+  a `cloud {}` block is not supported. Workspace lifecycle is a management
+  operation: it lives on the native API, the Terraform provider
+  (`terrapod_workspace`) and the UI, where it is RBAC-gated and audited. Deleting
+  the workspace that holds your state is not something a run should be able to do
+  in passing. Everything else `workspace` does from the CLI — selecting, listing,
+  creating on first `init` — works normally.
 - The Terraform/OpenTofu **engine** itself.
 - **Sentinel** (proprietary policy language) and **Terraform Stacks**
   (proprietary orchestration runtime with no local-execution path).
