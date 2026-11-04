@@ -280,33 +280,48 @@ spec:
             {{- if and (.Values.api.config.slack).enabled (.Values.api.config.slack).existingSecret }}
             # Slack integration (#556) — bot/app/signing tokens via secretKeyRef.
             #
-            # Gated on `enabled` AS WELL AS the Secret name (#2370). Keyed on the
-            # name alone, `enabled: false` left these three rendered, and because
-            # they are not `optional: true` a Secret that does not exist is fatal
-            # at container creation -- so an operator who had turned Slack OFF
-            # still got an API pod stuck in CreateContainerConfigError, and the
-            # obvious way to turn it off did not work.
+            # Gated on `enabled` AS WELL AS the Secret name, and `optional: true`
+            # on every ref (#2370). Two separate things went wrong with one
+            # condition.
             #
-            # The encryption block above looks like the same shape and is not:
-            # its refs ARE `optional: true`, so a missing Secret cannot break
-            # that pod, and gating it on `enabled` would be wrong anyway -- an
-            # operator turning encryption off still needs the key to read what
-            # is already encrypted. Do not "fix" it to match this.
+            # Keyed on the name alone, `enabled: false` left these three
+            # rendered, so the obvious way to turn Slack off did not work.
+            # That is what `enabled` in the condition fixes.
+            #
+            # `optional: true` fixes the other half: a Secret that does not
+            # exist is otherwise FATAL at container creation, so a typo in a
+            # Secret name -- or creating the Deployment before the Secret --
+            # took the whole API down (state backend, CLI, UI, every run) for a
+            # chat integration. Disproportionate, and the application already
+            # does the right thing without the values: all three settings are
+            # `Field(default="")`, and `slack_service` logs
+            # `slack.enabled_but_tokens_missing` with which token is absent and
+            # returns rather than starting. So the failure is legible without
+            # being fatal, which is why this is not a silent degradation.
+            #
+            # The encryption block above reached the same place first, for its
+            # own reason (one Secret may carry only the key the chosen provider
+            # needs) -- but do NOT also gate that one on `enabled`: an operator
+            # turning encryption off still needs the key to read what is
+            # already encrypted.
             - name: TERRAPOD_SLACK__BOT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.api.config.slack.existingSecret }}
                   key: {{ (.Values.api.config.slack.existingSecretKeys).botToken | default "bot-token" }}
+                  optional: true
             - name: TERRAPOD_SLACK__APP_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.api.config.slack.existingSecret }}
                   key: {{ (.Values.api.config.slack.existingSecretKeys).appToken | default "app-token" }}
+                  optional: true
             - name: TERRAPOD_SLACK__SIGNING_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.api.config.slack.existingSecret }}
                   key: {{ (.Values.api.config.slack.existingSecretKeys).signingSecret | default "signing-secret" }}
+                  optional: true
             {{- end }}
             {{- if and .Values.api.config.vcs.gitlab .Values.api.config.vcs.gitlab.existingSecret }}
             - name: TERRAPOD_VCS__GITLAB__WEBHOOK_SECRET
