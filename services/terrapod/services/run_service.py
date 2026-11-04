@@ -1360,6 +1360,12 @@ async def create_run(
     refresh: bool = True,
     allow_empty_apply: bool = False,
     save_plan: bool = False,
+    #: This run's own `-var` / `-var-file` values (#2377), as the CLI sent
+    #: them: a list of `{"key", "value"}`. Validated here rather than in the
+    #: router because every internal caller -- run triggers, the VCS poller,
+    #: drift detection, module impact, autodiscovery -- comes through this
+    #: function, and the router was once the only guard (#661/#1396).
+    run_variables: list[dict[str, str]] | None = None,
 ) -> Run:
     """Create a new run for a workspace.
 
@@ -1538,6 +1544,13 @@ async def create_run(
             ee_label=workspace.ansible_execution_environment,
         )
 
+    # Refusals live here, not in the router (#661/#1396). An empty list stays
+    # a no-op: OpenTofu sends `variables` on every run, empty when no `-var`
+    # was given, so refusing on presence would 422 every CLI plan.
+    from terrapod.services.variable_service import validated_run_variables
+
+    validated_run_vars = await validated_run_variables(db, workspace.id, run_variables)
+
     run = Run(
         workspace_id=workspace.id,
         configuration_version_id=configuration_version_id,
@@ -1607,6 +1620,7 @@ async def create_run(
         refresh=refresh,
         allow_empty_apply=allow_empty_apply,
         save_plan=save_plan,
+        run_variables=(json.dumps(validated_run_vars) if validated_run_vars else None),
     )
     db.add(run)
     await db.flush()

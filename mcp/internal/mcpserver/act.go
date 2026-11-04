@@ -96,7 +96,10 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		// it -- the server refuses the pair rather than ignoring one.
 		IsConfigure bool   `json:"is_configure,omitempty" jsonschema:"run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet"`
 		Playbook    string `json:"playbook,omitempty" jsonschema:"the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure"`
-		Limit       string `json:"limit,omitempty" jsonschema:"ansible --limit for this configure: which hosts, groups or patterns it reaches. Omit to use the workspace's default_limit, which may itself be empty meaning THE WHOLE INVENTORY. Read the resolved inventory with the limit first (terrapod_inventory_resolved) to see what it would target. Only valid with is_configure"`
+		// The CLI's -var equivalent. Per-run, and higher precedence than the
+		// workspace's own variables for this run only -- it does not edit them.
+		Variables map[string]string `json:"variables,omitempty" jsonschema:"variables for THIS run only, as a key/value map -- the equivalent of the CLI's -var. They take precedence over the workspace's own variables for this run and do not change them. A key pinned by a priority variable set is REFUSED with an error naming it, rather than silently ignored, so an operator guardrail cannot be overridden here. Values are stored encrypted and are never read back, so pass a secret only when the run genuinely needs one"`
+		Limit     string            `json:"limit,omitempty" jsonschema:"ansible --limit for this configure: which hosts, groups or patterns it reaches. Omit to use the workspace's default_limit, which may itself be empty meaning THE WHOLE INVENTORY. Read the resolved inventory with the limit first (terrapod_inventory_resolved) to see what it would target. Only valid with is_configure"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_create",
@@ -122,6 +125,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			IsConfigure: in.IsConfigure,
 			Playbook:    in.Playbook,
 			Limit:       in.Limit,
+			Variables:   in.Variables,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

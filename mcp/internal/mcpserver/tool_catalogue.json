@@ -1601,6 +1601,13 @@
             "boolean"
           ]
         },
+        "variables": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "variables for THIS run only, as a key/value map -- the equivalent of the CLI's -var. They take precedence over the workspace's own variables for this run and do not change them. A key pinned by a priority variable set is REFUSED with an error naming it, rather than silently ignored, so an operator guardrail cannot be overridden here. Values are stored encrypted and are never read back, so pass a secret only when the run genuinely needs one",
+          "type": "object"
+        },
         "workspace_id": {
           "description": "the workspace id (ws-...) to queue the run against",
           "type": "string"

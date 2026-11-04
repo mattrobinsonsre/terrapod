@@ -931,6 +931,7 @@
     "replace-addrs",
     "resource-cpu",
     "resource-memory",
+    "run-variable-keys",
     "runner-exit-code",
     "runner-exit-reason",
     "runner-exit-status",

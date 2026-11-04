@@ -243,6 +243,25 @@ def _reported_run_status(run: Run, *, tfe: bool) -> str:
     return run.status
 
 
+def _run_variables(run: Run) -> list[dict[str, str]]:
+    """This run's own `-var` values, from the encrypted snapshot (#2377).
+
+    Returns `[]` rather than raising on anything unreadable. The column is
+    only ever written by `run_service.create_run` through
+    `validated_run_variables`, so a value that will not decode means the
+    envelope itself is unreadable -- a wrong DEK, say -- and delivering no
+    override is then the only safe answer: a run that plans against the
+    workspace's own values is recoverable, one that plans against a
+    half-decrypted key is not.
+    """
+    return variable_service.decoded_run_variables(run.run_variables)
+
+
+def _run_variable_keys(run: Run) -> list[str]:
+    """The keys this run overrode. Values are never serialised -- see `_run_json`."""
+    return [e["key"] for e in _run_variables(run)]
+
+
 def _run_json(
     run: Run,
     *,
@@ -408,6 +427,15 @@ def _run_json(
                 "workspace-name": workspace_name,
                 "workspace-has-vcs": workspace_has_vcs,
                 "module-overrides": run.module_overrides,
+                # Terrapod-native (#2377). The KEYS this run overrode, never
+                # their values: `RunVariable` has no sensitive flag, so any
+                # value may be a secret a practitioner typed on a command
+                # line, which is why the column holding them is encrypted.
+                # Deliberately NOT spelled `variables`, go-tfe's own field:
+                # emitting that with the values omitted would read to a
+                # go-tfe client as "this run set no variables", which is
+                # worse than saying nothing at all.
+                "run-variable-keys": _run_variable_keys(run),
                 "vcs-commit-sha": run.vcs_commit_sha,
                 "vcs-branch": run.vcs_branch,
                 "vcs-pull-request-number": run.vcs_pull_request_number,
@@ -944,7 +972,17 @@ async def create_run(
             is_configure=bool(attrs.get("is-configure", False)),
             playbook=attrs.get("playbook", "") or "",
             ansible_limit=attrs.get("limit", "") or "",
+            run_variables=attrs.get("variables"),
         )
+    except variable_service.RunVariableRejected as exc:
+        # `-var` was accepted and dropped until #2377, so a plan ran against
+        # the wrong value and the engine then told the practitioner to pass
+        # the flag they had just passed. A 422 naming the key is the point:
+        # the one thing worse than refusing a run variable is taking it and
+        # ignoring it.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except ansible_ee_service.UnknownExecutionEnvironment as exc:
         # Its own docstring asks for exactly this -- "so a router can answer 422
         # naming the field" -- and no router did, so a workspace whose EE label
@@ -3438,7 +3476,9 @@ async def next_run(
     # `claim_next_run` returned the phase, so the narrowing costs nothing: an
     # apply-only variable (#2189) reaches an apply and never a plan, which
     # executes the configuration's code and so runs a pull request's code.
-    resolved = await resolve_variables(db, run.workspace_id, phase=phase)
+    resolved = await resolve_variables(
+        db, run.workspace_id, phase=phase, run_variables=_run_variables(run)
+    )
 
     # Vault value source (#1439): a variable whose `value_source` is "vault"
     # holds a reference, not a literal. Resolve it here — before delivery — so

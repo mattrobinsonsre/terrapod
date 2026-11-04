@@ -315,6 +315,7 @@ field CreateRunRequest.SavePlan bool
 field CreateRunRequest.TargetAddrs []string
 field CreateRunRequest.TerraformVersion string
 field CreateRunRequest.VCSRef string
+field CreateRunRequest.Variables map[string]string
 field CreateRunRequest.WorkspaceID string
 field CreateRunTaskRequest.Enabled *bool
 field CreateRunTaskRequest.EnforcementLevel string
@@ -995,6 +996,7 @@ field Run.RefreshOnly bool `json:"refresh-only"`
 field Run.ReplaceAddrs []string `json:"replace-addrs,omitempty"`
 field Run.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Run.ResourceMemory string `json:"resource-memory,omitempty"`
+field Run.RunVariableKeys []string `json:"run-variable-keys,omitempty"`
 field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
 field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
 field Run.RunnerExitStatus string `json:"runner-exit-status,omitempty"`
