@@ -22,28 +22,116 @@ def _root_files():
     }
 
 
+# Each case names the refusal it is written for, because a bare
+# `pytest.raises(CatalogError)` lets a case be satisfied by a DIFFERENT
+# refusal than the one it exists to pin -- and that was happening: with the
+# `".terraform" in parts` clause deleted, `.terraform/terraform.tfstate` was
+# still refused by the `.tfstate` suffix beside it, so the clause looked
+# covered and was not. Four elements of these conditions had no case at all
+# (`terraform.tfvars.json`, `*.auto.tfvars.json`, `.tfstate.backup`, and any
+# `.terraform/` member that is not itself a state file), and two whole
+# predicates had none either (control characters, and a member whose path
+# normalises to nothing).
+_UNSAFE = "Root archive contains an unsafe path"
+_STATE = "Root archive contains local Terraform state"
+_CONFLICT = "Root archive conflicts with catalog-managed files"
+
+
 @pytest.mark.parametrize(
-    "filename",
+    ("filename", "message"),
     [
-        "../escape.tf",
-        "/absolute.tf",
-        "modules/../../escape.tf",
-        "modules\\escape.tf",
-        "terrapod.auto.tfvars",
-        "zzzzz.auto.tfvars",
-        "terraform.tfvars",
-        ".terraform/terraform.tfstate",
-        "terraform.tfstate",
-        "zzzz_terrapod_backend_override.tf",
-        "zzzzz_override.tf",
-        "override.tf",
+        ("../escape.tf", _UNSAFE),
+        ("/absolute.tf", _UNSAFE),
+        ("modules/../../escape.tf", _UNSAFE),
+        ("modules\\escape.tf", _UNSAFE),
+        # A control character in a member name. Nothing exercised this branch.
+        ("bad\x01name.tf", _UNSAFE),
+        ("terrapod.auto.tfvars", _CONFLICT),
+        ("zzzzz.auto.tfvars", _CONFLICT),
+        # The `.json` halves of two tuples, each previously unexercised.
+        ("zzzzz.auto.tfvars.json", _CONFLICT),
+        ("terraform.tfvars", _CONFLICT),
+        ("terraform.tfvars.json", _CONFLICT),
+        (".terraform/terraform.tfstate", _STATE),
+        # A `.terraform/` member that is NOT a state file, which is the only
+        # thing that can pin the directory clause rather than the suffix.
+        (
+            ".terraform/providers/registry.terraform.io/hashicorp/aws/"
+            "5.0.0/linux_amd64/terraform-provider-aws",
+            _STATE,
+        ),
+        ("terraform.tfstate", _STATE),
+        ("terraform.tfstate.backup", _STATE),
+        ("zzzz_terrapod_backend_override.tf", _CONFLICT),
+        ("zzzzz_override.tf", _CONFLICT),
+        ("override.tf", _CONFLICT),
     ],
 )
-def test_archive_rejects_unsafe_and_conflicting_files(tmp_path, filename):
+def test_archive_rejects_unsafe_and_conflicting_files(tmp_path, filename, message):
     archive = tmp_path / "bad.tar.gz"
     archive.write_bytes(catalog_service._build_tarball({**_root_files(), filename: "x"}))
-    with pytest.raises(CatalogError):
+    with pytest.raises(CatalogError, match=message):
         catalog_service._validate_root_archive(str(archive))
+
+
+def test_a_member_that_normalises_to_nothing_is_refused_not_raised_through(tmp_path):
+    """The `not parts` guard, which had no case and whose absence is a 500.
+
+    A member named `./` is a file rather than the directory entry the loop
+    skips, so its path normalises to no parts at all. Without the guard the
+    next condition indexes `parts[-1]` and raises `IndexError`, which is NOT
+    in this function's `except (tarfile.TarError, EOFError, OSError,
+    zlib.error)` -- so it would escape as a 500 instead of a refusal that
+    names what is wrong with the archive.
+    """
+    archive = tmp_path / "empty-parts.tar.gz"
+    archive.write_bytes(catalog_service._build_tarball({**_root_files(), "./": "x"}))
+    with pytest.raises(CatalogError, match=_UNSAFE):
+        catalog_service._validate_root_archive(str(archive))
+
+
+def test_the_archive_is_validated_before_the_hcl_parser_reads_it():
+    """The ordering the feature's own merge commit called out by name.
+
+    `test_archive_limits_total_root_hcl_before_parsing` is named for this and
+    cannot see it: it calls `_validate_root_archive` directly, so it pins the
+    size cap and says nothing about where the call sits. Swapping the two
+    lines in `_stage_root_archive` -- so the interface parser reads an
+    unvalidated archive first -- passes 262 tests, which is why this is a
+    POSITIONAL assertion rather than a behavioural one. The same shape as the
+    `db.flush()`-inside-the-`try` gate: a handler cannot protect a call that
+    runs above it.
+    """
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(catalog_service))
+    fn = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_stage_root_archive"
+    )
+    calls = {}
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Call):
+            continue
+        for arg in node.args:
+            if isinstance(arg, ast.Name) and arg.id in (
+                "_validate_root_archive",
+                "extract_module_interface_result_from_file",
+            ):
+                calls.setdefault(arg.id, node.lineno)
+
+    assert "_validate_root_archive" in calls, (
+        "_stage_root_archive no longer validates the archive at all"
+    )
+    assert "extract_module_interface_result_from_file" in calls, (
+        "the interface parser moved; teach this gate the new shape rather than deleting it"
+    )
+    assert calls["_validate_root_archive"] < calls["extract_module_interface_result_from_file"], (
+        "the HCL parser reads the archive BEFORE it is validated -- an unvalidated "
+        "archive must never reach the parser"
+    )
 
 
 def test_archive_rejects_links_and_duplicate_names(tmp_path):
