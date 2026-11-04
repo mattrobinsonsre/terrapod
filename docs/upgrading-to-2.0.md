@@ -1131,3 +1131,68 @@ and diff for ever. Its explicit `= ""` round-trips too, decided from what the
 configuration asked for as well as what the server answered. No other attribute
 changes shape, no state migration is needed, and a stored value is never
 rewritten by the upgrade itself.
+
+### Downloading a protected configuration-version archive needs module `registry:read` too
+
+**Affects:** anyone reading configuration-version archives through the API on a
+workspace provisioned from a **self-contained** catalog item. If you have no
+self-contained items, nothing changes.
+
+Until 2.0 a configuration-version archive was governed by workspace
+`config:read` alone. A self-contained catalog item publishes a registry
+module's own archive as the root configuration, so that archive carries
+registry bytes — and reading it through the workspace door was a way to obtain
+module content the caller might have no registry grant for.
+
+So a **protected** archive now requires both workspace `config:read` **and**
+module `registry:read`, and that applies to the download, to a mint of a
+download ticket, and to each side of a diff. A caller holding only one of the
+two gets 403 where 2.0 previously returned bytes.
+
+Two consequences worth planning for rather than meeting:
+
+- **Historic archives are fail-closed.** A configuration version written before
+  this release has no recorded provenance, and the server will not guess. Such
+  a version is denied unless it is plainly an ordinary one — no module id, not
+  a catalog workspace, and produced by one of the familiar sources (`tfe-api`,
+  `cli`, `vcs`, `drift-detection`) — in which case it reads as unprotected and
+  behaves as before. Anything else, including an archive whose module has since
+  been deleted, is denied.
+- **A download ticket authorised at mint stays valid for up to 30 minutes**
+  even if the grant behind it is revoked in the meantime, and a ticket minted
+  for an ordinary configuration version cannot open a protected archive.
+
+**What to do:** give anyone who downloads archives from catalog-provisioned
+workspaces `registry:read` on the modules behind those items. During a mixed
+version rollout an older replica keeps serving the old behaviour, so the
+tightening appears gradually rather than at one instant.
+
+### A human read of a catalog instance's variables no longer returns their values
+
+**Affects:** anything reading `/variables` on a workspace provisioned from a
+catalog item — a person in the UI, a script, an agent. Runs are unaffected.
+
+A catalog item exists to narrow a module, and part of narrowing it is fixing
+inputs the provisioner must not choose, or must not see. Until 2.0 those
+values were readable straight back off the workspace's variables, which made
+the item's `hidden` and `sensitive` overlays advisory rather than real.
+
+A static native (or `terraform`-category) variable on a catalog-managed
+workspace is now returned with `value: null`, `sensitive: true` and
+`version-id: null` when the item marked it sensitive, when the item hid it, or
+when **the item's definition can no longer be tied to this instance** — the
+last being deliberately fail-closed, because guessing which inputs were hidden
+at provision time is exactly the guess that would leak one.
+
+**This is the change least likely to be noticed before it bites**, and the
+reason is worth stating: the route, the attribute names and the status code are
+all unchanged. Only the content moves, so no contract snapshot and no schema
+check reports it. A consumer that reads a value and writes it somewhere will
+start writing `null`.
+
+**What to do:** read catalog inputs from the catalog surface rather than the
+workspace's variables — `terrapod_catalog_instance_get` and the catalog API
+return the non-sensitive subset explicitly, which is an honest answer rather
+than a masked one. A reconfigure that omits `input_values` keeps the stored
+set, so a round trip through the catalog surface is lossless even for the
+values it does not show you.

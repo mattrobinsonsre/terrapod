@@ -122,6 +122,14 @@
           "description": "apply the resulting run without waiting for a human. DEFAULTS FALSE, which is the safe setting: the run plans and waits for terrapod_catalog_instance_confirm. Setting it true changes real infrastructure with no review",
           "type": "boolean"
         },
+        "engine_version": {
+          "description": "the engine version to move this instance to, resolved to an exact offered binary. Omit to keep its current version when the backend is unchanged; CHANGING THE BACKEND WITHOUT THIS RESOLVES TO LATEST for the new one, which is a version change you did not ask for, so name it explicitly when that matters",
+          "type": "string"
+        },
+        "execution_backend": {
+          "description": "MOVE this instance to tofu or terraform. Omit to keep the engine it already runs on. Anything else is refused 422, as is a backend the item's execution_backend_constraints do not permit -- which is how an item narrowed after provisioning refuses a reconfigure until the instance is moved to a permitted engine",
+          "type": "string"
+        },
         "input_values": {
           "additionalProperties": true,
           "description": "REPLACE the instance's inputs with this WHOLE set -- it is not a patch. Read the current ones from terrapod_catalog_instance_get and send them back with your change applied: a required field left out is refused 422 rather than keeping its stored value, and a key that is not a form field is refused too. Omit the field entirely to keep the stored set unchanged, which is how a version-pin-only reconfigure is expressed",
@@ -201,6 +209,13 @@
             "boolean"
           ]
         },
+        "execution_backend_constraints": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "restrict which engine, and which versions of it, may run this item: a map of tofu and/or terraform to a PEP440-style version range such as \u003e=1.8,\u003c2.0. Any other key, a non-string range, or a range that does not parse is refused 422. An EMPTY object is refused too -- omit the field instead to leave the item unconstrained. Required on a self-contained item and optional otherwise, and it is enforced at PROVISION: a provision whose backend is not a key here is refused, as is one whose resolved version falls outside the range, including when the backend and version come from the deployment defaults rather than from the caller",
+          "type": "object"
+        },
         "labels": {
           "additionalProperties": {
             "type": "string"
@@ -224,6 +239,13 @@
           "type": [
             "null",
             "array"
+          ]
+        },
+        "self_contained": {
+          "description": "publish this item as a SELF-CONTAINED root archive rather than as a generated wrapper around the module. DEFAULTS FALSE, so an ordinary item says nothing here. Two refusals come with it, both 422: a self-contained item may NOT carry provider_template_ids (the archive brings its own provider configuration), and it REQUIRES execution_backend_constraints (the archive is written against a particular engine, so the item must say which)",
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "variable_options": {
@@ -251,6 +273,13 @@
                 "type": [
                   "null",
                   "array"
+                ]
+              },
+              "sensitive": {
+                "description": "mark this input as a secret, so the provision form masks it and the stored value is not read back. Independent of hidden: hidden removes the input and wires a fixed value the provisioner never sees, while this one is still SUPPLIED by the provisioner and merely not displayed or echoed. Refused 422 if it is not a boolean",
+                "type": [
+                  "null",
+                  "boolean"
                 ]
               }
             },
@@ -427,6 +456,13 @@
             "boolean"
           ]
         },
+        "execution_backend_constraints": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "REPLACE the engine constraints: a map of tofu and/or terraform to a PEP440-style version range. An empty object is refused (422) rather than read as a clear -- pass unconstrain_execution_backends instead, exactly as allow_any_agent_pool lifts the pool restriction. Existing instances keep their engine until their next reconfigure, which then re-resolves it against the new range and is refused if their current backend is no longer permitted",
+          "type": "object"
+        },
         "labels": {
           "additionalProperties": {
             "type": "string"
@@ -458,6 +494,17 @@
             "array"
           ]
         },
+        "self_contained": {
+          "description": "whether this item is published as a SELF-CONTAINED root archive. Turning it ON is refused 422 unless the item has execution_backend_constraints -- already stored or sent in this same call -- and refused if it carries provider templates, so clear those first",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "unconstrain_execution_backends": {
+          "description": "remove the engine constraints altogether, so any supported backend and version may run this item. Mutually exclusive with execution_backend_constraints -- they are opposite answers to one question. Refused 422 on a SELF-CONTAINED item, which cannot be unconstrained",
+          "type": "boolean"
+        },
         "variable_options": {
           "description": "REPLACE the per-input form overrides. An empty list removes all of them, which returns every module input to the form with the module's own default",
           "items": {
@@ -483,6 +530,13 @@
                 "type": [
                   "null",
                   "array"
+                ]
+              },
+              "sensitive": {
+                "description": "mark this input as a secret, so the provision form masks it and the stored value is not read back. Independent of hidden: hidden removes the input and wires a fixed value the provisioner never sees, while this one is still SUPPLIED by the provisioner and merely not displayed or echoed. Refused 422 if it is not a boolean",
+                "type": [
+                  "null",
+                  "boolean"
                 ]
               }
             },
@@ -519,6 +573,14 @@
         },
         "catalog_item_id": {
           "description": "the catalog item to provision from (a bare UUID)",
+          "type": "string"
+        },
+        "engine_version": {
+          "description": "the engine version for this instance, resolved to an exact offered binary. Omit to take the deployment's default for the chosen backend. Refused 422 if supplied empty, if it falls outside the item's declared range, or if no offered version satisfies that range; a 503 asking you to retry means the available-versions lookup failed rather than that the version is wrong",
+          "type": "string"
+        },
+        "execution_backend": {
+          "description": "run this instance on tofu or terraform. Anything else is refused 422. OMIT to take the deployment's default -- but note that an item with execution_backend_constraints validates that default too, so if the item does not permit the deployment's default backend the provision is refused until you name a permitted one. Read the item's constraints from terrapod_catalog_item_get",
           "type": "string"
         },
         "input_values": {
