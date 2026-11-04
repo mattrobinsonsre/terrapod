@@ -240,16 +240,24 @@ class TestThePerOutputRead:
         assert resp.status_code == 404, resp.text
 
 
+#: A FIXED uuid, not `uuid.uuid4()`. A parametrize list is built at COLLECTION
+#: time, so a random value there gives every xdist worker a different test id
+#: and the shard dies on `Different tests were collected between gw0 and gw1`
+#: rather than on anything to do with the assertion. Invisible to a serial run,
+#: which is how it reached CI.
+_A_UUID = "6fe979e8-efbb-4bed-8b1d-fa34f4ca9e50"
+
+
 class TestTheSynthesisedId:
     @pytest.mark.parametrize(
         "bad",
         [
             "wsout-",  # nothing at all
             "wsout-not-a-uuid:name",  # left half is not a state version
-            f"wsout-{uuid.uuid4()}",  # no separator, so no name
-            f"wsout-{uuid.uuid4()}:",  # separator, empty name
-            f"wsout-{uuid.uuid4()}:a/b",  # go-tfe refuses a slash client-side
-            f"wsout-{uuid.uuid4()}:a b",  # ...and whitespace
+            f"wsout-{_A_UUID}",  # no separator, so no name
+            f"wsout-{_A_UUID}:",  # separator, empty name
+            f"wsout-{_A_UUID}:a/b",  # go-tfe refuses a slash client-side
+            f"wsout-{_A_UUID}:a b",  # ...and whitespace
         ],
     )
     def test_a_malformed_id_is_a_404_not_a_500(self, bad):
