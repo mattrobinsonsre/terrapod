@@ -2278,6 +2278,17 @@ jobs:
           if echo "$noslack" | grep -q "TERRAPOD_SLACK__BOT_TOKEN"; then
             echo "FAIL: slack secretKeyRef rendered with no Secret named — the pod would not start (#2370)"; exit 1
           fi
+          # And `enabled: false` must suppress them even WITH a Secret named.
+          # These refs are not `optional: true`, so rendering them for a disabled
+          # integration makes a Secret that may not exist fatal at container
+          # creation -- turning Slack off is exactly when the Secret is likely
+          # to be absent, which is how a dev stack became undeployable (#2370).
+          offslack=$(helm template ./helm/terrapod \
+            --set api.config.slack.enabled=false \
+            --set api.config.slack.existingSecret=terrapod-slack)
+          if echo "$offslack" | grep -q "TERRAPOD_SLACK__"; then
+            echo "FAIL: slack secretKeyRef rendered while slack.enabled=false (#2370)"; exit 1
+          fi
           # Cost estimation (#871): non-secret config renders into config.yaml.
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }

@@ -102,27 +102,24 @@ api:
     # surface are exercised in Tilt. Production defaults to off.
     catalog:
       enabled: true
-    # Interactive Slack integration (#556) is OFF in local dev, because having
-    # it on made the stack undeployable for anyone who had not hand-created the
+    # Interactive Slack integration (#556) is OFF in local dev. On, it made the
+    # stack undeployable for anyone who had not hand-created the
     # `terrapod-slack` Secret: the three Slack env vars are `secretKeyRef`s with
-    # no `optional: true`, so a missing Secret is fatal at container creation
-    # and the API pod sits in CreateContainerConfigError. Nothing in
+    # no `optional: true`, so a missing Secret is fatal at container creation and
+    # the API pod sits in CreateContainerConfigError. Nothing in
     # docs/local-development.md said so, which cost an outside contributor time
     # on #2326 (see #2370).
     #
-    # `existingSecret` is what has to be empty, NOT `enabled`. The deployment
-    # renders those env vars under `if (.Values.api.config.slack).existingSecret`,
-    # so leaving a Secret name here with `enabled: false` would still render
-    # them and still break the pod.
-    #
-    # To work on the Slack surface: create the Secret per
-    # docs/slack-integration.md, then set `enabled: true` and
-    # `existingSecret: terrapod-slack` here. Socket Mode means no ingress or
-    # tunnel is needed for the dev loop.
+    # The Secret NAME is kept here deliberately, because `enabled` now gates
+    # those env vars too: nothing is rendered while this is false, so the name
+    # can sit here documenting what to create. To work on the Slack surface,
+    # create the Secret per docs/slack-integration.md and flip `enabled` -- one
+    # line, and nothing else to remember. Socket Mode means no ingress or tunnel
+    # is needed for the dev loop.
     slack:
       enabled: false
       socket_mode: true
-      existingSecret: ""
+      existingSecret: terrapod-slack
     # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
     # full bootstrap → renew → rotate loop is observable in a few minutes
     # instead of an hour. Production stays at the 1h default.
