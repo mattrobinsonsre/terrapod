@@ -73,13 +73,22 @@ Terrapod is single-organization with no project concept. Both endpoints return `
 Note: `DELETE /api/tfe/v2/workspaces/{id}` is **not** in the CLI surface — the by-id
 delete is admin/UI-only and lives on the management API.
 
-The by-name delete is **not served either**, so `terraform/tofu workspace delete`
-cannot succeed: `permissions.can-force-delete` is absent from the workspace
-document, and `go-tfe` types it `*bool` precisely so nil means "server predates
-safe delete" — `internal/cloud/state.go` then sends every delete down
-`Workspaces.Delete(org, name)`. Whether this surface should grow the delete at all
-is a product question (workspace lifecycle is otherwise deliberately native-only);
-until it is answered, the row above records what the CLI calls, not a promise.
+The by-name delete is **not served either, and will not be** — deleting a workspace
+from the CLI is deliberately unsupported (decided 2026-11-04). Workspace lifecycle
+is a management operation and lives on the native API and the UI, where it is
+RBAC-gated and audited; a `cloud {}` block is for running Terraform, not for
+destroying the thing holding your state.
+
+So the row above records what the CLI **calls**, not what Terrapod serves.
+`terraform/tofu workspace delete` fails, and the mechanism is worth knowing because
+it is not obvious: `permissions.can-force-delete` is absent from the workspace
+document, `go-tfe` types it `*bool` precisely so nil means "server predates safe
+delete", and `internal/cloud/state.go` then sends **every** delete down
+`Workspaces.Delete(org, name)`. Supporting it would therefore mean adding three
+things together — that route, `can-force-delete`, and `actions/safe-delete` — since
+emitting the permission alone just moves the failure to the endpoint it then
+selects. Three routes to serve one verb we have chosen not to expose is the wrong
+trade; see `docs/known-limitations.md`.
 
 ## State Versions
 
