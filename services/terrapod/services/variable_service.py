@@ -464,7 +464,16 @@ class _RunVariableRow:
     key: str
     value: str
     category: str = NATIVE_CATEGORY
-    structured: bool = False
+    #: True because a run variable's VALUE IS AN HCL EXPRESSION, not a literal.
+    #: Measured against OpenTofu v1.13.1 rather than assumed: `-var
+    #: msg=OVERRIDE` arrives as `"\"OVERRIDE\""` -- the HCL source text for
+    #: that string, quotes included -- which is `go-tfe`'s own contract for
+    #: `RunVariable` and what lets `-var 'list=["a"]'` work at all.
+    #:
+    #: With False, `render_tfvars` JSON-quotes it a second time and the plan
+    #: runs against the literal `"OVERRIDE"` WITH the quotes -- a wrong value
+    #: that plans and applies cleanly, which is the shape no test catches.
+    structured: bool = True
     sensitive: bool = False
     value_source: str = "static"
     apply_only: bool = False
