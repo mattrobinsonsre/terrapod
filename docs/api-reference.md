@@ -1037,6 +1037,56 @@ GET /api/v1/workspaces/{id}/current-state-version
 
 For **agent-mode runs** reading another workspace's state via `data "terraform_remote_state"` (runner-token principals), authorization is by the producer-controlled consumer allowlist instead of per-user RBAC — see [Cross-Workspace Remote-State Consumers](#cross-workspace-remote-state-consumers) and [the composition guide](remote-state.md).
 
+### Current State Version Outputs
+
+```
+GET /api/tfe/v2/workspaces/{id}/current-state-version-outputs
+```
+
+**Required permission:** `state:read-metadata` (the read tier) on the workspace — or
+the producer-controlled consumer allowlist, as for `/current-state-version` above.
+
+What `tofu output` / `terraform output` reads first. Returns the current state
+version's root outputs as `state-version-outputs` resources, with
+`meta.pagination`:
+
+| Attribute | Description |
+|---|---|
+| `name` | the output's name |
+| `sensitive` | whether the configuration marks it sensitive |
+| `type` | the coarse type — `string`, `number`, `bool`, `array` or `object` |
+| `detailed-type` | the full cty type as JSON, verbatim from state |
+| `value` | **omitted when `sensitive` is true** — read it from the per-output route below |
+
+A sensitive value is **omitted rather than masked**: `go-tfe` types `value` as
+`any`, so a placeholder would be indistinguishable from a real value, and the CLI
+fetches a sensitive value through the per-output route regardless.
+
+`detailed-type` is always present. A client that sees it absent on any output —
+`GetRootOutputValues` in particular — falls back to downloading full state, so a
+truncated document reports *no* outputs rather than failing.
+
+**Terraform/OpenTofu only.** The document carries a cty type and a Pulumi stack's
+outputs have none; use `GET /api/v1/workspaces/{id}/state-outputs` for any engine,
+which masks sensitive values.
+
+### Show State Version Output
+
+```
+GET /api/tfe/v2/state-version-outputs/{id}
+```
+
+**Required permission:** `state:read` (the **plan** tier) on the workspace.
+
+The one route that reveals a sensitive output's value, which is why it sits a tier
+above the collection: the document is state-grade data, and serving it at the read
+tier would hand a read-only user what the `state:read` gate exists to withhold
+(GHSA-gwwq-5v7q-h3f4). `tofu output` calls this once per sensitive output.
+
+The `{id}` is **synthesised** as `wsout-{state-version-id}:{name}`, because outputs
+are re-derived from the state document and have no row of their own. Take it from
+the collection rather than constructing it; a malformed one answers `404`.
+
 ### Create State Version
 
 ```

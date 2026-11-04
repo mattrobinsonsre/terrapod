@@ -1049,6 +1049,13 @@
     "overridden",
     "run-status"
   ],
+  "tfe_v2._output_json": [
+    "detailed-type",
+    "name",
+    "sensitive",
+    "type",
+    "value"
+  ],
   "tfe_v2._state_version_json": [
     "created-at",
     "created-by",
@@ -1057,6 +1064,7 @@
     "hosted-state-upload-url",
     "lineage",
     "md5",
+    "resources-processed",
     "serial",
     "size"
   ],

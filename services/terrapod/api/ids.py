@@ -77,6 +77,10 @@ ID_PREFIXES: dict[str, str] = {
     "security-scans": "ss-",
     "slack-links": "slk-",
     "state-versions": "sv-",
+    # Synthesised, not a row: outputs are re-derived from the state blob on
+    # every read, so the id has to carry both halves of what identifies one
+    # -- `wsout-{state_version_uuid}:{name}` (#2376).
+    "state-version-outputs": "wsout-",
     "task-stage-results": "tsr-",
     "task-stages": "ts-",
     "variable-sets": "varset-",

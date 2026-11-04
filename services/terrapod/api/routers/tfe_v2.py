@@ -69,7 +69,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.engine_scope import engine_filter, load_workspace_scoped
-from terrapod.api.ids import parse_id
+from terrapod.api.ids import parse_id, strip_id_prefix
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
 from terrapod.api.prefixes import TFE_PREFIX, is_tfe_path
@@ -2941,6 +2941,170 @@ async def current_state_version(
     return JSONResponse(content=_state_version_json(sv, request), headers=_tfe_headers())
 
 
+#: A state-version output's id is SYNTHESISED, because no row exists -- outputs
+#: are re-derived from the state blob on every read. `list_workspace_tag_bindings`
+#: is the precedent for synthesising one at all (go-tfe's parser silently DROPS
+#: an entry with no id, which here would make `tofu output` conclude a workspace
+#: has none), and this is a genuine extension of it: a tag-binding id is only
+#: ever emitted, while this one has to round-trip through the read below. So it
+#: carries both halves of what identifies an output.
+_OUTPUT_ID_SEPARATOR = ":"
+
+#: go-tfe refuses an id containing a slash or whitespace client-side
+#: (`validStringID`), so a name that would break there must not be emitted as
+#: part of one. Terraform identifiers never do; a hand-crafted request might.
+_VALID_OUTPUT_NAME = re.compile(r"^[^/\s]+$")
+
+
+def _output_id(state_version_id: uuid.UUID, name: str) -> str:
+    return f"wsout-{state_version_id}{_OUTPUT_ID_SEPARATOR}{name}"
+
+
+def _parse_output_id(output_id: str) -> tuple[str, str]:
+    """Split a synthesised output id back into its state version and name.
+
+    404 on anything malformed rather than 422: the id is a path segment, and a
+    caller holding a bad one is asking for something that does not exist.
+    """
+    detail = "State version output not found"
+    raw = strip_id_prefix(output_id, "wsout-")
+    sv_part, sep, name = raw.partition(_OUTPUT_ID_SEPARATOR)
+    if not sep or not name or not _VALID_OUTPUT_NAME.match(name):
+        raise HTTPException(status_code=404, detail=detail)
+    # Through `parse_id` rather than `uuid.UUID` directly: a bare call on
+    # request input is what `test_id_prefix_tolerance` forbids, because it
+    # raises ValueError and answers 500.
+    parse_id(sv_part, detail=detail)
+    return sv_part, name
+
+
+def _output_json(sv_id: uuid.UUID, out, *, reveal: bool) -> dict:
+    """One `state-version-outputs` resource.
+
+    `value` is OMITTED for a sensitive output on the collection rather than
+    replaced with a mask string: go-tfe types it `any`, so a placeholder would
+    be indistinguishable from the real value to a client, and the CLI reads a
+    sensitive value through the per-output route anyway.
+    """
+    attrs: dict = {
+        "name": out.name,
+        "sensitive": out.sensitive,
+        "type": out.type,
+        "detailed-type": out.detailed_type,
+    }
+    if reveal or not out.sensitive:
+        attrs["value"] = out.value
+    return {"id": _output_id(sv_id, out.name), "type": "state-version-outputs", "attributes": attrs}
+
+
+async def _typed_outputs_of(sv) -> list:
+    from terrapod.services.state_graph_service import (
+        load_state_document,
+        typed_terraform_outputs,
+    )
+
+    document = await load_state_document(sv)
+    return typed_terraform_outputs(document) if document else []
+
+
+@router.get("/workspaces/{workspace_id}/current-state-version-outputs")
+async def current_state_version_outputs(
+    request: Request,
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The current state version's root outputs (#2376).
+
+    `tofu output` / `terraform output` reads this first and cannot work without
+    it: `GetRootOutputValues` has no fallback on error, so until this existed
+    the command failed outright with `could not read state version outputs`.
+
+    Gated on `state:read-metadata`, the READ tier, NOT on `state:read` -- and
+    that is the difference between a working command and a 403 for every
+    read-tier user, because `state:read` sits in the plan tier. A sensitive
+    value is withheld here and served by the per-output route on `state:read`,
+    which is TFE's own split and is also what the CLI does: it fetches a
+    sensitive value only through that route. So a read-tier user gets their
+    outputs, and meets a refusal only on one that is actually secret.
+
+    The runner path mirrors `current_state_version` (#344): a run already
+    permitted to read a producer's whole state may certainly read its outputs,
+    and refusing here while the adjacent route allows it would be inconsistent
+    in the strict direction with nothing to explain it.
+
+    TFE-only, not dual-mounted: this document carries a cty `detailed-type`, and
+    a Pulumi stack's outputs have no type to put in one. The native
+    `/api/v1/workspaces/{id}/state-outputs` already serves every engine, so no
+    door is missing -- the same reasoning that keeps the state-version WRITES
+    on this surface alone.
+    """
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
+    if not await _runner_state_read_allowed(db, user, ws):
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.STATE_READ_METADATA):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires read permission on workspace",
+            )
+
+    result = await db.execute(
+        select(StateVersion)
+        .where(StateVersion.workspace_id == ws.id)
+        .order_by(StateVersion.serial.desc())
+        .limit(1)
+    )
+    sv = result.scalar_one_or_none()
+    if sv is None:
+        raise HTTPException(status_code=404, detail="No state versions found")
+
+    items = [_output_json(sv.id, o, reveal=False) for o in await _typed_outputs_of(sv)]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta}, headers=_tfe_headers())
+
+
+@router.get("/state-version-outputs/{output_id}")
+async def show_state_version_output(
+    request: Request,
+    output_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """One root output, WITH its value, sensitive ones included (#2376).
+
+    Gated on `state:read` -- the plan tier -- because this is the one route
+    that reveals a sensitive output, and that is state-grade data. The
+    reasoning is `plan_json_output`'s (GHSA-gwwq-5v7q-h3f4): serving it a tier
+    below raw state download would hand a read-tier user exactly what the
+    `state:read` gate exists to withhold. Masking here instead was the
+    alternative and it breaks the command: the CLI fetches a sensitive value
+    only through this route, so a mask is simply a wrong answer.
+
+    No runner path, deliberately, unlike the collection: `terraform_remote_state`
+    reads whole state through its own route and has no reason to come here, so
+    there is no case to widen for.
+    """
+    sv_part, name = _parse_output_id(output_id)
+    sv = await _load_state_version_scoped(sv_part, db, request=request)
+
+    ws = await db.get(Workspace, sv.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="State version output not found")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.STATE_READ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires '{cap.STATE_READ}' capability on workspace",
+        )
+
+    for out in await _typed_outputs_of(sv):
+        if out.name == name:
+            return JSONResponse(
+                content={"data": _output_json(sv.id, out, reveal=True)}, headers=_tfe_headers()
+            )
+    raise HTTPException(status_code=404, detail="State version output not found")
+
+
 @dual_router.get("/state-versions/{state_version_id}/download")
 async def download_state(
     request: Request,
@@ -3095,6 +3259,17 @@ def _state_version_json(
                 "size": sv.state_size,
                 "created-at": _rfc3339(sv.created_at),
                 "created-by": sv.created_by,
+                # A CONSTANT, and the honest one: TFE indexes a state version's
+                # resources asynchronously and reports false until that finishes.
+                # Terrapod has no such phase -- a state version is complete the
+                # moment its content PUT succeeds -- so there is no state in
+                # which false would be true here.
+                #
+                # Not sourced from `resource_count`, which is NULL for every
+                # Terraform version by design. Without this attribute
+                # `tfci workspace output list` polls its whole five-minute
+                # budget waiting for a true that never arrives, then fails.
+                "resources-processed": True,
                 # Absolute URLs the client follows VERBATIM — service discovery
                 # does not govern them (proven in the #1528 spike: the client
                 # went straight past the advertised base to whatever these say).
