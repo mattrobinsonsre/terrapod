@@ -1,5 +1,11 @@
 """Absolute URLs the CLI follows are built from the caller's host (#1703).
 
+The PREFIX in these assertions is canonical (`/api/tfe/v2`) while two of the
+requests below are made on the deprecated `/api/v2` alias, deliberately: a
+caller on the alias is handed canonical URLs, which work on either surface and
+survive the alias being dropped. Handing back the alias is the drift
+`tests/api/test_tfe_link_prefixes.py` exists to stop.
+
 go-tfe needs absolute URLs for a configuration version's `upload-url` and a
 plan's or apply's `log-read-url`, and it uses them as-is. They used to be built
 from `auth.callback_base_url`, an SSO setting that defaults to
@@ -22,6 +28,7 @@ from starlette.requests import Request
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.api.routers.config_versions import _cv_json
 from terrapod.api.routers.runs import _apply_json, _plan_json
 from terrapod.auth.capabilities import caps_for_level
@@ -61,6 +68,11 @@ def _run():
     run.status = "planned"
     run.has_json_output = True
     run.resource_additions = None
+    # Set explicitly, and not noise: the plan document reads this column now
+    # rather than deriving the answer from the run status, so an unset MagicMock
+    # reaches `json.dumps` and the whole response 500s on a TypeError that names
+    # the attribute and nothing about the cause.
+    run.has_changes = True
     return run
 
 
@@ -82,7 +94,7 @@ class TestTheUrlsNameTheHostTheCallerUsed:
         # (GHSA: an unauthenticated upload addressed by a guessable id). This
         # test is about the HOST, so it asserts the base and leaves the segment
         # to the capability tests.
-        assert attrs["upload-url"].startswith(f"{PUBLIC}/api/v2/configuration-versions/")
+        assert attrs["upload-url"].startswith(f"{PUBLIC}{TFE_PREFIX}/configuration-versions/")
         assert "localhost" not in attrs["upload-url"]
 
     def test_plan_log_read_url_and_json_output(self):
@@ -93,8 +105,8 @@ class TestTheUrlsNameTheHostTheCallerUsed:
                     {"x-forwarded-host": "terrapod.example.com", "x-forwarded-proto": "https"}
                 ),
             )["data"]["attributes"]
-        assert attrs["log-read-url"].startswith(f"{PUBLIC}/api/v2/plans/")
-        assert attrs["json-output"].startswith(f"{PUBLIC}/api/v2/plans/")
+        assert attrs["log-read-url"].startswith(f"{PUBLIC}{TFE_PREFIX}/plans/")
+        assert attrs["json-output"].startswith(f"{PUBLIC}{TFE_PREFIX}/plans/")
 
     def test_apply_log_read_url(self):
         with _localhost_default():
@@ -104,7 +116,7 @@ class TestTheUrlsNameTheHostTheCallerUsed:
                     {"x-forwarded-host": "terrapod.example.com", "x-forwarded-proto": "https"}
                 ),
             )["data"]["attributes"]
-        assert attrs["log-read-url"].startswith(f"{PUBLIC}/api/v2/applies/")
+        assert attrs["log-read-url"].startswith(f"{PUBLIC}{TFE_PREFIX}/applies/")
 
     def test_a_plain_host_header_is_used_without_a_proxy(self):
         with _localhost_default():

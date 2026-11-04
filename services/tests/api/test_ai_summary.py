@@ -116,6 +116,9 @@ def _mock_run(ws_id=None, run_id=None, status="planned"):
     # The engine this belongs to (#1521) — set explicitly because a MagicMock
     # attribute is not JSON-serialisable and the serializer now reports it.
     run.engine = "terraform"
+    # Same class, same reason (#2368): the plan document reads this column now
+    # rather than deriving the answer from the run status.
+    run.has_changes = True
     run.id = run_id or uuid.uuid4()
     run.workspace_id = ws_id or uuid.uuid4()
     run.status = status

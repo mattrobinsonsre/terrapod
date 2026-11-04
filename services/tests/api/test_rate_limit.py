@@ -1,5 +1,6 @@
 """Tests for rate limiting middleware."""
 
+import time
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
@@ -180,6 +181,38 @@ class TestRateLimitMiddleware:
         assert "Retry-After" in response.headers
         body = response.json()
         assert body["errors"][0]["status"] == "429"
+
+    def test_429_carries_the_reset_header_go_tfe_actually_reads(self):
+        """`Retry-After` alone leaves `go-tfe` hammering us.
+
+        Its `rateLimitBackoff` reads **`X-RateLimit-Reset`** and ignores
+        `Retry-After` entirely. With neither it falls back to its own 100-400ms
+        range with `RetryMax: 30`, so a throttled client spends ~30 rapid retries
+        inside the same 60-second window, is refused every time, and then hard
+        fails -- thirty requests we serve for nothing, and a confusing failure
+        for the operator. Both headers go out: `Retry-After` is the standard one
+        proxies understand, and the reset is the one this client obeys.
+        """
+        before = int(time.time())
+        mock_redis = _make_redis_mock(count=6)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=5)
+        client = TestClient(app)
+        response = client.get("/api/terrapod/v1/workspaces")
+
+        assert response.status_code == 429
+        assert "X-RateLimit-Reset" in response.headers, (
+            "a 429 without X-RateLimit-Reset sends go-tfe into ~30 retries "
+            "inside the window it is being throttled by"
+        )
+        reset = int(response.headers["X-RateLimit-Reset"])
+        retry_after = int(response.headers["Retry-After"])
+
+        # An epoch second in the future, and the two headers agree: the reset is
+        # the moment the window rolls over, which is what `Retry-After` counts
+        # down to. A reset in the past would be read as "retry immediately".
+        assert reset > before, f"reset {reset} is not in the future (now {before})"
+        assert reset - before <= 60
+        assert abs(reset - (before + retry_after)) <= 1
 
     def test_auth_endpoint_uses_lower_limit(self):
         """Auth endpoints use the auth-specific rate limit."""

@@ -33,6 +33,7 @@ from terrapod.api.dependencies import AuthenticatedUser, effective_platform_role
 from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
+from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls, download_tickets
 from terrapod.auth.capabilities import has_capability
@@ -114,7 +115,7 @@ def _cv_json(
                 "status": cv.status,
                 "auto-queue-runs": cv.auto_queue_runs,
                 "speculative": cv.speculative,
-                "upload-url": f"{base}/api/v2/configuration-versions/{upload_seg}/upload",
+                "upload-url": f"{base}{TFE_PREFIX}/configuration-versions/{upload_seg}/upload",
                 "created-at": _rfc3339(cv.created_at),
             },
             "relationships": {
@@ -123,7 +124,7 @@ def _cv_json(
                 },
             },
             "links": {
-                "self": f"/api/v2/configuration-versions/{cv_id}",
+                "self": f"{TFE_PREFIX}/configuration-versions/{cv_id}",
             },
         }
     }
