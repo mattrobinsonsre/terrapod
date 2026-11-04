@@ -4717,7 +4717,7 @@ jobs:
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, secret-scan, codeql, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, helm-smoke, secret-scan, codeql, sast, scan-images]
     if: |
       always()
       && needs.build-images-amd64.result == 'success'
@@ -4728,6 +4728,7 @@ jobs:
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.python-audit.result == 'success' || needs.python-audit.result == 'skipped')
       && (needs.host-checks.result == 'success' || needs.host-checks.result == 'skipped')
+      && (needs.helm-smoke.result == 'success' || needs.helm-smoke.result == 'skipped')
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
       && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
@@ -4860,6 +4861,7 @@ jobs:
       - python-audit
       - secret-scan
       - host-checks
+      - helm-smoke
       - sast
     runs-on: ubuntu-latest
     steps:
@@ -4876,6 +4878,7 @@ jobs:
             python-audit=${{ needs.python-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
             host-checks=${{ needs.host-checks.result }}
+            helm-smoke=${{ needs.helm-smoke.result }}
             sast=${{ needs.sast.result }}
         run: |
           set -eu
@@ -5980,6 +5983,7 @@ jobs:
       - codeql
       - dependency-review
       - host-checks
+      - helm-smoke
       - helm-eval-boot
       - cli-contract
       - sast
@@ -6030,6 +6034,7 @@ jobs:
             "${{ needs.codeql.result }}"
             "${{ needs.dependency-review.result }}"
             "${{ needs.host-checks.result }}"
+            "${{ needs.helm-smoke.result }}"
             "${{ needs.helm-eval-boot.result }}"
             "${{ needs.cli-contract.result }}"
             "${{ needs.sast.result }}"
