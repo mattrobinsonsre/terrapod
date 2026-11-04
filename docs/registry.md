@@ -778,10 +778,20 @@ The provider cache implements the Terraform network mirror protocol. Runner Jobs
    - **Tier 1 — Postgres**: check for cached binaries in object storage. Cached platforms get presigned download URLs
    - **Tier 2 — Redis**: check for upstream metadata (24h TTL). Uncached platforms get proxy download URLs
    - **Tier 3 — Upstream**: fetch metadata from upstream registry, cache in Redis, return proxy URLs
-4. The `{version}.json` response returns **instantly** — no binary downloads during this step
-5. When terraform picks its platform and follows the download URL:
-   - **Cached**: 302 redirect to presigned URL in object storage
-   - **Uncached**: the download proxy fetches the single binary from upstream, stores it in object storage, creates a DB record, then 302 redirects — **only the requested os/arch is cached**
+4. The `{version}.json` response hands terraform a URL per platform, and which URL
+   depends on the platform filter (the route's own docstring states this):
+   - **Cached, or matching the configured filter**: a presigned object-storage URL.
+     A filter-matching platform that is not yet cached is fetched **during this
+     request** (`fetch_and_cache_single_platform`), so this response is not free —
+     it is one binary download per newly-seen in-filter platform, and a failure
+     falls back to the upstream URL rather than erroring.
+   - **Outside the filter**: the **upstream** download URL, direct. Terrapod does
+     not proxy or cache it, so the runner fetches it from upstream itself — which
+     is why the platform filter is what matters in a restricted network, and why a
+     sealed deployment must list every platform it needs.
+5. There is **no download-proxy route and no 302 hop**: `provider_mirror.py` serves
+   exactly `index.json` and `{version}.json`. (This step previously described a
+   proxy that fetched and 302'd on follow; no such route has ever existed here.)
 
 **Note:** Provider mirror endpoints require authentication. Runner Jobs authenticate via the `credentials` block in the CLI config, which sends the runner token as a Bearer token to the Terrapod host. The runner entrypoint sets `TF_REGISTRY_CLIENT_TIMEOUT=30` and `TF_PROVIDER_DOWNLOAD_RETRY=3` for timeout/retry resilience.
 
@@ -963,7 +973,13 @@ is the CLI archive; the resource plugin `pulumi up` downloads per provider comes
 deployment needs both, and the language SDK proxy (npm, PyPI, Go modules or NuGet)
 for the program's own dependencies on top.
 
-The provider network mirror has the equivalent override: `registry.provider_cache.upstream_registries` (see [Provider Caching](#provider-caching-network-mirror) above) — point it at an internal provider registry that implements the provider network-mirror protocol.
+The provider network mirror has the equivalent override: `registry.provider_cache.upstream_registries` (see [Provider Caching](#provider-caching-network-mirror) above) — point it at an internal provider **registry** — one that implements the
+[provider registry protocol](https://developer.hashicorp.com/terraform/internals/provider-registry-protocol),
+i.e. serves `/v1/providers/{namespace}/{type}/versions` and
+`/v1/providers/{namespace}/{type}/{version}/download/{os}/{arch}`. **Not** the
+network-mirror protocol: Terrapod *serves* the mirror protocol to runners and
+*speaks* the registry protocol upstream. Pointing this at a mirror-protocol
+server will not work.
 
 #### The platform tools, and the one pair that must move together
 

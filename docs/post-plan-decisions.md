@@ -24,8 +24,8 @@ default; a client can ask for either one.
 The run reports `status: planning`, the same status as a plan still running.
 Two things tell them apart:
 
-- `blocked-by` names the gate holding the run: `run-task`, `policy` or
-  `security-scan`. It is `null` for any run that is not held.
+- `blocked-by` names the gate holding the run: `run-task`, `policy`,
+  `security-scan` or `ai-policy`. It is `null` for any run that is not held.
 - The run's plan reports `status: finished`.
 
 A held apply run is discardable (`actions.is-discardable: true`). A failed
