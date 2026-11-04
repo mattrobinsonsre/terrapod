@@ -17,6 +17,7 @@ Endpoints:
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
@@ -27,7 +28,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    effective_platform_roles,
+    get_current_user,
+    require_admin,
+)
 from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
@@ -57,6 +63,7 @@ from terrapod.services.vault_source_service import (
     parse_reference,
 )
 from terrapod.services.workspace_rbac_service import (
+    fetch_custom_roles,
     resolve_workspace_capabilities_for,
 )
 
@@ -855,6 +862,79 @@ def _varset_json(vs: VariableSet) -> dict:
     }
 
 
+async def _visible_varsets(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    varsets: Sequence[VariableSet],
+) -> list[VariableSet]:
+    """The variable sets this principal may see, by workspace reach (#2379).
+
+    A variable set was not a resource RBAC had an opinion about: the three read
+    routes authenticated and then authorized nothing, so any principal who could
+    log in could enumerate every set in the deployment -- and through
+    `/relationships/vars`, every variable KEY and `sensitive` flag in each. The
+    values were masked; the inventory was not, and for a set carrying a
+    credential the inventory is most of the disclosure.
+
+    Visible means **reaching at least one workspace the caller can read**, which
+    is the same question `list_workspace_varsets` already answers from the other
+    end: if you may see what a run receives, you may see the set it came from.
+
+    Three paths, cheapest first, because only the third touches the database per
+    set:
+
+    * a platform `admin` or `audit` is visible on every workspace, so the filter
+      is a no-op -- mirroring the see-all fast path the workspace list takes
+      (#1056). The admin variable-sets page fetches unpaged, so this is the path
+      that matters for it;
+    * a **global** set is visible to every principal. It reaches the whole
+      estate, so for anyone with any reach at all the reach test would pass
+      anyway, and it names no particular workspace. Deciding it by the reach test
+      instead would make the page empty for a caller whose own reach is a
+      workspace that does not exist yet, which is a worse answer than the honest
+      one;
+    * otherwise `workspaces_for_varset` -- the exact inverse of the question. It
+      already unions explicit assignments with the rule match **and** applies the
+      refused-dimension predicate, so this filter cannot disagree with the
+      matcher about who receives a credential. Short-circuiting the global case
+      above is not an optimisation: for a global set it returns the whole estate.
+
+    `WORKSPACE_READ` explicitly rather than the bare truthiness (`if caps:`) the
+    workspace list uses, because "one gate -> exactly one capability" is the
+    documented contract. Readability is memoised per workspace id and the custom
+    roles are fetched once, so a caller holding a label-scoped role does not pay
+    the O(fleet) resolution #1056 exists to forbid.
+    """
+    platform_roles = effective_platform_roles(user)
+    if "admin" in platform_roles or "audit" in platform_roles:
+        return list(varsets)
+
+    preloaded = await fetch_custom_roles(db, user.roles)
+    token_preloaded = await fetch_custom_roles(db, user.pinned_roles or [])
+    readable: dict[uuid.UUID, bool] = {}
+    visible: list[VariableSet] = []
+
+    for vs in varsets:
+        if vs.global_set:
+            visible.append(vs)
+            continue
+        for ws, _source in await variable_service.workspaces_for_varset(db, vs):
+            if ws.id not in readable:
+                caps = await resolve_workspace_capabilities_for(
+                    db,
+                    user,
+                    ws,
+                    preloaded_roles=preloaded,
+                    token_preloaded_roles=token_preloaded,
+                )
+                readable[ws.id] = has_capability(caps, cap.WORKSPACE_READ)
+            if readable[ws.id]:
+                visible.append(vs)
+                break
+
+    return visible
+
+
 @router.get("/organizations/default/varsets")
 async def list_varsets(
     request: Request = None,
@@ -870,7 +950,7 @@ async def list_varsets(
         )
         .order_by(VariableSet.name)
     )
-    varsets = result.scalars().all()
+    varsets = await _visible_varsets(db, user, result.scalars().all())
     items = [_varset_json(vs) for vs in varsets]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
@@ -1011,6 +1091,26 @@ async def _get_varset(varset_id: str, db: AsyncSession) -> VariableSet:
     return vs
 
 
+async def _require_visible_varset(
+    varset_id: str,
+    db: AsyncSession,
+    user: AuthenticatedUser,
+) -> VariableSet:
+    """Load a variable set, 404ing when this principal cannot see it (#2379).
+
+    **404, not 403**, and that is the point of having it rather than filtering
+    the list alone: a 403 on an invisible set is distinguishable from a 404 on
+    one that does not exist, so walking ids would still answer "which variable
+    sets exist here" for a principal with no reach whatsoever. A list filter
+    cannot close that hole; only the by-id route can. `list_workspace_varsets`
+    already 404s for the same reason, one route over.
+    """
+    vs = await _get_varset(varset_id, db)
+    if not await _visible_varsets(db, user, [vs]):
+        raise HTTPException(status_code=404, detail="Variable set not found")
+    return vs
+
+
 @router.get("/varsets/{varset_id}")
 async def show_varset(
     varset_id: str = Path(...),
@@ -1018,7 +1118,7 @@ async def show_varset(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a variable set."""
-    vs = await _get_varset(varset_id, db)
+    vs = await _require_visible_varset(varset_id, db, user)
     return JSONResponse(content={"data": _varset_json(vs)})
 
 
@@ -1119,7 +1219,7 @@ async def list_varset_vars(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List variables in a variable set."""
-    vs = await _get_varset(varset_id, db)
+    vs = await _require_visible_varset(varset_id, db, user)
     await db.refresh(vs, ["variables"])
     items = [_vsvar_json(v, varset_id, tfe_surface=_is_tfe(request)) for v in vs.variables]
     page_items, meta = paginate(items, request)

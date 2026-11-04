@@ -637,7 +637,9 @@ class TestVariableSetCRUD:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_list_varsets(self, *mocks):
-        user = _user()
+        # An ADMIN: the page this route exists for. A non-admin now goes through
+        # the reach filter, which TestVarsetVisibility drives in both directions.
+        user = _user(roles=["admin"])
         app, mock_db = _make_app(user)
         vs = _mock_varset()
         mock_result = MagicMock()
@@ -691,6 +693,260 @@ class TestVariableSetCRUD:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
                 f"/api/v2/varsets/varset-{uuid.uuid4()}",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+
+class TestVarsetVisibility:
+    """A variable set is visible when it reaches a workspace you can read (#2379).
+
+    Before this, all three read routes authenticated and authorized nothing: any
+    principal who could log in could enumerate every variable set in the
+    deployment, and through `/relationships/vars` every variable KEY and
+    `sensitive` flag in each. The values were masked; the inventory was not.
+
+    The filter is driven here against mocked reach and mocked capabilities --
+    the router helper is the unit, and those two are its dependencies. The real
+    resolution against real roles, labels and assignments is exercised in
+    `tests/integration/test_varset_visibility.py`.
+    """
+
+    @staticmethod
+    def _reach(ws):
+        """What `workspaces_for_varset` returns: (workspace, how it applies)."""
+        return [(ws, "explicit")]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_an_admin_sees_a_set_reaching_nothing(self, mock_reach, *mocks):
+        """The see-all fast path, and the assertion that makes it a fast path:
+        reach is never consulted, so the admin page costs no per-set query."""
+        mock_reach.side_effect = AssertionError("an admin must not pay the reach query")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [_mock_varset()]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]) == 1
+        assert not mock_reach.called
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_an_auditor_sees_a_set_reaching_nothing(self, mock_reach, *mocks):
+        """`audit` is read-only everywhere, so it takes the same path as `admin`.
+        Asserted separately because the two are a disjunction a single test
+        cannot distinguish -- dropping either half would still pass the other."""
+        mock_reach.side_effect = AssertionError("an auditor must not pay the reach query")
+        app, mock_db = _make_app(_user(roles=["audit"]))
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [_mock_varset()]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]) == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_a_global_set_is_visible_without_a_reach_query(self, mock_reach, *mocks):
+        """A global set reaches the whole estate, so the reach test would pass for
+        anyone with any reach at all -- and `workspaces_for_varset` would return
+        the entire workspace table to answer it. Short-circuited, which is why
+        the mock asserts rather than returning."""
+        mock_reach.side_effect = AssertionError("a global set must not be queried for reach")
+        vs = _mock_varset(name="global-set")
+        vs.global_set = True
+        app, mock_db = _make_app(_user())
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [vs]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert resp.status_code == 200
+        assert [d["attributes"]["name"] for d in resp.json()["data"]] == ["global-set"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_a_reachable_set_is_visible(self, mock_reach, mock_caps, *mocks):
+        mock_reach.return_value = self._reach(_mock_workspace())
+        mock_caps.return_value = caps_for_level("read")
+        app, mock_db = _make_app(_user())
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [_mock_varset(name="reachable")]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert resp.status_code == 200
+        assert [d["attributes"]["name"] for d in resp.json()["data"]] == ["reachable"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_an_unreachable_set_is_withheld(self, mock_reach, mock_caps, *mocks):
+        """No capability on the only workspace the set reaches -> not listed.
+        This and the test above are the pair: either alone passes whichever way
+        the filter is written, because the property is a relationship."""
+        mock_reach.return_value = self._reach(_mock_workspace())
+        mock_caps.return_value = frozenset()
+        app, mock_db = _make_app(_user())
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [_mock_varset()]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"] == []
+        # The count is the VISIBLE count, because the filter runs before paginate.
+        # Reporting the row count would disclose how many sets exist, which is
+        # most of what the filter exists to withhold.
+        assert body["meta"]["pagination"]["total-count"] == 0
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_one_readable_workspace_is_enough(self, mock_reach, mock_caps, *mocks):
+        """Reach is ANY, not ALL: a set spanning the estate must not be hidden
+        from someone who can read one of the workspaces it feeds."""
+        unreadable, readable = _mock_workspace(), _mock_workspace()
+        mock_reach.return_value = [(unreadable, "rule"), (readable, "explicit")]
+        mock_caps.side_effect = lambda db, user, ws, **kw: (
+            caps_for_level("read") if ws is readable else frozenset()
+        )
+        app, mock_db = _make_app(_user())
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [_mock_varset(name="spanning")]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert [d["attributes"]["name"] for d in resp.json()["data"]] == ["spanning"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    async def test_readability_is_resolved_once_per_workspace(self, mock_reach, mock_caps, *mocks):
+        """Memoised per workspace id, so a set-per-workspace estate does not pay
+        the O(fleet x sets) resolution #1056 forbids."""
+        ws = _mock_workspace()
+        mock_reach.return_value = self._reach(ws)
+        mock_caps.return_value = caps_for_level("read")
+        app, mock_db = _make_app(_user())
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = [
+            _mock_varset(name=f"set-{i}") for i in range(5)
+        ]
+        mock_db.execute.return_value = res
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/varsets", headers=_AUTH)
+        assert len(resp.json()["data"]) == 5
+        assert mock_caps.await_count == 1, "five sets, one workspace, one resolution"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_an_invisible_set_is_404_by_id(self, mock_get, mock_reach, mock_caps, *mocks):
+        """404, not 403: the by-id route is the enumeration hole a list filter
+        cannot close, and a distinguishable 403 would still answer "does this id
+        exist" for a principal with no reach at all."""
+        mock_get.return_value = _mock_varset()
+        mock_reach.return_value = self._reach(_mock_workspace())
+        mock_caps.return_value = frozenset()
+        app, _ = _make_app(_user())
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/varsets/varset-{uuid.uuid4()}", headers=_AUTH)
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Variable set not found"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_the_variables_of_an_invisible_set_are_404(
+        self, mock_get, mock_reach, mock_caps, *mocks
+    ):
+        """The route that discloses most: every key and `sensitive` flag in the
+        set. Gated separately because it is a separate handler -- a filter on
+        the collection alone leaves this one open."""
+        mock_get.return_value = _mock_varset()
+        mock_reach.return_value = self._reach(_mock_workspace())
+        mock_caps.return_value = frozenset()
+        app, _ = _make_app(_user())
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars", headers=_AUTH
+            )
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.variables.variable_service.workspaces_for_varset")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_a_visible_set_still_serves_its_variables(
+        self, mock_get, mock_reach, mock_caps, *mocks
+    ):
+        """The other direction: the guard must not break the route it protects."""
+        vs = _mock_varset()
+        vs.variables = [_mock_vsvar()]
+        mock_get.return_value = vs
+        mock_reach.return_value = self._reach(_mock_workspace())
+        mock_caps.return_value = caps_for_level("read")
+        app, mock_db = _make_app(_user())
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars", headers=_AUTH
+            )
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]) == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_blast_radius_view_stays_admin_only(self, *mocks):
+        """`/relationships/workspaces` lists EVERY workspace a set reaches, so
+        the new rule would turn it into a leak: visible because you can read one
+        of them, then showing you the ones you cannot. It keeps `require_admin`,
+        and that is a decision rather than an omission."""
+        app, _ = _make_app(_user())
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/varsets/varset-{uuid.uuid4()}/relationships/workspaces",
                 headers=_AUTH,
             )
         assert resp.status_code == 403

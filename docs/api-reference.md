@@ -2647,6 +2647,17 @@ DELETE /api/tfe/v2/workspaces/{id}/vars/{var_id}
 GET /api/tfe/v2/organizations/default/varsets
 ```
 
+**Required permission:** authenticated, **filtered by reach**. A set is returned
+when it reaches at least one workspace you hold `workspace:read` on -- the same
+question the [workspace-side association view](#association-views) answers from
+the other end. A **global** set reaches the whole estate and is returned to every
+principal. Platform `admin` and `audit` see every set, including one that is
+assigned to nothing.
+
+`meta.pagination.total-count` is the count of what *you* can see, because the
+filter runs before the page is sliced. A set reaching only workspaces you cannot
+read is not listed, and `GET /varsets/{id}` on it answers `404`.
+
 ### Create Variable Set
 
 ```
@@ -2663,6 +2674,13 @@ POST   /api/tfe/v2/varsets/{varset_id}/relationships/vars
 PATCH  /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 DELETE /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 ```
+
+**Required permission:** platform `admin` to write. The `GET` is subject to the
+same reach rule as the list above, and answers **`404`** rather than `403` on a
+set you cannot see -- a distinguishable `403` would still let you learn which
+variable sets exist by walking ids. It is the read that discloses most: every
+`key` and every `sensitive` flag in the set. Values are masked for a sensitive
+variable regardless.
 
 A variable-set variable carries the same attributes as a workspace variable —
 `key`, `value`, `category`, `hcl`, `sensitive`, `value-source`, `description` —
