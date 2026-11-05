@@ -9,6 +9,33 @@
     "post_plan_awaiting_decision",
     "post_plan_running"
   ],
+  "run.reported_natively": [
+    "applied",
+    "applying",
+    "canceled",
+    "canceling",
+    "configuring",
+    "confirmed",
+    "discarded",
+    "errored",
+    "pending",
+    "planned",
+    "planning",
+    "queued"
+  ],
+  "run.reported_to_the_cli": [
+    "applied",
+    "apply_queued",
+    "applying",
+    "canceled",
+    "confirmed",
+    "discarded",
+    "errored",
+    "pending",
+    "plan_queued",
+    "planned",
+    "planning"
+  ],
   "run.stored": [
     "applied",
     "applying",

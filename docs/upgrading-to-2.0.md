@@ -1238,3 +1238,49 @@ can read a workspace they feed. If you rely on a non-admin seeing a set that is
 assigned to nothing, assign it, make it global, or give that principal `audit`.
 The admin variable-sets page in the UI is already admin-gated, so it is
 unaffected.
+
+### A run's status on `/api/tfe/v2` is always one `go-tfe` defines
+
+**Affects:** anything branching on `status` from the **TFE-compatible** surface —
+`go-tfe`-based automation, `tfci`, a script reading `/api/tfe/v2/runs/{id}`. The
+native `/api/v1` surface is **unchanged** and still reports Terrapod's own
+vocabulary verbatim.
+
+Two statuses had been going out on that surface since the beginning and are not
+`tfe.RunStatus` values at all, so a client's `switch r.Status` fell through every
+case:
+
+| Terrapod status | reported on `/api/tfe/v2` before | and now |
+|---|---|---|
+| `queued` | `queued` (not a TFE status) | `plan_queued`, or `apply_queued` for a standalone configure |
+| `canceling` | `canceling` (not a TFE status) | `applying` |
+
+`canceling` folds to `applying` rather than to the terminal `canceled`
+deliberately. A client that reads `canceled` concludes the run is finished while
+its Job is still winding down and its state upload has not happened;
+`VALID_TRANSITIONS` reaches `canceling` only from `confirmed`, `applying` and
+`configuring` — never from `planning` — so a canceling run is always apply-side,
+and `applying` is both parseable and true until it reaches `canceled` for real.
+
+`queued` folds by phase because Terrapod's `queued` means "waiting for a runner
+to claim it", and the dispatcher claims an ordinary run as a plan and a
+standalone configure as a configure. That is the same reading that already folds
+`configuring` to `applying`.
+
+**It reaches go-terrapod, and through it the provider, MCP and
+terrapod-migrate**, because `go-terrapod` reads a run from `/api/v2/runs/{id}` —
+the TFE alias — rather than from the native surface. That is pre-existing and
+not new with this change: it has always received the folded vocabulary, which is
+why a `configuring` run has always arrived there as `applying`. `Run.Status` is
+a bare `string` with no constant set, so nothing in the SDK needed changing, and
+nothing in the provider or MCP compares the literal. A third party importing
+go-terrapod and matching `"queued"` will need to match `"plan_queued"`.
+
+**What to do:** nothing, if you read the native surface or use the `terraform` /
+`tofu` CLI — the CLI could not interpret the old values either, so this can only
+improve what it does. If you have automation that matches the literal strings
+`queued` or `canceling` **against `/api/tfe/v2`**, point it at `/api/v1`, which
+reports the stored status and always did, or match the new values. A fold is now
+enforced in both directions by `test_run_status_contract.py`: every status the
+TFE surface reports must be one `go-tfe` defines, and the native surface must
+report the stored status verbatim.

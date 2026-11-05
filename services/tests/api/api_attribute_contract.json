@@ -1186,6 +1186,10 @@
     "key",
     "value"
   ],
+  "tfe_v2.organization_capacity": [
+    "pending",
+    "running"
+  ],
   "tfe_v2.organization_entitlements": [
     "agents",
     "audit-logging",

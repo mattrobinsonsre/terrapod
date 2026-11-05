@@ -101,6 +101,7 @@ from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.remote_state_access import consumer_grant_id
 from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
+    fetch_custom_roles,
     resolve_workspace_capabilities_for,
 )
 from terrapod.services.workspace_settings import (
@@ -533,6 +534,137 @@ async def organization_entitlements(
                     "user-limit": 0,
                     "vcs-integrations": True,
                 },
+            }
+        },
+        headers=_tfe_headers(),
+    )
+
+
+# ── Organization run queue + capacity (#2378) ────────────────────────────────
+#
+# `docs/tfe-cli-surface.md` catalogued both of these as in-scope and neither was
+# served. A 404 from either is FATAL upstream, not cosmetic: `waitForRun` does
+# `return r, generalError("Failed to retrieve queue", err)`, so the plan or
+# apply aborts rather than losing a "position in queue" message.
+#
+# **And it was reachable, which the issue first said it was not.** `confirmed`
+# is a real `tfe.RunStatus`, so Terrapod reports it verbatim, and `waitForRun`
+# returns early only on a status that is neither `pending` NOR `confirmed`. So
+# right after `Runs.Apply` the CLI waits `backoffMin` = 1.000s, reads the run,
+# and if it is still `confirmed` walks into the queue-position block. Measured
+# on a single-node dev stack: confirm -> `applying` took 0.305s and 0.555s, so
+# `tofu apply` worked by a ~450ms margin; with the listener scaled to zero the
+# run held in `confirmed` for the whole 20s observation window, and there the
+# apply aborts. A loaded deployment, a reconnecting listener or a cold pool is
+# all it takes.
+
+
+def _queue_item_json(run: Run, position: int, *, engine: str) -> dict:
+    """One `runs` resource in the queue document, carrying its position.
+
+    `position-in-queue` is the whole point of the route: `waitForRun` reads it
+    off ITS OWN run in this list and then subtracts capacity's `running` from
+    it. Omit the attribute and `position` stays 0, `ReadCapacity` is never
+    called, and the CLI prints "waiting for the operation to start" instead of
+    the queue position -- so the route would be served and do nothing.
+
+    Deliberately NOT added to `_run_json` for every run. `tfe.Run` defines the
+    attribute, but a run read through `GET /runs/{id}` has no position to
+    report, and emitting a hardcoded 0 there while this list says 3 would be
+    two answers to one question.
+    """
+    from terrapod.api.routers.runs import _run_json
+
+    document = _run_json(run, engine=engine, tfe=True)
+    document["data"]["attributes"]["position-in-queue"] = position
+    return document["data"]
+
+
+@router.get("/organizations/default/runs/queue")
+async def organization_run_queue(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The deployment's run queue, as `Organizations.ReadRunQueue` reads it.
+
+    **Which runs are LISTED is filtered by reach; the POSITIONS are not.** A run
+    appears only if the caller holds `run:read` on its workspace, matching
+    `GET /workspaces/{id}/runs` -- a cross-workspace run list is otherwise an
+    inventory of what every team is running. But `position-in-queue` is computed
+    over the whole queue, because it is the number the feature exists to produce
+    and a position counted over the caller's visible slice understates the wait
+    it is reporting. The disclosure that buys is an integer, not an identity, and
+    the only run whose position the CLI reads is the caller's own -- which they
+    can always see, having created it.
+
+    Oldest first: a queue is served in the order it was joined, which is the
+    opposite of every other run listing here.
+    """
+    queue = await run_service.organization_run_queue(db)
+
+    preloaded = await fetch_custom_roles(db, user.roles)
+    token_preloaded = await fetch_custom_roles(db, user.pinned_roles or [])
+    # One workspace load per DISTINCT workspace, answering both questions it is
+    # needed for -- may the caller read this run, and which engine does
+    # `_run_json` serialise it as (required with no default, #1536). The queue is
+    # small by nature, but a queue of fifty runs on one workspace must not be
+    # fifty lookups, and resolving capabilities per run is the O(fleet) shape
+    # #1056 forbids.
+    seen: dict[uuid.UUID, tuple[bool, str]] = {}
+    items = []
+    for run, position in queue:
+        if run.workspace_id not in seen:
+            ws = await db.get(Workspace, run.workspace_id)
+            caps = (
+                await resolve_workspace_capabilities_for(
+                    db,
+                    user,
+                    ws,
+                    preloaded_roles=preloaded,
+                    token_preloaded_roles=token_preloaded,
+                )
+                if ws is not None
+                else frozenset()
+            )
+            seen[run.workspace_id] = (
+                has_capability(caps, cap.RUN_READ),
+                (getattr(ws, "engine", None) or TERRAFORM) if ws is not None else TERRAFORM,
+            )
+        may_read, engine = seen[run.workspace_id]
+        if not may_read:
+            continue
+        items.append(_queue_item_json(run, position, engine=engine))
+
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta}, headers=_tfe_headers())
+
+
+@router.get("/organizations/default/capacity")
+async def organization_capacity(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """How many Terraform runs are waiting and running, deployment-wide.
+
+    `Organizations.ReadCapacity`. The cloud backend reaches it only once it has
+    found the caller's own run in the queue with a positive position, and then
+    displays `position - running` -- so this has to describe the same population
+    the positions were computed over: the same engine filter, and not filtered
+    by who is asking. Two integers about load, carrying no identity.
+
+    `pending` is `WAITING_STATES`, which includes a run whose configuration
+    version is still uploading; `running` is `EXECUTING_STATES`. The id is the
+    organization name, which is what `Capacity.Organization` -- the jsonapi
+    `primary` field -- means.
+    """
+    pending, running = await run_service.organization_run_capacity(db)
+    return JSONResponse(
+        content={
+            "data": {
+                "id": DEFAULT_ORG,
+                "type": "organization-capacity",
+                "attributes": {"pending": pending, "running": running},
             }
         },
         headers=_tfe_headers(),

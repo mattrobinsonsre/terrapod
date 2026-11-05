@@ -88,7 +88,10 @@ class TestRunCreation:
         run = await _create_run(client, ws_id)
         assert run["type"] == "runs"
         assert run["id"].startswith("run-")
-        assert run["attributes"]["status"] in ("pending", "queued")
+        # The TFE vocabulary, because `RUNS_ENDPOINT` is the TFE surface: a run
+        # waiting for a runner reports `plan_queued` there, not Terrapod's own
+        # `queued`, which is not a `tfe.RunStatus` at all (#2378).
+        assert run["attributes"]["status"] in ("pending", "plan_queued")
 
     async def test_create_plan_only_run(self, app, client):
         set_auth(app, admin_user())

@@ -396,6 +396,14 @@ jobs:
       - name: (docs-audit) the CLI surface catalogue is covered
         run: python3 scripts/docs-audit/check_cli_surface_covered.py
 
+      # And the catalogue is held to the SERVER, which is a different question
+      # from whether a section is exercised. #2378: both organization run-queue
+      # routes were catalogued as in-scope citing exact OpenTofu call sites, and
+      # neither was served -- a 404 the CLI turns into a fatal aborted apply. The
+      # route contract pins the routes that exist, not the ones we promised.
+      - name: (docs-audit) every catalogued CLI route is served
+        run: python3 scripts/docs-audit/check_cli_surface_served.py
+
       # An image we mirror, then pull from the registry we mirrored it away
       # from, is the mirror paying its cost and buying nothing -- and a
       # successful upstream pull is indistinguishable from a successful mirror

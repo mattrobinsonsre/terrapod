@@ -231,8 +231,16 @@ async def _push_state_version(client, ws_id: str, *, serial: int) -> None:
 
 
 async def _get_run(client, run_id: str) -> dict:
-    """Get a run by ID, return data dict."""
-    resp = await client.get(f"/api/v2/runs/{run_id}", headers=AUTH)
+    """Get a run by ID, return data dict.
+
+    The NATIVE surface, deliberately. Every assertion in this file is about the
+    state machine and the dispatcher -- what the row says -- and `/api/v1`
+    reports the stored status verbatim. The TFE surface folds a status it cannot
+    represent (`queued` -> `plan_queued`, #2378), so reading it here would
+    couple state-machine tests to a compatibility concern they have no opinion
+    about. The fold has its own gate in `tests/api/test_run_status_contract.py`.
+    """
+    resp = await client.get(f"/api/v1/runs/{run_id}", headers=AUTH)
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]
 
