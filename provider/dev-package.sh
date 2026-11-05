@@ -11,9 +11,25 @@ KEY_ID='Terrapod local dev provider <dev@terrapod.local>'
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
+# A released base version, which may carry a pre-release: `2.0.0` or
+# `2.0.0-alpha.1`. The alpha form is not hypothetical -- the Tiltfile derives the
+# dev provider version from the newest `v[0-9]*` tag, so the day `v2.0.0-alpha.1`
+# was published the whole LOCAL DEV STACK stopped starting: `dev-package.sh`
+# refused the version, the Tiltfile could not evaluate, and Tilt therefore built
+# nothing at all while the already-running API went on answering 200 -- which
+# reads as a wedged stack rather than as a version-string refusal.
+BASE_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+#: And the version this script DERIVES from it. A plain base gains a `-dev.N`
+#: pre-release; a base that already has one gains `.dev.N` INSIDE it, so there is
+#: ever only one pre-release section. `2.0.0-alpha.1-dev.7` would be legal semver
+#: by the letter -- a hyphen is allowed inside a pre-release identifier -- and is
+#: ambiguous to read and sorts oddly, where `2.0.0-alpha.1.dev.7` plainly follows
+#: `2.0.0-alpha.1`.
+DEV_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z.-]+\.)?dev\.[0-9]+$'
+
 artifact_version() {
   local base=$1 digest suffix
-  [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Expected numeric base version, got: $base"
+  [[ "$base" =~ $BASE_VERSION_RE ]] || die "Expected a semver base version, got: $base"
   digest=$(
     cd "$REPO_DIR"
     git ls-files --cached --others --exclude-standard -z -- \
@@ -22,7 +38,12 @@ artifact_version() {
       | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum
   )
   suffix=$((16#${digest:0:10}))
-  printf '%s-dev.%s\n' "$base" "$suffix"
+  # Extend the existing pre-release rather than starting a second one.
+  if [[ "$base" == *-* ]]; then
+    printf '%s.dev.%s\n' "$base" "$suffix"
+  else
+    printf '%s-dev.%s\n' "$base" "$suffix"
+  fi
 }
 
 ensure_key() {
@@ -59,7 +80,7 @@ ensure_key() {
 
 bundle() {
   local version=$1 binary=$2 output="$STORE/artifacts/$1" staging inner archive sums sig
-  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || die "Invalid dev version: $version"
+  [[ "$version" =~ $DEV_VERSION_RE ]] || die "Invalid dev version: $version"
   test -s "$binary" || die "Provider binary missing: $binary"
   ensure_key
   inner="terraform-provider-terrapod_v$version"
@@ -95,7 +116,7 @@ bundle() {
 generate_test_module() {
   local version source output file staging
   version=$(<"$STORE/current-version")
-  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] \
+  [[ "$version" =~ $DEV_VERSION_RE ]] \
     || die "Invalid current dev provider version: $version"
   source="$PROVIDER_DIR/examples/modules/terrapod_self_contained/main.tf"
   output="$STORE/terrapod_self_contained-test"
