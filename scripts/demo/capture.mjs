@@ -69,6 +69,35 @@ const wanted = (name) => !ONLY || ONLY.has(name)
 // the downscale argument an earlier version of this comment made.
 const VIEWPORT = { width: 1440, height: 900 }
 
+/**
+ * Refuse to publish a shot whose callback never navigated (#2334).
+ *
+ * A `shot` callback that cannot find what it needs returns early. Some say so
+ * (`admin-agent-pool-detail` logs and sets `exitCode`); one did not, and a bare
+ * `if (!ws) return` leaves the browser on the PREVIOUS shot's page -- so the
+ * driver screenshots that page under this shot's name, and `assertClean` passes
+ * because the previous page is perfectly substantive.
+ *
+ * That is the limit of the substance guard, stated plainly: it catches EMPTY,
+ * not WRONG. This closes the specific reachable path by comparing the URL
+ * across the callback, which is derived rather than relying on each callback
+ * remembering to announce itself -- the next silent return is covered too.
+ *
+ * A shot that deliberately captures the page it is already on would trip this;
+ * none does today, and one that wanted to should navigate to its own URL
+ * explicitly rather than inherit whatever ran before it.
+ */
+const navigated = async (page, name, before) => {
+  const after = page.url()
+  if (after !== before) return true
+  console.error(
+    `  ! ${name}: the callback did not navigate (still ${after}) -- it returned ` +
+      'early, and shooting now would publish the previous page under this name'
+  )
+  process.exitCode = 1
+  return false
+}
+
 const shots = []
 // A separate list because it is a separate browser context, and because the two
 // answer different questions: the desktop set shows what the product does, this
@@ -476,7 +505,11 @@ shot('workspace-runs', async (page) => {
   // `workspace-runs-populated`. A docs page explaining the runs tab wants both,
   // and `checkout-staging` is seeded with `run: None` precisely so one exists.
   const ws = await byName(page, 'checkout-staging-eu-west-1')
-  if (!ws) return
+  if (!ws) {
+    console.error('  ! checkout-staging-eu-west-1 is not seeded — re-run seed.py')
+    process.exitCode = 1
+    return
+  }
   await page.goto(`${BASE}/workspaces/${ws}?tab=runs`)
   await settle(page, 'main')
 })
@@ -535,14 +568,22 @@ shot('impact-graph', async (page, ws, run) => {
 
 shot('workspace-inventory', async (page) => {
   const ws = await byName(page, 'fleet-config-prod-eu-west-1')
-  if (!ws) return
+  if (!ws) {
+    console.error('  ! fleet-config-prod-eu-west-1 is not seeded — re-run seed.py')
+    process.exitCode = 1
+    return
+  }
   await page.goto(`${BASE}/workspaces/${ws}?tab=inventory`)
   await settle(page, 'main')
 })
 
 shot('workspace-pulumi', async (page) => {
   const ws = await byName(page, 'edge-cdn::prod')
-  if (!ws) return
+  if (!ws) {
+    console.error('  ! edge-cdn::prod is not seeded — re-run seed.py')
+    process.exitCode = 1
+    return
+  }
   await page.goto(`${BASE}/workspaces/${ws}`)
   await settle(page, 'main')
 })
@@ -652,7 +693,9 @@ const main = async () => {
     const anon = await anonCtx.newPage()
     for (const { name, fn } of anonShots) {
       if (!wanted(name)) continue
+      const beforeUrl = anon.url()
       await fn(anon)
+      if (!(await navigated(anon, name, beforeUrl))) continue
       if (!(await assertClean(anon, name))) continue
       const file = path.join(OUT, `${name}.png`)
       await anon.screenshot({ path: file, clip: { x: 0, y: 0, ...VIEWPORT } })
@@ -689,7 +732,9 @@ const main = async () => {
 
   for (const { name, fn } of shots) {
     if (!wanted(name)) continue
+    const beforeUrl = page.url()
     await fn(page, ws, run)
+    if (!(await navigated(page, name, beforeUrl))) continue
     if (!(await assertClean(page, name))) continue
     const file = path.join(OUT, `${name}.png`)
     // THE VIEWPORT. Not the page, not an element, and not the content height.
@@ -735,7 +780,9 @@ const main = async () => {
 
   for (const { name, fn } of phoneShots) {
     if (!wanted(name)) continue
+    const beforeUrl = phone.url()
     await fn(phone, ws, run)
+    if (!(await navigated(phone, name, beforeUrl))) continue
     if (!(await assertClean(phone, name))) continue
 
     // The claim these images make is that nothing overflows at this width.
