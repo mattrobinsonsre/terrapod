@@ -134,7 +134,7 @@ api:
   config:
     registry:
       platform_tools:
-        checkov_version: "3.3.30"
+        checkov_version: "3.4.3"
         trivy_version: "0.76.1"
 ```
 

@@ -40,6 +40,14 @@ export const WORKSPACE_STATUSES: ReadonlyArray<WorkspaceStatusDef> = [
   { filter: 'needs-confirm', label: 'Needs Confirm', color: 'amber', dot: 'bg-amber-400', priority: 3 },
   { filter: 'planning', label: 'Planning', color: 'blue', dot: 'bg-indigo-400', priority: 4 },
   { filter: 'applying', label: 'Applying', color: 'blue', dot: 'bg-indigo-400', priority: 4 },
+  // Active execution, same band and same colour as `applying`. The run-detail
+  // page distinguishes the two (both yellow there, each with its own `since`
+  // key) because you are looking at one run's phases; here the column answers
+  // "what is this workspace doing", and "executing" is the signal. Without
+  // this entry `resolveStatus` returned null for a configuring run, so the
+  // STATUS column showed a bare em-dash -- indistinguishable from "never
+  // planned" -- and `status:configuring` matched nothing in the filter.
+  { filter: 'configuring', label: 'Configuring', color: 'blue', dot: 'bg-indigo-400', priority: 4 },
   { filter: 'canceling', label: 'Canceling', color: 'amber', dot: 'bg-amber-400', priority: 4 },
   { filter: 'confirmed', label: 'Confirmed', color: 'blue', dot: 'bg-indigo-400', priority: 4 },
   { filter: 'queued', label: 'Queued', color: 'blue', dot: 'bg-indigo-400', priority: 4 },

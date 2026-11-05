@@ -20,7 +20,7 @@
 # site too, or the mirror copy sits unused.
 
 # The Ansible execution-environment matrix (#2154) builds each ansible-core line
-# on the newest python that line declares, which spans 3.10 to 3.14. Mirrored for
+# on the newest python that line declares, which spans 3.10 to 3.15. Mirrored for
 # the same two reasons as the rest of this list: CI does not then depend on Docker
 # Hub being reachable, and the daily sync is the security path that moves a base
 # which is rebuilt in place.
@@ -29,6 +29,7 @@ python:3.11-slim
 python:3.12-slim
 python:3.13-slim
 python:3.14-slim
+python:3.15-slim
 node:26-alpine
 node:24-alpine
 postgres:16-alpine
