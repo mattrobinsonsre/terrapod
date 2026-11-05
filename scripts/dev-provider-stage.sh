@@ -3,11 +3,29 @@
 set -euo pipefail
 
 VERSION=${1:?usage: dev-provider-stage.sh <version>}
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || exit 2
+# A FOURTH copy of the same version-shape regex lived here, in another
+# directory, and it refused `2.0.0-alpha.1.dev.N` after `dev-package.sh` learned
+# to derive one -- so the dev stack still would not come up, now failing a step
+# further along. It also said nothing at all: a bare `|| exit 2` gave Tilt
+# "exit status 2" and no reason, which is most of why it cost a diagnosis round.
+#
+# Loose on purpose now. The authoritative check is the comparison against
+# `current-version` below, which is the value `dev-package.sh` actually produced
+# -- strictly stronger than any pattern -- so this only has to refuse something
+# unsafe to interpolate into a path.
+if [[ ! "$VERSION" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
+  printf 'Refusing a version that is not safe as a path component: %s\n' "$VERSION" >&2
+  exit 2
+fi
 ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 STORE="$ROOT/provider/.dev-build"
 KEY_HOME="$HOME/.local/share/terrapod/certs/provider-gnupg"
-test "$(< "$STORE/current-version")" = "$VERSION"
+# The real gate: this must be the artifact `dev-package.sh` just built.
+if [[ "$(< "$STORE/current-version")" != "$VERSION" ]]; then
+  printf 'Staged version %s does not match the built one %s\n' \
+    "$VERSION" "$(< "$STORE/current-version")" >&2
+  exit 2
+fi
 case "$(uname -m)" in
   x86_64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
