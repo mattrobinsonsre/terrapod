@@ -190,6 +190,56 @@ def discovery(ctx: Ctx) -> None:
             raise Fail(f"login.v1 carries no {field!r}: {sorted(login)}")
 
 
+@check("Discovery / Auth", "the organization run queue and capacity answer")
+def run_queue_and_capacity(ctx: Ctx) -> None:
+    """Both were catalogued as in-scope and neither was served (#2378).
+
+    A 404 from either is FATAL upstream, not cosmetic: `waitForRun` does
+    `return r, generalError("Failed to retrieve queue", err)`, so the plan or
+    apply aborts. And it is reachable -- `confirmed` is a real `tfe.RunStatus`,
+    reported verbatim, and `waitForRun` returns early only on a status that is
+    neither `pending` nor `confirmed`, so an apply not claimed within
+    `backoffMin` = 1.000s walks straight into it.
+
+    Asserted through the API rather than by driving `tofu`, deliberately. The
+    CLI reaches the queue block only while a run is still `confirmed`, which on
+    a responsive stack lasts a few hundred milliseconds -- a check that raced
+    that would fail for timing reasons and teach everyone to re-run it. What is
+    deterministic, and what actually broke, is that the two endpoints exist and
+    carry the shapes `go-tfe` unmarshals.
+    """
+    code, body = ctx.api("GET", "/api/tfe/v2/organizations/default/runs/queue")
+    if code != 200:
+        raise Fail(f"the run queue answered {code}: {body}")
+    if not isinstance(body.get("data"), list):
+        raise Fail(f"the run queue is not a collection: {sorted(body)}")
+    # `rq.CurrentPage >= rq.TotalPages` is what ends go-tfe's paging loop, and
+    # it sends no page params on the first call -- so one page is what keeps the
+    # loop terminating without a `next-page` key Terrapod does not emit.
+    page = (body.get("meta") or {}).get("pagination") or {}
+    if page.get("total-pages") not in (0, 1):
+        raise Fail(f"the unpaged queue reports total-pages={page.get('total-pages')!r}")
+    for item in body["data"]:
+        attrs = item.get("attributes") or {}
+        if not isinstance(attrs.get("position-in-queue"), int):
+            raise Fail(
+                "a queue item carries no integer `position-in-queue`; without it "
+                "`waitForRun` leaves position at 0, never calls ReadCapacity, and "
+                f"prints nothing about the queue: {sorted(attrs)}"
+            )
+
+    code, body = ctx.api("GET", "/api/tfe/v2/organizations/default/capacity")
+    if code != 200:
+        raise Fail(f"capacity answered {code}: {body}")
+    data = body.get("data") or {}
+    if data.get("type") != "organization-capacity":
+        raise Fail(f"capacity type is {data.get('type')!r}, which go-tfe will not match")
+    attrs = data.get("attributes") or {}
+    for field in ("pending", "running"):
+        if not isinstance(attrs.get(field), int):
+            raise Fail(f"capacity `{field}` is {attrs.get(field)!r}, and tfe.Capacity wants an int")
+
+
 # ── The cloud-block lifecycle ───────────────────────────────────────────
 #
 # `terraform_data` throughout, deliberately. It is a BUILT-IN managed resource,

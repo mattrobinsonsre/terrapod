@@ -227,7 +227,38 @@ async def _engine_of(run: Run, db: AsyncSession) -> str:
 #: `structured`/`hcl` one from #1435 -- the honest name internally, the
 #: compatible name on the frozen surface, folded at ONE boundary -- so it needs
 #: no new precedent and should gain entries rather than a second mechanism.
-_TFE_STATUS_FOLD: dict[str, str] = {"configuring": "applying"}
+#:
+#: `canceling` and `queued` joined it in #2378, and they had been going out
+#: VERBATIM since the beginning -- neither is a `tfe.RunStatus`, so a `go-tfe`
+#: client's `switch r.Status` fell through every case. Measured over the stored
+#: vocabulary: of twelve statuses these were the only two the CLI could not
+#: parse. `test_the_cli_is_only_shown_statuses_it_knows` exists to catch exactly
+#: that and could not, because it asserted over the three post-plan hold
+#: statuses rather than over the status a run actually reports; #2378 widened it.
+#:
+#: **`canceling` folds to `applying`, not to `canceled`.** The survey proposed
+#: the terminal word, and it would be a lie in the dangerous direction: a client
+#: that reads `canceled` concludes the run is finished while its Job is still
+#: winding down and its state upload has not happened. `VALID_TRANSITIONS`
+#: reaches `canceling` only from `confirmed`, `applying` and `configuring` --
+#: never from `planning` -- so a canceling run is always apply-side, and
+#: `applying` is both parseable and true until it reaches `canceled` for real.
+#:
+#: **`queued` folds by PHASE, which is why this is no longer a bare dict
+#: lookup.** Terrapod's `queued` is "waiting for a runner to claim it", and the
+#: dispatcher claims it as a plan for an ordinary run and as a configure for a
+#: standalone one. `plan_queued` is the honest TFE word for the first;
+#: `apply_queued` for the second, because a configure mutates hosts and is
+#: queued for something apply-shaped, which is the same reading that already
+#: folds `configuring` to `applying`.
+_TFE_STATUS_FOLD: dict[str, str] = {
+    "configuring": "applying",
+    "canceling": "applying",
+    "queued": "plan_queued",
+}
+
+#: The fold `queued` takes when the run is a configure and nothing else.
+_TFE_STANDALONE_CONFIGURE_QUEUED = "apply_queued"
 
 
 def _reported_run_status(run: Run, *, tfe: bool) -> str:
@@ -238,9 +269,11 @@ def _reported_run_status(run: Run, *, tfe: bool) -> str:
     surfaces, and a test that only ever builds one of them passes whichever way
     the fold is written.
     """
-    if tfe:
-        return _TFE_STATUS_FOLD.get(run.status, run.status)
-    return run.status
+    if not tfe:
+        return run.status
+    if run.status == "queued" and run_service.is_standalone_configure(run):
+        return _TFE_STANDALONE_CONFIGURE_QUEUED
+    return _TFE_STATUS_FOLD.get(run.status, run.status)
 
 
 def _run_variables(run: Run) -> list[dict[str, str]]:

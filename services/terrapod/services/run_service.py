@@ -412,6 +412,31 @@ def is_standalone_configure_sql(model) -> object:
 #: operators are running: if any path does request at `confirmed`, the tighter
 #: rule fails every apply on it, and the looser one closes the finding just as
 #: completely. A security fix must not cost a supported line its functionality.
+#: The runs the deployment's queue is made of: waiting to be claimed, and being
+#: worked on. Terraform Enterprise's organization run queue and capacity are
+#: reported from these (#2378).
+#:
+#: `WAITING_STATES` is the pair `claim_next_run` selects a NEW run on --
+#: `queued` for a plan or a standalone configure, `confirmed` for an apply --
+#: plus `pending`, which is a run created against a configuration version that
+#: has not finished uploading, so it is waiting for something even earlier. The
+#: claim loop's fourth tuple claims a composite's configure out of `applying`,
+#: which is NOT waiting: a runner is already working that run, which is why
+#: `applying` belongs below and not here.
+#:
+#: Kept beside the transition table for the same reason
+#: `LIVE_STATES_FOR_PHASE` is, and pinned against the claim loop by
+#: `test_queue_states_match_the_dispatcher`: a new waiting state added to the
+#: dispatcher and not here would leave the queue silently short of the runs it
+#: exists to report.
+WAITING_STATES: frozenset[str] = frozenset({"pending", "queued", "confirmed"})
+
+#: And the states in which a runner is executing the run. `canceling` counts:
+#: the Job is still winding down, and it is reached only from the apply side
+#: (`confirmed`, `applying`, `configuring`), never from `planning`.
+EXECUTING_STATES: frozenset[str] = frozenset({"planning", "applying", "configuring", "canceling"})
+
+
 LIVE_STATES_FOR_PHASE: dict[str, frozenset[str]] = {
     "plan": frozenset({"planning"}),
     "apply": frozenset({"confirmed", "applying"}),
@@ -3302,6 +3327,65 @@ async def list_workspace_runs(
         .limit(page_size)
     )
     return list(result.scalars().all())
+
+
+async def organization_run_queue(db: AsyncSession) -> list[tuple[Run, int]]:
+    """Every Terraform run waiting for a runner, oldest first, with its position.
+
+    Terraform Enterprise's organization run queue (#2378), which the
+    `terraform`/`tofu` cloud backend reads to tell a waiting practitioner how
+    far down the queue their run is.
+
+    **Oldest first, because the position is the point.** Every other run listing
+    in Terrapod is newest-first -- that is what a person reading history wants --
+    and this one is the opposite: a queue is served in the order it was joined,
+    so position 1 is the run that has been waiting longest.
+
+    **Terraform only**, via the shared `engine_filter`. The queue document is
+    serialised with the TFE run vocabulary, and a Pulumi or Ansible run's status
+    is not a value `go-tfe` can switch on (#1905) -- so letting one in would
+    hand a `terraform` CLI a status it cannot parse, which is the defect that
+    filter exists to prevent.
+
+    The position is over the WHOLE queue, not the caller's visible slice: it is
+    the number the feature exists to produce, and a position computed over a
+    filtered list understates the wait. The route filters which runs it *lists*;
+    see `tfe_v2.organization_run_queue` for that half.
+    """
+    from terrapod.api.engine_scope import engine_filter
+
+    result = await db.execute(
+        select(Run)
+        .where(Run.status.in_(sorted(WAITING_STATES)), engine_filter(Run))
+        .order_by(Run.created_at.asc(), Run.id.asc())
+    )
+    return [(run, i) for i, run in enumerate(result.scalars().all(), start=1)]
+
+
+async def organization_run_capacity(db: AsyncSession) -> tuple[int, int]:
+    """`(pending, running)` Terraform runs across the deployment (#2378).
+
+    Terraform Enterprise's organization capacity. The cloud backend subtracts
+    `running` from a run's queue position to say how many runs are ahead of it,
+    so the two numbers have to describe the same population as
+    `organization_run_queue` -- same engine filter, and both unfiltered by who
+    is asking, because a count is what makes the figure true and it carries no
+    identities.
+
+    Counted in SQL rather than by loading the rows: `pending` is bounded by what
+    is actually waiting, but there is no reason to materialise it to count it.
+    """
+    from terrapod.api.engine_scope import engine_filter
+
+    async def _count(states: frozenset[str]) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Run)
+            .where(Run.status.in_(sorted(states)), engine_filter(Run))
+        )
+        return int(result.scalar_one())
+
+    return await _count(WAITING_STATES), await _count(EXECUTING_STATES)
 
 
 async def count_workspace_runs(db: AsyncSession, workspace_id: uuid.UUID) -> int:

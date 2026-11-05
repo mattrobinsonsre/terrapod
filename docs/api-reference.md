@@ -250,6 +250,64 @@ GET /api/tfe/v2/organizations/default/entitlement-set
 
 Returns feature flags (all enabled for Terrapod).
 
+<a id="run-queue-and-capacity"></a>
+
+### Run Queue and Capacity
+
+```
+GET /api/tfe/v2/organizations/default/runs/queue
+GET /api/tfe/v2/organizations/default/capacity
+```
+
+TFE-compatible only, and **not mounted natively** — a native path would carry an
+`organizations/default` segment, which Terrapod does not have (single
+organization, [architecture principle 9](architecture.md#why-a-single-organization)).
+
+The `terraform`/`tofu` cloud backend reads these while a run is waiting, to tell
+the practitioner how far down the queue it is. A 404 from either is **fatal**:
+`waitForRun` turns the error into `Failed to retrieve queue` and the plan or
+apply aborts rather than losing a status message.
+
+**The queue** is every Terraform run waiting for a runner — `pending` (its
+configuration version is still uploading), `queued` (waiting to be claimed for a
+plan or a standalone configure) and `confirmed` (waiting to be claimed for an
+apply) — **oldest first**, which is the opposite of every other run listing here.
+A queue is served in the order it was joined, so position 1 is the run that has
+been waiting longest. Each item is a `runs` resource carrying the usual
+attributes plus:
+
+| Attribute | Meaning |
+|---|---|
+| `position-in-queue` | 1-based position in the **whole** queue |
+
+**Which runs are listed is filtered by `run:read`; the positions are not.** A run
+appears only if you can read its workspace — a cross-workspace run list is
+otherwise an inventory of what every team is running — but `position-in-queue` is
+counted over the entire queue, because a position counted over your visible slice
+would understate the wait it is reporting. The only run whose position the CLI
+reads is your own, which you can always see.
+
+**Capacity** reports two integers and is deliberately **not** filtered by who is
+asking, for the same reason: the CLI subtracts `running` from a queue position, so
+both numbers have to describe the same population.
+
+```json
+{
+  "data": {
+    "type": "organization-capacity",
+    "id": "default",
+    "attributes": { "pending": 4, "running": 2 }
+  }
+}
+```
+
+`pending` is the queue above; `running` is the runs a runner is executing
+(`planning`, `applying`, `configuring`, and `canceling` — whose Job is still
+winding down). Both count **Terraform runs only**, matching the queue: a Pulumi
+or Ansible run's status is not a value `go-tfe` can parse, so neither reaches
+this surface. An operator wanting true runner occupancy across every engine
+should read the metrics, not this route.
+
 ---
 
 ## Workspaces

@@ -31,13 +31,34 @@ The discovery document points at:
 | GET | `/api/tfe/v2/account/details` | `Account.Read` | `go-tfe` startup |
 | GET | `/api/tfe/v2/organizations/default` | `Organizations.Read` | cloud backend init |
 | GET | `/api/tfe/v2/organizations/default/entitlement-set` | `Organizations.ReadEntitlements` | `cloud/backend.go:349`, `remote/backend.go:362` |
-| GET | `/api/tfe/v2/organizations/default/runs/queue` | `Organizations.ReadRunQueue` | `cloud/backend_common.go:170`, `remote/backend_common.go:172` (run-status display) — **NOT SERVED, see #2378** |
-| GET | `/api/tfe/v2/organizations/default/capacity` | `Organizations.ReadCapacity` | `cloud/backend_common.go:193`, `remote/backend_common.go:195` — **NOT SERVED, see #2378** |
+| GET | `/api/tfe/v2/organizations/default/runs/queue` | `Organizations.ReadRunQueue` | `cloud/backend_common.go:170`, `remote/backend_common.go:172` (run-status display) |
+| GET | `/api/tfe/v2/organizations/default/capacity` | `Organizations.ReadCapacity` | `cloud/backend_common.go:193`, `remote/backend_common.go:195` |
 
-> Those last two 404 today. They are unreachable rather than broken, because
-> `waitForRun` returns early unless the run is `pending`/`confirmed` and Terrapod
-> reports `queued` — so **adding them is a prerequisite for matching the run-status
-> vocabulary, not an independent tidy-up.** #2378 has the detail.
+> **Those last two were catalogued here and not served, and the earlier note
+> under them said they were unreachable. Both were wrong (#2378).** They now
+> work, and the correction is worth keeping because it is the kind of mistake
+> the catalogue invites.
+>
+> The note argued `waitForRun` returns early unless a run is `pending` or
+> `confirmed`, and that Terrapod reports `queued` — true of a **plan**, which is
+> `queued` from the moment it is created. But `confirmed` IS a `tfe.RunStatus`
+> and goes out verbatim, and an **apply** sits in it: right after `Runs.Apply`
+> the CLI waits `backoffMin` = 1.000s, reads the run, and if it is still
+> `confirmed` walks into the queue-position block. Measured on a single-node dev
+> stack, confirm → `applying` took 0.305s and 0.555s — so `tofu apply` worked by
+> a ~450ms margin — and with the listener scaled to zero the run held in
+> `confirmed` for the whole 20s observation window, where the apply aborts on
+> `Failed to retrieve queue`.
+>
+> The note also claimed these were a prerequisite for matching the run-status
+> vocabulary. They are not: `plan_queued` is neither `pending` nor `confirmed`,
+> so folding `queued` never reaches the queue block. The two were independent all
+> along, and the ordering constraint was imagined.
+>
+> `scripts/docs-audit/check_cli_surface_served.py` now holds this table to the
+> server in both directions — a row without a **NOT SERVED** marker must resolve
+> to a served route, and a row carrying one must not — so neither half of this
+> can go quiet again.
 
 ## Projects
 
