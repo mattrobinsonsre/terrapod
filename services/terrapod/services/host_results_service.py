@@ -28,6 +28,7 @@ somebody needs when a configure was killed.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -156,6 +157,21 @@ class _Partitioner:
         self._dir = tempfile.mkdtemp(prefix="tp-hostevents-", dir=_resolve_tmpdir())
         self._handles: dict[str, Any] = {}
         self._open_handles: OrderedDict[str, Any] = OrderedDict()
+        # Every handle this object opens is registered here the moment it is
+        # opened, so releasing them is one call rather than three hand-written
+        # loops that each had to remember the others. `cleanup` closes the
+        # stack; the LRU below and `flush` still close individual handles
+        # early, and closing an already-closed file is a no-op.
+        #
+        # This replaced a SIM115 suppression on the `open` below. The handle
+        # genuinely outlives that frame, so the noqa was honest -- but CodeQL
+        # reported it anyway (py/file-not-closed) and the dismissal did not
+        # survive the code moving: alert 550 was dismissed at line 162 and
+        # alert 558 appeared for the same construct twelve lines later. A
+        # suppression that has to be re-applied every time the file is edited
+        # is not a disposition, so the resource is handed to the stdlib's own
+        # mechanism for releasing a dynamic set of resources instead.
+        self._stack = contextlib.ExitStack()
 
     def add(self, host: str, raw: bytes) -> None:
         handle = self._handles.get(host)
@@ -171,7 +187,19 @@ class _Partitioner:
                 if handle is not None
                 else os.path.join(self._dir, f"{len(self._handles)}.jsonl")
             )
-            handle = open(path, "ab" if handle is not None else "wb")  # noqa: SIM115 -- closed on eviction or cleanup
+            # noqa because the handle outlives this frame by design: it is
+            # closed on LRU eviction above, in `flush`, or in `cleanup` -- and
+            # `cleanup` runs on every path because the only call site holds this
+            # object in a `with`. CodeQL's py/file-not-closed cannot see through
+            # the dict plus the context manager and reports it anyway (alert
+            # 558, dismissed); the property is pinned by
+            # `TestEveryHandleAndTheTempDirectoryAreReleased` in
+            # `tests/services/test_host_results_ingest.py`, which drives the
+            # real `ingest` with a failure AFTER the stream and asserts handles
+            # were opened and then all closed. Name the test rather than just
+            # asserting the property, so the next triage reads the proof
+            # instead of re-deriving it.
+            handle = self._stack.enter_context(open(path, "ab" if handle is not None else "wb"))
             self._handles[host] = handle
             self._open_handles[host] = handle
         else:
@@ -212,9 +240,15 @@ class _Partitioner:
         self.cleanup()
 
     def cleanup(self) -> None:
-        for handle in self._handles.values():
-            if not handle.closed:
-                handle.close()
+        """Release every handle and the temp directory, on every path.
+
+        The only call site holds this object in a `with`, so this runs whether
+        `ingest` returns or raises -- which is the property
+        `TestEveryHandleAndTheTempDirectoryAreReleased` pins by driving the real
+        `ingest` with a failure AFTER the stream and asserting that handles were
+        opened and then all closed.
+        """
+        self._stack.close()
         self._open_handles.clear()
         shutil.rmtree(self._dir, ignore_errors=True)
 
