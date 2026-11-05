@@ -973,6 +973,44 @@ kubectl create secret tls terrapod-tls \
 
 The Ingress routes all traffic to the web (Next.js) service. The web service proxies API calls internally. No special path-based routing is needed at the ingress level.
 
+### Your ingress MUST set `X-Forwarded-Proto`
+
+If it terminates TLS and talks plain HTTP to the pods — which is the ordinary
+arrangement — it has to say so in the header, or Terrapod hands clients URLs
+they cannot fetch.
+
+Terrapod returns **absolute** URLs in several places a client then follows on
+its own: the state-version `upload-url` and `download-url`, the plan
+`log-read-url`, the configuration-version upload target. Those are built from
+the request, so that an internal caller gets an internal URL and an external
+one gets an external URL. The scheme comes from `X-Forwarded-Proto`, and
+**falls back to the scheme of the connection the API pod actually saw** — which
+behind a TLS-terminating ingress is `http`.
+
+So an ingress that sets `X-Forwarded-Host` and omits `X-Forwarded-Proto` makes
+Terrapod publish `http://your-host/...` for a host that serves only HTTPS.
+
+**The symptom is a hang, not an error**, which is why this is worth stating
+rather than leaving to be discovered: `tofu` follows the URL it was given,
+connects to a port that is not serving plain HTTP, and waits. Nothing in the
+run log says the scheme was wrong, because from the server's point of view
+nothing was.
+
+The two common ingresses set it by default — ingress-nginx and Traefik both do —
+so this is a note about a hand-rolled proxy, an unusual ingress, or a service
+mesh in front of one. Check with:
+
+```zsh
+kubectl -n terrapod logs deploy/terrapod-api | grep -o 'http://[^"]*' | head
+```
+
+Any `http://` there, on a deployment you reach over HTTPS, is this.
+
+`X-Forwarded-Host` has the same shape and the same fallback chain (the bare
+`Host` header, then `api.config.auth.callback_base_url`), so a proxy that sets
+neither still works as long as `Host` carries a real hostname. It is the scheme
+that has no safe default.
+
 ---
 
 ## Encryption at Rest

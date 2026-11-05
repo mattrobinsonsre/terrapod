@@ -131,6 +131,19 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   control plane and let runners/listeners catch up later; the reverse (a newer
   runner against an older API) is also supported within the same window. This is
   what the frozen wire protocol above buys you.
+
+  **2.0 is the one exception, and it reverses the order: upgrade every listener
+  in every pool BEFORE the API.** Listener requests are signed from 2.0, with the
+  key the CA returns at join, and both authentication paths enforce it — the SSE
+  event stream included. A pre-2.0 listener does not sign, so it gets `401` on
+  every call, never connects, and **the pool dispatches nothing**: the symptom is
+  a pool that goes quiet. `api.config.agent_pools.require_listener_proof_of_possession: false`
+  turns the enforcement off for the duration of a staged upgrade;
+  [the 2.0 upgrade guide](upgrading-to-2.0.md) has the setting and the sequence.
+
+  This belongs on this page rather than only in that guide, because this page is
+  the skew contract — and read without the exception it says the opposite of what
+  2.0 needs ("upgrade the control plane and let listeners catch up later").
 - **runner ↔ listener:** normally not a pair that can skew, because both default to
   the chart's `appVersion` — but `runners.image.tag` and `listener.image.tag` are
   **independently settable**, so pinning one and not the other creates a skew the

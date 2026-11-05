@@ -750,11 +750,27 @@ join, binding it to one method, one path and a single-use nonce inside a 60-seco
 window. Both listener authentication paths enforce it, including the SSE event
 stream.
 
-**A listener image older than 2.0 does not sign, so it gets `401` on every call —
-including `renew`, which is not retried and falls back to the join token.** The
-effect is not a clean failure: the listener re-registers under a fresh name on
-every renewal cycle and churns pool membership. So either upgrade every listener
-in every pool before the API, or set:
+**A listener image older than 2.0 does not sign, so it gets `401` on every
+call — the SSE event stream included.** It therefore never connects, never
+claims a run, and the pool dispatches nothing. That is the failure to expect:
+the pool goes quiet, not noisy.
+
+It also does not fail cleanly, and the reason is in the 1.x code rather than in
+the API: a pre-2.0 listener could not tell a *rejected* certificate from a
+*transient* error, because `_renew` returned the same `None` for both. So a
+rejection retried for ever instead of surfacing. 2.0 splits them
+(`_CertRejected` against `_JoinTransient`) and that is what makes
+`on_cert_rejected` possible — but the listener holding the old code gets none of
+it.
+
+(This paragraph previously said `renew` "is not retried and falls back to the
+join token", and that the listener "re-registers under a fresh name on every
+renewal cycle and churns pool membership". Both halves were wrong, and wrong in
+the direction that sends an operator hunting churn when the real symptom is
+silence. `_CertRejected`'s own docstring records why: *"the documented fallback
+never happened and a rejected cert retried for ever."*)
+
+So either upgrade every listener in every pool before the API, or set:
 
 ```yaml
 api:
@@ -1284,3 +1300,27 @@ reports the stored status and always did, or match the new values. A fold is now
 enforced in both directions by `test_run_status_contract.py`: every status the
 TFE surface reports must be one `go-tfe` defines, and the native surface must
 report the stored status verbatim.
+
+### The UI's default theme is light, and dark is a source edit
+
+The web UI defaulted to dark through 1.x and **defaults to light from 2.0**
+(#2337). The dark theme is kept, not removed — but it is no longer what an
+operator gets by opening the page, and there is **no Helm value or config key
+that selects it**. The only way back is a source edit:
+
+```tsx
+// web/src/app/layout.tsx
+<html lang={locale} dir={dir} translate="no" className="dark">
+```
+
+That restores it exactly rather than approximately, which is a property of how
+the themes are built rather than a promise: the dark values are Tailwind's own
+plus the `brand` ramp and are declared nowhere, and light is a single
+`:root:not(.dark)` override that wins on specificity. So `class="dark"` takes
+the override out of play and leaves the stock values — dark has nothing to
+drift from.
+
+Listed here because it is the one breaking change in 2.0 that no gate, snapshot
+or test will tell you about: nothing fails, the UI simply looks different, and
+an operator who wants the old appearance will go looking for a setting that does
+not exist.
