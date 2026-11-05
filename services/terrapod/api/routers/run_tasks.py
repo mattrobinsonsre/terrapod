@@ -569,21 +569,74 @@ async def override_task_stage(
 # ── Callback (Unauthenticated, Token-Verified) ──────────────────────
 
 
+def _callback_token(body: dict, request: Request) -> str:
+    """The callback's bearer token, from either place it can arrive (#2366).
+
+    Terrapod has always read `access_token` from the body. HashiCorp's run task
+    integration spec says to present the payload's `access_token` as an
+    `Authorization: Bearer` header instead, which is what a spec-built
+    integration does.
+
+    Both are accepted, body first so an existing integration is untouched. This
+    does not widen anything: it is the same token, verified the same way, and
+    the header is simply a second envelope for it.
+    """
+    from_body = body.get("access_token", "")
+    if from_body:
+        return str(from_body)
+    header = request.headers.get("authorization", "")
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() == "bearer" and value.strip():
+        return value.strip()
+    return ""
+
+
+def _callback_result(body: dict) -> tuple[str, str]:
+    """`(status, message)` from either body shape the callback accepts (#2366).
+
+    Terrapod's own shape is flat -- `{"status": ..., "message": ...}`. The spec's
+    is JSON:API: `{"data": {"type": "task-results", "attributes": {...}}}`.
+
+    The flat form is read FIRST so an existing integration cannot be changed by
+    this, and the JSON:API form is only consulted when the flat `status` is
+    absent. `data.type` is NOT enforced: a body carrying attributes we can read
+    is one we should act on, and refusing over a type string would turn a
+    working integration into a 422 over a label.
+
+    `relationships.outcomes` is deliberately ignored. We declare
+    `capabilities.outcomes: false` in the outbound payload precisely so nobody
+    sends them, and silently dropping a field an integration believed we stored
+    would be worse than not advertising it.
+    """
+    flat = body.get("status", "")
+    if flat:
+        return str(flat), str(body.get("message", "") or "")
+    attrs = ((body.get("data") or {}).get("attributes") or {}) if isinstance(body, dict) else {}
+    if not isinstance(attrs, dict):
+        return "", ""
+    return str(attrs.get("status", "") or ""), str(attrs.get("message", "") or "")
+
+
 @extensions_router.patch("/task-stage-results/{tsr_id}/callback")
 async def task_stage_result_callback(
+    request: Request,
     tsr_id: str = Path(...),
     body: dict = Body(...),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """External service reports pass/fail for a task stage result.
+    """External service reports its result for a task stage result.
 
-    Unauthenticated — verified via access_token in body.
+    Unauthenticated — verified via the callback token, which may arrive in the
+    body as `access_token` or as an `Authorization: Bearer` header (#2366).
     """
     from terrapod.db.models import now_utc
 
-    access_token = body.get("access_token", "")
+    access_token = _callback_token(body, request)
     if not access_token:
-        raise HTTPException(status_code=401, detail="access_token is required")
+        raise HTTPException(
+            status_code=401,
+            detail="access_token is required, in the body or as an Authorization: Bearer header",
+        )
 
     # Verify the token
     verified_id = verify_callback_token(access_token)
@@ -605,12 +658,40 @@ async def task_stage_result_callback(
             status_code=409, detail=f"Result already in terminal state: {tsr.status}"
         )
 
-    result_status = body.get("status", "")
-    if result_status not in ("passed", "failed"):
-        raise HTTPException(status_code=422, detail="status must be 'passed' or 'failed'")
+    result_status, result_message = _callback_result(body)
+    if result_status not in ("passed", "failed", "running"):
+        raise HTTPException(
+            status_code=422, detail="status must be 'passed', 'failed' or 'running'"
+        )
 
     tsr.status = result_status
-    tsr.message = body.get("message", "")
+    tsr.message = result_message
+
+    # `running` is a PARTIAL update (#2366): the spec has an integration report
+    # progress before it has an answer, so the result stays open and no
+    # `finished_at` is stamped. The guard above already admits a callback only
+    # while the result is `pending` or `running`, so this cannot reopen a
+    # settled one -- and the stage must NOT be resolved, because resolving it is
+    # what releases the run.
+    #
+    # It cannot hang a run, and the reason is sharper than a timeout:
+    # `sweep_unreachable_stages` already treats a `running` result exactly as it
+    # treats a `pending` one, and it measures from the result's `created_at`
+    # rather than from the last report. So progress reports cannot extend the
+    # deadline however many arrive -- the result still errors an hour after it
+    # was created, when `verify_callback_token` would refuse the callback
+    # anyway. `running` was already a stored status that the sweep and the
+    # terminal-state guard above both understood; the only thing that refused
+    # to set it was this handler.
+    if result_status == "running":
+        await db.commit()
+        logger.info(
+            "Run task reported progress",
+            tsr_id=str(tsr.id),
+            status=result_status,
+        )
+        return JSONResponse(content={"data": _task_stage_result_json(tsr)})
+
     tsr.finished_at = now_utc()
     await db.flush()
 

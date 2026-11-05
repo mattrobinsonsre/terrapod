@@ -27,6 +27,10 @@ from terrapod.services.run_task_service import resolve_stage
 
 logger = get_logger(__name__)
 
+#: The signature header HashiCorp's run task integration spec defines. Sent
+#: alongside Terrapod's own `X-TFE-Task-Signature`, never instead of it.
+SPEC_SIGNATURE_HEADER = "X-TFC-Task-Signature"
+
 
 def _rfc3339(dt) -> str:  # type: ignore[no-untyped-def]
     if dt is None:
@@ -43,12 +47,19 @@ def build_task_callback_payload(
     workspace_id: str,
     workspace_name: str,
     workspace_app_url: str,
+    workspace_working_directory: str,
     task_name: str,
     task_id: str,
+    task_result_id: str,
+    task_result_enforcement_level: str,
     stage: str,
     callback_url: str,
     access_token: str,
     is_speculative: bool,
+    configuration_version_id: str | None,
+    vcs_repo_url: str | None,
+    vcs_branch: str | None,
+    vcs_commit_hash: str | None,
 ) -> dict:
     """Build a TFE V2-compatible run task callback payload.
 
@@ -68,13 +79,48 @@ def build_task_callback_payload(
     `run_status` used to be a parameter, resolved by the caller and never
     emitted. It is gone rather than added to the payload: a task's view of
     the run is the `stage` it was called at, and a new key is a payload
-    addition nobody asked for.
+    addition nobody asked for. **Re-checked against HashiCorp's run task
+    integration spec for #2366: there is no `run_status` field in it, so
+    removing it was right and the 2.0 run-status fold (#2378) does not reach
+    an integration through this payload at all.**
+
+    ### The spec-shaped fields (#2366)
+
+    Everything below `is_speculative` arrived for spec compatibility, and
+    every one is a value Terrapod already held and simply never wired in --
+    which is why they are additive rather than a decision.
+
+    **Nullable on purpose, and nullable in the spec too.** A run with no
+    configuration version, or on a workspace with no VCS connection, has no
+    honest value for these; the spec types them "or `null`", so `None` is the
+    documented absence rather than an omission. An omitted KEY is what breaks
+    a strict client, which is the same reasoning as the `or ""` at the call
+    site for the declared-string fields.
+
+    **`vcs_commit_url` and `vcs_pull_request_url` are hardcoded `None`, and
+    that is a gap rather than a value.** We hold the commit sha and the pull
+    request NUMBER, not a web URL, and building one needs provider-aware
+    construction -- GitHub `/pull/{n}` against GitLab `/-/merge_requests/{n}`,
+    over a `server_url` that may carry nested groups -- which does not exist
+    in this codebase yet. Emitting the keys as `null` is spec-legal and tells
+    an integration the fact is absent; inventing a URL shape per provider
+    inside a payload builder would be the wrong place for it. If they turn out
+    to be wanted they are a small follow-up.
+
+    **`capabilities` is what WE support, not what the caller does.** It reads
+    backwards at first: the spec has the sender declare whether it accepts
+    detailed outcomes in the callback. We do not accept them, so it is
+    `false` -- stated rather than omitted, so an integration's graceful
+    degradation is deterministic instead of inferred from a missing object.
     """
     return {
         "payload_version": 1,
         "stage": stage,
         "access_token": access_token,
+        "capabilities": {"outcomes": False},
         "task_result_callback_url": callback_url,
+        "task_result_id": task_result_id,
+        "task_result_enforcement_level": task_result_enforcement_level,
         "run_app_url": run_app_url,
         "run_id": run_id,
         "run_message": run_message,
@@ -83,10 +129,17 @@ def build_task_callback_payload(
         "workspace_id": workspace_id,
         "workspace_name": workspace_name,
         "workspace_app_url": workspace_app_url,
+        "workspace_working_directory": workspace_working_directory,
         "organization_name": "default",
         "task_name": task_name,
         "task_id": task_id,
         "is_speculative": is_speculative,
+        "configuration_version_id": configuration_version_id,
+        "vcs_repo_url": vcs_repo_url,
+        "vcs_branch": vcs_branch,
+        "vcs_commit_hash": vcs_commit_hash,
+        "vcs_commit_url": None,
+        "vcs_pull_request_url": None,
     }
 
 
@@ -196,12 +249,28 @@ async def handle_run_task_call(payload: dict) -> None:
             workspace_id=f"ws-{ws.id}",
             workspace_name=ws.name,
             workspace_app_url=run_links.workspace_url(ws.id) or "",
+            workspace_working_directory=ws.working_directory or "",
             task_name=rt.name,
             task_id=f"task-{rt.id}",
+            task_result_id=f"tsr-{tsr.id}",
+            task_result_enforcement_level=rt.enforcement_level,
             stage=ts.stage,
             callback_url=callback_url,
             access_token=tsr.callback_token,
             is_speculative=is_speculative,
+            # Nullable, and `or None` rather than `or ""`: these are declared
+            # nullable in the spec, so "absent" has a representation and an
+            # empty string would be a lie about a workspace with no VCS
+            # connection. The declared-string fields above keep their `or ""`.
+            configuration_version_id=(
+                f"cv-{run.configuration_version_id}" if run.configuration_version_id else None
+            ),
+            # The repo URL is the WORKSPACE's. A `Run` carries `vcs_branch`
+            # and `vcs_commit_sha` but no repo URL of its own, so the three
+            # VCS facts come from two different rows.
+            vcs_repo_url=ws.vcs_repo_url or None,
+            vcs_branch=run.vcs_branch or None,
+            vcs_commit_hash=run.vcs_commit_sha or None,
         )
 
         hmac_key: str | None = rt.hmac_key or None
@@ -211,7 +280,12 @@ async def handle_run_task_call(payload: dict) -> None:
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if hmac_key:
             sig = sign_payload(body_bytes, hmac_key)
+            # BOTH names, same signature over the same bytes (#2366). The spec
+            # says `X-TFC-Task-Signature`; Terrapod has always sent
+            # `X-TFE-Task-Signature`, and an integration already verifying that
+            # one must keep working, so this adds rather than renames.
             headers["X-TFE-Task-Signature"] = sig
+            headers[SPEC_SIGNATURE_HEADER] = sig
 
         try:
             # The other half of #1541. Structurally identical to the notification

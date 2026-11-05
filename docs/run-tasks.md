@@ -202,7 +202,12 @@ When a task fires, Terrapod sends an HTTP POST to the configured URL:
   "payload_version": 1,
   "stage": "pre_apply",
   "access_token": "result-id:timestamp:signature",
+  "capabilities": {
+    "outcomes": false
+  },
   "task_result_callback_url": "https://terrapod.local/api/v1/task-stage-results/tsr-id/callback",
+  "task_result_id": "tsr-uuid",
+  "task_result_enforcement_level": "advisory",
   "run_app_url": "https://terrapod.local/workspaces/ws-uuid/runs/run-uuid",
   "run_id": "run-uuid",
   "run_message": "Triggered via PR #418",
@@ -211,10 +216,17 @@ When a task fires, Terrapod sends an HTTP POST to the configured URL:
   "workspace_id": "ws-uuid",
   "workspace_name": "production",
   "workspace_app_url": "https://terrapod.local/workspaces/ws-uuid",
+  "workspace_working_directory": "infra/prod",
   "organization_name": "default",
   "task_name": "cost-check",
   "task_id": "task-uuid",
-  "is_speculative": false
+  "is_speculative": false,
+  "configuration_version_id": "cv-uuid",
+  "vcs_repo_url": "https://github.com/acme/payments",
+  "vcs_branch": "main",
+  "vcs_commit_hash": "deadbeefcafe",
+  "vcs_commit_url": null,
+  "vcs_pull_request_url": null
 }
 ```
 
@@ -230,7 +242,32 @@ Notes on three of those:
 - **`organization_name`** is always `default`: Terrapod is single-organization
   by design.
 
-If an HMAC key is configured, the payload is signed with HMAC-SHA512 and the signature is sent in the `X-TFE-Task-Signature` header.
+And on the spec-shaped fields:
+
+- **`capabilities`** describes what **Terrapod** accepts in the callback, not
+  what your service does — it reads backwards at first. `outcomes` is `false`
+  because Terrapod does not store detailed run task outcomes. It is stated
+  rather than omitted so your degradation is deterministic rather than inferred
+  from a missing object.
+- **The nullable fields** — `configuration_version_id`, `vcs_repo_url`,
+  `vcs_branch`, `vcs_commit_hash` — are `null` rather than `""` when the fact is
+  absent: a run created from the CLI has no configuration version, a workspace
+  with no VCS connection has no repository. The key is always present, so a
+  strict client never meets a missing one.
+- **`vcs_commit_url` and `vcs_pull_request_url` are always `null`**, and that is
+  a known gap rather than a value. Terrapod holds the commit sha and the pull
+  request number but not a web URL, and building one needs provider-aware
+  construction (GitHub `/pull/{n}` against GitLab `/-/merge_requests/{n}`, over
+  a server URL that may carry nested groups) that does not exist yet. Open an
+  issue if you need them.
+- **`workspace_working_directory`** is `""` for a workspace that runs from the
+  repository root. Unlike the fields above it is a plain string in the spec, and
+  there the empty value is the fact rather than the absence of one.
+
+If an HMAC key is configured, the payload is signed with HMAC-SHA512 and the
+signature is sent in **both** the `X-TFE-Task-Signature` header (Terrapod's
+original) and `X-TFC-Task-Signature` (the name the integration spec uses). Same
+signature, same bytes — verify whichever your integration already reads.
 
 ---
 
@@ -256,11 +293,65 @@ assert hmac.compare_digest(
 
 ---
 
+<a id="hashicorp-run-task-integration-spec"></a>
+
+## Compatibility with HashiCorp's run task integration spec
+
+Terrapod supports [HashiCorp's run task integration
+spec](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/run-tasks/run-tasks-integration)
+**on a best-effort basis**, so an integration built against it — the Wiz run
+task among them — works here without a Terrapod-specific build. Raised by
+[#2366](https://github.com/mattrobinsonsre/terrapod/issues/2366).
+
+"Best effort" means something specific rather than being a disclaimer:
+
+- **The shape is gated, not promised in prose.** An outbound payload is
+  something Terrapod *sends* rather than serves, so none of the API contract
+  snapshots can see it — which is exactly how six fields sat hardcoded empty,
+  fixed in
+  [#2367](https://github.com/mattrobinsonsre/terrapod/issues/2367). Two
+  docs-audit gates now hold it: one keeps the example above equal to the payload
+  the code builds, and one keeps the payload a superset of the spec's field set.
+  A field going missing or changing name fails CI rather than surfacing as a
+  third party's integration misbehaving.
+- **We will not claim a field or an endpoint we do not serve.** Where Terrapod
+  diverges, this page says so with the reason — see the table below.
+- **It is not full parity**, and the gaps are deliberate rather than pending.
+
+### What an integration can rely on
+
+| Spec surface | Terrapod |
+|---|---|
+| `POST` to the configured URL with the payload above | yes, all 26 fields |
+| `X-TFC-Task-Signature` | yes, sent alongside Terrapod's own `X-TFE-Task-Signature` — same HMAC-SHA512 over the same bytes |
+| `PATCH` the `task_result_callback_url` | yes |
+| `Authorization: Bearer <access_token>` on the callback | yes, **or** the token in the body as `access_token` |
+| JSON:API `{"data": {"type": "task-results", "attributes": {...}}}` callback body | yes, **or** Terrapod's flat `{"status": ..., "message": ...}` |
+| `passed` / `failed` / `running` statuses | yes — `running` is a partial update that leaves the result open |
+| `pre_plan`, `post_plan`, `pre_apply` stages | yes |
+
+### Where Terrapod diverges, and why
+
+| Spec | Terrapod | Why |
+|---|---|---|
+| `plan_json_api_url` | not sent | The plan JSON embeds `prior_state.values` and the root variables' values, sensitive ones included, in cleartext (GHSA-gwwq-5v7q-h3f4). Sending it would turn the payload's `access_token` — scoped to one task-stage result — into a state-grade read credential. An integration that needs the plan can fetch it with its own Terrapod token; see the OPA example below. |
+| `configuration_version_download_url` | not sent yet | The mechanism is settled — a single-resource, TTL-bounded [download ticket](api-reference.md#mint-download-ticket-terrapod-extension) — but handing a run task the configuration archive is a new disclosure for every existing task, so it will arrive behind a per-run-task opt-in that defaults to off. |
+| `relationships.outcomes` on the callback | not stored | Which is why the payload declares `capabilities.outcomes: false` rather than staying silent: an integration can then degrade deterministically instead of guessing. |
+| `post_apply` stage | not implemented | The run has finished by then, so a failing `post_apply` task blocks nothing — which makes it notification-shaped, and [notifications](notifications.md) already cover "tell something when a run reaches a state". |
+| `vcs_commit_url`, `vcs_pull_request_url` | always `null` | Terrapod holds the sha and the PR number but not a web URL. See the payload notes above. |
+
+---
+
 ## Callback Tokens
 
-Callback tokens are short-lived (1 hour) HMAC-SHA256 signed tokens. They contain the result ID, a timestamp, and a signature derived from a server-side secret. The external service receives the token in the webhook payload and must include it in the callback request.
+Callback tokens are short-lived (1 hour) HMAC-SHA256 signed tokens. They contain the result ID, a timestamp, and a signature derived from a server-side secret. The external service receives the token in the webhook payload and must include it in the callback request — either in the body as `access_token`, or as an `Authorization: Bearer` header, whichever your integration already does.
 
 Token format: `{result_id}:{timestamp}:{hmac_sha256_signature}`
+
+The token's one-hour life is also the window in which a callback can arrive at
+all: past it, `unreachable_stage_sweep_cycle` resolves a stage whose callbacks
+can no longer come, so a silent integration costs the wait rather than wedging
+the run.
 
 ---
 
@@ -281,7 +372,7 @@ Advisory failures do not block stage resolution.
 | Status | Meaning |
 |---|---|
 | `pending` | Webhook not yet dispatched |
-| `running` | Webhook sent, awaiting callback |
+| `running` | Webhook sent, awaiting callback — or the integration reported `running` itself as a partial update |
 | `passed` | External service reported success |
 | `failed` | External service reported failure |
 | `errored` | Webhook delivery returned non-2xx HTTP |

@@ -421,6 +421,14 @@ jobs:
       - name: (docs-audit) the documented run task payload is the one we send
         run: python3 scripts/docs-audit/check_run_task_payload_doc.py
 
+      # And that the payload stays a superset of HashiCorp's run task
+      # integration spec, which docs/run-tasks.md promises on a best-effort
+      # basis (#2366). A different question from the gate above: that one keeps
+      # our documentation honest, this one keeps the promise to a third party
+      # who built against the spec rather than against us.
+      - name: (docs-audit) the run task payload covers the integration spec
+        run: python3 scripts/docs-audit/check_run_task_spec_fields.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
