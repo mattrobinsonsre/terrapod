@@ -174,14 +174,26 @@ orjson = "^3.10"
 # cache that exists for Pulumi's language SDKs. None of that was right: parsing
 # a static inventory file is one stable operation, done once, in one place.
 #
-# A LINE, so the API takes that line's newest patch on each rebuild. It is NOT
-# a Helm value and must not become one -- a workspace's `ansible_version`
-# selects its execution-environment IMAGE, which is where the core line
-# genuinely matters because it decides the supported target Pythons (#2154).
+# A LINE, so the API takes that line's newest patch whenever
+# `scripts/lock-python-deps.sh` is re-run -- not on each image rebuild, which is
+# what this said before the hash-pinned lock was committed: the image installs
+# exactly the version written in `poetry.lock` and nothing else. It is NOT a
+# Helm value and must not become one -- a workspace's `ansible_version` selects
+# its execution-environment IMAGE, which is where the core line genuinely
+# matters because it decides the supported target Pythons (#2154).
 #
 # Only the API image installs this: the listener, migrations and runner images
 # resolve from their own `pyproject-{name}.toml` manifests. Review at every
 # minor release, as for the platform tools.
+#
+# Reviewed 2026-11-05 (#2334 gate G0) and HELD at 2.21 while 2.22.0 exists. The
+# review is not "take the newest line": no advisory affects what we run (the
+# newest, GHSA-w8p5-mx5w-cpqj, is patched at 2.21.1 and the lock is past it), so
+# there is no driver -- and the asymmetry runs the other way, because 2.22.0 is a
+# line's first release and this is the interpreter that resolves every Ansible
+# workspace's inventory. The two sides are decoupled by design, so a workspace
+# can select a 2.22 execution environment regardless of what the API parses with.
+# Move the line when something needs it, and say what.
 ansible-core = "~2.21"
 
 [tool.poetry.group.dev.dependencies]
