@@ -429,6 +429,13 @@ jobs:
       - name: (docs-audit) the run task payload covers the integration spec
         run: python3 scripts/docs-audit/check_run_task_spec_fields.py
 
+      # And that the CLI-surface body catalogues tell the truth (#2389). They
+      # say, per attribute, whether Terrapod consumes it -- which is the claim
+      # #1903 showed no route table can make: `POST /api/tfe/v2/runs` was served
+      # correctly while `save-plan` was read off its body by nobody.
+      - name: (docs-audit) the CLI-surface body catalogues match the handlers
+        run: python3 scripts/docs-audit/check_cli_body_claims.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:

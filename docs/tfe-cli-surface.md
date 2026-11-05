@@ -111,6 +111,86 @@ emitting the permission alone just moves the failure to the endpoint it then
 selects. Three routes to serve one verb we have chosen not to expose is the wrong
 trade; see `docs/known-limitations.md`.
 
+### Workspace create/PATCH attributes
+
+The TFE create path is **intentionally the CLI's subset**, not an incomplete
+implementation of TFE's. `_create_workspace_impl` pins the engine to Terraform
+rather than reading it from the body, and that is load-bearing: it is what keeps
+a TFE client unable to express an engine it could not then see. A workspace for
+another engine is created on the native surface, where the `engine` attribute
+lives.
+
+Most of what `go-tfe`'s `WorkspaceCreateOptions` defines and Terrapod does not
+read names a **TFE feature Terrapod does not have**. Those are listed below
+because a catalogue of what TFE publishes and we do not is worth having written
+down — but they are not a backlog, and adding them would advertise capability
+that does not exist.
+
+Consumed, on both `POST` and `PATCH` unless noted:
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `name` | `Name` | The workspace name; unique within the single organization |
+| `auto-apply` | `AutoApply` | Apply without confirmation after a successful plan |
+| `execution-mode` | `ExecutionMode` | `local` or `agent`. **`remote` is refused 422** — Terrapod has no hosted workers |
+| `agent-pool-id` | `AgentPoolID` | Resolved through `_resolve_pool_set_attrs`, shared by both paths |
+| `working-directory` | `WorkingDirectory` | The Terraform root |
+| `trigger-prefixes` | `TriggerPrefixes` | Path scoping for VCS triggers |
+| `terraform-version` | `TerraformVersion` | **`PATCH` only** — see the finding below |
+
+**An attribute `go-tfe` defines and Terrapod does not consume must be listed
+here as unsupported, or refused — never accepted and ignored.** The same rule as
+the run-create catalogue above, and on this family it has three classes rather
+than two, because the distinction that matters is *why* an attribute is absent.
+
+**Accepted and not consumed** — the class that is a defect rather than a
+decision, because the caller's intent is dropped and the response is still a
+`2xx`:
+
+| Attribute | go-tfe field | What happens |
+|---|---|---|
+| `vcs-repo` | `VCSRepo` | Dropped. Terrapod *has* VCS connections — it expresses them as `vcs-connection-id` + `vcs-repo-url` on the native surface — so unlike the rows below this is a feature we have in a shape we do not accept. A create that drops it returns `2xx` having ignored the caller's whole intent, and the identical bug class was fixed once on this surface for `vcs-connection-id` |
+| `terraform-version` | `TerraformVersion` | Dropped **on `POST`**, consumed on `PATCH`. `_create_workspace_impl` reads 59 attribute keys and this is not one of them; `update_workspace` reads both it and the `engine-version` alias. So the same attribute in the same body means two different things depending on the verb, which is the shape no route table can show |
+| `tags` / `tag-bindings` | `Tags`, `TagBindings` | Dropped on create. The tag *routes* are served (`relationships/tags`), so tags set in a create body are silently absent from a workspace whose tags can then be set a request later |
+
+**Not supported — Terrapod has no such feature.** Absent because the capability
+does not exist, which is a design subset rather than a gap:
+
+| Attribute | go-tfe field |
+|---|---|
+| `allow-destroy-plan` | `AllowDestroyPlan` |
+| `assessments-enabled` | `AssessmentsEnabled` |
+| `auto-apply-run-trigger` | `AutoApplyRunTrigger` |
+| `auto-destroy-at`, `auto-destroy-activity-duration`, `inherits-project-auto-destroy` | the `AutoDestroy*` set |
+| `description` | `Description` |
+| `file-triggers-enabled` | `FileTriggersEnabled` |
+| `global-remote-state`, `project-remote-state` | `GlobalRemoteState`, `ProjectRemoteState` — Terrapod's equivalent is explicit remote-state consumers |
+| `hyok-enabled` | `HYOKEnabled` |
+| `migration-environment` | `MigrationEnvironment` |
+| `project` | `Project` — Terrapod has no projects (single organization, rule 9) |
+| `queue-all-runs` | `QueueAllRuns` |
+| `setting-overwrites` | `SettingOverwrites` — a project-inheritance mechanism, so moot without projects |
+| `source-name`, `source-url` | `SourceName`, `SourceURL` |
+| `speculative-enabled` | `SpeculativeEnabled` |
+| `structured-run-output-enabled` | `StructuredRunOutputEnabled` |
+| `trigger-patterns` | `TriggerPatterns` — Terrapod scopes by prefix, not glob |
+
+`operations` is a **response** attribute rather than a settable one: Terrapod
+emits it as `execution_mode == "agent"` and never reads it from a body. The
+Terrapod-native attributes on these two routes — 59 of them, from
+`ai-summary-mode` to `vcs-workflow` — are not part of this contract and are
+documented in [api-reference.md](api-reference.md).
+
+### Workspace lock attributes
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `reason` | `WorkspaceLockOptions.Reason` | Consumed, and so are the terraform/tofu backend's own lock-info keys. `_lock_reason_from_body` takes the first non-blank of `reason`, `Info`, `Operation`, capped at `LOCK_REASON_MAX_LENGTH` — because the two clients of this route send different bodies: `go-tfe` sends `{"reason": ...}` while the `cloud`/`remote` backend sends its state lock-info object (#1705) |
+
+`WorkspaceAddTagsOptions` and `WorkspaceRemoveTagsOptions` carry a single
+untagged `Tags []*Tag`, which `go-tfe` marshals as a relationship rather than an
+attribute, so there is no attribute body to catalogue.
+
 ## State Versions
 
 | Method | Path | go-tfe method | Caller |
@@ -159,6 +239,29 @@ sensitive values masked.
 `GET /api/tfe/v2/workspaces/{id}/state-versions` (the list) is also served, on both
 surfaces, though no CLI calls it.
 
+### State-version-create attributes
+
+Consumed by `POST /api/tfe/v2/workspaces/{id}/state-versions`:
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `serial` | `Serial` | The state serial. A duplicate is a `409` unless `force` |
+| `lineage` | `Lineage` | Recorded on the version |
+| `md5` | `MD5` | Checked against the uploaded bytes |
+| `force` | `Force` | Skips the serial-conflict check |
+
+The `run` relationship is also read, which `go-tfe` sends when the state comes
+from a run.
+
+**Accepted and not consumed**, and the first row is the one worth knowing
+because it loses data rather than a preference:
+
+| Attribute | go-tfe field | What happens |
+|---|---|---|
+| `state` | `State` | Dropped. `go-tfe`'s `StateVersionCreateOptions.valid()` requires only `MD5` and `Serial`, so `state` is optional and a client may send the whole state **inline** in the create body instead of using the two-step `upload-url` flow. Terrapod reads only the metadata, so such a client gets a `201` and its state is not stored. The terraform/tofu backend is unaffected — it uses the two-step flow, which is what the `PUT .../content` row above describes and what the CLI-contract suite exercises — but a `go-tfe`-based tool that takes the one-step form silently uploads nothing |
+| `json-state` | `JSONState` | Dropped, consistently with the `PUT .../json-content` route, which is accepted and discarded |
+| `json-state-outputs` | `JSONStateOutputs` | Dropped. Terrapod derives outputs from the state blob itself (see the two output routes above), so it has no use for a client-supplied copy |
+
 ## Configuration Versions
 
 | Method | Path | go-tfe method | Caller |
@@ -170,6 +273,23 @@ surfaces, though no CLI calls it.
 `GET /api/tfe/v2/workspaces/{id}/configuration-versions` (the list) is served too,
 though no CLI calls it. Other Terrapod-only management on this surface (download,
 diff, ticket-based download) lives at `/api/v1/configuration-versions/...`.
+
+### Configuration-version-create attributes
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `auto-queue-runs` | `AutoQueueRuns` | Defaults **true**, as TFE does. Queues a run as soon as the upload completes |
+| `speculative` | `Speculative` | A plan-only version; forces `plan-only` on every run against it |
+
+**Accepted and not consumed:**
+
+| Attribute | go-tfe field | What happens |
+|---|---|---|
+| `provisional` | `Provisional` | Dropped. Upstream it means "does not become the workspace's current configuration until a run referencing it is ultimately applied" — a real behaviour Terrapod does not implement, so a client relying on it gets an ordinary configuration version that becomes current immediately |
+
+`source` is read here and is **Terrapod's own**, not a `go-tfe` field: it records
+where the version came from (`tfe-api` by default) and is documented in
+[api-reference.md](api-reference.md).
 
 ## Runs / Plans / Applies
 
@@ -234,6 +354,34 @@ Under that rule, these `RunCreateOptions` fields are **accepted and not consumed
 `debugging-mode` appears in HashiCorp's published request table but in no `go-tfe`
 `RunCreateOptions` struct, and no client we can find sends it.
 
+### Run-action attributes (`apply` / `discard` / `cancel`)
+
+These three carry a body, and it is **not** a JSON:API document. `go-tfe`'s
+`RunApplyOptions`, `RunDiscardOptions` and `RunCancelOptions` each declare a
+single field tagged `json:"comment,omitempty"` — a plain `json` tag, not
+`jsonapi` — so the body is flat:
+
+```json
+{ "comment": "why I did this" }
+```
+
+That matters more than it looks: a handler written to the surrounding JSON:API
+convention would look for `data.attributes.comment` and find nothing even if it
+tried, so this is the one place on the compatibility surface where the house
+envelope does not apply.
+
+**Accepted and not consumed**, on all three:
+
+| Route | go-tfe field | What happens |
+|---|---|---|
+| `POST /runs/{id}/actions/apply` | `RunApplyOptions.Comment` | Dropped — the handler takes no body parameter at all, so FastAPI never looks |
+| `POST /runs/{id}/actions/discard` | `RunDiscardOptions.Comment` | Dropped. Terrapod *has* a column for this (`runs.discard_reason`), which the PR-close sweep is meant to populate, so the CLI's own explanation is the obvious thing to record there and is not |
+| `POST /runs/{id}/actions/cancel` | `RunCancelOptions.Comment` | Dropped |
+
+A dropped comment loses no infrastructure state, which is why this is listed
+rather than refused: the action itself is performed exactly as asked. What is
+lost is the audit trail the caller tried to leave.
+
 ## Cost Estimates / Policy Checks / Task Stages
 
 These are CLI-aware (run progress display branches on relationships) but only exercised when the relationship is present on the run. Terrapod does not implement cost estimates in this shape, or Sentinel. Its OPA policy sets and security scan are served as **policy checks**, and run tasks as **task stages** (#1704).
@@ -294,6 +442,45 @@ which reads `GET /workspaces/{id}/current-state-version-outputs` — served sinc
 
 **Out of scope for tfci compat:** teams, projects, run tasks (TFE-shape), notifications, OAuth client management, the `hashicorp/tfe` Terraform provider's full surface. Those have structural divergence in Terrapod (single-org, label-RBAC instead of teams) that compatibility cannot bridge.
 
+### Variable and variable-set attributes
+
+`tfci` has no variable command, so these routes are driven by the web UI and by
+`go-tfe`-based automation rather than by the CLI. Catalogued all the same,
+because the rule is about what a client can send and we ignore.
+
+Consumed on `POST`/`PATCH` for a workspace variable (`VariableCreateOptions`,
+`VariableUpdateOptions`) and for a variable-set variable
+(`VariableSetVariableCreateOptions`, `VariableSetVariableUpdateOptions`):
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `key` | `Key` | The variable name. `env` keys are validated (`_validated_env_key`) |
+| `value` | `Value` | Stored encrypted |
+| `category` | `Category` | `terraform` folds to the stored `native` on write; the frozen surface reports `terraform` back (#1898). Not settable on a varset-variable update |
+| `hcl` | `HCL` | The wire name for the stored `structured` flag (#1435) |
+| `sensitive` | `Sensitive` | Write-only once set; the value is never echoed |
+| `description` | `Description` | Recorded |
+
+Consumed for a variable set (`VariableSetCreateOptions`,
+`VariableSetUpdateOptions`):
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `name` | `Name` | The set name |
+| `description` | `Description` | Recorded |
+| `global` | `Global` | Applies to every workspace |
+| `priority` | `Priority` | Wins over a workspace's own variable of the same key — and a run `-var` colliding with a priority key is refused rather than silently losing (see the run-create catalogue) |
+
+**Not supported — Terrapod has no such feature:**
+
+| Attribute | go-tfe field | Why |
+|---|---|---|
+| `parent` | `VariableSetCreateOptions.Parent` | A `polyrelation` naming an organization or a project. Terrapod is single-organization (rule 9) and has no projects, so there is no parent to name. `go-tfe` marks it BETA and subject to change |
+
+`VariableSetApplyToWorkspacesOptions` carries one untagged
+`Workspaces []*Workspace`, marshalled as a relationship rather than an
+attribute, so it has no attribute body to catalogue.
+
 ## Module Registry (CLI Download Protocol)
 
 Service-discovered via `modules.v1` URL.
@@ -323,10 +510,34 @@ When OpenTofu adds new go-tfe call sites in `internal/cloud/*` or `internal/back
 2. `grep -RP 'tfe\.[A-Z]\w+\(' internal/cloud internal/backend/remote --include='*.go' | grep -v _test.go`
 3. For each match, find the go-tfe method's `client.NewRequest(...)` line in https://github.com/hashicorp/go-tfe to extract the path
 4. Add to the relevant table above
-5. For `POST /runs`, diff `RunCreateOptions` in go-tfe's `run.go` against the
-   run-create attribute table above. A new field there is a new thing the CLI
-   may send, and step 2 will not find it — the call site does not change when
-   HashiCorp adds an option to a struct it already calls.
+5. For **every route with a request-body catalogue**, diff the matching
+   `*Options` struct in go-tfe against that catalogue. A new field there is a new
+   thing a client may send, and step 2 will not find it — the call site does not
+   change when HashiCorp adds an option to a struct it already calls. The
+   structs, with the file each lives in:
+
+   | Catalogue | go-tfe struct(s) | File |
+   |---|---|---|
+   | Workspace create/PATCH | `WorkspaceCreateOptions`, `WorkspaceUpdateOptions` | `workspace.go` |
+   | Workspace lock | `WorkspaceLockOptions` | `workspace.go` |
+   | State-version create | `StateVersionCreateOptions` | `state_version.go` |
+   | Configuration-version create | `ConfigurationVersionCreateOptions` | `configuration_version.go` |
+   | Run create | `RunCreateOptions` | `run.go` |
+   | Run actions | `RunApplyOptions`, `RunDiscardOptions`, `RunCancelOptions` | `run.go` |
+   | Variables / variable sets | `Variable*Options`, `VariableSet*Options` | `variable.go`, `variable_set.go`, `variable_set_variable.go` |
+
+   Read the **tag**, not just the field name. Three shapes appear and they are
+   not interchangeable: `jsonapi:"attr,name"` is a JSON:API attribute,
+   `jsonapi:"relation,name"` is a relationship (addressing, not a behavioural
+   option — the catalogues above leave those out), and a plain `json:"name"`
+   means the route takes a **flat** body rather than a JSON:API document, which
+   is how the three run actions work.
+
+   `scripts/docs-audit/check_cli_body_claims.py` checks the half of this that
+   needs no `go-tfe` checkout — that every attribute these catalogues call
+   consumed really is read, and every one they call accepted-and-not-consumed
+   really is not. It cannot tell you HashiCorp has added a field, which is why
+   this step is still a step.
 6. Grep `internal/cloud` and `internal/backend/remote` for literal URL path
    fragments, not just `tfe.` call sites. Step 2 structurally cannot find a route
    the CLI reaches with a hand-rolled request: `GET /plans/{id}/json-output-redacted`

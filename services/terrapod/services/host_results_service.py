@@ -171,7 +171,19 @@ class _Partitioner:
                 if handle is not None
                 else os.path.join(self._dir, f"{len(self._handles)}.jsonl")
             )
-            handle = open(path, "ab" if handle is not None else "wb")  # noqa: SIM115 -- closed on eviction or cleanup
+            # noqa because the handle outlives this frame by design: it is
+            # closed on LRU eviction above, in `flush`, or in `cleanup` -- and
+            # `cleanup` runs on every path because the only call site holds this
+            # object in a `with`. CodeQL's py/file-not-closed cannot see through
+            # the dict plus the context manager and reports it anyway (alert
+            # 558, dismissed); the property is pinned by
+            # `TestEveryHandleAndTheTempDirectoryAreReleased` in
+            # `tests/services/test_host_results_ingest.py`, which drives the
+            # real `ingest` with a failure AFTER the stream and asserts handles
+            # were opened and then all closed. Name the test rather than just
+            # asserting the property, so the next triage reads the proof
+            # instead of re-deriving it.
+            handle = open(path, "ab" if handle is not None else "wb")  # noqa: SIM115
             self._handles[host] = handle
             self._open_handles[host] = handle
         else:
