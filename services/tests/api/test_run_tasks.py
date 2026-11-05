@@ -420,6 +420,176 @@ class TestCallback:
         assert resp.json()["data"]["status"] == "passed"
         assert resp.json()["data"]["stage-status"] == "passed"
 
+    # ── The spec's callback shapes (#2366) ──────────────────────────────
+    #
+    # HashiCorp's run task integration spec presents the token as an
+    # `Authorization: Bearer` header and the result as a JSON:API
+    # `task-results` body, where Terrapod has always read a flat body with
+    # `access_token` in it. Both are accepted, and each test below drives the
+    # route rather than the helpers -- the helpers passing says nothing about
+    # whether the handler reads them.
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    @patch("terrapod.api.routers.run_tasks.get_task_stage_result")
+    @patch("terrapod.api.routers.run_tasks.resolve_stage")
+    async def test_the_token_may_arrive_as_a_bearer_header(
+        self, mock_resolve_stage, mock_get_tsr, mock_verify, *mocks
+    ):
+        tsr = _mock_task_stage_result(status="running")
+        mock_verify.return_value = tsr.id
+        mock_get_tsr.return_value = tsr
+        mock_resolve_stage.return_value = "passed"
+
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
+                headers={"Authorization": "Bearer valid-token"},
+                json={"status": "passed", "message": "via the header"},
+            )
+        assert resp.status_code == 200, resp.text
+        assert mock_verify.call_args[0][0] == "valid-token", (
+            "the header's token must reach the same verifier the body's does"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    @patch("terrapod.api.routers.run_tasks.get_task_stage_result")
+    @patch("terrapod.api.routers.run_tasks.resolve_stage")
+    async def test_the_body_token_still_wins_over_a_header(
+        self, mock_resolve_stage, mock_get_tsr, mock_verify, *mocks
+    ):
+        """The body is read FIRST, so an existing integration is untouched by
+        this even if something upstream adds an unrelated Authorization."""
+        tsr = _mock_task_stage_result(status="running")
+        mock_verify.return_value = tsr.id
+        mock_get_tsr.return_value = tsr
+        mock_resolve_stage.return_value = "passed"
+
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
+                headers={"Authorization": "Bearer from-header"},
+                json={"access_token": "from-body", "status": "passed"},
+            )
+        assert resp.status_code == 200, resp.text
+        assert mock_verify.call_args[0][0] == "from-body"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    @patch("terrapod.api.routers.run_tasks.get_task_stage_result")
+    @patch("terrapod.api.routers.run_tasks.resolve_stage")
+    async def test_the_jsonapi_task_results_body_is_accepted(
+        self, mock_resolve_stage, mock_get_tsr, mock_verify, *mocks
+    ):
+        tsr = _mock_task_stage_result(status="running")
+        mock_verify.return_value = tsr.id
+        mock_get_tsr.return_value = tsr
+        mock_resolve_stage.return_value = "failed"
+
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
+                headers={"Authorization": "Bearer valid-token"},
+                json={
+                    "data": {
+                        "type": "task-results",
+                        "attributes": {"status": "failed", "message": "policy denied"},
+                    }
+                },
+            )
+        assert resp.status_code == 200, resp.text
+        assert tsr.status == "failed"
+        assert tsr.message == "policy denied", "the message must come from the attributes too"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    @patch("terrapod.api.routers.run_tasks.get_task_stage_result")
+    @patch("terrapod.api.routers.run_tasks.resolve_stage")
+    async def test_running_is_a_partial_update_that_leaves_the_result_open(
+        self, mock_resolve_stage, mock_get_tsr, mock_verify, *mocks
+    ):
+        """The property that makes `running` a partial update rather than a
+        third terminal state: the result keeps no `finished_at`, and the STAGE
+        is not resolved -- resolving it is what releases the run."""
+        tsr = _mock_task_stage_result(status="running")
+        tsr.finished_at = None
+        mock_verify.return_value = tsr.id
+        mock_get_tsr.return_value = tsr
+
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
+                headers={"Authorization": "Bearer valid-token"},
+                json={"status": "running", "message": "scanning"},
+            )
+        assert resp.status_code == 200, resp.text
+        assert tsr.status == "running"
+        assert tsr.message == "scanning"
+        assert tsr.finished_at is None, "a partial update must not stamp finished_at"
+        assert not mock_resolve_stage.called, (
+            "resolving the stage is what releases the run, so a progress report must not do it"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    @patch("terrapod.api.routers.run_tasks.get_task_stage_result")
+    async def test_an_unknown_status_is_still_refused(self, mock_get_tsr, mock_verify, *mocks):
+        """Widening to three values is not widening to anything. `overridden`
+        is a real stored status and must not be settable from outside."""
+        tsr = _mock_task_stage_result(status="running")
+        mock_verify.return_value = tsr.id
+        mock_get_tsr.return_value = tsr
+
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
+                headers={"Authorization": "Bearer valid-token"},
+                json={"status": "overridden"},
+            )
+        assert resp.status_code == 422, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_tasks.verify_callback_token")
+    async def test_no_token_in_either_place_is_a_401(self, mock_verify, *mocks):
+        app, _ = _make_app(_user())
+        del app.dependency_overrides[get_current_user]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/task-stage-results/tsr-{uuid.uuid4()}/callback",
+                json={"status": "passed"},
+            )
+        assert resp.status_code == 401
+        assert not mock_verify.called, "nothing should be verified when nothing was sent"
+
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")

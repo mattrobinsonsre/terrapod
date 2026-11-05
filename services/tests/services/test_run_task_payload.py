@@ -28,6 +28,8 @@ def _fixture(*, speculative: bool = False, with_cv: bool = True):
     ws = MagicMock()
     ws.id = uuid.UUID("11111111-1111-1111-1111-111111111111")
     ws.name = "payments-prod"
+    ws.working_directory = "infra/prod"
+    ws.vcs_repo_url = "https://github.com/acme/payments"
 
     run = MagicMock()
     run.id = uuid.UUID("22222222-2222-2222-2222-222222222222")
@@ -39,6 +41,8 @@ def _fixture(*, speculative: bool = False, with_cv: bool = True):
     run.configuration_version_id = (
         uuid.UUID("33333333-3333-3333-3333-333333333333") if with_cv else None
     )
+    run.vcs_branch = "main"
+    run.vcs_commit_sha = "deadbeefcafe"
 
     cv = MagicMock()
     cv.id = run.configuration_version_id
@@ -54,6 +58,7 @@ def _fixture(*, speculative: bool = False, with_cv: bool = True):
     rt.name = "opa-gate"
     rt.url = "https://gate.example.com/webhook"
     rt.hmac_key = None
+    rt.enforcement_level = "advisory"
 
     tsr = MagicMock()
     tsr.id = uuid.UUID("55555555-5555-5555-5555-555555555555")
@@ -136,6 +141,23 @@ class TestEveryFieldDescribesTheRun:
             "task_name": "opa-gate",
             "task_id": "task-44444444-4444-4444-4444-444444444444",
             "is_speculative": False,
+            # The spec-shaped half (#2366). `capabilities` declares what WE
+            # accept in the callback, not what the integration does.
+            "capabilities": {"outcomes": False},
+            "task_result_id": "tsr-55555555-5555-5555-5555-555555555555",
+            "task_result_enforcement_level": "advisory",
+            "workspace_working_directory": "infra/prod",
+            "configuration_version_id": "cv-33333333-3333-3333-3333-333333333333",
+            "vcs_repo_url": "https://github.com/acme/payments",
+            "vcs_branch": "main",
+            "vcs_commit_hash": "deadbeefcafe",
+            # Hardcoded `None`, and a documented gap rather than a value: we
+            # hold the sha and the PR number but not a web URL, and building
+            # one needs provider-aware construction that does not exist yet.
+            # `null` is spec-legal; an omitted key is what breaks a strict
+            # client.
+            "vcs_commit_url": None,
+            "vcs_pull_request_url": None,
         }
 
     async def test_no_field_is_left_empty(self):
@@ -149,6 +171,37 @@ class TestEveryFieldDescribesTheRun:
         sent = await _dispatch(rows, tsr)
         blank = [k for k, v in sent["body"].items() if v == ""]
         assert blank == [], f"hardcoded-empty fields are back: {blank}"
+
+    async def test_an_absent_fact_is_null_and_not_an_empty_string(self):
+        """The distinction the nullable fields turn on (#2366).
+
+        A run with no configuration version and a workspace with no VCS
+        connection have no honest value for these, and the spec types them
+        "or `null`" — so `None` is the documented absence. An empty string
+        would be the #2367 defect wearing a different costume: a field that is
+        present, readable and lying about the run.
+
+        `workspace_working_directory` is deliberately NOT in this set. The spec
+        types it a plain string and a workspace at the repository root really
+        does have `""` as its working directory, so there the empty string is
+        the fact rather than the absence of one.
+        """
+        rows, tsr = _fixture(with_cv=False)
+        rows["Workspace"].vcs_repo_url = ""
+        rows["Run"].vcs_branch = ""
+        rows["Run"].vcs_commit_sha = ""
+        sent = await _dispatch(rows, tsr)
+
+        for field in (
+            "configuration_version_id",
+            "vcs_repo_url",
+            "vcs_branch",
+            "vcs_commit_hash",
+        ):
+            assert sent["body"][field] is None, (
+                f"{field} should be null, not {sent['body'][field]!r}"
+            )
+        assert "workspace_working_directory" in sent["body"]
 
     async def test_run_status_is_not_in_the_payload(self):
         """It was a parameter the caller resolved and nothing emitted (#2367).
@@ -208,6 +261,49 @@ class TestIsSpeculativeComesFromTheConfigurationVersion:
 
         assert sent["body"]["is_speculative"] is False
         assert "ConfigurationVersion" not in db_models_asked
+
+
+class TestTheSignatureHeaders:
+    """Both signature header names, over the same bytes (#2366).
+
+    Neither name was asserted anywhere before this -- including the
+    `X-TFE-Task-Signature` Terrapod has always sent, which is the half an
+    existing integration verifies. A constant nothing reads is how a rename
+    ships silently, so both are pinned here against the real HMAC.
+    """
+
+    async def test_both_names_carry_the_same_signature(self):
+        from terrapod.services.run_task_dispatcher import (
+            SPEC_SIGNATURE_HEADER,
+            sign_payload,
+        )
+
+        rows, tsr = _fixture()
+        rows["RunTask"].hmac_key = "s3cret"
+        sent = await _dispatch(rows, tsr)
+
+        headers = sent["headers"]
+        expected = sign_payload(json.dumps(sent["body"]).encode(), "s3cret")
+
+        assert headers["X-TFE-Task-Signature"] == expected, (
+            "Terrapod's own header is what an existing integration verifies"
+        )
+        assert headers[SPEC_SIGNATURE_HEADER] == expected, (
+            "the spec's name must carry the same signature, not a different one"
+        )
+        assert SPEC_SIGNATURE_HEADER == "X-TFC-Task-Signature"
+
+    async def test_no_key_means_no_signature_header_at_all(self):
+        """Not an empty one -- an integration checking for presence must not
+        see a header carrying nothing."""
+        from terrapod.services.run_task_dispatcher import SPEC_SIGNATURE_HEADER
+
+        rows, tsr = _fixture()
+        rows["RunTask"].hmac_key = None
+        sent = await _dispatch(rows, tsr)
+
+        assert "X-TFE-Task-Signature" not in sent["headers"]
+        assert SPEC_SIGNATURE_HEADER not in sent["headers"]
 
 
 class TestAnUnsetExternalUrl:
