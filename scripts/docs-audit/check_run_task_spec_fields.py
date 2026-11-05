@@ -50,9 +50,10 @@ BUILDER = "build_task_callback_payload"
 #: the gate rather than satisfy it.
 #:
 #: `plan_json_api_url` is in the spec as a CONDITIONAL field, present only for
-#: `post_plan`, `pre_apply` and `post_apply`. It is listed here all the same
-#: because we send it at no stage, so the distinction makes no difference to
-#: what this gate has to check.
+#: `post_plan`, `pre_apply` and `post_apply`. The builder emits the KEY at every
+#: stage and sets it to `None` for `pre_plan`, which is what makes it checkable
+#: here: this gate reads the key set, and a key that is always present with an
+#: honest value is the shape a strict client wants.
 SPEC_PAYLOAD_FIELDS = frozenset(
     {
         "access_token",
@@ -87,10 +88,15 @@ SPEC_PAYLOAD_FIELDS = frozenset(
 #: Spec fields Terrapod deliberately does not send, each with the phrase that
 #: must appear in the divergence table in `docs/run-tasks.md`. The reason lives
 #: in the document, where an integrator reads it; this holds the two together.
-DELIBERATELY_ABSENT = {
-    "plan_json_api_url": "plan_json_api_url",
-    "configuration_version_download_url": "configuration_version_download_url",
-}
+#: Currently EMPTY, and the mechanism is kept rather than deleted with it.
+#: Both former entries went when #2366's follow-up emitted the two URLs
+#: pointing at the ordinary authenticated routes -- a URL is not an
+#: authorization, so sending one discloses nothing and neither needed the
+#: per-run-task opt-in that the earlier capability-URL design would have.
+#: An empty ledger makes the first check above absolute: every spec field must
+#: be emitted. Keep the dict so the next genuine gap has somewhere to be
+#: declared WITH its reason, instead of being dropped silently.
+DELIBERATELY_ABSENT: dict[str, str] = {}
 
 #: Floors, so a matcher that stops matching FAILS rather than passing on nothing.
 MIN_SPEC_FIELDS = 20

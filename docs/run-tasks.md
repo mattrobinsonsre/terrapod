@@ -222,6 +222,8 @@ When a task fires, Terrapod sends an HTTP POST to the configured URL:
   "task_id": "task-uuid",
   "is_speculative": false,
   "configuration_version_id": "cv-uuid",
+  "configuration_version_download_url": "https://terrapod.local/api/v1/configuration-versions/cv-uuid/download",
+  "plan_json_api_url": "https://terrapod.local/api/tfe/v2/plans/run-uuid/json-output",
   "vcs_repo_url": "https://github.com/acme/payments",
   "vcs_branch": "main",
   "vcs_commit_hash": "deadbeefcafe",
@@ -263,6 +265,22 @@ And on the spec-shaped fields:
 - **`workspace_working_directory`** is `""` for a workspace that runs from the
   repository root. Unlike the fields above it is a plain string in the spec, and
   there the empty value is the fact rather than the absence of one.
+- **`configuration_version_download_url` and `plan_json_api_url` point at the
+  ordinary authenticated API routes, so they need YOUR OWN Terrapod token** —
+  not the payload's `access_token`, which is scoped to reporting one task-stage
+  result and nothing else. This is the one place Terrapod diverges from the spec
+  on these fields, and it is deliberate: the plan JSON carries cleartext prior
+  state and sensitive variable values, so the capability to read it stays with
+  whoever already holds `state:read`. Following the archive URL needs
+  `config:read` on the workspace (plus `registry:read` on the backing module, or
+  platform admin, for a protected or catalog-provisioned archive); the plan JSON
+  needs `state:read`. Both answer `404` rather than `403` where you lack it. See
+  the [OPA example](#example-opa-policy-checks) for the two-call shape.
+- **`plan_json_api_url` is `null` at the `pre_plan` stage**, because no plan
+  exists yet. At `post_plan` it can answer a brief
+  `404 JSON plan output not available`: the runner reports the plan result —
+  which is what dispatches that stage — just before it uploads the plan JSON, so
+  retry. By `pre_apply` it is long since there.
 
 If an HMAC key is configured, the payload is signed with HMAC-SHA512 and the
 signature is sent in **both** the `X-TFE-Task-Signature` header (Terrapod's
@@ -322,20 +340,21 @@ task among them — works here without a Terrapod-specific build. Raised by
 
 | Spec surface | Terrapod |
 |---|---|
-| `POST` to the configured URL with the payload above | yes, all 26 fields |
+| `POST` to the configured URL with the payload above | yes, all 28 fields |
 | `X-TFC-Task-Signature` | yes, sent alongside Terrapod's own `X-TFE-Task-Signature` — same HMAC-SHA512 over the same bytes |
 | `PATCH` the `task_result_callback_url` | yes |
 | `Authorization: Bearer <access_token>` on the callback | yes, **or** the token in the body as `access_token` |
 | JSON:API `{"data": {"type": "task-results", "attributes": {...}}}` callback body | yes, **or** Terrapod's flat `{"status": ..., "message": ...}` |
 | `passed` / `failed` / `running` statuses | yes — `running` is a partial update that leaves the result open |
+| `configuration_version_download_url` | yes — populated, and fetched with **your own** token (see the divergence below) |
+| `plan_json_api_url` | yes at `post_plan` and `pre_apply`, `null` at `pre_plan`; same auth caveat |
 | `pre_plan`, `post_plan`, `pre_apply` stages | yes |
 
 ### Where Terrapod diverges, and why
 
 | Spec | Terrapod | Why |
 |---|---|---|
-| `plan_json_api_url` | not sent | The plan JSON embeds `prior_state.values` and the root variables' values, sensitive ones included, in cleartext (GHSA-gwwq-5v7q-h3f4). Sending it would turn the payload's `access_token` — scoped to one task-stage result — into a state-grade read credential. An integration that needs the plan can fetch it with its own Terrapod token; see the OPA example below. |
-| `configuration_version_download_url` | not sent yet | The mechanism is settled — a single-resource, TTL-bounded [download ticket](api-reference.md#mint-download-ticket-terrapod-extension) — but handing a run task the configuration archive is a new disclosure for every existing task, so it will arrive behind a per-run-task opt-in that defaults to off. |
+| Fetching `configuration_version_download_url` / `plan_json_api_url` with the payload's `access_token` | **not supported** — both URLs are sent and populated, but they point at the ordinary authenticated routes, so an integration needs its own Terrapod token (`config:read`, or `state:read` for the plan JSON) | The payload's `access_token` is scoped to reporting one task-stage result. Widening it would make the plan JSON — cleartext prior state and sensitive variable values, [GHSA-gwwq-5v7q-h3f4](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gwwq-5v7q-h3f4) — readable by anything that saw one payload, and webhook receivers log bodies. Emitting the URL costs nothing because a URL is not an authorization; widening the token is the part we decline. |
 | `relationships.outcomes` on the callback | not stored | Which is why the payload declares `capabilities.outcomes: false` rather than staying silent: an integration can then degrade deterministically instead of guessing. |
 | `post_apply` stage | not implemented | The run has finished by then, so a failing `post_apply` task blocks nothing — which makes it notification-shaped, and [notifications](notifications.md) already cover "tell something when a run reaches a state". |
 | `vcs_commit_url`, `vcs_pull_request_url` | always `null` | Terrapod holds the sha and the PR number but not a web URL. See the payload notes above. |

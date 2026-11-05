@@ -148,6 +148,15 @@ class TestEveryFieldDescribesTheRun:
             "task_result_enforcement_level": "advisory",
             "workspace_working_directory": "infra/prod",
             "configuration_version_id": "cv-33333333-3333-3333-3333-333333333333",
+            # Both point at the ORDINARY AUTHENTICATED routes, which is what
+            # makes emitting them cost nothing: a URL is not an authorization.
+            "configuration_version_download_url": (
+                f"{EXTERNAL}/api/v1/configuration-versions/"
+                "cv-33333333-3333-3333-3333-333333333333/download"
+            ),
+            "plan_json_api_url": (
+                f"{EXTERNAL}/api/tfe/v2/plans/22222222-2222-2222-2222-222222222222/json-output"
+            ),
             "vcs_repo_url": "https://github.com/acme/payments",
             "vcs_branch": "main",
             "vcs_commit_hash": "deadbeefcafe",
@@ -194,6 +203,7 @@ class TestEveryFieldDescribesTheRun:
 
         for field in (
             "configuration_version_id",
+            "configuration_version_download_url",
             "vcs_repo_url",
             "vcs_branch",
             "vcs_commit_hash",
@@ -212,6 +222,64 @@ class TestEveryFieldDescribesTheRun:
         rows, tsr = _fixture()
         sent = await _dispatch(rows, tsr)
         assert "run_status" not in sent["body"]
+
+
+class TestTheTwoSpecUrls:
+    """Both are emitted, and both point at the AUTHENTICATED routes (#2366).
+
+    That is the whole reason they need no per-run-task opt-in, so it is the
+    property worth pinning rather than the strings themselves: a URL carrying
+    no credential discloses nothing, and `config:read` / `state:read` are
+    still resolved at fetch time against a real user.
+    """
+
+    async def test_neither_url_carries_a_credential(self):
+        """The mutation this exists for is someone "helpfully" making them
+        work with the payload's token by minting a capability URL -- which
+        would put a code-read credential in a body webhook receivers log."""
+        rows, tsr = _fixture()
+        sent = await _dispatch(rows, tsr)
+
+        for field in ("configuration_version_download_url", "plan_json_api_url"):
+            url = sent["body"][field]
+            assert url is not None
+            assert "?" not in url, f"{field} carries a query string: {url}"
+            assert "ticket" not in url, f"{field} looks like a capability URL: {url}"
+            assert sent["body"]["access_token"] not in url, (
+                f"{field} embeds the callback token: {url}"
+            )
+
+    async def test_the_archive_url_names_the_authenticated_download_route(self):
+        rows, tsr = _fixture()
+        sent = await _dispatch(rows, tsr)
+        assert sent["body"]["configuration_version_download_url"].endswith(
+            "/api/v1/configuration-versions/cv-33333333-3333-3333-3333-333333333333/download"
+        )
+
+    async def test_no_configuration_version_means_no_archive_url(self):
+        rows, tsr = _fixture(with_cv=False)
+        sent = await _dispatch(rows, tsr)
+        assert sent["body"]["configuration_version_download_url"] is None
+
+    @pytest.mark.parametrize("stage", ["post_plan", "pre_apply"])
+    async def test_the_plan_url_is_sent_at_the_stages_a_plan_exists(self, stage: str):
+        rows, tsr = _fixture()
+        rows["TaskStage"].stage = stage
+        sent = await _dispatch(rows, tsr)
+        assert sent["body"]["plan_json_api_url"].endswith(
+            "/api/tfe/v2/plans/22222222-2222-2222-2222-222222222222/json-output"
+        )
+
+    async def test_the_plan_url_is_null_at_pre_plan(self):
+        """No plan exists yet, so a URL there could only ever 404. The spec
+        marks the field conditional on the later stages for the same reason --
+        and the KEY is still present, because an omitted key is what breaks a
+        strict client."""
+        rows, tsr = _fixture()
+        rows["TaskStage"].stage = "pre_plan"
+        sent = await _dispatch(rows, tsr)
+        assert sent["body"]["plan_json_api_url"] is None
+        assert "plan_json_api_url" in sent["body"]
 
 
 class TestIsSpeculativeComesFromTheConfigurationVersion:

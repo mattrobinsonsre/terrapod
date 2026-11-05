@@ -11,6 +11,7 @@ import json
 import uuid
 from datetime import UTC
 
+from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.db.models import (
     ConfigurationVersion,
     Run,
@@ -57,6 +58,8 @@ def build_task_callback_payload(
     access_token: str,
     is_speculative: bool,
     configuration_version_id: str | None,
+    configuration_version_download_url: str | None,
+    plan_json_api_url: str | None,
     vcs_repo_url: str | None,
     vcs_branch: str | None,
     vcs_commit_hash: str | None,
@@ -112,6 +115,38 @@ def build_task_callback_payload(
     detailed outcomes in the callback. We do not accept them, so it is
     `false` -- stated rather than omitted, so an integration's graceful
     degradation is deterministic instead of inferred from a missing object.
+
+    ### The two URLs, and why they need no new disclosure
+
+    `configuration_version_download_url` and `plan_json_api_url` point at the
+    ORDINARY AUTHENTICATED routes -- `GET /api/v1/configuration-versions/
+    {cv}/download` and `GET /api/tfe/v2/plans/{plan}/json-output`. Whoever
+    follows one needs the capability they need today: `config:read` plus the
+    protected/admin-only provenance branch for the archive, `state:read` for
+    the plan JSON. **So emitting them discloses nothing.** That is the whole
+    reason they can be sent unconditionally rather than behind a per-run-task
+    opt-in: a URL is not an authorization, and the authorization still happens
+    at fetch time, where there is a real user to resolve capabilities for.
+
+    The divergence from the spec is therefore not the field's absence but its
+    AUTH: the spec has the integration fetch with the payload's `access_token`,
+    and ours is scoped to reporting one task-stage result and nothing else. An
+    integration holding its own Terrapod token works today; one that tries the
+    payload token gets a 401 naming what it needs. `docs/run-tasks.md` says so
+    in the divergence table rather than leaving it to be discovered.
+
+    **`plan_json_api_url` is None for `pre_plan`**, because no plan exists yet
+    and a URL that can only ever 404 is worse than an honest absence. The spec
+    marks the field conditional on the later stages for the same reason.
+
+    **And at `post_plan` it can 404 for a second or two.** The runner POSTs
+    `plan-result` -- which is what creates and dispatches this very stage --
+    *before* it uploads the plan JSON (`job_entrypoint`, deliberately: the
+    gate must not wait on the upload). So the flag the route reads is still
+    false at dispatch. The route answers a clean, retryable
+    `404 JSON plan output not available`, so this is a documented retry rather
+    than a silent gap, and it is gone by the time anything fetching
+    asynchronously arrives.
     """
     return {
         "payload_version": 1,
@@ -135,6 +170,8 @@ def build_task_callback_payload(
         "task_id": task_id,
         "is_speculative": is_speculative,
         "configuration_version_id": configuration_version_id,
+        "configuration_version_download_url": configuration_version_download_url,
+        "plan_json_api_url": plan_json_api_url,
         "vcs_repo_url": vcs_repo_url,
         "vcs_branch": vcs_branch,
         "vcs_commit_hash": vcs_commit_hash,
@@ -264,6 +301,17 @@ async def handle_run_task_call(payload: dict) -> None:
             # connection. The declared-string fields above keep their `or ""`.
             configuration_version_id=(
                 f"cv-{run.configuration_version_id}" if run.configuration_version_id else None
+            ),
+            # Both point at the authenticated routes, so neither widens
+            # anything -- see the builder's docstring. `base` is already the
+            # one an off-network service can resolve.
+            configuration_version_download_url=(
+                f"{base}/api/v1/configuration-versions/cv-{run.configuration_version_id}/download"
+                if run.configuration_version_id
+                else None
+            ),
+            plan_json_api_url=(
+                f"{base}{TFE_PREFIX}/plans/{run.id}/json-output" if ts.stage != "pre_plan" else None
             ),
             # The repo URL is the WORKSPACE's. A `Run` carries `vcs_branch`
             # and `vcs_commit_sha` but no repo URL of its own, so the three
