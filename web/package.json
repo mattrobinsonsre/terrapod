@@ -59,6 +59,9 @@
     "browserslist": "^4.28.8",
     "source-map-js": "^1.2.2",
     "postcss": "^8.5.28",
-    "zod": "^4.6.6"
+    "zod": "^4.6.6",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
