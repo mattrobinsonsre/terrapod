@@ -13,7 +13,7 @@ import pytest
 from terrapod.config import RunnerConfig
 from terrapod.runner import identity as identity_mod
 
-# establish_identity()/clear_credentials_secret() now take their non-sensitive
+# establish_identity()/rejoin_identity() now take their non-sensitive
 # inputs from RunnerConfig (runners.yaml + env layering) rather than reading
 # os.environ directly (#617). These tests construct a RunnerConfig with the
 # same name/API URL the env used to provide.
@@ -543,3 +543,218 @@ class TestA403OnRenewIsTransientNotARejection:
                 await identity_mod._call_renew_with_retries(ident)
 
         assert mock_client.post.call_count == 1
+
+
+class TestRejoinIdentity:
+    """A re-join must not destroy the credential it is trying to replace.
+
+    `_rejoin_unlocked` used to call `clear_credentials_secret()` and then
+    `establish_identity()`. The delete always succeeded; the join could fail for
+    a reason the listener cannot influence, and `_call_join` collapses *revoked*,
+    *exhausted* and **expired** into one `_JoinTokenExhausted` -- so with
+    `default_join_token_ttl_seconds: 3600` every listener alive longer than an
+    hour held a token that could not join, and deleted a cert it still held in
+    order to discover that. A pod restart then found no Secret and no usable
+    token and crash-looped.
+
+    Nothing covered it, because every test in `test_listener_rejoin.py` patches
+    `_rejoin_unlocked` itself -- those test the gate, and this tests the
+    mechanism the gate calls.
+    """
+
+    @staticmethod
+    def _join_response(lid: str, pid: str) -> dict:
+        return {
+            "listener_id": lid,
+            "pool_id": pid,
+            "certificate": "NEWPEM",
+            "private_key": "NEWK",
+            "ca_certificate": "NEWCA",
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_failed_join_leaves_the_credentials_secret_untouched(self):
+        """The defect: a join that fails must cost the listener nothing."""
+        held = _identity()
+        held.secret_resource_version = "100"
+        ours = _v1secret(listener_id=held.listener_id, pool_id=held.pool_id, rv="100")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-dead-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=ours),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(side_effect=identity_mod._JoinTokenExhausted("expired")),
+            ),
+            patch.object(identity_mod, "_replace_secret") as replace,
+            patch.object(identity_mod, "_create_secret") as create,
+        ):
+            with pytest.raises(identity_mod._JoinTokenExhausted):
+                await identity_mod.rejoin_identity(_RC, current=held)
+
+        # Nothing was written, and -- the whole point -- nothing was deleted.
+        replace.assert_not_called()
+        create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_successful_join_replaces_the_secret_under_cas(self):
+        held = _identity()
+        held.secret_resource_version = "100"
+        ours = _v1secret(listener_id=held.listener_id, pool_id=held.pool_id, rv="100")
+        lid, pid = str(uuid.uuid4()), str(uuid.uuid4())
+        written = _v1secret(listener_id=lid, pool_id=pid, rv="101")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=ours),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(return_value=self._join_response(lid, pid)),
+            ),
+            patch.object(identity_mod, "_replace_secret", return_value=written) as replace,
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=held)
+
+        assert str(result.listener_id) == lid
+        assert result.certificate_pem == "NEWPEM"
+        assert result.secret_resource_version == "101"
+        # CAS on the version we read, so a sibling writing meanwhile loses us the
+        # race rather than silently overwriting its identity.
+        assert replace.call_args.kwargs["resource_version"] == "100"
+
+    @pytest.mark.asyncio
+    async def test_a_secret_that_moved_since_ours_is_adopted_without_joining(self):
+        """A sibling already re-joined, so we must not spend a second token use."""
+        held = _identity()
+        held.secret_resource_version = "100"
+        sib_lid, sib_pid = uuid.uuid4(), uuid.uuid4()
+        theirs = _v1secret(listener_id=sib_lid, pool_id=sib_pid, cert="SIBPEM", rv="200")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=theirs),
+            patch.object(identity_mod, "_call_join", new=AsyncMock()) as join,
+            patch.object(identity_mod, "_replace_secret") as replace,
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=held)
+
+        assert result.listener_id == sib_lid
+        assert result.certificate_pem == "SIBPEM"
+        join.assert_not_called()
+        replace.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_our_own_rejected_secret_is_not_adopted(self):
+        """The contrast that makes the test above mean anything.
+
+        A bare "a Secret exists, adopt it" would adopt the very cert being
+        rejected and never join at all -- an infinite rejection loop. Only a
+        resourceVersion that has MOVED past the one we hold is a sibling's work.
+        """
+        held = _identity()
+        held.secret_resource_version = "100"
+        ours = _v1secret(listener_id=held.listener_id, pool_id=held.pool_id, rv="100")
+        lid, pid = str(uuid.uuid4()), str(uuid.uuid4())
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=ours),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(return_value=self._join_response(lid, pid)),
+            ) as join,
+            patch.object(
+                identity_mod,
+                "_replace_secret",
+                return_value=_v1secret(listener_id=lid, pool_id=pid, rv="101"),
+            ),
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=held)
+
+        join.assert_called_once()
+        assert str(result.listener_id) == lid
+
+    @pytest.mark.asyncio
+    async def test_an_absent_secret_is_created_rather_than_replaced(self):
+        lid, pid = str(uuid.uuid4()), str(uuid.uuid4())
+        created = _v1secret(listener_id=lid, pool_id=pid, rv="1")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=None),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(return_value=self._join_response(lid, pid)),
+            ),
+            patch.object(identity_mod, "_create_secret", return_value=created) as create,
+            patch.object(identity_mod, "_replace_secret") as replace,
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=None)
+
+        create.assert_called_once()
+        replace.assert_not_called()
+        assert str(result.listener_id) == lid
+
+    @pytest.mark.asyncio
+    async def test_a_lost_cas_race_adopts_the_winner(self):
+        held = _identity()
+        held.secret_resource_version = "100"
+        ours = _v1secret(listener_id=held.listener_id, pool_id=held.pool_id, rv="100")
+        win_lid, win_pid = uuid.uuid4(), uuid.uuid4()
+        winner = _v1secret(listener_id=win_lid, pool_id=win_pid, cert="WINPEM", rv="200")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", side_effect=[ours, winner]),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(
+                    return_value=self._join_response(str(uuid.uuid4()), str(uuid.uuid4()))
+                ),
+            ),
+            patch.object(
+                identity_mod,
+                "_replace_secret",
+                side_effect=identity_mod._SecretConflict("stale"),
+            ),
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=held)
+
+        assert result.listener_id == win_lid
+        assert result.certificate_pem == "WINPEM"
+
+    @pytest.mark.asyncio
+    async def test_a_missing_join_token_raises_before_touching_the_secret(self):
+        held = _identity()
+        held.secret_resource_version = "100"
+        ours = _v1secret(listener_id=held.listener_id, pool_id=held.pool_id, rv="100")
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", return_value=ours),
+            patch.object(identity_mod, "_call_join", new=AsyncMock()) as join,
+            patch.object(identity_mod, "_replace_secret") as replace,
+        ):
+            with pytest.raises(RuntimeError, match="TERRAPOD_JOIN_TOKEN"):
+                await identity_mod.rejoin_identity(_RC, current=held)
+
+        join.assert_not_called()
+        replace.assert_not_called()
