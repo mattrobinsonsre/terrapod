@@ -36,6 +36,7 @@ import {
   vocabularyFor,
 } from '@/lib/phase-vocabulary'
 import { gateOf, holdActivityKey, phaseOf, type Gate } from '@/lib/run-hold'
+import { RUN_TIMELINE_KEYS } from '@/lib/run-timeline'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
 const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
@@ -2567,22 +2568,23 @@ function RunDetailPageInner() {
           )}
         </div>
 
-        {/* Status timeline */}
+        {/* Status timeline -- order comes from RUN_TIMELINE_KEYS, which is
+            chronological and tested; see web/src/lib/run-timeline.ts */}
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
           <h3 className="text-sm font-medium text-slate-300 mb-4">{t('timeline.heading')}</h3>
           <div className="space-y-2">
-            {[
-              ['queued-at', t('timeline.queued')],
-              ['planning-at', word('timelinePlanningStarted')],
-              ['planned-at', word('timelinePlanComplete')],
-              ['confirmed-at', t('timeline.confirmed')],
-              ['applying-at', word('timelineApplyingStarted')],
-              ['applied-at', word('timelineApplied')],
-              ['configuring-at', t('timeline.configuring')],
-              ['errored-at', t('timeline.errored')],
-              ['canceled-at', t('timeline.canceled')],
-              ['discarded-at', t('timeline.discarded')],
-            ]
+            {RUN_TIMELINE_KEYS.map(key => [key, ({
+              'queued-at': t('timeline.queued'),
+              'planning-at': word('timelinePlanningStarted'),
+              'planned-at': word('timelinePlanComplete'),
+              'confirmed-at': t('timeline.confirmed'),
+              'applying-at': word('timelineApplyingStarted'),
+              'configuring-at': t('timeline.configuring'),
+              'applied-at': word('timelineApplied'),
+              'errored-at': t('timeline.errored'),
+              'canceled-at': t('timeline.canceled'),
+              'discarded-at': t('timeline.discarded'),
+            } as Record<string, string>)[key]] as const)
               .filter(([key]) => timestamps[key as string])
               .map(([key, label]) => (
                 <div key={key} className="flex items-center gap-3">

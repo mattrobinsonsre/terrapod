@@ -92,7 +92,22 @@ class Ctx:
                 raw = r.read()
                 return r.status, (json.loads(raw) if raw else {})
         except urllib.error.HTTPError as e:
-            return e.code, e.read()[:400].decode(errors="replace")
+            # A DICT on this path too, because every success path returns one
+            # and callers index the result. Returning the decoded text made a
+            # refusal surface as `AttributeError: 'str' object has no attribute
+            # 'get'` -- a harness crash where the honest verdict is "the API
+            # refused". Terrapod's error envelope is JSON:API with a top-level
+            # `detail`, so parsing it hands the caller the real message; the
+            # `_raw` fallback is for a refusal that is not ours (an ingress 502,
+            # say) and keeps the shape a dict regardless.
+            raw = e.read()[:400]
+            try:
+                parsed = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict):
+                return e.code, parsed
+            return e.code, {"_raw": raw.decode(errors="replace")}
 
     def tofu(
         self,
@@ -337,7 +352,11 @@ def saved_plan(ctx: Ctx) -> None:
     read afterwards; a server-side plan takes as long as it takes and waiting
     for one would make this the slowest check here by an order of magnitude.
     """
-    pools = ctx.api("GET", "/api/v1/agent-pools")[1]
+    code, pools = ctx.api("GET", "/api/v1/agent-pools")
+    if code != 200:
+        # Checked rather than indexed: this used to take `[1]` and read on, so
+        # a refusal became a confusing empty result instead of naming itself.
+        raise Fail(f"the agent-pool list answered {code}: {pools}")
     if not pools.get("data"):
         raise Fail("no agent pool exists, so agent-mode execution cannot be exercised")
     pool = pools["data"][0]["id"]
