@@ -95,6 +95,36 @@ DELIBERATELY_ABSENT = {
 #: Floors, so a matcher that stops matching FAILS rather than passing on nothing.
 MIN_SPEC_FIELDS = 20
 MIN_EMITTED = 20
+MIN_TABLE_CHARS = 400
+
+
+#: The heading the divergence table lives under, and the one after it. The
+#: gate's promise is that a gap appears in THAT table -- not merely somewhere in
+#: a 400-line document, which a passing mention elsewhere would satisfy.
+DIVERGENCE_HEADING = "### Where Terrapod diverges, and why"
+
+
+def divergence_table(doc: str) -> str:
+    """The divergence table's own text, sliced from its heading to the next one.
+
+    Checking the whole document would be the looser thing this gate's docstring
+    does not claim: `plan_json_api_url` is named in the payload notes as well,
+    so a whole-document search passes even with the table row deleted. Slicing
+    makes the check the one that was promised.
+    """
+    start = doc.find(DIVERGENCE_HEADING)
+    if start < 0:
+        raise SystemExit(
+            f"{DOC.name} no longer has a {DIVERGENCE_HEADING!r} heading. That table is "
+            "where a deliberate gap is explained to an integrator; restore it, or teach "
+            "this gate the new heading."
+        )
+    rest = doc[start + len(DIVERGENCE_HEADING) :]
+    end = rest.find("\n## ")
+    nxt = rest.find("\n### ")
+    if 0 <= nxt < (end if end >= 0 else len(rest)):
+        end = nxt
+    return rest[:end] if end >= 0 else rest
 
 
 def emitted_fields() -> set[str]:
@@ -118,12 +148,19 @@ def main() -> int:
     problems: list[str] = []
     emitted = emitted_fields()
     doc = DOC.read_text()
+    table = divergence_table(doc)
 
     if len(SPEC_PAYLOAD_FIELDS) < MIN_SPEC_FIELDS:
         problems.append(
             f"only {len(SPEC_PAYLOAD_FIELDS)} spec fields are transcribed, below the floor "
             f"of {MIN_SPEC_FIELDS}. Lines have been removed from SPEC_PAYLOAD_FIELDS, which "
             "silences this gate rather than satisfying it."
+        )
+    if len(table.strip()) < MIN_TABLE_CHARS:
+        problems.append(
+            f"the divergence table under {DIVERGENCE_HEADING!r} is only "
+            f"{len(table.strip())} characters, below the floor of {MIN_TABLE_CHARS}. "
+            "An emptied table would let every gap below read as documented."
         )
     if len(emitted) < MIN_EMITTED:
         problems.append(
@@ -148,11 +185,13 @@ def main() -> int:
                 f"{DOC.name}, which currently tells an integrator we do not send it."
             )
             continue
-        if phrase not in doc:
+        if phrase not in table:
+            where = "nowhere in" if phrase not in doc else "elsewhere in, but not in that table of"
             problems.append(
                 f"ABSENT AND UNDOCUMENTED: {field}\n"
-                f"      Not sent, and {phrase!r} appears nowhere in {DOC.name}. A gap has to be "
-                "a decision someone can read, not a line in a gate."
+                f"      Not sent, and {phrase!r} appears {where} {DOC.name} under "
+                f"{DIVERGENCE_HEADING!r}. A gap has to be a decision an integrator can read "
+                "where they look for it, not a line in a gate."
             )
 
     if problems:
