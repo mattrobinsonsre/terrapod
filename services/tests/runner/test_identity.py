@@ -758,3 +758,41 @@ class TestRejoinIdentity:
 
         join.assert_not_called()
         replace.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_losing_the_create_race_also_adopts_the_winner(self):
+        """The `_SecretAlreadyExists` half of the same handler.
+
+        Reachable when an operator has run the manual identity reset
+        (`kubectl delete secret ...`) and two pods re-join at once: both read no
+        Secret, both join, and the loser's `_create_secret` gets a 409. It shares
+        one `except` with the replace path's `_SecretConflict`, so dropping just
+        this name from the tuple would leave the loser raising instead of
+        adopting -- and no test of the conflict path can see that, which is the
+        gate-written-for-one-instance-of-a-class shape.
+        """
+        win_lid, win_pid = uuid.uuid4(), uuid.uuid4()
+        winner = _v1secret(listener_id=win_lid, pool_id=win_pid, cert="WINPEM", rv="7")
+
+        env = {"TERRAPOD_JOIN_TOKEN": "a-live-token"}
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch.object(identity_mod, "_read_in_pod_namespace", return_value="terrapod"),
+            patch.object(identity_mod, "_read_secret", side_effect=[None, winner]),
+            patch.object(
+                identity_mod,
+                "_call_join",
+                new=AsyncMock(
+                    return_value=self._join_response(str(uuid.uuid4()), str(uuid.uuid4()))
+                ),
+            ),
+            patch.object(
+                identity_mod,
+                "_create_secret",
+                side_effect=identity_mod._SecretAlreadyExists("exists"),
+            ),
+        ):
+            result = await identity_mod.rejoin_identity(_RC, current=None)
+
+        assert result.listener_id == win_lid
+        assert result.certificate_pem == "WINPEM"
