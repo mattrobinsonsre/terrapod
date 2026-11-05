@@ -29,7 +29,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.routers import runs as runs_router
-from terrapod.api.routers.runs import _apply_status, _reported_run_status, _run_json
+from terrapod.api.routers.runs import (
+    _TFE_STATUS_FOLD,
+    _apply_status,
+    _reported_run_status,
+    _run_json,
+)
 from terrapod.auth.runner_tokens import RUNNER_PHASES
 from terrapod.services import run_service
 from terrapod.services.run_reconciler import _phase_of
@@ -64,6 +69,11 @@ def _run(status="configuring", **kw):
     ):
         setattr(run, f, kw.get(f))
     run.is_configure = kw.get("is_configure", False)
+    # Explicit for the same reason the timestamps above are: it is UNSET-truthy
+    # otherwise, and `_reported_run_status` reads it to decide whether a `queued`
+    # run folds to `plan_queued` or to `apply_queued` (#2378) -- so a fixture
+    # that leaves it out makes every queued run look like a standalone configure.
+    run.configure_after_apply = kw.get("configure_after_apply", False)
     run.error_message = ""
     run.source = "tfe-api"
     return run
@@ -72,11 +82,20 @@ def _run(status="configuring", **kw):
 # ───────────────────────── the fold, as a contrast ─────────────────────────
 
 
-class TestConfiguringFoldsOnlyOnTheFrozenSurface:
+class TestTheFoldAppliesToTheFrozenSurfaceOnly:
     """The property is a RELATIONSHIP between two surfaces.
 
     A test that builds one of them passes whichever way the fold is written,
     including not written at all -- so every assertion here is a pair.
+
+    **This class used to be named for `configuring` being the ONLY fold, and
+    parametrised a hardcoded list of "every other status" to prove it.** That
+    premise died with #2378, which added `canceling` and `queued` -- both had
+    been going out verbatim and neither is a `tfe.RunStatus`, so a `go-tfe`
+    client's `switch r.Status` fell through every case. A hardcoded list is why
+    this file had to be edited to accept a correct change; the membership is
+    DERIVED from `_TFE_STATUS_FOLD` now, so a legitimate new entry does not
+    break it and an illegitimate one still does.
     """
 
     def test_the_same_run_reads_differently_per_surface(self):
@@ -90,15 +109,28 @@ class TestConfiguringFoldsOnlyOnTheFrozenSurface:
             "value it does not know is treated as unrecognised"
         )
 
-    @pytest.mark.parametrize(
-        "status", ["pending", "queued", "planning", "planned", "confirmed", "applying", "applied"]
-    )
-    def test_every_other_status_is_identical_on_both_surfaces(self, status):
-        # The fold must be exactly one entry wide. A Terraform user's run reads
-        # byte-identically to before on both prefixes.
-        run = _run(status)
-        assert _reported_run_status(run, tfe=False) == status
-        assert _reported_run_status(run, tfe=True) == status
+    def test_an_unfolded_status_is_identical_on_both_surfaces(self):
+        """Derived, not listed: every stored status the fold does not name must
+        read byte-identically on both prefixes. That is the half which keeps the
+        fold from quietly widening -- an entry added without being added to
+        `_TFE_STATUS_FOLD` would change the native surface too."""
+        stored = set(VALID_TRANSITIONS) | set().union(*VALID_TRANSITIONS.values())
+        unfolded = sorted(stored - set(_TFE_STATUS_FOLD))
+        assert unfolded, "the fold cannot name every status"
+        for status in unfolded:
+            run = _run(status)
+            assert _reported_run_status(run, tfe=False) == status, status
+            assert _reported_run_status(run, tfe=True) == status, status
+
+    def test_every_folded_status_actually_differs(self):
+        """And the other direction, which a no-op entry would slip past: a status
+        IN the fold must read differently on the two surfaces. An entry mapping a
+        status to itself would be decorative, and would read as deliberate."""
+        for status, folded in _TFE_STATUS_FOLD.items():
+            assert folded != status, f"{status!r} folds to itself, which buys nothing"
+            run = _run(status)
+            assert _reported_run_status(run, tfe=False) == status
+            assert _reported_run_status(run, tfe=True) == folded
 
     def test_the_serializer_folds_too(self):
         run = _run("configuring")
