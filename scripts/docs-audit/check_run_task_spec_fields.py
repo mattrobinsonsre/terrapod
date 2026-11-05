@@ -100,9 +100,7 @@ MIN_EMITTED = 20
 def emitted_fields() -> set[str]:
     """The payload's keys, read out of the builder's single return dict."""
     tree = ast.parse(DISPATCHER.read_text())
-    builders = [
-        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == BUILDER
-    ]
+    builders = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == BUILDER]
     if len(builders) != 1:
         raise SystemExit(f"expected exactly one {BUILDER}, found {len(builders)}")
     returns = [n for n in ast.walk(builders[0]) if isinstance(n, ast.Return)]
