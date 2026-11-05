@@ -1082,6 +1082,46 @@ listener:
 
 For Tilt local development, `values-local.yaml` overrides `listener_cert_ttl_seconds: 300` so a full bootstrap → renew → rotate cycle completes in a few minutes instead of an hour.
 
+### Re-join after persistent auth failures
+
+Renewal cannot recover from every rejection: an expired certificate cannot renew
+itself, and a Redis listener registration that has aged out leaves a perfectly
+valid cert that the API no longer recognises. The listener's last automatic
+recovery is to **re-join the pool** — which consumes a join-token use, so it is
+deliberately hard to trigger and bounded once triggered.
+
+- **Three authoritative rejections**, not one. A single `401` can be a flap. The
+  count survives transport failures on purpose: a listener whose cert has expired
+  is usually failing to connect as well, and a counter reset by any error at all
+  never reaches the threshold. A `401` from `/renew` and a `401` from the SSE
+  stream count towards the same threshold.
+- **One attempt a minute at most.** The count deliberately survives a *failed*
+  re-join, so without a floor on the interval every later rejection would spend
+  another token use.
+- **The join happens before the Secret is written.** A re-join that fails leaves
+  the listener exactly where it was, still holding the cert the API is rejecting.
+  It does not destroy its own credential in order to discover that the join token
+  is spent — which matters because an exhausted, revoked and **expired** token are
+  indistinguishable from the listener's side, and the default token TTL is one
+  hour.
+- **A sibling's re-join is adopted, not duplicated.** The credentials Secret is
+  read first, and a `resourceVersion` that has moved past the one this pod holds
+  means another pod has already re-joined (or renewed); its identity is adopted
+  instead of spending a second token use. So a fleet-wide registration expiry
+  costs the deployment roughly one token use rather than one per pod. On a lost
+  write race the winner is adopted, exactly as in renewal.
+
+What an operator sees: `Forcing re-join due to persistent auth failures` at error
+level, then either `Re-joined pool via token and wrote the credentials Secret` or
+`Re-join failed`. Repeated re-joins eventually exhaust `max_uses` — worth an
+alert on that first line.
+
+If the join token is spent or expired, no automatic recovery is possible and the
+listener keeps reporting the rejection until a usable token exists. Issue a
+replacement through the API; see
+[Manual identity reset](#operational-notes) below if you also want to force every
+pod onto a fresh identity.
+
 ### Operational notes
 
 - **Manual identity reset.** Delete the credentials Secret to force a fresh join on the next pod start: `kubectl -n terrapod delete secret {release-fullname}-listener-credentials` (find the exact name with `kubectl get secret -l app.kubernetes.io/component=listener`). This invalidates all running pods' certs on the next renewal. Rotate the join token first if the old one is no longer trusted.

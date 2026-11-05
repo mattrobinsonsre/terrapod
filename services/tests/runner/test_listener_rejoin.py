@@ -182,3 +182,55 @@ class TestReJoinIsSerialised:
 
         assert ran["n"] == 1, "the second caller must see the generation move and skip"
         assert listener._rejoin_generation == 1
+
+
+class TestTheRejoinMechanismIsCalledCorrectly:
+    """The gate above patches `_rejoin_unlocked`, so nothing here exercised it.
+
+    Two properties of the CALL, which no test of `rejoin_identity` itself can
+    see: that the listener hands it the identity it holds, and that a failure
+    propagates rather than being swallowed into a partial state.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_held_identity_is_passed_so_a_sibling_can_be_distinguished(self):
+        """`current=None` would make `rejoin_identity` adopt our own rejected cert.
+
+        The resourceVersion we hold is the only thing separating "a sibling has
+        re-joined, adopt it" from "the Secret still holds the cert being
+        rejected", so dropping this argument is silently fatal: the listener
+        would adopt the rejected cert for ever and never join.
+        """
+        listener = _make_listener()
+        fresh = SimpleNamespace(
+            listener_id="22222222-2222-2222-2222-222222222222",
+            name="listener",
+            api_url="http://test",
+            certificate_pem="",
+        )
+        rejoin = AsyncMock(return_value=fresh)
+
+        with patch("terrapod.runner.identity.rejoin_identity", rejoin):
+            await listener._rejoin_unlocked()
+
+        assert rejoin.await_args.kwargs["current"] is not None
+        assert listener.identity is fresh
+        assert listener._identity_ready is True
+        # The cached headers are keyed on the old cert and must not survive.
+        assert listener._cached_auth_headers_for_cert is None
+
+    @pytest.mark.asyncio
+    async def test_a_failed_rejoin_propagates_and_leaves_the_old_identity(self):
+        listener = _make_listener()
+        held = listener.identity
+
+        with patch(
+            "terrapod.runner.identity.rejoin_identity",
+            AsyncMock(side_effect=RuntimeError("join refused")),
+        ):
+            with pytest.raises(RuntimeError, match="join refused"):
+                await listener._rejoin_unlocked()
+
+        # Unchanged: the caller's `except Exception` turns this into a False, and
+        # the listener keeps the identity it had rather than holding none.
+        assert listener.identity is held

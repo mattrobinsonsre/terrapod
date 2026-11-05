@@ -117,32 +117,126 @@ async def establish_identity(runner_config: RunnerConfig) -> ListenerIdentity:
     return await _bootstrap_via_join_token(name, api_url, secret_name, namespace)
 
 
-# ── Secret I/O ──────────────────────────────────────────────────────
+async def rejoin_identity(
+    runner_config: RunnerConfig, *, current: ListenerIdentity | None
+) -> ListenerIdentity:
+    """Re-join the pool, writing the credentials Secret only once a new identity exists.
 
+    This replaces `clear_credentials_secret()` + `establish_identity()`, which
+    destroyed the credential before obtaining its replacement. The invariant it
+    now holds is the one the rest of this project already applies to a schema:
+    **never contract before the replacement exists.**
 
-def clear_credentials_secret(runner_config: RunnerConfig) -> None:
-    """Delete the credentials Secret so the next establish_identity() bootstraps fresh.
+    The old order was unsafe because `/join` can fail for a reason the listener
+    cannot do anything about, and `_call_join` collapses *revoked*, *exhausted*
+    and **expired** into one `_JoinTokenExhausted`. With
+    `default_join_token_ttl_seconds: 3600` the bootstrap token is dead after an
+    hour, so any listener alive longer than that holds one that cannot join --
+    and the old order deleted a cert it still held in order to find that out.
+    The consequences were asymmetric and both bad: the running pod kept its
+    in-memory cert and merely went on being rejected, while **a pod restart then
+    found no Secret, no usable token, and crash-looped** -- recoverable only by
+    minting a fresh join token by hand. A Redis fingerprint flush made that the
+    state of every pod in the fleet at once.
 
-    Used by `_rejoin` after persistent 401s — the cert in the Secret has been
-    rejected by the API (e.g. Redis listener registration aged out and the
-    fingerprint check now fails). Removing the Secret forces fall-through to
-    the join-token path. Other pods sharing the deployment will see the
-    Secret vanish on their next renewal cycle and join afresh themselves —
-    that's the price of a shared identity going stale.
+    Joining first costs nothing. The cert we hold is being rejected, so keeping
+    it has no upside -- but it has no downside either, and on a failure the
+    listener is left exactly where it was rather than somewhere worse.
+
+    **A sibling's re-join is adopted rather than duplicated.** The Secret is
+    read first, and a `resourceVersion` that has MOVED since the one we hold
+    means another pod re-joined (or renewed) meanwhile, so we take its identity
+    instead of spending a second join-token use -- which on a `max_uses: 1` pool
+    is the difference between a recovered deployment and an unjoinable one. The
+    comparison is against the version we hold, not merely "a Secret exists":
+    without that we would adopt our own rejected cert and never join at all.
+
+    On a lost CAS race the winner is adopted, exactly as the renewal loop does.
     """
-    from kubernetes.client.rest import ApiException
-
     name = runner_config.listener_name
+    api_url = runner_config.server_url or "http://localhost:8000"
     secret_name = _credentials_secret_name(name, runner_config.credentials_secret_name)
     namespace = _read_in_pod_namespace(runner_config.listener_namespace)
-    api = _core_api()
+
+    held = current.secret_resource_version if current is not None else None
+    secret = _read_secret(secret_name, namespace)
+    if secret is not None and secret.metadata.resource_version != held:
+        identity = _identity_from_secret(secret, name=name, api_url=api_url)
+        logger.info(
+            "Credentials Secret moved since ours was loaded; adopting it instead of re-joining",
+            listener_id=str(identity.listener_id),
+            name=name,
+        )
+        return identity
+
+    join_token = os.environ.get("TERRAPOD_JOIN_TOKEN", "")
+    if not join_token:
+        raise RuntimeError(
+            "TERRAPOD_JOIN_TOKEN is required to re-join after persistent auth failures. "
+            "Create a join token via the API, store it in the listener's join-token "
+            "Secret, and restart."
+        )
+
+    # Raises on every failure, and the Secret is still untouched when it does.
+    data = await _call_join(api_url, join_token, name)
+
     try:
-        api.delete_namespaced_secret(name=secret_name, namespace=namespace)
-        logger.info("Cleared credentials Secret", secret=f"{namespace}/{secret_name}")
-    except ApiException as e:
-        if e.status == 404:
-            return  # already gone
-        logger.warning("Failed to clear credentials Secret", error=str(e))
+        if secret is None:
+            written = _create_secret(
+                secret_name,
+                namespace,
+                cert=data["certificate"],
+                key=data["private_key"],
+                ca=data["ca_certificate"],
+                listener_id=uuid.UUID(data["listener_id"]),
+                pool_id=uuid.UUID(data["pool_id"]),
+            )
+        else:
+            written = _replace_secret(
+                secret_name,
+                namespace,
+                cert=data["certificate"],
+                key=data["private_key"],
+                ca=data["ca_certificate"],
+                listener_id=uuid.UUID(data["listener_id"]),
+                pool_id=uuid.UUID(data["pool_id"]),
+                resource_version=secret.metadata.resource_version,
+            )
+    except (_SecretConflict, _SecretAlreadyExists):
+        winner = _read_secret(secret_name, namespace)
+        if winner is None:
+            raise RuntimeError(
+                "Lost the CAS race on the credentials Secret and it then vanished; "
+                "will retry on the next re-join."
+            ) from None
+        identity = _identity_from_secret(winner, name=name, api_url=api_url)
+        logger.info(
+            "Lost CAS race while re-joining; adopted the winner's identity",
+            listener_id=str(identity.listener_id),
+            name=name,
+        )
+        return identity
+
+    identity = ListenerIdentity(
+        listener_id=uuid.UUID(data["listener_id"]),
+        name=name,
+        pool_id=uuid.UUID(data["pool_id"]),
+        api_url=api_url,
+        certificate_pem=data["certificate"],
+        private_key_pem=data["private_key"],
+        ca_cert_pem=data["ca_certificate"],
+        secret_resource_version=written.metadata.resource_version,
+    )
+    logger.info(
+        "Re-joined pool via token and wrote the credentials Secret",
+        listener_id=str(identity.listener_id),
+        name=name,
+        pool_id=str(identity.pool_id),
+    )
+    return identity
+
+
+# ── Secret I/O ──────────────────────────────────────────────────────
 
 
 def _credentials_secret_name(listener_name: str, explicit: str = "") -> str:

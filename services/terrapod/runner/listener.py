@@ -383,16 +383,22 @@ class RunnerListener:
             return True
 
     async def _rejoin_unlocked(self) -> None:
-        """Force a fresh join by clearing the credentials Secret and re-establishing.
+        """Obtain a fresh identity, then write it over the credentials Secret.
 
-        Called when the listener receives persistent 401s, indicating its
-        Redis registration has expired (300s TTL) and the API no longer
-        recognises the cert in our credentials Secret. We drop the Secret
-        so the next `establish_identity()` falls through to the join-token
-        path; other pods of the same deployment will pick up the change
-        on their next cert renewal cycle (Secret missing → bootstrap path).
+        Called when the listener receives persistent 401s, indicating its Redis
+        registration has expired (300s TTL) and the API no longer recognises the
+        cert in our credentials Secret.
+
+        The order is load-bearing and `rejoin_identity` owns it: the join happens
+        BEFORE the Secret is touched, so a join that fails leaves the listener
+        where it was rather than holding no credential at all. It used to delete
+        the Secret first, on the reasoning that siblings would see it vanish and
+        bootstrap themselves -- which made a failed join destructive and turned a
+        fleet-wide fingerprint expiry into every pod racing for one token use. A
+        sibling now sees the Secret CHANGE instead, which its renewal loop already
+        adopts at step 1.
         """
-        from terrapod.runner.identity import clear_credentials_secret
+        from terrapod.runner.identity import rejoin_identity
 
         # Error-level: this is an operator-actionable signal. Persistent auth
         # failures usually mean the cert in our Secret no longer matches what
@@ -406,8 +412,14 @@ class RunnerListener:
             listener_id=str(self.identity.listener_id) if self.identity else "<unknown>",
             name=self.identity.name if self.identity else "<unknown>",
         )
-        clear_credentials_secret(self.runner_config)
-        await self._establish_identity()
+        # `current=` is what distinguishes "a sibling has re-joined, adopt it"
+        # from "the Secret still holds the cert that is being rejected": the
+        # resourceVersion we hold is the only way to tell those apart, and
+        # passing None would make the first read adopt our own rejected cert.
+        self.identity = await rejoin_identity(self.runner_config, current=self.identity)
+        self._identity_ready = True
+        # Drop any cached headers so the next call re-encodes against the new cert.
+        self._cached_auth_headers_for_cert = None
 
         # Recreate HTTP clients with the new identity base URL
         if self._http_client:
@@ -595,7 +607,21 @@ class RunnerListener:
         while not _shutdown.is_set():
             try:
                 await self._sse_connect()
-                self._auth_failures = 0  # a successful connection clears the count
+                # A successful connection clears the count, and sharing one
+                # counter with the renewal loop is sound rather than merely
+                # convenient. A review suggested it was not -- that SSE
+                # authenticating says nothing about `/renew`, so a renew-only
+                # rejection might never reach the threshold. Measured, the two
+                # apply the SAME predicate: `authenticate_listener` (SSE) and
+                # `get_listener_identity` (renew) each verify the CA signature,
+                # the expiry, the CN's Redis registration and the fingerprint,
+                # both call `_enforce_listener_pop`, and the listener signs both
+                # through `_sign_headers`. So they cannot disagree on a 401, and
+                # a successful connect genuinely is evidence that renew would
+                # authenticate too. The one asymmetry the review named -- a 403
+                # on a `listener_id` mismatch -- is no longer a rejection at all:
+                # it is retried, because no reachable API path emits one there.
+                self._auth_failures = 0
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
                     # API doesn't recognise our listener-id: Redis TTL expired
