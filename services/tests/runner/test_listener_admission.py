@@ -382,3 +382,82 @@ async def test_a_wakeup_arriving_during_a_drain_is_not_lost():
             await asyncio.gather(listener._handle_run_available(), listener._handle_run_available())
 
     assert listener._launch_run.await_count == 1, "the second wakeup was dropped"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replicas", [1, 2, 3, 4, 6])
+async def test_several_replicas_sharing_a_namespace_stay_within_one_job_per_extra(replicas):
+    """Replicas coordinate only through the namespace-wide list, so bound it.
+
+    `listener.maxConcurrent` is documented as a POOL-wide ceiling, which means
+    this is the number an operator running more than one replica relies on.
+    Measured against a real apiserver: a list with no `resourceVersion` is a
+    consistent read, so a Job is visible to every replica the moment its
+    creation returns. What is left is the window between one replica deciding
+    it has room and its Job existing — one Job per extra replica, which is why
+    two replicas hold the cap exactly.
+
+    The parametrisation is the point: asserting only `<= max * replicas` would
+    pass on the pre-fix code.
+    """
+    from terrapod.runner.job_template import runner_job_name
+
+    max_concurrent, depth = 10, 60
+    served = {"n": 0}
+    created: list[str] = []  # the shared namespace
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/runs/next"):
+            if served["n"] >= depth:
+                return httpx.Response(204)
+            served["n"] += 1
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": f"run-{served['n']:08d}-0000-7000-8000-000000000000",
+                        "attributes": {"phase": "plan"},
+                    }
+                },
+            )
+        return httpx.Response(200, json={"ok": True})
+
+    async def shared_list(namespace: str = "", **kw) -> set[str]:
+        await asyncio.sleep(0)
+        return set(created)
+
+    async def fake_launch(run_id, attrs):
+        # A Job exists only once its creation RETURNS; the awaits are the
+        # claim/token/Secret/create round trips before that, and they are what
+        # opens the one window replicas cannot see into.
+        for _ in range(4):
+            await asyncio.sleep(0)
+        created.append(runner_job_name(run_id, attrs.get("phase", "plan")))
+
+    clients, passes = [], []
+    try:
+        for r in range(replicas):
+            client = httpx.AsyncClient(
+                base_url="http://test", transport=httpx.MockTransport(handler)
+            )
+            clients.append(client)
+            listener = _make_listener(client)
+            listener.identity.listener_id = f"{r:08d}-1111-1111-1111-111111111111"
+            listener._max_concurrent = max_concurrent
+            listener._launch_run = AsyncMock(side_effect=fake_launch)
+            passes.extend(listener._handle_run_available() for _ in range(12))
+
+        with patch("terrapod.runner.job_manager.list_occupying_runner_jobs", shared_list):
+            await asyncio.gather(*passes)
+    finally:
+        for client in clients:
+            await client.aclose()
+
+    # Derived, not tabulated: each replica can be at most one claim-and-create
+    # window ahead of what the shared list justified, so the pool can exceed
+    # the cap by at most one Job per EXTRA replica. A single replica is exact.
+    allowed_over = replicas - 1
+    assert len(created) <= max_concurrent + allowed_over, (
+        f"{replicas} replicas launched {len(created)} against a cap of {max_concurrent} "
+        f"(at most {allowed_over} over is expected)"
+    )
