@@ -24,6 +24,12 @@ So the subjects are DERIVED rather than listed: every `_get_*_api` in
 `job_manager`, and every config loader any client must call first. An accessor
 added tomorrow is covered by the first; a client built somewhere new is covered by
 the second, because a Kubernetes client cannot be built without loading config.
+It lives in `tests/runner/` rather than a `tests/meta/` tier because this release
+line has no such tier -- `tests/meta` is absent from the unit shard's path list in
+`ci.yml`, so a test placed there would be collected by nothing and this guard
+would be unprotected on the line while `main` has it protected. The paths below
+are relative to `parents[1]`/`parents[2]`, which are the same from either
+directory, so nothing else changes.
 """
 
 from __future__ import annotations
