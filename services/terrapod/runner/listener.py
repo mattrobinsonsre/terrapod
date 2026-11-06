@@ -104,6 +104,16 @@ class RunnerListener:
         self._last_rejoin_attempt = 0.0
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
+        #: Serialises the drain loop. Every SSE event is dispatched as its own
+        #: task and the API publishes one `run_available` per queued run, so a
+        #: burst starts one drain pass per run; each used to read occupancy and
+        #: admit against it independently, walking straight through
+        #: `max_concurrent` (#2399). Concurrent passes buy nothing — one pass
+        #: already drains the whole backlog (#750).
+        self._drain_lock = asyncio.Lock()
+        #: Set by every `run_available`; a wakeup arriving mid-drain makes the
+        #: holder loop once more rather than being lost.
+        self._drain_requested = False
         # Real running-Job count from K8s, refreshed each heartbeat (#749).
         # `_active_launches` only covers the create window; this is the honest
         # occupancy operators see in the pool/listener status and metrics.
@@ -796,53 +806,93 @@ class RunnerListener:
     # ── Event Handlers ───────────────────────────────────────────────
 
     async def _handle_run_available(self) -> None:
-        """Claim and launch queued runs up to capacity, then stop.
+        """Drain the pool's queued runs up to capacity.
 
-        Keeps claiming until the pool has no more queued runs (204) or the
-        listener is at capacity, so a backlog drains as fast as slots free
-        (#750) instead of one run per 30s poll — the API nudges the pool with a
-        fresh `run_available` on every terminal transition, and this loop
-        drains everything that fits in one pass. Each iteration re-checks real
-        capacity (#749), so a single event never over-admits onto a fixed
-        cluster.
+        **Serialised.** Every SSE event is dispatched as its own task
+        (`_sse_loop`), and the API publishes one `run_available` per run
+        entering `queued`, so queueing N runs starts N of these at once. Each
+        pass used to read occupancy and admit against it independently, which
+        is how a burst of 146 runs walked through a cap of 50 (#2399).
+
+        Concurrent passes buy nothing to begin with: one pass already drains
+        the whole backlog until capacity or an empty queue (#750). So a second
+        one is pure duplication, and the flag below means a wakeup that arrives
+        mid-drain is honoured by one more loop rather than lost.
         """
-        from terrapod.runner.job_manager import count_active_runner_jobs
+        self._drain_requested = True
+        if self._drain_lock.locked():
+            return  # the holder will see the flag and go round again
+        async with self._drain_lock:
+            while self._drain_requested:
+                self._drain_requested = False
+                if not await self._drain_once():
+                    # The pass stopped for capacity (or an unknown count), not
+                    # for an empty queue. Going round again cannot help —
+                    # nothing has freed, and a fresh pass starts with no
+                    # memory of the Jobs it just created, which is how the
+                    # second half of #2399's over-admission happened. A slot
+                    # freeing is itself an event: the API publishes
+                    # `run_available` on every terminal transition, and the
+                    # 30s poll is the backstop.
+                    return
 
-        launched = 0
+    async def _drain_once(self) -> bool:
+        """Claim and launch queued runs until capacity or an empty queue.
+
+        Returns **True** when it stopped because the pool had no more queued
+        runs, and **False** when it stopped at capacity or could not read
+        occupancy. The caller re-drains only on True — see
+        `_handle_run_available`.
+
+        Runs under `_drain_lock`, so there is exactly one of these in flight
+        per listener. Each iteration re-reads real occupancy from Kubernetes
+        (#749), so a slot freed mid-drain is used and a cluster that is already
+        full is never over-admitted onto.
+        """
+        from terrapod.runner.job_manager import list_occupying_runner_jobs
+        from terrapod.runner.job_template import runner_job_name
+
+        # Jobs this pass created. The apiserver may serve the list below from a
+        # slightly stale watch cache, so a Job created a moment ago can be
+        # missing from it; unioning the names makes the count exact either way,
+        # and a union cannot double-count the way adding an integer would.
+        launched_names: set[str] = set()
+
         while True:
             # Fast local guard — never exceed max_concurrent from launch ops
             # alone (also bounds this loop even if K8s counting fails open).
             if self._active_launches >= self._max_concurrent:
-                return
+                return False
 
-            # Capacity-aware admission (#749): gate on the real running-Job
-            # count from K8s (authoritative — keeps the listener stateless) plus
-            # in-flight launches plus Jobs already launched *this* pass. The K8s
-            # count lags a just-created Job (its pod isn't active yet), so
-            # `launched` prevents a single drain pass from over-admitting.
-            active_jobs = await count_active_runner_jobs(self.runner_config.runner_namespace)
-            if active_jobs is None:
+            # Capacity-aware admission (#749): gate on the real set of
+            # occupying Jobs from K8s (authoritative — keeps the listener
+            # stateless), plus the in-flight claim→create window, plus what
+            # this pass has already created.
+            occupying = await list_occupying_runner_jobs(self.runner_config.runner_namespace)
+            if occupying is None:
                 # Fail CLOSED: K8s (the source of truth for occupancy) was
                 # unreachable after retries. Defer this drain pass rather than
                 # launch blind — the runs stay queued and the next
                 # `run_available`/poll re-drives them. This is what stops a
                 # transient apiserver blip from snowballing into an over-launch
-                # storm (see count_active_runner_jobs).
+                # storm (see list_occupying_runner_jobs).
                 logger.warning(
-                    "Deferring run claim — active-Job count unknown from K8s (fail-closed)",
+                    "Deferring run claim — occupancy unknown from K8s (fail-closed)",
                     active_launches=self._active_launches,
-                    launched=launched,
+                    launched=len(launched_names),
                 )
-                return
-            if self._active_launches + active_jobs + launched >= self._max_concurrent:
-                if launched == 0:
+                return False
+
+            occupancy = len(occupying | launched_names)
+            if self._active_launches + occupancy >= self._max_concurrent:
+                if not launched_names:
                     logger.debug(
                         "At capacity — deferring run claim",
-                        active_jobs=active_jobs,
+                        occupancy=occupancy,
                         active_launches=self._active_launches,
                         max_concurrent=self._max_concurrent,
                     )
-                return
+                return False
 
             response = await arequest_with_retry(
                 self._http_client,
@@ -852,20 +902,25 @@ class RunnerListener:
             )
 
             if response.status_code == 204:
-                return  # No more queued runs for this pool
+                return True  # No more queued runs for this pool
             response.raise_for_status()
 
             data = response.json()["data"]
             run_id = data["id"].removeprefix("run-")
             attrs = data.get("attributes", {})
 
-            # Launch the Job in the background (fire-and-forget)
+            # Reserve the slot BEFORE launching, and keep it reserved even if
+            # the launch fails: a launch that fails *after* creating the Job
+            # leaves the Job occupying a node, and one that fails before it
+            # costs this pass a single slot that the next list corrects.
+            # Over-admitting is the expensive direction.
+            launched_names.add(runner_job_name(run_id, attrs.get("phase", "plan")))
+
             self._active_launches += 1
             try:
                 await self._launch_run(run_id, attrs)
             finally:
                 self._active_launches -= 1
-            launched += 1
 
     async def _launch_run(self, run_id: str, attrs: dict) -> None:
         """Build and launch a K8s Job for a claimed run, then report back.

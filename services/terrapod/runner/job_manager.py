@@ -536,36 +536,69 @@ async def job_is_finished(job_name: str, namespace: str = "") -> bool:
     )
 
 
-async def count_active_runner_jobs(
+def _job_is_terminal(job) -> bool:
+    """Has the Job controller finished with this Job?
+
+    Decided from the Job's **conditions**, not from its `succeeded` / `failed`
+    pod counters, because runner Jobs carry `backoffLimit: 3`: a Job whose
+    first pod failed has `failed == 1` and is *retrying*, so it still occupies
+    a slot. Reading `failed > 0` as terminal -- which this did until #2399 --
+    made a retrying Job invisible to admission.
+
+    `Complete` and `Failed` are the two terminal conditions; an
+    `activeDeadlineSeconds` expiry arrives as `Failed` too.
+    """
+    status = job.status
+    if not status:
+        return False
+    for cond in status.conditions or []:
+        if cond.type in ("Complete", "Failed") and cond.status == "True":
+            return True
+    return False
+
+
+async def list_occupying_runner_jobs(
     namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
-) -> int | None:
-    """Count runner Jobs currently occupying capacity in the namespace — i.e.
-    non-terminal Jobs with at least one active (Pending or Running) pod (#749).
+) -> set[str] | None:
+    """The NAMES of runner Jobs currently occupying capacity in `namespace`.
+
+    A Job occupies a slot from the moment it **exists** until the Job
+    controller declares it terminal. That is deliberately not
+    `status.active > 0`: `active` counts *pods*, and a Job that has just been
+    created has none yet, so it reads as zero. Between
+    `create_namespaced_job` returning and the Job controller creating the pod,
+    such a Job was counted by **nothing** -- not here, and not by the
+    listener's in-flight counter, which is released as soon as the Job is
+    created -- so a burst of concurrent admissions walked straight through
+    `max_concurrent` (#2399).
+
+    Counting a Job that merely exists is also the honest answer for an
+    **unschedulable** one: it holds no pod, but it will take a node the moment
+    one frees, and #1198's reaper is what releases its slot.
+
+    Returns names rather than a count so a caller can union in Jobs it created
+    itself a moment ago. That is what makes admission exact even if the
+    apiserver serves this list from a slightly stale watch cache.
 
     Kubernetes is the source of truth for occupancy, so this queries it live on
     every call rather than trusting a local counter (which would drift as Jobs
-    complete, get evicted, or are launched by other listener replicas). The
-    listener admits runs up to `max_concurrent`; its in-process
-    `_active_launches` counter only tracks the brief launch-create window, so
-    counting real Jobs from K8s is what makes admission reflect actual occupancy
-    and keeps the listener stateless.
+    complete, get evicted, or are launched by another listener replica) --
+    which is also what keeps the listener stateless.
 
     Selects by the runner component label (`app.kubernetes.io/component=runner`)
-    that every runner Job carries, scoped to `namespace`. Terminal Jobs
-    (succeeded/failed) are excluded — they no longer occupy a slot. A Job that
-    exists but has no active pod yet is covered by `_active_launches` on the
-    listener, so it is not double-counted here.
+    that every runner Job carries, scoped to `namespace`.
 
     The list is **retried with bounded backoff** on transient errors. On
-    persistent failure it returns **None** ("occupancy unknown"), NOT 0 — and
-    the caller MUST treat None as *fail-closed* (defer launching). Returning 0
-    on error is fail-OPEN and dangerous under load: a struggling apiserver times
-    out the list → "0 active" reads as full capacity → the listener launches a
-    whole batch → that adds apiserver load and more list timeouts → a runaway
-    over-launch storm. Failing closed keeps the runs queued (recoverable, and
-    re-driven by the next `run_available`/poll) instead of stampeding a
-    struggling apiserver. (#748's reconciler remains the backstop for any Job
-    that does slip through and can't be placed.)
+    persistent failure it returns **None** ("occupancy unknown"), NOT an empty
+    set -- and the caller MUST treat None as *fail-closed* (defer launching).
+    Returning empty on error is fail-OPEN and dangerous under load: a
+    struggling apiserver times out the list -> "nothing occupied" reads as full
+    capacity -> the listener launches a whole batch -> that adds apiserver load
+    and more list timeouts -> a runaway over-launch storm. Failing closed keeps
+    the runs queued (recoverable, and re-driven by the next
+    `run_available`/poll) instead of stampeding a struggling apiserver.
+    (#748's reconciler remains the backstop for any Job that does slip through
+    and cannot be placed.)
     """
     if not namespace:
         namespace = _default_namespace()
@@ -590,29 +623,40 @@ async def count_active_runner_jobs(
             )
             batch_api.api_client.last_response = None
 
-            count = 0
+            occupying: set[str] = set()
             for job in jobs.items:
-                st = job.status
-                if not st:
-                    continue
-                if (st.succeeded and st.succeeded > 0) or (st.failed and st.failed > 0):
-                    continue  # terminal — no longer occupies a slot
-                if st.active and st.active > 0:
-                    count += 1
-            return count
-        except Exception as e:  # noqa: BLE001 — any K8s/list error is retryable
+                if _job_is_terminal(job):
+                    continue  # the controller is done with it -- slot released
+                name = job.metadata.name if job.metadata else None
+                if name:
+                    occupying.add(name)
+            return occupying
+        except Exception as e:  # noqa: BLE001 -- any K8s/list error is retryable
             last_error = e
             if attempt < retries - 1:
                 await asyncio.sleep(backoff_base * (attempt + 1))
 
-    # Persistent failure → fail CLOSED (caller defers launching). See docstring.
+    # Persistent failure -> fail CLOSED (caller defers launching). See docstring.
     logger.warning(
-        "Could not determine active runner-Job count from K8s after retries — "
+        "Could not determine occupying runner-Job names from K8s after retries — "
         "reporting unknown; admission will fail closed",
         error=str(last_error),
         retries=retries,
     )
     return None
+
+
+async def count_active_runner_jobs(
+    namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
+) -> int | None:
+    """How many runner Jobs occupy capacity in `namespace`, or None if unknown.
+
+    A thin wrapper over `list_occupying_runner_jobs`, for callers that need
+    only the size -- the heartbeat's operator-visible occupancy figure. See
+    that function for what "occupying" means, and why None MUST fail closed.
+    """
+    names = await list_occupying_runner_jobs(namespace, retries=retries, backoff_base=backoff_base)
+    return None if names is None else len(names)
 
 
 async def get_pod_terminated_info(
