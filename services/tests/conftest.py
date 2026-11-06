@@ -149,3 +149,39 @@ def _stateless_token_signing_key():
     finally:
         token_signing._signing_key = previous_key
         token_signing._provenance = previous_provenance
+
+
+# No test may reach a real Kubernetes cluster (#2406).
+#
+# `job_manager._get_batch_api` lazily calls `init_k8s()`, which loads the
+# developer's kubeconfig and caches the client in module globals. A test that
+# forgets to patch its occupancy or Job call therefore behaves DIFFERENTLY by
+# environment: on a workstation it issues a real `list_namespaced_job` against
+# whatever context happens to be current and passes, while on a CI runner with
+# no cluster it fails closed and fails. That is not a hypothetical -- it is how
+# two tests in #2399 passed the entire local blast radius and then failed in
+# CI, and the module-global caching means the first test to do it leaves a live
+# client behind for every test after it.
+#
+# So the default is a refusal that names the fix. A test that genuinely wants
+# the client patches `_get_batch_api` itself, which overrides this.
+@pytest.fixture(autouse=True)
+def _no_real_kubernetes():
+    from terrapod.runner import job_manager
+
+    def _refuse():
+        raise RuntimeError(
+            "This test reached the real Kubernetes client. Patch what it calls "
+            "instead -- e.g. patch('terrapod.runner.job_manager."
+            "list_occupying_runner_jobs') for admission, or "
+            "patch('terrapod.runner.job_manager._get_batch_api') for a Job call. "
+            "Left unpatched, this test passes on a machine with a kubeconfig and "
+            "fails in CI (#2406)."
+        )
+
+    previous = job_manager._get_batch_api
+    job_manager._get_batch_api = _refuse
+    try:
+        yield
+    finally:
+        job_manager._get_batch_api = previous

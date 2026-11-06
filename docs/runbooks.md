@@ -540,12 +540,35 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
      "https://<terrapod>/api/v1/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
    ```
 
-2. **Check listener capacity:**
+2. **Check listener capacity.** The listeners endpoint reports whether each
+   listener is alive, not how busy it is — it serialises `name` and `status`,
+   and deliberately not the occupancy figures:
+
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
      https://<terrapod>/api/v1/agent-pools/<pool-id>/listeners | \
-     jq '.data[] | {name: .attributes.name, active: .attributes["active-runs"], capacity: .attributes.capacity}'
+     jq '.data[] | {name: .attributes.name, status: .attributes.status}'
    ```
+
+   For occupancy, read the gauge the listener exports, which counts the runner
+   Jobs occupying its namespace:
+
+   ```promql
+   terrapod_listener_active_runs
+   ```
+
+   Or count them directly, which is the same question the listener asks on
+   every admission decision:
+
+   ```bash
+   kubectl get jobs -n <runner-namespace> \
+     -l app.kubernetes.io/component=runner \
+     -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}'
+   ```
+
+   Compare the count against `listener.maxConcurrent`, which is the
+   **pool-wide** ceiling — every replica admits against this same namespace-wide
+   count, so it is not multiplied by `listener.replicas`.
 
 3. **Check for scheduling issues on runner Jobs:**
    ```bash

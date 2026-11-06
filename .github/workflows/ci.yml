@@ -429,6 +429,15 @@ jobs:
       - name: (docs-audit) the run task payload covers the integration spec
         run: python3 scripts/docs-audit/check_run_task_spec_fields.py
 
+      # And that a field the docs tell an operator to READ is one we serialise
+      # (#2406). A runbook step is a command somebody runs during an incident:
+      # the queue-backlog runbook told them to read `.attributes["active-runs"]`
+      # and `.attributes.capacity`, and `_listener_json` emits neither, so the
+      # diagnostic printed nulls. Validated against the attribute contract
+      # snapshot, so there is no second source of truth to maintain.
+      - name: (docs-audit) the docs only read attributes the API serves
+        run: python3 scripts/docs-audit/check_doc_api_attributes.py
+
       # And that the CLI-surface body catalogues tell the truth (#2389). They
       # say, per attribute, whether Terrapod consumes it -- which is the claim
       # #1903 showed no route table can make: `POST /api/tfe/v2/runs` was served
