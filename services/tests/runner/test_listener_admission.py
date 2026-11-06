@@ -461,3 +461,83 @@ async def test_several_replicas_sharing_a_namespace_stay_within_one_job_per_extr
         f"{replicas} replicas launched {len(created)} against a cap of {max_concurrent} "
         f"(at most {allowed_over} over is expected)"
     )
+
+
+# ── #2399: the lock must never outlive the pass that took it ────────────────
+#
+# Serialising the drain made the lock the pool's admission path for this pod.
+# Anything that leaves it held — a raise, a hang — stops the listener claiming
+# for the life of the pod, and nothing notices: `/health` returns 200
+# unconditionally and the heartbeat keeps reporting healthy. That is strictly
+# worse than the over-admission being fixed, because it is silent.
+
+
+@pytest.mark.asyncio
+async def test_a_raising_drain_releases_the_lock_and_the_next_event_still_claims():
+    """A 5xx on `/runs/next` must not wedge admission.
+
+    `response.raise_for_status()` is not caught, so the exception leaves
+    `_handle_run_available`. Only the `async with` releases the lock — rewrite
+    it as acquire/release without try/finally, which is the obvious way to drop
+    an indent level, and this is the test that fails.
+    """
+    fail = {"on": True}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/runs/next"):
+            if fail["on"]:
+                return httpx.Response(500, json={"errors": [{"detail": "boom"}]})
+            return httpx.Response(204)
+        return httpx.Response(200, json={"ok": True})
+
+    async def empty_list(namespace: str = "", **kw) -> set[str]:
+        await asyncio.sleep(0)
+        return set()
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(base_url="http://test", transport=transport) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 3
+        listener._launch_run = AsyncMock()
+
+        with patch("terrapod.runner.job_manager.list_occupying_runner_jobs", empty_list):
+            with pytest.raises(httpx.HTTPStatusError):
+                await listener._handle_run_available()
+
+            assert not listener._drain_lock.locked(), "the lock outlived the failed pass"
+
+            # And the pool is still usable: a later event drains normally.
+            fail["on"] = False
+            await listener._handle_run_available()
+
+
+@pytest.mark.asyncio
+async def test_a_hung_drain_gives_the_lock_back_instead_of_holding_it_for_ever():
+    """The apiserver call inside the lock has no timeout of its own by default.
+
+    urllib3 does not time out, so a half-open connection parks an executor
+    thread and the `await` never returns. Without a deadline on the pass, the
+    lock is held for the life of the pod and every later event returns at the
+    `locked()` check to a holder that will never look again.
+    """
+
+    async def hangs(namespace: str = "", **kw) -> set[str]:
+        await asyncio.sleep(3600)  # never returns within the test
+        return set()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(base_url="http://test", transport=transport) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 3
+        listener._launch_run = AsyncMock()
+
+        with (
+            patch("terrapod.runner.job_manager.list_occupying_runner_jobs", hangs),
+            patch("terrapod.runner.listener._DRAIN_TIMEOUT_SECONDS", 0.05),
+        ):
+            await listener._handle_run_available()
+
+        assert not listener._drain_lock.locked(), "a hung pass kept the admission lock"
