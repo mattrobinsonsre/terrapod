@@ -9,8 +9,9 @@ retry helper's ``asyncio.sleep`` to an async no-op so the bounded backoff
 doesn't actually delay the test.
 """
 
+import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -109,3 +110,90 @@ async def test_heartbeat_read_timeout_exhausts_and_raises():
     # Default 3 retries → 4 total attempts before giving up.
     assert calls["n"] == 4
     assert listener._last_heartbeat_at is None
+
+
+# ── #2406: the heartbeat's occupancy report has a call site, not just a helper ──
+#
+# `_send_heartbeat` is what tells the API how busy a listener is, and #2403
+# changed what that number counts. Three mutations of the call site survived
+# the whole suite before these existed: deleting the occupancy read (every
+# heartbeat reports 0), dropping the `is not None` guard (a Kubernetes blip
+# sends `null`, which the code's own comment says must not happen), and
+# dropping `retries=1` (the heartbeat then pays admission-grade retry latency
+# on a blip). Testing the helper directly cannot see any of them.
+
+
+def _capture_heartbeat(bodies: list) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/heartbeat"):
+            bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True})
+
+    return httpx.AsyncClient(base_url="http://test", transport=httpx.MockTransport(handler))
+
+
+@pytest.mark.asyncio
+async def test_the_heartbeat_reports_the_occupancy_it_measured():
+    bodies: list = []
+    async with _capture_heartbeat(bodies) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 7
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=4),
+        ):
+            await listener._send_heartbeat()
+
+    assert len(bodies) == 1
+    assert bodies[0]["active_runs"] == 4, bodies[0]
+    assert bodies[0]["capacity"] == 7, bodies[0]
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_occupancy_keeps_the_last_value_rather_than_reporting_none():
+    """A Kubernetes blip must not publish `null` as the occupancy.
+
+    The listener's own comment says so: the figure is best-effort status that
+    self-heals on the next heartbeat, so an unknown reading keeps the last
+    one. Dropping the `is not None` guard sends `null` to the API, and nothing
+    noticed.
+    """
+    bodies: list = []
+    async with _capture_heartbeat(bodies) as client:
+        listener = _make_listener(client)
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=3),
+        ):
+            await listener._send_heartbeat()
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=None),  # occupancy unknown
+        ):
+            await listener._send_heartbeat()
+
+    assert [b["active_runs"] for b in bodies] == [3, 3], bodies
+
+
+@pytest.mark.asyncio
+async def test_the_heartbeat_does_not_pay_admission_grade_retries_for_occupancy():
+    """`retries=1`, because this figure is status rather than a decision.
+
+    Admission fails closed and retries hard when occupancy is unknown, since
+    it is about to launch Jobs. The heartbeat must not: it would add backoff
+    latency to every heartbeat during an apiserver blip, for a number that
+    self-heals on the next one.
+    """
+    seen: dict = {}
+
+    async def fake_count(namespace: str = "", **kw):
+        seen.update(namespace=namespace, **kw)
+        return 2
+
+    bodies: list = []
+    async with _capture_heartbeat(bodies) as client:
+        listener = _make_listener(client)
+        with patch("terrapod.runner.job_manager.count_active_runner_jobs", fake_count):
+            await listener._send_heartbeat()
+
+    assert seen.get("retries") == 1, seen
