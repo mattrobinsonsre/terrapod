@@ -1074,12 +1074,20 @@ class TestTheReservedNameMatchesTheJob:
 
     @pytest.mark.parametrize("phase", ["plan", "apply", "configure"])
     def test_the_predicted_name_is_the_name_the_spec_carries(self, phase):
-        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
-        from terrapod.runner.job_template import runner_job_name
+        """Calls the TEMPLATE directly, not an engine strategy.
+
+        Two reasons, and the second one bit on the carry to `release/v1.11`:
+        the template is the thing that actually assigns the name, so a strategy
+        wrapper would put a layer between the test and the property; and the
+        strategy layer is a 2.0 addition, so a test written against it fails on
+        every release line with a `TypeError` about an argument the older
+        template does not take. The six arguments below are the required set on
+        every supported line.
+        """
+        from terrapod.runner.job_template import build_job_spec, runner_job_name
 
         run_id = "01a15e7a-1809-7500-8000-000000000000"
-        spec = TerraformStrategy().build_job_spec(
-            options=TerraformRunOptions(),
+        spec = build_job_spec(
             run_id=run_id,
             phase=phase,
             runner_config=_runner_config(),
