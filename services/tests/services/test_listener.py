@@ -135,8 +135,13 @@ class TestHandleRunAvailable:
 
         listener._launch_run = AsyncMock()
         with patch(
-            "terrapod.runner.job_manager.count_active_runner_jobs",
-            AsyncMock(return_value=0),
+            # Patch the function the drain actually calls. Leaving this on the
+            # old name is a FALSE GREEN on a workstation: the real one loads
+            # the developer's kubeconfig and answers `set()`, so the claim
+            # proceeds, while a CI runner with no cluster fails closed and the
+            # claim never happens (#2399).
+            "terrapod.runner.job_manager.list_occupying_runner_jobs",
+            AsyncMock(return_value=set()),
         ):
             await listener._handle_run_available()
 
@@ -167,8 +172,13 @@ class TestHandleRunAvailable:
 
         listener._launch_run = AsyncMock()
         with patch(
-            "terrapod.runner.job_manager.count_active_runner_jobs",
-            AsyncMock(return_value=0),
+            # Patch the function the drain actually calls. Leaving this on the
+            # old name is a FALSE GREEN on a workstation: the real one loads
+            # the developer's kubeconfig and answers `set()`, so the claim
+            # proceeds, while a CI runner with no cluster fails closed and the
+            # claim never happens (#2399).
+            "terrapod.runner.job_manager.list_occupying_runner_jobs",
+            AsyncMock(return_value=set()),
         ):
             await listener._handle_run_available()
 
