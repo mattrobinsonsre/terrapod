@@ -2,6 +2,7 @@
 fallback used when the pod has been GC'd before the listener could read
 its terminated state."""
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -147,10 +148,43 @@ def _pod(phase, sched_status="True", reason=None):
     )
 
 
-def _job(succeeded=None, failed=None, active=None):
+def _job(
+    succeeded=None,
+    failed=None,
+    active=None,
+    name="tprun-x-plan",
+    conditions=None,
+    age_seconds=0,
+    deleting=False,
+):
+    """A Job as the real client hands it over.
+
+    Everything occupancy reads is modelled, because every one of these decides
+    it (#2399): the NAME is what the listener unions against Jobs it created
+    itself; the CONDITIONS are the only authoritative terminal signal, since
+    `backoffLimit: 3` means `failed > 0` can mean "retrying"; the CREATION
+    timestamp bounds the credit given to a Job with no pod yet; and a DELETION
+    timestamp means the object is only still listed because of foreground
+    propagation.
+    """
     return SimpleNamespace(
-        status=SimpleNamespace(succeeded=succeeded, failed=failed, active=active)
+        metadata=SimpleNamespace(
+            name=name,
+            creation_timestamp=datetime.now(UTC) - timedelta(seconds=age_seconds),
+            deletion_timestamp=datetime.now(UTC) if deleting else None,
+        ),
+        status=SimpleNamespace(
+            succeeded=succeeded, failed=failed, active=active, conditions=conditions
+        ),
     )
+
+
+def _complete():
+    return [SimpleNamespace(type="Complete", status="True", reason=None, message=None)]
+
+
+def _failed():
+    return [SimpleNamespace(type="Failed", status="True", reason=None, message=None)]
 
 
 class TestUnschedulableDetection:
@@ -229,26 +263,91 @@ class TestUnschedulableDetection:
 
 
 class TestCountActiveRunnerJobs:
-    """#749 — the listener admits runs on real running-Job occupancy, not the
-    near-instant launch counter. count_active_runner_jobs counts non-terminal
-    Jobs with an active pod; terminal Jobs don't occupy a slot; K8s errors
-    fail open (return 0, #748 is the backstop)."""
+    """#749 — the listener admits runs on real Job occupancy, not the
+    near-instant launch counter. A Job occupies a slot from the moment it
+    EXISTS until the controller declares it terminal (#2399); K8s errors fail
+    closed (None, #748 is the backstop)."""
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
-    async def test_counts_only_active_non_terminal(self, _ns, mock_batch):
+    async def test_a_pod_or_a_recent_creation_occupies_and_nothing_else_does(self, _ns, mock_batch):
+        """The four cases, and the bounded middle one is the whole point.
+
+        A Job with a pod occupies, whatever state that pod is in -- that is the
+        steady state, and the rule before #2399 had it right. A Job with NO pod
+        occupies only briefly, which covers the window between
+        `create_namespaced_job` returning and the controller creating the pod
+        (the window a burst walked straight through) WITHOUT crediting a Job
+        that will never get a pod at all.
+
+        Rows `f` and `g` are the pair that matters, and `g` is measured rather
+        than imagined -- see the quota test below.
+        """
         from terrapod.runner.job_manager import count_active_runner_jobs
 
         mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
             items=[
-                _job(active=1),  # running/pending — counts
-                _job(active=1),  # counts
-                _job(succeeded=1, active=0),  # terminal — excluded
-                _job(failed=1),  # terminal — excluded
-                _job(active=None),  # created, no pod yet — not counted here
+                _job(active=1, name="a"),  # has a pod -- occupies
+                _job(active=1, name="b", age_seconds=9999),  # age irrelevant with a pod
+                _job(succeeded=1, active=0, name="c", conditions=_complete()),  # terminal
+                _job(failed=4, name="d", conditions=_failed()),  # terminal
+                _job(failed=1, active=1, name="e"),  # RETRYING with a pod -- occupies
+                _job(active=None, name="f", age_seconds=1),  # just created -- occupies
+                _job(active=None, name="g", age_seconds=9999),  # podless and old -- NO
+                _job(active=1, name="h", deleting=True),  # being torn down -- NO
             ]
         )
-        assert await count_active_runner_jobs() == 2
+        assert await count_active_runner_jobs() == 4
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_a_quota_blocked_job_stops_occupying_once_past_the_grace(self, _ns, mock_batch):
+        """The stall this bound exists to prevent, as its own test.
+
+        Measured against a real apiserver, not invented: pods refused by a
+        `ResourceQuota` are never created, so `status.failed` never increments
+        and no terminal condition ever arrives -- `active=None, failed=None,
+        conditions=[]`, indefinitely. Crediting that for ever means three of
+        them wedge a pool at the shipped `maxConcurrent: 3`, silently, because
+        the listener keeps heart-beating and `/health` stays 200. And a quota
+        on the runner namespace is what `docs/deployment.md` recommends.
+        """
+        from terrapod.runner.job_manager import list_occupying_runner_jobs
+
+        blocked = _job(active=None, failed=None, name="tprun-quotablocked-plan")
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(items=[blocked])
+        assert await list_occupying_runner_jobs() == {"tprun-quotablocked-plan"}
+
+        blocked.metadata.creation_timestamp = datetime.now(UTC) - timedelta(seconds=3600)
+        assert await list_occupying_runner_jobs() == set()
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_a_job_being_deleted_releases_its_slot_immediately(self, _ns, mock_batch):
+        """Foreground propagation keeps the object listed, with no terminal
+        condition, until its pods are gone -- and `delete_job` is the path
+        every cancel takes. A pod stuck `Terminating` would otherwise hold the
+        slot for ever, with no reaper for it, because the run is already gone.
+        """
+        from terrapod.runner.job_manager import list_occupying_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
+            items=[_job(active=1, name="tprun-cancelled-plan", deleting=True)]
+        )
+        assert await list_occupying_runner_jobs() == set()
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_returns_the_names_so_a_caller_can_union_its_own(self, _ns, mock_batch):
+        """The listener unions these with Jobs it created a moment ago, which
+        is what makes admission exact even if this list is served from a stale
+        watch cache. A count could not be unioned without double-counting."""
+        from terrapod.runner.job_manager import list_occupying_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
+            items=[_job(active=1, name="a"), _job(succeeded=1, name="b", conditions=_complete())]
+        )
+        assert await list_occupying_runner_jobs() == {"a"}
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
@@ -257,9 +356,13 @@ class TestCountActiveRunnerJobs:
 
         mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(items=[])
         await count_active_runner_jobs("runners-ns")
+        from terrapod.runner.job_manager import _LIST_TIMEOUT_SECONDS
+
         mock_batch.return_value.list_namespaced_job.assert_called_once_with(
             namespace="runners-ns",
             label_selector="app.kubernetes.io/component=runner",
+            # Bounded on purpose: the caller holds the admission lock across it.
+            _request_timeout=_LIST_TIMEOUT_SECONDS,
         )
 
     @patch("terrapod.runner.job_manager._get_batch_api")
@@ -300,9 +403,7 @@ class TestCountActiveRunnerJobs:
         # real count is returned (not None) — a blip must not fail closed.
         from terrapod.runner.job_manager import count_active_runner_jobs
 
-        one_active = SimpleNamespace(
-            items=[SimpleNamespace(status=SimpleNamespace(active=1, succeeded=None, failed=None))]
-        )
+        one_active = SimpleNamespace(items=[_job(active=1)])
         mock_batch.return_value.list_namespaced_job.side_effect = [
             ApiException(status=500),  # first attempt fails
             one_active,  # retry succeeds

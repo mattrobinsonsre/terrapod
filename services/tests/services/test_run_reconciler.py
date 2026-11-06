@@ -929,7 +929,7 @@ class TestPoolQueueDepth:
 class TestAbandonedJobsAreReaped:
     """A Job whose run the reconciler gives up on must not keep its capacity.
 
-    `count_active_runner_jobs` counts non-terminal Jobs with a **Pending** or
+    `list_occupying_runner_jobs` counts Jobs with a **Pending** or
     Running pod, and the listener admits work against that count. A Job left
     behind by an unschedulable or abandoned run therefore holds a slot for the
     life of the listener — nothing else reaps it, because

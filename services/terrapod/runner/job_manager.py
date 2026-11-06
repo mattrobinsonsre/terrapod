@@ -6,6 +6,7 @@ Uses the kubernetes Python client to interact with the K8s API.
 import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -364,36 +365,139 @@ async def job_is_finished(job_name: str, namespace: str = "") -> bool:
     )
 
 
-async def count_active_runner_jobs(
+def _job_is_terminal(job) -> bool:
+    """Has the Job controller finished with this Job?
+
+    Decided from the Job's **conditions**, not from its `succeeded` / `failed`
+    pod counters, because runner Jobs carry `backoffLimit: 3`: a Job whose
+    first pod failed has `failed == 1` and is *retrying*, so it still occupies
+    a slot. Reading `failed > 0` as terminal -- which this did until #2399 --
+    made a retrying Job invisible to admission.
+
+    `Complete` and `Failed` are the two terminal conditions; an
+    `activeDeadlineSeconds` expiry arrives as `Failed` too.
+    """
+    status = job.status
+    if not status:
+        return False
+    for cond in status.conditions or []:
+        if cond.type in ("Complete", "Failed") and cond.status == "True":
+            return True
+    return False
+
+
+#: How long a Job with no pod yet is credited with a slot. It exists to cover
+#: one window only: `create_namespaced_job` has returned and the Job controller
+#: has not created the pod, which is sub-second in practice. Anything longer is
+#: a Job that cannot get a pod at all, and crediting THAT forever is how the
+#: first cut of #2399 turned over-admission into a silent pool stall.
+_PODLESS_GRACE_SECONDS = 60
+
+#: Connect/read bound for the occupancy list. See the call site.
+_LIST_TIMEOUT_SECONDS = 10.0
+
+
+def _job_occupies_a_slot(job, now: datetime) -> bool:
+    """Does this Job hold capacity we must not admit over?
+
+    Four cases, and the bounded middle one is the whole point:
+
+    * **being deleted** -- no. Foreground propagation keeps the object listed
+      until its pods are gone and the controller adds no terminal condition, so
+      a pod stuck `Terminating` would otherwise hold the slot for ever. This is
+      the path `delete_job` takes, i.e. every cancel.
+    * **terminal** -- no. The controller is done with it.
+    * **has a pod** -- yes. Pending, unschedulable or running, the pod is real
+      and will take a node. This is the steady-state answer and it is what the
+      rule before #2399 got right.
+    * **no pod yet** -- yes, but only for `_PODLESS_GRACE_SECONDS`. That covers
+      the burst window without crediting a Job that will never get a pod.
+
+    That last bound is not theoretical. Measured against a real apiserver: a
+    Job whose pods a `ResourceQuota` refuses reports `active=None`,
+    `failed=None` and **no conditions, indefinitely** -- the pod is never
+    created, so nothing ever increments `failed` and no terminal condition
+    arrives. An unbounded credit there stalls the pool until the reconciler's
+    hour-long `stale_timeout_seconds`, on the very configuration
+    `docs/deployment.md` recommends (a quota as the hard backstop). A webhook
+    rejecting the pod, or a missing ServiceAccount, behaves the same way.
+
+    Stalling is the dangerous direction, because it is silent: the listener
+    keeps heart-beating, `/health` stays 200, and the pool simply stops
+    claiming. Over-admission at least errors loudly with a message naming the
+    requested CPU and memory. So where this cannot tell, it declines to count.
+    """
+    meta = getattr(job, "metadata", None)
+    if meta is not None and getattr(meta, "deletion_timestamp", None):
+        return False
+    if _job_is_terminal(job):
+        return False
+
+    status = getattr(job, "status", None)
+    active = getattr(status, "active", None) if status is not None else None
+    if active:
+        return True
+
+    created = getattr(meta, "creation_timestamp", None) if meta is not None else None
+    if created is None:
+        # Every object the apiserver returns carries this, so we are past the
+        # end of what should happen. Decline rather than credit it for ever:
+        # one extra Job is recoverable and loud, a leaked slot is neither.
+        return False
+    return (now - created).total_seconds() <= _PODLESS_GRACE_SECONDS
+
+
+async def list_occupying_runner_jobs(
     namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
-) -> int | None:
-    """Count runner Jobs currently occupying capacity in the namespace — i.e.
-    non-terminal Jobs with at least one active (Pending or Running) pod (#749).
+) -> set[str] | None:
+    """The NAMES of runner Jobs currently occupying capacity in `namespace`.
+
+    `_job_occupies_a_slot` decides what counts, and that predicate is the
+    whole of #2399 -- read it first. In short: a Job with a pod, plus a Job
+    created within the last `_PODLESS_GRACE_SECONDS`.
+
+    The old rule was `status.active > 0` alone, and `active` counts *pods*: a
+    Job that had just been created has none, so it read as zero occupancy.
+    Between `create_namespaced_job` returning and the controller creating the
+    pod, such a Job was counted by **nothing** -- not here, and not by the
+    listener's in-flight counter, which is released as soon as the Job exists
+    -- so a burst of concurrent admissions walked straight through
+    `max_concurrent`.
+
+    The first attempt at this counted a Job until it went terminal, which
+    traded that over-admission for several silent ways to STALL -- a
+    quota-blocked Job, a Job stuck Terminating, a Job retrying under
+    `backoffLimit`. Hence the time bound: it covers the burst window and
+    nothing else.
+
+    Returns names rather than a count so a caller can union in the Jobs it
+    created itself a moment ago. The list below asks for no `resourceVersion`,
+    which Kubernetes answers with a consistent read, so in practice a Job is
+    already here the instant its creation returns (measured: 30 of 30). The
+    union is a backstop against that guarantee being WEAKENED rather than
+    against it being false -- adding `limit=` or `resource_version="0"` would
+    silently drop it, and the multi-replica bound in `docs/runners.md` rests
+    on it.
 
     Kubernetes is the source of truth for occupancy, so this queries it live on
     every call rather than trusting a local counter (which would drift as Jobs
-    complete, get evicted, or are launched by other listener replicas). The
-    listener admits runs up to `max_concurrent`; its in-process
-    `_active_launches` counter only tracks the brief launch-create window, so
-    counting real Jobs from K8s is what makes admission reflect actual occupancy
-    and keeps the listener stateless.
+    complete, get evicted, or are launched by another listener replica) --
+    which is also what keeps the listener stateless.
 
     Selects by the runner component label (`app.kubernetes.io/component=runner`)
-    that every runner Job carries, scoped to `namespace`. Terminal Jobs
-    (succeeded/failed) are excluded — they no longer occupy a slot. A Job that
-    exists but has no active pod yet is covered by `_active_launches` on the
-    listener, so it is not double-counted here.
+    that every runner Job carries, scoped to `namespace`.
 
     The list is **retried with bounded backoff** on transient errors. On
-    persistent failure it returns **None** ("occupancy unknown"), NOT 0 — and
-    the caller MUST treat None as *fail-closed* (defer launching). Returning 0
-    on error is fail-OPEN and dangerous under load: a struggling apiserver times
-    out the list → "0 active" reads as full capacity → the listener launches a
-    whole batch → that adds apiserver load and more list timeouts → a runaway
-    over-launch storm. Failing closed keeps the runs queued (recoverable, and
-    re-driven by the next `run_available`/poll) instead of stampeding a
-    struggling apiserver. (#748's reconciler remains the backstop for any Job
-    that does slip through and can't be placed.)
+    persistent failure it returns **None** ("occupancy unknown"), NOT an empty
+    set -- and the caller MUST treat None as *fail-closed* (defer launching).
+    Returning empty on error is fail-OPEN and dangerous under load: a
+    struggling apiserver times out the list -> "nothing occupied" reads as full
+    capacity -> the listener launches a whole batch -> that adds apiserver load
+    and more list timeouts -> a runaway over-launch storm. Failing closed keeps
+    the runs queued (recoverable, and re-driven by the next
+    `run_available`/poll) instead of stampeding a struggling apiserver.
+    (#748's reconciler remains the backstop for any Job that does slip through
+    and cannot be placed.)
     """
     if not namespace:
         namespace = _default_namespace()
@@ -411,36 +515,61 @@ async def count_active_runner_jobs(
             # explicit binding keeps the closure unambiguous.
             jobs = await loop.run_in_executor(
                 _executor,
+                # NO `resource_version` and NO `limit`, deliberately: that is
+                # what makes this a consistent read, so a Job just created by
+                # ANOTHER listener replica is already here. Adding either would
+                # make this a possibly-stale or partial answer and silently
+                # invalidate the multi-replica bound in `docs/runners.md`.
                 lambda b=batch_api: b.list_namespaced_job(
                     namespace=namespace,
                     label_selector="app.kubernetes.io/component=runner",
+                    # Bounded, because the caller holds the drain lock across
+                    # this await. urllib3 has no default timeout, so a
+                    # half-open connection to the apiserver would park an
+                    # executor thread for ever and the listener would stop
+                    # claiming for the life of the pod -- silently, with a
+                    # green heartbeat. A timeout turns that into the retryable
+                    # error the loop below already handles.
+                    _request_timeout=_LIST_TIMEOUT_SECONDS,
                 ),
             )
             batch_api.api_client.last_response = None
 
-            count = 0
+            now = datetime.now(UTC)
+            occupying: set[str] = set()
             for job in jobs.items:
-                st = job.status
-                if not st:
+                if not _job_occupies_a_slot(job, now):
                     continue
-                if (st.succeeded and st.succeeded > 0) or (st.failed and st.failed > 0):
-                    continue  # terminal — no longer occupies a slot
-                if st.active and st.active > 0:
-                    count += 1
-            return count
-        except Exception as e:  # noqa: BLE001 — any K8s/list error is retryable
+                name = job.metadata.name if job.metadata else None
+                if name:
+                    occupying.add(name)
+            return occupying
+        except Exception as e:  # noqa: BLE001 -- any K8s/list error is retryable
             last_error = e
             if attempt < retries - 1:
                 await asyncio.sleep(backoff_base * (attempt + 1))
 
-    # Persistent failure → fail CLOSED (caller defers launching). See docstring.
+    # Persistent failure -> fail CLOSED (caller defers launching). See docstring.
     logger.warning(
-        "Could not determine active runner-Job count from K8s after retries — "
+        "Could not determine occupying runner-Job names from K8s after retries — "
         "reporting unknown; admission will fail closed",
         error=str(last_error),
         retries=retries,
     )
     return None
+
+
+async def count_active_runner_jobs(
+    namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
+) -> int | None:
+    """How many runner Jobs occupy capacity in `namespace`, or None if unknown.
+
+    A thin wrapper over `list_occupying_runner_jobs`, for callers that need
+    only the size -- the heartbeat's operator-visible occupancy figure. See
+    that function for what "occupying" means, and why None MUST fail closed.
+    """
+    names = await list_occupying_runner_jobs(namespace, retries=retries, backoff_base=backoff_base)
+    return None if names is None else len(names)
 
 
 async def get_pod_terminated_info(

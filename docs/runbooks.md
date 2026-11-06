@@ -561,12 +561,24 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 
 ### Resolution
 
-1. **Scale up listeners** (if all at capacity):
-   ```bash
-   kubectl scale deployment/terrapod-listener -n <ns> --replicas=<N>
+1. **Raise the pool's concurrency ceiling** — this is the knob, not replicas:
+   ```yaml
+   # Helm values. POOL-WIDE: every listener replica admits against the same
+   # namespace-wide count, so adding replicas does NOT add concurrency.
+   listener:
+     maxConcurrent: 6   # was 3
    ```
+   On a **fixed-capacity** pool, check `(maxConcurrent + replicas - 1) × per-workspace
+   requests` still fits node allocatable before raising it, or the extra runner Jobs
+   simply sit **Pending** and error after `runners.launchTimeoutSeconds`. See
+   [Deployment → Sizing runner concurrency](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster).
 
-2. **Scale up cluster nodes** if runner Jobs can't be scheduled due to resource exhaustion.
+2. **Scale up cluster nodes** if runner Jobs can't be scheduled due to resource
+   exhaustion — and raise `maxConcurrent` with them, since the ceiling is what
+   bounds admission, not the available capacity.
+
+   Scaling `listener.replicas` is for **availability and claim latency**, not
+   throughput: every replica shares the one `maxConcurrent` ceiling.
 
 3. **Reduce per-workspace resources** if Jobs are requesting more than needed:
    Update `resource_cpu` and `resource_memory` on workspaces via the API.
@@ -578,7 +590,10 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 
 - Queued run count decreasing
 - New runs are claimed within seconds of queueing
-- `terrapod_listener_active_runs` shows listeners are processing
+- `terrapod_listener_active_runs` is below `maxConcurrent` (note it counts Jobs
+  occupying the namespace, so a Pending or unschedulable Job is included — a
+  value pinned at the ceiling with nothing executing means Jobs cannot be
+  scheduled, not that the pool is busy)
 
 ---
 

@@ -1024,3 +1024,60 @@ class TestEveryPathTheRunnerWritesToIsWritable:
         writable = self._writable_mounts(self._spec())
         assert "/var/run/terrapod/files" not in writable
         assert "/var/run/terrapod/vars" not in writable
+
+
+class TestTheReservedNameMatchesTheJob:
+    """#2399: admission reserves a slot under a Job name it predicts.
+
+    `_drain_once` names the Job it is about to create with `runner_job_name`
+    BEFORE `build_job_spec` runs, because the reservation has to exist before
+    the apiserver can list the Job. If the two ever disagree, occupancy counts
+    the predicted name AND the real one once the list catches up, so each
+    launch consumes two slots and the pool silently admits half of
+    `max_concurrent`.
+
+    Every admission test calls `runner_job_name` itself to build its fixture,
+    so they agree with themselves by construction and cannot see a divergence.
+    This is the only place the prediction is checked against the thing
+    predicted.
+    """
+
+    @pytest.mark.parametrize("phase", ["plan", "apply", "configure"])
+    def test_the_predicted_name_is_the_name_the_spec_carries(self, phase):
+        """Calls the TEMPLATE directly, not an engine strategy.
+
+        Two reasons, and the second one bit on the carry to `release/v1.11`:
+        the template is the thing that actually assigns the name, so a strategy
+        wrapper would put a layer between the test and the property; and the
+        strategy layer is a 2.0 addition, so a test written against it fails on
+        every release line with a `TypeError` about an argument the older
+        template does not take. The six arguments below are the required set on
+        every supported line.
+        """
+        from terrapod.runner.job_template import build_job_spec, runner_job_name
+
+        run_id = "01a15e7a-1809-7500-8000-000000000000"
+        spec = build_job_spec(
+            run_id=run_id,
+            phase=phase,
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-x-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        assert spec["metadata"]["name"] == runner_job_name(run_id, phase)
+
+    def test_the_phase_is_part_of_the_name(self):
+        """Pins the clause a `runner_job_name(run_id, "plan")` slip would drop.
+
+        Every fixture in the admission tests serves `"phase": "plan"`, so
+        hard-coding the phase there survives the whole suite while breaking
+        every apply and configure run in production.
+        """
+        from terrapod.runner.job_template import runner_job_name
+
+        run_id = "01a15e7a-1809-7500-8000-000000000000"
+        names = {p: runner_job_name(run_id, p) for p in ("plan", "apply", "configure")}
+        assert len(set(names.values())) == 3, names
+        for phase, name in names.items():
+            assert name.endswith(f"-{phase}")

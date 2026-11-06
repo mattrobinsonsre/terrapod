@@ -137,8 +137,11 @@ class RunnerConfig(BaseSettings):
         default=3,
         description=(
             "Pool-wide max concurrent runner Jobs. Every listener replica admits on the "
-            "shared namespace-wide running-Job count, so this is the pool ceiling regardless "
-            "of replica count (raise this, not replicas, for more concurrency)."
+            "same namespace-wide count of Jobs occupying it — one with a pod, Pending "
+            "or running, plus one just created whose pod does not exist yet — which "
+            "makes this the pool ceiling regardless of replica count (raise this, not "
+            "replicas, for more). Note it is scoped to the runner NAMESPACE, so pools "
+            "sharing one namespace share the ceiling."
         ),
     )
     poll_interval: int = Field(
