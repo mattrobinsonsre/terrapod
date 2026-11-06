@@ -784,6 +784,14 @@ jobs:
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list
         run: python3 scripts/docs-audit/check_peer_fairness.py
+      # And that a field the docs tell an operator to READ is one we serialise
+      # (#2406). A runbook step is a command somebody runs during an incident:
+      # the queue-backlog runbook told them to read `.attributes["active-runs"]`
+      # and `.attributes.capacity`, and `_listener_json` emits neither, so the
+      # diagnostic printed nulls. Validated against the attribute contract
+      # snapshot, so there is no second source of truth to maintain.
+      - name: The docs only read attributes the API serves
+        run: python3 scripts/docs-audit/check_doc_api_attributes.py
 
   # ── Helm Lint ──────────────────────────────────────────
   helm-lint:
