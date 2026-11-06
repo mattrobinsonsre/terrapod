@@ -271,7 +271,7 @@ The listener process itself exposes metrics on its health port (`8081` at `GET /
 
 | Metric | Type | Description |
 |---|---|---|
-| `terrapod_listener_active_runs` | Gauge | Number of currently active runner Jobs |
+| `terrapod_listener_active_runs` | Gauge | Runner Jobs occupying the pool's namespace — existing and not yet finished, so **Pending and unschedulable Jobs are included**. Pinned at `maxConcurrent` with nothing executing means Jobs cannot be scheduled |
 | `terrapod_listener_identity_ready` | Gauge | 1 if identity established, 0 otherwise |
 | `terrapod_listener_heartbeat_age_seconds` | Gauge | Seconds since last successful heartbeat (-1 if never) |
 

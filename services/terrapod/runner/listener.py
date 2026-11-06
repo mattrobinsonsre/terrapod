@@ -38,6 +38,12 @@ from terrapod.runner.job_template import run_object_slug
 
 logger = get_logger(__name__)
 
+#: Deadline for one drain pass. Generous -- a pass may legitimately launch
+#: `max_concurrent` Jobs, each several API and Kubernetes round trips -- because
+#: its job is only to stop a HUNG call holding the admission lock for ever, not
+#: to bound normal work.
+_DRAIN_TIMEOUT_SECONDS = 600
+
 # Shutdown flag
 _shutdown = asyncio.Event()
 
@@ -107,7 +113,9 @@ class RunnerListener:
         #: Set by every `run_available`; a wakeup arriving mid-drain makes the
         #: holder loop once more rather than being lost.
         self._drain_requested = False
-        # Real running-Job count from K8s, refreshed each heartbeat (#749).
+        # Real occupancy from K8s, refreshed each heartbeat (#749) — Jobs that
+        # occupy it: one with a pod (Pending or running), plus one just
+        # created whose pod does not exist yet (#2399).
         # `_active_launches` only covers the create window; this is the honest
         # occupancy operators see in the pool/listener status and metrics.
         self._active_runs_observed = 0
@@ -126,7 +134,8 @@ class RunnerListener:
         self._metrics_registry = CollectorRegistry()
         self._metric_active_runs = Gauge(
             "terrapod_listener_active_runs",
-            "Number of currently active launches",
+            "Runner Jobs occupying this pool's namespace: existing and not yet "
+            "finished, so Pending and unschedulable Jobs are included",
             registry=self._metrics_registry,
         )
         self._metric_identity_ready = Gauge(
@@ -517,7 +526,7 @@ class RunnerListener:
         name — but is not guaranteed by every CRI, so non-Helm operators
         running this listener should set POD_NAME explicitly.
         """
-        # Report the real running-Job count from K8s, not the launch counter,
+        # Report real occupancy from K8s, not the launch counter,
         # so the pool/listener status operators see reflects actual occupancy
         # (#749). On a transient K8s blip the count is unknown (None) — keep the
         # last observed value rather than zeroing it; it self-heals on the next
@@ -750,15 +759,40 @@ class RunnerListener:
         async with self._drain_lock:
             while self._drain_requested:
                 self._drain_requested = False
-                if not await self._drain_once():
-                    # The pass stopped for capacity (or an unknown count), not
-                    # for an empty queue. Going round again cannot help —
-                    # nothing has freed, and a fresh pass starts with no
+                try:
+                    # Bounded, because this lock is the pool's admission path
+                    # for this pod. Anything that hangs under it -- a half-open
+                    # apiserver connection, a stuck Secret create -- would
+                    # otherwise hold it for ever, and every later event returns
+                    # at the `locked()` check above to a holder that never
+                    # looks again. The listener would claim nothing for the
+                    # life of the pod while `/health` stayed 200 and the
+                    # heartbeat stayed green. Timing out releases the lock and
+                    # the next event or poll re-drives the drain.
+                    async with asyncio.timeout(_DRAIN_TIMEOUT_SECONDS):
+                        drained_queue = await self._drain_once()
+                except TimeoutError:
+                    logger.error(
+                        "Drain pass exceeded its deadline — releasing the admission "
+                        "lock so the next event can re-drive it",
+                        timeout=_DRAIN_TIMEOUT_SECONDS,
+                    )
+                    return
+                if not drained_queue:
+                    # The pass stopped for capacity (or an unknown count),
+                    # not for an empty queue. A fresh pass starts with no
                     # memory of the Jobs it just created, which is how the
-                    # second half of #2399's over-admission happened. A slot
-                    # freeing is itself an event: the API publishes
-                    # `run_available` on every terminal transition, and the
-                    # 30s poll is the backstop.
+                    # second half of #2399's over-admission happened, so do
+                    # not loop straight back in.
+                    #
+                    # The cost, stated honestly rather than waved away: a
+                    # `run_available` published because a Job FINISHED while
+                    # this pass was running has already set the flag, and
+                    # returning here leaves it set but unconsumed. The freed
+                    # slot is then taken by the next event or by the 30s poll,
+                    # whichever comes first -- so draining a backlog as slots
+                    # free can lag by up to one poll interval in that race.
+                    # Tracked on #2399.
                     return
 
     async def _drain_once(self) -> bool:
@@ -777,10 +811,10 @@ class RunnerListener:
         from terrapod.runner.job_manager import list_occupying_runner_jobs
         from terrapod.runner.job_template import runner_job_name
 
-        # Jobs this pass created. The apiserver may serve the list below from a
-        # slightly stale watch cache, so a Job created a moment ago can be
-        # missing from it; unioning the names makes the count exact either way,
-        # and a union cannot double-count the way adding an integer would.
+        # Jobs this pass created. The list below is a consistent read (see
+        # list_occupying_runner_jobs), so a Job is normally already in it; the
+        # union keeps THIS pass exact if that is ever weakened, and a union
+        # cannot double-count the way adding an integer would.
         launched_names: set[str] = set()
 
         while True:

@@ -245,7 +245,7 @@ autoscale — rather than co-locating heavy Terraform execution with the API.
 | Read/API throughput | Adding stateless API replicas (HPA); no leader contention | The load balancer and Postgres/Redis you point it at |
 | List latency at large workspace counts | O(page) paginated reads | — (flat) |
 | Run **dispatch** (claim → state transition) | Multiple replicas draining one queue via `SKIP LOCKED` | Postgres write throughput |
-| Run **execution** (concurrent Terraform Jobs) | More runner listeners / agent pools / nodes; a cluster-autoscaler adds nodes when Jobs go `Pending` | Real CPU/memory of your execution cluster. Excess Jobs back up (`Pending`/queued) — correct backpressure, not a platform limit |
+| Run **execution** (concurrent Terraform Jobs) | `listener.maxConcurrent` (the pool-wide ceiling — more listener *replicas* add availability, not concurrency) / more agent pools / more nodes; a cluster-autoscaler adds nodes when Jobs go `Pending` | Real CPU/memory of your execution cluster. Excess Jobs back up (`Pending`/queued) — correct backpressure, not a platform limit |
 
 The control plane (everything except running Terraform itself) scales
 horizontally. Terraform execution is bounded by the compute you give the runner
