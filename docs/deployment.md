@@ -484,8 +484,11 @@ size concurrency to the capacity you have — otherwise runner Jobs sit
 **Pending / unschedulable** and never start.
 
 **How the multiplier works.** A listener admits a run only while the **real**
-count of running runner Jobs in the pool's namespace is below
-`listener.maxConcurrent` (default **3**). Every listener replica counts that same
+count of runner Jobs occupying the pool's namespace is below
+`listener.maxConcurrent` (default **3**). A Job counts from the moment it
+**exists** until Kubernetes declares it finished — so one whose pod is still
+Pending, unschedulable, or not yet created holds its slot, which is precisely
+what you want on a fixed pool. Every listener replica counts that same
 namespace-wide Job total, so `listener.maxConcurrent` is the **pool-wide**
 concurrency ceiling — running multiple `listener.replicas` gives you
 **high availability** (any replica can claim a run and launch its Job; if one

@@ -147,10 +147,29 @@ def _pod(phase, sched_status="True", reason=None):
     )
 
 
-def _job(succeeded=None, failed=None, active=None):
+def _job(succeeded=None, failed=None, active=None, name="tprun-x-plan", conditions=None):
+    """A Job as the real client hands it over.
+
+    `metadata.name` and `status.conditions` are both modelled because
+    occupancy is decided from them (#2399): the name is what the listener
+    unions against Jobs it created itself, and the conditions are the only
+    authoritative terminal signal — `backoffLimit: 3` means `failed > 0` can
+    mean "retrying", not "finished".
+    """
     return SimpleNamespace(
-        status=SimpleNamespace(succeeded=succeeded, failed=failed, active=active)
+        metadata=SimpleNamespace(name=name),
+        status=SimpleNamespace(
+            succeeded=succeeded, failed=failed, active=active, conditions=conditions
+        ),
     )
+
+
+def _complete():
+    return [SimpleNamespace(type="Complete", status="True", reason=None, message=None)]
+
+
+def _failed():
+    return [SimpleNamespace(type="Failed", status="True", reason=None, message=None)]
 
 
 class TestUnschedulableDetection:
@@ -229,26 +248,48 @@ class TestUnschedulableDetection:
 
 
 class TestCountActiveRunnerJobs:
-    """#749 — the listener admits runs on real running-Job occupancy, not the
-    near-instant launch counter. count_active_runner_jobs counts non-terminal
-    Jobs with an active pod; terminal Jobs don't occupy a slot; K8s errors
-    fail open (return 0, #748 is the backstop)."""
+    """#749 — the listener admits runs on real Job occupancy, not the
+    near-instant launch counter. A Job occupies a slot from the moment it
+    EXISTS until the controller declares it terminal (#2399); K8s errors fail
+    closed (None, #748 is the backstop)."""
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
-    async def test_counts_only_active_non_terminal(self, _ns, mock_batch):
+    async def test_counts_every_non_terminal_job_however_few_pods(self, _ns, mock_batch):
+        """Occupancy is "the Job exists and is not finished", not "it has a pod".
+
+        The last two rows are the #2399 fix and they invert what this asserted
+        before. A Job with no pod yet was counted by NOTHING — not here, and
+        not by `_active_launches`, which is released as soon as the Job is
+        created — and a Job whose first pod failed is *retrying* under
+        `backoffLimit: 3`, so it still holds a node.
+        """
         from terrapod.runner.job_manager import count_active_runner_jobs
 
         mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
             items=[
-                _job(active=1),  # running/pending — counts
-                _job(active=1),  # counts
-                _job(succeeded=1, active=0),  # terminal — excluded
-                _job(failed=1),  # terminal — excluded
-                _job(active=None),  # created, no pod yet — not counted here
+                _job(active=1, name="a"),  # running/pending — counts
+                _job(active=1, name="b"),  # counts
+                _job(succeeded=1, active=0, name="c", conditions=_complete()),  # terminal
+                _job(failed=4, name="d", conditions=_failed()),  # terminal
+                _job(failed=1, name="e"),  # RETRYING, not terminal — counts
+                _job(active=None, name="f"),  # created, no pod yet — counts
             ]
         )
-        assert await count_active_runner_jobs() == 2
+        assert await count_active_runner_jobs() == 4
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_returns_the_names_so_a_caller_can_union_its_own(self, _ns, mock_batch):
+        """The listener unions these with Jobs it created a moment ago, which
+        is what makes admission exact even if this list is served from a stale
+        watch cache. A count could not be unioned without double-counting."""
+        from terrapod.runner.job_manager import list_occupying_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
+            items=[_job(active=1, name="a"), _job(succeeded=1, name="b", conditions=_complete())]
+        )
+        assert await list_occupying_runner_jobs() == {"a"}
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
@@ -300,9 +341,7 @@ class TestCountActiveRunnerJobs:
         # real count is returned (not None) — a blip must not fail closed.
         from terrapod.runner.job_manager import count_active_runner_jobs
 
-        one_active = SimpleNamespace(
-            items=[SimpleNamespace(status=SimpleNamespace(active=1, succeeded=None, failed=None))]
-        )
+        one_active = SimpleNamespace(items=[_job(active=1)])
         mock_batch.return_value.list_namespaced_job.side_effect = [
             ApiException(status=500),  # first attempt fails
             one_active,  # retry succeeds
