@@ -105,7 +105,12 @@ HELPER_BUILT: dict[str, tuple[str, str]] = {
 #: They bound total breakage only; SELF_TEST is what pins the individual spellings,
 #: because a per-form count over the docs cannot distinguish a doc that stopped
 #: using a form from a matcher that stopped reading it.
-MIN_REFERENCES = 24
+#: 20 against 31 on `main` and 25 on the oldest supported release line, where the
+#: docs are smaller -- this file is carried unchanged to every branch, so the floor
+#: has to clear the smallest of them with room for a page legitimately losing a
+#: snippet. It is a backstop against the matcher breaking wholesale; SELF_TEST is
+#: what pins each spelling.
+MIN_REFERENCES = 20
 MIN_ATTRIBUTE_NAMES = 400
 
 #: The object whose field is being read. The prefix admits both `.attributes.x`
@@ -217,6 +222,17 @@ def self_test() -> list[str]:
 
 
 def ledger_problems() -> list[str]:
+    """Check what is checkable about each ledger entry WITHOUT consulting it.
+
+    The phrase floor and the document's existence are properties of the entry, so
+    they hold on any branch. Whether that document mentions the field is checked
+    at the point the exemption is actually USED (see `main`), because an unused
+    entry has no reader to anchor: this gate runs on the release lines too, and
+    there `docs/tfe-cli-surface.md` is a third the size, never mentions `comment`,
+    and no doc references it -- so requiring the anchor unconditionally failed on
+    two branches for an entry that is simply dormant there. An unused entry is
+    reported in the summary line rather than as a problem.
+    """
     out: list[str] = []
     for name, (where, phrase) in DOCUMENTED_AS_ABSENT.items():
         if len(phrase) < MIN_EXEMPTION_PHRASE:
@@ -225,14 +241,8 @@ def ledger_problems() -> list[str]:
                 f"mean anything (floor {MIN_EXEMPTION_PHRASE} characters). An exemption has "
                 "to point at a passage, not at a common word."
             )
-        doc = ROOT / where
-        if not doc.is_file():
+        if not (ROOT / where).is_file():
             out.append(f"the exemption for `{name}` names {where}, which does not exist.")
-        elif name not in doc.read_text(errors="ignore"):
-            out.append(
-                f"the exemption for `{name}` names {where}, which never mentions it, so the "
-                "exemption is anchored to nothing a reader would find."
-            )
     for name, (where, call) in HELPER_BUILT.items():
         src = ROOT / where
         if not src.is_file() or call not in src.read_text(errors="ignore"):
@@ -273,6 +283,7 @@ def main() -> int:
         return 1
 
     problems = ledger_problems()
+    used: set[str] = set()
     seen = 0
     for path in tracked_docs():
         rel = path.relative_to(ROOT).as_posix()
@@ -284,11 +295,13 @@ def main() -> int:
             exempt = DOCUMENTED_AS_ABSENT.get(name)
             if exempt is not None:
                 where, phrase = exempt
-                if rel == where and phrase in text:
+                if rel == where and phrase in text and name in text:
+                    used.add(name)
                     continue
                 problems.append(
-                    f"{rel}: `.attributes.{name}` is exempt only in {where} and only while "
-                    f"that document says {phrase!r} — neither holds here."
+                    f"{rel}: `.attributes.{name}` is exempt only in {where}, and only while "
+                    f"that document both says {phrase!r} and names the field — so a reader "
+                    "is actually told it is absent. Not all of that holds here."
                 )
                 continue
             hint = (
@@ -318,11 +331,13 @@ def main() -> int:
             print(f"  - {problem}")
         return 1
 
+    dormant = sorted(set(DOCUMENTED_AS_ABSENT) - used)
     print(
         f"OK — {seen} `.attributes.*` reference(s) across the docs, all served by one of "
-        f"{len(attributes)} snapshotted attributes; {len(DOCUMENTED_AS_ABSENT)} "
-        f"documented-as-absent and {len(HELPER_BUILT)} helper-built exemption(s). "
+        f"{len(attributes)} snapshotted attributes; {len(used)} documented-as-absent "
+        f"exemption(s) in use and {len(HELPER_BUILT)} helper-built. "
         f"{len(SELF_TEST)} matcher fixtures hold."
+        + (f" Dormant on this branch: {dormant}." if dormant else "")
     )
     return 0
 
