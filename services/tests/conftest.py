@@ -153,35 +153,74 @@ def _stateless_token_signing_key():
 
 # No test may reach a real Kubernetes cluster (#2406).
 #
-# `job_manager._get_batch_api` lazily calls `init_k8s()`, which loads the
-# developer's kubeconfig and caches the client in module globals. A test that
-# forgets to patch its occupancy or Job call therefore behaves DIFFERENTLY by
-# environment: on a workstation it issues a real `list_namespaced_job` against
-# whatever context happens to be current and passes, while on a CI runner with
-# no cluster it fails closed and fails. That is not a hypothetical -- it is how
-# two tests in #2399 passed the entire local blast radius and then failed in
-# CI, and the module-global caching means the first test to do it leaves a live
-# client behind for every test after it.
+# A test that forgets to patch a Kubernetes call behaves DIFFERENTLY by
+# environment: on a workstation it issues the real call against whatever context
+# happens to be current and passes, while on a CI runner with no cluster it fails
+# closed and fails. That is not a hypothetical -- it is how two tests in #2399
+# passed the entire local blast radius and then failed in CI.
 #
-# So the default is a refusal that names the fix. A test that genuinely wants
-# the client patches `_get_batch_api` itself, which overrides this.
+# The guard is on CONFIG LOADING rather than on a list of accessors, because
+# every Kubernetes client must load config before it can be built. That closes
+# the class: `job_manager.init_k8s` loads it (`job_manager.py:94-102`), and so
+# does `component_status._sample_blocking`, which builds its own `CoreV1Api`,
+# `AppsV1Api` and `PolicyV1Api` with its own `load_kube_config()` and never goes
+# through `job_manager` at all. An accessor-shaped guard cannot see that one, and
+# an accessor nobody has written yet is covered here for free.
+#
+# The two accessors are ALSO refused, for two reasons: the message can name the
+# fix precisely, and a client cached by an earlier test would otherwise be handed
+# out without loading config again. The cached globals are cleared as well, since
+# restoring the accessor would otherwise hand back a live client built earlier in
+# the worker process.
+#
+# WHERE THE MESSAGE SURFACES, honestly: on a direct Job or pod call it propagates.
+# On the ADMISSION path it does NOT -- `_get_batch_api()` is called inside
+# `list_occupying_runner_jobs`' retry `try` deliberately, so that an
+# uninitialised client is treated as a transient failure, and the blanket
+# `except Exception` swallows this RuntimeError exactly as it swallows a real one.
+# The author sees occupancy come back `None` and admission fail closed, plus the
+# "Could not determine occupying runner-Job names" warning. That is the right
+# production behaviour and it is worth knowing it hides this message, so a test
+# whose runs mysteriously never launch should suspect an unpatched occupancy call.
+#
+# A test that genuinely wants a client patches the accessor itself, which
+# overrides this.
 @pytest.fixture(autouse=True)
 def _no_real_kubernetes():
+    from kubernetes import config as k8s_config
+
     from terrapod.runner import job_manager
 
-    def _refuse():
+    def _refuse(*_args, **_kwargs):
         raise RuntimeError(
             "This test reached the real Kubernetes client. Patch what it calls "
             "instead -- e.g. patch('terrapod.runner.job_manager."
-            "list_occupying_runner_jobs') for admission, or "
-            "patch('terrapod.runner.job_manager._get_batch_api') for a Job call. "
+            "list_occupying_runner_jobs') for admission, "
+            "patch('terrapod.runner.job_manager._get_batch_api') for a Job call, "
+            "patch('terrapod.runner.job_manager._get_core_api') for a pod or "
+            "Secret call, or patch asyncio.to_thread for component status. "
             "Left unpatched, this test passes on a machine with a kubeconfig and "
-            "fails in CI (#2406)."
+            "fails in CI (#2406). Note the admission path swallows this message "
+            "and reports occupancy as unknown instead."
         )
 
-    previous = job_manager._get_batch_api
-    job_manager._get_batch_api = _refuse
+    loaders = ("load_incluster_config", "load_kube_config")
+    saved_loaders = {name: getattr(k8s_config, name) for name in loaders}
+    saved_accessors = {
+        name: getattr(job_manager, name) for name in ("_get_batch_api", "_get_core_api")
+    }
+    saved_clients = (job_manager._batch_v1, job_manager._core_v1)
+    for name in saved_loaders:
+        setattr(k8s_config, name, _refuse)
+    for name in saved_accessors:
+        setattr(job_manager, name, _refuse)
+    job_manager._batch_v1 = None
+    job_manager._core_v1 = None
     try:
         yield
     finally:
-        job_manager._get_batch_api = previous
+        for name, previous in saved_loaders.items():
+            setattr(k8s_config, name, previous)
+        for name, previous in saved_accessors.items():
+            setattr(job_manager, name, previous)
+        job_manager._batch_v1, job_manager._core_v1 = saved_clients

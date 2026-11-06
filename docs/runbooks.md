@@ -540,9 +540,9 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
      "https://<terrapod>/api/v1/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
    ```
 
-2. **Check listener capacity.** The listeners endpoint reports whether each
-   listener is alive, not how busy it is — it serialises `name` and `status`,
-   and deliberately not the occupancy figures:
+2. **Check that each listener is alive.** The listeners endpoint reports liveness
+   rather than load — `status` is derived from the last heartbeat and the
+   certificate, and is one of `online`, `offline` or `cert-expired`:
 
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
@@ -550,15 +550,32 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
      jq '.data[] | {name: .attributes.name, status: .attributes.status}'
    ```
 
-   For occupancy, read the gauge the listener exports, which counts the runner
-   Jobs occupying its namespace:
+   The occupancy figures a listener reports are not on this document, but they are
+   not unobtainable: they arrive with every heartbeat and are published on the
+   pool's SSE channel, which is what the agent-pool page in the UI renders.
+
+3. **Read occupancy, and know what each source counts.** The three answers below
+   disagree with each other by design, so comparing them without knowing why
+   wastes time in an incident.
+
+   The listener exports a gauge of the runner Jobs occupying the namespace it
+   launches into:
 
    ```promql
-   terrapod_listener_active_runs
+   max(terrapod_listener_active_runs)
    ```
 
-   Or count them directly, which is the same question the listener asks on
-   every admission decision:
+   Three things to know before acting on it. It counts the **runner** namespace
+   (`listener.runnerNamespace`), which is deliberately not the listener's own
+   namespace in a hardened install. It carries **no pool label**, and every
+   replica reports the same namespace-wide figure — so `max` is right and `sum`
+   multiplies by `listener.replicas`. And it is refreshed once per heartbeat
+   (`listener.heartbeatInterval`, default 60s) and **keeps its last value when a
+   reading fails**, so while the Kubernetes API is unreachable — the next step — it shows a
+   plausible, stale, too-low number. If the query returns nothing at all, the
+   chart's scrape is off by default — `api.config.metrics.podMonitor.enabled`.
+
+   Or count the Jobs directly:
 
    ```bash
    kubectl get jobs -n <runner-namespace> \
@@ -566,17 +583,43 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
      -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}'
    ```
 
-   Compare the count against `listener.maxConcurrent`, which is the
-   **pool-wide** ceiling — every replica admits against this same namespace-wide
-   count, so it is not multiplied by `listener.replicas`.
+   **This count is not the admission figure and is normally higher than it.**
+   Admission ignores a Job that is being deleted, one that has finished but not
+   yet been reaped (`runners.ttlSecondsAfterFinished`, which the Resolution section
+   suggests lowering precisely because those linger), and one that has had no pod for more than a
+   minute, which is how a Job blocked by a `ResourceQuota` stops holding a slot.
+   `kubectl` shows all of them. So a count above `listener.maxConcurrent` is the
+   expected reading, not a broken cap. Note also that the label is on the
+   **Jobs**; runner *pods* carry `terrapod.io/run-id` and `terrapod.io/phase`
+   instead, so carrying this selector into the scheduling step below returns nothing.
 
-3. **Check for scheduling issues on runner Jobs:**
+   `listener.maxConcurrent` is scoped to the **runner namespace**, not to the
+   pool: two pools sharing one namespace share one ceiling and each other's
+   occupancy. It is not multiplied by `listener.replicas`, though a Job created by
+   one replica is visible to the next list rather than instantly, so the real
+   bound with several replicas is `maxConcurrent + listener.replicas - 1`.
+
+4. **Rule out admission failing closed.** This is a backlog cause with no other
+   symptom: when the listener cannot list Jobs it refuses to claim rather than
+   risk over-admitting, and meanwhile it heartbeats normally, `/ready` answers
+   200, and the gauge holds its last value. The queue simply stops draining.
+
+   ```bash
+   kubectl logs -n <namespace> -l app.kubernetes.io/component=listener --tail=200 \
+     | grep -E 'occupancy unknown|admission will fail closed'
+   ```
+
+   Either line means the listener is reaching the Kubernetes API and not getting
+   an answer — check its RBAC for `jobs: list` in the runner namespace, and the
+   apiserver's own health. It recovers by itself once the list succeeds.
+
+5. **Check for scheduling issues on runner Jobs:**
    ```bash
    kubectl get pods -n <runner-ns> --field-selector=status.phase=Pending
    kubectl describe pod <pending-pod> -n <runner-ns>
    ```
 
-4. **Check node resources:**
+6. **Check node resources:**
    ```bash
    kubectl top nodes
    kubectl describe nodes | grep -A 5 "Allocated resources"
