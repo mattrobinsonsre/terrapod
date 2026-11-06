@@ -44,6 +44,17 @@ def run_object_slug(run_id: str) -> str:
     return hashlib.sha256(run_id.encode()).hexdigest()[:_RUN_SLUG_LEN]
 
 
+def runner_job_name(run_id: str, phase: str) -> str:
+    """The Kubernetes Job name for a run's phase.
+
+    ONE producer, for the same reason `run_object_slug` is: the listener needs
+    to name a Job it has just created *before* the Kubernetes apiserver will
+    list it, so admission can count it (#2399). A second copy of this format
+    would make that count silently wrong rather than loudly broken.
+    """
+    return f"tprun-{run_object_slug(run_id)}-{phase}"
+
+
 # Per-run vars Secret (mounted files). Keep in sync with
 # runner/job_entrypoint.py + runner/phases/execution_hooks.py which read the
 # same paths.
@@ -265,8 +276,7 @@ def build_job_spec(
     if not namespace:
         namespace = runner_config.runner_namespace
 
-    run_short = run_object_slug(run_id)
-    job_name = f"tprun-{run_short}-{phase}"
+    job_name = runner_job_name(run_id, phase)
 
     # Build container env vars
     api_url = runner_config.server_url or "http://terrapod-api:8000"
