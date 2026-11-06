@@ -715,7 +715,7 @@ Exposed at `GET /metrics` on port 8081 (same health HTTP server). Uses a separat
 
 | Metric | Type | Description |
 |---|---|---|
-| `terrapod_listener_active_runs` | Gauge | Number of currently active runner Jobs |
+| `terrapod_listener_active_runs` | Gauge | Runner Jobs occupying the pool's namespace — existing and not yet finished, so Pending and unschedulable Jobs are included |
 | `terrapod_listener_identity_ready` | Gauge | 1 if identity established, 0 otherwise |
 | `terrapod_listener_heartbeat_age_seconds` | Gauge | Seconds since last successful heartbeat (-1 if never) |
 

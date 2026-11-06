@@ -85,8 +85,9 @@ priorityClasses:
     enabled: true
     value: -10000
 
-# maxConcurrent is the per-listener launch cap; with the listener HPA below it
-# multiplies across replicas. It's kept moderate — the goal is NOT to maximise
+# maxConcurrent is the POOL-WIDE cap on concurrent runner Jobs: every replica
+# admits on the same namespace-wide count, so it does NOT multiply across
+# replicas. It's kept moderate — the goal is NOT to maximise
 # concurrent Jobs on one node, but to keep the control plane healthy under load
 # while excess runner Jobs back up (Pending/queued) as correct backpressure.
 listener:
@@ -96,7 +97,8 @@ listener:
   # share + redundancy — so a single CPU-starved replica can't take the tier down and
   # re-queue everything (that was the failure when it was pinned to 1 replica).
   # minReplicas: 2 gives baseline redundancy; on a real multi-node deployment the
-  # added listeners land on fresh runner-node compute and add real launch throughput.
+  # added listeners give redundancy and claim latency, NOT execution concurrency —
+  # that is maxConcurrent above, which they share. Raise it to add throughput.
   autoscaling:
     enabled: true
     minReplicas: 2

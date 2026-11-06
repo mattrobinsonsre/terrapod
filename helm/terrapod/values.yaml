@@ -2282,7 +2282,9 @@ listener:
   # (runners.yaml → RunnerConfig), not Deployment env (#617). Defaults are
   # sane; override per cluster as needed.
   heartbeatInterval: 60   # Seconds between listener heartbeats (Redis TTL is 300).
-  maxConcurrent: 3        # Max concurrent run launches per listener pod.
+  maxConcurrent: 3        # POOL-WIDE max concurrent runner Jobs (not per pod):
+                          # every replica admits on the same namespace-wide count.
+                          # Raise this, not listener.replicas, for more concurrency.
   pollInterval: 30        # Fallback poll interval when SSE is idle (s).
   sseReadTimeout: 30      # SSE silence beyond this reconnects (keepalive is 1s).
   sseMaxAge: 600          # Proactive SSE reconnect interval (s).

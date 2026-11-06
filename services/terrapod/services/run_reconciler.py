@@ -708,7 +708,7 @@ async def _reap_abandoned_job(run: Run) -> None:
 
     Only for the paths where the Job is **not** terminal — a pod that never
     scheduled, or a Job we have stopped waiting on. Those keep counting toward
-    `count_active_runner_jobs`, which is what the listener admits work against,
+    `list_occupying_runner_jobs`, which is what the listener admits work against,
     so a Job left behind here holds a capacity slot for the rest of the
     listener's life: at the shipped `maxConcurrent: 3`, three of them and the
     pool never claims again. Nothing reaps them on its own either —

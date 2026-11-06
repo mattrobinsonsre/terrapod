@@ -6,6 +6,7 @@ Uses the kubernetes Python client to interact with the K8s API.
 import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -557,28 +558,98 @@ def _job_is_terminal(job) -> bool:
     return False
 
 
+#: How long a Job with no pod yet is credited with a slot. It exists to cover
+#: one window only: `create_namespaced_job` has returned and the Job controller
+#: has not created the pod, which is sub-second in practice. Anything longer is
+#: a Job that cannot get a pod at all, and crediting THAT forever is how the
+#: first cut of #2399 turned over-admission into a silent pool stall.
+_PODLESS_GRACE_SECONDS = 60
+
+#: Connect/read bound for the occupancy list. See the call site.
+_LIST_TIMEOUT_SECONDS = 10.0
+
+
+def _job_occupies_a_slot(job, now: datetime) -> bool:
+    """Does this Job hold capacity we must not admit over?
+
+    Four cases, and the bounded middle one is the whole point:
+
+    * **being deleted** -- no. Foreground propagation keeps the object listed
+      until its pods are gone and the controller adds no terminal condition, so
+      a pod stuck `Terminating` would otherwise hold the slot for ever. This is
+      the path `delete_job` takes, i.e. every cancel.
+    * **terminal** -- no. The controller is done with it.
+    * **has a pod** -- yes. Pending, unschedulable or running, the pod is real
+      and will take a node. This is the steady-state answer and it is what the
+      rule before #2399 got right.
+    * **no pod yet** -- yes, but only for `_PODLESS_GRACE_SECONDS`. That covers
+      the burst window without crediting a Job that will never get a pod.
+
+    That last bound is not theoretical. Measured against a real apiserver: a
+    Job whose pods a `ResourceQuota` refuses reports `active=None`,
+    `failed=None` and **no conditions, indefinitely** -- the pod is never
+    created, so nothing ever increments `failed` and no terminal condition
+    arrives. An unbounded credit there stalls the pool until the reconciler's
+    hour-long `stale_timeout_seconds`, on the very configuration
+    `docs/deployment.md` recommends (a quota as the hard backstop). A webhook
+    rejecting the pod, or a missing ServiceAccount, behaves the same way.
+
+    Stalling is the dangerous direction, because it is silent: the listener
+    keeps heart-beating, `/health` stays 200, and the pool simply stops
+    claiming. Over-admission at least errors loudly with a message naming the
+    requested CPU and memory. So where this cannot tell, it declines to count.
+    """
+    meta = getattr(job, "metadata", None)
+    if meta is not None and getattr(meta, "deletion_timestamp", None):
+        return False
+    if _job_is_terminal(job):
+        return False
+
+    status = getattr(job, "status", None)
+    active = getattr(status, "active", None) if status is not None else None
+    if active:
+        return True
+
+    created = getattr(meta, "creation_timestamp", None) if meta is not None else None
+    if created is None:
+        # Every object the apiserver returns carries this, so we are past the
+        # end of what should happen. Decline rather than credit it for ever:
+        # one extra Job is recoverable and loud, a leaked slot is neither.
+        return False
+    return (now - created).total_seconds() <= _PODLESS_GRACE_SECONDS
+
+
 async def list_occupying_runner_jobs(
     namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
 ) -> set[str] | None:
     """The NAMES of runner Jobs currently occupying capacity in `namespace`.
 
-    A Job occupies a slot from the moment it **exists** until the Job
-    controller declares it terminal. That is deliberately not
-    `status.active > 0`: `active` counts *pods*, and a Job that has just been
-    created has none yet, so it reads as zero. Between
-    `create_namespaced_job` returning and the Job controller creating the pod,
-    such a Job was counted by **nothing** -- not here, and not by the
-    listener's in-flight counter, which is released as soon as the Job is
-    created -- so a burst of concurrent admissions walked straight through
-    `max_concurrent` (#2399).
+    `_job_occupies_a_slot` decides what counts, and that predicate is the
+    whole of #2399 -- read it first. In short: a Job with a pod, plus a Job
+    created within the last `_PODLESS_GRACE_SECONDS`.
 
-    Counting a Job that merely exists is also the honest answer for an
-    **unschedulable** one: it holds no pod, but it will take a node the moment
-    one frees, and #1198's reaper is what releases its slot.
+    The old rule was `status.active > 0` alone, and `active` counts *pods*: a
+    Job that had just been created has none, so it read as zero occupancy.
+    Between `create_namespaced_job` returning and the controller creating the
+    pod, such a Job was counted by **nothing** -- not here, and not by the
+    listener's in-flight counter, which is released as soon as the Job exists
+    -- so a burst of concurrent admissions walked straight through
+    `max_concurrent`.
 
-    Returns names rather than a count so a caller can union in Jobs it created
-    itself a moment ago. That is what makes admission exact even if the
-    apiserver serves this list from a slightly stale watch cache.
+    The first attempt at this counted a Job until it went terminal, which
+    traded that over-admission for several silent ways to STALL -- a
+    quota-blocked Job, a Job stuck Terminating, a Job retrying under
+    `backoffLimit`. Hence the time bound: it covers the burst window and
+    nothing else.
+
+    Returns names rather than a count so a caller can union in the Jobs it
+    created itself a moment ago. The list below asks for no `resourceVersion`,
+    which Kubernetes answers with a consistent read, so in practice a Job is
+    already here the instant its creation returns (measured: 30 of 30). The
+    union is a backstop against that guarantee being WEAKENED rather than
+    against it being false -- adding `limit=` or `resource_version="0"` would
+    silently drop it, and the multi-replica bound in `docs/runners.md` rests
+    on it.
 
     Kubernetes is the source of truth for occupancy, so this queries it live on
     every call rather than trusting a local counter (which would drift as Jobs
@@ -616,17 +687,31 @@ async def list_occupying_runner_jobs(
             # explicit binding keeps the closure unambiguous.
             jobs = await loop.run_in_executor(
                 _executor,
+                # NO `resource_version` and NO `limit`, deliberately: that is
+                # what makes this a consistent read, so a Job just created by
+                # ANOTHER listener replica is already here. Adding either would
+                # make this a possibly-stale or partial answer and silently
+                # invalidate the multi-replica bound in `docs/runners.md`.
                 lambda b=batch_api: b.list_namespaced_job(
                     namespace=namespace,
                     label_selector="app.kubernetes.io/component=runner",
+                    # Bounded, because the caller holds the drain lock across
+                    # this await. urllib3 has no default timeout, so a
+                    # half-open connection to the apiserver would park an
+                    # executor thread for ever and the listener would stop
+                    # claiming for the life of the pod -- silently, with a
+                    # green heartbeat. A timeout turns that into the retryable
+                    # error the loop below already handles.
+                    _request_timeout=_LIST_TIMEOUT_SECONDS,
                 ),
             )
             batch_api.api_client.last_response = None
 
+            now = datetime.now(UTC)
             occupying: set[str] = set()
             for job in jobs.items:
-                if _job_is_terminal(job):
-                    continue  # the controller is done with it -- slot released
+                if not _job_occupies_a_slot(job, now):
+                    continue
                 name = job.metadata.name if job.metadata else None
                 if name:
                     occupying.add(name)

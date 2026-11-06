@@ -429,7 +429,7 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-listener` | Listener Docker image |
 | `listener.image.tag` | `""` (appVersion) | Image tag |
 | `listener.replicas` | `1` | Number of listener replicas |
-| `listener.maxConcurrent` | `3` | **Pool-wide** max concurrent runner Jobs. Admission is gated on the **real** namespace-wide running-Job count, which every listener replica shares — so this is the pool ceiling regardless of `listener.replicas` (replicas are for HA, not extra concurrency; raise this, not replicas, for more). The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
+| `listener.maxConcurrent` | `3` | **Pool-wide** max concurrent runner Jobs. Admission is gated on the **real** namespace-wide count of runner Jobs occupying it — one with a **pod** (Pending, unschedulable or running), plus one created moments ago whose pod does not exist yet — which every listener replica shares — so this is the pool ceiling regardless of `listener.replicas` (replicas are for HA, not extra concurrency; raise this, not replicas, for more). The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
 | `listener.joinToken` | `""` | Raw join token. Delivered to the pod by `secretKeyRef` from a chart-managed Secret, not as a literal Deployment env — but still use `existingSecret` for production, because a token given here is in the release's own values |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
@@ -488,10 +488,11 @@ size concurrency to the capacity you have — otherwise runner Jobs sit
 
 **How the multiplier works.** A listener admits a run only while the **real**
 count of runner Jobs occupying the pool's namespace is below
-`listener.maxConcurrent` (default **3**). A Job counts from the moment it
-**exists** until Kubernetes declares it finished — so one whose pod is still
-Pending, unschedulable, or not yet created holds its slot, which is precisely
-what you want on a fixed pool. Every listener replica counts that same
+`listener.maxConcurrent` (default **3**). A Job occupies a slot while it has a
+**pod** — Pending, unschedulable or running, since that pod will take a node —
+which is precisely what you want on a fixed pool, plus a short grace after
+creation before its pod exists. A Job being deleted, or one with no pod after
+that grace, releases its slot. Every listener replica counts that same
 namespace-wide Job total, so `listener.maxConcurrent` is the **pool-wide**
 concurrency ceiling — running multiple `listener.replicas` gives you
 **high availability** (any replica can claim a run and launch its Job; if one
@@ -504,10 +505,17 @@ Kubernetes scheduler fits pods by their **requests**, so the worst-case
 simultaneous runner demand across the whole pool is:
 
 ```
-listener.maxConcurrent × max(per-workspace resource_cpu / resource_memory requests)
+(listener.maxConcurrent + listener.replicas - 1) × max(per-workspace resource_cpu / resource_memory requests)
 ```
 
-— independent of how many listener replicas you run.
+The `replicas - 1` term is the admission overshoot: each replica is exact about
+the Jobs it is creating itself and sees another's as soon as they exist, but in
+the window between one replica deciding it has room and its Job existing,
+another can decide the same. One replica is exact, so with the default
+`listener.replicas: 1` the term is zero and the figure is just
+`maxConcurrent × requests`. Size on the worst case, not the common one — this
+section exists to stop a fixed pool being sized so tight that the extra Job
+goes **Pending**.
 
 **The inequality to keep true** (per node, using requests):
 
