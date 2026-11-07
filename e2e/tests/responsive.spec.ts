@@ -2166,9 +2166,12 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     // The fifth used to be the settings form, a `<fieldset>` — which defaults to
     // `min-inline-size: min-content` and will not shrink below its content
     // unless told to, which is how /admin/bulk-update once overflowed by 122px.
-    // That form is gone (#1929); the application's only remaining fieldset is on
+    // That form is gone (#1929); every fieldset the application still has is on
     // /admin/bulk-update, which this suite drives separately, so the case is
-    // still covered.
+    // still covered. Three of them since #2413 F4 — the filter, and the two
+    // that disable a list editor behind an off gate — and all three carry the
+    // `min-w-0` that is the whole fix, so "only remaining" is no longer the
+    // right wording even though the reasoning is unchanged.
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2erespinv'))
     const web = await seedInventoryGroup(token, wsId, 'web')
@@ -2212,9 +2215,9 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     }
 
     // The `<fieldset>` case used to be driven here, via the inventory settings
-    // form. That form is gone (#1929) and the application's only remaining
-    // fieldset is on `/admin/bulk-update`, which this suite already drives —
-    // so no coverage is lost by removing this block rather than relocating it.
+    // form. That form is gone (#1929) and every fieldset the application still
+    // has is on `/admin/bulk-update`, which this suite already drives — so no
+    // coverage is lost by removing this block rather than relocating it.
 
     // The variable table, whose values are unbroken identifier-ish runs.
     await page.getByRole('button', { name: 'Inventory variables', exact: true }).click()
