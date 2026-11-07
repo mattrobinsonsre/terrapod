@@ -61,9 +61,72 @@ interface HostEventAttrs {
   sequence: number;
 }
 
-export function HostsPanel({ runId }: { runId: string }) {
+/**
+ * A host's status, and the way to that host's output (#2413 F16).
+ *
+ * One producer because the panel renders the same badge twice -- a `<td>` at
+ * desktop width and a `MobileCard` badge at phone width -- and a link added to
+ * one of those is a link half the operators never see.
+ *
+ * A `<button>` only when there is somewhere to go, so the standalone panel
+ * renders exactly the span it always did rather than a dead control. The
+ * accessible name is `Configure log — <host>`: as a button its text alone
+ * is the status word, which says what the host did and not what clicking does.
+ */
+function HostStatusBadge({
+  host,
+  status,
+  label,
+  linkLabel,
+  onOpen,
+}: {
+  host: string;
+  status: string;
+  label: string;
+  linkLabel: string;
+  onOpen?: (host: string) => void;
+}) {
+  const cls = `rounded px-2 py-0.5 text-xs ${hostStatusBadge(status)}`;
+  if (!onOpen) return <span className={cls}>{label}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(host)}
+      aria-label={`${linkLabel} — ${host}`}
+      className={`${cls} underline decoration-dotted underline-offset-2 hover:brightness-125 focus:outline-none focus:ring-1 focus:ring-brand-500`}
+    >
+      {label}
+    </button>
+  );
+}
+
+export function HostsPanel({
+  runId,
+  onOpenHostLog,
+}: {
+  runId: string;
+  /**
+   * Open the configure log filtered to one host (#2413 F16).
+   *
+   * A callback rather than an `<a href>` because the run page owns its view in
+   * `useState` and writes the URL with `replaceState`: a client-side
+   * navigation to `?view=configure&host=…` would not re-run the state
+   * initialiser, so the URL would change and the pane would not. Every other
+   * view switch on that page is a callback for the same reason.
+   *
+   * Optional, so the panel still renders standalone -- and the links are
+   * data-gated on it rather than on anything about the run.
+   */
+  onOpenHostLog?: (host: string) => void;
+}) {
   const t = useTranslations("runDetail.hosts");
   const { confirmIrreversible } = useConfirm();
+  // `Configure log`, which already exists in every catalogue as the view's own
+  // tab label. Deliberately NOT a new string: a per-link label would be one
+  // more value to keep true in 32 catalogues, and this one is both accurate
+  // and already translated. The host name is composed into the accessible
+  // name rather than written into a sentence, so no locale has to carry it.
+  const tTabs = useTranslations("runDetail.tabs");
   const router = useRouter();
   const params = useParams();
   const [hosts, setHosts] = useState<HostResultAttrs[] | null>(null);
@@ -186,8 +249,27 @@ export function HostsPanel({ runId }: { runId: string }) {
             {t("outstandingTitle", { count: outstanding.length })}
           </p>
           <p className="text-xs text-amber-300/80">{t("outstandingNote")}</p>
+          {/* Each name goes to its own output (#2413 F16). These are the
+              hosts a configure did not reach, so they are the ones someone
+              most wants to read -- and plain text was the one thing standing
+              between the banner and the answer. Still a plain run of names
+              when there is nowhere to go. */}
           <p className="break-words font-mono text-xs text-slate-300">
-            {outstanding.join(", ")}
+            {onOpenHostLog
+              ? outstanding.map((host, i) => (
+                  <span key={host}>
+                    {i > 0 && ", "}
+                    <button
+                      type="button"
+                      onClick={() => onOpenHostLog(host)}
+                      aria-label={`${tTabs("configureFull")} — ${host}`}
+                      className="underline decoration-dotted underline-offset-2 hover:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded"
+                    >
+                      {host}
+                    </button>
+                  </span>
+                ))
+              : outstanding.join(", ")}
           </p>
           <button
             type="button"
@@ -261,13 +343,17 @@ export function HostsPanel({ runId }: { runId: string }) {
                 <tr key={h.host} className="border-t border-slate-800">
                   <td className="px-3 py-2 font-mono text-xs">{h.host}</td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs ${hostStatusBadge(h.status)}`}
-                    >
-                      {hostStatusKey(h.status)
-                        ? t(hostStatusKey(h.status)!)
-                        : h.status}
-                    </span>
+                    <HostStatusBadge
+                      host={h.host}
+                      status={h.status}
+                      label={
+                        hostStatusKey(h.status)
+                          ? t(hostStatusKey(h.status)!)
+                          : h.status
+                      }
+                      linkLabel={tTabs("configureFull")}
+                      onOpen={onOpenHostLog}
+                    />
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {count(h.ok)}
@@ -312,13 +398,15 @@ export function HostsPanel({ runId }: { runId: string }) {
               </span>
             }
             badge={
-              <span
-                className={`rounded px-2 py-0.5 text-xs ${hostStatusBadge(h.status)}`}
-              >
-                {hostStatusKey(h.status)
-                  ? t(hostStatusKey(h.status)!)
-                  : h.status}
-              </span>
+              <HostStatusBadge
+                host={h.host}
+                status={h.status}
+                label={
+                  hostStatusKey(h.status) ? t(hostStatusKey(h.status)!) : h.status
+                }
+                linkLabel={tTabs("configureFull")}
+                onOpen={onOpenHostLog}
+              />
             }
             fields={[
               { label: t("columnOk"), value: count(h.ok) },
@@ -358,14 +446,31 @@ export function HostsPanel({ runId }: { runId: string }) {
               than adding a per-host string: it reads correctly under a heading
               that already names the host, and a near-duplicate key would be 31
               more values to keep true for no gain a reader can see. */}
-          {detail === "available" && (
-            <a
-              className="inline-block rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-600"
-              href={`/api/v1/runs/${runId}/host-events/stream?host=${encodeURIComponent(expanded)}`}
-            >
-              {t("detailDownload")}
-            </a>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {detail === "available" && (
+              <a
+                className="inline-block rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-600"
+                href={`/api/v1/runs/${runId}/host-events/stream?host=${encodeURIComponent(expanded)}`}
+              >
+                {t("detailDownload")}
+              </a>
+            )}
+            {/* #2413 F16. The expansion stays in place -- it answers WHICH
+                tasks failed, which is a different question from what the host
+                printed -- and this is the way out of it to the output. Not
+                gated on `detail`: the log is a separate artifact from the
+                per-host events, so it can be there when they have been
+                reaped. */}
+            {onOpenHostLog && (
+              <button
+                type="button"
+                onClick={() => onOpenHostLog(expanded)}
+                className="inline-block rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-600"
+              >
+                {tTabs("configureFull")}
+              </button>
+            )}
+          </div>
           {eventsFor(expanded).map((e) => (
             <div key={`${e.sequence}-${e.kind}`} className="text-xs space-y-1">
               <div className="flex flex-wrap items-center gap-2">
