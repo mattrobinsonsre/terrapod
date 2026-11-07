@@ -45,13 +45,21 @@ test.describe('Configure triggers', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
     // The gate is off, so neither control can do anything -- and both are
-    // still RENDERED, disabled (#2413 F20). Nothing on this form is hidden by
-    // a gate: an operator learns the option exists by seeing it, and the
-    // disabled state says it is not available yet rather than not existing.
+    // still RENDERED (#2413 F20). Nothing on this form is hidden by a gate: an
+    // operator learns the option exists by seeing it.
     //
-    // Asserted as present AND disabled rather than merely present, because
-    // present-and-editable is the defect this replaced a hide with: a control
-    // that cannot work must not accept input.
+    // In VIEW mode a field is a value, not a control -- it renders as a span
+    // reading "Disabled" -- so visibility is the whole assertion here and
+    // a disabled-control assertion would be a category error. The real one is
+    // asserted below, in edit mode, which is where one exists.
+    for (const id of ['ws-auto-configure-enabled', 'ws-configure-after-apply']) {
+      await expect(page.getByTestId(id)).toBeVisible()
+    }
+
+    // Edit mode: now they are real inputs, and they must be present AND
+    // disabled. Present-and-editable is the defect that replacing a hide could
+    // introduce -- a control that cannot work must not accept input.
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
     for (const id of ['ws-auto-configure-enabled', 'ws-configure-after-apply']) {
       await expect(page.getByTestId(id)).toBeVisible()
       await expect(page.getByTestId(id)).toBeDisabled()
