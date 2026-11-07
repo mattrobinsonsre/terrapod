@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Po použití následuje konfigurace ve stejném běhu.",
       "queueConfigureConfirmDynamic": "Tento pracovní prostor řeší zdroje inventáře na runneru, takže hosty, kterých se dotkne, nejsou známy až do začátku běhu.",
       "configureReachAll": "Konfigurace zasáhne VŠECHNY hostitele v inventáři — není nastaven žádný limit.",
-      "configureReachLimited": "Konfigurace zasáhne {limit}."
+      "configureReachLimited": "Konfigurace zasáhne {limit}.",
+      "queueFullRun": "Úplné spuštění",
+      "queueFullRunConfirm": "Plan, apply A konfigurace tohoto pracovního prostoru? Konfigurace změní skutečné hostitele poté, co apply změní skutečnou infrastrukturu, a mezi nimi není samostatná kontrola.",
+      "moreRunKinds": "Jiné druhy spuštění"
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Th'' apply be followed by a riggin'' on this same run.",
       "queueConfigureConfirmDynamic": "This here workspace be reckonin' its inventory sources aboard the runner, so the ports it'll be makin' landfall upon be unknown 'til the voyage be underway, arr.",
       "configureReachAll": "A riggin’ run be boardin’ EVERY vessel on th’ manifest — no bounds be set.",
-      "configureReachLimited": "A riggin’ run be boardin’ {limit}."
+      "configureReachLimited": "A riggin’ run be boardin’ {limit}.",
+      "queueFullRun": "Th’ whole voyage",
+      "queueFullRunConfirm": "Chart, commit AN’ rig this here workspace? Th’ riggin’ boards real vessels after th’ commit shifts real waters, an’ there be no inspection betwixt ’em.",
+      "moreRunKinds": "Other manners o’ sailin’"
     },
     "state": {
       "deleteConfirm": "Send state version #{serial} t'' Davy Jones? This cannot be undone.",

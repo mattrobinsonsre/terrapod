@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。",
       "queueConfigureConfirmDynamic": "このワークスペースはインベントリソースをランナー上で解決するため、到達するホストは実行が開始されるまで分かりません。",
       "configureReachAll": "Configure はインベントリの「すべて」のホストに適用されます。制限が設定されていません。",
-      "configureReachLimited": "Configure は {limit} に適用されます。"
+      "configureReachLimited": "Configure は {limit} に適用されます。",
+      "queueFullRun": "フル実行",
+      "queueFullRunConfirm": "このワークスペースでプラン・適用・構成をすべて実行しますか？適用が実際のインフラを変更した後、構成が実際のホストを変更します。その間に個別のレビューはありません。",
+      "moreRunKinds": "その他の実行種別"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

@@ -18,6 +18,8 @@ import {
   dependencyMet,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { RunKindSplitButton, type RunKindOption } from '@/components/run-kind-split-button'
+import { availableRunKinds, type RunKindId } from '@/lib/run-kinds'
 import { categoryKey, nativeCategoryKey } from '@/lib/variable-category'
 import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
@@ -2079,7 +2081,7 @@ function WorkspaceDetailContent() {
 
   // `planOnly` is the button pressed, not a stored toggle (#1340) — the choice
   // is per-press, so nothing persists between runs to be misread later.
-  async function handleQueuePlan(planOnly: boolean) {
+  async function handleQueuePlan(planOnly: boolean, withConfigure = false) {
     // A non-default VCS ref is forced plan-only server-side. The apply button
     // is disabled in that state, so reaching here with both set would mean the
     // guard failed — refuse rather than silently queue the wrong kind of run.
@@ -2090,7 +2092,9 @@ function WorkspaceDetailContent() {
     // immediately.
     const planMsg = planOnly
       ? phaseWord('queuePlanConfirm')
-      : phaseWord('queueApplyConfirm')
+      : withConfigure
+        ? t('runs.queueFullRunConfirm')
+        : phaseWord('queueApplyConfirm')
     if (!confirmTouchMutation(planMsg)) return
     setQueueingPlan(true)
     setError('')
@@ -2110,6 +2114,16 @@ function WorkspaceDetailContent() {
       // is absent there, so this only guards a stale tick from an engine change.
       if (planAllowEmpty && !isPulumi) attrs['allow-empty-apply'] = true
       if (vcsRef) attrs['vcs-ref'] = vcsRef
+      // The per-run composite (#2413 F12), sent EXPLICITLY in both directions
+      // on any run that has an apply -- which is what makes the two buttons
+      // mean what they say.
+      //
+      // `false` is not a no-op and not a default: on a workspace that declares
+      // `configure-after-apply`, it is what makes `Plan + apply` run just the
+      // first two phases, which is the partial the review asked for by name.
+      // Omitted entirely on a plan-only run, where the server refuses `true`
+      // and `false` would say nothing.
+      if (!planOnly) attrs['configure-after-apply'] = withConfigure
 
       const res = await apiFetch(`/api/v1/runs`, {
         method: 'POST',
@@ -2487,6 +2501,64 @@ function WorkspaceDetailContent() {
 
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
+
+  // The run button's options, most complete first (#2413 F12 / F10).
+  //
+  // Derived here from the workspace and this caller's own capabilities, so
+  // "which is primary" is answered once rather than by which button somebody
+  // pressed last. `availableRunKinds` decides membership and order; this maps
+  // each kind to its label, its action and why it cannot run now.
+  //
+  // It also closes a gap the old row had: nothing read `plan-apply-enabled`, so
+  // a workspace that declares no plan/apply operation still showed Plan and
+  // Plan + apply buttons the API refuses (#1966) -- the #1634 shape. The
+  // derivation withholds them, the same way the Configure button has always
+  // been withheld from a workspace with no configure operation.
+  const runKindOptions: RunKindOption[] = availableRunKinds({
+    // `?? true` mirrors the column default, the same way the editor reads it:
+    // a workspace row written before #1966 has no value and plans and applies.
+    planApplyEnabled: attrs['plan-apply-enabled'] ?? true,
+    configureEnabled: attrs['configure-enabled'] === true,
+    canQueueRun: !!perms['can-queue-run'],
+    canQueueApply: !!perms['can-queue-apply'],
+    vcsRefSelected: !!vcsRef,
+  }).map((k) => {
+    const label: Record<RunKindId, string> = {
+      full: t('runs.queueFullRun'),
+      planApply: phaseWord('queueRun'),
+      configure: t('runs.queueConfigure'),
+      plan: phaseWord('queuePlan'),
+    }
+    const run: Record<RunKindId, () => void> = {
+      // The composite, which #2419 made requestable per run.
+      full: () => handleQueuePlan(false, true),
+      // Explicitly NOT a composite, which is what makes this the partial on a
+      // workspace that declares `configure-after-apply`.
+      planApply: () => handleQueuePlan(false, false),
+      configure: () => handleQueueConfigure(),
+      plan: () => handleQueuePlan(true),
+    }
+    const title: Record<RunKindId, string | undefined> = {
+      full: undefined,
+      planApply: phaseWord('queueApplyTitle'),
+      configure: t('runs.queueConfigureTitle'),
+      plan: undefined,
+    }
+    return {
+      id: k.id,
+      label: label[k.id],
+      title: title[k.id],
+      // `locked` blocks every kind, so it wins over the per-kind reason: a
+      // locked workspace cannot run anything, and saying why is more use than
+      // explaining a ref that is also in the way.
+      blockedReason: attrs.locked
+        ? t('common.workspaceLocked')
+        : k.blocked === 'vcsRef'
+          ? phaseWord('queueApplyRefBlocked')
+          : undefined,
+      run: run[k.id],
+    }
+  })
 
   // `oidc-audiences` arrives MERGED, so provenance only exists by subtracting
   // the deployment catalogue. Derived on every render rather than stored: the
@@ -5077,55 +5149,34 @@ function WorkspaceDetailContent() {
                       </button>
                     </div>
                   ))}
-                  {/* Two buttons, not a button plus a hidden checkbox (#1340).
-                      Plan-vs-apply is the decision that matters every time, so
-                      it is made by which button you press; the options panel
-                      keeps only the genuinely occasional flags. Pressing Plan
-                      does exactly what it did before. */}
-                  <button
-                    onClick={() => handleQueuePlan(true)}
-                    disabled={queueingPlan || attrs.locked}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                    title={attrs.locked ? t('common.workspaceLocked') : undefined}
-                  >
-                    {queueingPlan ? t('actions.queuing') : phaseWord('queuePlan')}
-                  </button>
-                  {perms['can-queue-apply'] && (
-                    <button
-                      onClick={() => handleQueuePlan(false)}
-                      // Disabled on a non-default VCS ref because the server
-                      // forces those runs plan-only. Leaving it enabled would
-                      // promise an apply and quietly deliver a plan.
-                      disabled={queueingPlan || attrs.locked || !!vcsRef}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-900/40 hover:bg-amber-900/60 disabled:bg-amber-900/20 disabled:text-amber-600/70 text-amber-300 transition-colors"
-                      title={
-                        attrs.locked
-                          ? t('common.workspaceLocked')
-                          : vcsRef
-                            ? phaseWord('queueApplyRefBlocked')
-                            : phaseWord('queueApplyTitle')
-                      }
-                    >
-                      {queueingPlan ? t('actions.queuing') : phaseWord('queueRun')}
-                    </button>
-                  )}
-                  {/* The configure trigger (#1974), data-gated: a workspace that
-                      declares no configure operation shows no button, so a
-                      terraform/tofu-only deployment pays nothing and there is no
-                      flag to set. Gated on `can-queue-apply` because a configure
-                      is apply-equivalent -- it needs `run:apply`, so offering it
-                      to a plan-level role would show a button the API refuses
-                      (#1634's lesson, applied to the third run kind). */}
-                  {attrs['configure-enabled'] && perms['can-queue-apply'] && (
-                    <button
-                      onClick={handleQueueConfigure}
-                      disabled={queueingConfigure || attrs.locked}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-500 disabled:bg-violet-900/40 disabled:text-violet-500/70 text-white transition-colors"
-                      title={attrs.locked ? t('common.workspaceLocked') : t('runs.queueConfigureTitle')}
-                    >
-                      {queueingConfigure ? t('actions.queuing') : t('runs.queueConfigure')}
-                    </button>
-                  )}
+                  {/* ONE primary action, with the partials behind a caret
+                      (#2413 F12 / F10).
+                      
+                      This was three buttons -- Plan (solid brand), Plan + apply
+                      (muted amber) and Configure (solid violet) -- and their
+                      weight did not track risk: the two loudest were the safest
+                      action and a fleet-changing one, while the most
+                      consequential were the quiet ones. F10 is that finding and
+                      this is its resolution, from F12 rather than from a
+                      restyle: with one primary there is one loud control, and
+                      it is the complete thing the workspace says it does.
+                      
+                      Membership, order and every per-kind reason come from
+                      `runKindOptions` above. Pressing the primary still does
+                      exactly one thing, and nothing is remembered between
+                      presses.
+                      
+                      `Destroy` stays a button of its own, above: it carries its
+                      own grant and its own inline two-step, and burying the most
+                      consequential action in a menu is the one place a caret
+                      would cost more than it saves. */}
+                  <RunKindSplitButton
+                    options={runKindOptions}
+                    menuLabel={t('runs.moreRunKinds')}
+                    busyLabel={t('actions.queuing')}
+                    busy={queueingPlan || queueingConfigure}
+                    primaryClassName="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                  />
                 </div>
                 {/* What a configure would REACH, on the page (#2413 F14).
                     Until now this sentence existed only inside the confirm

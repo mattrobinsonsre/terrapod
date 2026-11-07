@@ -23,6 +23,11 @@
  */
 import { test, expect, type Dialog } from '@playwright/test'
 import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api'
+import {
+  revealRunKind,
+  expectRunKindOffered,
+  expectRunKindAbsent,
+} from '../helpers/run-kinds'
 
 /** Capture the next confirm()'s text and DISMISS it, so nothing is queued.
  *  Registered before the click: confirm() is synchronous and blocks the
@@ -95,13 +100,13 @@ test.describe('Configure triggers', () => {
     const wsId = await createWorkspace(token, uniqueName('e2enobtn'))
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    // `Plan`, not "Queue plan": the button's accessible name is
-    // `phases.terraform.words.queuePlan`, whose VALUE is `Plan` — the key name
-    // is not the label, and reading one off the other is what failed here.
-    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Configure', exact: true }).filter({ visible: true }),
-    ).toHaveCount(0)
+    // By KIND, not by label. The run button is a split button since F12, so
+    // `plan` is in the closed caret menu on a plain workspace and a locator on
+    // the accessible name resolves to nothing. `expectRunKindAbsent` opens the
+    // menu before asserting zero, which is the half that matters here: absent
+    // from the row and one click away are different things.
+    await expectRunKindOffered(page, 'plan')
+    await expectRunKindAbsent(page, 'configure')
   })
 
   test('the Configure button does NOT prompt on a precise pointer', async ({ page }) => {
@@ -129,10 +134,10 @@ test.describe('Configure triggers', () => {
     })
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    const button = page
-      .getByRole('button', { name: 'Configure', exact: true })
-      .filter({ visible: true })
-    await expect(button).toBeVisible({ timeout: 15_000 })
+    // Revealed before the dialog capture is armed, because revealing opens the
+    // caret menu and that is a click of its own -- arming first would leave the
+    // capture watching the wrong interaction.
+    const button = await revealRunKind(page, 'configure')
 
     const dialog = captureAndDismiss(page)
     await button.click()
@@ -195,9 +200,10 @@ test.describe('Configure triggers', () => {
     const wsId = await createWorkspace(token, uniqueName('e2enoreach'))
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible({
-      timeout: 15_000,
-    })
+    // Anchored on the run button having rendered at all, so the absent reach
+    // line below is a statement about the workspace rather than about a page
+    // that had not finished loading.
+    await expectRunKindOffered(page, 'plan')
     await expect(page.getByTestId('ws-configure-reach')).toHaveCount(0)
   })
 

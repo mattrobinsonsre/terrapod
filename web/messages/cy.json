@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Mae cyflunio yn dilyn y gweithrediad ar yr un rhediad hwn.",
       "queueConfigureConfirmDynamic": "Mae'r gweithle hwn yn datrys ffynonellau rhestr eiddo ar y rhedwr, felly nid yw'r gwesteiwyr y bydd yn eu cyrraedd yn hysbys hyd nes i'r rhediad ddechrau.",
       "configureReachAll": "Bydd cyflunio yn cyrraedd POB gwesteiwr yn y rhestr eiddo — nid oes terfyn wedi’i osod.",
-      "configureReachLimited": "Bydd cyflunio yn cyrraedd {limit}."
+      "configureReachLimited": "Bydd cyflunio yn cyrraedd {limit}.",
+      "queueFullRun": "Rhediad Llawn",
+      "queueFullRunConfirm": "Cynllunio, gweithredu A chyflunio’r gweithle hwn? Mae’r cyflunio yn newid gwesteiwyr go iawn ar ôl i’r gweithredu newid seilwaith go iawn, ac nid oes adolygiad ar wahân rhyngddynt.",
+      "moreRunKinds": "Mathau rhediad eraill"
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

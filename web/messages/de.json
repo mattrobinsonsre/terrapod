@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Auf die Anwendung folgt im selben Lauf ein Konfigurieren.",
       "queueConfigureConfirmDynamic": "Dieser Workspace löst Inventarquellen auf dem Runner auf, daher sind die Hosts, die er erreicht, erst bekannt, wenn der Lauf startet.",
       "configureReachAll": "Eine Konfiguration erreicht JEDEN Host im Inventar — es ist kein Limit gesetzt.",
-      "configureReachLimited": "Eine Konfiguration erreicht {limit}."
+      "configureReachLimited": "Eine Konfiguration erreicht {limit}.",
+      "queueFullRun": "Vollständiger Lauf",
+      "queueFullRunConfirm": "Plan, Apply UND Konfigurieren für diesen Workspace? Das Konfigurieren ändert echte Hosts, nachdem das Apply echte Infrastruktur geändert hat, und zwischen beiden gibt es keine separate Prüfung.",
+      "moreRunKinds": "Andere Laufarten"
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",

@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Efter tillämpningen följer en konfigurering i samma körning.",
       "queueConfigureConfirmDynamic": "Den här arbetsytan löser inventariekällor på runnern, så värdarna den kommer att nå är inte kända förrän körningen startar.",
       "configureReachAll": "En configure når VARJE värd i inventariet — ingen gräns är satt.",
-      "configureReachLimited": "En configure når {limit}."
+      "configureReachLimited": "En configure når {limit}.",
+      "queueFullRun": "Fullständig körning",
+      "queueFullRunConfirm": "Plan, apply OCH konfigurera denna arbetsyta? Konfigurationen ändrar riktiga värdar efter att apply har ändrat riktig infrastruktur, och det finns ingen separat granskning mellan dem.",
+      "moreRunKinds": "Andra körningstyper"
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

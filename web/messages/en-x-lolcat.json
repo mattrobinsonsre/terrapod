@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Teh apply is followd by a konfigur on dis same run.",
       "queueConfigureConfirmDynamic": "Dis workspace figurez out inventory sorces on da runner, so da hoomans it gonna touch is a mystry til da run startz. srsly.",
       "configureReachAll": "Teh configgie gunna touch EVRY kitteh in teh inventree — no limitz set!",
-      "configureReachLimited": "Teh configgie gunna touch {limit}. kthx"
+      "configureReachLimited": "Teh configgie gunna touch {limit}. kthx",
+      "queueFullRun": "DO ALL TEH THINGS",
+      "queueFullRunConfirm": "Plan, do it AN konfigur dis workspace? Teh konfigur touchez real kittehs after teh do-it touchez real infrastruktur, an no checkin in between. srsly?",
+      "moreRunKinds": "Uvver run kindz"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

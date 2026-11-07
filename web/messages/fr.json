@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution.",
       "queueConfigureConfirmDynamic": "Cet espace de travail résout les sources d''inventaire sur le runner, donc les hôtes qu''il atteindra ne sont pas connus avant le démarrage de l''exécution.",
       "configureReachAll": "Une configuration touchera TOUS les hôtes de l’inventaire — aucune limite n’est définie.",
-      "configureReachLimited": "Une configuration touchera {limit}."
+      "configureReachLimited": "Une configuration touchera {limit}.",
+      "queueFullRun": "Exécution complète",
+      "queueFullRunConfirm": "Plan, apply ET configuration de cet espace de travail ? La configuration modifie de vrais hôtes après que l’apply a modifié de vraies infrastructures, sans revue intermédiaire.",
+      "moreRunKinds": "Autres types d’exécution"
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

@@ -2923,7 +2923,10 @@
       "typeConfigureAfterApplyHint": "Applicationem configuratio in hoc eodem cursu sequitur.",
       "queueConfigureConfirmDynamic": "Hoc spatium operis fontes indicis in cursore resolvit, itaque hospites quos attinget ignoti sunt donec cursus incipiat.",
       "configureReachAll": "Configuratio OMNES hospites inventarii attinget — nullus finis positus est.",
-      "configureReachLimited": "Configuratio {limit} attinget."
+      "configureReachLimited": "Configuratio {limit} attinget.",
+      "queueFullRun": "Executio plena",
+      "queueFullRunConfirm": "Consilium, exsecutio ET configuratio huius loci operis? Configuratio hospites veros mutat postquam exsecutio infrastructuram veram mutavit, nec inter ea recognitio separata est.",
+      "moreRunKinds": "Alia genera executionis"
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

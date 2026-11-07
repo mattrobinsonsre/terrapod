@@ -2,6 +2,7 @@ import { test, expect, type Page, type Route, type Dialog } from '@playwright/te
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
+import { expectRunKindOffered, queueRunKind } from '../helpers/run-kinds';
 import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedVariable, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
@@ -501,10 +502,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     // Plan-vs-apply is the decision that matters every time, so neither button
     // may be hidden behind a breakpoint — a phone must be able to make the
     // same choice a desktop can.
-    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible({
-      timeout: 15_000,
-    })
-    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible()
+    await expectRunKindOffered(page, 'planApply')
+    // Reached through the caret at phone width, which is the control this test
+    // is really about: it is the smallest thing in the row and the one most
+    // likely to be missed with a thumb, so it carries a 44px tap target.
+    await expectRunKindOffered(page, 'plan')
 
     // Four buttons on one row is where a phone starts scrolling sideways.
     await expectNoHorizontalPageScroll(page)
@@ -524,9 +526,7 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     // A THIRD button on the row the #1340 test already calls the point where a
     // phone starts scrolling sideways — so this is the case that would break it.
-    await expect(
-      page.getByRole('button', { name: 'Configure', exact: true }).filter({ visible: true }),
-    ).toBeVisible({ timeout: 15_000 })
+    await expectRunKindOffered(page, 'configure')
     await expectNoHorizontalPageScroll(page)
 
     // And the per-run overrides: two more inputs inside the options panel,
@@ -1132,10 +1132,7 @@ test.describe('Responsive harness (phone viewport)', () => {
     // confirm() is synchronous and blocks the handler.
     let msg = '';
     page.once('dialog', async (d) => { msg = d.message(); await d.dismiss(); });
-    await page
-      .getByRole('button', { name: 'Configure', exact: true })
-      .filter({ visible: true })
-      .click();
+    await queueRunKind(page, 'configure');
     // Names the limit rather than shouting about the whole estate — the
     // contrast that makes the warning worth reading.
     await expect.poll(() => msg, { timeout: 5_000 }).toContain('canary');
