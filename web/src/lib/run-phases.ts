@@ -72,3 +72,21 @@ export function explainingPhase(
   }
   return null
 }
+
+/** The run link, pointed at the view that explains the status wherever we can
+ *  tell which that is (#2413 F16).
+ *
+ *  `?view=` is the run page's own deep-link parameter, already accepting
+ *  eleven views -- so this needs no new mechanism, only a caller. Falls back
+ *  to the bare run link rather than guessing: a wrong view is worse than the
+ *  page's default, because it asserts that the phase it opened is the one that
+ *  explains the outcome. */
+export function runHref(
+  workspaceId: string,
+  runId: string,
+  phaseStarts?: Record<string, unknown> | null,
+): string {
+  const base = `/workspaces/${workspaceId}/runs/${runId}`
+  const phase = explainingPhase(phaseStarts)
+  return phase ? `${base}?view=${phase}` : base
+}

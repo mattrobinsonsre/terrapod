@@ -34,6 +34,8 @@ import {
   type GroupId,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
@@ -1058,8 +1060,9 @@ export default function AutodiscoveryPage() {
         // the same trap -- bind-plan renders for Pulumi only, so a form that
         // defaults to Terraform never reveals it until somebody switches.
         return (
-          <p className="mt-1 text-xs text-slate-500">
-            {tWs.rich('fields.bindPlanHelp', {
+          <HintWithDetail
+            lead={tWs('fields.bindPlanLead')}
+            detail={tWs.rich('fields.bindPlanHelp', {
               docs: (chunks) => (
                 <a
                   href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
@@ -1071,7 +1074,7 @@ export default function AutodiscoveryPage() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'plan-apply-enabled':
         return hintText(tWs('fields.planApplyEnabledHint'))
@@ -1084,7 +1087,7 @@ export default function AutodiscoveryPage() {
       case 'configure-all-hosts':
         return hintText(tWs('fields.configureAllHostsHint'))
       case 'config-directory':
-        return hintText(tWs('fields.configDirectoryRootHint'))
+        return tieredHint(tWs, 'fields.configDirectoryTitle')
       case 'default-playbook':
         return hintText(tWs('fields.defaultPlaybookTitle'))
       case 'default-limit':
@@ -1092,11 +1095,9 @@ export default function AutodiscoveryPage() {
       case 'inventory-paths':
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return hintText(tWs('fields.dynamicInventoryEnabledHint'))
-      case 'inventory-scripts-enabled':
-        return hintText(tWs('fields.inventoryScriptsEnabledHint'))
+        return hintText(tWs('fields.dynamicInventoryModeHint'))
       case 'ansible-host-key-checking':
-        return hintText(tWs('fields.ansibleHostKeyCheckingHint'))
+        return tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-version':
         return hintText(
           envs.listing === 'complete' && envs.lines.length > 0
@@ -1110,7 +1111,7 @@ export default function AutodiscoveryPage() {
       case 'ansible-execution-environment':
         return hintText(tWs('fields.ansibleExecutionEnvironmentTitle'))
       case 'ansible-collections':
-        return hintText(tWs('fields.ansibleCollectionsHint'))
+        return tieredHint(tWs, 'fields.ansibleCollectionsHint')
       case 'var-files':
         // `t.rich`: carries a <code> tag.
         return (
@@ -1329,8 +1330,18 @@ export default function AutodiscoveryPage() {
         />
         {/* Which inventory sources ansible may resolve on the runner (#2033).
             Terrapod itself never runs either kind, in either state. */}
-        <RuleYesNo attr="dynamic-inventory-enabled" ctx={ruleCtx} />
-        <RuleYesNo attr="inventory-scripts-enabled" ctx={ruleCtx} />
+        {/* ONE ordered select over both grants (#2413 F19), replacing two
+            yes/no selects whose combination nobody could reason about: one of
+            the two permits an arbitrary executable from the repository to run
+            in the runner Job. NOT "the only settings that let third-party code
+            run on a runner" -- see `lib/dynamic-inventory.ts` for why that
+            framing is wrong. Four options, not the finding's three. */}
+        <Field
+          attr="dynamic-inventory-enabled"
+          ctx={ruleCtx}
+          kind="select"
+          control={<DynamicInventorySelect ctx={ruleCtx} />}
+        />
         {/* Defaults to yes, which is both the rule column's default and
             ansible's own behaviour (#2318). */}
         <RuleYesNo attr="ansible-host-key-checking" ctx={ruleCtx} />

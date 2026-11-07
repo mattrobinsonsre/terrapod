@@ -16,6 +16,7 @@
  */
 
 import { useTranslations } from 'next-intl'
+import { tieredHint } from '@/components/hint-with-detail'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 
 // Defined here rather than imported, which is this tree's own convention for a
@@ -163,7 +164,7 @@ export function AnsibleCredentialFields({
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
-      <p className="text-xs text-slate-400">{t('machineHint')}</p>
+      {tieredHint(t, 'machineHint')}
       {/* One column on a phone, two from `sm` up. Stacked at 412px this is a
           long form, but a two-column grid there would put an escalation
           password beside a key and neither is wide enough to read. The two
@@ -182,7 +183,7 @@ export function AnsibleCredentialFields({
             {t('knownHosts')}
           </label>
           {multiline('known_hosts', 3, 'host.example.com ssh-ed25519 AAAAC3Nza...')}
-          <p className="mt-1 text-xs text-slate-400">{t('knownHostsHint')}</p>
+          {tieredHint(t, 'knownHostsHint')}
         </div>
         <div>
           <label htmlFor={`${idPrefix}-ansible-password`} className={LABEL}>

@@ -1988,7 +1988,9 @@
       "providerInvalid": "Provider-nimessä ei ole välilyöntejä ja enintään yksi piste — aws tai aws.west.",
       "providerPlaceholder": "aws tai aws.west",
       "removeProviderAria": "Poista provider-konfiguraatio {provider}"
-    }
+    },
+    "showDetail": "Näytä koko selitys",
+    "hideDetail": "Piilota koko selitys"
   },
   "planSummary": {
     "aiGenerated": "Tekoälyn luoma",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-asetushakemisto",
       "configDirectoryTitle": "Missä ansible.cfg, playbookit, roles/, group_vars/ ja host_vars/ sijaitsevat, suhteessa tietovaraston juureen. Jätä tyhjäksi, jos kyse on tietovaraston juuresta itsestään. Onko tällä työtilalla lainkaan määritystoimintoa, ratkaisee yllä oleva Määritys-asetus eikä tämä polku.",
       "configDirectoryPlaceholder": "esim. ansible",
-      "configDirectoryRootHint": "Jätä tämä tyhjäksi, jos tarkoitat tietovaraston juurta itseään.",
       "configDirectoryRoot": "Tietovaraston juuri",
       "inventoryPaths": "Inventaariopolut",
       "inventoryPathsHint": "Järjestetyt inventaariolähteet, joista kukin on tiedosto tai hakemisto, suhteessa asetushakemistoon. Järjestys määrää etusijan.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansiblen muistipyyntö",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versio",
+      "dynamicInventoryMode": "Dynaaminen inventaario",
+      "dynamicInventoryModeHint": "Sallii määritellyn inventaariolaajennuksen, suoritettavan skriptin tai molemmat. Skripti on mielivaltainen suoritettava tiedosto repositoriosta; laajennus voidaan lukea ennen suoritusta. Terrapod ei koskaan suorita kumpaakaan, ja sen oma näkymä inventaarioon muuttuu osittaiseksi.",
+      "dynamicInventoryModeNone": "Ei mitään",
+      "dynamicInventoryModePlugins": "Määritellyt laajennukset",
+      "dynamicInventoryModeScripts": "Suoritettavat skriptit",
+      "dynamicInventoryModeBoth": "Määritellyt laajennukset ja suoritettavat skriptit",
       "dynamicInventoryEnabled": "Dynaamiset inventaariolaajennukset",
       "dynamicInventoryEnabledHint": "Sallii määritellyt inventaariolaajennukset — YAML-lähteen, jossa on ylimmän tason plugin-avain — kun suorittaja ratkaisee inventaarion. Terrapod ei koskaan suorita niitä itse, kummassakaan tilassa. Kun tämä on pois päältä, laajennuslähde hylätään nimeltä sen sijaan, että se ratkeaisi osittaiseksi konejoukoksi; kun se on päällä, tässä näytetty inventaario on nimenomaisesti osittainen lähdettä kohden, ja suorittajan ratkaisema joukko on määräävä.",
       "inventoryScriptsEnabled": "Inventaarioskriptit",
       "inventoryScriptsEnabledHint": "Sallii suoritettavat inventaarioskriptit, kun suorittaja ratkaisee inventaarion. Erillinen dynaamisista inventaariolaajennuksista, jotta määritellyt laajennusasetukset, jotka nimeävät kokoelman ja jotka voidaan lukea ennen suoritusta, voidaan sallia sallimatta samalla mielivaltaisia suoritettavia tiedostoja.",
       "ansibleHostKeyChecking": "SSH-isäntäavaimen tarkistus",
-      "ansibleHostKeyCheckingHint": "Päällä oletuksena, mikä on Ansiblen oma toimintatapa: määritys hylkää isännän, joka esittää avaimen, johon se ei vielä luota. Jos tämän poistaa käytöstä, mikä tahansa isännän esittämä avain hyväksytään, jolloin yhteyttä voidaan salakuunnella — parempi on antaa isännän julkinen avain konetunnisteen mukana ja jättää tarkistus päälle. Isäntäkohtainen Ansible-muuttuja ohittaa tämän asetuksen kummassakin tapauksessa."
+      "ansibleHostKeyCheckingHint": "Päällä oletuksena, mikä on Ansiblen oma toimintatapa: määritys hylkää isännän, joka esittää avaimen, johon se ei vielä luota. Jos tämän poistaa käytöstä, mikä tahansa isännän esittämä avain hyväksytään, jolloin yhteyttä voidaan salakuunnella — parempi on antaa isännän julkinen avain konetunnisteen mukana ja jättää tarkistus päälle. Isäntäkohtainen Ansible-muuttuja ohittaa tämän asetuksen kummassakin tapauksessa.",
+      "oidcAudiencesLead": "Terrapod myöntää lyhytikäisen OpenID Connect -tokenin jokaiselle provider-konfiguraatiolle ja kirjoittaa sen paikkaan, josta ajo voi lukea sen.",
+      "driftIgnoreRulesLead": "Terraform-osoitteet ja attribuuttipolut, jotka ajautumaluokitin vaimentaa. Pelkkä osoite ilman attribuuttia vaimentaa jokaisen muutoksen kyseiseen resurssiin.",
+      "dynamicInventoryEnabledLead": "Sallii määritellyt inventaariolaajennukset, kun suorittaja ratkaisee inventaarion. Tässä näytetty inventaario muuttuu silloin osittaiseksi lähdettä kohden, ja suorittajan ratkaisema joukko on määräävä.",
+      "inventoryScriptsEnabledLead": "Sallii suoritettavat inventaarioskriptit. Mielivaltainen suoritettava tiedosto repositoriosta suoritetaan silloin suorittajan Jobin sisällä, sen pilvi-identiteetillä, ennen kuin playbook suoritetaan — ja tässä näytetty inventaario muuttuu osittaiseksi.",
+      "ansibleHostKeyCheckingLead": "Päällä oletuksena, mikä on Ansiblen oma toimintatapa. Pois päältä se löysentää suojausta: mikä tahansa isännän esittämä avain hyväksytään, jolloin yhteyttä voidaan salakuunnella.",
+      "bindPlanLead": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin.",
+      "configDirectoryLead": "Missä ansible.cfg, playbookit, roles/, group_vars/ ja host_vars/ sijaitsevat, suhteessa tietovaraston juureen. Tyhjä tarkoittaa juurta itseään.",
+      "ansibleCollectionsLead": "Kokoelmat, jotka asennetaan ennen configuren suoritusta, yksi riviä kohden muodossa namespace.name tai namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön.",
       "configureOnly": "Vain määritys",
       "configureOnlyHint": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta. Laitekannan oma tunnistetieto — SSH-avain koneille, become-salasana — ei kuulu kumpaankaan niistä.",
-      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen."
+      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen.",
+      "vaultFileLead": "Muuttuja sisältää tiedoston polun, ei salaisuutta.",
+      "vaultFileTemplateLead": "Jokainen paikkamerkki korvataan kyseisellä kentällä tästä yhdestä OpenBao/Vault-lukukerrasta.",
+      "gitSshLead": "Todentaa käyttöönottoavaimella yksityiset moduulilähteet, jotka alkavat git::ssh:// ja vastaavat yllä olevaa mallia."
     },
     "runs": {
       "options": "Vaihtoehdot",
@@ -3286,7 +3304,8 @@
       "label": "Suunnittele forkista avatut pull requestit",
       "hint": "Ajo saa tämän työtilan ympäristömuuttujat, arkaluonteiset arvot, kaikki Vaultista haetut salaisuudet ja työn pilvi-identiteetin. Forkista pull requestin avaavalla ei ole kirjoitusoikeutta eikä hän voi yhdistää, joten spekulatiivinen suunnitelma on ainoa reitti, jota pitkin hänen koodinsa pääsee noihin tunnuksiin. Ota tämä käyttöön työtilassa, jossa ei ole mitään viemisen arvoista — vaikkapa julkisessa moduulirepositoriossa, joka ottaa vastaan yhteisön kontribuutioita. Repositorion omista haaroista avatut pull requestit eivät muutu, ja ne suunnitellaan aina.",
       "activeBadge": "Päällä",
-      "confirmEnable": "Suunnitellaanko forkeista avatut pull requestit? Niiden tekijöiden koodi ajetaan tämän työtilan tunnuksilla ja puretuilla muuttujilla, ilman että kukaan hyväksyy sitä ensin."
+      "confirmEnable": "Suunnitellaanko forkeista avatut pull requestit? Niiden tekijöiden koodi ajetaan tämän työtilan tunnuksilla ja puretuilla muuttujilla, ilman että kukaan hyväksyy sitä ensin.",
+      "lead": "Löysentää suojausta: forkin pull requestista tehty suunnitelma pääsee tämän työtilan ympäristömuuttujiin, arkaluonteisiin arvoihin, Vault-salaisuuksiin ja pilvi-identiteettiin — ja tällaisen pull requestin avaajalla ei ole kirjoitusoikeutta eikä mahdollisuutta yhdistää."
     },
     "groups": {
       "identity": "Identiteetti",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Korotuksen salasana",
     "replaceHint": "Tallennus korvaa koko tunnistetiedon, joten täytä jokainen tarvittava kenttä — ei vain sitä, jota muutat. Jos jätät kaikki tyhjiksi, tallennettu tunnistetieto säilyy ennallaan.",
     "knownHosts": "Tunnetut isännät",
-    "knownHostsHint": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa. Osoita inventaariomuuttuja tähän polkuun, jotta voit yhdistää ilman isäntäavaimen tarkistuksen löysentämistä. Ei piiloteta: isännän julkinen avain on julkinen ja juuri sitä verrataan, kun avain ei täsmää."
+    "knownHostsHint": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa. Osoita inventaariomuuttuja tähän polkuun, jotta voit yhdistää ilman isäntäavaimen tarkistuksen löysentämistä. Ei piiloteta: isännän julkinen avain on julkinen ja juuri sitä verrataan, kun avain ei täsmää.",
+    "knownHostsLead": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa.",
+    "machineLead": "Miten Ansible yhdistää niihin koneisiin, jotka viittaavat tähän tunnistetietoon. Anna yksityinen avain tai salasana, tai molemmat."
   }
 }

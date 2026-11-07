@@ -44,6 +44,8 @@ import {
   type GroupId,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   OidcAudiencesEditor,
@@ -163,7 +165,7 @@ function WorkspaceGroupRows({
 
             {!isCollapsed && group.workspaces.map(item => {
               const ws = item.workspace as Workspace
-              const { def, runId } = resolveStatus(ws)
+              const { def, runId, phaseStarts } = resolveStatus(ws)
               return (
                 <tr key={item.id} className="hover:bg-slate-700/20 transition-colors border-t border-slate-700/30">
                   <td className="px-4 py-3">
@@ -205,6 +207,7 @@ function WorkspaceGroupRows({
                           engine={ws.attributes.engine}
                           def={def}
                           runId={runId}
+                          phaseStarts={phaseStarts}
                           lifecycleState={ws.attributes['lifecycle-state']}
                         />
                       </div>
@@ -225,6 +228,7 @@ function WorkspaceGroupRows({
                       engine={ws.attributes.engine}
                       def={def}
                       runId={runId}
+                      phaseStarts={phaseStarts}
                       lifecycleState={ws.attributes['lifecycle-state']}
                     />
                   </td>
@@ -1023,8 +1027,9 @@ function WorkspacesPageInner() {
         // thrown for whoever first selected Pulumi. Found by the gate, not by
         // the demo, which is the argument for having both.
         return (
-          <p className="mt-1 text-xs text-slate-400">
-            {tDetail.rich('fields.bindPlanHelp', {
+          <HintWithDetail
+            lead={tDetail('fields.bindPlanLead')}
+            detail={tDetail.rich('fields.bindPlanHelp', {
               docs: (chunks) => (
                 <a
                   href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
@@ -1036,7 +1041,7 @@ function WorkspacesPageInner() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'plan-apply-enabled':
         return hintText(tDetail('fields.planApplyEnabledHint'))
@@ -1049,21 +1054,19 @@ function WorkspacesPageInner() {
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
       case 'config-directory':
-        return hintText(tDetail('fields.configDirectoryRootHint'))
+        return tieredHint(tDetail, 'fields.configDirectoryTitle')
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return hintText(tDetail('fields.dynamicInventoryEnabledHint'))
-      case 'inventory-scripts-enabled':
-        return hintText(tDetail('fields.inventoryScriptsEnabledHint'))
+        return hintText(tDetail('fields.dynamicInventoryModeHint'))
       case 'ansible-host-key-checking':
-        return hintText(tDetail('fields.ansibleHostKeyCheckingHint'))
+        return tieredHint(tDetail, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-collections':
-        return hintText(tDetail('fields.ansibleCollectionsHint'))
+        return tieredHint(tDetail, 'fields.ansibleCollectionsHint')
       case 'agent-pool-ids':
         return hintText(tDetail('fields.agentPoolsHint'))
       case 'allow-fork-pr-plans':
-        return hintText(tDetail('allowForkPrPlans.hint'))
+        return tieredHint(tDetail, 'allowForkPrPlans.hint')
       case 'trigger-prefixes':
         return hintText(tDetail('fields.triggerPrefixesHint'))
       case 'drift-ignore-rules':
@@ -1074,8 +1077,9 @@ function WorkspacesPageInner() {
         // in a browser. Components match the edit tab's rendering so the two
         // forms read identically.
         return (
-          <p className="mt-1 text-xs text-slate-400">
-            {tDetail.rich('fields.driftIgnoreRulesHint', {
+          <HintWithDetail
+            lead={tDetail('fields.driftIgnoreRulesLead')}
+            detail={tDetail.rich('fields.driftIgnoreRulesHint', {
               star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
               dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
               n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
@@ -1091,14 +1095,14 @@ function WorkspacesPageInner() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'ai-summary-context':
         return hintText(tDetail('aiSummary.contextHint'))
       case 'ai-policy-mode':
         return hintText(tDetail('aiSummary.policyModeNote'))
       case 'oidc-audiences':
-        return hintText(tDetail('fields.oidcAudiencesHint'))
+        return tieredHint(tDetail, 'fields.oidcAudiencesHint')
       case 'debug-mode':
         return hintText(tDetail('debugMode.hint'))
       case 'slack-channel':
@@ -1376,8 +1380,17 @@ function WorkspacesPageInner() {
         />
         {/* Which inventory sources ansible may resolve on the runner
             (#2033). Terrapod itself never runs either kind, in either state. */}
-        <Field attr="dynamic-inventory-enabled" ctx={createCtx} kind="checkbox" />
-        <Field attr="inventory-scripts-enabled" ctx={createCtx} kind="checkbox" />
+        {/* ONE ordered select over both grants (#2413 F19). Four options, not
+            the finding's three: `scripts` without `plugins` is a real
+            configuration -- see `lib/dynamic-inventory.ts`. The second
+            attribute is still written, by the control rather than by a Field
+            of its own. */}
+        <Field
+          attr="dynamic-inventory-enabled"
+          ctx={createCtx}
+          kind="select"
+          control={<DynamicInventorySelect ctx={createCtx} />}
+        />
         {/* Whether a configure verifies the host key of the hosts it targets
             (#2318). On is ansible's own behaviour; `createDefaults` seeds it
             so the box shows that rather than reading as off. */}
@@ -2199,7 +2212,7 @@ function WorkspacesPageInner() {
               </thead>
               <tbody className="divide-y divide-slate-700/30">
                 {sortedWorkspaces.map((ws) => {
-                  const { def, runId } = resolveStatus(ws)
+                  const { def, runId, phaseStarts } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
@@ -2249,6 +2262,7 @@ function WorkspacesPageInner() {
                             engine={ws.attributes.engine}
                             def={def}
                             runId={runId}
+                            phaseStarts={phaseStarts}
                             lifecycleState={ws.attributes['lifecycle-state']}
                           />
                         </div>
@@ -2273,6 +2287,7 @@ function WorkspacesPageInner() {
                         engine={ws.attributes.engine}
                         def={def}
                         runId={runId}
+                        phaseStarts={phaseStarts}
                         lifecycleState={ws.attributes['lifecycle-state']}
                       />
                     </td>

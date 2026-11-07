@@ -1988,7 +1988,9 @@
       "providerInvalid": "provider pong: Daq chIm Hutlh ''ej wa'' per neH ghaj — aws, pagh aws.west.",
       "providerPlaceholder": "Da aws, pagh aws.west",
       "removeProviderAria": "{provider} provider chenmoHghach teq"
-    }
+    },
+    "showDetail": "QIj naQ ''ang",
+    "hideDetail": "QIj naQ So''"
   },
   "planSummary": {
     "aiGenerated": "AI chenmoHlu'pu'",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible Qum tetlh",
       "configDirectoryTitle": "ansible.cfg, Qu'' paqmey, roles/, group_vars/ je host_vars/ Daq, qawHaq mung-vo''. qawHaq mung ''e'' DaneHchugh, chIm yIlI''Ha''. Qum Qu'' ghaj''a'' Qumwo''vam, Qum Dochmey Dung ngu'', qechvam He ngu''be''.",
       "configDirectoryPlaceholder": "Da ansible",
-      "configDirectoryRootHint": "qawHaq mung ''e'' DaHechchugh, chImmoH.",
       "configDirectoryRoot": "qawHaq mung",
       "inventoryPaths": "ghom tetlh Hemmey",
       "inventoryPathsHint": "patlhbogh ghom tetlh mungmey; Hoch teywI'' pagh tetlh, Qum tetlh-vo''. patlh ''oH patlh.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible qawHaq tlhob",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt mI'",
+      "dynamicInventoryMode": "De' pIm",
+      "dynamicInventoryModeHint": "chenmoHwI'' maqlu''bogh, ghItlh vangbogh, pagh cha'' Hoch chaw''. ghItlh ''oH qawHaq-vo'' Hoch vumlaHbogh De''; ''ach chenmoHwI'' vumpa'' laDlaH. Terrapod cha'' Hoch vumbe'', ''ej naDev ghom tetlh ''oH puSqu''.",
+      "dynamicInventoryModeNone": "pagh",
+      "dynamicInventoryModePlugins": "chenmoHwI'mey maqlu'bogh",
+      "dynamicInventoryModeScripts": "ghItlhmey vangbogh",
+      "dynamicInventoryModeBoth": "chenmoHwI'mey maqlu'bogh ghItlhmey vangbogh je",
       "dynamicInventoryEnabled": "ghom tetlh chenmoHwI''mey",
       "dynamicInventoryEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw'': YAML mung, plugin per tIn ghajbogh. cha'' Dotlhmey-vaD, Terrapod ''e'' vumbe'' net Sov. chu''be''chugh, chenmoHwI'' mung pong lajbe''lu'', ''ej hostmey puSqu'' ngu''be''lu''. chu''chugh, naDev ghom tetlh ''oH Hoch mung-vaD puSqu'' ''e'' maqlu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
       "inventoryScriptsEnabled": "ghom tetlh ghItlhmey",
       "inventoryScriptsEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', vumlaHbogh ghom tetlh ghItlhmey chaw''. ghom tetlh chenmoHwI''mey-vo'' pIm: ngu''lu''bogh chenmoHwI'' De'' ghomHom pong ''ej vumpa'' laDlaH, vaj bIH chaw''laH ''ej Hoch vumlaHbogh De'' chaw''be''.",
       "ansibleHostKeyChecking": "SSH host ngaQHa'moHwI' tob",
-      "ansibleHostKeyCheckingHint": "motlh 'oH chu'lu'; Ansible Dotlh je 'oH. ngaQHa'moHwI' voqbe'bogh host lajQo' Qum. chu'Ha'lu'chugh, host ngaQHa'moHwI' nobbogh Hoch lajlu', vaj rar HIvlaH — QaQ law' jan chaw' tlhej host ngaQHa'moHwI' teH yInob 'ej tob yIchu'taH. host choHlaH Ansible reH Dochvam DIvI'."
+      "ansibleHostKeyCheckingHint": "motlh 'oH chu'lu'; Ansible Dotlh je 'oH. ngaQHa'moHwI' voqbe'bogh host lajQo' Qum. chu'Ha'lu'chugh, host ngaQHa'moHwI' nobbogh Hoch lajlu', vaj rar HIvlaH — QaQ law' jan chaw' tlhej host ngaQHa'moHwI' teH yInob 'ej tob yIchu'taH. host choHlaH Ansible reH Dochvam DIvI'.",
+      "oidcAudiencesLead": "Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh DaqDaq lan.",
+      "driftIgnoreRulesLead": "tlhotlh chevwI'' So''bogh Terraform Summey je Sep Hemmey. Sep Hutlhbogh Sum neH Dochvetlh choHmey Hoch tuHHa''.",
+      "dynamicInventoryEnabledLead": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw''. vaj naDev ghom tetlh ''oH Hoch mung-vaD puSqu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
+      "inventoryScriptsEnabledLead": "vumlaHbogh ghom tetlh ghItlhmey chaw''. vaj qawHaq-vo'' Hoch vumlaHbogh De'' vum, qalIHwI'' Qu''Daq, ''eng pongDaj lo''taHvIS, Qu'' paq vumpa'' — ''ej naDev ghom tetlh ''oH puSqu''.",
+      "ansibleHostKeyCheckingLead": "motlh chu''lu'', Ansible Dotlh je. chu''Ha''lu''DI'' ''avwI'' tunmoH: host nobbogh ngaQHa''moHwI'' Hoch lajlu'', vaj rar HIvlaH.",
+      "bindPlanLead": "chu''lu''DI'', chovnatlh polbogh nab ''e'' ta''qu''lu''. vaj chovnatlh ret choHlu''bogh Hoch lajbe''lu'', ''ej ta'' luj.",
+      "configDirectoryLead": "ansible.cfg, Qu'' paqmey, roles/, group_vars/ je host_vars/ Daq, qawHaq mung-vo''. chImchugh, mung ''e'' ''oS.",
+      "ansibleCollectionsLead": "configure qaSpa'' lan ta''lu''bogh ghomHommey, wa'' per Dagh namespace.name ghap namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS.",
       "configureOnly": "Qum neH",
       "configureOnlyHint": "Qum neH vInob; nab je lo' je vIghoj. Duj De' — SSH ngaQHa'moHwI', become mu'qaD — nab 'ebDaq lo' 'ebDaq je tu'lu'be'nIS.",
-      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch."
+      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch.",
+      "vaultFileLead": "ghItlh He ngaS choH, pegh ngaSbe''.",
+      "vaultFileTemplateLead": "Hoch Daq, OpenBao/Vault laDlu''bogh wa''vam-vo'' Say''vetlh lIS.",
+      "gitSshLead": "Dung per rurbogh pegh git::ssh:// Segh mungmey yIchaw''; lI''meH ngaQHa''wI'' yIlo''."
     },
     "runs": {
       "options": "wIvmey",
@@ -3286,7 +3304,8 @@
       "label": "fork PRmey yInab",
       "hint": "Qumwo'vam choHlaHmey, pegh De'mey, Vault-vo' Sambogh peghmey, je Qu' 'eng pong Hev Sar. fork-vo' PR poSmoHbogh ghot ghItlh chaw' ghajbe' 'ej merge laHbe'; vaj Hech nab neH 'oH He'e' ngoqDaj pegh ghoSmeH. pagh ngaSbogh Qumwo'vaD wa' yIchu' — ghom boQ Hevbogh qawHaq pegh Hutlhbogh. qawHaq paQmeyvo' poSmoHlu'bogh PRmey choHbe'lu', 'ej reH nab Hevlu'.",
       "activeBadge": "chu'lu'",
-      "confirmEnable": "fork-vo' poSmoHlu'bogh PRmey DanabmoH'a'? pagh chaw'DI' vay', Qumwo'vam pegh je choHlaHmey lo'taHvIS qonwI'chaj ngoq qaS."
+      "confirmEnable": "fork-vo' poSmoHlu'bogh PRmey DanabmoH'a'? pagh chaw'DI' vay', Qumwo'vam pegh je choHlaHmey lo'taHvIS qonwI'chaj ngoq qaS.",
+      "lead": "''avwI'' tunmoH: fork PR-vo'' nab Qumwo''vam choHlaHmey, pegh De''mey, Vault peghmey, je ''eng pong ghoS — ghItlh chaw'' Hutlhbogh ''ej merge laHbe''bogh ghot poSmoHpu''."
     },
     "groups": {
       "identity": "pong",
@@ -3982,6 +4001,8 @@
     "becomePassword": "nIvmoHghach mu'qaD",
     "replaceHint": "QaDmeH ngaQHa'wI' naQ chollu'; vaj poQbogh Hoch yav yIbuy'moH, choHbogh yav neH yIbuy'moHQo'. Hoch chIm DalIHchugh, ngaQHa'wI' pollu'bogh choHbe'lu'.",
     "knownHosts": "Sovbogh wIjwI'",
-    "knownHostsHint": "DaH ngaQHa'moHwI' DIvI' Dochvetlh retlh jonta' ghaj, wa' per jIHmey known_hosts mo'. inventory choHbogh He'etlh DaH ghoS, ngaQHa'moHwI' tob Hoch lajQo'. So'be': wIjwI' DIvI' ngaQHa'moHwI' DIvI' ghaH, 'ej ngaQHa'moHwI' motlh chu'Ha'lu'chugh Dochvetlh Daghov."
+    "knownHostsHint": "DaH ngaQHa'moHwI' DIvI' Dochvetlh retlh jonta' ghaj, wa' per jIHmey known_hosts mo'. inventory choHbogh He'etlh DaH ghoS, ngaQHa'moHwI' tob Hoch lajQo'. So'be': wIjwI' DIvI' ngaQHa'moHwI' DIvI' ghaH, 'ej ngaQHa'moHwI' motlh chu'Ha'lu'chugh Dochvetlh Daghov.",
+    "knownHostsLead": "ngaQHa''wI''vam ghoSbogh jonta''mey DIvI'' ngaQHa''moHwI''mey, wa'' per Dagh known_hosts mo''.",
+    "machineLead": "chay'' ngaQHa''wI''vam ngu''bogh hostmey rar Ansible. pegh ngaQHa''wI'' ghap mu''qaD ghap cha''logh yInob."
   }
 }

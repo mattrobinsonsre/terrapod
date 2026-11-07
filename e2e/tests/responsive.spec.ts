@@ -24,6 +24,40 @@ const API_URL = process.env.API_URL || 'http://localhost:8000';
  */
 
 test.describe('Responsive harness (phone viewport)', () => {
+  test('a two-tier hint is openable with a thumb and pushes rather than covers (#2413 F15)', async ({
+    page,
+  }) => {
+    // The ⓘ is the SMALLEST control on a form full of inputs, so it is the one
+    // most likely to be missed with a thumb -- hence `min-h-11 min-w-11` on
+    // touch, collapsing on a precise pointer. Asserted here because this is
+    // the only project running a coarse pointer.
+    await page.goto('/workspaces')
+    await page.click('button:has-text("New Workspace")')
+    const toggle = page.getByTestId('hint-detail-toggle').first()
+    await expect(toggle).toBeVisible({ timeout: 15_000 })
+
+    const box = await toggle.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+
+    await expectNoHorizontalPageScroll(page)
+
+    // Opening it must not introduce one either: the detail carries paths and
+    // identifiers that do not wrap on their own, which is why it is
+    // `break-words`. A floating popover would have covered the control it
+    // describes at this width; an in-flow block can only push.
+    await toggle.click()
+    const detail = page.getByTestId('hint-detail').first()
+    await expect(detail).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    const db = await detail.boundingBox()
+    expect(db).not.toBeNull()
+    const vw = page.viewportSize()!.width
+    expect(db!.x).toBeGreaterThanOrEqual(0)
+    expect(db!.x + db!.width).toBeLessThanOrEqual(vw)
+  })
+
   test('the Vault reference builder is usable at phone width (#1439)', async ({ page }) => {
     // The desktop defect this guards against in the other direction: five
     // fields crammed into a narrow container truncated the path and field
@@ -2507,6 +2541,56 @@ test.describe('Workspace form sections (#2253)', () => {
     // it would return to all of them.
     await expect(page.locator('form details')).toHaveCount(0)
   })
+
+  test('dynamic inventory is ONE ordered select with four options (#2413 F19)', async ({
+    page,
+  }) => {
+    // Two adjacent booleans became one ordered control, because their
+    // combination is what nobody could reason about: one of the two permits an
+    // arbitrary executable from the repository to run in the runner Job. NOT
+    // "the only settings that let third-party code run on a runner", which an
+    // earlier version of this comment said -- see `lib/dynamic-inventory.ts`.
+    //
+    // FOUR options, not the finding's three. `scripts` without `plugins` is a
+    // real configuration: the runner's `_enabled_plugins` appends the two
+    // independently and yields `script,yaml,ini`, so a tri-state would delete a
+    // state. Asserting the COUNT is the guard against that -- a later
+    // "simplification" to three would pass a check that only looked for the
+    // control.
+    await page.goto('/workspaces')
+    await page.getByRole('button', { name: 'New Workspace' }).click()
+
+    const select = page.getByTestId('ws-dynamic-inventory-mode')
+    await expect(select).toBeVisible({ timeout: 15_000 })
+    await expect(select.locator('option')).toHaveCount(4)
+
+    // Ordered by what it permits, so the default is first and the most
+    // permissive is last. The order IS the control, so it is asserted.
+    await expect(select.locator('option').nth(0)).toHaveText('None')
+    await expect(select.locator('option').nth(3)).toHaveText(
+      'Declared plugins and executable scripts',
+    )
+
+    // The second control is GONE rather than merely unused: leaving one behind
+    // would let the pair disagree.
+    await expect(page.getByTestId('ws-inventory-scripts-enabled')).toHaveCount(0)
+
+    // Rendered but DISABLED until the workspace declares a configure
+    // operation (#2413 F20: nothing is hidden by a gate). That is why the
+    // select cannot simply be operated here, and asserting both halves is
+    // stronger than ticking the box and moving on -- a regression that left it
+    // enabled would offer a control the workspace cannot use.
+    await expect(select).toBeDisabled()
+    await page.getByLabel('Configure', { exact: true }).check()
+    await expect(select).toBeEnabled()
+
+    // And it is usable at phone width, which is where a four-option select
+    // with a long last label would push a page sideways.
+    await select.selectOption('both')
+    await expect(select).toHaveValue('both')
+    await expectNoHorizontalPageScroll(page)
+  })
+
 
   test('the create form offers the sections too, and fits a phone', async ({ page }) => {
     // The headline of #2253: create offered 13 controls against ~50 accepted

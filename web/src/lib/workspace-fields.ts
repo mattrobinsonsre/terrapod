@@ -580,7 +580,12 @@ export const LABEL_KEY: Record<string, string> = {
   'default-playbook': 'fields.defaultPlaybook',
   'default-limit': 'fields.defaultLimit',
   'inventory-paths': 'fields.inventoryPaths',
-  'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabled',
+  // The COMPOSED label (#2413 F19): the three surfaces that set a concrete
+  // value render one ordered select over this attribute and
+  // `inventory-scripts-enabled`, so "Dynamic inventory plugins" would name half
+  // of what the control writes. Bulk update keeps the two separate and uses its
+  // own labels, so it is unaffected.
+  'dynamic-inventory-enabled': 'fields.dynamicInventoryMode',
   'inventory-scripts-enabled': 'fields.inventoryScriptsEnabled',
   'ansible-host-key-checking': 'fields.ansibleHostKeyChecking',
   'ansible-version': 'fields.ansibleVersion',

@@ -1988,7 +1988,9 @@
       "providerInvalid": "Ein Provider-Name enthält keine Leerzeichen und höchstens einen Punkt — aws oder aws.west.",
       "providerPlaceholder": "aws oder aws.west",
       "removeProviderAria": "Provider-Konfiguration {provider} entfernen"
-    }
+    },
+    "showDetail": "Vollständige Erklärung anzeigen",
+    "hideDetail": "Vollständige Erklärung ausblenden"
   },
   "planSummary": {
     "aiGenerated": "KI-generiert",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-Konfigurationsverzeichnis",
       "configDirectoryTitle": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer lassen für das Repository-Wurzelverzeichnis selbst. Ob dieser Workspace überhaupt eine Konfigurationsoperation hat, entscheidet die Einstellung Konfigurieren oben, nicht dieser Pfad.",
       "configDirectoryPlaceholder": "z. B. ansible",
-      "configDirectoryRootHint": "Für das Repository-Wurzelverzeichnis selbst leer lassen.",
       "configDirectoryRoot": "Repository-Wurzel",
       "inventoryPaths": "Inventarpfade",
       "inventoryPathsHint": "Geordnete Inventarquellen, jede eine Datei oder ein Verzeichnis, relativ zum Konfigurationsverzeichnis. Die Reihenfolge ist die Vorrangfolge.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible-Speicher-Anforderung",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-Version",
+      "dynamicInventoryMode": "Dynamisches Inventar",
+      "dynamicInventoryModeHint": "Erlaubt ein deklariertes Inventar-Plugin, ein ausführbares Skript oder beides. Ein Skript ist eine beliebige ausführbare Datei aus dem Repository; ein Plugin kann vor der Ausführung gelesen werden. Terrapod selbst führt niemals eines von beiden aus, und seine eigene Sicht auf das Inventar wird unvollständig.",
+      "dynamicInventoryModeNone": "Keine",
+      "dynamicInventoryModePlugins": "Deklarierte Plugins",
+      "dynamicInventoryModeScripts": "Ausführbare Skripte",
+      "dynamicInventoryModeBoth": "Deklarierte Plugins und ausführbare Skripte",
       "dynamicInventoryEnabled": "Dynamische Inventar-Plugins",
       "dynamicInventoryEnabledHint": "Erlaubt deklarierte Inventar-Plugins — eine YAML-Quelle mit einem plugin-Schlüssel auf oberster Ebene —, wenn der Runner das Inventar auflöst. Terrapod selbst führt in keinem der beiden Zustände eines aus. Solange dies aus ist, wird eine Plugin-Quelle namentlich abgelehnt, statt zu einer unvollständigen Hostliste aufzulösen; solange es an ist, ist das hier gezeigte Inventar je Quelle ausdrücklich unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
       "inventoryScriptsEnabled": "Inventar-Skripte",
       "inventoryScriptsEnabledHint": "Erlaubt ausführbare Inventar-Skripte, wenn der Runner das Inventar auflöst. Getrennt von dynamischen Inventar-Plugins, damit deklarierte Plugin-Konfigurationen, die eine Collection benennen und vor der Ausführung gelesen werden können, erlaubt werden können, ohne auch beliebige ausführbare Dateien zu erlauben.",
       "ansibleHostKeyChecking": "SSH-Hostschlüsselprüfung",
-      "ansibleHostKeyCheckingHint": "Standardmäßig an, und das ist Ansibles eigenes Verhalten: Ein Konfigurationslauf weist einen Host ab, dessen Schlüssel er nicht schon kennt. Schaltet man sie aus, wird jeder Schlüssel akzeptiert, den ein Host vorzeigt, sodass die Verbindung abgehört werden kann — besser ist es, den öffentlichen Schlüssel des Hosts mit den Maschinen-Zugangsdaten mitzugeben und die Prüfung an zu lassen. Eine Ansible-Variable pro Host hat in beiden Fällen Vorrang vor dieser Einstellung."
+      "ansibleHostKeyCheckingHint": "Standardmäßig an, und das ist Ansibles eigenes Verhalten: Ein Konfigurationslauf weist einen Host ab, dessen Schlüssel er nicht schon kennt. Schaltet man sie aus, wird jeder Schlüssel akzeptiert, den ein Host vorzeigt, sodass die Verbindung abgehört werden kann — besser ist es, den öffentlichen Schlüssel des Hosts mit den Maschinen-Zugangsdaten mitzugeben und die Prüfung an zu lassen. Eine Ansible-Variable pro Host hat in beiden Fällen Vorrang vor dieser Einstellung.",
+      "oidcAudiencesLead": "Terrapod stellt pro Provider-Konfiguration ein kurzlebiges OpenID-Connect-Token aus und schreibt es dorthin, wo der Lauf es lesen kann.",
+      "driftIgnoreRulesLead": "Terraform-Adressen und Attributpfade, die der Drift-Klassifikator unterdrückt. Eine bloße Adresse ohne Attribut unterdrückt jede Änderung an dieser Ressource.",
+      "dynamicInventoryEnabledLead": "Erlaubt deklarierte Inventar-Plugins, wenn der Runner das Inventar auflöst. Das hier gezeigte Inventar wird dann je Quelle unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
+      "inventoryScriptsEnabledLead": "Erlaubt ausführbare Inventar-Skripte. Eine beliebige ausführbare Datei aus dem Repository läuft dann im Runner-Job, mit dessen Cloud-Identität, bevor das Playbook läuft — und das hier gezeigte Inventar wird unvollständig.",
+      "ansibleHostKeyCheckingLead": "Standardmäßig an, wie Ansible es selbst tut. Schwächt eine Schutzmaßnahme ab, wenn aus: Jeder Schlüssel, den ein Host vorzeigt, wird akzeptiert, sodass die Verbindung abgehört werden kann.",
+      "bindPlanLead": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat; was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden.",
+      "configDirectoryLead": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer bedeutet das Wurzelverzeichnis selbst.",
+      "ansibleCollectionsLead": "Collections, die vor einem Configure installiert werden, eine pro Zeile als namespace.name oder namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen.",
       "configureOnly": "Nur Konfigurieren",
       "configureOnlyHint": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen. Das Zugangsdatum der Flotte selbst — ein SSH-Schlüssel zum Bestand, ein become-Passwort — hat in keinem von beiden etwas zu suchen.",
-      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren."
+      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren.",
+      "vaultFileLead": "Die Variable enthält den Pfad der Datei, nicht das Secret.",
+      "vaultFileTemplateLead": "Jeder Platzhalter wird durch das entsprechende Feld aus diesem einen OpenBao/Vault-Lesevorgang ersetzt.",
+      "gitSshLead": "Authentifiziert private git::ssh://-Modulquellen, die dem obigen Muster entsprechen, mit einem Deploy-Key."
     },
     "runs": {
       "options": "Optionen",
@@ -3286,7 +3304,8 @@
       "label": "Pull Requests aus Forks planen",
       "hint": "Ein Lauf erhält die Umgebungsvariablen dieses Arbeitsbereichs, vertrauliche Werte, alle über Vault aufgelösten Geheimnisse und die Cloud-Identität des Jobs. Wer einen Pull Request aus einem Fork öffnet, hat keinen Schreibzugriff und kann nicht mergen – ein spekulativer Plan ist also der einzige Weg, auf dem sein Code an diese Zugangsdaten gelangt. Aktivieren Sie dies für einen Arbeitsbereich, in dem es nichts zu holen gibt – etwa ein öffentliches Modul-Repository, das Beiträge aus der Community annimmt. Pull Requests aus Branches im Repository selbst sind davon nicht betroffen und werden immer geplant.",
       "activeBadge": "Ein",
-      "confirmEnable": "Pull Requests aus Forks planen? Der Code ihrer Autoren wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs ausgeführt, ohne dass jemand dies zuvor genehmigt."
+      "confirmEnable": "Pull Requests aus Forks planen? Der Code ihrer Autoren wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs ausgeführt, ohne dass jemand dies zuvor genehmigt.",
+      "lead": "Schwächt eine Schutzmaßnahme ab: Ein Plan aus dem Pull Request eines Forks erreicht die Umgebungsvariablen dieses Arbeitsbereichs, vertrauliche Werte, Vault-Geheimnisse und die Cloud-Identität — geöffnet von jemandem ohne Schreibzugriff und ohne die Möglichkeit zu mergen."
     },
     "groups": {
       "identity": "Identität",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Passwort für Rechteerweiterung",
     "replaceHint": "Das Speichern ersetzt die gesamten Zugangsdaten — füllen Sie daher jedes benötigte Feld aus, nicht nur das geänderte. Bleiben alle leer, bleiben die gespeicherten Zugangsdaten unverändert.",
     "knownHosts": "Bekannte Hosts",
-    "knownHostsHint": "Die öffentlichen Hostschlüssel der Maschinen, die dieses Anmeldedatum erreicht, einer pro Zeile im known_hosts-Format. Richte eine Inventarvariable auf diesen Pfad, um ohne Abschwächung der Hostschlüsselprüfung zu verbinden. Nicht verborgen: Der öffentliche Schlüssel eines Hosts ist öffentlich und genau das, was du vergleichst, wenn ein Schlüssel nicht übereinstimmt."
+    "knownHostsHint": "Die öffentlichen Hostschlüssel der Maschinen, die dieses Anmeldedatum erreicht, einer pro Zeile im known_hosts-Format. Richte eine Inventarvariable auf diesen Pfad, um ohne Abschwächung der Hostschlüsselprüfung zu verbinden. Nicht verborgen: Der öffentliche Schlüssel eines Hosts ist öffentlich und genau das, was du vergleichst, wenn ein Schlüssel nicht übereinstimmt.",
+    "knownHostsLead": "Die öffentlichen Hostschlüssel der Maschinen, die mit diesen Zugangsdaten erreicht werden, einer pro Zeile im known_hosts-Format.",
+    "machineLead": "Wie Ansible sich mit den Hosts verbindet, die auf diese Zugangsdaten verweisen. Geben Sie einen privaten Schlüssel oder ein Passwort an, oder beides."
   }
 }

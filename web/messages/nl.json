@@ -1988,7 +1988,9 @@
       "providerInvalid": "Een providernaam bevat geen spaties en maximaal één punt — aws of aws.west.",
       "providerPlaceholder": "aws of aws.west",
       "removeProviderAria": "Providerconfiguratie {provider} verwijderen"
-    }
+    },
+    "showDetail": "Volledige uitleg tonen",
+    "hideDetail": "Volledige uitleg verbergen"
   },
   "planSummary": {
     "aiGenerated": "Door AI gegenereerd",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-configuratiemap",
       "configDirectoryTitle": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Laat dit leeg voor de repositorywortel zelf. Of deze workspace überhaupt een configure-operatie heeft, bepaalt de instelling Configureren hierboven, niet dit pad.",
       "configDirectoryPlaceholder": "bijv. ansible",
-      "configDirectoryRootHint": "Laat dit leeg voor de repositorywortel zelf.",
       "configDirectoryRoot": "Repositorywortel",
       "inventoryPaths": "Inventarispaden",
       "inventoryPathsHint": "Geordende inventarisbronnen, elk een bestand of een map, relatief ten opzichte van de configuratiemap. De volgorde is de voorrangsvolgorde.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible geheugenaanvraag",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versie",
+      "dynamicInventoryMode": "Dynamische inventaris",
+      "dynamicInventoryModeHint": "Staat een gedeclareerde inventaris-plug-in, een uitvoerbaar script of beide toe. Een script is een willekeurig uitvoerbaar bestand uit de repository; een plug-in kan vóór uitvoering gelezen worden. Terrapod voert zelf nooit een van beide uit, en zijn eigen beeld van de inventaris wordt onvolledig.",
+      "dynamicInventoryModeNone": "Geen",
+      "dynamicInventoryModePlugins": "Gedeclareerde plug-ins",
+      "dynamicInventoryModeScripts": "Uitvoerbare scripts",
+      "dynamicInventoryModeBoth": "Gedeclareerde plug-ins en uitvoerbare scripts",
       "dynamicInventoryEnabled": "Dynamische inventaris-plug-ins",
       "dynamicInventoryEnabledHint": "Staat gedeclareerde inventaris-plug-ins toe — een YAML-bron met een plugin-sleutel op het hoogste niveau — wanneer de runner de inventaris oplost. Terrapod voert er zelf nooit een uit, in geen van beide standen. Zolang dit uit staat, wordt een plug-inbron bij naam geweigerd in plaats van tot een onvolledige hostlijst op te lossen; zolang het aan staat, is de hier weergegeven inventaris per bron uitdrukkelijk onvolledig, en is de door de runner opgeloste verzameling bepalend.",
       "inventoryScriptsEnabled": "Inventaris-scripts",
       "inventoryScriptsEnabledHint": "Staat uitvoerbare inventaris-scripts toe wanneer de runner de inventaris oplost. Gescheiden van dynamische inventaris-plug-ins, zodat gedeclareerde plug-inconfiguraties, die een collection benoemen en vóór uitvoering gelezen kunnen worden, toegestaan kunnen worden zonder ook willekeurige uitvoerbare bestanden toe te staan.",
       "ansibleHostKeyChecking": "SSH-hostsleutelcontrole",
-      "ansibleHostKeyCheckingHint": "Staat standaard aan, en dat is het eigen gedrag van Ansible: een configure-run weigert een host waarvan hij de sleutel nog niet vertrouwt. Zet je het uit, dan wordt elke sleutel die een host aanbiedt geaccepteerd, zodat de verbinding kan worden afgeluisterd — beter is het de publieke sleutel van de host bij de machinereferentie aan te leveren en de controle aan te laten. Een Ansible-variabele per host gaat in beide gevallen voor op deze instelling."
+      "ansibleHostKeyCheckingHint": "Staat standaard aan, en dat is het eigen gedrag van Ansible: een configure-run weigert een host waarvan hij de sleutel nog niet vertrouwt. Zet je het uit, dan wordt elke sleutel die een host aanbiedt geaccepteerd, zodat de verbinding kan worden afgeluisterd — beter is het de publieke sleutel van de host bij de machinereferentie aan te leveren en de controle aan te laten. Een Ansible-variabele per host gaat in beide gevallen voor op deze instelling.",
+      "oidcAudiencesLead": "Terrapod geeft per providerconfiguratie een kortlevend OpenID Connect-token uit en schrijft het daar waar de uitvoering het kan lezen.",
+      "driftIgnoreRulesLead": "Terraform-adressen en attribuutpaden die de drift-classificator onderdrukt. Een kaal adres zonder attribuut dempt elke wijziging aan die resource.",
+      "dynamicInventoryEnabledLead": "Staat gedeclareerde inventaris-plug-ins toe wanneer de runner de inventaris oplost. De hier weergegeven inventaris wordt dan per bron onvolledig, en de door de runner opgeloste verzameling is bepalend.",
+      "inventoryScriptsEnabledLead": "Staat uitvoerbare inventaris-scripts toe. Een willekeurig uitvoerbaar bestand uit de repository wordt dan binnen de runner-Job uitgevoerd, met de cloudidentiteit daarvan, nog vóór het playbook draait — en de hier weergegeven inventaris wordt onvolledig.",
+      "ansibleHostKeyCheckingLead": "Staat standaard aan, zoals Ansible zelf doet. Versoepelt een beveiliging als dit uit staat: elke sleutel die een host aanbiedt wordt geaccepteerd, zodat de verbinding kan worden afgeluisterd.",
+      "bindPlanLead": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast.",
+      "configDirectoryLead": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Leeg betekent de wortel zelf.",
+      "ansibleCollectionsLead": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan.",
       "configureOnly": "Alleen configureren",
       "configureOnlyHint": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden. De credential van de vloot zelf — een SSH-sleutel naar het machinepark, een become-wachtwoord — hoort in geen van beide thuis.",
-      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren."
+      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren.",
+      "vaultFileLead": "De variabele bevat het pad van het bestand, niet het geheim.",
+      "vaultFileTemplateLead": "Elke placeholder wordt vervangen door dat veld uit deze ene OpenBao/Vault-leesactie.",
+      "gitSshLead": "Authenticeert privé git::ssh://-modulebronnen die overeenkomen met het patroon hierboven, met een deploy key."
     },
     "runs": {
       "options": "Opties",
@@ -3286,7 +3304,8 @@
       "label": "Pull requests uit forks plannen",
       "hint": "Een uitvoering krijgt de omgevingsvariabelen van deze werkruimte, gevoelige waarden, alle via Vault opgehaalde secrets en de cloudidentiteit van de job. Wie een pull request vanuit een fork opent heeft geen schrijfrechten en kan niet mergen, dus een speculatief plan is de enige weg waarlangs hun code bij die referenties komt. Zet dit aan voor een werkruimte waarin niets te halen valt — bijvoorbeeld een openbare modulerepository die bijdragen uit de community aanneemt. Pull requests vanuit branches in de repository zelf zijn hierdoor niet geraakt en krijgen altijd een plan.",
       "activeBadge": "Aan",
-      "confirmEnable": "Pull requests die vanuit een fork zijn geopend plannen? De code van hun auteurs draait met de referenties en ontsleutelde variabelen van deze werkruimte, zonder dat iemand dat eerst goedkeurt."
+      "confirmEnable": "Pull requests die vanuit een fork zijn geopend plannen? De code van hun auteurs draait met de referenties en ontsleutelde variabelen van deze werkruimte, zonder dat iemand dat eerst goedkeurt.",
+      "lead": "Versoepelt een beveiliging: een plan uit de pull request van een fork komt bij de omgevingsvariabelen van deze werkruimte, gevoelige waarden, Vault-secrets en de cloudidentiteit — geopend door iemand zonder schrijfrechten die niet kan mergen."
     },
     "groups": {
       "identity": "Identiteit",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Escalatiewachtwoord",
     "replaceHint": "Opslaan vervangt de volledige inloggegevens, dus vul elk veld in dat nodig is — niet alleen het veld dat je wijzigt. Laat je ze allemaal leeg, dan blijven de opgeslagen inloggegevens ongewijzigd.",
     "knownHosts": "Bekende hosts",
-    "knownHostsHint": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat. Laat een inventarisvariabele naar dit pad verwijzen om te verbinden zonder de hostsleutelverificatie te versoepelen. Niet verborgen: de publieke sleutel van een host is openbaar en is precies wat je vergelijkt als een sleutel niet overeenkomt."
+    "knownHostsHint": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat. Laat een inventarisvariabele naar dit pad verwijzen om te verbinden zonder de hostsleutelverificatie te versoepelen. Niet verborgen: de publieke sleutel van een host is openbaar en is precies wat je vergelijkt als een sleutel niet overeenkomt.",
+    "knownHostsLead": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat.",
+    "machineLead": "Hoe Ansible verbinding maakt met de hosts die naar deze inloggegevens verwijzen. Geef een privésleutel of een wachtwoord op, of beide."
   }
 }

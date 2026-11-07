@@ -1988,7 +1988,9 @@
       "providerInvalid": "provider 名稱不含空格，且最多一個點 — aws，或 aws.west。",
       "providerPlaceholder": "aws，或 aws.west",
       "removeProviderAria": "移除 provider 設定 {provider}"
-    }
+    },
+    "showDetail": "顯示完整說明",
+    "hideDetail": "隱藏完整說明"
   },
   "planSummary": {
     "aiGenerated": "AI 生成",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible 設定目錄",
       "configDirectoryTitle": "ansible.cfg、playbook、roles/、group_vars/ 與 host_vars/ 所在的位置，相對於儲存庫根目錄。若就是儲存庫根目錄本身，請留空。此工作區是否擁有設定作業由上方的 設定 選項決定，而不是這個路徑。",
       "configDirectoryPlaceholder": "例如 ansible",
-      "configDirectoryRootHint": "若指儲存庫根目錄本身，請留空。",
       "configDirectoryRoot": "儲存庫根目錄",
       "inventoryPaths": "清冊路徑",
       "inventoryPathsHint": "有序的清冊來源，每一項是檔案或目錄，相對於設定目錄。順序即優先順序。",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible 記憶體請求",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 版本",
+      "dynamicInventoryMode": "動態清單",
+      "dynamicInventoryModeHint": "允許已宣告的清單外掛、可執行指令碼，或兩者都允許。指令碼是儲存庫中的任意可執行檔；外掛則在執行前可以讀取。Terrapod 本身兩者都不會執行，而此處顯示的清單會變得不完整。",
+      "dynamicInventoryModeNone": "無",
+      "dynamicInventoryModePlugins": "已宣告的外掛",
+      "dynamicInventoryModeScripts": "可執行指令碼",
+      "dynamicInventoryModeBoth": "已宣告的外掛和可執行指令碼",
       "dynamicInventoryEnabled": "動態清單外掛",
       "dynamicInventoryEnabledHint": "允許 runner 解析清單時使用已宣告的清單外掛，也就是帶有頂層 plugin 鍵的 YAML 來源。Terrapod 本身在兩種狀態下都不會執行外掛。關閉時，外掛來源會被指名拒絕，而不是解析成不完整的主機集合；開啟時，此處顯示的清單會按來源明確標示為不完整，由 runner 解析出的集合才是權威結果。",
       "inventoryScriptsEnabled": "清單指令碼",
       "inventoryScriptsEnabledHint": "允許 runner 解析清單時使用可執行的清單指令碼。與動態清單外掛分開設定，這樣便可只允許已宣告的外掛設定——它們指明了一個集合，且在執行前可以讀取——而不必同時允許任意可執行檔。",
       "ansibleHostKeyChecking": "SSH 主機金鑰檢查",
-      "ansibleHostKeyCheckingHint": "預設開啟，這也是 Ansible 自身的行為：設定會拒絕其金鑰尚未受信任的主機。關閉後，主機出示的任何金鑰都會被接受，連線因而可能被攔截——較好的做法是隨機器憑證一併提供主機的公開金鑰，並維持檢查開啟。無論哪種情況，針對單一主機的 Ansible 變數都優先於此設定。"
+      "ansibleHostKeyCheckingHint": "預設開啟，這也是 Ansible 自身的行為：設定會拒絕其金鑰尚未受信任的主機。關閉後，主機出示的任何金鑰都會被接受，連線因而可能被攔截——較好的做法是隨機器憑證一併提供主機的公開金鑰，並維持檢查開啟。無論哪種情況，針對單一主機的 Ansible 變數都優先於此設定。",
+      "oidcAudiencesLead": "Terrapod 為每個 provider 設定簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的位置。",
+      "driftIgnoreRulesLead": "漂移分類器所抑制的 Terraform 地址與屬性路徑。沒有屬性的裸地址會靜默該資源的所有更改。",
+      "dynamicInventoryEnabledLead": "允許 runner 解析清單時使用已宣告的清單外掛。此後此處顯示的清單會按來源變得不完整，由 runner 解析出的集合才是權威結果。",
+      "inventoryScriptsEnabledLead": "允許使用可執行的清單指令碼。此後儲存庫中的任意可執行檔會在 playbook 之前，在 runner Job 內以其雲端身分執行 — 而此處顯示的清單也會變得不完整。",
+      "ansibleHostKeyCheckingLead": "預設開啟，這也是 Ansible 自身的行為。關閉會放寬一項保護：主機出示的任何金鑰都會被接受，連線因而可能被攔截。",
+      "bindPlanLead": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。",
+      "configDirectoryLead": "ansible.cfg、playbook、roles/、group_vars/ 與 host_vars/ 所在的位置，相對於儲存庫根目錄。留空即表示根目錄本身。",
+      "ansibleCollectionsLead": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。",
       "configureOnly": "僅設定",
       "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
-      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。"
+      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。",
+      "vaultFileLead": "變數保存的是檔案路徑，而不是密鑰。",
+      "vaultFileTemplateLead": "每個預留位置都會替換為這一次 OpenBao/Vault 讀取中的對應欄位。",
+      "gitSshLead": "使用部署金鑰對符合上方比對樣式的私有 git::ssh:// 模組來源進行驗證。"
     },
     "runs": {
       "options": "選項",
@@ -3286,7 +3304,8 @@
       "label": "為 fork 的拉取請求執行計畫",
       "hint": "一次執行會取得此工作區的環境變數、敏感值、所有由 Vault 解析的密鑰，以及該工作的雲端身分。從 fork 發起拉取請求的人沒有寫入權限，也無法合併，因此推測性計畫是其程式碼接觸到這些憑證的唯一途徑。請只為沒有任何值得竊取之物的工作區開啟它 — 例如一個接受社群貢獻的公開模組儲存庫。來自儲存庫自身分支的拉取請求不受影響，始終會執行計畫。",
       "activeBadge": "已開啟",
-      "confirmEnable": "要為從 fork 發起的拉取請求執行計畫嗎？其作者的程式碼將使用此工作區的憑證與已解密的變數執行，且無需任何人事先核准。"
+      "confirmEnable": "要為從 fork 發起的拉取請求執行計畫嗎？其作者的程式碼將使用此工作區的憑證與已解密的變數執行，且無需任何人事先核准。",
+      "lead": "放寬一項保護：來自 fork 拉取請求的計畫會接觸到此工作區的環境變數、敏感值、Vault 密鑰與雲端身分 — 而發起它的人既沒有寫入權限，也無法合併。"
     },
     "groups": {
       "identity": "身分",
@@ -3982,6 +4001,8 @@
     "becomePassword": "提升密碼",
     "replaceHint": "儲存會取代整份憑證，因此請填寫它需要的每個欄位，而不只是正在變更的那一個。全部留空則會保留已儲存的憑證不變。",
     "knownHosts": "已知主機",
-    "knownHostsHint": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。將清查變數指向其路徑，即可在不放寬主機金鑰驗證的情況下建立連線。不會隱藏：主機的公開金鑰本就是公開的，金鑰不相符時比對的正是它。"
+    "knownHostsHint": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。將清查變數指向其路徑，即可在不放寬主機金鑰驗證的情況下建立連線。不會隱藏：主機的公開金鑰本就是公開的，金鑰不相符時比對的正是它。",
+    "knownHostsLead": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。",
+    "machineLead": "Ansible 連線到引用此憑證的主機的方式。請提供私密金鑰或密碼，也可以同時提供兩者。"
   }
 }

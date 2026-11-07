@@ -18,6 +18,9 @@ import {
   dependencyMet,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
+import { modeFromFlags } from '@/lib/dynamic-inventory'
 import { explainingPhase } from '@/lib/run-phases'
 import { RunKindSplitButton, type RunKindOption } from '@/components/run-kind-split-button'
 import { availableRunKinds, type RunKindId } from '@/lib/run-kinds'
@@ -2753,10 +2756,9 @@ function WorkspaceDetailContent() {
     'configure-enabled': 'fields.configureEnabledHint',
     'configure-after-apply': 'fields.configureAfterApplyHint',
     'configure-all-hosts': 'fields.configureAllHostsHint',
-    'config-directory': 'fields.configDirectoryRootHint',
+    'config-directory': 'fields.configDirectoryTitle',
     'inventory-paths': 'fields.inventoryPathsHint',
-    'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabledHint',
-    'inventory-scripts-enabled': 'fields.inventoryScriptsEnabledHint',
+    'dynamic-inventory-enabled': 'fields.dynamicInventoryModeHint',
     'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
@@ -2782,7 +2784,10 @@ function WorkspaceDetailContent() {
     // markup put it too — a read view that repeated it would be noise.
     const editOnly = attr === 'config-directory'
     if (!key || (editOnly && !settingsEditing)) return null
-    return <p className="mt-1 text-xs text-slate-400">{t(key)}</p>
+    // One call covers every hint on this surface, long or short (#2413 F15):
+    // `tieredHint` reads the registry and falls back to the plain paragraph, so
+    // this resolver never has to know which hints are long.
+    return tieredHint(t, key)
   }
 
   /** Where each settings field's change goes.
@@ -2900,12 +2905,12 @@ function WorkspaceDetailContent() {
   /** A card's own hint line, with its in-flight indicator. The indicator sits
    *  in the hint rather than beside the control because that is where the old
    *  markup put it, and it is the only feedback an instant PATCH gives. */
-  const savingHint = (key: string, busy: boolean): ReactNode => (
-    <p className="text-xs text-slate-500 mt-1">
-      {t(key)}
-      {busy && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
-    </p>
-  )
+  const savingHint = (key: string, busy: boolean): ReactNode =>
+    tieredHint(
+      t,
+      key,
+      busy ? <span className="ms-2 text-brand-400">{t('actions.saving')}</span> : null,
+    )
 
   /** Whether a settings field's gate is on.
    *
@@ -2973,6 +2978,32 @@ function WorkspaceDetailContent() {
       {Boolean(settingsValues[attr] ?? fallback) ? t('common.enabled') : t('common.disabled')}
     </span>
   )
+
+  /** The dynamic-inventory MODE in view mode (#2413 F19).
+   *
+   *  Its own display rather than `toggleDisplay`, because the field reads two
+   *  attributes: a per-attribute Enabled/Disabled would show half of what the
+   *  control writes, and on the pair that lets third-party code run on a runner
+   *  half an answer is the wrong kind of wrong. */
+  const dynamicInventoryDisplay = (): ReactNode => {
+    const mode = modeFromFlags(
+      settingsValues['dynamic-inventory-enabled'] === true,
+      settingsValues['inventory-scripts-enabled'] === true,
+    )
+    return (
+      <span data-testid="ws-dynamic-inventory-mode-display">
+        {t(
+          mode === 'both'
+            ? 'fields.dynamicInventoryModeBoth'
+            : mode === 'plugins'
+              ? 'fields.dynamicInventoryModePlugins'
+              : mode === 'scripts'
+                ? 'fields.dynamicInventoryModeScripts'
+                : 'fields.dynamicInventoryModeNone',
+        )}
+      </span>
+    )
+  }
 
   /** The Enabled/Disabled toggle for a card that PATCHes on change.
    *
@@ -3485,13 +3516,14 @@ function WorkspaceDetailContent() {
                           {attrs['pulumi-bind-plan'] ? t('common.enabled') : t('common.disabled')}
                         </dd>
                       )}
-                      <p className="mt-1 text-xs text-slate-400">
-                        {t.rich('fields.bindPlanHelp', {
+                      <HintWithDetail
+                        lead={t('fields.bindPlanLead')}
+                        detail={t.rich('fields.bindPlanHelp', {
                           docs: (chunks) => (
                             <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline">{chunks}</a>
                           ),
                         })}
-                      </p>
+                      />
                     </div>
                   )}
                 </Group>
@@ -3615,7 +3647,6 @@ function WorkspaceDetailContent() {
                         value={editConfigDir}
                         onChange={(e) => setEditConfigDir(e.target.value)}
                         placeholder={t('fields.configDirectoryPlaceholder')}
-                        title={t('fields.configDirectoryTitle')}
                         className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     }
@@ -3713,19 +3744,19 @@ function WorkspaceDetailContent() {
                       runner (#2033). Terrapod itself never runs either kind,
                       in either state -- off means a plugin source is refused
                       by name rather than resolving to a partial host set. */}
+                  {/* ONE ordered select over both grants (#2413 F19). Four
+                      options, not the finding's three: `scripts` without
+                      `plugins` is a real configuration -- see
+                      `lib/dynamic-inventory.ts` for the measurement. The second
+                      attribute is still written, by the control rather than by
+                      a Field of its own, and still appears in this file's state
+                      and payload. */}
                   <Field
                     attr="dynamic-inventory-enabled"
                     ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('dynamic-inventory-enabled', false)}
-                    control={settingsToggle('dynamic-inventory-enabled')}
-                  />
-                  <Field
-                    attr="inventory-scripts-enabled"
-                    ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('inventory-scripts-enabled', false)}
-                    control={settingsToggle('inventory-scripts-enabled')}
+                    kind="select"
+                    display={dynamicInventoryDisplay()}
+                    control={<DynamicInventorySelect ctx={ansibleCtx} />}
                   />
                   {/* Whether a configure verifies the host key of the hosts
                       it targets (#2318). The `toggleDisplay` fallback is TRUE,
@@ -4120,15 +4151,16 @@ function WorkspaceDetailContent() {
                       <dt className="text-xs text-slate-500 mb-1">{t('fields.driftIgnoreRules')}</dt>
                       {settingsEditing ? (
                         <dd className="space-y-2">
-                          <p className="text-xs text-slate-400">
-                            {t.rich('fields.driftIgnoreRulesHint', {
+                          <HintWithDetail
+                            lead={t('fields.driftIgnoreRulesLead')}
+                            detail={t.rich('fields.driftIgnoreRulesHint', {
                               star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
                               dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
                               n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
                               starIdx: () => <code className="text-[10px] bg-slate-800 px-1">[*]</code>,
                               docs: (chunks) => <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">{chunks}</a>,
                             })}
-                          </p>
+                          />
                           {editDriftIgnoreRules.map((r, i) => (
                             <div key={`${r}-${i}`} className="flex items-center gap-2">
                               <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{r}</code>
@@ -4192,7 +4224,7 @@ function WorkspaceDetailContent() {
                     <dt className="text-xs text-slate-500 mb-1">{t('fields.oidcAudiences')}</dt>
                     {settingsEditing ? (
                       <dd className="space-y-2">
-                        <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
+                        {tieredHint(t, 'fields.oidcAudiencesHint')}
                         {/* `value` is the owned set and `fallbacks` the
                             catalogue for the keys in force, so an inherited
                             entry is shown and offered for override rather than
@@ -4957,7 +4989,7 @@ function WorkspaceDetailContent() {
 
                 {varCategory === 'git_ssh_auth' && (
                   <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
-                    <p className="text-xs text-slate-400">{t('variables.gitSshHint')}</p>
+                    {tieredHint(t, 'variables.gitSshHint')}
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitPrivateKey')}</label>
                       <SensitiveValueInput id="git-key" value={gitPrivateKey} onChange={setGitPrivateKey} sensitive placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" rows={4} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />

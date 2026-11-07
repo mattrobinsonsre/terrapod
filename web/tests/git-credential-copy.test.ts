@@ -70,6 +70,7 @@ test('the subject is the whole git namespace, derived from the source catalogue'
       'gitSourceStatic',
       'gitSourceVcs',
       'gitSshHint',
+      'gitSshLead',
       'gitToken',
       'gitUrlPattern',
       'gitUsername',

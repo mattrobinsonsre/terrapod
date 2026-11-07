@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import { tieredHint } from '@/components/hint-with-detail'
 import {
   EE_UNKNOWN,
   fetchAnsibleExecutionEnvironments,
@@ -838,13 +839,10 @@ export default function BulkUpdatePage() {
                 onChange={(e) => setUConfigDirectory(e.target.value)}
                 placeholder={tWs('fields.configDirectoryPlaceholder')}
                 aria-label={tWs('fields.configDirectory')}
-                title={tWs('fields.configDirectoryTitle')}
                 disabled={gateOff('config-directory')}
                 className={inputCls}
               />
-              <p className="mt-1 text-xs text-slate-400">
-                {tWs('fields.configDirectoryRootHint')}
-              </p>
+              {tieredHint(tWs, 'fields.configDirectoryTitle')}
             </>
           )}
         </div>
@@ -934,9 +932,7 @@ export default function BulkUpdatePage() {
             <option value="true">{tCommon('yes')}</option>
             <option value="false">{tCommon('no')}</option>
           </select>
-          <p className="mt-1 text-xs text-slate-400">
-            {tWs('fields.dynamicInventoryEnabledHint')}
-          </p>
+          {tieredHint(tWs, 'fields.dynamicInventoryEnabledHint')}
         </div>
         <div className="min-w-0">
           <label className={labelCls} htmlFor="bu-inventory-scripts-enabled">
@@ -953,9 +949,7 @@ export default function BulkUpdatePage() {
             <option value="true">{tCommon('yes')}</option>
             <option value="false">{tCommon('no')}</option>
           </select>
-          <p className="mt-1 text-xs text-slate-400">
-            {tWs('fields.inventoryScriptsEnabledHint')}
-          </p>
+          {tieredHint(tWs, 'fields.inventoryScriptsEnabledHint')}
         </div>
         {/* Whether a configure verifies the host key of the hosts it
             targets (#2318). Tri-state like every select on this surface:
@@ -977,9 +971,7 @@ export default function BulkUpdatePage() {
             <option value="true">{tCommon('yes')}</option>
             <option value="false">{tCommon('no')}</option>
           </select>
-          <p className="mt-1 text-xs text-slate-400">
-            {tWs('fields.ansibleHostKeyCheckingHint')}
-          </p>
+          {tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')}
         </div>
         <div className="min-w-0">
           <label className={labelCls} title={tWs('fields.ansibleVersionTitle')}>
@@ -1051,7 +1043,7 @@ export default function BulkUpdatePage() {
               disabled={gateOff('ansible-collections')}
               className="min-w-0 border-0 p-0 m-0 space-y-2"
             >
-              <p className="text-xs text-slate-400">{tWs('fields.ansibleCollectionsHint')}</p>
+              {tieredHint(tWs, 'fields.ansibleCollectionsHint')}
               <StringListEditor
                 values={uAnsibleCollections}
                 onChange={setUAnsibleCollections}
@@ -1341,7 +1333,7 @@ export default function BulkUpdatePage() {
         </label>
         {uSetOidcAudiences && (
           <div className="space-y-2">
-            <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
+            {tieredHint(tWs, 'fields.oidcAudiencesHint')}
             <OidcAudiencesEditor
               value={uOidcAudiences}
               inert={!oidcDefaults.issuerEnabled}

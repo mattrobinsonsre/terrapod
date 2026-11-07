@@ -1988,7 +1988,9 @@
       "providerInvalid": "Bir provider adında boşluk olmaz ve en fazla bir nokta bulunur — aws ya da aws.west.",
       "providerPlaceholder": "aws ya da aws.west",
       "removeProviderAria": "{provider} provider yapılandırmasını kaldır"
-    }
+    },
+    "showDetail": "Tam açıklamayı göster",
+    "hideDetail": "Tam açıklamayı gizle"
   },
   "planSummary": {
     "aiGenerated": "AI üretti",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible yapılandırma dizini",
       "configDirectoryTitle": "ansible.cfg, playbook'lar, roles/, group_vars/ ve host_vars/ dosyalarının depo kökünden göreli olarak bulunduğu yer. Deponun kendi kökü için boş bırakın. Bu çalışma alanının hiç yapılandırma işlemi olup olmadığına yukarıdaki Yapılandırma ayarı karar verir, bu yol değil.",
       "configDirectoryPlaceholder": "örn. ansible",
-      "configDirectoryRootHint": "Depo kökünün kendisi için burayı boş bırakın.",
       "configDirectoryRoot": "Depo kökü",
       "inventoryPaths": "Envanter yolları",
       "inventoryPathsHint": "Her biri bir dosya veya bir dizin olan sıralı envanter kaynakları, yapılandırma dizinine göreli. Sıra, önceliği belirler.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible bellek isteği",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt sürümü",
+      "dynamicInventoryMode": "Dinamik envanter",
+      "dynamicInventoryModeHint": "Bildirilen bir envanter eklentisine, çalıştırılabilir bir betiğe ya da her ikisine izin verir. Betik, depodan gelen rastgele bir çalıştırılabilir dosyadır; eklenti ise çalışmadan önce okunabilir. Terrapod hiçbirini kendisi çalıştırmaz ve envantere dair kendi görünümü eksik hâle gelir.",
+      "dynamicInventoryModeNone": "Yok",
+      "dynamicInventoryModePlugins": "Bildirilen eklentiler",
+      "dynamicInventoryModeScripts": "Çalıştırılabilir betikler",
+      "dynamicInventoryModeBoth": "Bildirilen eklentiler ve çalıştırılabilir betikler",
       "dynamicInventoryEnabled": "Dinamik envanter eklentileri",
       "dynamicInventoryEnabledHint": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine — üst düzey bir plugin anahtarı taşıyan bir YAML kaynağına — izin verir. Terrapod bunları hiçbir durumda kendisi çalıştırmaz. Bu kapalıyken bir eklenti kaynağı, eksik bir makine kümesine çözümlenmek yerine adıyla reddedilir; açıkken burada gösterilen envanter kaynak kaynak açıkça eksiktir ve runner''ın çözümlediği küme belirleyici olandır.",
       "inventoryScriptsEnabled": "Envanter betikleri",
       "inventoryScriptsEnabledHint": "Runner envanteri çözümlerken çalıştırılabilir envanter betiklerine izin verir. Dinamik envanter eklentilerinden ayrı tutulur; böylece bir koleksiyon adı veren ve çalışmadan önce okunabilen bildirilmiş eklenti yapılandırmalarına, rastgele çalıştırılabilir dosyalara da izin vermeden izin verilebilir.",
       "ansibleHostKeyChecking": "SSH ana makine anahtarı denetimi",
-      "ansibleHostKeyCheckingHint": "Öntanımlı olarak açıktır; bu, Ansible''ın kendi davranışıdır: bir yapılandırma, anahtarına henüz güvenmediği bir ana makineyi reddeder. Kapatırsanız bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir — ana makinenin açık anahtarını makine kimlik bilgisiyle birlikte vermek ve denetimi açık bırakmak daha iyidir. Ana makine başına tanımlanan bir Ansible değişkeni her durumda bu ayarın önüne geçer."
+      "ansibleHostKeyCheckingHint": "Öntanımlı olarak açıktır; bu, Ansible''ın kendi davranışıdır: bir yapılandırma, anahtarına henüz güvenmediği bir ana makineyi reddeder. Kapatırsanız bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir — ana makinenin açık anahtarını makine kimlik bilgisiyle birlikte vermek ve denetimi açık bırakmak daha iyidir. Ana makine başına tanımlanan bir Ansible değişkeni her durumda bu ayarın önüne geçer.",
+      "oidcAudiencesLead": "Terrapod, her provider yapılandırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir yere yazar.",
+      "driftIgnoreRulesLead": "Sürüklenme sınıflandırıcısının bastırdığı Terraform adresleri ve öznitelik yolları. Özniteliği olmayan çıplak bir adres, o kaynağa yapılan her değişikliği susturur.",
+      "dynamicInventoryEnabledLead": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine izin verir. Burada gösterilen envanter o zaman kaynak kaynak eksik hâle gelir ve runner''ın çözümlediği küme belirleyici olandır.",
+      "inventoryScriptsEnabledLead": "Çalıştırılabilir envanter betiklerine izin verir. Depodan gelen rastgele bir çalıştırılabilir dosya o zaman runner Job''unun içinde, onun bulut kimliğiyle, playbook''tan önce çalışır — ve burada gösterilen envanter eksik hâle gelir.",
+      "ansibleHostKeyCheckingLead": "Öntanımlı olarak açıktır; Ansible''ın kendi davranışı da budur. Kapatıldığında bir korumayı gevşetir: bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir.",
+      "bindPlanLead": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar.",
+      "configDirectoryLead": "ansible.cfg, playbook''lar, roles/, group_vars/ ve host_vars/ dosyalarının depo kökünden göreli olarak bulunduğu yer. Boş bırakmak kökün kendisi anlamına gelir.",
+      "ansibleCollectionsLead": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır.",
       "configureOnly": "Yalnızca yapılandırma",
       "configureOnlyHint": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır. Filonun kendi kimlik bilgisi — makinelere giden SSH anahtarı, become parolası — bunların hiçbiriyle ilgili değildir.",
-      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır."
+      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır.",
+      "vaultFileLead": "Değişken gizli değeri değil, dosyanın yolunu tutar.",
+      "vaultFileTemplateLead": "Her yer tutucu, bu tek OpenBao/Vault okumasındaki o alanla değiştirilir.",
+      "gitSshLead": "Yukarıdaki desene uyan özel git::ssh:// modül kaynaklarının kimliğini bir dağıtım anahtarıyla doğrular."
     },
     "runs": {
       "options": "Seçenekler",
@@ -3286,7 +3304,8 @@
       "label": "Fork pull request''lerini planla",
       "hint": "Bir çalıştırma, bu çalışma alanının ortam değişkenlerini, hassas değerlerini, Vault''tan çözümlenen tüm gizli bilgileri ve işin bulut kimliğini alır. Bir fork''tan pull request açan kişinin yazma erişimi yoktur ve birleştirme yapamaz; dolayısıyla spekülatif plan, kodunun bu kimlik bilgilerine ulaşmasının tek yoludur. Bunu, alınmaya değer hiçbir şey barındırmayan bir çalışma alanı için açın — örneğin topluluk katkılarını kabul eden herkese açık bir modül deposu. Deponun kendi dallarından açılan pull request''ler bundan etkilenmez ve her zaman plan alır.",
       "activeBadge": "Açık",
-      "confirmEnable": "Fork''lardan açılan pull request''ler planlansın mı? Sahiplerinin kodu, önceden kimsenin onayı olmadan bu çalışma alanının kimlik bilgileri ve şifresi çözülmüş değişkenleriyle çalışacak."
+      "confirmEnable": "Fork''lardan açılan pull request''ler planlansın mı? Sahiplerinin kodu, önceden kimsenin onayı olmadan bu çalışma alanının kimlik bilgileri ve şifresi çözülmüş değişkenleriyle çalışacak.",
+      "lead": "Bir korumayı gevşetir: bir fork''un pull request''inden gelen plan, bu çalışma alanının ortam değişkenlerine, hassas değerlerine, Vault gizli bilgilerine ve bulut kimliğine erişir — ve böyle bir pull request''i açan kişinin ne yazma erişimi ne de birleştirme yetkisi vardır."
     },
     "groups": {
       "identity": "Kimlik",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Yükseltme parolası",
     "replaceHint": "Kaydetmek kimlik bilgisinin tamamını değiştirir; bu yüzden yalnızca değiştirdiğiniz alanı değil, gereken her alanı doldurun. Hepsini boş bırakırsanız kayıtlı kimlik bilgisi olduğu gibi kalır.",
     "knownHosts": "Bilinen ana makineler",
-    "knownHostsHint": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane. Ana makine anahtarı doğrulamasını gevşetmeden bağlanmak için bir envanter değişkenini bu yola yönlendirin. Gizlenmez: bir ana makinenin genel anahtarı geneldir ve bir anahtar uyuşmadığında karşılaştırdığınız şey tam olarak budur."
+    "knownHostsHint": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane. Ana makine anahtarı doğrulamasını gevşetmeden bağlanmak için bir envanter değişkenini bu yola yönlendirin. Gizlenmez: bir ana makinenin genel anahtarı geneldir ve bir anahtar uyuşmadığında karşılaştırdığınız şey tam olarak budur.",
+    "knownHostsLead": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane.",
+    "machineLead": "Ansible''ın bu kimlik bilgisine atıfta bulunan ana makinelere nasıl bağlandığı. Bir özel anahtar ya da parola girin; ikisini birlikte de verebilirsiniz."
   }
 }

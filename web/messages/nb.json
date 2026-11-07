@@ -1988,7 +1988,9 @@
       "providerInvalid": "Et providernavn inneholder ingen mellomrom og høyst ett punktum — aws eller aws.west.",
       "providerPlaceholder": "aws eller aws.west",
       "removeProviderAria": "Fjern providerkonfigurasjonen {provider}"
-    }
+    },
+    "showDetail": "Vis hele forklaringen",
+    "hideDetail": "Skjul hele forklaringen"
   },
   "planSummary": {
     "aiGenerated": "AI-generert",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-konfigurasjonsmappe",
       "configDirectoryTitle": "Hvor ansible.cfg, playbookene, roles/, group_vars/ og host_vars/ ligger, relativt til depotroten. La feltet stå tomt for depotroten selv. Om dette arbeidsområdet i det hele tatt har en konfigurasjonsoperasjon, avgjøres av innstillingen Konfigurer ovenfor, ikke av denne stien.",
       "configDirectoryPlaceholder": "f.eks. ansible",
-      "configDirectoryRootHint": "La dette stå tomt for depotroten selv.",
       "configDirectoryRoot": "Depotroten",
       "inventoryPaths": "Inventarstier",
       "inventoryPathsHint": "Ordnede inventarkilder, hver av dem en fil eller en mappe, relativt til konfigurasjonsmappen. Rekkefølgen er forrangsrekkefølgen.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible minneforespørsel",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versjon",
+      "dynamicInventoryMode": "Dynamisk inventar",
+      "dynamicInventoryModeHint": "Tillater et erklært plugin-modul for inventar, et kjørbart skript eller begge. Et skript er en vilkårlig kjørbar fil fra repositoriet; et plugin-modul kan leses før det kjører. Terrapod kjører aldri noen av dem selv, og dets eget bilde av inventaret blir ufullstendig.",
+      "dynamicInventoryModeNone": "Ingen",
+      "dynamicInventoryModePlugins": "Erklærte plugin-moduler",
+      "dynamicInventoryModeScripts": "Kjørbare skript",
+      "dynamicInventoryModeBoth": "Erklærte plugin-moduler og kjørbare skript",
       "dynamicInventoryEnabled": "Dynamiske inventar-plugins",
       "dynamicInventoryEnabledHint": "Tillater deklarerte inventar-plugins — en YAML-kilde med en plugin-nøkkel på øverste nivå — når runneren løser opp inventaret. Terrapod kjører aldri et selv, i ingen av de to tilstandene. Så lenge dette er av, avvises en pluginkilde ved navn i stedet for å løses opp til et ufullstendig vertssett; så lenge det er på, er inventaret som vises her uttrykkelig ufullstendig per kilde, og settet runneren løser opp er det som gjelder.",
       "inventoryScriptsEnabled": "Inventar-skript",
       "inventoryScriptsEnabledHint": "Tillater kjørbare inventar-skript når runneren løser opp inventaret. Holdt atskilt fra dynamiske inventar-plugins, slik at deklarerte pluginkonfigurasjoner, som navngir en collection og kan leses før de kjører, kan tillates uten også å tillate vilkårlige kjørbare filer.",
       "ansibleHostKeyChecking": "Kontroll av SSH-vertsnøkkel",
-      "ansibleHostKeyCheckingHint": "Slått på som standard, som er Ansibles egen oppførsel: en konfigurasjonskjøring avviser en vert hvis nøkkel den ikke allerede stoler på. Slår du den av, godtas enhver nøkkel en vert viser fram, slik at forbindelsen kan avlyttes — det er bedre å oppgi vertens offentlige nøkkel sammen med maskinlegitimasjonen og la kontrollen stå på. En Ansible-variabel per vert går uansett foran denne innstillingen."
+      "ansibleHostKeyCheckingHint": "Slått på som standard, som er Ansibles egen oppførsel: en konfigurasjonskjøring avviser en vert hvis nøkkel den ikke allerede stoler på. Slår du den av, godtas enhver nøkkel en vert viser fram, slik at forbindelsen kan avlyttes — det er bedre å oppgi vertens offentlige nøkkel sammen med maskinlegitimasjonen og la kontrollen stå på. En Ansible-variabel per vert går uansett foran denne innstillingen.",
+      "oidcAudiencesLead": "Terrapod utsteder et kortlevd OpenID Connect-token per providerkonfigurasjon og skriver det der kjøringen kan lese det.",
+      "driftIgnoreRulesLead": "Terraform-adresser og attributtstier som avdriftsklassifisereren undertrykker. En bar adresse uten attributt demper enhver endring på den ressursen.",
+      "dynamicInventoryEnabledLead": "Tillater deklarerte inventar-plugins når runneren løser opp inventaret. Inventaret som vises her blir da ufullstendig per kilde, og settet runneren løser opp er det som gjelder.",
+      "inventoryScriptsEnabledLead": "Tillater kjørbare inventar-skript. En vilkårlig kjørbar fil fra repositoriet kjører da inne i runner-Jobben, med dens skyidentitet, før playbooken kjører — og inventaret som vises her blir ufullstendig.",
+      "ansibleHostKeyCheckingLead": "Slått på som standard, slik Ansible selv gjør. Svekker en beskyttelse når den er av: enhver nøkkel en vert viser fram godtas, slik at forbindelsen kan avlyttes.",
+      "bindPlanLead": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk.",
+      "configDirectoryLead": "Hvor ansible.cfg, playbookene, roles/, group_vars/ og host_vars/ ligger, relativt til depotroten. Tomt betyr roten selv.",
+      "ansibleCollectionsLead": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan.",
       "configureOnly": "Bare konfigurer",
       "configureOnlyHint": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply. Flåtens egen legitimasjon — en SSH-nøkkel til maskinparken, et become-passord — hører ikke hjemme i noen av dem.",
-      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer."
+      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer.",
+      "vaultFileLead": "Variabelen inneholder filens sti, ikke hemmeligheten.",
+      "vaultFileTemplateLead": "Hver plassholder erstattes med det feltet fra denne ene lesingen fra OpenBao/Vault.",
+      "gitSshLead": "Autentiserer private git::ssh://-modulkilder som samsvarer med mønsteret ovenfor, med en deploy-nøkkel."
     },
     "runs": {
       "options": "Alternativer",
@@ -3286,7 +3304,8 @@
       "label": "Planlegg pull requests fra forker",
       "hint": "En kjøring mottar dette arbeidsområdets miljøvariabler, sensitive verdier, alle hemmeligheter hentet via Vault og jobbens skyidentitet. Den som åpner en pull request fra en fork har ingen skrivetilgang og kan ikke slå sammen, så en spekulativ plan er den eneste veien koden deres når fram til den legitimasjonen. Slå dette på for et arbeidsområde som ikke rommer noe verdt å ta — for eksempel et offentlig modulrepositorium som tar imot bidrag fra fellesskapet. Pull requests fra grener i selve repositoriet er upåvirket og får alltid plan.",
       "activeBadge": "På",
-      "confirmEnable": "Planlegge pull requests som er åpnet fra forker? Koden til forfatterne deres kjøres med dette arbeidsområdets legitimasjon og dekrypterte variabler, uten at noen godkjenner det først."
+      "confirmEnable": "Planlegge pull requests som er åpnet fra forker? Koden til forfatterne deres kjøres med dette arbeidsområdets legitimasjon og dekrypterte variabler, uten at noen godkjenner det først.",
+      "lead": "Svekker en beskyttelse: en plan fra pull requesten til en fork når dette arbeidsområdets miljøvariabler, sensitive verdier, Vault-hemmeligheter og skyidentitet — åpnet av noen uten skrivetilgang og uten mulighet til å slå sammen."
     },
     "groups": {
       "identity": "Identitet",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Passord for rettighetsheving",
     "replaceHint": "Lagring erstatter hele legitimasjonen, så fyll ut hvert felt den trenger — ikke bare det du endrer. Lar du alle stå tomme, beholdes den lagrede legitimasjonen som den er.",
     "knownHosts": "Kjente verter",
-    "knownHostsHint": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format. Pek en inventarvariabel mot stien dens for å koble til uten å svekke verifiseringen av vertsnøkkelen. Skjules ikke: en verts offentlige nøkkel er offentlig og er nettopp det du sammenligner når en nøkkel ikke stemmer."
+    "knownHostsHint": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format. Pek en inventarvariabel mot stien dens for å koble til uten å svekke verifiseringen av vertsnøkkelen. Skjules ikke: en verts offentlige nøkkel er offentlig og er nettopp det du sammenligner når en nøkkel ikke stemmer.",
+    "knownHostsLead": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format.",
+    "machineLead": "Hvordan Ansible kobler seg til vertene som viser til denne legitimasjonen. Oppgi en privat nøkkel eller et passord, eller begge."
   }
 }

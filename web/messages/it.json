@@ -1988,7 +1988,9 @@
       "providerInvalid": "Un nome di provider non contiene spazi e al massimo un punto — aws, oppure aws.west.",
       "providerPlaceholder": "aws, oppure aws.west",
       "removeProviderAria": "Rimuovi la configurazione di provider {provider}"
-    }
+    },
+    "showDetail": "Mostra la spiegazione completa",
+    "hideDetail": "Nascondi la spiegazione completa"
   },
   "planSummary": {
     "aiGenerated": "Generato dall''IA",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Directory di configurazione Ansible",
       "configDirectoryTitle": "Dove si trovano ansible.cfg, i playbook, roles/, group_vars/ e host_vars/, rispetto alla radice del repository. Lascia vuoto per la radice del repository stessa. Se questo spazio di lavoro abbia o no un'operazione di configurazione lo decide l'impostazione Configurare qui sopra, non questo percorso.",
       "configDirectoryPlaceholder": "ad es. ansible",
-      "configDirectoryRootHint": "Lascia vuoto per la radice stessa del repository.",
       "configDirectoryRoot": "Radice del repository",
       "inventoryPaths": "Percorsi di inventario",
       "inventoryPathsHint": "Sorgenti di inventario ordinate, ciascuna un file o una directory, rispetto alla directory di configurazione. L'ordine è l'ordine di precedenza.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Richiesta memoria Ansible",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versione di Terragrunt",
+      "dynamicInventoryMode": "Inventario dinamico",
+      "dynamicInventoryModeHint": "Consente un plugin di inventario dichiarato, uno script eseguibile o entrambi. Uno script è un eseguibile arbitrario del repository; un plugin può essere letto prima di essere eseguito. Terrapod non esegue mai né l''uno né l''altro, e la sua stessa vista dell''inventario diventa parziale.",
+      "dynamicInventoryModeNone": "Nessuno",
+      "dynamicInventoryModePlugins": "Plugin dichiarati",
+      "dynamicInventoryModeScripts": "Script eseguibili",
+      "dynamicInventoryModeBoth": "Plugin dichiarati e script eseguibili",
       "dynamicInventoryEnabled": "Plugin di inventario dinamico",
       "dynamicInventoryEnabledHint": "Consente i plugin di inventario dichiarati — una sorgente YAML con una chiave plugin di primo livello — quando il runner risolve l''inventario. Terrapod non ne esegue mai uno direttamente, in nessuno dei due stati. Finché questa opzione è disattivata, una sorgente plugin viene rifiutata per nome anziché risolversi in un insieme di host parziale; finché è attiva, l''inventario mostrato qui è esplicitamente parziale per sorgente, e l''insieme risolto dal runner è quello che fa fede.",
       "inventoryScriptsEnabled": "Script di inventario",
       "inventoryScriptsEnabledHint": "Consente gli script di inventario eseguibili quando il runner risolve l''inventario. Separato dai plugin di inventario dinamico, in modo che le configurazioni di plugin dichiarate, che nominano una collection e possono essere lette prima di essere eseguite, possano essere consentite senza consentire anche eseguibili arbitrari.",
       "ansibleHostKeyChecking": "Verifica della chiave host SSH",
-      "ansibleHostKeyCheckingHint": "Attiva per impostazione predefinita, che è il comportamento proprio di Ansible: una configurazione rifiuta un host di cui non conosce già la chiave. Disattivandola, viene accettata qualsiasi chiave presentata da un host, così la connessione può essere intercettata — meglio fornire la chiave pubblica dell''host con la credenziale macchina e lasciare attiva la verifica. Una variabile Ansible definita per host prevale comunque su questa impostazione."
+      "ansibleHostKeyCheckingHint": "Attiva per impostazione predefinita, che è il comportamento proprio di Ansible: una configurazione rifiuta un host di cui non conosce già la chiave. Disattivandola, viene accettata qualsiasi chiave presentata da un host, così la connessione può essere intercettata — meglio fornire la chiave pubblica dell''host con la credenziale macchina e lasciare attiva la verifica. Una variabile Ansible definita per host prevale comunque su questa impostazione.",
+      "oidcAudiencesLead": "Terrapod emette un token OpenID Connect di breve durata per ogni configurazione di provider e lo scrive dove l''esecuzione può leggerlo.",
+      "driftIgnoreRulesLead": "Indirizzi Terraform e percorsi di attributi soppressi dal classificatore di deriva. Un indirizzo nudo, senza attributo, silenzia qualsiasi modifica a quella risorsa.",
+      "dynamicInventoryEnabledLead": "Consente i plugin di inventario dichiarati quando il runner risolve l''inventario. L''inventario mostrato qui diventa allora parziale per sorgente, e l''insieme risolto dal runner è quello che fa fede.",
+      "inventoryScriptsEnabledLead": "Consente gli script di inventario eseguibili. Un eseguibile arbitrario preso dal repository viene allora eseguito all''interno del Job del runner, con la sua identità cloud, prima che lo faccia il playbook — e l''inventario mostrato qui diventa parziale.",
+      "ansibleHostKeyCheckingLead": "Attiva per impostazione predefinita, come fa Ansible di per sé. Allenta una protezione se disattivata: viene accettata qualsiasi chiave presentata da un host, così la connessione può essere intercettata.",
+      "bindPlanLead": "Se attivo, l''aggiornamento applica esattamente il piano salvato dall''anteprima, quindi qualsiasi cosa cambiata dopo l''anteprima fa fallire l''aggiornamento invece di essere applicata.",
+      "configDirectoryLead": "Dove si trovano ansible.cfg, i playbook, roles/, group_vars/ e host_vars/, rispetto alla radice del repository. Vuoto significa la radice stessa.",
+      "ansibleCollectionsLead": "Collection installate prima dell''esecuzione di un configure, una per riga come namespace.name o namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Trattenuta da un plan e consegnata solo a un apply. Un plan esegue il codice della configurazione, quindi una credenziale che serve solo all'apply non dovrebbe trovarsi nell'ambiente di un plan.",
       "configureOnly": "Solo configurare",
       "configureOnlyHint": "Consegnata solo a un configurare e trattenuta sia da un plan sia da un apply. La credenziale della flotta stessa — una chiave SSH verso il parco macchine, una password become — non ha nulla a che fare con nessuno dei due.",
-      "phaseSlotExclusive": "Una variabile occupa un solo posto alla volta. Solo apply raggiunge un apply e un configurare; Solo configurare raggiunge soltanto un configurare."
+      "phaseSlotExclusive": "Una variabile occupa un solo posto alla volta. Solo apply raggiunge un apply e un configurare; Solo configurare raggiunge soltanto un configurare.",
+      "vaultFileLead": "La variabile contiene il percorso del file, non il segreto.",
+      "vaultFileTemplateLead": "Ogni segnaposto viene sostituito con quel campo di questa unica lettura OpenBao/Vault.",
+      "gitSshLead": "Autentica con una chiave di deploy le origini di modulo private git::ssh:// che corrispondono al pattern qui sopra."
     },
     "runs": {
       "options": "Opzioni",
@@ -3286,7 +3304,8 @@
       "label": "Esegui il plan sulle pull request da fork",
       "hint": "Un''esecuzione riceve le variabili d''ambiente di questo spazio di lavoro, i valori sensibili, tutti i segreti risolti tramite Vault e l''identità cloud del job. Chi apre una pull request da un fork non ha accesso in scrittura e non può fare merge, quindi un plan speculativo è l''unico modo in cui il suo codice raggiunge quelle credenziali. Attivalo per uno spazio di lavoro che non custodisce nulla che valga la pena rubare — un repository pubblico di moduli aperto ai contributi della comunità, per esempio. Le pull request dai branch del repository stesso non sono interessate e generano sempre un plan.",
       "activeBadge": "Attivo",
-      "confirmEnable": "Eseguire il plan sulle pull request aperte da fork? Il codice dei loro autori verrà eseguito con le credenziali e le variabili decifrate di questo spazio di lavoro, senza che nessuno lo approvi prima."
+      "confirmEnable": "Eseguire il plan sulle pull request aperte da fork? Il codice dei loro autori verrà eseguito con le credenziali e le variabili decifrate di questo spazio di lavoro, senza che nessuno lo approvi prima.",
+      "lead": "Allenta una protezione: un plan da una pull request aperta da un fork raggiunge le variabili d''ambiente di questo spazio di lavoro, i suoi valori sensibili, i suoi segreti Vault e la sua identità cloud — aperta da qualcuno che non ha accesso in scrittura e non può fare merge."
     },
     "groups": {
       "identity": "Identità",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Password di elevazione",
     "replaceHint": "Il salvataggio sostituisce l'intera credenziale: compila quindi tutti i campi necessari, non solo quello che stai modificando. Lasciandoli tutti vuoti, la credenziale memorizzata resta invariata.",
     "knownHosts": "Host noti",
-    "knownHostsHint": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts. Punta una variabile di inventario al suo percorso per connetterti senza allentare la verifica della chiave host. Non nascosta: la chiave pubblica di un host è pubblica ed è proprio ciò che confronti quando una chiave non corrisponde."
+    "knownHostsHint": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts. Punta una variabile di inventario al suo percorso per connetterti senza allentare la verifica della chiave host. Non nascosta: la chiave pubblica di un host è pubblica ed è proprio ciò che confronti quando una chiave non corrisponde.",
+    "knownHostsLead": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts.",
+    "machineLead": "Come Ansible si connette agli host che fanno riferimento a questa credenziale. Fornisci una chiave privata o una password, o entrambe."
   }
 }

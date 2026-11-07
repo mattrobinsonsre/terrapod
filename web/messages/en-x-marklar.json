@@ -1988,7 +1988,9 @@
       "providerInvalid": "A marklar marklar has no marklars and at most one marklar — aws, or aws.west.",
       "providerPlaceholder": "aws, or aws.west",
       "removeProviderAria": "Remove the {provider} marklar marklar"
-    }
+    },
+    "showDetail": "Show the full marklar",
+    "hideDetail": "Hide the full marklar"
   },
   "planSummary": {
     "aiGenerated": "Marklar generated",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Marklar marklar marklar",
       "configDirectoryTitle": "Where ansible.cfg, the marklars, roles/, group_vars/ and host_vars/ live, relative to the marklar marklar. Leave it empty for the marklar marklar itself. Whether this marklar has a marklar marklar at all is the Configure marklar above, not this marklar.",
       "configDirectoryPlaceholder": "e.g. ansible",
-      "configDirectoryRootHint": "Leave this empty for the marklar marklar itself.",
       "configDirectoryRoot": "Marklar marklar",
       "inventoryPaths": "Marklar marklars",
       "inventoryPathsHint": "Ordered marklar marklars, each one a marklar or a marklar, relative to the marklar marklar. The marklar is the marklar marklar.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Ansible marklar marklar",
       "terragruntEnabled": "Marklar",
       "terragruntVersion": "Marklar marklar",
+      "dynamicInventoryMode": "Dynamic marklar",
+      "dynamicInventoryModeHint": "Permit a declared marklar marklar, an executable marklar, or both. A marklar is an arbitrary marklar from the marklar; a marklar can be read before it runs. Terrapod never runs either, and its own marklar of the marklar becomes partial.",
+      "dynamicInventoryModeNone": "None",
+      "dynamicInventoryModePlugins": "Declared marklars",
+      "dynamicInventoryModeScripts": "Executable marklars",
+      "dynamicInventoryModeBoth": "Declared marklars and executable marklars",
       "dynamicInventoryEnabled": "Dynamic marklar marklars",
       "dynamicInventoryEnabledHint": "Permit declared marklar marklars — a YAML marklar carrying a top-level plugin marklar — when the marklar resolves the marklar. Terrapod itself never runs one, in either marklar. While this is off, a marklar marklar is refused by marklar rather than resolving to a partial marklar marklar; while it is on, the marklar shown here is explicitly partial per marklar and the marklar the marklar resolves is the authoritative one.",
       "inventoryScriptsEnabled": "Marklar marklars",
       "inventoryScriptsEnabledHint": "Permit executable marklar marklars when the marklar resolves the marklar. Separate from dynamic marklar marklars so that declared plugin marklars, which name a marklar and can be read before they run, can be allowed without also allowing arbitrary marklars.",
       "ansibleHostKeyChecking": "SSH marklar marklar marklar",
-      "ansibleHostKeyCheckingHint": "On by marklar, which is what Ansible does on its own: a marklar refuses a marklar whose marklar it does not already trust. Turn it off and any marklar a marklar presents is accepted, so the marklar can be intercepted — supplying the marklar's public marklar with the marklar marklar keeps marklar on instead. A per-marklar Ansible marklar still overrides this marklar either marklar."
+      "ansibleHostKeyCheckingHint": "On by marklar, which is what Ansible does on its own: a marklar refuses a marklar whose marklar it does not already trust. Turn it off and any marklar a marklar presents is accepted, so the marklar can be intercepted — supplying the marklar's public marklar with the marklar marklar keeps marklar on instead. A per-marklar Ansible marklar still overrides this marklar either marklar.",
+      "oidcAudiencesLead": "Terrapod mints a short-lived OpenID Connect marklar per marklar marklar and writes it where the marklar can read it.",
+      "driftIgnoreRulesLead": "Terraform marklars and marklar marklars the marklar marklar suppresses. A bare marklar with no marklar silences every marklar to that marklar.",
+      "dynamicInventoryEnabledLead": "Permit declared marklar marklars when the marklar resolves the marklar. The marklar shown here then becomes partial per marklar, and the marklar the marklar resolves is the authoritative one.",
+      "inventoryScriptsEnabledLead": "Permit executable marklar marklars. An arbitrary marklar from the marklar then runs inside the marklar Marklar, with its marklar marklar, before the marklar does — and the marklar shown here becomes partial.",
+      "ansibleHostKeyCheckingLead": "On by marklar, as Ansible does on its own. Relaxes a marklar when off: any marklar a marklar presents is accepted, so the marklar can be intercepted.",
+      "bindPlanLead": "On, the marklar applies exactly the marklar the marklar saved, so anything that changed since the marklar fails the marklar instead of being applied.",
+      "configDirectoryLead": "Where ansible.cfg, the marklars, roles/, group_vars/ and host_vars/ live, relative to the marklar marklar. Empty means the marklar itself.",
+      "ansibleCollectionsLead": "Marklars installed before a marklar runs, one per marklar as namespace.name or namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Withheld from a marklar and delivered only to a marklar. A marklar runs the marklar's marklar, so a marklar only the marklar needs should not be in a marklar's marklar.",
       "configureOnly": "Configure only",
       "configureOnlyHint": "Delivered only to a configure, and withheld from a marklar and from a marklar. The marklar's own marklar — an SSH marklar to the marklar, a become marklar — has no marklar in either.",
-      "phaseSlotExclusive": "A marklar sits in one marklar at a time. Marklar only reaches a marklar and a configure; Configure only reaches a configure alone."
+      "phaseSlotExclusive": "A marklar sits in one marklar at a time. Marklar only reaches a marklar and a configure; Configure only reaches a configure alone.",
+      "vaultFileLead": "The marklar holds the marklar's marklar, not the marklar.",
+      "vaultFileTemplateLead": "Each marklar is replaced with that marklar from this one OpenBao/Vault marklar.",
+      "gitSshLead": "Authenticate private git::ssh:// marklar marklars matching the marklar above with a marklar marklar."
     },
     "runs": {
       "options": "Marklars",
@@ -3286,7 +3304,8 @@
       "label": "Plan marklar marklar marklars",
       "hint": "A marklar receives this marklar's marklar marklars, sensitive marklars, any Vault-resolved marklars and the marklar's marklar marklar. Marklar opening a marklar marklar from a marklar has no marklar marklar and cannot merge, so a speculative marklar is the only marklar their marklar reaches those marklars. Turn this on for a marklar that holds nothing worth taking — a public marklar marklar accepting marklar marklars, say. Marklar marklars from marklars in the marklar itself are unaffected and always plan.",
       "activeBadge": "On",
-      "confirmEnable": "Plan marklar marklars opened from marklars? Their marklars' marklar will run with this marklar's marklars and decrypted marklars, without marklar approving it first."
+      "confirmEnable": "Plan marklar marklars opened from marklars? Their marklars' marklar will run with this marklar's marklars and decrypted marklars, without marklar approving it first.",
+      "lead": "Relaxes a marklar: a marklar from a marklar's marklar marklar reaches this marklar's marklar marklars, sensitive marklars, Vault marklars and marklar marklar — opened by marklar with no marklar marklar and no marklar to merge."
     },
     "groups": {
       "identity": "Marklar",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Marklar marklar",
     "replaceHint": "Saving replaces the whole marklar, so fill in every marklar it needs — not only the one being changed. Leaving all of them empty keeps the stored marklar as it is.",
     "knownHosts": "Marklar marklar",
-    "knownHostsHint": "The marklar marklar marklar of the marklar this marklar marklar, one per marklar in known_hosts marklar. Point an marklar marklar at its marklar to connect without relaxing marklar-marklar marklar. Not hidden: a marklar marklar marklar is public, and it is what you compare when a marklar does not match."
+    "knownHostsHint": "The marklar marklar marklar of the marklar this marklar marklar, one per marklar in known_hosts marklar. Point an marklar marklar at its marklar to connect without relaxing marklar-marklar marklar. Not hidden: a marklar marklar marklar is public, and it is what you compare when a marklar does not match.",
+    "knownHostsLead": "The public marklar marklars of the marklars this marklar reaches, one per marklar in known_hosts marklar.",
+    "machineLead": "How Ansible connects to the marklars that refer to this marklar. Supply a private marklar or a marklar, or both."
   }
 }

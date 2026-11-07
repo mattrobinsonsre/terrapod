@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { runHref } from '@/lib/run-phases'
 import { useTranslations } from 'next-intl'
 
 import { phaseKey } from '@/lib/phase-vocabulary'
@@ -41,16 +42,29 @@ const pill =
  * desktop STATUS column AND inline in the row on mobile — one implementation,
  * so the two viewports always agree.
  */
+
 export function WorkspaceStatusBadges({
   workspaceId,
   def,
   runId,
+  phaseStarts,
   lifecycleState,
   engine,
 }: {
   workspaceId: string
   def: WorkspaceStatusDef | null
   runId: string | null
+  /** The run's phase-START times, from `resolveStatus`. Used to deep-link the
+   *  badge to the view that EXPLAINS the status it is showing (#2413 F16) --
+   *  the case the review named: "when you click errored on a workspace you get
+   *  taken to the run which errored".
+   *
+   *  Optional, and absent is handled three ways over: a workspace-level
+   *  condition has no run phase, `drifted` deliberately sends null because its
+   *  run is the drift run rather than the latest, and a server predating
+   *  `phase-started-at` sends nothing. All three fall back to the plain run
+   *  link, which is what this always was. */
+  phaseStarts?: Record<string, unknown> | null
   lifecycleState?: 'active' | 'pending_deletion' | 'archived'
   engine?: string
 }) {
@@ -71,7 +85,7 @@ export function WorkspaceStatusBadges({
         <span className="text-xs text-slate-500">&mdash;</span>
       ) : runId ? (
         <Link
-          href={`/workspaces/${workspaceId}/runs/${runId}`}
+          href={runHref(workspaceId, runId, phaseStarts)}
           className={`${pill} hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
         >
           {label(def.filter)}

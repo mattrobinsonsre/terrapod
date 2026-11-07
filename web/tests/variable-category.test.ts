@@ -18,6 +18,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
+import { HINT_LEADS } from '../src/lib/hint-tiers.ts'
 import { join } from 'node:path'
 
 import { categoryKey, nativeCategoryKey } from '../src/lib/variable-category.ts'
@@ -210,7 +211,7 @@ function formFields(slice: string): string[] {
 /** The panel split into its vault branch and its machine branch. */
 function panelBranches(): { vault: string; machine: string } {
   const vaultMark = 'if (category === ANSIBLE_VAULT_CATEGORY) {'
-  const machineMark = "{t('machineHint')}"
+  const machineMark = "{tieredHint(t, 'machineHint')}"
   // A non-unique anchor would slice at the wrong place and the assertions below
   // would then be about a region nobody chose.
   assert.equal(PANEL.split(vaultMark).length - 1, 1, 'the vault-branch anchor is not unique')
@@ -352,7 +353,23 @@ test('every offered locale carries the whole Ansible credential namespace', () =
       for (const [, key] of src.matchAll(new RegExp(`\\b${bound}\\('([A-Za-z]+)'`, 'g'))) {
         requested.add(key)
       }
+      // A two-tier hint (#2413 F15) is passed TO the resolver rather than
+      // called, so `bound('key')` cannot see it: `tieredHint(t, 'machineHint')`
+      // reads as having no reader while being the only thing that renders it.
+      for (const [, key] of src.matchAll(
+        new RegExp(`tieredHint\\(\\s*${bound},\\s*'([A-Za-z]+)'`, 'g'),
+      )) {
+        requested.add(key)
+      }
     }
+  }
+  // The LEAD of a tiered hint is requested by `tieredHint` itself, from the
+  // registry -- so it is DERIVED here rather than read out of the form, which
+  // never names it. Deriving it also means a lead whose hint stops being
+  // rendered stops being requested, and then fails as a key with no reader.
+  for (const key of [...requested]) {
+    const lead = HINT_LEADS[key]
+    if (lead) requested.add(lead)
   }
   const keys = Object.keys(EN_ANSIBLE)
   assert.ok(requested.size >= 10, `read only ${requested.size} requested keys -- matcher broken?`)

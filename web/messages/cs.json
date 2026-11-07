@@ -1988,7 +1988,9 @@
       "providerInvalid": "Název provideru neobsahuje mezery a nejvýše jednu tečku — aws, nebo aws.west.",
       "providerPlaceholder": "aws, nebo aws.west",
       "removeProviderAria": "Odebrat konfiguraci provideru {provider}"
-    }
+    },
+    "showDetail": "Zobrazit celé vysvětlení",
+    "hideDetail": "Skrýt celé vysvětlení"
   },
   "planSummary": {
     "aiGenerated": "Vygenerováno AI",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Konfigurační adresář Ansible",
       "configDirectoryTitle": "Kde leží ansible.cfg, playbooky, roles/, group_vars/ a host_vars/, relativně ke kořeni repozitáře. Pro samotný kořen repozitáře nechte prázdné. Jestli tento pracovní prostor vůbec má konfigurační operaci, rozhoduje nastavení Konfigurace výše, nikoli tato cesta.",
       "configDirectoryPlaceholder": "např. ansible",
-      "configDirectoryRootHint": "Pro samotný kořen repozitáře nechte prázdné.",
       "configDirectoryRoot": "Kořen repozitáře",
       "inventoryPaths": "Cesty inventáře",
       "inventoryPathsHint": "Setříděné zdroje inventáře, každý z nich soubor nebo adresář, relativně ke konfiguračnímu adresáři. Pořadí určuje přednost.",
@@ -2684,12 +2685,26 @@
       "eeMemoryRequest": "Požadavek paměti pro Ansible",
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Verze Terragrunt",
+      "dynamicInventoryMode": "Dynamický inventář",
+      "dynamicInventoryModeHint": "Povolí deklarovaný plugin inventáře, spustitelný skript nebo obojí. Skript je libovolný spustitelný soubor z repozitáře; plugin lze přečíst před spuštěním. Terrapod nikdy nespouští ani jedno, ani druhé a jeho vlastní pohled na inventář se stává částečným.",
+      "dynamicInventoryModeNone": "Žádné",
+      "dynamicInventoryModePlugins": "Deklarované pluginy",
+      "dynamicInventoryModeScripts": "Spustitelné skripty",
+      "dynamicInventoryModeBoth": "Deklarované pluginy a spustitelné skripty",
       "dynamicInventoryEnabled": "Dynamické pluginy inventáře",
       "dynamicInventoryEnabledHint": "Povolí deklarované pluginy inventáře — zdroj YAML s klíčem plugin na nejvyšší úrovni — když runner vyhodnocuje inventář. Terrapod sám nikdy žádný nespouští, ani v jednom z obou stavů. Dokud je toto vypnuté, je zdroj pluginu odmítnut jmenovitě, místo aby se vyhodnotil na neúplnou množinu hostů; když je zapnuté, je zde zobrazený inventář výslovně částečný pro každý zdroj a množina, kterou vyhodnotí runner, je rozhodující.",
       "inventoryScriptsEnabled": "Skripty inventáře",
       "inventoryScriptsEnabledHint": "Povolí spustitelné skripty inventáře, když runner vyhodnocuje inventář. Odděleno od dynamických pluginů inventáře, aby bylo možné povolit deklarované konfigurace pluginů, které pojmenovávají kolekci a lze je přečíst před spuštěním, bez povolení libovolných spustitelných souborů.",
       "ansibleHostKeyChecking": "Kontrola klíče hostitele SSH",
-      "ansibleHostKeyCheckingHint": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible: konfigurace odmítne hostitele, jehož klíč dosud nezná. Když to vypnete, přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout — lépe je zadat veřejný klíč hostitele spolu s přihlašovacími údaji ke stroji a kontrolu nechat zapnutou. Proměnná Ansible nastavená pro jednotlivého hostitele má nad tímto nastavením tak či tak přednost."
+      "ansibleHostKeyCheckingHint": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible: konfigurace odmítne hostitele, jehož klíč dosud nezná. Když to vypnete, přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout — lépe je zadat veřejný klíč hostitele spolu s přihlašovacími údaji ke stroji a kontrolu nechat zapnutou. Proměnná Ansible nastavená pro jednotlivého hostitele má nad tímto nastavením tak či tak přednost.",
+      "oidcAudiencesLead": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru a zapisuje ho tam, kde si ho běh může přečíst.",
+      "driftIgnoreRulesLead": "Terraform adresy a cesty atributů, které klasifikátor odchýlení potlačuje. Holá adresa bez atributu umlčí jakoukoli změnu tohoto prostředku.",
+      "dynamicInventoryEnabledLead": "Povolí deklarované pluginy inventáře, když runner vyhodnocuje inventář. Zde zobrazený inventář se pak stává částečným pro každý zdroj a množina, kterou vyhodnotí runner, je rozhodující.",
+      "inventoryScriptsEnabledLead": "Povolí spustitelné skripty inventáře. Libovolný spustitelný soubor z repozitáře se pak spustí uvnitř runner Jobu, s jeho cloudovou identitou, dříve než playbook — a zde zobrazený inventář se stává částečným.",
+      "ansibleHostKeyCheckingLead": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible. Když to vypnete, oslabuje to ochranu: přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout.",
+      "bindPlanLead": "Když je zapnuto, aktualizace použije přesně plán uložený náhledem, takže cokoli, co se od náhledu změnilo, aktualizaci zastaví, místo aby se to použilo.",
+      "configDirectoryLead": "Kde leží ansible.cfg, playbooky, roles/, group_vars/ a host_vars/, relativně ke kořeni repozitáře. Prázdná hodnota znamená samotný kořen.",
+      "ansibleCollectionsLead": "Kolekce instalované před spuštěním configure, jedna na řádek ve tvaru namespace.name nebo namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
@@ -2843,7 +2858,10 @@
       "applyOnlyHint": "Zadržena u plan a doručena pouze do apply. plan spouští kód konfigurace, takže přihlašovací údaje, které potřebuje jen apply, by neměly být v prostředí plan.",
       "configureOnly": "Pouze konfigurace",
       "configureOnlyHint": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply. Přihlašovací údaje samotné flotily — SSH klíč ke strojům, heslo become — nemají s ani jedním z nich nic společného.",
-      "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace."
+      "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace.",
+      "vaultFileLead": "Proměnná obsahuje cestu k souboru, ne tajemství.",
+      "vaultFileTemplateLead": "Každý zástupný symbol se nahradí tímto polem z tohoto jediného čtení z OpenBao/Vault.",
+      "gitSshLead": "Autentizuje privátní zdroje modulů git::ssh://, které odpovídají výše uvedenému vzoru, pomocí nasazovacího klíče."
     },
     "runs": {
       "options": "Možnosti",
@@ -3286,7 +3304,8 @@
       "label": "Plánovat pull requesty z forků",
       "hint": "Běh dostane proměnné prostředí tohoto pracovního prostoru, citlivé hodnoty, všechna tajemství získaná přes Vault a cloudovou identitu úlohy. Kdo otevře pull request z forku, nemá právo zápisu a nemůže slučovat, takže spekulativní plán je jediná cesta, kterou se jeho kód k těmto přihlašovacím údajům dostane. Zapněte to pro pracovní prostor, v němž není nic, co by stálo za odnesení — třeba pro veřejný repozitář modulů přijímající příspěvky komunity. Pull requesty z větví samotného repozitáře to neovlivní a plán dostanou vždy.",
       "activeBadge": "Zapnuto",
-      "confirmEnable": "Plánovat pull requesty otevřené z forků? Kód jejich autorů poběží s přihlašovacími údaji a dešifrovanými proměnnými tohoto pracovního prostoru, aniž by to někdo předem schválil."
+      "confirmEnable": "Plánovat pull requesty otevřené z forků? Kód jejich autorů poběží s přihlašovacími údaji a dešifrovanými proměnnými tohoto pracovního prostoru, aniž by to někdo předem schválil.",
+      "lead": "Oslabuje ochranu: plán pro pull request z forku se dostane k proměnným prostředí tohoto pracovního prostoru, citlivým hodnotám, tajemstvím z Vaultu a cloudové identitě — a takový pull request otevírá někdo, kdo nemá právo zápisu ani možnost slučovat."
     },
     "groups": {
       "identity": "Identita",
@@ -3982,6 +4001,8 @@
     "becomePassword": "Heslo pro zvýšení oprávnění",
     "replaceHint": "Uložení nahradí celé přihlašovací údaje, vyplňte proto každé potřebné pole, ne jen to, které měníte. Když necháte všechna prázdná, uložené údaje zůstanou beze změny.",
     "knownHosts": "Známí hostitelé",
-    "knownHostsHint": "Veřejné klíče hostitelů strojů, na které toto přihlašovací údaje dosáhne, jeden na řádek ve formátu known_hosts. Nasměruj proměnnou inventáře na tuto cestu, abys se připojil bez oslabení ověření klíče hostitele. Není skrytý: veřejný klíč hostitele je veřejný a je to právě to, co porovnáváš, když klíč nesouhlasí."
+    "knownHostsHint": "Veřejné klíče hostitelů strojů, na které toto přihlašovací údaje dosáhne, jeden na řádek ve formátu known_hosts. Nasměruj proměnnou inventáře na tuto cestu, abys se připojil bez oslabení ověření klíče hostitele. Není skrytý: veřejný klíč hostitele je veřejný a je to právě to, co porovnáváš, když klíč nesouhlasí.",
+    "knownHostsLead": "Veřejné klíče hostitelů strojů, na které tyto přihlašovací údaje dosáhnou, jeden na řádek ve formátu known_hosts.",
+    "machineLead": "Jak se Ansible připojuje k hostitelům, kteří odkazují na tyto přihlašovací údaje. Zadejte privátní klíč nebo heslo, případně obojí."
   }
 }
