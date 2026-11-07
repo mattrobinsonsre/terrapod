@@ -80,7 +80,6 @@ from terrapod.services.ansible_auth import (
     MACHINE_VALUE_FIELDS,
     VAULT_CATEGORY,
     AnsibleAuthError,
-    parse_boolean,
 )
 
 logger = structlog.get_logger("runner.ansible_auth")
@@ -322,11 +321,6 @@ def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[
     for field in sorted(MACHINE_VALUE_FIELDS):
         value = envelope.get(field)
         if value is None or value == "":
-            continue
-        if field == "become":
-            # Validated at the write boundary; normalised here so an inventory
-            # substituting it gets something ansible reads as a boolean.
-            out[f"{key}.{field}"] = "true" if parse_boolean(str(value)) else "false"
             continue
         if field in MACHINE_SECRET_FIELDS:
             # A LOWER floor than the default, because this field has no

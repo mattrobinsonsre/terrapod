@@ -98,22 +98,41 @@ class TestTheMachineEnvelope:
         """Derived from the field maps, so a field added to one and forgotten
         in the other fails here rather than at a configure."""
         envelope = dict.fromkeys(sorted(aa.MACHINE_FIELDS), "x")
-        envelope["become"] = "yes"
         assert aa.validate_envelope(aa.MACHINE_CATEGORY, "all", json.dumps(envelope))
 
-    @pytest.mark.parametrize("raw", ["true", "yes", "1", "on", "FALSE", "no", "off"])
-    def test_the_booleans_an_operator_would_write_are_accepted(self, raw):
+    @pytest.mark.parametrize("field", ["user", "become", "become_method", "become_user"])
+    def test_a_non_secret_connection_setting_is_refused(self, field):
+        """#2413 F9. These four used to be accepted and substituted verbatim,
+        which put a plain value into the resolved inventory -- the opposite of
+        what this category exists to do. They are inventory variables: write
+        `ansible_user: deploy` in the inventory, where it is visible, can differ
+        per host and needs no indirection through a shared credential.
+
+        Refused rather than ignored, so an operator who writes one is told. The
+        envelope has always refused an unknown field, so this is that rule
+        applying to four fewer known ones."""
+        with pytest.raises(aa.AnsibleAuthError):
+            aa.validate_envelope(
+                aa.MACHINE_CATEGORY, "all", json.dumps({"password": "p", field: "x"})
+            )
+
+    def test_the_two_secrets_that_remain_are_still_accepted(self):
+        """The other half of the narrowing: `become_password` stays because it
+        IS a secret and ansible has no `ansible_become_password_file`, so it
+        can only ever be a variable -- which is why it needs the redactor."""
         assert aa.validate_envelope(
-            aa.MACHINE_CATEGORY, "all", json.dumps({"password": "p", "become": raw})
+            aa.MACHINE_CATEGORY,
+            "all",
+            json.dumps({"password": "p", "become_password": "s"}),
         )
 
-    def test_a_typo_in_become_is_refused_rather_than_read_as_false(self):
-        """Read as false it would silently drop privilege escalation, and the
-        operator's next signal is a playbook that cannot write anything."""
-        with pytest.raises(aa.AnsibleAuthError, match="boolean"):
-            aa.validate_envelope(
-                aa.MACHINE_CATEGORY, "all", json.dumps({"password": "p", "become": "ture"})
-            )
+    def test_the_value_fields_are_exactly_the_secrets(self):
+        """Derived rather than restated: if a non-secret is ever added back,
+        this fails instead of the review catching it again."""
+        assert aa.MACHINE_VALUE_FIELDS <= aa.MACHINE_SECRET_FIELDS, (
+            "every substituted field must be a secret -- a non-secret belongs "
+            "in the inventory (#2413 F9)"
+        )
 
 
 class TestTheEnvelopeItself:

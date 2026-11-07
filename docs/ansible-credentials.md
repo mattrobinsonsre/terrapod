@@ -14,7 +14,7 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, password?, user?, become?, become_method?, become_user?, become_password?}` | a `0600` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
+| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, known_hosts?, password?, become_password?}` | a `0600` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
 | `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0600` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
@@ -55,11 +55,26 @@ rather than ignored — a credential field under a name nothing reads is a
 credential that silently does not apply, and the operator's next signal would be
 a configure that cannot connect.
 
+**A credential carries secrets, and nothing else.** The four fields it holds
+are the two that are delivered as a file and the two that are substituted
+verbatim, and every one of those is either key material or a password.
+
+`user`, `become`, `become_method` and `become_user` used to be here and were
+removed, because none of them is a secret. Each is an ordinary connection
+setting with a first-class home in the inventory — `ansible_user`,
+`ansible_become`, `ansible_become_method`, `ansible_become_user` — where it is
+visible in a diff, reviewable in a pull request, and settable per host or per
+group. Carrying them here made a second place to say the same thing, and the
+two could disagree with the credential winning silently: a credential is
+injected late and is write-only once saved, so an operator reading the
+inventory would see one value and the run would use another. Set them in the
+inventory. The server refuses all four on a write.
+
 **Nothing in the middle column happens automatically.** It is the inventory
-variable operators usually point a field's placeholder at — setting `user` does
-not set `ansible_user` for you. A placeholder can fill *any* connection
-variable, including a fragment of one, so the column is a convention rather
-than a mapping; see
+variable operators usually point a field's placeholder at — setting `password`
+does not set `ansible_password` for you. A placeholder can fill *any*
+connection variable, including a fragment of one, so the column is a convention
+rather than a mapping; see
 [`key` is the credential's name](#key-is-the-credentials-name-and-the-inventory-says-where-it-is-used)
 below.
 
@@ -68,10 +83,6 @@ below.
 | `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
 | `known_hosts` | `ansible_ssh_common_args`, as `-o UserKnownHostsFile=…` | the **path** to a file holding the host keys this credential's hosts present. See [the `known_hosts` field](#the-known_hosts-field) |
 | `password` | `ansible_password` | |
-| `user` | `ansible_user` | |
-| `become` | `ansible_become` | a boolean. `true`/`yes`/`1`/`on` and `false`/`no`/`0`/`off` are accepted; anything else is refused, because a value ansible cannot read as true would read as false and silently drop privilege escalation |
-| `become_method` | `ansible_become_method` | |
-| `become_user` | `ansible_become_user` | |
 | `become_password` | `ansible_become_password` | |
 
 **At least one of `private_key` or `password` is required.** With neither,
@@ -215,10 +226,7 @@ resource "terrapod_variable" "fleet_key" {
   category     = "ansible_machine_auth"
   sensitive    = true
   value = jsonencode({
-    user          = "deploy"
-    private_key   = file("${path.module}/keys/fleet")
-    become        = "true"
-    become_method = "sudo"
+    private_key = file("${path.module}/keys/fleet")
   })
 }
 
@@ -228,7 +236,6 @@ resource "terrapod_variable" "database_key" {
   category     = "ansible_machine_auth"
   sensitive    = true
   value = jsonencode({
-    user        = "dbadmin"
     private_key = file("${path.module}/keys/databases")
   })
 }
@@ -238,15 +245,20 @@ The inventory then decides who gets which — and because these are ordinary
 inventory variables, **Ansible's own precedence settles the overlap**: a host
 variable beats a group variable, which beats one on `all`.
 
+Note what is and is not a placeholder below. The key comes from a credential,
+because it is secret; the account and the escalation are written straight into
+the inventory, because they are not. That split is the whole of the design, and
+it is why `ansible_user` takes a literal here rather than a reference.
+
 ```ini
 [all:vars]
-ansible_user=${terrapod:fleet-key.user}
+ansible_user=deploy
+ansible_become=true
+ansible_become_method=sudo
 ansible_ssh_private_key_file=${terrapod:fleet-key.private_key}
-ansible_become=${terrapod:fleet-key.become}
-ansible_become_method=${terrapod:fleet-key.become_method}
 
 [databases:vars]
-ansible_user=${terrapod:db-key.user}
+ansible_user=dbadmin
 ansible_ssh_private_key_file=${terrapod:db-key.private_key}
 ```
 
@@ -582,8 +594,10 @@ inventory never named the credential for that host.
 
 If the reference is there but the host still cannot be reached, the value it
 resolved to is a path on the Job's shared volume, so it is the *credential* that
-is wrong rather than its placement — a key for the wrong fleet, a `user` the
-host does not have, or escalation the playbook needs and the envelope omits.
+is wrong rather than its placement — a key for the wrong fleet, or a password
+the account does not have. Check the inventory separately for the things that
+are not in a credential: the account `ansible_user` names and whether
+`ansible_become` is set for a playbook that needs escalation.
 
 A reference naming a credential that was not delivered does **not** reach this
 point: the configure refuses before running, and that is
@@ -651,7 +665,7 @@ an operator to the wrong place. The cases are:
 | a field the category does not have | a field nothing reads is a credential that silently does not apply |
 | a non-string field value | it cannot be written to a credential file or an inventory variable |
 | a machine credential with neither `private_key` nor `password` | ansible would have no way to authenticate |
-| a `become` value that is not one of the accepted spellings | a value ansible cannot read as true reads as false, silently dropping escalation |
+| `user`, `become`, `become_method` or `become_user` | not secrets, so not credential fields; they are inventory variables (see [the envelope](#the-envelope)) |
 | a vault credential with an empty or absent `password` | nothing to decrypt with |
 | a vault ID label containing `,` or `@` | the label is interpolated into `ANSIBLE_VAULT_IDENTITY_LIST`, so either character produces a different list rather than a rejected one |
 | a machine scope usable as neither a host name, a group name, nor `all` | the credential is delivered as inventory variables for that scope, so a name ansible cannot resolve applies to nothing. Whitespace and the `--limit` operators `,`&nbsp;`:`&nbsp;`!`&nbsp;`&`&nbsp;`~` are what this excludes |

@@ -127,8 +127,9 @@ PHASES_SEEING_CONFIGURE_ONLY = frozenset({"configure"})
 #: **The envelope's fields are NOT restated here.** `services/ansible_auth.py`
 #: is their one producer, shared with the runner so the two cannot disagree, and
 #: this comment had already drifted from it -- it listed five machine fields
-#: where `MACHINE_VALUE_FIELDS` carries six, omitting `become` and
-#: `become_user`. A field list in prose has no gate behind it.
+#: against a set that then carried six. The set is now TWO (#2413 F9 removed the
+#: four non-secrets), which is the second time that drift would have bitten. A
+#: field list in prose has no gate behind it.
 ANSIBLE_AUTH_CATEGORIES = frozenset({"ansible_machine_auth", "ansible_vault_auth"})
 
 #: Every category whose `value` is a JSON credential envelope rather than a

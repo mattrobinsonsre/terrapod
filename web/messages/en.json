@@ -4004,13 +4004,6 @@
     "knownHosts": "Known hosts",
     "knownHostsHint": "The public host keys of the machines this credential reaches, one per line in known_hosts format. Point an inventory variable at its path to connect without relaxing host-key verification. Not hidden: a host's public key is public, and it is what you compare when a key does not match.",
     "password": "Password",
-    "user": "User",
-    "become": "Privilege escalation",
-    "becomeUnset": "Not set",
-    "becomeYes": "Enabled",
-    "becomeNo": "Disabled",
-    "becomeMethod": "Escalation method",
-    "becomeUser": "Escalate to user",
     "becomePassword": "Escalation password",
     "replaceHint": "Saving replaces the whole credential, so fill in every field it needs — not only the one being changed. Leaving all of them empty keeps the stored credential as it is."
   }

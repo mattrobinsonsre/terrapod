@@ -136,9 +136,27 @@ CREDENTIAL_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key", "known_hosts"})
 
 #: The fields whose value a placeholder substitutes verbatim.
-MACHINE_VALUE_FIELDS: frozenset[str] = frozenset(
-    {"password", "user", "become", "become_method", "become_user", "become_password"}
-)
+#:
+#: SECRETS ONLY, and that is the whole design rule (#2413 F9): a credential
+#: holds what must not reach the resolved inventory, and everything else is an
+#: inventory variable. `user`, `become`, `become_method` and `become_user`
+#: used to be here and are gone, because they failed that test on their own
+#: terms -- none is secret, none is a file, and substituting one puts a plain
+#: value into the resolved inventory, which is the opposite of what
+#: `machineHint` promises this category does.
+#:
+#: The placeholder is PULL-based, so the inventory author writes
+#: `${terrapod:web-key.user}` themselves. For a non-secret that is strictly
+#: worse than writing `ansible_user: deploy` in the same file: identical
+#: visibility, one more indirection, and a second home for the value. Become
+#: settings also differ legitimately per host and per group, while a credential
+#: is referenced by name from many hosts, so holding them here pushed an
+#: inventory-shaped concern into a shared object.
+#:
+#: `become_password` STAYS even though its siblings went: it is a secret, and
+#: ansible has no `ansible_become_password_file`, so it can only ever be a
+#: variable -- which is exactly why it needs the log redactor.
+MACHINE_VALUE_FIELDS: frozenset[str] = frozenset({"password", "become_password"})
 
 MACHINE_FIELDS = MACHINE_FILE_FIELDS | MACHINE_VALUE_FIELDS
 VAULT_FIELDS = frozenset({"password"})
@@ -146,11 +164,6 @@ VAULT_FIELDS = frozenset({"password"})
 #: The fields whose value is secret, so the runner can register them with the
 #: log redactor without re-deriving which is which.
 MACHINE_SECRET_FIELDS = frozenset({"private_key", "password", "become_password"})
-
-#: `become` is a boolean in ansible; accept the strings an operator would write
-#: and refuse anything else rather than letting a typo read as false.
-_TRUE = frozenset({"true", "yes", "1", "on"})
-_FALSE = frozenset({"false", "no", "0", "off"})
 
 
 class AnsibleAuthError(ValueError):
@@ -167,20 +180,6 @@ class AnsibleAuthError(ValueError):
 def is_ansible_auth(category: str) -> bool:
     """Whether this category's value is one of the two Ansible envelopes."""
     return category in (MACHINE_CATEGORY, VAULT_CATEGORY)
-
-
-def parse_boolean(raw: str) -> bool:
-    """Ansible's own boolean spellings; raise on anything else."""
-    lowered = raw.strip().lower()
-    if lowered in _TRUE:
-        return True
-    if lowered in _FALSE:
-        return False
-    raise AnsibleAuthError(
-        f"{raw!r} is not a boolean: write one of "
-        f"{', '.join(sorted(_TRUE | _FALSE))}. A value ansible cannot read as "
-        f"true would read as false, which silently drops privilege escalation."
-    )
 
 
 def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
@@ -234,9 +233,6 @@ def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
                 f"{field!r} must be a string; a {type(field_value).__name__} cannot be "
                 f"written to a credential file or an inventory variable"
             )
-    if "become" in parsed:
-        parse_boolean(parsed["become"])
-
     _validate_name(category, key)
 
     if category == VAULT_CATEGORY:
