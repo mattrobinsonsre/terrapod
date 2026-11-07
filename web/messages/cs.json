@@ -3028,7 +3028,7 @@
         "label": "Sekce inventáře",
         "hosts": "Hostitelé",
         "groups": "Skupiny",
-        "vars": "Proměnné",
+        "vars": "Proměnné inventáře",
         "resolved": "Vyhodnoceno"
       },
       "actions": {
