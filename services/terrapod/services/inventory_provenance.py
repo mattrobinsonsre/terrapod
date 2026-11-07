@@ -129,6 +129,20 @@ def _ancestry(group: str, children: dict[str, list[str]]) -> list[str]:
             continue
         seen.append(node)
         frontier.extend(parents.get(node, []))
+
+    # `all` is ROOTED IMPLICITLY, and it has to be: it is ansible's own root, so
+    # it is deliberately absent from the declared structure -- the resolved
+    # payload's `group-children` for a real two-level inventory is
+    # `{"prod": ["prod_web"]}` and nothing above it.
+    #
+    # Without this, a variable from `group_vars/all` -- which is what the
+    # workspace's own global vars render to -- finds no level in the chain and
+    # reports `here`, crediting the host for a value it did not set. Measured on
+    # a live instance: `region = eu` came back `origin=here chain=(none)` where
+    # the honest answer is `all`.
+    if "all" not in seen:
+        seen.append("all")
+
     # `seen` is the group then upwards; reverse for shallowest-first.
     return list(reversed(seen))
 
