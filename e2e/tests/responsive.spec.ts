@@ -2385,33 +2385,35 @@ test.describe('Workspace form sections (#2253)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
-  test('an advanced group on the create form is shut, opens, and does not overflow', async ({
-    page,
-  }) => {
-    // The collapsing mechanism is a property of the CREATE form only. The
-    // Configuration tab deliberately passes `advanced` to no group — two of its
-    // groups are all-advanced and existing specs assert their fields visible —
-    // so an earlier version of this test drove `?tab=configuration` and waited
-    // for a `<details>` that page never renders.
+  test('every group on the create form is open, with no interaction needed', async ({ page }) => {
+    // This test used to assert the opposite. `diagnostics` was all-`advanced`,
+    // so the create form rendered it as a shut `<details>` with a derived
+    // summary of what it held, and the assertion was that it started closed and
+    // opened on click.
     //
-    // `diagnostics` is all-advanced (debug mode, Slack channel), so the derived
-    // rule collapses it. What a shut group ANNOUNCES is unit-tested instead, in
-    // web/tests/workspace-field-logic.test.ts, against both the array and the
-    // map shape — which is the stronger test, and the only place the map shape
-    // is covered. A fresh create form has nothing set, so there is no count to
-    // surface here and asserting one would be asserting the fixture.
+    // #2413 F4 withdrew that: *"sections make the complex forms navigable even
+    // without collapsing or hiding anything and I stand by that"*. So the
+    // stronger assertion is the one that now holds — the group's own FIELDS are
+    // visible with nothing clicked, which is what "nothing is hidden" means on
+    // a form, and there is no `<details>` left on the page to open.
+    //
+    // At phone width, which is where it would break: this is the project that
+    // keeps meeting a grid item refusing to shrink below its content without
+    // `min-w-0`.
     await page.goto('/workspaces')
     await page.getByRole('button', { name: 'New Workspace' }).click()
 
-    const group = page.getByTestId('ws-adv-diagnostics')
+    const group = page.getByTestId('ws-group-diagnostics')
     await expect(group).toBeVisible({ timeout: 15_000 })
-    await expect(group).not.toHaveAttribute('open', /.*/)
+    // Its fields, not just its heading. A section that renders empty would
+    // satisfy a visibility check on the wrapper alone.
+    await expect(page.getByTestId('ws-debug-mode')).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
-    // Open it: the fields appear and the page still does not scroll sideways.
-    await group.locator('summary').click()
-    await expect(group).toHaveAttribute('open', /.*/)
-    await expectNoHorizontalPageScroll(page)
+    // Nothing on this form collapses, so there is nothing to open. Asserted
+    // rather than implied: the `<details>` idiom returning to one group is how
+    // it would return to all of them.
+    await expect(page.locator('form details')).toHaveCount(0)
   })
 
   test('the create form offers the sections too, and fits a phone', async ({ page }) => {

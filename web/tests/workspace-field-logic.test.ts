@@ -12,15 +12,13 @@
 // feeds `disabled` rather than a render decision, and the render decision is
 // `fieldApplies`, which is ENGINE applicability and nothing else.
 //
-// `groupSummary` decides what a COLLAPSED group admits to holding, and it is
-// the one design property #2253 says to settle before any markup moves: a
-// collapsed group must not conceal a non-default value. Its whole point is
-// that it is DERIVED from the value — a count for a list, set/unset for an
-// optional scalar — and never from a copy of the model's defaults, because one
-// copy of those already exists in `admin/autodiscovery/page.tsx` and a second
-// would be the kind of ledger this repo keeps learning drifts.
+// `groupSummary` used to be the second piece of logic here, deciding what a
+// COLLAPSED group admitted to holding so it could not conceal a non-default
+// value. It is gone with the collapsing (#2413 F4): nothing collapses, so
+// nothing stands in place of a group’s own fields and there is nothing to
+// summarise.
 //
-// Neither could be unit-tested while they lived in a file holding JSX, since
+// It could not be unit-tested while it lived in a file holding JSX, since
 // the runner is bare `node --test` with no transpiler. That is why the table
 // moved to `src/lib`.
 //
@@ -38,7 +36,6 @@ import {
   fieldApplies,
   fieldGateMet,
   groupFields,
-  groupSummary,
   toAttributes,
 } from '../src/lib/workspace-fields.ts'
 
@@ -68,101 +65,13 @@ test('an ABSENT gate reads as off, which is the fail-closed direction', () => {
   assert.equal(dependencyMet(interval, { 'drift-detection-enabled': 'false' }), false)
 })
 
-test('a counted field surfaces a COUNT while its group is shut — ARRAY shape', () => {
-  const held = groupSummary('metadata', 'terraform', { 'var-files': ['a.tfvars', 'b.tfvars'] }, label)
-  const vf = held.find((h) => h.attr === 'var-files')
-  assert.ok(vf, 'var-files should be summarised')
-  assert.match(vf.text, /2/)
-})
-
-test('a counted field surfaces a COUNT — MAP shape, which is what labels really is', () => {
-  // `labels` is `Mapped[dict[str, Any]]` and `oidc-audiences` is
-  // `Mapped[dict[str, list[str]]]`. An earlier version of this test passed an
-  // ARRAY for labels -- a shape that never occurs -- so it passed while the
-  // implementation reported 0 for every map and a collapsed group holding
-  // labels concealed them. The fixture shape is the whole assertion here.
-  const held = groupSummary(
-    'metadata',
-    'terraform',
-    { labels: { team: 'platform', tier: 'prod', owner: 'sre' } },
-    label,
-  )
-  const labels = held.find((h) => h.attr === 'labels')
-  assert.ok(labels, 'a map-valued field must be summarised, not silently counted as 0')
-  assert.match(labels.text, /3/)
-
-  const auds = groupSummary(
-    'cloudIdentity',
-    'terraform',
-    { 'oidc-audiences': { aws: ['sts.amazonaws.com'], azurerm: ['api://AzureADTokenExchange'] } },
-    label,
-  )
-  assert.ok(auds.some((h) => h.attr === 'oidc-audiences'))
-  assert.match(auds.find((h) => h.attr === 'oidc-audiences')!.text, /2/)
-})
-
-test('an empty collection says nothing, in either shape', () => {
-  assert.deepEqual(groupSummary('metadata', 'terraform', { labels: {} }, label), [])
-  assert.deepEqual(groupSummary('metadata', 'terraform', { 'var-files': [] }, label), [])
-  assert.deepEqual(groupSummary('metadata', 'terraform', {}, label), [])
-})
-
-test('an optional scalar surfaces as set, and only when set', () => {
-  const set = groupSummary('diagnostics', 'terraform', { 'slack-channel': '#ops' }, label)
-  assert.ok(
-    set.some((h) => h.attr === 'slack-channel'),
-    'a set channel should be announced',
-  )
-  for (const empty of ['', undefined, null, 0]) {
-    assert.deepEqual(
-      groupSummary('diagnostics', 'terraform', { 'slack-channel': empty }, label),
-      [],
-      `an empty channel (${JSON.stringify(empty)}) must not be announced`,
-    )
-  }
-})
-
-test('NO default is ever consulted — a value equal to its default is not announced', () => {
-  // The property the whole design rests on. `parallelism` is 10 by default and
-  // carries no `summary`, so it cannot be announced at all and nothing here
-  // needs to know what 10 means. If a defaults table ever creeps in, the
-  // natural first step is giving one of these three a summary — which this
-  // asserts is not the case.
-  for (const attr of ['parallelism', 'resource-cpu', 'resource-memory']) {
-    const spec = FIELD_BY_ATTR[attr]
-    assert.ok(spec, `${attr} should be declared`)
-    assert.equal(
-      spec.summary ?? 'none',
-      'none',
-      `${attr} has a real default, so it must never be summarised — and must never be collapsed`,
-    )
-    assert.notEqual(
-      spec.advanced,
-      true,
-      `${attr} has a real default a count cannot express, so it must stay expanded`,
-    )
-  }
-})
-
-test('a summary skips a field whose gate is off', () => {
-  // Otherwise a collapsed Ansible group would announce inventory paths on a
-  // workspace with configure switched off, i.e. advertise a value that is not
-  // in play.
-  const off = groupSummary(
-    'ansible',
-    'terraform',
-    { 'configure-enabled': false, 'inventory-paths': ['hosts.d'] },
-    label,
-  )
-  assert.deepEqual(off, [])
-  const on = groupSummary(
-    'ansible',
-    'terraform',
-    { 'configure-enabled': true, 'inventory-paths': ['hosts.d'] },
-    label,
-  )
-  assert.ok(on.some((h) => h.attr === 'inventory-paths'))
-})
+// The six `groupSummary` tests that stood here went with the collapsing
+// (#2413 F4). They asserted what a SHUT group announced -- a count for a
+// list in both its array and map shapes, set-or-unset for an optional
+// scalar, and that no defaults table was ever consulted -- which was real
+// and is now unreachable: nothing collapses, so nothing is announced in
+// place of its own fields. Deleted rather than skipped, because a test for
+// a mechanism that does not exist is the same debt as a flag nothing reads.
 
 test('groupFields filters by engine', () => {
   const tfExec = groupFields('execution', 'terraform').map((f) => f.attr)
