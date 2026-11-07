@@ -297,7 +297,7 @@ export function VariableEditPanel({
           </button>
         </div>
       </div>
-      <PhaseSlotNote namespace="workspaceDetail.variables" state={state} />
+      <PhaseSlotNote namespace="workspaceDetail.variables" />
       {saveError && (
         <p
           role="alert"

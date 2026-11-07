@@ -842,7 +842,6 @@ export default function VariableSetDetailPage() {
                         row rather than squeezing it between two checkboxes. */}
                     <PhaseSlotNote
                       namespace="adminVariableSets.detail"
-                      state={phaseSlots}
                       className="w-full text-xs text-slate-500"
                     />
                   </div>

@@ -524,21 +524,28 @@ export default function AdminCatalogPage() {
                   </label>
                   <p className="mt-1 text-xs text-slate-500">{t('form.configureEnabledHint')}</p>
 
-                  {f.configureEnabled && (
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Rendered whether or not configure is on, DISABLED until it
+                      is (#2413 F20). Behind the checkbox these were invisible
+                      inside a form that is itself behind a button, so an
+                      operator met an empty heading with one tick-box and no
+                      sign that three more fields -- one of them REQUIRED --
+                      were waiting. Seeing them is how you learn what
+                      provisioning a configure asks of you. */}
+                    <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3${f.configureEnabled ? '' : ' opacity-60'}`}>
                       <div className="min-w-0 sm:col-span-2">
                         <label htmlFor="cat-ansible-dir" className="block text-sm font-medium text-slate-300 mb-1">
                           {t('form.ansibleDirectory')}<span className="text-red-400 ms-0.5">*</span>
                         </label>
-                        <input id="cat-ansible-dir" type="text" value={f.ansibleDirectory}
-                          onChange={(e) => setF({ ...f, ansibleDirectory: e.target.value })} required
+                        <input id="cat-ansible-dir" type="text" disabled={!f.configureEnabled} value={f.ansibleDirectory}
+                          onChange={(e) => setF({ ...f, ansibleDirectory: e.target.value })}
+                          required={f.configureEnabled}
                           placeholder="ansible" // i18n-ignore: an example path, not UX copy
                           className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                         <p className="mt-1 text-xs text-slate-500">{t('form.ansibleDirectoryHint')}</p>
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="cat-playbook" className="block text-sm font-medium text-slate-300 mb-1">{t('form.defaultPlaybook')}</label>
-                        <input id="cat-playbook" type="text" value={f.defaultPlaybook}
+                        <input id="cat-playbook" type="text" disabled={!f.configureEnabled} value={f.defaultPlaybook}
                           onChange={(e) => setF({ ...f, defaultPlaybook: e.target.value })}
                           placeholder="site.yml" // i18n-ignore: an example filename, not UX copy
                           className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
@@ -546,14 +553,13 @@ export default function AdminCatalogPage() {
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="cat-limit" className="block text-sm font-medium text-slate-300 mb-1">{t('form.defaultLimit')}</label>
-                        <input id="cat-limit" type="text" value={f.defaultLimit}
+                        <input id="cat-limit" type="text" disabled={!f.configureEnabled} value={f.defaultLimit}
                           onChange={(e) => setF({ ...f, defaultLimit: e.target.value })}
                           placeholder="webservers" // i18n-ignore: an example host pattern, not UX copy
                           className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                         <p className="mt-1 text-xs text-slate-500">{t('form.defaultLimitHint')}</p>
                       </div>
                     </div>
-                  )}
                 </div>
 
                 {/* Labels */}

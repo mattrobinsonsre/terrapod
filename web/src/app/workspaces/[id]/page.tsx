@@ -3323,7 +3323,10 @@ function WorkspaceDetailContent() {
                                 : t('common.disabled')}
                             </span>
                           </label>
-                          {editTerragruntEnabled && (
+                          {/* Rendered disabled rather than hidden (#2413 F20).
+                              The registry already declares terragrunt-version as
+                              gated on terragrunt-enabled; this bespoke control
+                              hand-rolled the same gate as a hide. */}
                             <input
                               type="text"
                               value={editTerragruntVersion}
@@ -3332,8 +3335,8 @@ function WorkspaceDetailContent() {
                               pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
                               title={t('fields.terragruntVersionTitle')}
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                              disabled={!editTerragruntEnabled}
                             />
-                          )}
                         </div>
                       ) : (
                         <dd className="mt-1 text-sm text-slate-200">
@@ -4712,7 +4715,7 @@ function WorkspaceDetailContent() {
                         labelClassName="text-sm text-slate-300"
                       />
                     </div>
-                    <PhaseSlotNote namespace="workspaceDetail.variables" state={phaseSlots} />
+                    <PhaseSlotNote namespace="workspaceDetail.variables" />
                   </>
                 )}
 
@@ -4785,7 +4788,6 @@ function WorkspaceDetailContent() {
                           row rather than squeezing it between two checkboxes. */}
                       <PhaseSlotNote
                         namespace="workspaceDetail.variables"
-                        state={phaseSlots}
                         className="w-full text-xs text-slate-500"
                       />
                     </div>
