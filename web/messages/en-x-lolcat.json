@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.g. 1.11 or 1.11.5",
       "versionTitle": "Vershun in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
       "ansibleVersion": "Ansibul Vershun",
-      "ansibleVersionPlaceholder": "e.g. 2.21.5",
+      "ansibleVersionPlaceholder": "e.g. 2.21",
       "ansibleVersionTitle": "Teh ansible-core vershun for dis werkspace. Leev it empty an it followz teh deployment defawlt. srsly",
       "ansibleCollections": "Ansibul Collekshunz",
       "ansibleCollectionsHint": "Collekshunz wot gets instolled b4 a configyur runz, wun per line liek namespace.name or namespace.name:version. Dey gets instolled AFTR da configyurashun's own requyrmentz fyle an squish it, so a vershun u setted heer winz ovr wun wot was committed in da repozitree. KTHXBAI",

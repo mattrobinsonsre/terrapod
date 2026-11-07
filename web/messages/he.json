@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "לדוגמה 1.11 או 1.11.5",
       "versionTitle": "גרסה בפורמט X.Y או X.Y.Z (לדוגמה 1.11 או 1.11.5)",
       "ansibleVersion": "גרסת Ansible",
-      "ansibleVersionPlaceholder": "לדוגמה 2.21.5",
+      "ansibleVersionPlaceholder": "לדוגמה 2.21",
       "ansibleVersionTitle": "גרסת ansible-core עבור סביבת עבודה זו. השארה ריקה פועלת לפי ברירת המחדל של הפריסה.",
       "ansibleCollections": "אוספי Ansible",
       "ansibleCollectionsHint": "אוספים שמותקנים לפני הרצת configure, אחד בכל שורה בצורה namespace.name או namespace.name:version. הם מותקנים אחרי קובץ הדרישות של התצורה עצמה ודורסים אותו, ולכן גרסה שנקבעת כאן מנצחת גרסה שהוגדרה במאגר.",

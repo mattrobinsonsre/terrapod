@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.e. 1.11 neu 1.11.5",
       "versionTitle": "Fersiwn ar ffurf X.Y neu X.Y.Z (e.e. 1.11 neu 1.11.5)",
       "ansibleVersion": "Fersiwn Ansible",
-      "ansibleVersionPlaceholder": "e.e. 2.21.5",
+      "ansibleVersionPlaceholder": "e.e. 2.21",
       "ansibleVersionTitle": "Fersiwn ansible-core ar gyfer y gweithfan hon. Gadewch yn wag i ddilyn rhagosodiad y defnydd.",
       "ansibleCollections": "Casgliadau Ansible",
       "ansibleCollectionsHint": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version. Fe'u gosodir ar ôl ffeil gofynion y ffurfweddiad ei hun ac yn ei ddisodli, felly mae fersiwn a osodir yma'n trechu un a ymrwymwyd yn yr ystorfa.",

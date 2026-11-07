@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "例如 1.11 或 1.11.5",
       "versionTitle": "版本採用 X.Y 或 X.Y.Z 格式（例如 1.11 或 1.11.5）",
       "ansibleVersion": "Ansible 版本",
-      "ansibleVersionPlaceholder": "例如 2.21.5",
+      "ansibleVersionPlaceholder": "例如 2.21",
       "ansibleVersionTitle": "此工作區使用的 ansible-core 版本。留空則遵循部署預設設定。",
       "ansibleCollections": "Ansible 集合",
       "ansibleCollectionsHint": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。它們會在組態本身的 requirements 檔案之後安裝並覆寫該檔案，因此此處設定的版本優先於存放庫中提交的版本。",

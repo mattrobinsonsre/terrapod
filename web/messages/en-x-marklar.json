@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.g. 1.11 or 1.11.5",
       "versionTitle": "Marklar in X.Y or X.Y.Z marklar (e.g. 1.11 or 1.11.5)",
       "ansibleVersion": "Marklar marklar",
-      "ansibleVersionPlaceholder": "e.g. 2.21.5",
+      "ansibleVersionPlaceholder": "e.g. 2.21",
       "ansibleVersionTitle": "The ansible-core marklar for this marklar. Leave empty to follow the marklar default.",
       "ansibleCollections": "Ansible marklars",
       "ansibleCollectionsHint": "Marklars installed before a marklar runs, one per marklar as namespace.name or namespace.name:version. They are installed after the marklar's own marklar marklar and override it, so a marklar set here wins over one committed in the marklar.",

@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "f.eks. 1.11 eller 1.11.5",
       "versionTitle": "Versjon i formatet X.Y eller X.Y.Z (f.eks. 1.11 eller 1.11.5)",
       "ansibleVersion": "Ansible-versjon",
-      "ansibleVersionPlaceholder": "f.eks. 2.21.5",
+      "ansibleVersionPlaceholder": "f.eks. 2.21",
       "ansibleVersionTitle": "ansible-core-versjonen for dette arbeidsområdet. La feltet stå tomt for å følge utrullingsstandarden.",
       "ansibleCollections": "Ansible-samlinger",
       "ansibleCollectionsHint": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version. De installeres etter konfigurasjonens egen requirements-fil og overstyrer den, så en versjon satt her vinner over en som er sjekket inn i repoet.",

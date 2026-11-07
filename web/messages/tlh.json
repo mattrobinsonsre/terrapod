@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "Da 1.11 joq 1.11.5",
       "versionTitle": "X.Y joq X.Y.Z mI' (Da 1.11 joq 1.11.5)",
       "ansibleVersion": "Ansible mI''",
-      "ansibleVersionPlaceholder": "Da 2.21.5",
+      "ansibleVersionPlaceholder": "Da 2.21",
       "ansibleVersionTitle": "Qumwo''vam ansible-core mI''. chIm chugh, nISwI'' motlh tlha''.",
       "ansibleCollections": "Ansible ghomHom",
       "ansibleCollectionsHint": "configure qaSpa' lan ta'lu'bogh ghomHommey, wa' per Dagh namespace.name ghap namespace.name:version. configuration poQbogh tetlh tlhap ghoDpu'DI' lan lu', vaj naDev Qorgh mI'' repository-Daq QormoHbogh mI'' lunuqDI'.",

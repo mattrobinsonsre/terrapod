@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "مثلاً 1.11 یا 1.11.5",
       "versionTitle": "نسخه در قالب X.Y یا X.Y.Z (مثلاً 1.11 یا 1.11.5)",
       "ansibleVersion": "نسخه Ansible",
-      "ansibleVersionPlaceholder": "مثلاً 2.21.5",
+      "ansibleVersionPlaceholder": "مثلاً 2.21",
       "ansibleVersionTitle": "نسخه ansible-core برای این فضای کاری. خالی بگذارید تا از پیش‌فرض استقرار پیروی شود.",
       "ansibleCollections": "مجموعه‌های Ansible",
       "ansibleCollectionsHint": "مجموعه‌هایی که پیش از اجرای configure نصب می‌شوند، در هر خط یکی به شکل namespace.name یا namespace.name:version. آن‌ها پس از فایل نیازمندی‌های خودِ پیکربندی نصب می‌شوند و آن را بازنویسی می‌کنند، بنابراین نسخه‌ای که اینجا تعیین شود بر نسخهٔ ثبت‌شده در مخزن اولویت دارد.",

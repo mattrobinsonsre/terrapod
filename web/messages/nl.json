@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "bijv. 1.11 of 1.11.5",
       "versionTitle": "Versie in het formaat X.Y of X.Y.Z (bijv. 1.11 of 1.11.5)",
       "ansibleVersion": "Ansible-versie",
-      "ansibleVersionPlaceholder": "bijv. 2.21.5",
+      "ansibleVersionPlaceholder": "bijv. 2.21",
       "ansibleVersionTitle": "De ansible-core-versie voor deze workspace. Laat leeg om de standaard van de deployment te volgen.",
       "ansibleCollections": "Ansible-collections",
       "ansibleCollectionsHint": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version. Ze worden na het requirements-bestand van de configuratie zelf geïnstalleerd en overschrijven dat, dus een versie die hier is ingesteld wint van een die in de repository is vastgelegd.",
