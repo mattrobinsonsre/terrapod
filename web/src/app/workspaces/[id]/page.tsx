@@ -19,6 +19,8 @@ import {
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
+import { modeFromFlags } from '@/lib/dynamic-inventory'
 import { explainingPhase } from '@/lib/run-phases'
 import { RunKindSplitButton, type RunKindOption } from '@/components/run-kind-split-button'
 import { availableRunKinds, type RunKindId } from '@/lib/run-kinds'
@@ -2756,8 +2758,7 @@ function WorkspaceDetailContent() {
     'configure-all-hosts': 'fields.configureAllHostsHint',
     'config-directory': 'fields.configDirectoryTitle',
     'inventory-paths': 'fields.inventoryPathsHint',
-    'dynamic-inventory-enabled': 'fields.dynamicInventoryEnabledHint',
-    'inventory-scripts-enabled': 'fields.inventoryScriptsEnabledHint',
+    'dynamic-inventory-enabled': 'fields.dynamicInventoryModeHint',
     'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
@@ -2977,6 +2978,32 @@ function WorkspaceDetailContent() {
       {Boolean(settingsValues[attr] ?? fallback) ? t('common.enabled') : t('common.disabled')}
     </span>
   )
+
+  /** The dynamic-inventory MODE in view mode (#2413 F19).
+   *
+   *  Its own display rather than `toggleDisplay`, because the field reads two
+   *  attributes: a per-attribute Enabled/Disabled would show half of what the
+   *  control writes, and on the pair that lets third-party code run on a runner
+   *  half an answer is the wrong kind of wrong. */
+  const dynamicInventoryDisplay = (): ReactNode => {
+    const mode = modeFromFlags(
+      settingsValues['dynamic-inventory-enabled'] === true,
+      settingsValues['inventory-scripts-enabled'] === true,
+    )
+    return (
+      <span data-testid="ws-dynamic-inventory-mode-display">
+        {t(
+          mode === 'both'
+            ? 'fields.dynamicInventoryModeBoth'
+            : mode === 'plugins'
+              ? 'fields.dynamicInventoryModePlugins'
+              : mode === 'scripts'
+                ? 'fields.dynamicInventoryModeScripts'
+                : 'fields.dynamicInventoryModeNone',
+        )}
+      </span>
+    )
+  }
 
   /** The Enabled/Disabled toggle for a card that PATCHes on change.
    *
@@ -3717,19 +3744,19 @@ function WorkspaceDetailContent() {
                       runner (#2033). Terrapod itself never runs either kind,
                       in either state -- off means a plugin source is refused
                       by name rather than resolving to a partial host set. */}
+                  {/* ONE ordered select over both grants (#2413 F19). Four
+                      options, not the finding's three: `scripts` without
+                      `plugins` is a real configuration -- see
+                      `lib/dynamic-inventory.ts` for the measurement. The second
+                      attribute is still written, by the control rather than by
+                      a Field of its own, and still appears in this file's state
+                      and payload. */}
                   <Field
                     attr="dynamic-inventory-enabled"
                     ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('dynamic-inventory-enabled', false)}
-                    control={settingsToggle('dynamic-inventory-enabled')}
-                  />
-                  <Field
-                    attr="inventory-scripts-enabled"
-                    ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('inventory-scripts-enabled', false)}
-                    control={settingsToggle('inventory-scripts-enabled')}
+                    kind="select"
+                    display={dynamicInventoryDisplay()}
+                    control={<DynamicInventorySelect ctx={ansibleCtx} />}
                   />
                   {/* Whether a configure verifies the host key of the hosts
                       it targets (#2318). The `toggleDisplay` fallback is TRUE,

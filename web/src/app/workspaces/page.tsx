@@ -45,6 +45,7 @@ import {
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   OidcAudiencesEditor,
@@ -1055,9 +1056,7 @@ function WorkspacesPageInner() {
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return tieredHint(tDetail, 'fields.dynamicInventoryEnabledHint')
-      case 'inventory-scripts-enabled':
-        return tieredHint(tDetail, 'fields.inventoryScriptsEnabledHint')
+        return hintText(tDetail('fields.dynamicInventoryModeHint'))
       case 'ansible-host-key-checking':
         return tieredHint(tDetail, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-collections':
@@ -1379,8 +1378,17 @@ function WorkspacesPageInner() {
         />
         {/* Which inventory sources ansible may resolve on the runner
             (#2033). Terrapod itself never runs either kind, in either state. */}
-        <Field attr="dynamic-inventory-enabled" ctx={createCtx} kind="checkbox" />
-        <Field attr="inventory-scripts-enabled" ctx={createCtx} kind="checkbox" />
+        {/* ONE ordered select over both grants (#2413 F19). Four options, not
+            the finding's three: `scripts` without `plugins` is a real
+            configuration -- see `lib/dynamic-inventory.ts`. The second
+            attribute is still written, by the control rather than by a Field
+            of its own. */}
+        <Field
+          attr="dynamic-inventory-enabled"
+          ctx={createCtx}
+          kind="select"
+          control={<DynamicInventorySelect ctx={createCtx} />}
+        />
         {/* Whether a configure verifies the host key of the hosts it targets
             (#2318). On is ansible's own behaviour; `createDefaults` seeds it
             so the box shows that rather than reading as off. */}

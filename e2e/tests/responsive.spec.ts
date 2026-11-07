@@ -2542,6 +2542,45 @@ test.describe('Workspace form sections (#2253)', () => {
     await expect(page.locator('form details')).toHaveCount(0)
   })
 
+  test('dynamic inventory is ONE ordered select with four options (#2413 F19)', async ({
+    page,
+  }) => {
+    // Two adjacent booleans became one ordered control, on the only two
+    // settings that let third-party code run on a runner -- which is what made
+    // their combination worth being legible.
+    //
+    // FOUR options, not the finding's three. `scripts` without `plugins` is a
+    // real configuration: the runner's `_enabled_plugins` appends the two
+    // independently and yields `script,yaml,ini`, so a tri-state would delete a
+    // state. Asserting the COUNT is the guard against that -- a later
+    // "simplification" to three would pass a check that only looked for the
+    // control.
+    await page.goto('/workspaces')
+    await page.getByRole('button', { name: 'New Workspace' }).click()
+
+    const select = page.getByTestId('ws-dynamic-inventory-mode')
+    await expect(select).toBeVisible({ timeout: 15_000 })
+    await expect(select.locator('option')).toHaveCount(4)
+
+    // Ordered by what it permits, so the default is first and the most
+    // permissive is last. The order IS the control, so it is asserted.
+    await expect(select.locator('option').nth(0)).toHaveText('None')
+    await expect(select.locator('option').nth(3)).toHaveText(
+      'Declared plugins and executable scripts',
+    )
+
+    // The second control is GONE rather than merely unused: leaving one behind
+    // would let the pair disagree.
+    await expect(page.getByTestId('ws-inventory-scripts-enabled')).toHaveCount(0)
+
+    // And it is usable at phone width, which is where a four-option select
+    // with a long last label would push a page sideways.
+    await select.selectOption('both')
+    await expect(select).toHaveValue('both')
+    await expectNoHorizontalPageScroll(page)
+  })
+
+
   test('the create form offers the sections too, and fits a phone', async ({ page }) => {
     // The headline of #2253: create offered 13 controls against ~50 accepted
     // attributes, so an operator could not set Operations, Ansible, drift, AI

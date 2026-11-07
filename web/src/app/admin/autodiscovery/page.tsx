@@ -35,6 +35,7 @@ import {
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
@@ -1094,9 +1095,7 @@ export default function AutodiscoveryPage() {
       case 'inventory-paths':
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return tieredHint(tWs, 'fields.dynamicInventoryEnabledHint')
-      case 'inventory-scripts-enabled':
-        return tieredHint(tWs, 'fields.inventoryScriptsEnabledHint')
+        return hintText(tWs('fields.dynamicInventoryModeHint'))
       case 'ansible-host-key-checking':
         return tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-version':
@@ -1331,8 +1330,16 @@ export default function AutodiscoveryPage() {
         />
         {/* Which inventory sources ansible may resolve on the runner (#2033).
             Terrapod itself never runs either kind, in either state. */}
-        <RuleYesNo attr="dynamic-inventory-enabled" ctx={ruleCtx} />
-        <RuleYesNo attr="inventory-scripts-enabled" ctx={ruleCtx} />
+        {/* ONE ordered select over both grants (#2413 F19), replacing two
+            yes/no selects whose combination nobody could reason about -- on the
+            only two settings that let third-party code run on a runner. Four
+            options, not the finding's three. */}
+        <Field
+          attr="dynamic-inventory-enabled"
+          ctx={ruleCtx}
+          kind="select"
+          control={<DynamicInventorySelect ctx={ruleCtx} />}
+        />
         {/* Defaults to yes, which is both the rule column's default and
             ansible's own behaviour (#2318). */}
         <RuleYesNo attr="ansible-host-key-checking" ctx={ruleCtx} />
