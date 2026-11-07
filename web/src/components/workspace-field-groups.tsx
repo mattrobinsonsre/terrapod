@@ -40,7 +40,8 @@ import {
   EDIT_INPUT,
   FIELD_BY_ATTR,
   WsField,
-  dependencyMet,
+  fieldApplies,
+  fieldGateMet,
   groupFields,
   groupSummary,
   type FieldMode,
@@ -69,13 +70,6 @@ export interface GroupCtx {
 
 const inputClass = (mode: FieldMode) => (mode === 'create' ? CREATE_INPUT : EDIT_INPUT)
 
-/** Whether this field is rendered at all: engine applies, and its gate is on. */
-function shown(attr: string, ctx: GroupCtx): boolean {
-  const spec = FIELD_BY_ATTR[attr]
-  if (!spec) return false
-  if (spec.engines && !spec.engines.includes(ctx.engine)) return false
-  return dependencyMet(spec, ctx.values)
-}
 
 /**
  * One control, chosen by kind.
@@ -106,7 +100,7 @@ function Control({
   const spec = FIELD_BY_ATTR[attr]
   const id = spec?.id ?? attr
   const v = ctx.values[attr]
-  const disabled = ctx.busy || ctx.readOnly?.has(attr)
+  const disabled = ctx.busy || ctx.readOnly?.has(attr) || !fieldGateMet(attr, ctx.values)
   const cls = inputClass(ctx.mode)
 
   if (kind === 'list') {
@@ -220,7 +214,7 @@ export function Field({
    */
   control?: ReactNode
 }) {
-  if (!shown(attr, ctx)) return null
+  if (!fieldApplies(attr, ctx.engine)) return null
   const spec = FIELD_BY_ATTR[attr]
   const v = ctx.values[attr]
   const shownValue =
@@ -290,8 +284,9 @@ export function Group({
   advanced?: boolean
   children: ReactNode
 }) {
-  // Nothing applies to this engine, or every field is behind an off gate.
-  const any = groupFields(id, ctx.engine).some((f) => shown(f.attr, ctx))
+  // Nothing here applies to this engine. A group whose every field is merely
+  // behind an OFF GATE still renders, with those fields disabled (#2413 F20).
+  const any = groupFields(id, ctx.engine).some((f) => fieldApplies(f.attr, ctx.engine))
   if (!any) return null
 
   const body = (

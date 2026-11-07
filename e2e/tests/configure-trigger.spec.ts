@@ -37,17 +37,25 @@ function captureAndDismiss(page: import('@playwright/test').Page): { text: strin
 }
 
 test.describe('Configure triggers', () => {
-  test('a workspace with no configure operation shows neither trigger', async ({ page }) => {
+  test('a workspace with no configure operation shows both triggers disabled', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2enotrig'))
 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
-    // The gate. Neither control exists, because neither can do anything
-    // without `configure-enabled`.
-    await expect(page.getByTestId('ws-auto-configure-enabled')).toHaveCount(0)
-    await expect(page.getByTestId('ws-configure-after-apply')).toHaveCount(0)
+    // The gate is off, so neither control can do anything -- and both are
+    // still RENDERED, disabled (#2413 F20). Nothing on this form is hidden by
+    // a gate: an operator learns the option exists by seeing it, and the
+    // disabled state says it is not available yet rather than not existing.
+    //
+    // Asserted as present AND disabled rather than merely present, because
+    // present-and-editable is the defect this replaced a hide with: a control
+    // that cannot work must not accept input.
+    for (const id of ['ws-auto-configure-enabled', 'ws-configure-after-apply']) {
+      await expect(page.getByTestId(id)).toBeVisible()
+      await expect(page.getByTestId(id)).toBeDisabled()
+    }
   })
 
   test('the triggers appear once configure is declared, and round-trip', async ({ page }) => {

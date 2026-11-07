@@ -1,8 +1,16 @@
 // The two pieces of real logic behind the shared workspace forms (#2253).
 //
-// `dependencyMet` decides whether a field is MEANINGFUL — it is what replaced
-// the old disable-and-explain idiom, so with drift off the interval input is
-// absent rather than rendered showing an 86400 it is not using.
+// `dependencyMet` decides whether a field is MEANINGFUL. It used to decide
+// whether the field was RENDERED at all — #2253 replaced a disable-and-explain
+// idiom with hiding, on the grounds that a disabled interval input still shows
+// an 86400 it is not using.
+//
+// #2413 F20 reverses that: nothing on these forms is hidden by a gate, because
+// seeing an option is how an operator learns it exists. The 86400 objection is
+// real and did not go away — it is answered by the field's hint saying the
+// value is not in effect, not by removing the control. So `dependencyMet` now
+// feeds `disabled` rather than a render decision, and the render decision is
+// `fieldApplies`, which is ENGINE applicability and nothing else.
 //
 // `groupSummary` decides what a COLLAPSED group admits to holding, and it is
 // the one design property #2253 says to settle before any markup moves: a
@@ -25,6 +33,8 @@ import {
   FIELD_BY_ATTR,
   FIELDS,
   dependencyMet,
+  fieldApplies,
+  fieldGateMet,
   groupFields,
   groupSummary,
   toAttributes,
@@ -209,4 +219,40 @@ test('every declared field belongs to a declared group', () => {
     const members = groupFields(id, 'terraform').concat(groupFields(id, 'pulumi'))
     assert.ok(members.length > 0, `group ${id} has no fields on either engine`)
   }
+})
+
+
+// ── The #2413 F20 split: engine hides, a gate only disables ────────────────
+//
+// `terragrunt-version` is the field that exercises both halves at once: it is
+// restricted to Terraform AND gated on `terragrunt-enabled`. Collapsing the two
+// predicates back together would put dead Terraform controls on every Pulumi
+// workspace, which is what these assertions exist to stop.
+
+test('a gated field still APPLIES when its gate is off — the gate only disables', () => {
+  // The load-bearing one. If `fieldApplies` ever consults the gate again, this
+  // fails, and the form goes back to hiding what it should be disabling.
+  assert.equal(fieldApplies('terragrunt-version', 'terraform'), true)
+  assert.equal(fieldGateMet('terragrunt-version', {}), false)
+  assert.equal(fieldApplies('ansible-version', 'terraform'), true)
+  assert.equal(fieldGateMet('ansible-version', {}), false)
+})
+
+test('a field belonging to another engine does NOT apply, so it stays hidden', () => {
+  assert.equal(fieldApplies('terragrunt-version', 'pulumi'), false)
+  assert.equal(fieldApplies('pulumi-bind-plan', 'terraform'), false)
+  assert.equal(fieldApplies('pulumi-bind-plan', 'pulumi'), true)
+})
+
+test('a gate being ON does not change applicability either way', () => {
+  assert.equal(fieldApplies('terragrunt-version', 'terraform'), true)
+  assert.equal(fieldGateMet('terragrunt-version', { 'terragrunt-enabled': true }), true)
+  assert.equal(fieldApplies('terragrunt-version', 'pulumi'), false)
+  assert.equal(fieldGateMet('terragrunt-version', { 'terragrunt-enabled': true }), true)
+})
+
+test('both predicates fail closed on an attribute nothing describes', () => {
+  // A control nothing declares must not render and must not be editable.
+  assert.equal(fieldApplies('no-such-attribute', 'terraform'), false)
+  assert.equal(fieldGateMet('no-such-attribute', {}), false)
 })

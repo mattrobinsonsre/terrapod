@@ -25,7 +25,7 @@ import {
 } from '@/components/template-editors'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch, fetchAllPages } from '@/lib/api'
+import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { parseCollectionLines } from '@/lib/ansible-collections'
 
 interface WorkspaceSummary {
@@ -364,8 +364,10 @@ export default function BulkUpdatePage() {
         body: JSON.stringify({ filter: buildFilter() }),
       })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || t('errors.searchFailed', { status: res.status }))
+        // `parseApiError`, not `data.detail` (#2413 F2): a FastAPI validation
+        // error carries `detail` as an ARRAY, which renders as [object Object]
+        // through a bare `||`. The helper knows all four shapes the API emits.
+        throw new Error(await parseApiError(res, t('errors.search')))
       }
       setSearchResult(await res.json())
     } catch (err) {
@@ -391,8 +393,7 @@ export default function BulkUpdatePage() {
         }),
       })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || t('errors.bulkUpdateFailed', { status: res.status }))
+        throw new Error(await parseApiError(res, t('errors.bulkUpdate')))
       }
       const json = await res.json()
       if (json.dry_run) setDryResult(json as DryRunResult)
