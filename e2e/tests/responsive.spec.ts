@@ -2326,9 +2326,18 @@ test.describe('Per-host results (#1928)', () => {
     const notReached = page.getByText('Not reached', { exact: true }).filter({ visible: true });
     await expect(notReached).toHaveCount(1, { timeout: 10_000 });
     await expect(notReached).toBeVisible();
+    // Scoped to the CARD, which is what this test is about at phone width.
+    // An unscoped `getByText('hdead', { exact: true })` was unambiguous only
+    // while the outstanding-hosts banner printed its names as one joined text
+    // node. F16 above makes each name its own button, so the bare locator
+    // matches the banner's link as well as the card and fails strict mode ---
+    // which this spec's own next assertion already anticipates for the retry
+    // BUTTON, for the same reason. Asserting the card is also the stronger
+    // statement: "some element says hdead" would pass with the card list
+    // absent, which is the one thing a phone-width test is about.
     await expect(
-      page.getByText('hdead', { exact: true }).filter({ visible: true }),
-    ).toBeVisible();
+      page.getByRole('listitem').filter({ hasText: 'hdead' }).filter({ visible: true }),
+    ).toHaveCount(1);
 
     // The outstanding-hosts banner and its action (#1973). Scoped to visible
     // for the same reason as above, and matched on the BUTTON rather than on
