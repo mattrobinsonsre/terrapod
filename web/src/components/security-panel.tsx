@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { isAdmin } from '@/lib/auth'
-import { useIsTouch } from '@/lib/use-media-query'
+import { useConfirm } from '@/lib/use-confirm'
 
 interface SecurityFinding {
   file?: string
@@ -76,7 +76,7 @@ export function SecurityPanel({
   onChanged: () => void
 }) {
   const t = useTranslations('runDetail')
-  const isTouch = useIsTouch()
+  const { confirmTouchMutation } = useConfirm()
   const [attrs, setAttrs] = useState<SecurityScanAttrs | null>(null)
   const [summary, setSummary] = useState<SecuritySummaryMeta | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -132,7 +132,7 @@ export function SecurityPanel({
     // Overriding lets a blocking run apply anyway — irreversible enough to
     // guard. Native confirm() in touch mode (mis-tap hazard); precise pointer
     // proceeds (an explicit admin-only button click).
-    if (isTouch && !window.confirm(t('securityPanel.overrideConfirm'))) return
+    if (!confirmTouchMutation(t('securityPanel.overrideConfirm'))) return
     setOverriding(true)
     setErr('')
     try {

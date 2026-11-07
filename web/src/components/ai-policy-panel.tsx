@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { isAdmin } from '@/lib/auth'
-import { useIsTouch } from '@/lib/use-media-query'
+import { useConfirm } from '@/lib/use-confirm'
 import { engineWord } from '@/lib/phase-vocabulary'
 
 interface VerdictReason {
@@ -85,7 +85,7 @@ export function AIPolicyPanel({
 }) {
   const t = useTranslations('runDetail')
   const tRoot = useTranslations()
-  const isTouch = useIsTouch()
+  const { confirmTouchMutation } = useConfirm()
   const [attrs, setAttrs] = useState<AIPolicyAttrs | null>(null)
   const [meta, setMeta] = useState<AIPolicyMeta | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -166,7 +166,7 @@ export function AIPolicyPanel({
   const riskLevel = attrs['risk-level']
 
   async function override() {
-    if (isTouch && !window.confirm(engineWord(tRoot, engine, 'aiPolicyOverrideConfirm'))) return
+    if (!confirmTouchMutation(engineWord(tRoot, engine, 'aiPolicyOverrideConfirm'))) return
     setOverriding(true)
     setErr('')
     try {

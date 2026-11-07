@@ -31,8 +31,8 @@ import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { StackOutputsPanel } from '@/components/stack-outputs-panel'
 import { InventoryPanel, useInventoryPresence } from '@/components/inventory-panel'
-import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { versionToolFor } from '@/lib/engine-version'
 import { PHASE_STATUSES, engineWord, phaseKey } from '@/lib/phase-vocabulary'
@@ -658,13 +658,12 @@ function WorkspaceDetailContent() {
   const [editVaultRef, setEditVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const [addingVar, setAddingVar] = useState(false)
 
-  const isTouch = useIsTouch()
 
-  // #719 two-tier confirm policy (see AGENTS.md → Responsive → Touch model):
-  // an irreversible delete/remove prompts in BOTH modes; any other single-tap
-  // mutation prompts on touch only (a mis-tap is easy on a phone).
-  const confirmDelete = (msg: string) => window.confirm(msg)
-  const confirmTouchMutation = (msg: string) => !isTouch || window.confirm(msg)
+  // The #719 two-tier policy comes from the shared hook, not a copy of it
+  // (#2413 F13). This file used to re-implement both tiers here and hand-roll a
+  // third form inline, which is how two surfaces come to disagree about what
+  // prompts where.
+  const { confirmDelete, confirmIrreversible, confirmTouchMutation } = useConfirm()
 
   // Runs
   const [runs, setRuns] = useState<RunItem[]>([])
@@ -1621,7 +1620,7 @@ function WorkspaceDetailContent() {
   // variables — so the touch confirm guards that direction only.
   async function handleDebugModeUpdate(next: boolean) {
     if (!workspace) return
-    if (next && isTouch && !window.confirm(t('debugMode.confirmEnable'))) return
+    if (next && !confirmTouchMutation(t('debugMode.confirmEnable'))) return
     setSavingDebugMode(true)
     try {
       const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
@@ -1650,7 +1649,7 @@ function WorkspaceDetailContent() {
   // the touch confirm guards that one.
   async function handleForkPlansUpdate(next: boolean) {
     if (!workspace) return
-    if (next && isTouch && !window.confirm(t('allowForkPrPlans.confirmEnable'))) return
+    if (next && !confirmTouchMutation(t('allowForkPrPlans.confirmEnable'))) return
     setSavingForkPlans(true)
     try {
       // `/api/v1`, not the `/api/v2` this arrived from the 1.9 line carrying. The
@@ -2013,7 +2012,12 @@ function WorkspaceDetailContent() {
         ? t('runs.queueConfigureConfirmLimited', { limit: reach })
         : t('runs.queueConfigureConfirmAll')) +
       (dynamic ? ' ' + t('runs.queueConfigureConfirmDynamic') : '')
-    if (!window.confirm(msg)) return
+    // BOTH modes, deliberately unchanged here. The decision is that the run
+    // buttons prompt on touch only -- but this sentence is currently the ONLY
+    // place a configure's reach is stated, so relaxing it before #2413 F14 puts
+    // the effective limit on the page would remove the information rather than
+    // move it. The two land together.
+    if (!confirmIrreversible(msg)) return
     setQueueingConfigure(true)
     setError('')
     try {
@@ -2072,12 +2076,10 @@ function WorkspaceDetailContent() {
     // `plan + apply` run can change infrastructure), so a stray tap on a touch
     // device (any width) gets a native confirm; a precise pointer runs
     // immediately.
-    if (isTouch) {
-      const msg = planOnly
-        ? phaseWord('queuePlanConfirm')
-        : phaseWord('queueApplyConfirm')
-      if (!window.confirm(msg)) return
-    }
+    const planMsg = planOnly
+      ? phaseWord('queuePlanConfirm')
+      : phaseWord('queueApplyConfirm')
+    if (!confirmTouchMutation(planMsg)) return
     setQueueingPlan(true)
     setError('')
     try {
@@ -3321,7 +3323,10 @@ function WorkspaceDetailContent() {
                                 : t('common.disabled')}
                             </span>
                           </label>
-                          {editTerragruntEnabled && (
+                          {/* Rendered disabled rather than hidden (#2413 F20).
+                              The registry already declares terragrunt-version as
+                              gated on terragrunt-enabled; this bespoke control
+                              hand-rolled the same gate as a hide. */}
                             <input
                               type="text"
                               value={editTerragruntVersion}
@@ -3330,8 +3335,8 @@ function WorkspaceDetailContent() {
                               pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
                               title={t('fields.terragruntVersionTitle')}
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                              disabled={!editTerragruntEnabled}
                             />
-                          )}
                         </div>
                       ) : (
                         <dd className="mt-1 text-sm text-slate-200">
@@ -4710,7 +4715,7 @@ function WorkspaceDetailContent() {
                         labelClassName="text-sm text-slate-300"
                       />
                     </div>
-                    <PhaseSlotNote namespace="workspaceDetail.variables" state={phaseSlots} />
+                    <PhaseSlotNote namespace="workspaceDetail.variables" />
                   </>
                 )}
 
@@ -4783,7 +4788,6 @@ function WorkspaceDetailContent() {
                           row rather than squeezing it between two checkboxes. */}
                       <PhaseSlotNote
                         namespace="workspaceDetail.variables"
-                        state={phaseSlots}
                         className="w-full text-xs text-slate-500"
                       />
                     </div>
@@ -5322,7 +5326,18 @@ function WorkspaceDetailContent() {
                                 {phaseWord('badgePlanOnly')}
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-500">{phaseWord('typePlanApply')}</span>
+                              /* A badge like the other four, not bare text
+                                 (#2413 F11). Four of the five markers in this
+                                 cell are badges -- destroy, plan-only,
+                                 configure, saved plan -- and the DEFAULT kind
+                                 was the only one rendered as prose, so beside
+                                 them it read as an absence rather than as what
+                                 the run is. Slate keeps it the quietest of the
+                                 five, which is right for a default; being a
+                                 badge makes it the same KIND of thing. */
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300">
+                                {phaseWord('typePlanApply')}
+                              </span>
                             )}
                             {/* Additive like the saved-plan badge beside it, and
                                 for the same reason: a COMPOSITE is a plan+apply

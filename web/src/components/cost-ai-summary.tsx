@@ -23,7 +23,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, RefreshCw, TrendingDown, Sigma } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
-import { useIsTouch } from '@/lib/use-media-query'
+import { useConfirm } from '@/lib/use-confirm'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { CostSummaryChat } from '@/components/cost-summary-chat'
 import { withMarkdownSafety } from '@/lib/markdown-safety'
@@ -103,7 +103,7 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
   // previous (stale-language) content on screen under a spinner (#871/#767).
   const [translating, setTranslating] = useState(false)
   const hasContentRef = useRef(false)
-  const isTouch = useIsTouch()
+  const { confirmTouchMutation } = useConfirm()
 
   const load = useCallback(async () => {
     // A re-fetch while we already have content means the reader switched
@@ -145,7 +145,7 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
 
   const regenerate = useCallback(async () => {
     // Touch-only confirm: a mis-tap re-runs the model (#719 tier-2 mutation).
-    if (isTouch && !window.confirm(t('costAi.regenerate.confirm'))) return
+    if (!confirmTouchMutation(t('costAi.regenerate.confirm'))) return
     setRegenerating(true)
     setRegenerateError(null)
     try {
@@ -171,7 +171,7 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
     } finally {
       setRegenerating(false)
     }
-  }, [runId, isTouch, t])
+  }, [runId, confirmTouchMutation, t])
 
   // Feature off (no row ever) → render nothing at all.
   if (missing) return null

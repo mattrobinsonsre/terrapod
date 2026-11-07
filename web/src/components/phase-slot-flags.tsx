@@ -79,23 +79,30 @@ export function PhaseSlotFlags({
 }
 
 /**
- * The reason the other control is disabled, as TEXT.
+ * What the three slots mean, as TEXT.
  *
  * Not left in the `title` the labels already carry: a tooltip is hover-only,
  * so on touch — where a mis-tap is likeliest — a greyed-out checkbox would
- * have no explanation at all. Shown only while one of the two is set, which is
- * exactly when a control is disabled and the question arises.
+ * have no explanation at all.
+ *
+ * ALWAYS rendered (#2413 F20). It used to appear only once a box was ticked,
+ * on the reasoning that that is when a control becomes disabled and the
+ * question arises. The question arises earlier: the non-obvious fact is that
+ * apply-only reaches an apply AND a configure while configure-only reaches a
+ * configure alone, and whoever has not chosen yet is exactly who needs it. It
+ * takes no state now, because it describes the slots rather than the choice.
  */
 export function PhaseSlotNote({
   namespace,
-  state,
   className = 'text-xs text-slate-500',
 }: {
   namespace: string
-  state: PhaseSlotState
   className?: string
 }) {
   const t = useTranslations(namespace)
-  if (!state.applyOnly && !state.configureOnly) return null
+  // Always rendered (#2413 F20). It used to appear only once a box was ticked,
+  // which hid it from exactly the person who has not chosen yet -- and the
+  // sentence is where the non-obvious fact lives: apply-only reaches an apply
+  // AND a configure, configure-only reaches a configure alone.
   return <p className={className}>{t('phaseSlotExclusive')}</p>
 }

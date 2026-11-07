@@ -218,10 +218,14 @@ class TestTheCredentialEnvironment:
             cfg,
             work_dir=tree,
             inventory=_INV,
-            extra_env={"ANSIBLE_INVENTORY_ENABLED": "auto", "ANSIBLE_FORCE_COLOR": "1"},
+            extra_env={"ANSIBLE_INVENTORY_ENABLED": "auto", "ANSIBLE_FORCE_COLOR": "0"},
         )
         assert ee.calls[0]["env"]["ANSIBLE_INVENTORY_ENABLED"] == "yaml,ini"
-        assert ee.calls[0]["env"]["ANSIBLE_FORCE_COLOR"] == "0"
+        # The operator passes "0" and the forced set says "1" (#2413 F18), so
+        # the override is still OBSERVABLE here. Passing the same value the
+        # forced set holds would make this assertion pass without testing the
+        # merge order it exists for.
+        assert ee.calls[0]["env"]["ANSIBLE_FORCE_COLOR"] == "1"
 
     def test_no_credentials_changes_nothing(self, cfg, tree, ee):
         configure.run(cfg, work_dir=tree, inventory=_INV, extra_env={})

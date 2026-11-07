@@ -29,7 +29,7 @@ import {
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
-import { useIsTouch } from '@/lib/use-media-query'
+import { useConfirm } from '@/lib/use-confirm'
 import { ArchitectureCritiqueChat } from '@/components/architecture-critique-chat'
 import { withMarkdownSafety } from '@/lib/markdown-safety'
 
@@ -108,7 +108,7 @@ export function ArchitectureCritiquePanel({
 }) {
   const t = useTranslations('runDetail')
   const locale = useLocale()
-  const isTouch = useIsTouch()
+  const { confirmTouchMutation } = useConfirm()
   const [critique, setCritique] = useState<Critique | null>(null)
   const [absent, setAbsent] = useState(false)
   const [disabled, setDisabled] = useState(false)
@@ -154,7 +154,7 @@ export function ArchitectureCritiquePanel({
   }, [endpoint, refreshKey, locale, t])
 
   const regenerate = useCallback(async () => {
-    if (isTouch && !window.confirm(t('architecture.regenerateConfirm'))) return
+    if (!confirmTouchMutation(t('architecture.regenerateConfirm'))) return
     setRegenerating(true)
     setError(null)
     try {
@@ -167,7 +167,7 @@ export function ArchitectureCritiquePanel({
     } finally {
       setRegenerating(false)
     }
-  }, [endpoint, isTouch, t])
+  }, [endpoint, confirmTouchMutation, t])
 
   if (error) return <ErrorBanner message={error} />
   if (disabled) {
