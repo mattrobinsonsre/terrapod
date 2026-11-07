@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Configuratio {limit} attinget.",
       "queueFullRun": "Executio plena",
       "queueFullRunConfirm": "Consilium, exsecutio ET configuratio huius loci operis? Configuratio hospites veros mutat postquam exsecutio infrastructuram veram mutavit, nec inter ea recognitio separata est.",
-      "moreRunKinds": "Alia genera executionis"
+      "moreRunKinds": "Alia genera executionis",
+      "openExplainingPhase": "acta phasis quae id explicat aperire"
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

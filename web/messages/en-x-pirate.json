@@ -2926,7 +2926,8 @@
       "configureReachLimited": "A riggin’ run be boardin’ {limit}.",
       "queueFullRun": "Th’ whole voyage",
       "queueFullRunConfirm": "Chart, commit AN’ rig this here workspace? Th’ riggin’ boards real vessels after th’ commit shifts real waters, an’ there be no inspection betwixt ’em.",
-      "moreRunKinds": "Other manners o’ sailin’"
+      "moreRunKinds": "Other manners o’ sailin’",
+      "openExplainingPhase": "open th’ log o’ the stage what explains it"
     },
     "state": {
       "deleteConfirm": "Send state version #{serial} t'' Davy Jones? This cannot be undone.",

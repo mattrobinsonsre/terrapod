@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Uma configuração alcançará {limit}.",
       "queueFullRun": "Execução completa",
       "queueFullRunConfirm": "Plan, apply E configurar este workspace? A configuração altera hosts reais depois que o apply altera infraestrutura real, sem revisão entre as duas.",
-      "moreRunKinds": "Outros tipos de execução"
+      "moreRunKinds": "Outros tipos de execução",
+      "openExplainingPhase": "abrir o log da fase que explica isso"
     },
     "state": {
       "deleteConfirm": "Excluir a versão de estado #{serial}? Isso não pode ser desfeito.",

@@ -2926,7 +2926,8 @@
       "configureReachLimited": "En configure rammer {limit}.",
       "queueFullRun": "Fuld kørsel",
       "queueFullRunConfirm": "Plan, apply OG konfigurer dette arbejdsområde? Konfigurationen ændrer rigtige værter efter at apply har ændret rigtig infrastruktur, og der er ingen separat gennemgang imellem.",
-      "moreRunKinds": "Andre kørselstyper"
+      "moreRunKinds": "Andre kørselstyper",
+      "openExplainingPhase": "åbn loggen for den fase, der forklarer det"
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

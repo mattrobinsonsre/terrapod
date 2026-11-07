@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Configure 將作用於 {limit}。",
       "queueFullRun": "完整執行",
       "queueFullRunConfirm": "對此工作區執行計畫、套用與設定？套用變更真實基礎架構之後，設定會變更真實主機，兩者之間沒有獨立的審查。",
-      "moreRunKinds": "其他執行類型"
+      "moreRunKinds": "其他執行類型",
+      "openExplainingPhase": "開啟說明該結果的階段日誌"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

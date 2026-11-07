@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Een configuratie bereikt {limit}.",
       "queueFullRun": "Volledige run",
       "queueFullRunConfirm": "Plan, apply ÉN configureren voor deze workspace? Het configureren wijzigt echte hosts nadat de apply echte infrastructuur heeft gewijzigd, en er is geen tussentijdse beoordeling.",
-      "moreRunKinds": "Andere runtypen"
+      "moreRunKinds": "Andere runtypen",
+      "openExplainingPhase": "open het logboek van de fase die dit verklaart"
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",

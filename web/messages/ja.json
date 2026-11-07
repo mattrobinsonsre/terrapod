@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Configure は {limit} に適用されます。",
       "queueFullRun": "フル実行",
       "queueFullRunConfirm": "このワークスペースでプラン・適用・構成をすべて実行しますか？適用が実際のインフラを変更した後、構成が実際のホストを変更します。その間に個別のレビューはありません。",
-      "moreRunKinds": "その他の実行種別"
+      "moreRunKinds": "その他の実行種別",
+      "openExplainingPhase": "これを説明するフェーズのログを開く"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

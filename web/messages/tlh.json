@@ -2926,7 +2926,8 @@
       "configureReachLimited": "{limit} Sum configure.",
       "queueFullRun": "naQ ta",
       "queueFullRunConfirm": "nab, ta, Qum je Dalaj’a’? ta vumwI’mey teH choHpu’DI’, Qum qachmey teH choH; chaH joj Dojbe’ nughI.",
-      "moreRunKinds": "latlh ta Segh"
+      "moreRunKinds": "latlh ta Segh",
+      "openExplainingPhase": "vay' QIjbogh chevmey De'wI' qonta' poSmoH"
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

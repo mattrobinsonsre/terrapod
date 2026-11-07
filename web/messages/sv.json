@@ -2926,7 +2926,8 @@
       "configureReachLimited": "En configure når {limit}.",
       "queueFullRun": "Fullständig körning",
       "queueFullRunConfirm": "Plan, apply OCH konfigurera denna arbetsyta? Konfigurationen ändrar riktiga värdar efter att apply har ändrat riktig infrastruktur, och det finns ingen separat granskning mellan dem.",
-      "moreRunKinds": "Andra körningstyper"
+      "moreRunKinds": "Andra körningstyper",
+      "openExplainingPhase": "öppna loggen för fasen som förklarar det"
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

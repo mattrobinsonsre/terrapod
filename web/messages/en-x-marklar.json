@@ -2926,7 +2926,8 @@
       "configureReachLimited": "A marklar will reach {limit}.",
       "queueFullRun": "Marklar Marklar",
       "queueFullRunConfirm": "Marklar, marklar AND marklar this marklar? The marklar changes real marklars after the marklar changes real marklar, and there is no separate marklar between them.",
-      "moreRunKinds": "Other marklar marklars"
+      "moreRunKinds": "Other marklar marklars",
+      "openExplainingPhase": "open the marklar of the marklar that explains it"
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

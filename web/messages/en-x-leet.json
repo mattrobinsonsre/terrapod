@@ -2926,7 +2926,8 @@
       "configureReachLimited": "4 c0nf1gur3 w1ll r34ch {limit}.",
       "queueFullRun": "C0mpl373 Run",
       "queueFullRunConfirm": "Pl4n, 4pply 4ND c0nf1gur3 7h15 w0rk5p4c3? 7h3 c0nf1gur3 ch4ng35 r34l h0575 4f73r 7h3 4pply ch4ng35 r34l 1nfr4572uc7ur3, 4nd 7h3r3 15 n0 53p4r473 r3v13w b37w33n 7h3m.",
-      "moreRunKinds": "07h3r run k1nd5"
+      "moreRunKinds": "07h3r run k1nd5",
+      "openExplainingPhase": "0p3n 7h3 l0g 0f 7h3 ph453 7h47 3xpl41n5 17"
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",

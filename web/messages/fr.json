@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Une configuration touchera {limit}.",
       "queueFullRun": "Exécution complète",
       "queueFullRunConfirm": "Plan, apply ET configuration de cet espace de travail ? La configuration modifie de vrais hôtes après que l’apply a modifié de vraies infrastructures, sans revue intermédiaire.",
-      "moreRunKinds": "Autres types d’exécution"
+      "moreRunKinds": "Autres types d’exécution",
+      "openExplainingPhase": "ouvrir le journal de la phase qui l’explique"
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

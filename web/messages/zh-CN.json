@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Configure 将作用于 {limit}。",
       "queueFullRun": "完整运行",
       "queueFullRunConfirm": "对该工作区执行计划、应用和配置？应用更改真实基础设施后，配置会更改真实主机，两者之间没有单独的审查。",
-      "moreRunKinds": "其他运行类型"
+      "moreRunKinds": "其他运行类型",
+      "openExplainingPhase": "打开解释该结果的阶段日志"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

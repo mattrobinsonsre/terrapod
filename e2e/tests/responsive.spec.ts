@@ -933,6 +933,50 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('a run card lands on the phase that explains the result (#2413 F16)', async ({ page }) => {
+    // The phone half of F16, and it is a DIFFERENT mechanism from the desktop
+    // one rather than the same code at another width: `MobileCard` wraps its
+    // whole body in a `<Link>`, so a separately-tappable status badge would be
+    // interactive content nested inside an anchor. The card itself carries the
+    // view instead -- one tap target, landing where the result is explained.
+    //
+    // Nothing is lost by going deeper: the run page's own view picker is a
+    // native <select> at the top, asserted by the mobile run-page tests above.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('resp-f16'));
+    await seedRun(token, wsId);
+
+    // Stubbed, because a seeded run never starts a phase in a stack with no
+    // runner -- so unstubbed the card correctly carries no view at all, which
+    // is the negative case asserted at the end of this test.
+    await page.route('**/api/*/workspaces/*/runs*', async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json().catch(() => null);
+      if (!Array.isArray(json?.data)) return route.fulfill({ response: res });
+      for (const r of json.data) {
+        r.attributes['status-timestamps'] = {
+          'planning-at': '2026-01-01T00:00:00Z',
+          'planned-at': '2026-01-01T00:01:00Z',
+          'applying-at': '2026-01-01T00:02:00Z',
+        };
+      }
+      await route.fulfill({ response: res, json });
+    });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    const card = page.locator('a[href*="/runs/run-"]').first();
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card).toHaveAttribute('href', /\?view=apply$/);
+    await expectNoHorizontalPageScroll(page);
+
+    // And the negative: with no phase started the card must NOT invent one.
+    await page.unroute('**/api/*/workspaces/*/runs*');
+    await page.reload();
+    const plain = page.locator('a[href*="/runs/run-"]').first();
+    await expect(plain).toBeVisible({ timeout: 15_000 });
+    await expect(plain).toHaveAttribute('href', /\/runs\/run-[0-9a-f-]+$/);
+  });
+
   test('workspace cost tab has no horizontal page scroll at phone width', async ({ page }) => {
     // The Cost tab (#871) — headline card + per-resource table (which collapses
     // to stacked cards below sm). A fresh workspace has no state, so it shows

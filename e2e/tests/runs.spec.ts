@@ -15,7 +15,7 @@
  * not here — the E2E stack has no runner pool. We exercise the UI
  * surfaces with API-seeded runs.
  */
-import { test, expect, type Route } from '@playwright/test';
+import { test, expect, type Route, type Page } from '@playwright/test';
 import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
 import { queueRunKind } from '../helpers/run-kinds';
 
@@ -173,5 +173,104 @@ test.describe('Run lifecycle UI', () => {
 
     await page.goto(`/workspaces/${wsId}/runs/${runId}`);
     await expect.poll(() => engine, { timeout: 15_000 }).toBe('terraform');
+  });
+
+  // ── a result indicator carries you to what explains it (#2413 F16) ────────
+  //
+  // The maintainer's instruction: *"when you click errored on a workspace you
+  // get taken to the run which errored ... with the log view optimised for what
+  // you click on. This is important in general for ergonomics."*
+  //
+  // The phase timestamps are STUBBED into the list response, the same way the
+  // drift-remediate test above stubs a run: a seeded run never starts a phase
+  // (the E2E stack has no runner), so `status-timestamps` carries no
+  // `planning-at` and the badge is correctly a plain span with nothing to link
+  // to. Stubbing pins the UI derivation, not the phase transitions.
+
+  /** Inject phase timestamps into whatever the workspace's run list returns. */
+  async function stubRunTimestamps(page: Page, stamps: Record<string, string>) {
+    await page.route('**/api/*/workspaces/*/runs*', async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json().catch(() => null);
+      if (!Array.isArray(json?.data)) return route.fulfill({ response: res });
+      for (const r of json.data) {
+        r.attributes['status-timestamps'] = { ...(r.attributes['status-timestamps'] ?? {}), ...stamps };
+      }
+      await route.fulfill({ response: res, json });
+    });
+  }
+
+  test('the status badge opens the phase that explains the result', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-explain-apply'));
+    await seedRun(token, wsId);
+
+    // Everything up to and including the apply started, so the apply is the
+    // furthest the run got and therefore the phase that explains it.
+    await stubRunTimestamps(page, {
+      'planning-at': '2026-01-01T00:00:00Z',
+      'planned-at': '2026-01-01T00:01:00Z',
+      'applying-at': '2026-01-01T00:02:00Z',
+    });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    // By its accessible name, which carries the purpose as well as the status
+    // -- the badge is a `<button>` only when there is a phase to open.
+    const badge = page.getByRole('button', { name: /open the log of the phase/i }).first();
+    await expect(badge).toBeVisible({ timeout: 15_000 });
+    await badge.click();
+
+    await expect(page).toHaveURL(/\/runs\/run-[^?]+\?view=apply$/, { timeout: 15_000 });
+  });
+
+  test('a configure badge opens the configure log, not the explaining phase', async ({ page }) => {
+    // The two differ on a composite that errored in its apply, and a badge that
+    // NAMES a phase has to mean what it says.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-explain-cfg'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'site.yml',
+    });
+    await seedRun(token, wsId);
+
+    await page.route('**/api/*/workspaces/*/runs*', async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json().catch(() => null);
+      if (!Array.isArray(json?.data)) return route.fulfill({ response: res });
+      for (const r of json.data) {
+        r.attributes['is-configure'] = true;
+        // The APPLY is the explaining phase here, deliberately: it proves the
+        // configure badge is not merely inheriting the status badge's answer.
+        r.attributes['status-timestamps'] = {
+          'planning-at': '2026-01-01T00:00:00Z',
+          'planned-at': '2026-01-01T00:01:00Z',
+          'applying-at': '2026-01-01T00:02:00Z',
+        };
+      }
+      await route.fulfill({ response: res, json });
+    });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    const cfg = page.getByRole('button', { name: 'configure', exact: true }).first();
+    await expect(cfg).toBeVisible({ timeout: 15_000 });
+    await cfg.click();
+
+    await expect(page).toHaveURL(/\?view=configure$/, { timeout: 15_000 });
+  });
+
+  test('a run that never started a phase has nothing to open', async ({ page }) => {
+    // The negative half, and the reason the badge is conditionally a button:
+    // linking a queued run to a plan log that does not exist yet would be worse
+    // than not linking it. A seeded run is exactly this case, unstubbed.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-explain-none'));
+    await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    await expect(page.getByTestId('ws-run-planApply')).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole('button', { name: /open the log of the phase/i }),
+    ).toHaveCount(0);
   });
 });

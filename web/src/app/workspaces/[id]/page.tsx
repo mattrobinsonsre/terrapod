@@ -18,6 +18,7 @@ import {
   dependencyMet,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { explainingPhase } from '@/lib/run-phases'
 import { RunKindSplitButton, type RunKindOption } from '@/components/run-kind-split-button'
 import { availableRunKinds, type RunKindId } from '@/lib/run-kinds'
 import { categoryKey, nativeCategoryKey } from '@/lib/variable-category'
@@ -232,6 +233,12 @@ interface RunItem {
   id: string
   attributes: {
     status: string
+    // Every phase boundary the run passed, as the server emits them: keys are
+    // omitted when falsy, so PRESENCE is the signal. Native-only for the two
+    // configure keys, which is fine -- this page is on `/api/v1`, enforced by
+    // `web/tests/engine-scoped-prefixes.test.ts`. Read by `explainingPhase`
+    // (#2413 F16); nothing had to be added to the server for it.
+    'status-timestamps'?: Record<string, string>
     source: string
     message: string
     'plan-only': boolean
@@ -2514,6 +2521,33 @@ function WorkspaceDetailContent() {
   // Plan + apply buttons the API refuses (#1966) -- the #1634 shape. The
   // derivation withholds them, the same way the Configure button has always
   // been withheld from a workspace with no configure operation.
+  // ── a result indicator carries you to what explains it (#2413 F16) ──────
+  //
+  // One producer for the destination, used by both renders. The maintainer's
+  // instruction: *"when you click errored on a workspace you get taken to the
+  // run which errored ... with the log view optimised for what you click on.
+  // This is important in general for ergonomics."*
+  //
+  // `explainingPhase` needs no server attribute -- `status-timestamps` already
+  // carries every phase boundary natively, and the run LIST carries them too.
+  // See its docstring for why the rule is the last phase STARTED and not the
+  // one whose end timestamp is missing.
+  // Plain functions, not `useCallback`: this sits below an early return, so a
+  // hook here would be called conditionally -- and neither is worth memoising,
+  // being a string build and a navigation used inside a `.map`.
+  const runPhaseQuery = (run: RunItem) => {
+    const phase = explainingPhase(run.attributes['status-timestamps'])
+    return phase ? `?view=${phase}` : ''
+  }
+
+  // `stopPropagation` is what keeps the row's general destination and the
+  // badge's specific one distinct: without it the row's own handler fires too
+  // and overwrites the deeper link.
+  const goToRunView = (e: React.MouseEvent, runId: string, view: string) => {
+    e.stopPropagation()
+    router.push(`/workspaces/${workspaceId}/runs/${runId}?view=${view}`)
+  }
+
   const runKindOptions: RunKindOption[] = availableRunKinds({
     // `?? true` mirrors the column default, the same way the editor reads it:
     // a workspace row written before #1966 has no value and plans and applies.
@@ -5406,9 +5440,39 @@ function WorkspaceDetailContent() {
                                 {t('runs.awaitingDecision')}
                               </span>
                             ) : (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
-                                {runStatusLabel(run.attributes.status)}
-                              </span>
+                              /* The row still goes to the overview; this badge
+                                 goes to the log of the phase that produced the
+                                 result -- a more specific destination beside a
+                                 general one, not a replacement for it. Only
+                                 the plain STATUS branch gets it: the two
+                                 branches above are action prompts, and the
+                                 action lives on the overview. A run that never
+                                 started a phase has nothing to link to, so it
+                                 stays a plain span. */
+                              (() => {
+                                const phase = explainingPhase(run.attributes['status-timestamps'])
+                                const cls = `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`
+                                return phase ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => goToRunView(e, run.id, phase)}
+                                    /* `aria-label`, NOT `title`: F15 bans any
+                                       new native `title=` used for
+                                       explanation, and a hover tooltip is
+                                       useless on touch anyway. The label
+                                       keeps the status word and adds the
+                                       purpose, the same shape
+                                       `hosts-panel.tsx` uses for its own
+                                       result links. */
+                                    aria-label={`${runStatusLabel(run.attributes.status)} — ${t('runs.openExplainingPhase')}`}
+                                    className={`${cls} hover:brightness-125 transition-all`}
+                                  >
+                                    {runStatusLabel(run.attributes.status)}
+                                  </button>
+                                ) : (
+                                  <span className={cls}>{runStatusLabel(run.attributes.status)}</span>
+                                )
+                              })()
                             )
                           )}
                         </td>
@@ -5441,14 +5505,21 @@ function WorkspaceDetailContent() {
                                 AND a configure, so one badge replacing the other
                                 would hide half of what the run does (#1974). */}
                             {run.attributes['is-configure'] && (
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300"
+                              /* A badge that NAMES a phase links to that
+                                 phase's log, not to whichever phase explained
+                                 the run (#2413 F16). On a composite that
+                                 errored in its apply the two differ, and the
+                                 badge should mean what it says. */
+                              <button
+                                type="button"
+                                onClick={(e) => goToRunView(e, run.id, 'configure')}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300 hover:bg-violet-800/60 hover:text-violet-200 transition-colors"
                                 title={run.attributes['configure-after-apply']
                                   ? t('runs.typeConfigureAfterApplyHint')
                                   : t('runs.typeConfigureHint')}
                               >
                                 {t('runs.typeConfigure')}
-                              </span>
+                              </button>
                             )}
                             {/* Additive, not another branch: a saved plan can also
                                 be a destroy, and "deferred" is the fact that
@@ -5504,7 +5575,15 @@ function WorkspaceDetailContent() {
                   return (
                     <MobileCard
                       key={run.id}
-                      href={`/workspaces/${workspaceId}/runs/${run.id}`}
+                      /* The card carries the view (#2413 F16). A phone has ONE
+                         tap target here and the status badge is the most
+                         prominent thing on it, so the card lands where the
+                         result is explained; `MobileCard` wraps its whole body
+                         in a `<Link>`, so a separately-tappable badge would be
+                         interactive content nested inside an anchor. Nothing is
+                         lost by going deeper -- the run page's mobile view
+                         picker is a native `<select>` at the top of the page. */
+                      href={`/workspaces/${workspaceId}/runs/${run.id}${runPhaseQuery(run)}`}
                       title={<span className="text-sm font-mono text-brand-400">{shortId}</span>}
                       badge={
                         run.attributes.actions?.['is-confirmable'] ? (
