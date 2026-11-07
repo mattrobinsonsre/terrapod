@@ -19,7 +19,7 @@ import {
   uniqueName,
 } from '../helpers/api';
 import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
-import { revealRunKind } from '../helpers/run-kinds';
+import { revealRunKind, expectRunKindOffered } from '../helpers/run-kinds';
 
 test.describe('Pulumi workspace', () => {
   test('appears in the list, opens, and saves an edit', async ({ page }) => {
@@ -284,9 +284,12 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     await page.goto(`/workspaces/${wsId}?tab=runs`);
-    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // `Preview` is the PARTIAL on a Pulumi workspace -- the primary is
+    // `Preview + update` -- so it lives in the caret menu. `expectRunKindOffered`
+    // reveals it, asserts it, and closes the menu behind itself, which matters
+    // here: the menu is absolutely positioned, and at phone width where this row
+    // wraps it would sit over the Options button clicked on the next line.
+    await expectRunKindOffered(page, 'plan', 20_000);
     await page.getByRole('button', { name: 'Options', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Preview Options' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);

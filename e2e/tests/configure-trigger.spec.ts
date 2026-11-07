@@ -139,13 +139,30 @@ test.describe('Configure triggers', () => {
     // capture watching the wrong interaction.
     const button = await revealRunKind(page, 'configure')
 
+    // Asserted on the POST rather than on the Runs list, and that is not a
+    // weakening -- it is the difference between testing this button and testing
+    // the server's configuration-version requirement. A bare workspace has no
+    // uploaded configuration, so queueing a configure against it answers
+    // `422 Workspace has no uploaded configuration` (measured against a live
+    // instance). The old version of this test DISMISSED the prompt, so it never
+    // reached the POST and never met that -- relaxing the prompt is what
+    // exposed it, which is the whole reason a test that blocks the action it is
+    // about proves less than it looks.
+    //
+    // The request is also the stronger claim. "No dialog appeared" alone passes
+    // on a button that does nothing at all, which is the one regression this
+    // test exists to catch.
+    let body: string | null = null
+    await page.route('**/api/*/runs', async (route) => {
+      if (route.request().method() === 'POST') body = route.request().postData()
+      await route.continue()
+    })
+
     const dialog = captureAndDismiss(page)
     await button.click()
 
-    // Queued with no prompt: the Runs list gains a configure.
-    await expect(
-      page.getByText('configure', { exact: true }).filter({ visible: true }).first(),
-    ).toBeVisible({ timeout: 20_000 })
+    await expect.poll(() => body, { timeout: 15_000 }).not.toBeNull()
+    expect(JSON.parse(body!).data.attributes['is-configure']).toBe(true)
     expect(dialog.text).toBeNull()
   })
 
