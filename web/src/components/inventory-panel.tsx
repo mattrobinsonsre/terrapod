@@ -1681,7 +1681,7 @@ function InventoryTree({
         aria-current={isSel ? 'true' : undefined}
         data-testid={`inv-tree-${n.kind}-${n.name}`}
         className={`inline-flex min-h-11 items-center gap-2 rounded px-2 py-1 text-start font-mono text-xs sm:min-h-0 ${
-          isSel ? 'bg-brand-600/30 text-brand-200' : 'text-slate-300 hover:bg-slate-700/40'
+          isSel ? 'bg-brand-700/30 text-brand-100' : 'text-slate-300 hover:bg-slate-700/40'
         }`}
         dir="ltr"
       >
