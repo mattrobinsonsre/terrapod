@@ -2117,7 +2117,10 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
 
     // The sub-view nav wraps rather than scrolling inside itself: an inner
     // scroller hides whichever entry the reader needs.
-    for (const view of ['Groups', 'Variables', 'Resolved']) {
+    // `Inventory variables`, not `Variables` (#2413 F7): the pill and the
+    // workspace tab strip both read "Variables", in two idioms, going to
+    // different places, so the sub-view one was relabelled.
+    for (const view of ['Groups', 'Inventory variables', 'Resolved']) {
       await page.getByRole('button', { name: view, exact: true }).click()
       await expectNoHorizontalPageScroll(page)
     }
@@ -2128,7 +2131,7 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     // so no coverage is lost by removing this block rather than relocating it.
 
     // The variable table, whose values are unbroken identifier-ish runs.
-    await page.getByRole('button', { name: 'Variables', exact: true }).click()
+    await page.getByRole('button', { name: 'Inventory variables', exact: true }).click()
     await expect(page.getByText('ansible_user').filter({ visible: true }).first()).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
