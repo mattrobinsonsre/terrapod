@@ -187,3 +187,33 @@ test('the five fields the rule derives or scopes itself are not offered as templ
   }
   assert.match(page, /'vcs-connection-id': vcsConnectionId/)
 })
+
+test('the audience editor is not sanitised on the way IN, only on the way out', () => {
+  // `sanitizeOidcAudiences` drops a provider whose audience list is empty
+  // (`if (kept.length === 0) continue`), and "Add provider configuration"
+  // creates exactly that: a named provider with no audiences yet. So
+  // sanitising inside the onChange deleted the row the instant the operator
+  // added it, and the e2e that adds one and looks for its Remove button is
+  // what caught it.
+  //
+  // The sanitiser belongs at the WRITE boundary, where an empty row would
+  // otherwise 422 the submit -- which is the thing it exists to prevent. This
+  // asserts BOTH halves, because either alone is satisfiable the wrong way: a
+  // page that sanitises nowhere would 422, and a page that sanitises
+  // everywhere cannot be edited.
+  const dispatch = page.match(/case 'oidc-audiences': set\w+\(([^)]*)\)/)
+  assert.ok(dispatch, "no `case 'oidc-audiences'` dispatch found in the page")
+  assert.ok(
+    !dispatch[1].includes('sanitizeOidcAudiences'),
+    'the oidc-audiences dispatch sanitises on input, which deletes a just-added provider',
+  )
+
+  // ...and the submit still does. Read with its own matcher rather than
+  // through `body()`: that helper matches a plain `function` and
+  // `handleSubmit` is `async`, so it would report the function as absent --
+  // which asserts nothing while reading like a failure.
+  assert.ok(
+    /'oidc-audiences': sanitizeOidcAudiences\(/.test(page),
+    'the submit payload must sanitise the audience map before sending it',
+  )
+})

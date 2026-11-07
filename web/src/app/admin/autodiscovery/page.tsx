@@ -993,7 +993,19 @@ export default function AutodiscoveryPage() {
       case 'owner-email': setOwnerEmail(s); break
       case 'labels': setLabels(v as Record<string, string>); break
       case 'var-files': setVarFiles(v as string[]); break
-      case 'oidc-audiences': setOidcAudiences(sanitizeOidcAudiences(v as OidcAudiences)); break
+      // NOT sanitised here. `sanitizeOidcAudiences` drops a provider whose
+      // audience list is empty (`if (kept.length === 0) continue`), and "Add
+      // provider configuration" creates exactly that -- a named provider with
+      // no audiences yet -- so sanitising on INPUT deleted the row the instant
+      // the operator added it, and there was no way to reach a second one.
+      //
+      // The sanitiser belongs at the WRITE boundary, where `handleSubmit`
+      // already applies it: an empty row left in the editor would 422 the
+      // submit, and that is the thing it exists to prevent. Transforming on the
+      // way in is the recorded "validate, never transform" defect -- it
+      // destroys the operator's in-progress state rather than refusing a bad
+      // one.
+      case 'oidc-audiences': setOidcAudiences(v as OidcAudiences); break
       case 'debug-mode': setRuleDebugMode(b); break
       case 'slack-channel': setRuleSlackChannel(s); break
     }
