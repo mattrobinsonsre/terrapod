@@ -1,5 +1,9 @@
 # Pulumi provider (`pulumi-resource-terrapod`)
 
+> **This page documents the 2.0 line.** Pulumi support ships in **2.0**, which is
+> in pre-release; it is **not** in the stable 1.11.x line. If you installed the
+> stable line, nothing here applies yet.
+
 Manage Terrapod itself from a Pulumi program — the same objects the
 [Terraform provider](terraform-provider.md) manages, in whichever language that
 program is written in.

@@ -1,5 +1,12 @@
 # Running a Configure
 
+> **This page documents the 2.0 line.** Ansible support ships in **2.0**, which
+> is in pre-release; it is **not** in the stable 1.11.x line, so
+> `configure_enabled` and everything on this page is refused by a 1.11.x API as
+> an unknown attribute. If you installed the stable line, nothing here applies
+> yet. See the [Status note in the README](../README.md#terrapod) for which line
+> is which.
+
 A [configure operation](runners.md#what-a-configure-actually-runs) runs the
 workspace's playbook against the hosts in its
 [inventory](ansible-inventory.md). This page is about how one **starts**.

@@ -1,5 +1,12 @@
 # Ansible inventory
 
+> **This page documents the 2.0 line.** Ansible support ships in **2.0**, which
+> is in pre-release; it is **not** in the stable 1.11.x line, so
+> `configure_enabled` and everything on this page is refused by a 1.11.x API as
+> an unknown attribute. If you installed the stable line, nothing here applies
+> yet. See the [Status note in the README](../README.md#terrapod) for which line
+> is which.
+
 A Terrapod workspace carries **one inventory**, made of the structures ansible's
 inventory actually has: hosts, groups, the memberships between them, the
 nestings between groups, and variables on a host, on a group or inventory-wide.

@@ -127,9 +127,9 @@ Pinning `opa_version` explicitly is unaffected.
 
 | Surface | Deprecated in | Sunset (removed no earlier than) | Replacement | Notes |
 |---|---|---|---|---|
-| `/api/terrapod/v1/…` (the whole Terrapod-native surface) | v1.7.0 | v2.0.0 / 2026-11-03 (8-week floor; if two minors have not shipped by then, the later date governs) | `/api/v1/…` | Same routes, same responses — only the prefix changed. Both are served; nothing to do until you upgrade your consumers. |
-| `/api/v2/…` (TFE compatibility surface) | v1.7.0 | v2.0.0 / 2026-11-03 | `/api/tfe/v2/…` | Same routes, same responses. Service discovery advertises the new path and the CLI honours it, so `terraform`/`tofu` move by themselves. |
-| `/v1/providers/…` (provider network mirror) | v1.7.0 | v2.0.0 / 2026-11-03 | `/api/v1/provider-mirror/…` | The mirror joins the other pull-through caches. Runner images write the old URL into the Job's CLI config themselves and move when they are upgraded. |
+| `/api/terrapod/v1/…` (the whole Terrapod-native surface) | v1.7.0 | v2.1.0 / 2027-02-02 (8-week floor; if two minors have not shipped by then, the later date governs). **The previous floor was v2.0.0 / 2026-11-03 and has passed without removal — deliberately: 2.0 serves both prefixes, as [Upgrading to 2.0](upgrading-to-2.0.md) states. The column is a floor, never a deadline** | `/api/v1/…` | Same routes, same responses — only the prefix changed. Both are served; nothing to do until you upgrade your consumers. |
+| `/api/v2/…` (TFE compatibility surface) | v1.7.0 | v2.1.0 / 2027-02-02 | `/api/tfe/v2/…` | Same routes, same responses. Service discovery advertises the new path and the CLI honours it, so `terraform`/`tofu` move by themselves. |
+| `/v1/providers/…` (provider network mirror) | v1.7.0 | v2.1.0 / 2027-02-02 | `/api/v1/provider-mirror/…` | The mirror joins the other pull-through caches. Runner images write the old URL into the Job's CLI config themselves and move when they are upgraded. |
 
 ### `/api/v2/…` → `/api/tfe/v2/…` and `/v1/providers/…` → `/api/v1/provider-mirror/…`
 
