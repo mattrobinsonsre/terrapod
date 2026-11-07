@@ -1988,7 +1988,9 @@
       "providerInvalid": "Ett providernamn innehåller inga blanksteg och högst en punkt — aws eller aws.west.",
       "providerPlaceholder": "aws eller aws.west",
       "removeProviderAria": "Ta bort providerkonfigurationen {provider}"
-    }
+    },
+    "showDetail": "Visa hela förklaringen",
+    "hideDetail": "Dölj hela förklaringen"
   },
   "planSummary": {
     "aiGenerated": "AI-genererad",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-konfigurationskatalog",
       "configDirectoryTitle": "Var ansible.cfg, playbooken, roles/, group_vars/ och host_vars/ finns, relativt förrådets rot. Lämna tomt för förrådets rot själv. Om den här arbetsytan alls har en konfigurationsoperation avgörs av inställningen Konfigurera ovan, inte av den här sökvägen.",
       "configDirectoryPlaceholder": "t.ex. ansible",
-      "configDirectoryRootHint": "Lämna detta tomt för förrådets rot själv.",
       "configDirectoryRoot": "Förrådets rot",
       "inventoryPaths": "Inventariesökvägar",
       "inventoryPathsHint": "Ordnade inventariekällor, var och en en fil eller en katalog, relativt konfigurationskatalogen. Ordningen är företrädesordningen.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Inventarie-skript",
       "inventoryScriptsEnabledHint": "Tillåter körbara inventarie-skript när runnern löser upp inventariet. Åtskilt från dynamiska inventarie-plugins så att deklarerade pluginkonfigurationer, som namnger en collection och kan läsas innan de körs, kan tillåtas utan att även godta godtyckliga körbara filer.",
       "ansibleHostKeyChecking": "Kontroll av SSH-värdnyckel",
-      "ansibleHostKeyCheckingHint": "På som standard, vilket är Ansibles eget beteende: en konfigurationskörning avvisar en värd vars nyckel den inte redan litar på. Stänger du av den accepteras vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas — bättre är att ange värdens publika nyckel i maskinuppgifterna och låta kontrollen vara på. En Ansible-variabel per värd går ändå före den här inställningen."
+      "ansibleHostKeyCheckingHint": "På som standard, vilket är Ansibles eget beteende: en konfigurationskörning avvisar en värd vars nyckel den inte redan litar på. Stänger du av den accepteras vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas — bättre är att ange värdens publika nyckel i maskinuppgifterna och låta kontrollen vara på. En Ansible-variabel per värd går ändå före den här inställningen.",
+      "oidcAudiencesLead": "Terrapod utfärdar ett kortlivat OpenID Connect-token per providerkonfiguration och skriver det där körningen kan läsa det.",
+      "driftIgnoreRulesLead": "Terraform-adresser och attributsökvägar som driftklassificeraren undertrycker. En ren adress utan attribut tystar alla ändringar av den resursen.",
+      "dynamicInventoryEnabledLead": "Tillåter deklarerade inventarie-plugins när runnern löser upp inventariet. Inventariet som visas här blir då ofullständigt per källa, och den uppsättning runnern löser upp är den som gäller.",
+      "inventoryScriptsEnabledLead": "Tillåter körbara inventarie-skript. En godtycklig körbar fil från repositoriet körs då inuti runner-jobbet, med dess molnidentitet, innan playbooken körs — och inventariet som visas här blir ofullständigt.",
+      "ansibleHostKeyCheckingLead": "På som standard, vilket Ansible själv gör. Mjukar upp ett skydd när det är av: vilken nyckel en värd än visar upp accepteras, så anslutningen kan avlyssnas.",
+      "bindPlanLead": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas.",
+      "configDirectoryLead": "Var ansible.cfg, playbooken, roles/, group_vars/ och host_vars/ finns, relativt förrådets rot. Tomt betyder roten själv.",
+      "ansibleCollectionsLead": "Samlingar som installeras innan en configure körs, en per rad som namespace.name eller namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Undanhålls från en plan och levereras endast till en apply. En plan kör konfigurationens kod, så en behörighet som bara apply behöver bör inte finnas i en plans miljö.",
       "configureOnly": "Endast konfigurera",
       "configureOnlyHint": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply. Flottans egen behörighet — en SSH-nyckel till maskinparken, ett become-lösenord — hör inte hemma i någon av dem.",
-      "phaseSlotExclusive": "En variabel upptar bara en plats i taget. Endast apply når en apply och en konfigurera; Endast konfigurera når bara en konfigurera."
+      "phaseSlotExclusive": "En variabel upptar bara en plats i taget. Endast apply når en apply och en konfigurera; Endast konfigurera når bara en konfigurera.",
+      "vaultFileLead": "Variabeln innehåller filens sökväg, inte hemligheten.",
+      "vaultFileTemplateLead": "Varje platshållare ersätts med det fältet från denna enda läsning från OpenBao/Vault.",
+      "gitSshLead": "Autentiserar privata git::ssh://-modulkällor som matchar mönstret ovan med hjälp av en deploy-nyckel."
     },
     "runs": {
       "options": "Alternativ",
@@ -3286,7 +3298,8 @@
       "label": "Planera pull requests från forkar",
       "hint": "En körning får den här arbetsytans miljövariabler, känsliga värden, alla hemligheter som hämtats via Vault och jobbets molnidentitet. Den som öppnar en pull request från en fork har ingen skrivbehörighet och kan inte merga, så en spekulativ plan är den enda vägen för deras kod till de här autentiseringsuppgifterna. Slå på detta för en arbetsyta som inte innehåller något värt att ta — till exempel ett publikt modulförråd som tar emot bidrag från communityn. Pull requests från grenar i själva förrådet påverkas inte och planeras alltid.",
       "activeBadge": "På",
-      "confirmEnable": "Planera pull requests som öppnats från forkar? Deras författares kod körs med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler, utan att någon godkänner det först."
+      "confirmEnable": "Planera pull requests som öppnats från forkar? Deras författares kod körs med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler, utan att någon godkänner det först.",
+      "lead": "Mjukar upp ett skydd: en plan från en forks pull request når den här arbetsytans miljövariabler, känsliga värden, Vault-hemligheter och molnidentitet — öppnad av någon utan skrivbehörighet och utan möjlighet att merga."
     },
     "groups": {
       "identity": "Identitet",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Lösenord för behörighetshöjning",
     "replaceHint": "Att spara ersätter hela uppgiften, så fyll i varje fält som behövs — inte bara det du ändrar. Lämnar du alla tomma behålls de lagrade uppgifterna som de är.",
     "knownHosts": "Kända värdar",
-    "knownHostsHint": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format. Låt en inventarievariabel peka på dess sökväg för att ansluta utan att mjuka upp verifieringen av värdnyckeln. Döljs inte: en värds publika nyckel är offentlig och är precis det du jämför när en nyckel inte stämmer."
+    "knownHostsHint": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format. Låt en inventarievariabel peka på dess sökväg för att ansluta utan att mjuka upp verifieringen av värdnyckeln. Döljs inte: en värds publika nyckel är offentlig och är precis det du jämför när en nyckel inte stämmer.",
+    "knownHostsLead": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format.",
+    "machineLead": "Hur Ansible ansluter till de värdar som hänvisar till den här autentiseringsuppgiften. Ange en privat nyckel eller ett lösenord, eller båda."
   }
 }

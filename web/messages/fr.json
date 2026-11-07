@@ -1988,7 +1988,9 @@
       "providerInvalid": "Un nom de provider ne contient pas d''espace et au plus un point — aws, ou aws.west.",
       "providerPlaceholder": "aws, ou aws.west",
       "removeProviderAria": "Retirer la configuration de provider {provider}"
-    }
+    },
+    "showDetail": "Afficher l''explication complète",
+    "hideDetail": "Masquer l''explication complète"
   },
   "planSummary": {
     "aiGenerated": "Généré par IA",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Répertoire de configuration Ansible",
       "configDirectoryTitle": "Où se trouvent ansible.cfg, les playbooks, roles/, group_vars/ et host_vars/, par rapport à la racine du dépôt. Laissez vide pour la racine du dépôt elle-même. C'est le réglage Configurer ci-dessus qui détermine si cet espace de travail a une opération de configuration, et non ce chemin.",
       "configDirectoryPlaceholder": "p. ex. ansible",
-      "configDirectoryRootHint": "Laissez ce champ vide pour la racine du dépôt elle-même.",
       "configDirectoryRoot": "Racine du dépôt",
       "inventoryPaths": "Chemins d'inventaire",
       "inventoryPathsHint": "Sources d'inventaire ordonnées, chacune un fichier ou un répertoire, par rapport au répertoire de configuration. L'ordre est l'ordre de priorité.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Scripts d''inventaire",
       "inventoryScriptsEnabledHint": "Autorise les scripts d''inventaire exécutables lorsque le runner résout l''inventaire. Distinct des plugins d''inventaire dynamique afin que les configurations de plugin déclarées, qui nomment une collection et peuvent être lues avant leur exécution, puissent être autorisées sans autoriser aussi des exécutables arbitraires.",
       "ansibleHostKeyChecking": "Vérification de la clé d'hôte SSH",
-      "ansibleHostKeyCheckingHint": "Activée par défaut, ce qui est le comportement propre d'Ansible : une configuration refuse un hôte dont elle ne connaît pas déjà la clé. Désactivez-la et n'importe quelle clé présentée par un hôte est acceptée, de sorte que la connexion peut être interceptée — mieux vaut fournir la clé publique de l'hôte avec l'identifiant machine et laisser la vérification active. Une variable Ansible définie par hôte prime de toute façon sur ce réglage."
+      "ansibleHostKeyCheckingHint": "Activée par défaut, ce qui est le comportement propre d'Ansible : une configuration refuse un hôte dont elle ne connaît pas déjà la clé. Désactivez-la et n'importe quelle clé présentée par un hôte est acceptée, de sorte que la connexion peut être interceptée — mieux vaut fournir la clé publique de l'hôte avec l'identifiant machine et laisser la vérification active. Une variable Ansible définie par hôte prime de toute façon sur ce réglage.",
+      "oidcAudiencesLead": "Terrapod émet un jeton OpenID Connect de courte durée par configuration de provider et l''écrit là où l''exécution peut le lire.",
+      "driftIgnoreRulesLead": "Adresses Terraform et chemins d''attributs supprimés par le classificateur de dérive. Une adresse seule, sans attribut, fait taire toute modification de cette ressource.",
+      "dynamicInventoryEnabledLead": "Autorise les plugins d''inventaire déclarés lorsque le runner résout l''inventaire. L''inventaire affiché ici devient alors partiel source par source, et l''ensemble résolu par le runner fait autorité.",
+      "inventoryScriptsEnabledLead": "Autorise les scripts d''inventaire exécutables. Un exécutable arbitraire issu du dépôt s''exécute alors dans le Job du runner, avec son identité cloud, avant même que le playbook ne s''exécute — et l''inventaire affiché ici devient partiel.",
+      "ansibleHostKeyCheckingLead": "Activée par défaut, comme le fait Ansible de lui-même. Assouplit une protection si elle est désactivée : n''importe quelle clé présentée par un hôte est acceptée, de sorte que la connexion peut être interceptée.",
+      "bindPlanLead": "Si activé, la mise à jour applique exactement le plan enregistré par l''aperçu : tout ce qui a changé depuis l''aperçu fait échouer la mise à jour au lieu d''être appliqué.",
+      "configDirectoryLead": "Où se trouvent ansible.cfg, les playbooks, roles/, group_vars/ et host_vars/, par rapport à la racine du dépôt. Vide signifie la racine elle-même.",
+      "ansibleCollectionsLead": "Collections installées avant l''exécution d''un configure, une par ligne sous la forme namespace.name ou namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Retiré d'un plan et livré uniquement à un apply. Un plan exécute le code de la configuration, donc un identifiant dont seul l'apply a besoin ne devrait pas se trouver dans l'environnement d'un plan.",
       "configureOnly": "Configurer uniquement",
       "configureOnlyHint": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply. L'identifiant de la flotte elle-même — une clé SSH vers le parc, un mot de passe become — n'a rien à faire ni dans l'un ni dans l'autre.",
-      "phaseSlotExclusive": "Une variable n'occupe qu'un emplacement à la fois. apply uniquement atteint un apply et un configurer ; Configurer uniquement n'atteint qu'un configurer."
+      "phaseSlotExclusive": "Une variable n'occupe qu'un emplacement à la fois. apply uniquement atteint un apply et un configurer ; Configurer uniquement n'atteint qu'un configurer.",
+      "vaultFileLead": "La variable contient le chemin du fichier, pas le secret.",
+      "vaultFileTemplateLead": "Chaque espace réservé est remplacé par ce champ issu de cette unique lecture OpenBao/Vault.",
+      "gitSshLead": "Authentifiez à l''aide d''une clé de déploiement les sources de module privées git::ssh:// qui correspondent au motif ci-dessus."
     },
     "runs": {
       "options": "Options",
@@ -3286,7 +3298,8 @@
       "label": "Lancer un plan sur les pull requests depuis un fork",
       "hint": "Une exécution reçoit les variables d'environnement de cet espace de travail, les valeurs sensibles, tous les secrets résolus via Vault et l'identité cloud du job. Qui ouvre une pull request depuis un fork n'a pas d'accès en écriture et ne peut pas fusionner : un plan spéculatif est donc le seul moyen pour son code d'atteindre ces identifiants. Activez ceci pour un espace de travail qui ne contient rien à dérober — un dépôt de modules public ouvert aux contributions de la communauté, par exemple. Les pull requests issues de branches du dépôt lui-même ne sont pas concernées et donnent toujours lieu à un plan.",
       "activeBadge": "Activé",
-      "confirmEnable": "Lancer un plan sur les pull requests ouvertes depuis un fork ? Le code de leurs auteurs s'exécutera avec les identifiants et les variables déchiffrées de cet espace de travail, sans approbation préalable."
+      "confirmEnable": "Lancer un plan sur les pull requests ouvertes depuis un fork ? Le code de leurs auteurs s'exécutera avec les identifiants et les variables déchiffrées de cet espace de travail, sans approbation préalable.",
+      "lead": "Assouplit une protection : un plan lancé depuis une pull request d''un fork atteint les variables d''environnement de cet espace de travail, ses valeurs sensibles, ses secrets Vault et son identité cloud — ouverte par quelqu''un qui n''a pas d''accès en écriture et ne peut pas fusionner."
     },
     "groups": {
       "identity": "Identité",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Mot de passe d'élévation",
     "replaceHint": "L'enregistrement remplace l'intégralité des identifiants : renseignez donc tous les champs nécessaires, pas seulement celui que vous modifiez. Si vous les laissez tous vides, les identifiants stockés restent inchangés.",
     "knownHosts": "Hôtes connus",
-    "knownHostsHint": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts. Pointez une variable d''inventaire sur son chemin pour vous connecter sans assouplir la vérification de la clé d''hôte. Non masquée : la clé publique d''un hôte est publique, et c''est précisément ce que vous comparez lorsqu''une clé ne correspond pas."
+    "knownHostsHint": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts. Pointez une variable d''inventaire sur son chemin pour vous connecter sans assouplir la vérification de la clé d''hôte. Non masquée : la clé publique d''un hôte est publique, et c''est précisément ce que vous comparez lorsqu''une clé ne correspond pas.",
+    "knownHostsLead": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts.",
+    "machineLead": "Comment Ansible se connecte aux hôtes qui désignent ces identifiants. Fournissez une clé privée ou un mot de passe, ou les deux."
   }
 }

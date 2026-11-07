@@ -1988,7 +1988,9 @@
       "providerInvalid": "Nazwa providera nie zawiera spacji i ma co najwyżej jedną kropkę — aws lub aws.west.",
       "providerPlaceholder": "aws lub aws.west",
       "removeProviderAria": "Usuń konfigurację providera {provider}"
-    }
+    },
+    "showDetail": "Pokaż pełne wyjaśnienie",
+    "hideDetail": "Ukryj pełne wyjaśnienie"
   },
   "planSummary": {
     "aiGenerated": "Wygenerowano przez AI",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Katalog konfiguracji Ansible",
       "configDirectoryTitle": "Gdzie znajdują się ansible.cfg, playbooki, roles/, group_vars/ i host_vars/, względem katalogu głównego repozytorium. Pozostaw puste dla samego katalogu głównego repozytorium. O tym, czy ta przestrzeń robocza ma operację konfiguracji, decyduje ustawienie Konfiguracja powyżej, a nie ta ścieżka.",
       "configDirectoryPlaceholder": "np. ansible",
-      "configDirectoryRootHint": "Pozostaw puste, aby wskazać sam katalog główny repozytorium.",
       "configDirectoryRoot": "Katalog główny repozytorium",
       "inventoryPaths": "Ścieżki inwentarza",
       "inventoryPathsHint": "Uporządkowane źródła inwentarza, każde będące plikiem lub katalogiem, względem katalogu konfiguracji. Kolejność wyznacza pierwszeństwo.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Skrypty inwentarza",
       "inventoryScriptsEnabledHint": "Zezwala na wykonywalne skrypty inwentarza, gdy runner rozwiązuje inwentarz. Oddzielone od dynamicznych wtyczek inwentarza, aby zadeklarowane konfiguracje wtyczek, które wskazują kolekcję i można je przeczytać przed uruchomieniem, mogły być dozwolone bez dopuszczania także dowolnych plików wykonywalnych.",
       "ansibleHostKeyChecking": "Sprawdzanie klucza hosta SSH",
-      "ansibleHostKeyCheckingHint": "Domyślnie włączone, co jest własnym zachowaniem Ansible: konfiguracja odrzuca hosta, którego klucza jeszcze nie zna. Po wyłączeniu przyjmowany jest dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone — lepiej podać klucz publiczny hosta wraz z poświadczeniem maszynowym i zostawić sprawdzanie włączone. Zmienna Ansible ustawiona dla pojedynczego hosta i tak ma pierwszeństwo nad tym ustawieniem."
+      "ansibleHostKeyCheckingHint": "Domyślnie włączone, co jest własnym zachowaniem Ansible: konfiguracja odrzuca hosta, którego klucza jeszcze nie zna. Po wyłączeniu przyjmowany jest dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone — lepiej podać klucz publiczny hosta wraz z poświadczeniem maszynowym i zostawić sprawdzanie włączone. Zmienna Ansible ustawiona dla pojedynczego hosta i tak ma pierwszeństwo nad tym ustawieniem.",
+      "oidcAudiencesLead": "Terrapod wystawia krótkotrwały token OpenID Connect dla każdej konfiguracji providera i zapisuje go tam, gdzie uruchomienie może go odczytać.",
+      "driftIgnoreRulesLead": "Adresy Terraform i ścieżki atrybutów tłumione przez klasyfikator dryfu. Sam adres bez atrybutu wycisza każdą zmianę tego zasobu.",
+      "dynamicInventoryEnabledLead": "Zezwala na zadeklarowane wtyczki inwentarza, gdy runner rozwiązuje inwentarz. Pokazany tutaj inwentarz staje się wtedy częściowy dla każdego źródła, a zbiór rozwiązany przez runnera jest rozstrzygający.",
+      "inventoryScriptsEnabledLead": "Zezwala na wykonywalne skrypty inwentarza. Dowolny plik wykonywalny z repozytorium uruchamia się wtedy wewnątrz zadania runnera, z jego tożsamością chmurową, zanim uruchomi się playbook — a pokazany tutaj inwentarz staje się częściowy.",
+      "ansibleHostKeyCheckingLead": "Domyślnie włączone, tak jak robi to samo Ansible. Po wyłączeniu osłabia zabezpieczenie: przyjmowany jest dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone.",
+      "bindPlanLead": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane.",
+      "configDirectoryLead": "Gdzie znajdują się ansible.cfg, playbooki, roles/, group_vars/ i host_vars/, względem katalogu głównego repozytorium. Puste oznacza sam katalog główny.",
+      "ansibleCollectionsLead": "Kolekcje instalowane przed uruchomieniem configure, po jednej w wierszu jako namespace.name lub namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan.",
       "configureOnly": "Tylko konfiguracja",
       "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
-      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji."
+      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji.",
+      "vaultFileLead": "Zmienna zawiera ścieżkę pliku, a nie sekret.",
+      "vaultFileTemplateLead": "Każdy symbol zastępczy jest zastępowany tym polem z tego jednego odczytu z OpenBao/Vault.",
+      "gitSshLead": "Uwierzytelnia prywatne źródła modułów git::ssh:// zgodne z powyższym wzorcem za pomocą klucza wdrożeniowego."
     },
     "runs": {
       "options": "Opcje",
@@ -3286,7 +3298,8 @@
       "label": "Planuj pull requesty z forków",
       "hint": "Uruchomienie otrzymuje zmienne środowiskowe tej przestrzeni roboczej, wartości wrażliwe, wszystkie sekrety pobrane przez Vault oraz tożsamość chmurową zadania. Kto otwiera pull request z forka, nie ma uprawnień do zapisu i nie może scalić zmian, więc plan spekulatywny to jedyna droga, którą jego kod dociera do tych poświadczeń. Włącz to dla przestrzeni roboczej, w której nie ma nic wartego zabrania — na przykład dla publicznego repozytorium modułów przyjmującego wkład społeczności. Pull requesty z gałęzi samego repozytorium nie są tym objęte i zawsze otrzymują plan.",
       "activeBadge": "Wł.",
-      "confirmEnable": "Planować pull requesty otwarte z forków? Kod ich autorów zostanie uruchomiony z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, bez niczyjego wcześniejszego zatwierdzenia."
+      "confirmEnable": "Planować pull requesty otwarte z forków? Kod ich autorów zostanie uruchomiony z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, bez niczyjego wcześniejszego zatwierdzenia.",
+      "lead": "Osłabia zabezpieczenie: plan dla pull requesta z forka sięga do zmiennych środowiskowych tej przestrzeni roboczej, wartości wrażliwych, sekretów Vault i tożsamości chmurowej — a taki pull request otwiera ktoś, kto nie ma uprawnień do zapisu ani możliwości scalenia zmian."
     },
     "groups": {
       "identity": "Tożsamość",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Hasło podniesienia uprawnień",
     "replaceHint": "Zapis zastępuje całe dane uwierzytelniające, więc wypełnij każde potrzebne pole, a nie tylko to zmieniane. Pozostawienie wszystkich pustych zachowuje zapisane dane bez zmian.",
     "knownHosts": "Znane hosty",
-    "knownHostsHint": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts. Wskaż zmiennej inwentarza tę ścieżkę, aby połączyć się bez osłabiania weryfikacji klucza hosta. Nie jest ukrywany: publiczny klucz hosta jest publiczny i to właśnie go porównujesz, gdy klucz się nie zgadza."
+    "knownHostsHint": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts. Wskaż zmiennej inwentarza tę ścieżkę, aby połączyć się bez osłabiania weryfikacji klucza hosta. Nie jest ukrywany: publiczny klucz hosta jest publiczny i to właśnie go porównujesz, gdy klucz się nie zgadza.",
+    "knownHostsLead": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts.",
+    "machineLead": "Sposób, w jaki Ansible łączy się z hostami, które odwołują się do tego poświadczenia. Podaj klucz prywatny lub hasło — albo oba."
   }
 }

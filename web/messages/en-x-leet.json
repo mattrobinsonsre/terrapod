@@ -1988,7 +1988,9 @@
       "providerInvalid": "4 pr0v1d3r n4m3 h45 n0 5p4c35 4nd 47 m057 0n3 d07 — 4w5, 0r 4w5.w357.",
       "providerPlaceholder": "4w5, 0r 4w5.w357",
       "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n"
-    }
+    },
+    "showDetail": "5h0w 7h3 full 3xpl4n4710n",
+    "hideDetail": "H1d3 7h3 full 3xpl4n4710n"
   },
   "planSummary": {
     "aiGenerated": "41 g3n3r473d",
@@ -2609,7 +2611,6 @@
       "configDirectory": "4n51bl3 c0nf1g d1r3c70ry",
       "configDirectoryTitle": "Wh3r3 4n51bl3.cfg, 7h3 pl4yb00k5, r0l35/, gr0up_v4r5/ 4nd h057_v4r5/ l1v3, r3l471v3 70 7h3 r3p05170ry r007. L34v3 17 3mp7y f0r 7h3 r3p05170ry r007 1753lf. Wh37h3r 7h15 w0rk5p4c3 h45 4 c0nf1gur3 0p3r4710n 47 4ll 15 7h3 C0nf1gur3 53771ng 4b0v3, n07 7h15 p47h.",
       "configDirectoryPlaceholder": "3.g. 4n51bl3",
-      "configDirectoryRootHint": "L34v3 7h15 3mp7y f0r 7h3 r3p05170ry r007 1753lf.",
       "configDirectoryRoot": "R3p05170ry r007",
       "inventoryPaths": "1nv3n70ry p47h5",
       "inventoryPathsHint": "0rd3r3d 1nv3n70ry 50urc35, 34ch 0n3 4 f1l3 0r 4 d1r3c70ry, r3l471v3 70 7h3 c0nf1g d1r3c70ry. 7h3 0rd3r 15 7h3 pr3c3d3nc3 0rd3r.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "1nv3n70ry 5cr1p75",
       "inventoryScriptsEnabledHint": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 53p4r473 fr0m dyn4m1c 1nv3n70ry plug1n5 50 7h47 d3cl4r3d plug1n c0nf1g5, wh1ch n4m3 4 c0ll3c710n 4nd c4n b3 r34d b3f0r3 7h3y run, c4n b3 4ll0w3d w17h0u7 4l50 4ll0w1ng 4rb17r4ry 3x3cu74bl35.",
       "ansibleHostKeyChecking": "55H h057 k3y ch3ck1ng",
-      "ansibleHostKeyCheckingHint": "0n by d3f4ul7, wh1ch 15 wh47 4n51bl3 d035 0n 175 0wn: 4 c0nf1gur3 r3fu535 4 h057 wh053 k3y 17 d035 n07 4lr34dy 7ru57. 7urn 17 0ff 4nd 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d — 5upply1ng 7h3 h057'5 publ1c k3y w17h 7h3 m4ch1n3 cr3d3n714l k33p5 v3r1f1c4710n 0n 1n5734d. 4 p3r-h057 4n51bl3 v4r14bl3 571ll 0v3rr1d35 7h15 53771ng 317h3r w4y."
+      "ansibleHostKeyCheckingHint": "0n by d3f4ul7, wh1ch 15 wh47 4n51bl3 d035 0n 175 0wn: 4 c0nf1gur3 r3fu535 4 h057 wh053 k3y 17 d035 n07 4lr34dy 7ru57. 7urn 17 0ff 4nd 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d — 5upply1ng 7h3 h057'5 publ1c k3y w17h 7h3 m4ch1n3 cr3d3n714l k33p5 v3r1f1c4710n 0n 1n5734d. 4 p3r-h057 4n51bl3 v4r14bl3 571ll 0v3rr1d35 7h15 53771ng 317h3r w4y.",
+      "oidcAudiencesLead": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n p3r pr0v1d3r c0nf1gur4710n 4nd wr1735 17 wh3r3 7h3 run c4n r34d 17.",
+      "driftIgnoreRulesLead": "73rr4f0rm 4ddr35535 4nd 477r1bu73 p47h5 7h3 dr1f7 cl4551f13r 5uppr35535. 4 b4r3 4ddr355 w17h n0 477r1bu73 51l3nc35 3v3ry ch4ng3 70 7h47 r350urc3.",
+      "dynamicInventoryEnabledLead": "P3rm17 d3cl4r3d 1nv3n70ry plug1n5 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 7h3 1nv3n70ry 5h0wn h3r3 7h3n b3c0m35 p4r714l p3r 50urc3, 4nd 7h3 537 7h3 runn3r r350lv35 15 7h3 4u7h0r17471v3 0n3.",
+      "inventoryScriptsEnabledLead": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75. 4n 4rb17r4ry 3x3cu74bl3 fr0m 7h3 r3p05170ry 7h3n run5 1n51d3 7h3 runn3r J0b, w17h 175 cl0ud 1d3n717y, b3f0r3 7h3 pl4yb00k d035 — 4nd 7h3 1nv3n70ry 5h0wn h3r3 b3c0m35 p4r714l.",
+      "ansibleHostKeyCheckingLead": "0n by d3f4ul7, 45 4n51bl3 d035 0n 175 0wn. R3l4x35 4 pr073c710n wh3n 0ff: 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d.",
+      "bindPlanLead": "0n, 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 7h3 pr3v13w 54v3d, 50 4ny7h1ng 7h47 ch4ng3d 51nc3 7h3 pr3v13w f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d.",
+      "configDirectoryLead": "Wh3r3 4n51bl3.cfg, 7h3 pl4yb00k5, r0l35/, gr0up_v4r5/ 4nd h057_v4r5/ l1v3, r3l471v3 70 7h3 r3p05170ry r007. 3mp7y m34n5 7h3 r007 1753lf.",
+      "ansibleCollectionsLead": "C0ll3c710n5 1n574ll3d b3f0r3 4 c0nf1gur3 run5, 0n3 p3r l1n3 45 n4m35p4c3.n4m3 0r n4m35p4c3.n4m3:v3r510n."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply. 4 pl4n run5 7h3 c0nf1gur4710n'5 c0d3, 50 4 cr3d3n714l 0nly 7h3 4pply n33d5 5h0uld n07 b3 1n 4 pl4n'5 3nv1r0nm3n7.",
       "configureOnly": "C0nf1gur3 0nly",
       "configureOnlyHint": "D3l1v3r3d 0nly 70 4 c0nf1gur3, 4nd w17hh3ld fr0m 4 pl4n 4nd fr0m 4n 4pply. 7h3 fl337'5 0wn cr3d3n714l — 4n 55H k3y 70 7h3 357473, 4 b3c0m3 p455w0rd — h45 n0 bu51n355 1n 317h3r.",
-      "phaseSlotExclusive": "4 v4r14bl3 5175 1n 0n3 5l07 47 4 71m3. 4pply 0nly r34ch35 4n 4pply 4nd 4 c0nf1gur3; C0nf1gur3 0nly r34ch35 4 c0nf1gur3 4l0n3."
+      "phaseSlotExclusive": "4 v4r14bl3 5175 1n 0n3 5l07 47 4 71m3. 4pply 0nly r34ch35 4n 4pply 4nd 4 c0nf1gur3; C0nf1gur3 0nly r34ch35 4 c0nf1gur3 4l0n3.",
+      "vaultFileLead": "7h3 v4r14bl3 h0ld5 7h3 f1l3'5 p47h, n07 7h3 53cr37.",
+      "vaultFileTemplateLead": "34ch pl4c3h0ld3r 15 r3pl4c3d w17h 7h47 f13ld fr0m 7h15 0n3 0p3nB40/V4ul7 r34d.",
+      "gitSshLead": "4u7h3n71c473 pr1v473 g17::55h:// m0dul3 50urc35 m47ch1ng 7h3 p4773rn 4b0v3 w17h 4 d3pl0y k3y."
     },
     "runs": {
       "options": "0p710n5",
@@ -3286,7 +3298,8 @@
       "label": "Pl4n f0rk pull r3qu3575",
       "hint": "4 run r3c31v35 7h15 w0rk5p4c3'5 3nv1r0nm3n7 v4r14bl35, 53n5171v3 v4lu35, 4ny V4ul7-r350lv3d 53cr375 4nd 7h3 j0b'5 cl0ud 1d3n717y. 50m30n3 0p3n1ng 4 pull r3qu357 fr0m 4 f0rk h45 n0 wr173 4cc355 4nd c4nn07 m3rg3, 50 4 5p3cul471v3 pl4n 15 7h3 0nly w4y 7h31r c0d3 r34ch35 7h053 cr3d3n714l5. 7urn 7h15 0n f0r 4 w0rk5p4c3 7h47 h0ld5 n07h1ng w0r7h 74k1ng — 4 publ1c m0dul3 r3p05170ry 4cc3p71ng c0mmun17y c0n7r1bu710n5, 54y. Pull r3qu3575 fr0m br4nch35 1n 7h3 r3p05170ry 1753lf 4r3 un4ff3c73d 4nd 4lw4y5 pl4n.",
       "activeBadge": "0n",
-      "confirmEnable": "Pl4n pull r3qu3575 0p3n3d fr0m f0rk5? 7h31r 4u7h0r5' c0d3 w1ll run w17h 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35, w17h0u7 4ny0n3 4ppr0v1ng 17 f1r57."
+      "confirmEnable": "Pl4n pull r3qu3575 0p3n3d fr0m f0rk5? 7h31r 4u7h0r5' c0d3 w1ll run w17h 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35, w17h0u7 4ny0n3 4ppr0v1ng 17 f1r57.",
+      "lead": "R3l4x35 4 pr073c710n: 4 pl4n fr0m 4 f0rk'5 pull r3qu357 r34ch35 7h15 w0rk5p4c3'5 3nv1r0nm3n7 v4r14bl35, 53n5171v3 v4lu35, V4ul7 53cr375 4nd cl0ud 1d3n717y — 0p3n3d by 50m30n3 w17h n0 wr173 4cc355 4nd n0 4b1l17y 70 m3rg3."
     },
     "groups": {
       "identity": "1d3n717y",
@@ -3982,6 +3995,8 @@
     "becomePassword": "35c4l4710n p455w0rd",
     "replaceHint": "54v1ng r3pl4c35 7h3 wh0l3 cr3d3n714l, 50 f1ll 1n 3v3ry f13ld 17 n33d5 — n07 0nly 7h3 0n3 b31ng ch4ng3d. L34v1ng 4ll 0f 7h3m 3mp7y k33p5 7h3 570r3d cr3d3n714l 45 17 15.",
     "knownHosts": "Kn0wn h0575",
-    "knownHostsHint": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47. P01n7 4n 1nv3n70ry v4r14bl3 47 175 p47h 70 c0nn3c7 w17h0u7 r3l4x1ng h057-k3y v3r1f1c4710n. N07 h1dd3n: 4 h057'5 publ1c k3y 15 publ1c, 4nd 17 15 wh47 y0u c0mp4r3 wh3n 4 k3y d035 n07 m47ch."
+    "knownHostsHint": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47. P01n7 4n 1nv3n70ry v4r14bl3 47 175 p47h 70 c0nn3c7 w17h0u7 r3l4x1ng h057-k3y v3r1f1c4710n. N07 h1dd3n: 4 h057'5 publ1c k3y 15 publ1c, 4nd 17 15 wh47 y0u c0mp4r3 wh3n 4 k3y d035 n07 m47ch.",
+    "knownHostsLead": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47.",
+    "machineLead": "H0w 4n51bl3 c0nn3c75 70 7h3 h0575 7h47 r3f3r 70 7h15 cr3d3n714l. 5upply 4 pr1v473 k3y 0r 4 p455w0rd, 0r b07h."
   }
 }

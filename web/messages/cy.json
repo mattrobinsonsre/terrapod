@@ -1988,7 +1988,9 @@
       "providerInvalid": "Nid oes bylchau yn enw provider, ac un dot ar y mwyaf — aws, neu aws.west.",
       "providerPlaceholder": "aws, neu aws.west",
       "removeProviderAria": "Tynnu cyfluniad provider {provider}"
-    }
+    },
+    "showDetail": "Dangos yr esboniad llawn",
+    "hideDetail": "Cuddio'r esboniad llawn"
   },
   "planSummary": {
     "aiGenerated": "Cynhyrchwyd gan AI",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Cyfeiriadur cyfluniad Ansible",
       "configDirectoryTitle": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Gadewch hwn yn wag ar gyfer gwraidd y gadwrfa ei hun. Y gosodiad Cyflunio uchod sy'n penderfynu a oes gan y gweithle hwn weithrediad cyflunio o gwbl, nid y llwybr hwn.",
       "configDirectoryPlaceholder": "e.e. ansible",
-      "configDirectoryRootHint": "Gadewch hwn yn wag ar gyfer gwraidd y gadwrfa ei hun.",
       "configDirectoryRoot": "Gwraidd y gadwrfa",
       "inventoryPaths": "Llwybrau rhestr eiddo",
       "inventoryPathsHint": "Ffynonellau rhestr eiddo wedi'u trefnu, pob un yn ffeil neu'n gyfeiriadur, yn gymharol i'r cyfeiriadur cyfluniad. Y drefn yw'r drefn blaenoriaeth.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Sgriptiau rhestr eiddo",
       "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd.",
       "ansibleHostKeyChecking": "Gwirio allwedd gwesteiwr SSH",
-      "ansibleHostKeyCheckingHint": "Ymlaen yn ddiofyn, sy'n ymddygiad Ansible ei hun: mae cyflunio yn gwrthod gwesteiwr nad yw'n ymddiried yn ei allwedd eto. Os byddwch yn ei ddiffodd, derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad — mae'n well darparu allwedd gyhoeddus y gwesteiwr gyda'r manylion peiriant a gadael y gwiriad ymlaen. Mae newidyn Ansible fesul gwesteiwr yn drech na'r gosodiad hwn y naill ffordd neu'r llall."
+      "ansibleHostKeyCheckingHint": "Ymlaen yn ddiofyn, sy'n ymddygiad Ansible ei hun: mae cyflunio yn gwrthod gwesteiwr nad yw'n ymddiried yn ei allwedd eto. Os byddwch yn ei ddiffodd, derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad — mae'n well darparu allwedd gyhoeddus y gwesteiwr gyda'r manylion peiriant a gadael y gwiriad ymlaen. Mae newidyn Ansible fesul gwesteiwr yn drech na'r gosodiad hwn y naill ffordd neu'r llall.",
+      "oidcAudiencesLead": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider, ac yn ei ysgrifennu lle gall y rhediad ei ddarllen.",
+      "driftIgnoreRulesLead": "Cyfeiriadau Terraform a llwybrau priodwedd y mae'r dosbarthwr drifft yn eu hatal. Mae cyfeiriad moel heb briodwedd yn distewi pob newid i'r adnodd hwnnw.",
+      "dynamicInventoryEnabledLead": "Caniatáu ategion rhestr eiddo a ddatganwyd pan fydd y rhedwr yn datrys y rhestr eiddo. Bryd hynny mae''r rhestr eiddo a ddangosir yma yn dod yn anghyflawn fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
+      "inventoryScriptsEnabledLead": "Caniatáu sgriptiau rhestr eiddo gweithredadwy. Bryd hynny mae ffeil weithredadwy fympwyol o''r storfa yn rhedeg y tu mewn i Job y rhedwr, gyda''i hunaniaeth cwmwl, cyn i''r llyfr chwarae redeg — ac mae''r rhestr eiddo a ddangosir yma yn dod yn anghyflawn.",
+      "ansibleHostKeyCheckingLead": "Ymlaen yn ddiofyn, fel y mae Ansible yn ei wneud ohono'i hun. Mae diffodd hwn yn llacio amddiffyniad: derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad.",
+      "bindPlanLead": "Pan fydd ymlaen, mae'r diweddariad yn gweithredu'r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu'r diweddariad yn hytrach na chael ei weithredu.",
+      "configDirectoryLead": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Mae gwag yn golygu'r gwraidd ei hun.",
+      "ansibleCollectionsLead": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun.",
       "configureOnly": "Cyflunio yn unig",
       "configureOnlyHint": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu. Nid oes a wnelo tystlythyr y fflyd ei hun — allwedd SSH i'r ystad, cyfrinair become — â'r naill na'r llall.",
-      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd."
+      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd.",
+      "vaultFileLead": "Mae'r newidyn yn dal llwybr y ffeil, nid y gyfrinach.",
+      "vaultFileTemplateLead": "Mae pob dalfan yn cael ei disodli gan y maes hwnnw o'r un darlleniad OpenBao/Vault hwn.",
+      "gitSshLead": "Dilysu ffynonellau modiwl preifat git::ssh:// sy'n cyfateb i'r patrwm uchod drwy allwedd gosod."
     },
     "runs": {
       "options": "Opsiynau",
@@ -3286,7 +3298,8 @@
       "label": "Cynllunio ceisiadau tynnu o fforch",
       "hint": "Mae rhediad yn derbyn newidynnau amgylchedd y gweithle hwn, gwerthoedd sensitif, unrhyw gyfrinachau a ddatryswyd drwy Vault, a hunaniaeth cwmwl y swydd. Nid oes gan rywun sy'n agor cais tynnu o fforch fynediad ysgrifennu ac ni all gyfuno, felly cynllun tybiannol yw'r unig ffordd i'w god gyrraedd y tystlythyrau hynny. Trowch hyn ymlaen ar gyfer gweithle nad yw'n dal dim gwerth ei gymryd — storfa modiwlau gyhoeddus sy'n derbyn cyfraniadau'r gymuned, dyweder. Nid effeithir ar geisiadau tynnu o ganghennau yn y storfa ei hun, ac maent bob amser yn cael cynllun.",
       "activeBadge": "Ymlaen",
-      "confirmEnable": "Cynllunio ceisiadau tynnu a agorwyd o fforchau? Bydd cod eu hawduron yn rhedeg gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn, heb i neb ei gymeradwyo ymlaen llaw."
+      "confirmEnable": "Cynllunio ceisiadau tynnu a agorwyd o fforchau? Bydd cod eu hawduron yn rhedeg gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn, heb i neb ei gymeradwyo ymlaen llaw.",
+      "lead": "Yn llacio amddiffyniad: mae cynllun o gais tynnu fforch yn cyrraedd newidynnau amgylchedd y gweithle hwn, ei werthoedd sensitif, cyfrinachau Vault a hunaniaeth y cwmwl — ac fe'i agorwyd gan rywun heb fynediad ysgrifennu a heb allu cyfuno."
     },
     "groups": {
       "identity": "Hunaniaeth",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Cyfrinair dyrchafu",
     "replaceHint": "Mae cadw yn disodli'r tystlythyr cyfan, felly llwythwch bob maes sydd ei angen — nid dim ond yr un sy'n cael ei newid. Mae gadael pob un yn wag yn cadw'r tystlythyr a storiwyd fel y mae.",
     "knownHosts": "Gwesteiwyr hysbys",
-    "knownHostsHint": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae''r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts. Cyfeiria newidyn rhestr eiddo at ei lwybr i gysylltu heb lacio dilysu allwedd y gwesteiwr. Nid yw''n cael ei guddio: mae allwedd gyhoeddus gwesteiwr yn gyhoeddus, a dyna''n union yr hyn a gymharir pan nad yw allwedd yn cyfateb."
+    "knownHostsHint": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae''r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts. Cyfeiria newidyn rhestr eiddo at ei lwybr i gysylltu heb lacio dilysu allwedd y gwesteiwr. Nid yw''n cael ei guddio: mae allwedd gyhoeddus gwesteiwr yn gyhoeddus, a dyna''n union yr hyn a gymharir pan nad yw allwedd yn cyfateb.",
+    "knownHostsLead": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae'r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts.",
+    "machineLead": "Sut mae Ansible yn cysylltu â'r gwesteiwyr sy'n cyfeirio at y tystlythyr hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau."
   }
 }

@@ -1988,7 +1988,9 @@
       "providerInvalid": "A provider name has no spaces and at most one dot — aws, or aws.west.",
       "providerPlaceholder": "aws, or aws.west",
       "removeProviderAria": "Remove the {provider} provider configuration"
-    }
+    },
+    "showDetail": "Show the full explanation",
+    "hideDetail": "Hide the full explanation"
   },
   "planSummary": {
     "aiGenerated": "AI generated",
@@ -2617,7 +2619,6 @@
       "configDirectory": "Ansible config directory",
       "configDirectoryTitle": "Where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, relative to the repository root. Leave it empty for the repository root itself. Whether this workspace has a configure operation at all is the Configure setting above, not this path.",
       "configDirectoryPlaceholder": "e.g. ansible",
-      "configDirectoryRootHint": "Leave this empty for the repository root itself.",
       "configDirectoryRoot": "Repository root",
       "inventoryPaths": "Inventory paths",
       "inventoryPathsHint": "Ordered inventory sources, each one a file or a directory, relative to the config directory. The order is the precedence order.",
@@ -2697,7 +2698,15 @@
       "eeCpuRequest": "Ansible CPU request",
       "eeMemoryRequest": "Ansible memory request",
       "terragruntEnabled": "Terragrunt",
-      "terragruntVersion": "Terragrunt version"
+      "terragruntVersion": "Terragrunt version",
+      "oidcAudiencesLead": "Terrapod mints a short-lived OpenID Connect token per provider configuration and writes it where the run can read it.",
+      "driftIgnoreRulesLead": "Terraform addresses and attribute paths the drift classifier suppresses. A bare address with no attribute silences every change to that resource.",
+      "dynamicInventoryEnabledLead": "Permit declared inventory plugins when the runner resolves the inventory. The inventory shown here then becomes partial per source, and the set the runner resolves is the authoritative one.",
+      "inventoryScriptsEnabledLead": "Permit executable inventory scripts. An arbitrary executable from the repository then runs inside the runner Job, with its cloud identity, before the playbook does — and the inventory shown here becomes partial.",
+      "ansibleHostKeyCheckingLead": "On by default, as Ansible does on its own. Relaxes a protection when off: any key a host presents is accepted, so the connection can be intercepted.",
+      "bindPlanLead": "On, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied.",
+      "configDirectoryLead": "Where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, relative to the repository root. Empty means the root itself.",
+      "ansibleCollectionsLead": "Collections installed before a configure runs, one per line as namespace.name or namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",
@@ -2851,7 +2860,10 @@
       "applyOnlyHint": "Withheld from a plan and delivered only to an apply. A plan runs the configuration's code, so a credential only the apply needs should not be in a plan's environment.",
       "configureOnly": "Configure only",
       "configureOnlyHint": "Delivered only to a configure, and withheld from a plan and from an apply. The fleet's own credential — an SSH key to the estate, a become password — has no business in either.",
-      "phaseSlotExclusive": "A variable sits in one slot at a time. Apply only reaches an apply and a configure; Configure only reaches a configure alone."
+      "phaseSlotExclusive": "A variable sits in one slot at a time. Apply only reaches an apply and a configure; Configure only reaches a configure alone.",
+      "vaultFileLead": "The variable holds the file's path, not the secret.",
+      "vaultFileTemplateLead": "Each placeholder is replaced with that field from this one OpenBao/Vault read.",
+      "gitSshLead": "Authenticate private git::ssh:// module sources matching the pattern above with a deploy key."
     },
     "runs": {
       "options": "Options",
@@ -3286,7 +3298,8 @@
       "label": "Plan fork pull requests",
       "hint": "A run receives this workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity. Someone opening a pull request from a fork has no write access and cannot merge, so a speculative plan is the only way their code reaches those credentials. Turn this on for a workspace that holds nothing worth taking — a public module repository accepting community contributions, say. Pull requests from branches in the repository itself are unaffected and always plan.",
       "activeBadge": "On",
-      "confirmEnable": "Plan pull requests opened from forks? Their authors' code will run with this workspace's credentials and decrypted variables, without anyone approving it first."
+      "confirmEnable": "Plan pull requests opened from forks? Their authors' code will run with this workspace's credentials and decrypted variables, without anyone approving it first.",
+      "lead": "Relaxes a protection: a plan from a fork's pull request reaches this workspace's environment variables, sensitive values, Vault secrets and cloud identity — opened by someone with no write access and no ability to merge."
     },
     "groups": {
       "identity": "Identity",
@@ -3982,6 +3995,8 @@
     "knownHostsHint": "The public host keys of the machines this credential reaches, one per line in known_hosts format. Point an inventory variable at its path to connect without relaxing host-key verification. Not hidden: a host's public key is public, and it is what you compare when a key does not match.",
     "password": "Password",
     "becomePassword": "Escalation password",
-    "replaceHint": "Saving replaces the whole credential, so fill in every field it needs — not only the one being changed. Leaving all of them empty keeps the stored credential as it is."
+    "replaceHint": "Saving replaces the whole credential, so fill in every field it needs — not only the one being changed. Leaving all of them empty keeps the stored credential as it is.",
+    "knownHostsLead": "The public host keys of the machines this credential reaches, one per line in known_hosts format.",
+    "machineLead": "How Ansible connects to the hosts that refer to this credential. Supply a private key or a password, or both."
   }
 }

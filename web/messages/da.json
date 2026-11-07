@@ -1988,7 +1988,9 @@
       "providerInvalid": "Et providernavn indeholder ingen mellemrum og højst ét punktum — aws eller aws.west.",
       "providerPlaceholder": "aws eller aws.west",
       "removeProviderAria": "Fjern providerkonfigurationen {provider}"
-    }
+    },
+    "showDetail": "Vis den fulde forklaring",
+    "hideDetail": "Skjul den fulde forklaring"
   },
   "planSummary": {
     "aiGenerated": "AI-genereret",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible-konfigurationsmappe",
       "configDirectoryTitle": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Lad feltet være tomt for depotets rod selv. Om dette arbejdsområde overhovedet har en konfigurationshandling, afgøres af indstillingen Konfigurer ovenfor, ikke af denne sti.",
       "configDirectoryPlaceholder": "f.eks. ansible",
-      "configDirectoryRootHint": "Lad dette stå tomt for depotets rod selv.",
       "configDirectoryRoot": "Depotets rod",
       "inventoryPaths": "Inventarstier",
       "inventoryPathsHint": "Ordnede inventarkilder, hver især en fil eller en mappe, relativt til konfigurationsmappen. Rækkefølgen er forrangsrækkefølgen.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Inventar-scripts",
       "inventoryScriptsEnabledHint": "Tillader eksekverbare inventar-scripts, når runneren opløser inventaret. Holdt adskilt fra dynamiske inventar-plugins, så deklarerede pluginkonfigurationer, der navngiver en collection og kan læses, før de kører, kan tillades uden også at tillade vilkårlige eksekverbare filer.",
       "ansibleHostKeyChecking": "Kontrol af SSH-værtsnøgle",
-      "ansibleHostKeyCheckingHint": "Slået til som standard, hvilket er Ansibles egen adfærd: en konfigurationskørsel afviser en vært, hvis nøgle den ikke allerede kender. Slår du den fra, accepteres enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes — det er bedre at angive værtens offentlige nøgle sammen med maskinoplysningerne og lade kontrollen være slået til. En Ansible-variabel pr. vært går under alle omstændigheder forud for denne indstilling."
+      "ansibleHostKeyCheckingHint": "Slået til som standard, hvilket er Ansibles egen adfærd: en konfigurationskørsel afviser en vært, hvis nøgle den ikke allerede kender. Slår du den fra, accepteres enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes — det er bedre at angive værtens offentlige nøgle sammen med maskinoplysningerne og lade kontrollen være slået til. En Ansible-variabel pr. vært går under alle omstændigheder forud for denne indstilling.",
+      "oidcAudiencesLead": "Terrapod udsteder et kortlivet OpenID Connect-token pr. providerkonfiguration og skriver det et sted, hvor kørslen kan læse det.",
+      "driftIgnoreRulesLead": "Terraform-adresser og attributstier, som afdriftsklassificeringen undertrykker. En bar adresse uden attribut dæmper enhver ændring af den ressource.",
+      "dynamicInventoryEnabledLead": "Tillader deklarerede inventar-plugins, når runneren opløser inventaret. Inventaret, der vises her, bliver så ufuldstændigt pr. kilde, og det sæt, runneren opløser, er det gældende.",
+      "inventoryScriptsEnabledLead": "Tillader eksekverbare inventar-scripts. En vilkårlig eksekverbar fil fra repositoriet kører så inde i runner-Jobbet, med dets cloud-identitet, før playbooken kører — og inventaret, der vises her, bliver ufuldstændigt.",
+      "ansibleHostKeyCheckingLead": "Slået til som standard, som Ansible selv gør. Løsner en beskyttelse, når den er slået fra: enhver nøgle, en vært viser frem, accepteres, så forbindelsen kan aflyttes.",
+      "bindPlanLead": "Når den er slået til, anvender opdateringen præcis den plan, forhåndsvisningen gemte, så alt, der har ændret sig siden forhåndsvisningen, får opdateringen til at fejle i stedet for at blive anvendt.",
+      "configDirectoryLead": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Tomt betyder roden selv.",
+      "ansibleCollectionsLead": "Samlinger der installeres, før en configure kører, én pr. linje som namespace.name eller namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø.",
       "configureOnly": "Kun konfigurer",
       "configureOnlyHint": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply. Flådens egen legitimation — en SSH-nøgle til maskinparken, en become-adgangskode — hører ikke hjemme i nogen af dem.",
-      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer."
+      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer.",
+      "vaultFileLead": "Variablen indeholder filens sti, ikke hemmeligheden.",
+      "vaultFileTemplateLead": "Hver pladsholder erstattes med det felt fra denne ene læsning fra OpenBao/Vault.",
+      "gitSshLead": "Autentificerer private git::ssh://-modulkilder, der matcher mønstret ovenfor, med en deploy-nøgle."
     },
     "runs": {
       "options": "Indstillinger",
@@ -3286,7 +3298,8 @@
       "label": "Planlæg pull requests fra forks",
       "hint": "En kørsel modtager dette arbejdsområdes miljøvariabler, følsomme værdier, alle hemmeligheder hentet via Vault og jobbets cloud-identitet. Den, der åbner en pull request fra en fork, har ingen skriveadgang og kan ikke merge, så en spekulativ plan er den eneste vej, ad hvilken deres kode når frem til de legitimationsoplysninger. Slå dette til for et arbejdsområde, der ikke rummer noget værd at tage — for eksempel et offentligt modul-repository, der tager imod bidrag fra fællesskabet. Pull requests fra grene i selve repositoryet er upåvirkede og planlægges altid.",
       "activeBadge": "Til",
-      "confirmEnable": "Planlæg pull requests åbnet fra forks? Deres forfatteres kode vil køre med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, uden at nogen godkender det først."
+      "confirmEnable": "Planlæg pull requests åbnet fra forks? Deres forfatteres kode vil køre med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, uden at nogen godkender det først.",
+      "lead": "Løsner en beskyttelse: en plan fra en forks pull request når dette arbejdsområdes miljøvariabler, følsomme værdier, Vault-hemmeligheder og cloud-identitet — åbnet af nogen uden skriveadgang og uden mulighed for at merge."
     },
     "groups": {
       "identity": "Identitet",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Adgangskode til rettighedsforøgelse",
     "replaceHint": "Når du gemmer, erstattes hele legitimationen, så udfyld hvert felt den har brug for — ikke kun det, du ændrer. Lader du dem alle stå tomme, bevares den gemte legitimation, som den er.",
     "knownHosts": "Kendte værter",
-    "knownHostsHint": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format. Peg en inventarvariabel på dens sti for at forbinde uden at løsne verifikationen af værtsnøglen. Skjules ikke: en værts offentlige nøgle er offentlig og er netop det, du sammenligner, når en nøgle ikke passer."
+    "knownHostsHint": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format. Peg en inventarvariabel på dens sti for at forbinde uden at løsne verifikationen af værtsnøglen. Skjules ikke: en værts offentlige nøgle er offentlig og er netop det, du sammenligner, når en nøgle ikke passer.",
+    "knownHostsLead": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format.",
+    "machineLead": "Hvordan Ansible forbinder til de værter, der henviser til denne legitimation. Angiv en privat nøgle eller en adgangskode, eller begge."
   }
 }

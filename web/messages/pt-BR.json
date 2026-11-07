@@ -1988,7 +1988,9 @@
       "providerInvalid": "Um nome de provider não tem espaços e tem no máximo um ponto — aws, ou aws.west.",
       "providerPlaceholder": "aws, ou aws.west",
       "removeProviderAria": "Remover a configuração de provider {provider}"
-    }
+    },
+    "showDetail": "Mostrar a explicação completa",
+    "hideDetail": "Ocultar a explicação completa"
   },
   "planSummary": {
     "aiGenerated": "Gerado por IA",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Diretório de configuração do Ansible",
       "configDirectoryTitle": "Onde ficam ansible.cfg, os playbooks, roles/, group_vars/ e host_vars/, em relação à raiz do repositório. Deixe vazio para a própria raiz do repositório. Se este espaço de trabalho tem ou não uma operação de configuração é decidido pela configuração Configurar acima, não por este caminho.",
       "configDirectoryPlaceholder": "ex.: ansible",
-      "configDirectoryRootHint": "Deixe vazio para a própria raiz do repositório.",
       "configDirectoryRoot": "Raiz do repositório",
       "inventoryPaths": "Caminhos de inventário",
       "inventoryPathsHint": "Fontes de inventário ordenadas, cada uma um arquivo ou um diretório, em relação ao diretório de configuração. A ordem é a ordem de precedência.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Scripts de inventário",
       "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plugins de inventário dinâmico para que configurações de plugin declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários.",
       "ansibleHostKeyChecking": "Verificação da chave de host SSH",
-      "ansibleHostKeyCheckingHint": "Ativada por padrão, que é o que o Ansible faz por conta própria: uma configuração recusa um host cuja chave ela ainda não conhece. Se você desativar, qualquer chave que um host apresente é aceita, de modo que a conexão pode ser interceptada — é melhor fornecer a chave pública do host com a credencial de máquina e deixar a verificação ativada. Uma variável do Ansible definida por host prevalece de qualquer forma sobre esta opção."
+      "ansibleHostKeyCheckingHint": "Ativada por padrão, que é o que o Ansible faz por conta própria: uma configuração recusa um host cuja chave ela ainda não conhece. Se você desativar, qualquer chave que um host apresente é aceita, de modo que a conexão pode ser interceptada — é melhor fornecer a chave pública do host com a credencial de máquina e deixar a verificação ativada. Uma variável do Ansible definida por host prevalece de qualquer forma sobre esta opção.",
+      "oidcAudiencesLead": "O Terrapod emite um token OpenID Connect de curta duração para cada configuração de provider e o grava onde a execução pode lê-lo.",
+      "driftIgnoreRulesLead": "Endereços do Terraform e caminhos de atributo suprimidos pelo classificador de drift. Um endereço isolado, sem atributo, silencia qualquer alteração naquele recurso.",
+      "dynamicInventoryEnabledLead": "Permite plugins de inventário declarados quando o runner resolve o inventário. O inventário mostrado aqui passa então a ser parcial por fonte, e o conjunto que o runner resolve é o que vale.",
+      "inventoryScriptsEnabledLead": "Permite scripts de inventário executáveis. Um executável arbitrário do repositório é então executado dentro do Job do runner, com a sua identidade de nuvem, antes que o playbook seja executado — e o inventário mostrado aqui passa a ser parcial.",
+      "ansibleHostKeyCheckingLead": "Ativada por padrão, como o Ansible faz por conta própria. Afrouxa uma proteção quando desativada: qualquer chave que um host apresente é aceita, de modo que a conexão pode ser interceptada.",
+      "bindPlanLead": "Quando ativado, a atualização aplica exatamente o plano que a prévia salvou, então qualquer coisa que tenha mudado desde a prévia faz a atualização falhar em vez de ser aplicada.",
+      "configDirectoryLead": "Onde ficam ansible.cfg, os playbooks, roles/, group_vars/ e host_vars/, em relação à raiz do repositório. Vazio significa a própria raiz.",
+      "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, portanto uma credencial que só o apply precisa não deveria estar no ambiente de um plan.",
       "configureOnly": "Somente configurar",
       "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply. A credencial da própria frota — uma chave SSH do parque, uma senha become — não tem o que fazer em nenhum dos dois.",
-      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar por vez. Somente apply alcança um apply e um configurar; Somente configurar alcança apenas um configurar."
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar por vez. Somente apply alcança um apply e um configurar; Somente configurar alcança apenas um configurar.",
+      "vaultFileLead": "A variável contém o caminho do arquivo, não o segredo.",
+      "vaultFileTemplateLead": "Cada marcador é substituído por esse campo desta única leitura do OpenBao/Vault.",
+      "gitSshLead": "Autentique com uma chave de implantação as origens de módulo privadas git::ssh:// que correspondam ao padrão acima."
     },
     "runs": {
       "options": "Opções",
@@ -3286,7 +3298,8 @@
       "label": "Planejar pull requests de forks",
       "hint": "Uma execução recebe as variáveis de ambiente deste espaço de trabalho, os valores sensíveis, quaisquer segredos resolvidos pelo Vault e a identidade de nuvem do job. Quem abre uma pull request a partir de um fork não tem acesso de escrita e não pode fazer merge, então um plano especulativo é o único caminho pelo qual o código dessa pessoa alcança essas credenciais. Ative isto para um espaço de trabalho que não guarda nada que valha a pena levar — um repositório público de módulos que aceita contribuições da comunidade, por exemplo. Pull requests de branches do próprio repositório não são afetadas e sempre geram plano.",
       "activeBadge": "Ligado",
-      "confirmEnable": "Planejar pull requests abertas a partir de forks? O código de seus autores será executado com as credenciais e as variáveis descriptografadas deste espaço de trabalho, sem que ninguém aprove antes."
+      "confirmEnable": "Planejar pull requests abertas a partir de forks? O código de seus autores será executado com as credenciais e as variáveis descriptografadas deste espaço de trabalho, sem que ninguém aprove antes.",
+      "lead": "Afrouxa uma proteção: um plano de uma pull request aberta a partir de um fork alcança as variáveis de ambiente deste espaço de trabalho, os seus valores sensíveis, os seus segredos do Vault e a sua identidade de nuvem — aberta por alguém que não tem acesso de escrita e não pode fazer merge."
     },
     "groups": {
       "identity": "Identidade",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Senha de elevação",
     "replaceHint": "Salvar substitui a credencial inteira, então preencha todos os campos necessários — não apenas o que está sendo alterado. Deixar todos em branco mantém a credencial armazenada como está.",
     "knownHosts": "Hosts conhecidos",
-    "knownHostsHint": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para conectar sem afrouxar a verificação da chave de host. Não é oculta: a chave pública de um host é pública e é exatamente o que você compara quando uma chave não corresponde."
+    "knownHostsHint": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para conectar sem afrouxar a verificação da chave de host. Não é oculta: a chave pública de um host é pública e é exatamente o que você compara quando uma chave não corresponde.",
+    "knownHostsLead": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts.",
+    "machineLead": "Como o Ansible se conecta aos hosts que se referem a esta credencial. Informe uma chave privada ou uma senha, ou as duas."
   }
 }

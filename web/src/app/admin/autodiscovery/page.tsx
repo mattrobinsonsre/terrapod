@@ -34,6 +34,7 @@ import {
   type GroupId,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
@@ -1058,8 +1059,9 @@ export default function AutodiscoveryPage() {
         // the same trap -- bind-plan renders for Pulumi only, so a form that
         // defaults to Terraform never reveals it until somebody switches.
         return (
-          <p className="mt-1 text-xs text-slate-500">
-            {tWs.rich('fields.bindPlanHelp', {
+          <HintWithDetail
+            lead={tWs('fields.bindPlanLead')}
+            detail={tWs.rich('fields.bindPlanHelp', {
               docs: (chunks) => (
                 <a
                   href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
@@ -1071,7 +1073,7 @@ export default function AutodiscoveryPage() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'plan-apply-enabled':
         return hintText(tWs('fields.planApplyEnabledHint'))
@@ -1084,7 +1086,7 @@ export default function AutodiscoveryPage() {
       case 'configure-all-hosts':
         return hintText(tWs('fields.configureAllHostsHint'))
       case 'config-directory':
-        return hintText(tWs('fields.configDirectoryRootHint'))
+        return tieredHint(tWs, 'fields.configDirectoryTitle')
       case 'default-playbook':
         return hintText(tWs('fields.defaultPlaybookTitle'))
       case 'default-limit':
@@ -1092,11 +1094,11 @@ export default function AutodiscoveryPage() {
       case 'inventory-paths':
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return hintText(tWs('fields.dynamicInventoryEnabledHint'))
+        return tieredHint(tWs, 'fields.dynamicInventoryEnabledHint')
       case 'inventory-scripts-enabled':
-        return hintText(tWs('fields.inventoryScriptsEnabledHint'))
+        return tieredHint(tWs, 'fields.inventoryScriptsEnabledHint')
       case 'ansible-host-key-checking':
-        return hintText(tWs('fields.ansibleHostKeyCheckingHint'))
+        return tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-version':
         return hintText(
           envs.listing === 'complete' && envs.lines.length > 0
@@ -1110,7 +1112,7 @@ export default function AutodiscoveryPage() {
       case 'ansible-execution-environment':
         return hintText(tWs('fields.ansibleExecutionEnvironmentTitle'))
       case 'ansible-collections':
-        return hintText(tWs('fields.ansibleCollectionsHint'))
+        return tieredHint(tWs, 'fields.ansibleCollectionsHint')
       case 'var-files':
         // `t.rich`: carries a <code> tag.
         return (

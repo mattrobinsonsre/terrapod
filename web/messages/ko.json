@@ -1988,7 +1988,9 @@
       "providerInvalid": "프로바이더 이름에는 공백이 없고 점은 최대 하나입니다 — aws 또는 aws.west.",
       "providerPlaceholder": "aws 또는 aws.west",
       "removeProviderAria": "프로바이더 구성 {provider} 제거"
-    }
+    },
+    "showDetail": "전체 설명 표시",
+    "hideDetail": "전체 설명 숨기기"
   },
   "planSummary": {
     "aiGenerated": "AI 생성",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible 구성 디렉터리",
       "configDirectoryTitle": "ansible.cfg, 플레이북, roles/, group_vars/, host_vars/ 가 있는 위치를 저장소 루트 기준 상대 경로로 지정합니다. 저장소 루트 자체이면 비워 두십시오. 이 워크스페이스에 구성 작업이 있는지는 위의 구성 설정이 결정하며, 이 경로가 결정하지 않습니다.",
       "configDirectoryPlaceholder": "예: ansible",
-      "configDirectoryRootHint": "저장소 루트 자체를 가리키려면 비워 두세요.",
       "configDirectoryRoot": "저장소 루트",
       "inventoryPaths": "인벤토리 경로",
       "inventoryPathsHint": "순서가 있는 인벤토리 소스로, 각각 파일 또는 디렉터리이며 구성 디렉터리 기준 상대 경로입니다. 순서가 우선순위입니다.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "인벤토리 스크립트",
       "inventoryScriptsEnabledHint": "러너가 인벤토리를 확인할 때 실행 가능한 인벤토리 스크립트를 허용합니다. 동적 인벤토리 플러그인과 분리되어 있어, 컬렉션을 지정하고 실행 전에 내용을 읽을 수 있는 선언된 플러그인 설정만 허용하고 임의의 실행 파일은 허용하지 않을 수 있습니다.",
       "ansibleHostKeyChecking": "SSH 호스트 키 확인",
-      "ansibleHostKeyCheckingHint": "기본적으로 켜져 있으며, 이는 Ansible 자체의 동작입니다. 구성은 아직 신뢰하지 않는 키를 제시하는 호스트를 거부합니다. 이것을 끄면 호스트가 제시하는 어떤 키든 받아들여지므로 연결이 가로채일 수 있습니다. 호스트의 공개 키를 머신 자격 증명과 함께 제공하고 확인을 켜 두는 것이 더 낫습니다. 호스트별 Ansible 변수는 어느 쪽이든 이 설정보다 우선합니다."
+      "ansibleHostKeyCheckingHint": "기본적으로 켜져 있으며, 이는 Ansible 자체의 동작입니다. 구성은 아직 신뢰하지 않는 키를 제시하는 호스트를 거부합니다. 이것을 끄면 호스트가 제시하는 어떤 키든 받아들여지므로 연결이 가로채일 수 있습니다. 호스트의 공개 키를 머신 자격 증명과 함께 제공하고 확인을 켜 두는 것이 더 낫습니다. 호스트별 Ansible 변수는 어느 쪽이든 이 설정보다 우선합니다.",
+      "oidcAudiencesLead": "Terrapod는 프로바이더 구성마다 단기 OpenID Connect 토큰을 발급하고, 실행이 읽을 수 있는 위치에 기록합니다.",
+      "driftIgnoreRulesLead": "드리프트 분류기가 억제하는 Terraform 주소와 속성 경로입니다. 속성이 없는 순수 주소는 해당 리소스에 대한 모든 변경을 억제합니다.",
+      "dynamicInventoryEnabledLead": "러너가 인벤토리를 확인할 때 선언된 인벤토리 플러그인을 허용합니다. 그러면 여기에 표시되는 인벤토리는 소스별로 부분적인 것이 되고, 러너가 확인한 집합이 기준이 됩니다.",
+      "inventoryScriptsEnabledLead": "실행 가능한 인벤토리 스크립트를 허용합니다. 그러면 저장소에 있는 임의의 실행 파일이 플레이북보다 먼저, 러너 Job 내부에서 그 클라우드 ID로 실행됩니다 — 그리고 여기에 표시되는 인벤토리는 부분적인 것이 됩니다.",
+      "ansibleHostKeyCheckingLead": "기본적으로 켜져 있으며, 이는 Ansible 자체의 동작입니다. 끄면 보호를 완화합니다: 호스트가 제시하는 어떤 키든 받아들여지므로 연결이 가로채일 수 있습니다.",
+      "bindPlanLead": "켜면 업데이트는 미리보기가 저장한 계획을 그대로 적용하므로, 미리보기 이후 바뀐 것이 있으면 적용되는 대신 업데이트가 실패합니다.",
+      "configDirectoryLead": "ansible.cfg, 플레이북, roles/, group_vars/, host_vars/ 가 있는 위치를 저장소 루트 기준 상대 경로로 지정합니다. 비워 두면 루트 자체를 뜻합니다.",
+      "ansibleCollectionsLead": "구성 실행 전에 설치되는 컬렉션으로, 한 줄에 하나씩 namespace.name 또는 namespace.name:version 형식으로 입력합니다."
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다.",
       "configureOnly": "구성 전용",
       "configureOnlyHint": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다. 플릿 자체의 자격 증명 — 설비에 대한 SSH 키나 become 암호 — 은 둘 중 어느 쪽과도 상관이 없습니다.",
-      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다."
+      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다.",
+      "vaultFileLead": "변수에는 시크릿이 아니라 파일 경로가 들어갑니다.",
+      "vaultFileTemplateLead": "각 자리 표시자는 이 한 번의 OpenBao/Vault 읽기에서 가져온 해당 필드로 바뀝니다.",
+      "gitSshLead": "위의 패턴과 일치하는 비공개 git::ssh:// 모듈 소스를 배포 키로 인증합니다."
     },
     "runs": {
       "options": "옵션",
@@ -3286,7 +3298,8 @@
       "label": "포크 풀 리퀘스트 계획 실행",
       "hint": "실행은 이 워크스페이스의 환경 변수, 민감한 값, Vault에서 해석된 시크릿, 그리고 작업의 클라우드 ID를 받습니다. 포크에서 풀 리퀘스트를 연 사람은 쓰기 권한이 없고 병합할 수도 없으므로, 예상 계획이 그 코드가 이러한 자격 증명에 닿는 유일한 경로입니다. 가져갈 만한 것이 전혀 없는 워크스페이스 — 예를 들어 커뮤니티 기여를 받는 공개 모듈 저장소 — 에서는 이것을 켜세요. 저장소 자체의 브랜치에서 연 풀 리퀘스트는 영향을 받지 않으며 항상 계획을 받습니다.",
       "activeBadge": "켜짐",
-      "confirmEnable": "포크에서 연 풀 리퀘스트에 계획을 실행할까요? 작성자의 코드가 누구의 승인도 없이 이 워크스페이스의 자격 증명과 복호화된 변수로 실행됩니다."
+      "confirmEnable": "포크에서 연 풀 리퀘스트에 계획을 실행할까요? 작성자의 코드가 누구의 승인도 없이 이 워크스페이스의 자격 증명과 복호화된 변수로 실행됩니다.",
+      "lead": "보호를 완화합니다: 포크의 풀 리퀘스트에서 실행되는 계획이 이 워크스페이스의 환경 변수, 민감한 값, Vault 시크릿, 클라우드 ID에 닿습니다 — 그것을 연 사람은 쓰기 권한이 없고 병합할 수도 없습니다."
     },
     "groups": {
       "identity": "아이덴티티",
@@ -3982,6 +3995,8 @@
     "becomePassword": "권한 상승 암호",
     "replaceHint": "저장하면 자격 증명 전체가 교체됩니다. 변경하는 항목만이 아니라 필요한 모든 항목을 입력하세요. 모두 비워 두면 저장된 자격 증명이 그대로 유지됩니다.",
     "knownHosts": "알려진 호스트",
-    "knownHostsHint": "이 자격 증명이 연결하는 머신의 공개 호스트 키를 known_hosts 형식으로 한 줄에 하나씩 적습니다. 호스트 키 검증을 완화하지 않고 연결하려면 인벤토리 변수를 이 경로로 지정하세요. 숨기지 않습니다. 호스트의 공개 키는 공개 정보이며, 키가 일치하지 않을 때 비교하는 대상이 바로 이것입니다."
+    "knownHostsHint": "이 자격 증명이 연결하는 머신의 공개 호스트 키를 known_hosts 형식으로 한 줄에 하나씩 적습니다. 호스트 키 검증을 완화하지 않고 연결하려면 인벤토리 변수를 이 경로로 지정하세요. 숨기지 않습니다. 호스트의 공개 키는 공개 정보이며, 키가 일치하지 않을 때 비교하는 대상이 바로 이것입니다.",
+    "knownHostsLead": "이 자격 증명이 연결하는 머신의 공개 호스트 키를 known_hosts 형식으로 한 줄에 하나씩 적습니다.",
+    "machineLead": "이 자격 증명을 가리키는 호스트에 Ansible이 연결하는 방식입니다. 개인 키나 암호를 입력하세요. 둘 다 입력해도 됩니다."
   }
 }

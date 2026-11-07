@@ -127,14 +127,45 @@ def main() -> int:
     )
     ap.add_argument("--namespace", default="workspaceDetail")
     ap.add_argument("--allow-identical", default="")
+    ap.add_argument(
+        "--replace",
+        default="",
+        help=(
+            "Dotted keys the locale ALREADY has, to be overwritten. Every value "
+            "refusal below still applies, so a replacement cannot be the English "
+            "string or drop a placeholder. Naming a key the locale does not have "
+            "is refused: that is a fill, and mixing the two silently would let a "
+            "typo in a key name read as a successful replace."
+        ),
+    )
     args = ap.parse_args()
 
     if args.locale == "en":
         sys.exit("en is the SOURCE catalogue; it is not filled by this script")
 
     keys = missing_keys(args.locale, args.namespace)
+    replace = {k.strip() for k in args.replace.split(",") if k.strip()}
+    if replace:
+        have = _load(args.locale).get(args.namespace, {})
+        absent = []
+        for key in sorted(replace):
+            try:
+                found = _reach(have, key)
+            except (KeyError, TypeError):
+                found = None
+            if not isinstance(found, str):
+                absent.append(key)
+        if absent:
+            sys.exit(
+                f"--replace names keys {args.locale} does not already carry "
+                f"(that is a fill, not a replace): {absent}"
+            )
+        keys = tuple(dict.fromkeys((*keys, *sorted(replace))))
     if not keys:
-        sys.exit(f"{args.locale} is already complete under {args.namespace}; nothing to fill")
+        sys.exit(
+            f"{args.locale} is already complete under {args.namespace} and "
+            "--replace named nothing; there is nothing to write"
+        )
 
     allow_identical = {k.strip() for k in args.allow_identical.split(",") if k.strip()}
     unknown_exemptions = allow_identical - set(keys)

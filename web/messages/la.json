@@ -1988,7 +1988,9 @@
       "providerInvalid": "Nomen provider spatia non habet et ad summum unum punctum — aws, vel aws.west.",
       "providerPlaceholder": "aws, vel aws.west",
       "removeProviderAria": "Configurationem provider {provider} removere"
-    }
+    },
+    "showDetail": "Explicationem plenam monstrare",
+    "hideDetail": "Explicationem plenam celare"
   },
   "planSummary": {
     "aiGenerated": "AI generatum",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Directorium configurationis Ansible",
       "configDirectoryTitle": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum relinque pro ipsa radice repositorii. Utrum hoc spatium operis operationem configurandi omnino habeat, optio Configurare supra decernit, non haec via.",
       "configDirectoryPlaceholder": "ex. gr. ansible",
-      "configDirectoryRootHint": "Hoc vacuum relinque pro ipsa radice repositorii.",
       "configDirectoryRoot": "Radix repositorii",
       "inventoryPaths": "Semitae inventarii",
       "inventoryPathsHint": "Fontes inventarii ordinati, unusquisque plica aut directorium, relative ad directorium configurationis. Ordo est ordo praecedentiae.",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "Scripta inventarii",
       "inventoryScriptsEnabledHint": "Scripta inventarii exsecutabilia permittit cum cursor inventarium resolvit. Ab interpolamentis inventarii dynamici separatum est, ut configurationes interpolamenti declaratae, quae collectionem nominant et ante exsecutionem legi possunt, permitti queant sine licentia quorumlibet exsecutabilium.",
       "ansibleHostKeyChecking": "Inspectio clavis hospitis SSH",
-      "ansibleHostKeyCheckingHint": "Praedefinite accensa, quod est mos ipsius Ansible: configuratio hospitem respuit cuius clavi nondum confidit. Si eam exstinxeris, quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest — melius est clavem publicam hospitis cum credentiali machinae praebere et inspectionem accensam relinquere. Variabilis Ansible pro singulis hospitibus huic optioni utroque modo praevalet."
+      "ansibleHostKeyCheckingHint": "Praedefinite accensa, quod est mos ipsius Ansible: configuratio hospitem respuit cuius clavi nondum confidit. Si eam exstinxeris, quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest — melius est clavem publicam hospitis cum credentiali machinae praebere et inspectionem accensam relinquere. Variabilis Ansible pro singulis hospitibus huic optioni utroque modo praevalet.",
+      "oidcAudiencesLead": "Terrapod pro singulis configurationibus provider tesseram OpenID Connect brevis aevi emittit eamque ibi scribit ubi exsecutio eam legere potest.",
+      "driftIgnoreRulesLead": "Inscriptiones Terraform et semitae attributorum quas classificator aberrationis supprimit. Inscriptio nuda, sine attributo, quamvis mutationem illius facultatis silet.",
+      "dynamicInventoryEnabledLead": "Interpolamenta inventarii declarata permittit cum cursor inventarium resolvit. Inventarium hic ostensum tunc per singulos fontes partiale fit, et copia quam cursor resolvit auctoritatem habet.",
+      "inventoryScriptsEnabledLead": "Scripta inventarii exsecutabilia permittit. Exsecutabile quodlibet ex repositorio tunc intra Job cursoris currit, cum identitate nubis eius, priusquam libellus ludendi currat — et inventarium hic ostensum partiale fit.",
+      "ansibleHostKeyCheckingLead": "Praedefinite accensa, sicut ipse Ansible facit. Praesidium relaxat cum exstincta est: quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest.",
+      "bindPlanLead": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur.",
+      "configDirectoryLead": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum ipsam radicem significat.",
+      "ansibleCollectionsLead": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent.",
       "configureOnly": "Tantum configurare",
       "configureOnlyHint": "Soli configurare traditur et tam a plan quam ab apply retinetur. Credentia ipsius classis — clavis SSH ad praedium, tessera become — in neutro quicquam agunt.",
-      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit."
+      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit.",
+      "vaultFileLead": "Variabilis semitam fasciculi tenet, non arcanum.",
+      "vaultFileTemplateLead": "Quisque locum tenens eo campo ex hac una lectione OpenBao/Vault substituitur.",
+      "gitSshLead": "Fontes modulorum privatos git::ssh:// qui exemplari supra posito conveniunt clave emissaria authentica."
     },
     "runs": {
       "options": "Optiones",
@@ -3286,7 +3298,8 @@
       "label": "Rogationes tractionis e furca consiliari",
       "hint": "Exsecutio accipit variabiles ambitus huius loci operis, valores sensibiles, arcana quaelibet per Vault resoluta, atque identitatem nubis operis. Qui rogationem tractionis e furca aperit neque scribendi potestatem habet neque conflare potest; itaque consilium speculativum sola via est qua codex eius ad illas credentias pervenit. Hoc accende pro loco operis qui nihil auferendum continet — exempli gratia, pro repositorio modulorum publico quod conlationes communitatis accipit. Rogationes tractionis e ramis ipsius repositorii non afficiuntur et semper consilium accipiunt.",
       "activeBadge": "Accensum",
-      "confirmEnable": "Rogationes tractionis e furcis apertas consiliari? Codex auctorum earum cum credentiis variabilibusque decryptis huius loci operis exsequetur, nemine prius approbante."
+      "confirmEnable": "Rogationes tractionis e furcis apertas consiliari? Codex auctorum earum cum credentiis variabilibusque decryptis huius loci operis exsequetur, nemine prius approbante.",
+      "lead": "Praesidium relaxat: consilium ex rogatione tractionis e furca ad variabiles ambitus huius loci operis, valores sensibiles, arcana Vault atque identitatem nubis pervenit — quam aperuit aliquis qui neque scribendi potestatem habet neque conflare potest."
     },
     "groups": {
       "identity": "Identitas",
@@ -3982,6 +3995,8 @@
     "becomePassword": "Tessera auctionis",
     "replaceHint": "Conservatio totum testimonium substituit; itaque omnem campum necessarium comple, non solum eum quem mutas. Si omnes vacuos relinquis, testimonium conditum manet ut est.",
     "knownHosts": "Hospites noti",
-    "knownHostsHint": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts. Variabilem inventarii ad eius semitam dirige ut sine relaxatione probationis clavis hospitis coniungas. Non occultatur: clavis publica hospitis publica est, atque id ipsum est quod comparas cum clavis non congruit."
+    "knownHostsHint": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts. Variabilem inventarii ad eius semitam dirige ut sine relaxatione probationis clavis hospitis coniungas. Non occultatur: clavis publica hospitis publica est, atque id ipsum est quod comparas cum clavis non congruit.",
+    "knownHostsLead": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts.",
+    "machineLead": "Quomodo Ansible ad hospites se coniungit qui hoc testimonium appellant. Clavem privatam aut tesseram praebe, vel utramque."
   }
 }

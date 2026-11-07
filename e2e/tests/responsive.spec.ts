@@ -24,6 +24,40 @@ const API_URL = process.env.API_URL || 'http://localhost:8000';
  */
 
 test.describe('Responsive harness (phone viewport)', () => {
+  test('a two-tier hint is openable with a thumb and pushes rather than covers (#2413 F15)', async ({
+    page,
+  }) => {
+    // The ⓘ is the SMALLEST control on a form full of inputs, so it is the one
+    // most likely to be missed with a thumb -- hence `min-h-11 min-w-11` on
+    // touch, collapsing on a precise pointer. Asserted here because this is
+    // the only project running a coarse pointer.
+    await page.goto('/workspaces')
+    await page.click('button:has-text("Create Workspace")')
+    const toggle = page.getByTestId('hint-detail-toggle').first()
+    await expect(toggle).toBeVisible({ timeout: 15_000 })
+
+    const box = await toggle.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+
+    await expectNoHorizontalPageScroll(page)
+
+    // Opening it must not introduce one either: the detail carries paths and
+    // identifiers that do not wrap on their own, which is why it is
+    // `break-words`. A floating popover would have covered the control it
+    // describes at this width; an in-flow block can only push.
+    await toggle.click()
+    const detail = page.getByTestId('hint-detail').first()
+    await expect(detail).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    const db = await detail.boundingBox()
+    expect(db).not.toBeNull()
+    const vw = page.viewportSize()!.width
+    expect(db!.x).toBeGreaterThanOrEqual(0)
+    expect(db!.x + db!.width).toBeLessThanOrEqual(vw)
+  })
+
   test('the Vault reference builder is usable at phone width (#1439)', async ({ page }) => {
     // The desktop defect this guards against in the other direction: five
     // fields crammed into a narrow container truncated the path and field

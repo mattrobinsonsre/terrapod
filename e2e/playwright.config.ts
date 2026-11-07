@@ -312,6 +312,15 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], storageState: ADMIN_AUTH },
     },
     {
+      // Two-tier field hints (#2413 F15). Desktop Chrome on purpose: the
+      // click-not-hover and keyboard halves are precise-pointer properties,
+      // and the phone-width half lives in the `responsive` project where the
+      // coarse pointer is.
+      name: 'hint-tiers',
+      testMatch: 'hint-tiers.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       // i18n language switcher (#767): proves the nav globe dropdown flips
       // strings through the real BFF chain (German full catalog + Spanish
       // fallback + a joke locale), with no MISSING_MESSAGE leak.

@@ -1988,7 +1988,9 @@
       "providerInvalid": "provider 名称不含空格，且最多一个点 — aws，或 aws.west。",
       "providerPlaceholder": "aws，或 aws.west",
       "removeProviderAria": "移除 provider 配置 {provider}"
-    }
+    },
+    "showDetail": "显示完整说明",
+    "hideDetail": "隐藏完整说明"
   },
   "planSummary": {
     "aiGenerated": "AI 生成",
@@ -2609,7 +2611,6 @@
       "configDirectory": "Ansible 配置目录",
       "configDirectoryTitle": "ansible.cfg、playbook、roles/、group_vars/ 和 host_vars/ 所在的位置，相对于仓库根目录。若就是仓库根目录本身，请留空。此工作区是否拥有配置操作由上方的 配置 设置决定，而不是这个路径。",
       "configDirectoryPlaceholder": "例如 ansible",
-      "configDirectoryRootHint": "若指仓库根目录本身，请留空。",
       "configDirectoryRoot": "仓库根目录",
       "inventoryPaths": "清单路径",
       "inventoryPathsHint": "有序的清单来源，每一项是文件或目录，相对于配置目录。顺序即优先级顺序。",
@@ -2689,7 +2690,15 @@
       "inventoryScriptsEnabled": "清单脚本",
       "inventoryScriptsEnabledHint": "允许 runner 解析清单时使用可执行的清单脚本。与动态清单插件分开设置，这样就可以只允许已声明的插件配置——它们指明了一个集合，并且在运行前可以读取——而不必同时允许任意可执行文件。",
       "ansibleHostKeyChecking": "SSH 主机密钥检查",
-      "ansibleHostKeyCheckingHint": "默认开启，这也是 Ansible 自身的行为：配置会拒绝其密钥尚未受信任的主机。关闭后，主机出示的任何密钥都会被接受，连接因而可能被截取——更好的做法是随机器凭据一并提供主机的公钥，并保持检查开启。无论哪种情况，针对单台主机的 Ansible 变量都优先于此设置。"
+      "ansibleHostKeyCheckingHint": "默认开启，这也是 Ansible 自身的行为：配置会拒绝其密钥尚未受信任的主机。关闭后，主机出示的任何密钥都会被接受，连接因而可能被截取——更好的做法是随机器凭据一并提供主机的公钥，并保持检查开启。无论哪种情况，针对单台主机的 Ansible 变量都优先于此设置。",
+      "oidcAudiencesLead": "Terrapod 为每个 provider 配置颁发一个短期的 OpenID Connect 令牌，并写入运行可读取的位置。",
+      "driftIgnoreRulesLead": "漂移分类器所抑制的 Terraform 地址与属性路径。没有属性的裸地址会静默该资源的所有更改。",
+      "dynamicInventoryEnabledLead": "允许 runner 解析清单时使用已声明的清单插件。此后此处显示的清单会按来源变得不完整，由 runner 解析出的集合才是权威结果。",
+      "inventoryScriptsEnabledLead": "允许使用可执行的清单脚本。此后仓库中的任意可执行文件会在 playbook 之前，在 runner Job 内以其云身份运行 — 而此处显示的清单也会变得不完整。",
+      "ansibleHostKeyCheckingLead": "默认开启，这也是 Ansible 自身的行为。关闭会放宽一项保护：主机出示的任何密钥都会被接受，连接因而可能被截取。",
+      "bindPlanLead": "开启后，更新会严格应用预览保存的计划，因此自预览以来发生的任何变化都会导致更新失败，而不会被应用。",
+      "configDirectoryLead": "ansible.cfg、playbook、roles/、group_vars/ 和 host_vars/ 所在的位置，相对于仓库根目录。留空即表示根目录本身。",
+      "ansibleCollectionsLead": "在配置运行前安装的集合，每行一个，格式为 namespace.name 或 namespace.name:version。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",
@@ -2843,7 +2852,10 @@
       "applyOnlyHint": "对 plan 隐藏，仅交付给 apply。plan 会执行配置中的代码，因此只有 apply 需要的凭据不应出现在 plan 的环境中。",
       "configureOnly": "仅配置",
       "configureOnlyHint": "仅交付给配置，对 plan 和 apply 都隐藏。机群自身的凭据 — 通往设备的 SSH 密钥、become 口令 — 与这两者都无关。",
-      "phaseSlotExclusive": "一个变量一次只占用一个槽位。“仅 apply”会到达 apply 和配置；“仅配置”只会到达配置。"
+      "phaseSlotExclusive": "一个变量一次只占用一个槽位。“仅 apply”会到达 apply 和配置；“仅配置”只会到达配置。",
+      "vaultFileLead": "变量保存的是文件路径，而不是密钥。",
+      "vaultFileTemplateLead": "每个占位符都会替换为这一次 OpenBao/Vault 读取中的对应字段。",
+      "gitSshLead": "使用部署密钥对匹配上方模式的私有 git::ssh:// 模块源进行身份验证。"
     },
     "runs": {
       "options": "选项",
@@ -3286,7 +3298,8 @@
       "label": "为 fork 的拉取请求运行计划",
       "hint": "一次运行会获得此工作区的环境变量、敏感值、所有由 Vault 解析的密钥，以及该任务的云身份。从 fork 发起拉取请求的人没有写入权限，也无法合并，因此推测性计划是其代码接触到这些凭据的唯一途径。请只为没有任何值得窃取之物的工作区开启它 — 例如一个接受社区贡献的公开模块仓库。来自仓库自身分支的拉取请求不受影响，始终会执行计划。",
       "activeBadge": "已开启",
-      "confirmEnable": "要为从 fork 发起的拉取请求运行计划吗？其作者的代码将使用此工作区的凭据和已解密变量运行，且无需任何人事先批准。"
+      "confirmEnable": "要为从 fork 发起的拉取请求运行计划吗？其作者的代码将使用此工作区的凭据和已解密变量运行，且无需任何人事先批准。",
+      "lead": "放宽一项保护：来自 fork 拉取请求的计划会接触到此工作区的环境变量、敏感值、Vault 密钥和云身份 — 而发起它的人既没有写入权限，也无法合并。"
     },
     "groups": {
       "identity": "身份",
@@ -3982,6 +3995,8 @@
     "becomePassword": "提升密码",
     "replaceHint": "保存会替换整条凭据，因此请填写它需要的每个字段，而不只是正在修改的那个。全部留空则保留已存储的凭据不变。",
     "knownHosts": "已知主机",
-    "knownHostsHint": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。将清单变量指向其路径，即可在不放松主机密钥校验的情况下建立连接。不会隐藏：主机的公钥本就是公开的，密钥不匹配时比对的正是它。"
+    "knownHostsHint": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。将清单变量指向其路径，即可在不放松主机密钥校验的情况下建立连接。不会隐藏：主机的公钥本就是公开的，密钥不匹配时比对的正是它。",
+    "knownHostsLead": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。",
+    "machineLead": "Ansible 连接引用此凭据的主机的方式。请提供私钥或密码，也可以同时提供两者。"
   }
 }

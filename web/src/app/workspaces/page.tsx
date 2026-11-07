@@ -44,6 +44,7 @@ import {
   type GroupId,
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
+import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   OidcAudiencesEditor,
@@ -1023,8 +1024,9 @@ function WorkspacesPageInner() {
         // thrown for whoever first selected Pulumi. Found by the gate, not by
         // the demo, which is the argument for having both.
         return (
-          <p className="mt-1 text-xs text-slate-400">
-            {tDetail.rich('fields.bindPlanHelp', {
+          <HintWithDetail
+            lead={tDetail('fields.bindPlanLead')}
+            detail={tDetail.rich('fields.bindPlanHelp', {
               docs: (chunks) => (
                 <a
                   href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
@@ -1036,7 +1038,7 @@ function WorkspacesPageInner() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'plan-apply-enabled':
         return hintText(tDetail('fields.planApplyEnabledHint'))
@@ -1049,21 +1051,21 @@ function WorkspacesPageInner() {
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
       case 'config-directory':
-        return hintText(tDetail('fields.configDirectoryRootHint'))
+        return tieredHint(tDetail, 'fields.configDirectoryTitle')
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
-        return hintText(tDetail('fields.dynamicInventoryEnabledHint'))
+        return tieredHint(tDetail, 'fields.dynamicInventoryEnabledHint')
       case 'inventory-scripts-enabled':
-        return hintText(tDetail('fields.inventoryScriptsEnabledHint'))
+        return tieredHint(tDetail, 'fields.inventoryScriptsEnabledHint')
       case 'ansible-host-key-checking':
-        return hintText(tDetail('fields.ansibleHostKeyCheckingHint'))
+        return tieredHint(tDetail, 'fields.ansibleHostKeyCheckingHint')
       case 'ansible-collections':
-        return hintText(tDetail('fields.ansibleCollectionsHint'))
+        return tieredHint(tDetail, 'fields.ansibleCollectionsHint')
       case 'agent-pool-ids':
         return hintText(tDetail('fields.agentPoolsHint'))
       case 'allow-fork-pr-plans':
-        return hintText(tDetail('allowForkPrPlans.hint'))
+        return tieredHint(tDetail, 'allowForkPrPlans.hint')
       case 'trigger-prefixes':
         return hintText(tDetail('fields.triggerPrefixesHint'))
       case 'drift-ignore-rules':
@@ -1074,8 +1076,9 @@ function WorkspacesPageInner() {
         // in a browser. Components match the edit tab's rendering so the two
         // forms read identically.
         return (
-          <p className="mt-1 text-xs text-slate-400">
-            {tDetail.rich('fields.driftIgnoreRulesHint', {
+          <HintWithDetail
+            lead={tDetail('fields.driftIgnoreRulesLead')}
+            detail={tDetail.rich('fields.driftIgnoreRulesHint', {
               star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
               dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
               n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
@@ -1091,14 +1094,14 @@ function WorkspacesPageInner() {
                 </a>
               ),
             })}
-          </p>
+          />
         )
       case 'ai-summary-context':
         return hintText(tDetail('aiSummary.contextHint'))
       case 'ai-policy-mode':
         return hintText(tDetail('aiSummary.policyModeNote'))
       case 'oidc-audiences':
-        return hintText(tDetail('fields.oidcAudiencesHint'))
+        return tieredHint(tDetail, 'fields.oidcAudiencesHint')
       case 'debug-mode':
         return hintText(tDetail('debugMode.hint'))
       case 'slack-channel':
