@@ -880,6 +880,38 @@ def _workspace_json(
             "status": latest_run.status,
             "plan-only": latest_run.plan_only,
             "created-at": _rfc3339(latest_run.created_at),
+            # The three PHASE-START times, so a status badge can link to the
+            # view that explains the status it is showing (#2413 F16).
+            #
+            # `status` alone cannot do it: `errored` does not say WHICH phase
+            # errored, and the obvious end-timestamp rule identifies nothing on
+            # an errored run, because the phase that failed never recorded a
+            # finish. The last phase to have STARTED is the one that explains
+            # the outcome.
+            #
+            # Deliberately NOT called `status-timestamps`, though those are the
+            # key names the run document uses: that attribute carries queue and
+            # finish times too, and a subset under the same name would read as
+            # the whole of it. Same key names so one rule reads both --
+            # `web/src/lib/run-phases.ts::explainingPhase` is the only producer
+            # of "which phase explains this", and it takes any dict carrying
+            # these keys.
+            # Filtered on the DATETIME, not on the formatted string.
+            # `_rfc3339(None)` returns `""`, so the obvious `if v is not None`
+            # over formatted values drops nothing and emits `"planning-at": ""`
+            # for a phase that never ran -- which reads as a value. The run
+            # document's own `status-timestamps` has that exact dead filter and
+            # does emit the empty strings; `explainingPhase` survives it only
+            # because it tests truthiness rather than presence.
+            "phase-started-at": {
+                key: _rfc3339(started)
+                for key, started in (
+                    ("planning-at", latest_run.plan_started_at),
+                    ("applying-at", latest_run.apply_started_at),
+                    ("configuring-at", latest_run.configure_started_at),
+                )
+                if started is not None
+            },
         }
 
     payload = {

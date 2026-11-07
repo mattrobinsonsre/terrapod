@@ -58,9 +58,10 @@ export const HINT_LEADS: Record<string, string> = {
  * Hint strings at or over `LONG` that are deliberately NOT two-tier.
  *
  * Each entry says why, and the gate requires a reason — an empty string fails.
- * The two here are not field hints at all: one is a `confirm()` body, where an
- * ⓘ cannot be opened because the dialog is modal, and the other is a standing
- * explainer block rather than a line under a control.
+ * The four here are not field hints at all: two are `confirm()` bodies, where an
+ * ⓘ cannot be opened because the dialog is modal; one is an empty-state
+ * description; and one is a standing explainer block rather than a line under a
+ * control.
  */
 export const NOT_TIERED: Record<string, string> = {
   'adminDeletedWorkspaces.restoreConfirm':

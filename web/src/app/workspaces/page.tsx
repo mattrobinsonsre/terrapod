@@ -165,7 +165,7 @@ function WorkspaceGroupRows({
 
             {!isCollapsed && group.workspaces.map(item => {
               const ws = item.workspace as Workspace
-              const { def, runId } = resolveStatus(ws)
+              const { def, runId, phaseStarts } = resolveStatus(ws)
               return (
                 <tr key={item.id} className="hover:bg-slate-700/20 transition-colors border-t border-slate-700/30">
                   <td className="px-4 py-3">
@@ -207,6 +207,7 @@ function WorkspaceGroupRows({
                           engine={ws.attributes.engine}
                           def={def}
                           runId={runId}
+                          phaseStarts={phaseStarts}
                           lifecycleState={ws.attributes['lifecycle-state']}
                         />
                       </div>
@@ -227,6 +228,7 @@ function WorkspaceGroupRows({
                       engine={ws.attributes.engine}
                       def={def}
                       runId={runId}
+                      phaseStarts={phaseStarts}
                       lifecycleState={ws.attributes['lifecycle-state']}
                     />
                   </td>
@@ -2210,7 +2212,7 @@ function WorkspacesPageInner() {
               </thead>
               <tbody className="divide-y divide-slate-700/30">
                 {sortedWorkspaces.map((ws) => {
-                  const { def, runId } = resolveStatus(ws)
+                  const { def, runId, phaseStarts } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
@@ -2260,6 +2262,7 @@ function WorkspacesPageInner() {
                             engine={ws.attributes.engine}
                             def={def}
                             runId={runId}
+                            phaseStarts={phaseStarts}
                             lifecycleState={ws.attributes['lifecycle-state']}
                           />
                         </div>
@@ -2284,6 +2287,7 @@ function WorkspacesPageInner() {
                         engine={ws.attributes.engine}
                         def={def}
                         runId={runId}
+                        phaseStarts={phaseStarts}
                         lifecycleState={ws.attributes['lifecycle-state']}
                       />
                     </td>

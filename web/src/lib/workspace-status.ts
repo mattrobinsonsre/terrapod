@@ -72,6 +72,10 @@ interface ResolveInput {
       id: string
       status: string
       'plan-only': boolean
+      /** The three phase-START times, when the server sends them (#2413 F16).
+       *  Shaped for `explainingPhase`, which is the only producer of the
+       *  which-phase-explains-this rule. */
+      'phase-started-at'?: Record<string, unknown>
     } | null
   }
 }
@@ -81,6 +85,15 @@ export interface ResolvedStatus {
   def: WorkspaceStatusDef | null
   /** Run id for run-level statuses; null for workspace-level conditions. */
   runId: string | null
+  /** The phase starts of the run `runId` names, when that run is the
+   *  workspace's LATEST one -- so a badge can deep-link to the view that
+   *  explains the status (#2413 F16).
+   *
+   *  Null for a workspace-level condition, and null for `drifted`, whose
+   *  `runId` is the DRIFT run rather than the latest: the latest run's phase
+   *  starts would describe a different run, which is worse than no link
+   *  target at all. */
+  phaseStarts: Record<string, unknown> | null
 }
 
 /** Resolve a workspace's effective status from its signals.
@@ -104,20 +117,35 @@ export function resolveStatus(ws: ResolveInput): ResolvedStatus {
   const run = a['latest-run']
   // needs-confirm wins — actionable beats alarm.
   if (run && run.status === 'planned' && !run['plan-only']) {
-    return { def: STATUS_BY_FILTER.get('needs-confirm') ?? null, runId: run.id }
+    return {
+      def: STATUS_BY_FILTER.get('needs-confirm') ?? null,
+      runId: run.id,
+      phaseStarts: run['phase-started-at'] ?? null,
+    }
   }
-  if (a['state-diverged']) return { def: STATUS_BY_FILTER.get('state-diverged') ?? null, runId: null }
-  if (a['vcs-last-error']) return { def: STATUS_BY_FILTER.get('vcs-error') ?? null, runId: null }
+  if (a['state-diverged'])
+    return { def: STATUS_BY_FILTER.get('state-diverged') ?? null, runId: null, phaseStarts: null }
+  if (a['vcs-last-error'])
+    return { def: STATUS_BY_FILTER.get('vcs-error') ?? null, runId: null, phaseStarts: null }
   if (a['drift-status'] === 'drifted') {
     // Drift status links to the drift run that produced it when one exists,
     // so clicking the badge takes the operator straight to the plan output
     // instead of forcing them to hunt through the runs list. Falls back to
     // null (no link) for legacy rows where the column was never populated.
-    return { def: STATUS_BY_FILTER.get('drifted') ?? null, runId: a['drift-latest-run-id'] ?? null }
+    return {
+      def: STATUS_BY_FILTER.get('drifted') ?? null,
+      runId: a['drift-latest-run-id'] ?? null,
+      // NOT the latest run's phase starts: this links the DRIFT run.
+      phaseStarts: null,
+    }
   }
-  if (!run) return { def: null, runId: null }
+  if (!run) return { def: null, runId: null, phaseStarts: null }
   // plan-only `planned` is a successful read of the world, not an
   // awaiting-confirm signal.
   const filter = run.status === 'planned' ? 'planned' : run.status
-  return { def: STATUS_BY_FILTER.get(filter) ?? null, runId: run.id }
+  return {
+    def: STATUS_BY_FILTER.get(filter) ?? null,
+    runId: run.id,
+    phaseStarts: run['phase-started-at'] ?? null,
+  }
 }

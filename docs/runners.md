@@ -504,7 +504,7 @@ read normally, with its `roles_path`, `forks`, `strategy` and
 |---|---|
 | `ANSIBLE_INVENTORY_ENABLED=yaml,ini` | no `auto` and no `script`, so no inventory plugin and no executable inventory can run |
 | `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED=True` | an unreadable source fails the run rather than resolving a partial host set |
-| `ANSIBLE_FORCE_COLOR=0` | colour is terminal control bytes, and nothing reads this log in a terminal |
+| `ANSIBLE_FORCE_COLOR=1` | the log viewer renders ANSI and offers a colour toggle, so a configure reads like every other phase. This said `=0` with the reason "nothing reads this log in a terminal", which was backwards: redaction operates on the whole stream, so colour never threatened it (#2413 F18) |
 | `ANSIBLE_RETRY_FILES_ENABLED=False` | a retry file would be written into the fetched tree, and nothing reads it back |
 | `ANSIBLE_FORKS` | the workspace's own `parallelism`, so the platform's per-workspace setting governs rather than the file's `forks`. Set only when the workspace declares one |
 
@@ -614,7 +614,7 @@ One caveat if you run several replicas. Each is exact about the Jobs it is creat
 
 The bound also does not hold *during* an upgrade from a release before 2.0.0-alpha.1 / 1.11.4 / 1.10.9: a replica still running the older code admits without it, so while the rollout has one old pod the pool can exceed `maxConcurrent` as it did before. Multi-replica pools under load should expect that window, which is why the quota is the backstop rather than the cap.
 
-`maxConcurrent` is the primary knob for **sizing a fixed-resource cluster**: on an autoscaling pool the scheduler just adds nodes, but on a fixed pool `maxConcurrent × per-workspace requests` must fit within node allocatable or the extra runner Jobs sit **Pending / unschedulable** (a schedule-time failure, distinct from the runtime OOMKilled case below). The reconciler fails an unplaceable run after `runners.launchTimeoutSeconds` with a message naming the requested CPU/memory. See [Deployment → Sizing runner concurrency on a fixed-resource cluster](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster) for the formula, a worked example, and the recommended ResourceQuota backstop.
+`maxConcurrent` is the primary knob for **sizing a fixed-resource cluster**: on an autoscaling pool the scheduler just adds nodes, but on a fixed pool `(maxConcurrent + replicas - 1) × per-workspace requests` must fit within node allocatable -- the `replicas - 1` term because two replicas can momentarily reach `maxConcurrent + 1` and four `maxConcurrent + 3`, so at the default `replicas: 1` it is zero and this reduces to `maxConcurrent × requests` or the extra runner Jobs sit **Pending / unschedulable** (a schedule-time failure, distinct from the runtime OOMKilled case below). The reconciler fails an unplaceable run after `runners.launchTimeoutSeconds` with a message naming the requested CPU/memory. See [Deployment → Sizing runner concurrency on a fixed-resource cluster](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster) for the formula, a worked example, and the recommended ResourceQuota backstop.
 
 ### Memory Pressure & OOM Visibility (#430)
 
