@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.g. 1.11 or 1.11.5",
       "versionTitle": "Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
       "ansibleVersion": "Ansible Mark",
-      "ansibleVersionPlaceholder": "e.g. 2.21.5",
+      "ansibleVersionPlaceholder": "e.g. 2.21",
       "ansibleVersionTitle": "The ansible-core mark fer this work-deck. Leave it empty an'' she''ll follow the deployment default, arr.",
       "ansibleCollections": "Ansible hoards",
       "ansibleCollectionsHint": "Hoards hauled aboard afore a configure sets sail, one per line as namespace.name or namespace.name:version. They be loaded AFTER the configuration's own manifest o' requirements and overrule it, so a version ye set here beats one committed in the repository, arr.",

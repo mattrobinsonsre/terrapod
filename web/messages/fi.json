@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "esim. 1.11 tai 1.11.5",
       "versionTitle": "Versio muodossa X.Y tai X.Y.Z (esim. 1.11 tai 1.11.5)",
       "ansibleVersion": "Ansible-versio",
-      "ansibleVersionPlaceholder": "esim. 2.21.5",
+      "ansibleVersionPlaceholder": "esim. 2.21",
       "ansibleVersionTitle": "Tämän työtilan ansible-core-versio. Jätä tyhjäksi, niin noudatetaan käyttöönoton oletusta.",
       "ansibleCollections": "Ansible-kokoelmat",
       "ansibleCollectionsHint": "Kokoelmat, jotka asennetaan ennen configuren suoritusta, yksi riviä kohden muodossa namespace.name tai namespace.name:version. Ne asennetaan konfiguraation oman requirements-tiedoston jälkeen ja korvaavat sen, joten tässä asetettu versio voittaa repositorioon kirjatun.",

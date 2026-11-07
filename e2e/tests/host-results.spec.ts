@@ -124,7 +124,11 @@ const HOST_EVENTS = {
 
 async function stubRun(
   page: import('@playwright/test').Page,
-  { hosts, detail = 'available' }: { hosts: boolean; detail?: string },
+  {
+    hosts,
+    detail = 'available',
+    outstanding,
+  }: { hosts: boolean; detail?: string; outstanding?: string[] },
 ) {
   await page.route(`**/api/*/runs/${RUN_ID}`, async (route) => {
     await route.fulfill({
@@ -162,7 +166,13 @@ async function stubRun(
         hosts
           ? {
               ...HOST_RESULTS,
-              meta: { ...HOST_RESULTS.meta, detail: { state: detail } },
+              meta: {
+                ...HOST_RESULTS.meta,
+                detail: { state: detail },
+                // #1973's banner. Absent unless a test asks for it, so every
+                // other test here keeps the clean-run shape.
+                ...(outstanding ? { outstanding: { hosts: outstanding } } : {}),
+              },
             }
           : {
               data: [],
@@ -279,6 +289,72 @@ test.describe('per-host results', () => {
     await expect(
       page.getByText(/removed by artifact retention/i),
     ).toHaveCount(0)
+  })
+
+  // ── a result indicator carries you to the output (#2413 F16) ─────────
+  //
+  // The review's ask: "when you click on a thing indicating a result you
+  // should be taken to a view of the run with the log view optimised for what
+  // you click on." Every one of these needs BOTH halves of the run page's view
+  // state -- the view and F17's `host` param -- so asserting the URL is
+  // asserting the thing that makes the link useful rather than merely present.
+
+  test("a host's status badge opens that host's configure log", async ({ page }) => {
+    await stubRun(page, { hosts: true })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=hosts`)
+
+    // By the accessible name, which is what a button carrying only a status
+    // word has to supply: the text says what the host did, not what clicking
+    // does. `web2` is the failing host in the fixture.
+    await page
+      .getByRole('button', { name: /Configure log — web2/ })
+      .filter({ visible: true })
+      .first()
+      .click()
+
+    await expect(page).toHaveURL(/[?&]view=configure/)
+    await expect(page).toHaveURL(/[?&]host=web2/)
+  })
+
+  test('the failures expansion stays in place and offers the way out to the log', async ({
+    page,
+  }) => {
+    // Both halves matter: the expansion answers WHICH tasks failed, which is a
+    // different question from what the host printed, so it is not replaced.
+    await stubRun(page, { hosts: true })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=hosts`)
+
+    await page.getByRole('button', { name: /1 failure/ }).filter({ visible: true }).first().click()
+    await expect(page.getByText('restart nginx').filter({ visible: true }).first()).toBeVisible()
+
+    await page
+      .getByRole('button', { name: 'Configure log', exact: true })
+      .filter({ visible: true })
+      .first()
+      .click()
+    await expect(page).toHaveURL(/[?&]view=configure/)
+    await expect(page).toHaveURL(/[?&]host=web2/)
+  })
+
+  test("an outstanding host's name in the banner goes to its output", async ({ page }) => {
+    // The hosts a configure did not reach are the ones someone most wants to
+    // read, and the banner printed them as plain text.
+    await stubRun(page, { hosts: true, outstanding: ['db1', 'hdead'] })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=hosts`)
+
+    // SCOPED to the banner. `hdead` is also a row in the table below, and its
+    // status badge carries the same accessible name by design -- so an
+    // unscoped locator would match two elements and `.first()` would be
+    // asserting DOM order rather than the banner.
+    const banner = page
+      .locator('div')
+      .filter({ hasText: 'hosts still need configuring' })
+      .last()
+    await expect(banner).toBeVisible()
+    await banner.getByRole('button', { name: /Configure log — hdead/ }).click()
+
+    await expect(page).toHaveURL(/[?&]view=configure/)
+    await expect(page).toHaveURL(/[?&]host=hdead/)
   })
 
   test('a run with no hosts has no Hosts tab at all', async ({ page }) => {

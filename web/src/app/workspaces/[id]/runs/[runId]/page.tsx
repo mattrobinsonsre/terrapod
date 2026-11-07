@@ -504,6 +504,8 @@ function LogPanel({
   onRefresh,
   engine,
   lastOutputAt,
+  initialHost = '',
+  onHostChange,
 }: {
   log: string | null
   precomputedHtml?: string
@@ -528,6 +530,25 @@ function LogPanel({
    * window the server is willing to wait.
    */
   lastOutputAt?: string | null
+  /**
+   * The per-host filter, read from the URL (#2413 F17).
+   *
+   * `host=` is view state rather than a display toggle -- it changes what the
+   * pane CONTAINS rather than how it is rendered -- so AGENTS.md requires the
+   * URL to be its source of truth, and it was `useState`-only: "the configure
+   * log, filtered to this host" had no address, so it could not be linked to,
+   * survive a reload, or be shared. It is also the prerequisite for the
+   * result-indicator links (F16), which are all of the form
+   * `?view=configure&host=<name>`.
+   *
+   * Initialised from the param and written back on change, which is exactly
+   * the idiom `view` already uses on this page. Like `view`, that gives
+   * reload, deep-link and share; the browser's Back button does not step
+   * through filter changes, and matching the existing pattern is worth more
+   * here than fixing that for one param.
+   */
+  initialHost?: string
+  onHostChange?: (host: string) => void
   /**
    * True once the server has marked this phase's log complete (#1590). The
    * plan index appears only then: a settled log parses in one pass, so the
@@ -586,7 +607,7 @@ function LogPanel({
   // image emits ansible's plain output, and the fallback is the traditional
   // view with the switch absent rather than an empty per-host pane.
   const hostLog = useMemo(() => parseHostLog(cleanLog), [cleanLog])
-  const [hostFilter, setHostFilter] = useState('')
+  const [hostFilter, setHostFilter] = useState(initialHost)
 
   // Every host the run TARGETED, not only those that have produced output
   // yet. An inventory host ansible has not reached is exactly what someone
@@ -1019,7 +1040,10 @@ function LogPanel({
                   id={`log-hosts-${phase}`}
                   data-testid={`log-hosts-${phase}`}
                   value={hostFilter}
-                  onChange={e => setHostFilter(e.target.value)}
+                  onChange={e => {
+                    setHostFilter(e.target.value)
+                    onHostChange?.(e.target.value)
+                  }}
                   className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors max-w-[12rem] focus:border-brand-500 focus:outline-none"
                   title={t('log.hosts.title')}
                 >
@@ -1259,6 +1283,9 @@ function RunDetailPageInner() {
 
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
+  // #2413 F17. Read once, as `view` is: `LogPanel` owns the live value and
+  // writes it back through `switchHost`.
+  const hostParam = searchParams.get('host') ?? ''
 
   // Top-level view (#721): this is a faithful split — everything that was on
   // the single-scroll run page stays on the default "Overview" view exactly as
@@ -1291,6 +1318,19 @@ function RunDetailPageInner() {
         ? 'apply'
         : 'overview'
   const [activeView, setActiveView] = useState<RunView>(initialView)
+
+  /** Put the per-host filter in the URL, so the filtered log has an address.
+   *
+   *  Deliberately does NOT clear on a view change: switching to the plan log
+   *  and back should bring the filter with you, and no other view reads the
+   *  param -- the picker is gated on the log carrying host tags, which only a
+   *  configure from a current runner does. */
+  const switchHost = useCallback((host: string) => {
+    const url = new URL(window.location.href)
+    if (host) url.searchParams.set('host', host)
+    else url.searchParams.delete('host')
+    window.history.replaceState({}, '', url.toString())
+  }, [])
 
   const switchView = useCallback((view: RunView) => {
     setActiveView(view)
@@ -2398,7 +2438,19 @@ function RunDetailPageInner() {
         {/* Per-host results (#1928) — a configure reports per HOST, so this is
             the table of them, including the hosts the run targeted and never
             reached. */}
-        {view === 'hosts' && <HostsPanel runId={runId} />}
+        {/* #2413 F16. The panel's result indicators carry you to the output
+            that explains them, which needs both halves of the run page's view
+            state -- the view and F17's host param -- so the page supplies one
+            callback that sets both. */}
+        {view === 'hosts' && (
+          <HostsPanel
+            runId={runId}
+            onOpenHostLog={(host) => {
+              switchHost(host)
+              switchView('configure')
+            }}
+          />
+        )}
 
         {/* Impact graph tab (#761) — interactive plan dependency + blast-radius
             view; the tab only appears when the run produced a JSON plan. */}
@@ -2608,6 +2660,8 @@ function RunDetailPageInner() {
             runId={runId}
             isStreaming={attrs.status === 'planning' && !gate}
             logComplete={planLogComplete}
+            initialHost={hostParam}
+            onHostChange={switchHost}
             onRefresh={() => loadPlanLog(true)}
           />
         )}
@@ -2633,6 +2687,13 @@ function RunDetailPageInner() {
             engine={engine}
             runId={runId}
             isStreaming={attrs.status === 'configuring'}
+            // #2413 F17. Passed to all three panels rather than this one alone:
+            // the picker and the filter are both gated on the LOG carrying host
+            // tags (`shownLog` returns `cleanLog` untouched when it does not),
+            // so a phase that gains tagging later needs no change here. Today
+            // only a configure from a current runner is tagged.
+            initialHost={hostParam}
+            onHostChange={switchHost}
             onRefresh={() => loadConfigureLog(true)}
           />
         )}
@@ -2654,6 +2715,8 @@ function RunDetailPageInner() {
             engine={engine}
             runId={runId}
             isStreaming={attrs.status === 'applying'}
+            initialHost={hostParam}
+            onHostChange={switchHost}
             onRefresh={() => loadApplyLog(true)}
           />
         )}

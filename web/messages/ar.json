@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "مثال: 1.11 أو 1.11.5",
       "versionTitle": "الإصدار بصيغة X.Y أو X.Y.Z (مثال: 1.11 أو 1.11.5)",
       "ansibleVersion": "إصدار Ansible",
-      "ansibleVersionPlaceholder": "مثال: 2.21.5",
+      "ansibleVersionPlaceholder": "مثال: 2.21",
       "ansibleVersionTitle": "إصدار ansible-core لمساحة العمل هذه. اتركه فارغًا لاتباع الافتراضي للنشر.",
       "ansibleCollections": "مجموعات Ansible",
       "ansibleCollectionsHint": "المجموعات التي تُثبَّت قبل تشغيل configure، واحدة في كل سطر بالصيغة namespace.name أو namespace.name:version. تُثبَّت بعد ملف المتطلبات الخاص بالتهيئة نفسها وتتجاوزه، لذا فإن الإصدار المحدد هنا يتقدم على الإصدار المثبَّت في المستودع.",

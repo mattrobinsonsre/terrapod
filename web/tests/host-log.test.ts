@@ -326,3 +326,78 @@ describe('a coloured configure log', () => {
     assert.ok(only.includes(ESC), 'colour is preserved through the filter')
   })
 })
+
+// ---------------------------------------------------------------------------
+// The filter has an address (#2413 F17).
+//
+// `hostFilter` was `useState`-only, so "the configure log, filtered to this
+// host" could not be linked to, survive a reload, or be shared. AGENTS.md
+// forbids that outright for view state — "URL is the source of truth for
+// tab/view state … no `useState`-only tabs" — and this is view state by the
+// panel's own description: it is the one control there that changes what the
+// pane CONTAINS rather than how it is displayed.
+//
+// The behaviour is proven in `e2e/tests/configure-log.spec.ts`, which drives a
+// real tagged log through a real browser. What is asserted here is the shape
+// that behaviour rests on, because the defect form is a one-word edit —
+// `useState(initialHost)` back to `useState('')` — and it would leave every
+// e2e passing on a page that silently stopped writing the URL.
+
+const RUN_PAGE = readFileSync(
+  join(
+    import.meta.dirname,
+    '..',
+    'src',
+    'app',
+    'workspaces',
+    '[id]',
+    'runs',
+    '[runId]',
+    'page.tsx',
+  ),
+  'utf8',
+)
+
+describe('the per-host filter is URL state, not component state', () => {
+  it('initialises from the param rather than from an empty literal', () => {
+    assert.ok(
+      !/const \[hostFilter, setHostFilter\] = useState\(\s*''\s*\)/.test(RUN_PAGE),
+      'hostFilter is back to useState(\'\') — the filter has no address again',
+    )
+    assert.match(
+      RUN_PAGE,
+      /const \[hostFilter, setHostFilter\] = useState\(initialHost\)/,
+      'the filter must start from the URL',
+    )
+  })
+
+  it('reads the param on the page and hands it to every log panel', () => {
+    assert.match(
+      RUN_PAGE,
+      /searchParams\.get\('host'\)/,
+      'nothing reads the host param, so a deep link cannot arrive filtered',
+    )
+    // All three panels, deliberately: the picker and the filter are both gated
+    // on the LOG carrying host tags, so a phase that gains tagging later needs
+    // no change at the call site. A count below three means one was missed.
+    const wired = (RUN_PAGE.match(/initialHost=\{hostParam\}/g) ?? []).length
+    assert.equal(wired, 3, `only ${wired} of 3 log panels take the host param`)
+    assert.equal(
+      (RUN_PAGE.match(/onHostChange=\{switchHost\}/g) ?? []).length,
+      3,
+      'a panel that cannot write the param gives a filter with no address',
+    )
+  })
+
+  it('writes the param when a host is picked, and removes it for All hosts', () => {
+    // Removing it matters as much as setting it: a stale `host=` in a shared
+    // link would filter someone else's first view of the log to one host.
+    assert.match(RUN_PAGE, /onHostChange\?\.\(e\.target\.value\)/, 'the picker must write back')
+    const writer = RUN_PAGE.match(
+      /const switchHost = useCallback\(\(host: string\) => \{[\s\S]*?\}, \[\]\)/,
+    )
+    assert.ok(writer, 'switchHost is gone')
+    assert.match(writer![0], /searchParams\.set\('host', host\)/)
+    assert.match(writer![0], /searchParams\.delete\('host'\)/)
+  })
+})

@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.g. 1.11 aut 1.11.5",
       "versionTitle": "Versio forma X.Y aut X.Y.Z (exempli gratia 1.11 aut 1.11.5)",
       "ansibleVersion": "Versio Ansible",
-      "ansibleVersionPlaceholder": "e.g. 2.21.5",
+      "ansibleVersionPlaceholder": "e.g. 2.21",
       "ansibleVersionTitle": "Versio ansible-core huic loco operis. Vacuum relinque ut praedefinitum instructionis sequatur.",
       "ansibleCollections": "Collectiones Ansible",
       "ansibleCollectionsHint": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version. Post ipsius configurationis tabellam requisitorum instituuntur eamque supervertunt, itaque versio hic posita illam in promptuario consignatam vincit.",

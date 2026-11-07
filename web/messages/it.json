@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "es. 1.11 o 1.11.5",
       "versionTitle": "Versione nel formato X.Y o X.Y.Z (es. 1.11 o 1.11.5)",
       "ansibleVersion": "Versione Ansible",
-      "ansibleVersionPlaceholder": "es. 2.21.5",
+      "ansibleVersionPlaceholder": "es. 2.21",
       "ansibleVersionTitle": "La versione di ansible-core per questo workspace. Lascia vuoto per seguire l''impostazione predefinita del deployment.",
       "ansibleCollections": "Collection Ansible",
       "ansibleCollectionsHint": "Collection installate prima dell'esecuzione di un configure, una per riga come namespace.name o namespace.name:version. Vengono installate dopo il file dei requisiti della configurazione e lo sovrascrivono, quindi una versione impostata qui prevale su una fissata nel repository.",

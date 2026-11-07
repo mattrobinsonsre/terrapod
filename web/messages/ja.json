@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "例: 1.11 または 1.11.5",
       "versionTitle": "X.YまたはX.Y.Z形式のバージョン（例: 1.11 または 1.11.5）",
       "ansibleVersion": "Ansible バージョン",
-      "ansibleVersionPlaceholder": "例: 2.21.5",
+      "ansibleVersionPlaceholder": "例: 2.21",
       "ansibleVersionTitle": "このワークスペースの ansible-core バージョン。空欄にするとデプロイメントのデフォルトに従います。",
       "ansibleCollections": "Ansible コレクション",
       "ansibleCollectionsHint": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。構成自体の requirements ファイルより後にインストールされて上書きするため、ここで指定したバージョンがリポジトリにコミットされたものより優先されます。",

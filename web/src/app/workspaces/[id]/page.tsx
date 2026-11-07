@@ -5440,7 +5440,17 @@ function WorkspaceDetailContent() {
                                   {phaseWord('badgePlanOnly')}
                                 </span>
                               ) : (
-                                <span className="text-slate-400">{phaseWord('typePlanApply')}</span>
+                                /* The SAME badge as the desktop table (#2413
+                                   F11). It was prose here while the desktop
+                                   render became a badge, so on a phone the
+                                   default kind was still typeset as a
+                                   different kind of thing from the
+                                   `Configure` badge beside it -- which is the
+                                   whole of what F11 is about, surviving in the
+                                   render half the operators on phones see. */
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300">
+                                  {phaseWord('typePlanApply')}
+                                </span>
                               )}
                               {run.attributes['is-configure'] && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">

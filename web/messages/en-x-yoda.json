@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "e.g. 1.11 or 1.11.5",
       "versionTitle": "In X.Y or X.Y.Z format, the version must be (e.g. 1.11 or 1.11.5)",
       "ansibleVersion": "Version, Ansible",
-      "ansibleVersionPlaceholder": "e.g. 2.21.5",
+      "ansibleVersionPlaceholder": "e.g. 2.21",
       "ansibleVersionTitle": "For this workspace, the ansible-core version this is. Empty, leave it, and the deployment default it follows.",
       "ansibleCollections": "collections, Ansible",
       "ansibleCollectionsHint": "Before a configure runs, installed the collections are, one per line as namespace.name or namespace.name:version. After the configuration's own requirements file installed they are, and override it they do. So over one committed in the repository, a version set here wins.",

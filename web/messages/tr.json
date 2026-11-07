@@ -2625,7 +2625,7 @@
       "versionPlaceholder": "örn. 1.11 veya 1.11.5",
       "versionTitle": "X.Y veya X.Y.Z biçiminde sürüm (örn. 1.11 veya 1.11.5)",
       "ansibleVersion": "Ansible sürümü",
-      "ansibleVersionPlaceholder": "örn. 2.21.5",
+      "ansibleVersionPlaceholder": "örn. 2.21",
       "ansibleVersionTitle": "Bu çalışma alanı için ansible-core sürümü. Dağıtım varsayılanını izlemek için boş bırakın.",
       "ansibleCollections": "Ansible koleksiyonları",
       "ansibleCollectionsHint": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde. Yapılandırmanın kendi gereksinim dosyasından sonra kurulur ve onu geçersiz kılar; bu nedenle burada belirtilen sürüm, depoda sabitlenmiş olanın önüne geçer.",
