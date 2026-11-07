@@ -301,6 +301,7 @@ field CreateRoleRequest.WorkspacePermission string
 field CreateRunRequest.AllowEmptyApply bool
 field CreateRunRequest.AutoApply *bool
 field CreateRunRequest.ConfigurationVersionID string
+field CreateRunRequest.ConfigureAfterApply *bool
 field CreateRunRequest.EngineVersion string
 field CreateRunRequest.IsConfigure bool
 field CreateRunRequest.IsDestroy bool

@@ -320,6 +320,145 @@ class TestTheIncoherentRequestsAreRefused:
         assert "speculative" in resp.json()["detail"]
 
 
+class TestThePerRunComposite:
+    """`configure-after-apply` as a per-run request (#2413 F12).
+
+    The composite came solely from a standing workspace setting, so asking for
+    one run of apply-then-configure meant changing behaviour for every later
+    apply including CLI ones, and then changing it back. The attribute was
+    output-only on the run document and read by nothing on the way in.
+
+    A TRISTATE, which is what the router has to distinguish: absent, true and
+    false are three different requests, and `attrs.get(...)` collapses two of
+    them.
+    """
+
+    @_boot
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_true_asks_for_a_composite_on_a_workspace_that_declares_none(
+        self, mock_caps, mock_create, mock_queue, *_
+    ):
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws(configure_after_apply=False)
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        mock_create.return_value = run
+        mock_queue.return_value = run
+        app, _db = _app(_user(), ws)
+
+        with patch("terrapod.api.routers.runs._run_json", return_value={"data": {}}):
+            resp = await _post(app, {"configure-after-apply": True}, ws)
+
+        assert resp.status_code == 201, resp.text
+        assert mock_create.await_args.kwargs["configure_after_apply"] is True
+
+    @_boot
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_false_declines_it_on_a_workspace_that_declares_it(
+        self, mock_caps, mock_create, mock_queue, *_
+    ):
+        """The half that is easy to miss, and was asked for in as many words:
+        "I still want a Plan+apply on workspaces which have configure so users
+        have the option of just running the first 2 phases"."""
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws(configure_after_apply=True)
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        mock_create.return_value = run
+        mock_queue.return_value = run
+        app, _db = _app(_user(), ws)
+
+        with patch("terrapod.api.routers.runs._run_json", return_value={"data": {}}):
+            resp = await _post(app, {"configure-after-apply": False}, ws)
+
+        assert resp.status_code == 201, resp.text
+        assert mock_create.await_args.kwargs["configure_after_apply"] is False
+
+    @_boot
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_absent_is_NOT_false_and_leaves_the_workspace_to_decide(
+        self, mock_caps, mock_create, mock_queue, *_
+    ):
+        """The distinction a boolean cannot carry. If the router read this with
+        `attrs.get(..., False)` this test would see `False` and a workspace that
+        declares the composite would silently stop producing one."""
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws(configure_after_apply=True)
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        mock_create.return_value = run
+        mock_queue.return_value = run
+        app, _db = _app(_user(), ws)
+
+        with patch("terrapod.api.routers.runs._run_json", return_value={"data": {}}):
+            resp = await _post(app, {"plan-only": False}, ws)
+
+        assert resp.status_code == 201, resp.text
+        assert mock_create.await_args.kwargs["configure_after_apply"] is None
+
+    @_boot
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_composite_on_a_plan_only_run_is_refused_not_dropped(self, mock_caps, *_):
+        """Refused rather than resolved to something smaller. The caller asked
+        for an apply they are not going to get, and accepting the attribute and
+        ignoring it is the #2116 class."""
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws()
+        app, _db = _app(_user(), ws)
+
+        resp = await _post(app, {"configure-after-apply": True, "plan-only": True}, ws)
+
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "configure-after-apply" in detail and "plan-only" in detail
+
+    @_boot
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_composite_on_a_destroy_is_refused_for_its_own_reason(self, mock_caps, *_):
+        """A different reason, said differently: a destroy removes the hosts a
+        configure would target."""
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws()
+        app, _db = _app(_user(), ws)
+
+        resp = await _post(app, {"configure-after-apply": True, "is-destroy": True}, ws)
+
+        assert resp.status_code == 422
+        assert "hosts" in resp.json()["detail"]
+
+    @_boot
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_composite_needs_the_workspace_to_declare_a_configure(self, mock_caps, *_):
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws(configure_enabled=False)
+        app, _db = _app(_user(), ws)
+
+        resp = await _post(app, {"configure-after-apply": True}, ws)
+
+        assert resp.status_code == 422
+        assert "configure-enabled" in resp.json()["detail"]
+
+    @_boot
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_non_boolean_is_refused_rather_than_coerced(self, mock_caps, *_):
+        """`"false"` from a form would be TRUTHY, which is the direction that
+        silently runs a configure nobody asked for."""
+        mock_caps.return_value = caps_for_level("write")
+        ws = _ws()
+        app, _db = _app(_user(), ws)
+
+        resp = await _post(app, {"configure-after-apply": "false"}, ws)
+
+        assert resp.status_code == 422
+        assert "boolean" in resp.json()["detail"]
+
+
 class TestTheOptionsReachTheRun:
     @_boot
     @patch("terrapod.api.routers.runs.run_service.queue_run")

@@ -321,6 +321,7 @@ def resolve_configure_shape(
     workspace,
     *,
     requested_configure: bool,
+    requested_after_apply: bool | None = None,
     plan_only: bool,
     is_destroy: bool,
 ) -> tuple[bool, bool]:
@@ -341,6 +342,38 @@ def resolve_configure_shape(
       configure's logs is the whole reason the setting exists;
     * **anything else** is an ordinary run, `(False, False)`.
 
+    `requested_after_apply` is the PER-RUN answer to the composite question
+    (#2413 F12), and it is a TRISTATE rather than a boolean because all three
+    of its states are things a caller means:
+
+    * `None` -- nothing was asked, so the workspace's standing setting decides.
+      Every caller that predates F12 passes this, which is why the default is
+      here rather than at the call sites;
+    * `True` -- a composite for THIS run, `(True, True)`, whatever the
+      workspace says. The gap F12 exists to close: the composite came solely
+      from a standing setting, so doing it once meant changing behaviour for
+      every later apply including CLI ones, then changing it back;
+    * `False` -- a plain apply for THIS run, `(False, False)`, overriding a
+      workspace that declares `configure_after_apply`. This is the half that
+      is easy to miss and was asked for in as many words: *"I still want a
+      Plan+apply on workspaces which have configure so users have the option
+      of just running the first 2 phases."* A boolean could not express it --
+      absent and false would be the same value, and the workspace setting
+      would win.
+
+    It is read BEFORE `requested_configure`, because the two are not in
+    conflict: `is-configure` means "this run carries a configure", which a
+    composite also does, so a caller sending both is describing a composite and
+    not contradicting itself. That is the same reading the run document's own
+    attributes have.
+
+    The two exclusions below are NOT applied to an explicit
+    `requested_after_apply=True`: a composite asked for on a plan-only or
+    destroy run is refused by the router with a 422 naming the reason, rather
+    than silently resolved to something smaller. Dropping it here would be the
+    #2116 class -- an attribute accepted and ignored -- and the caller asked
+    for an apply they are not going to get.
+
     Two exclusions, and both are about there being no apply to follow:
 
     * `plan_only` -- a speculative plan, a CLI `plan`, a drift check. Nothing
@@ -353,9 +386,15 @@ def resolve_configure_shape(
       describing machines that no longer exist. It is excluded structurally
       rather than left to fail at ansible's own unreachable-host handling.
     """
+    if requested_after_apply is True:
+        return True, True
     if requested_configure:
         return True, False
     if plan_only or is_destroy:
+        return False, False
+    if requested_after_apply is False:
+        # An explicit opt-out beats the workspace, which is the whole point of
+        # it being a tristate.
         return False, False
     return (
         (True, True) if bool(getattr(workspace, "configure_after_apply", False)) else (False, False)
@@ -1368,12 +1407,17 @@ async def create_run(
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
     is_drift_detection: bool = False,
-    # An explicit request for a STANDALONE configure (#1974). A composite is
-    # not asked for here -- it is resolved from the workspace's own
-    # `configure_after_apply` by `resolve_configure_shape` below, because the
-    # CLI has no way to pass a flag and the composite exists so a remote
-    # execution can stream the configure's logs.
+    # An explicit request for a STANDALONE configure (#1974).
     is_configure: bool = False,
+    # The PER-RUN answer to the composite question, as a tristate (#2413 F12).
+    # `None` -- the default, and what every pre-F12 caller passes -- leaves the
+    # workspace's standing `configure_after_apply` to decide, which is what the
+    # CLI and the VCS poller need: neither can send a flag, and the composite
+    # exists so a remote execution can stream the configure's logs. `True`
+    # asks for a composite for this run alone; `False` asks for a plain apply
+    # on a workspace that declares one. See `resolve_configure_shape` for why
+    # a boolean cannot express the third state.
+    configure_after_apply: bool | None = None,
     # What THIS run was asked to configure. Empty means the workspace's
     # `default_playbook` / `default_limit`, which is what a platform-decided
     # configure runs: a push carries no run options.
@@ -1456,6 +1500,7 @@ async def create_run(
     is_configure, configure_after_apply = resolve_configure_shape(
         workspace,
         requested_configure=bool(is_configure),
+        requested_after_apply=configure_after_apply,
         plan_only=bool(plan_only),
         is_destroy=bool(is_destroy),
     )
