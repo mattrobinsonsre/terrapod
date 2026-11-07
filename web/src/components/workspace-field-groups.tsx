@@ -40,7 +40,8 @@ import {
   EDIT_INPUT,
   FIELD_BY_ATTR,
   WsField,
-  dependencyMet,
+  fieldApplies,
+  fieldGateMet,
   groupFields,
   groupSummary,
   type FieldMode,
@@ -69,13 +70,6 @@ export interface GroupCtx {
 
 const inputClass = (mode: FieldMode) => (mode === 'create' ? CREATE_INPUT : EDIT_INPUT)
 
-/** Whether this field is rendered at all: engine applies, and its gate is on. */
-function shown(attr: string, ctx: GroupCtx): boolean {
-  const spec = FIELD_BY_ATTR[attr]
-  if (!spec) return false
-  if (spec.engines && !spec.engines.includes(ctx.engine)) return false
-  return dependencyMet(spec, ctx.values)
-}
 
 /**
  * One control, chosen by kind.
@@ -106,7 +100,7 @@ function Control({
   const spec = FIELD_BY_ATTR[attr]
   const id = spec?.id ?? attr
   const v = ctx.values[attr]
-  const disabled = ctx.busy || ctx.readOnly?.has(attr)
+  const disabled = ctx.busy || ctx.readOnly?.has(attr) || !fieldGateMet(attr, ctx.values)
   const cls = inputClass(ctx.mode)
 
   if (kind === 'list') {
@@ -215,13 +209,16 @@ export function Field({
    * tab has real per-row editors for the path lists and uses
    * `labels-editor.tsx` for labels, and reimplementing those here would make
    * every future field an argument with an abstraction. A field passing
-   * `control` still gets the group's label, view mode, hint and dependency
-   * hiding -- only the input differs.
+   * `control` still gets the group's label, view mode, hint and -- since
+   * #2413 F20 -- the dependency gate, applied by wrapping it in a disabled
+   * `<fieldset>` rather than by the caller remembering to. Only the input
+   * differs.
    */
   control?: ReactNode
 }) {
-  if (!shown(attr, ctx)) return null
+  if (!fieldApplies(attr, ctx.engine)) return null
   const spec = FIELD_BY_ATTR[attr]
+  const gateMet = fieldGateMet(attr, ctx.values)
   const v = ctx.values[attr]
   const shownValue =
     display ??
@@ -244,7 +241,28 @@ export function Field({
       display={shownValue}
       hint={ctx.hint?.(attr)}
     >
-      {control ?? (
+      {control ? (
+        gateMet ? (
+          control
+        ) : (
+          /* A bespoke control builds its own `<input>`, so `Control`'s own
+           * `disabled` cannot reach it -- and 38 call sites across the two
+           * forms pass one. Wrapping in a disabled `<fieldset>` disables every
+           * descendant control by DOM ancestry, so the gate holds for the list
+           * editors, the version datalists and the Enabled/Disabled toggles
+           * without each of them having to remember it. This is what the e2e
+           * caught: the toggles rendered under #2413 F20 and accepted input.
+           *
+           * Only wrapped when the gate is OFF, which is a state that rendered
+           * nothing at all before F20 -- so the extra element cannot change a
+           * layout that already works. `min-w-0` because a fieldset defaults
+           * to `min-inline-size: min-content` and will not shrink at phone
+           * width; the rest zeroes its default chrome. */
+          <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+            {control}
+          </fieldset>
+        )
+      ) : (
         <Control
           attr={attr}
           ctx={ctx}
@@ -290,8 +308,9 @@ export function Group({
   advanced?: boolean
   children: ReactNode
 }) {
-  // Nothing applies to this engine, or every field is behind an off gate.
-  const any = groupFields(id, ctx.engine).some((f) => shown(f.attr, ctx))
+  // Nothing here applies to this engine. A group whose every field is merely
+  // behind an OFF GATE still renders, with those fields disabled (#2413 F20).
+  const any = groupFields(id, ctx.engine).some((f) => fieldApplies(f.attr, ctx.engine))
   if (!any) return null
 
   const body = (

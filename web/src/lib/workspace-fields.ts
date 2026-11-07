@@ -51,10 +51,17 @@
 // definition list and the create form is a roomier standalone form -- and
 // collapsing them would change the look of both surfaces in a change that is
 // supposed to be about structure.
+//
+// Both carry a visible disabled state, which #2413 F20 made load-bearing
+// rather than cosmetic: a field whose gate is off is now RENDERED instead of
+// removed, so the operator has to be able to see that it cannot be typed into.
+// Without this the dark-theme native disabled rendering is nearly
+// indistinguishable from an ordinary input, and "disabled but visible" reads
+// as "enabled and ignoring me".
 export const EDIT_INPUT =
-  'mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500'
+  'mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed'
 export const CREATE_INPUT =
-  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
 
 /**
  * Which form is rendering.
@@ -452,6 +459,39 @@ export function groupFields(group: GroupId, engine: string): FieldSpec[] {
  * dependent removes something meaningless, while hiding a toggle removes the
  * only way to discover the feature exists.
  */
+/**
+ * Whether a field can EVER apply to this workspace, which is engine
+ * applicability and nothing else (#2413 F20).
+ *
+ * Split from the gate deliberately, because the two look alike and must not be
+ * treated alike. A field whose GATE is off could apply once the gate is set, so
+ * it renders DISABLED -- seeing the option is how an operator learns it exists,
+ * and nothing on these forms is hidden by a gate. A field belonging to another
+ * ENGINE can never apply here, so a permanently disabled control would be noise
+ * rather than understanding, and it stays hidden.
+ *
+ * Collapsing the two is what would put a set of dead Terraform controls on
+ * every Pulumi workspace for ever; `e2e/tests/pulumi-workspace.spec.ts` asserts
+ * three of them absent and is what catches it.
+ */
+export function fieldApplies(attr: string, engine: string): boolean {
+  const spec = FIELD_BY_ATTR[attr]
+  if (!spec) return false
+  return !spec.engines || spec.engines.includes(engine)
+}
+
+/**
+ * Whether a field's gate is on, i.e. whether it is meaningful right now.
+ *
+ * Feeds `disabled`, never a decision to render. Returns false for an unknown
+ * attribute, which is the fail-closed direction: a control nothing describes
+ * must not be editable.
+ */
+export function fieldGateMet(attr: string, values: Record<string, unknown>): boolean {
+  const spec = FIELD_BY_ATTR[attr]
+  return !!spec && dependencyMet(spec, values)
+}
+
 export function dependencyMet(spec: FieldSpec, values: Record<string, unknown>): boolean {
   if (!spec.dependsOn) return true
   const gate = values[spec.dependsOn]

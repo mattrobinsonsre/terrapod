@@ -940,10 +940,13 @@ function WorkspacesPageInner() {
       // make every workspace Terraform and leave Pulumi uncreatable from the UI
       // — the #1535 defect over again.
       //
-      // `include` sends only what the form actually SHOWED, on the same two
-      // conditions the groups render on: the field applies to this engine, and
-      // its gating boolean is on. So turning configure on, typing a playbook
-      // and turning it back off does not quietly ship the playbook, and a
+      // `include` sends only what the form MEANT, on two conditions: the field
+      // applies to this engine, and its gating boolean is on. Since #2413 F20
+      // that is no longer the same as what the form SHOWED -- a gated-off field
+      // is rendered disabled rather than removed, so it can still be holding a
+      // value from before the gate was turned off, and this filter is the only
+      // thing that stops it shipping. So turning configure on, typing a
+      // playbook and turning it back off does not quietly ship the playbook, and a
       // Pulumi workspace is not sent a Terraform-family execution backend it
       // has no use for. Each omitted column takes its own default, which is
       // what the operator saw in place of the field.

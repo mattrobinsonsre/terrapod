@@ -37,17 +37,33 @@ function captureAndDismiss(page: import('@playwright/test').Page): { text: strin
 }
 
 test.describe('Configure triggers', () => {
-  test('a workspace with no configure operation shows neither trigger', async ({ page }) => {
+  test('a workspace with no configure operation shows both triggers disabled', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2enotrig'))
 
     await page.goto(`/workspaces/${wsId}?tab=configuration`)
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
-    // The gate. Neither control exists, because neither can do anything
-    // without `configure-enabled`.
-    await expect(page.getByTestId('ws-auto-configure-enabled')).toHaveCount(0)
-    await expect(page.getByTestId('ws-configure-after-apply')).toHaveCount(0)
+    // The gate is off, so neither control can do anything -- and both are
+    // still RENDERED (#2413 F20). Nothing on this form is hidden by a gate: an
+    // operator learns the option exists by seeing it.
+    //
+    // In VIEW mode a field is a value, not a control -- it renders as a span
+    // reading "Disabled" -- so visibility is the whole assertion here and
+    // a disabled-control assertion would be a category error. The real one is
+    // asserted below, in edit mode, which is where one exists.
+    for (const id of ['ws-auto-configure-enabled', 'ws-configure-after-apply']) {
+      await expect(page.getByTestId(id)).toBeVisible()
+    }
+
+    // Edit mode: now they are real inputs, and they must be present AND
+    // disabled. Present-and-editable is the defect that replacing a hide could
+    // introduce -- a control that cannot work must not accept input.
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+    for (const id of ['ws-auto-configure-enabled', 'ws-configure-after-apply']) {
+      await expect(page.getByTestId(id)).toBeVisible()
+      await expect(page.getByTestId(id)).toBeDisabled()
+    }
   })
 
   test('the triggers appear once configure is declared, and round-trip', async ({ page }) => {

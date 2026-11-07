@@ -26,7 +26,7 @@ import {
   type NotificationSpec,
 } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch, fetchAllPages } from '@/lib/api'
+import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
@@ -546,12 +546,13 @@ export default function AutodiscoveryPage() {
         body: JSON.stringify({ data: { type: 'autodiscovery-rules', attributes: attrs } }),
       })
       if (!res.ok) {
-        const txt = await res.text()
-        throw new Error(
-          editingId
-            ? t('errors.updateFailed', { status: res.status, detail: txt })
-            : t('errors.createFailed', { status: res.status, detail: txt }),
-        )
+        // Through `parseApiError`, not `res.text()` (#2413 F2). The server's
+        // refusals here NAME the thing they refuse -- a malformed collection
+        // comes back as "ansible-collections: 'community general' is not a
+        // collection name" -- and collection parsing deliberately validates
+        // nothing in the browser, so this message is the WHOLE of the feedback.
+        // Interpolating the raw body shipped it wrapped in a JSON envelope.
+        throw new Error(await parseApiError(res, t('errors.save')))
       }
       setSuccess(editingId ? t('success.updated', { name }) : t('success.created', { name }))
       setShowForm(false)
