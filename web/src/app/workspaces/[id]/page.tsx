@@ -5326,7 +5326,18 @@ function WorkspaceDetailContent() {
                                 {phaseWord('badgePlanOnly')}
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-500">{phaseWord('typePlanApply')}</span>
+                              /* A badge like the other four, not bare text
+                                 (#2413 F11). Four of the five markers in this
+                                 cell are badges -- destroy, plan-only,
+                                 configure, saved plan -- and the DEFAULT kind
+                                 was the only one rendered as prose, so beside
+                                 them it read as an absence rather than as what
+                                 the run is. Slate keeps it the quietest of the
+                                 five, which is right for a default; being a
+                                 badge makes it the same KIND of thing. */
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300">
+                                {phaseWord('typePlanApply')}
+                              </span>
                             )}
                             {/* Additive like the saved-plan badge beside it, and
                                 for the same reason: a COMPOSITE is a plan+apply
