@@ -87,6 +87,30 @@ test('resetForm does not clear more than the form holds', () => {
   )
 })
 
+test('a Pulumi rule omits the two scan keys the endpoint refuses there', () => {
+  // `_rule_attrs` 422s on the mere PRESENCE of either key on a Pulumi rule --
+  // "applies only to a Terraform rule: a Pulumi run is not security-scanned" --
+  // and then defaults the enforcement to `off` itself. The form sent both
+  // unconditionally alongside `engine`, so every Pulumi rule it ever submitted
+  // was a guaranteed 422: the engine was uncreatable from this page.
+  //
+  // Asserted on the PAYLOAD rather than on the controls, because that is where
+  // the defect was. `security-scan-enforcement` is hidden on a Pulumi rule by
+  // the shared table's `engines: ['terraform']`, and `security-scan-engine` is
+  // not -- the table cannot express "both on a rule, one on a workspace" and
+  // must not be bent to, since two other surfaces read it. So the control can
+  // render and the key still must not be sent.
+  assert.match(
+    page,
+    /\.\.\.\(engine === 'pulumi'\n\s*\? \{\}\n\s*: \{\n\s*'security-scan-enforcement': scanEnforcement,\n\s*'security-scan-engine': scanEngine,/,
+    'the rule payload does not gate the two scan keys on the engine',
+  )
+  // The threshold is engine-agnostic and the endpoint takes it either way, so
+  // it must stay OUTSIDE the conditional. Gating it too would look tidier and
+  // silently stop templating it onto every Pulumi rule.
+  assert.match(page, /\n {6}'security-scan-severity-threshold': scanThreshold,/)
+})
+
 // ── the shared sections (#2413 F4) ────────────────────────────────────────
 
 test('the rule form renders the shared groups rather than its own sections', () => {

@@ -624,8 +624,26 @@ export default function AutodiscoveryPage() {
       // would otherwise 422 the whole rule.
       'oidc-audiences': sanitizeOidcAudiences(oidcAudiences),
       'execution-hook-templates': executionHookTemplates.map(s => s.trim()).filter(Boolean),
-      'security-scan-enforcement': scanEnforcement,
-      'security-scan-engine': scanEngine,
+      // Omitted entirely on a Pulumi rule, because the rule endpoint refuses
+      // the mere PRESENCE of either key there: a Pulumi run is not
+      // security-scanned, so `_rule_attrs` 422s with "<key> applies only to a
+      // Terraform rule" and then defaults the enforcement to `off` itself.
+      //
+      // The form sent both unconditionally, so **no Pulumi rule could be
+      // created or saved from this page at all** -- `engine: 'pulumi'` plus
+      // `security-scan-enforcement: 'advisory'` is a guaranteed 422, which is
+      // every Pulumi rule this form has ever submitted. Shaped exactly like
+      // the `pulumi-bind-plan` line above, which is the mirror case: a setting
+      // the endpoint accepts for one engine and refuses for the other.
+      //
+      // The threshold is NOT in here: it is engine-agnostic and the endpoint
+      // takes it either way.
+      ...(engine === 'pulumi'
+        ? {}
+        : {
+            'security-scan-enforcement': scanEnforcement,
+            'security-scan-engine': scanEngine,
+          }),
       'security-scan-severity-threshold': scanThreshold,
       'ai-summary-mode': aiSummaryMode,
       'ai-policy-mode': aiPolicyMode,
