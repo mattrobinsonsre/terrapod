@@ -17,6 +17,7 @@ import { SecurityPanel } from '@/components/security-panel'
 import { HostsPanel } from '@/components/hosts-panel'
 import { AIPolicyPanel } from '@/components/ai-policy-panel'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
@@ -545,6 +546,7 @@ function LogPanel({
   // touch tablet/foldable page-scrolls too, while a mouse (any width) keeps the
   // inner pane. Mirrors the CSS `fine:` overflow on the <pre> below.
   const t = useTranslations('runDetail')
+  const isTouch = useIsTouch()
   // The per-host status strings are the Hosts tab's (#1928), reused rather
   // than restated, so the picker and the table cannot disagree about a word.
   const tHosts = useTranslations('runDetail.hosts')
@@ -552,7 +554,6 @@ function LogPanel({
   const fmt = useFormat()
   const tRoot = useTranslations()
   const summaryLabel = engineWord(tRoot, engine, 'logIndexSummary')
-  const isTouch = useIsTouch()
   const [colorMode, setColorMode] = useState(true)
   // Follow the tail by default while streaming; a static (finished) log opens
   // at the top so the operator reads from the start.
@@ -1161,6 +1162,7 @@ export default function RunDetailPage() {
 
 function RunDetailPageInner() {
   const t = useTranslations('runDetail')
+  const { confirmTouchMutation } = useConfirm()
   // Root namespace, for the per-engine phase vocabulary (#1911). Every label on
   // this page that names a phase reads from here, so the pill, the status card,
   // the tabs and the buttons can never show two different words for one run.
@@ -1172,8 +1174,6 @@ function RunDetailPageInner() {
   const params = useParams()
   const workspaceId = params.id as string
   const runId = params.runId as string
-
-  const isTouch = useIsTouch()
   const [run, setRun] = useState<Run | null>(null)
   // Which engine's words this run is described in, and which of its surfaces
   // apply at all (#1911). Null until the run loads; every reader falls back to
@@ -1706,16 +1706,14 @@ function RunDetailPageInner() {
   // confirm(); with a precise pointer (mouse/trackpad) execute immediately.
   // Keyed on pointer, not width, so a wide touch tablet is still guarded.
   function requestAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {
-    if (isTouch) {
-      const prompts: Record<string, string> = {
-        // Apply and discard name a phase; cancel and retry name the run itself.
-        confirm: word('confirmApply'),
-        discard: word('confirmDiscard'),
-        cancel: t('confirm.cancel'),
-        retry: t('confirm.retry'),
-      }
-      if (!window.confirm(prompts[action])) return
+    const prompts: Record<string, string> = {
+      // Apply and discard name a phase; cancel and retry name the run itself.
+      confirm: word('confirmApply'),
+      discard: word('confirmDiscard'),
+      cancel: t('confirm.cancel'),
+      retry: t('confirm.retry'),
     }
+    if (!confirmTouchMutation(prompts[action])) return
     handleAction(action)
   }
 
@@ -2002,7 +2000,7 @@ function RunDetailPageInner() {
     // Deliberately a NEW run rather than applying this one: a drift run is
     // plan-only and its plan is a detection artifact, so the right output is an
     // ordinary run against current config with default options.
-    if (isTouch && !window.confirm(word('driftRemediateConfirm'))) return
+    if (!confirmTouchMutation(word('driftRemediateConfirm'))) return
     setActionLoading('remediate')
     try {
       const res = await apiFetch('/api/v1/runs', {

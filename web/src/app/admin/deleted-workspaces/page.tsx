@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { useIsAdmin } from '@/lib/use-auth-roles'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 
@@ -45,6 +46,7 @@ function formatDate(raw: string | null): string {
 
 export default function DeletedWorkspacesPage() {
   const t = useTranslations('adminDeletedWorkspaces')
+  const { confirmIrreversible } = useConfirm()
   // Gated on the post-mount value rather than isAdmin() so the first render
   // matches SSR, which has no roles — the same hydration guard the other
   // admin pages use.
@@ -105,8 +107,8 @@ export default function DeletedWorkspacesPage() {
     // server refuses by default, so confirming here is what sends force —
     // consent to that specific consequence, not a generic "are you sure".
     const confirmed = prior.length
-      ? window.confirm(t('restoreAgainConfirm', { name, existing: prior.join(', ') }))
-      : window.confirm(t('restoreConfirm', { name }))
+      ? confirmIrreversible(t('restoreAgainConfirm', { name, existing: prior.join(', ') }))
+      : confirmIrreversible(t('restoreConfirm', { name }))
     if (!confirmed) return
 
     setRestoring(w.id)

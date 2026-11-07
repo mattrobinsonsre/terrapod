@@ -13,9 +13,9 @@ import { LabelsEditor } from '@/components/labels-editor'
 import { HealthConditions } from '@/components/health-conditions'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
-import { useIsTouch } from '@/lib/use-media-query'
 
 // Module autodiscovery rules (#1584, #1620): find the modules in a repository,
 // or in every repository of an org, group or name pattern — the root and any
@@ -167,10 +167,10 @@ function kindOf(value: unknown): TargetKind {
 export default function ModuleAutodiscoveryPage() {
   const router = useRouter()
   const t = useTranslations('adminModuleAutodiscovery')
+  const { confirmDelete, confirmIrreversible, confirmTouchMutation } = useConfirm()
   const tw = useTranslations('adminAutodiscovery')
   const td = useTranslations('registry.modules.discover')
   const format = useFormatter()
-  const isTouch = useIsTouch()
 
   const [rules, setRules] = useState<ModuleRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
@@ -366,7 +366,7 @@ export default function ModuleAutodiscoveryPage() {
 
   // Irreversible: a native confirm in every pointer mode (AGENTS.md).
   async function handleDelete(r: ModuleRule) {
-    if (!window.confirm(t('confirmDelete', { name: r.attributes.name }))) return
+    if (!confirmDelete(t('confirmDelete', { name: r.attributes.name }))) return
     setError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/module-autodiscovery-rules/${r.id}`, { method: 'DELETE' })
@@ -457,7 +457,10 @@ export default function ModuleAutodiscoveryPage() {
     // Registering everything is one tap. For an org-wide rule it can be many
     // repositories' worth, so it is always confirmed; for one repository only
     // on touch, where a mis-tap is easy (AGENTS.md).
-    if (all && (kind !== 'repository' || isTouch) && !window.confirm(t('grouped.confirmRegisterAll'))) return
+    // An org-wide rule is always confirmed; one repository only on touch. The
+    // tier is chosen rather than the prompt hand-rolled (#2413 F13).
+    const guard = kind !== 'repository' ? confirmIrreversible : confirmTouchMutation
+    if (all && !guard(t('grouped.confirmRegisterAll'))) return
     let attributes: Record<string, unknown> = {}
     if (!all) {
       if (kind === 'repository') {

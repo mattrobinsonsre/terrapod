@@ -22,7 +22,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
-import { useIsTouch } from '@/lib/use-media-query'
+import { useConfirm } from '@/lib/use-confirm'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { PlanSummaryChat } from '@/components/plan-summary-chat'
 import { engineWord } from '@/lib/phase-vocabulary'
@@ -118,7 +118,7 @@ export function PlanAiSummary({ runId, refreshKey = 0, engine }: Props) {
   // spinner over it, rather than blanking the panel (#767).
   const [translating, setTranslating] = useState(false)
   const hasContentRef = useRef(false)
-  const isTouch = useIsTouch()
+  const { confirmTouchMutation } = useConfirm()
 
   const load = useCallback(async () => {
     // A re-fetch while we already have a summary means the user switched
@@ -162,7 +162,7 @@ export function PlanAiSummary({ runId, refreshKey = 0, engine }: Props) {
     // On a precise pointer a regenerate click is unambiguous ("this one wasn't
     // good enough"); on touch it re-runs the model on a mis-tap, so guard it
     // (#719 tier-2 mutation → touch-only confirm).
-    if (isTouch && !window.confirm(t('regenerate.confirm'))) return
+    if (!confirmTouchMutation(t('regenerate.confirm'))) return
     setRegenerating(true)
     setRegenerateError(null)
     try {
@@ -194,7 +194,7 @@ export function PlanAiSummary({ runId, refreshKey = 0, engine }: Props) {
     } finally {
       setRegenerating(false)
     }
-  }, [runId, isTouch, t])
+  }, [runId, confirmTouchMutation, t])
 
   // When the feature is globally disabled (no row will ever appear) we
   // render nothing — operators on a non-AI deployment don't see this

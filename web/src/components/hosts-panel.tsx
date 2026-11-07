@@ -28,6 +28,7 @@
 // shows it and pays nothing. There is no flag (#1986).
 
 import { useEffect, useState } from "react";
+import { useConfirm } from '@/lib/use-confirm'
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -62,6 +63,7 @@ interface HostEventAttrs {
 
 export function HostsPanel({ runId }: { runId: string }) {
   const t = useTranslations("runDetail.hosts");
+  const { confirmIrreversible } = useConfirm();
   const router = useRouter();
   const params = useParams();
   const [hosts, setHosts] = useState<HostResultAttrs[] | null>(null);
@@ -143,7 +145,9 @@ export function HostsPanel({ runId }: { runId: string }) {
     // confirms unconditionally everywhere else (`queueConfigureConfirm*`):
     // running a playbook changes real hosts and there is no undo. That it is a
     // NARROWER action than the full retry does not make it reversible.
-    if (!window.confirm(t("retryOutstandingConfirm", { hosts: outstanding.join(", ") })))
+    // BOTH modes: this queues a configure against real hosts and cannot be
+    // undone, which is the tier's axis rather than the word "delete" (#2413 F13).
+    if (!confirmIrreversible(t("retryOutstandingConfirm", { hosts: outstanding.join(", ") })))
       return;
     setRetrying(true);
     try {

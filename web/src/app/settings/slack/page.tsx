@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { useFormat } from '@/lib/format'
 
@@ -34,6 +35,7 @@ interface SlackLink {
 export default function SlackLinksPage() {
   const router = useRouter()
   const t = useTranslations('settings')
+  const { confirmDelete } = useConfirm()
   const fmt = useFormat()
   const [links, setLinks] = useState<SlackLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,7 +67,7 @@ export default function SlackLinksPage() {
   async function revoke(link: SlackLink) {
     // Both pointer modes, not touch only: this deletes a record, and a stray
     // click losing it is a desktop hazard too.
-    if (!window.confirm(t('slackLinks.confirmRevoke', { user: link['slack-user-id'] }))) return
+    if (!confirmDelete(t('slackLinks.confirmRevoke', { user: link['slack-user-id'] }))) return
     try {
       const res = await apiFetch(`/api/v1/slack/links/${link.id}`, { method: 'DELETE' })
       if (!res.ok && res.status !== 204) throw new Error(t('slackLinks.errors.revoke'))

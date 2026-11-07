@@ -31,8 +31,8 @@ import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { StackOutputsPanel } from '@/components/stack-outputs-panel'
 import { InventoryPanel, useInventoryPresence } from '@/components/inventory-panel'
-import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { versionToolFor } from '@/lib/engine-version'
 import { PHASE_STATUSES, engineWord, phaseKey } from '@/lib/phase-vocabulary'
@@ -658,13 +658,12 @@ function WorkspaceDetailContent() {
   const [editVaultRef, setEditVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const [addingVar, setAddingVar] = useState(false)
 
-  const isTouch = useIsTouch()
 
-  // #719 two-tier confirm policy (see AGENTS.md → Responsive → Touch model):
-  // an irreversible delete/remove prompts in BOTH modes; any other single-tap
-  // mutation prompts on touch only (a mis-tap is easy on a phone).
-  const confirmDelete = (msg: string) => window.confirm(msg)
-  const confirmTouchMutation = (msg: string) => !isTouch || window.confirm(msg)
+  // The #719 two-tier policy comes from the shared hook, not a copy of it
+  // (#2413 F13). This file used to re-implement both tiers here and hand-roll a
+  // third form inline, which is how two surfaces come to disagree about what
+  // prompts where.
+  const { confirmDelete, confirmIrreversible, confirmTouchMutation } = useConfirm()
 
   // Runs
   const [runs, setRuns] = useState<RunItem[]>([])
@@ -1621,7 +1620,7 @@ function WorkspaceDetailContent() {
   // variables — so the touch confirm guards that direction only.
   async function handleDebugModeUpdate(next: boolean) {
     if (!workspace) return
-    if (next && isTouch && !window.confirm(t('debugMode.confirmEnable'))) return
+    if (next && !confirmTouchMutation(t('debugMode.confirmEnable'))) return
     setSavingDebugMode(true)
     try {
       const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
@@ -1650,7 +1649,7 @@ function WorkspaceDetailContent() {
   // the touch confirm guards that one.
   async function handleForkPlansUpdate(next: boolean) {
     if (!workspace) return
-    if (next && isTouch && !window.confirm(t('allowForkPrPlans.confirmEnable'))) return
+    if (next && !confirmTouchMutation(t('allowForkPrPlans.confirmEnable'))) return
     setSavingForkPlans(true)
     try {
       // `/api/v1`, not the `/api/v2` this arrived from the 1.9 line carrying. The
@@ -2013,7 +2012,12 @@ function WorkspaceDetailContent() {
         ? t('runs.queueConfigureConfirmLimited', { limit: reach })
         : t('runs.queueConfigureConfirmAll')) +
       (dynamic ? ' ' + t('runs.queueConfigureConfirmDynamic') : '')
-    if (!window.confirm(msg)) return
+    // BOTH modes, deliberately unchanged here. The decision is that the run
+    // buttons prompt on touch only -- but this sentence is currently the ONLY
+    // place a configure's reach is stated, so relaxing it before #2413 F14 puts
+    // the effective limit on the page would remove the information rather than
+    // move it. The two land together.
+    if (!confirmIrreversible(msg)) return
     setQueueingConfigure(true)
     setError('')
     try {
@@ -2072,12 +2076,10 @@ function WorkspaceDetailContent() {
     // `plan + apply` run can change infrastructure), so a stray tap on a touch
     // device (any width) gets a native confirm; a precise pointer runs
     // immediately.
-    if (isTouch) {
-      const msg = planOnly
-        ? phaseWord('queuePlanConfirm')
-        : phaseWord('queueApplyConfirm')
-      if (!window.confirm(msg)) return
-    }
+    const planMsg = planOnly
+      ? phaseWord('queuePlanConfirm')
+      : phaseWord('queueApplyConfirm')
+    if (!confirmTouchMutation(planMsg)) return
     setQueueingPlan(true)
     setError('')
     try {
