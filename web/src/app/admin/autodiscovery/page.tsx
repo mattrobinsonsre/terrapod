@@ -1128,7 +1128,25 @@ export default function AutodiscoveryPage() {
     engine,
     label: ruleLabel,
     hint: ruleHint,
-    readOnly: RULE_READ_ONLY,
+    // `execution-mode` always, plus `security-scan-engine` on a PULUMI rule.
+    //
+    // The endpoint refuses the mere PRESENCE of either scan key on a Pulumi
+    // rule (`autodiscovery_rules.py`), so the payload omits both -- but the
+    // shared table hides `security-scan-enforcement` and NOT the engine
+    // picker, because `engines: ['terraform']` there would also hide it on a
+    // Pulumi WORKSPACE, where the endpoint does accept it, and two other
+    // surfaces read that table.
+    //
+    // So the control would otherwise render live while its value is silently
+    // discarded, which is the lie F20 exists to remove: a field the surface
+    // cannot write is rendered DISABLED, not rendered as though it worked.
+    // `GroupCtx.readOnly` is exactly that hook -- "attributes this caller may
+    // not change, rendered disabled rather than hidden" -- so this needs no
+    // change to the shared component and no rule-local escape hatch.
+    readOnly:
+      engine === 'pulumi'
+        ? new Set([...RULE_READ_ONLY, 'security-scan-engine'])
+        : RULE_READ_ONLY,
     busy: submitting,
   }
 
