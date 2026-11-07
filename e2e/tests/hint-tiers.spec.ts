@@ -30,7 +30,10 @@ import { test, expect } from '@playwright/test'
  *  about the component rather than about seeding. */
 async function openCreateForm(page: import('@playwright/test').Page) {
   await page.goto('/workspaces')
-  await page.click('button:has-text("Create Workspace")')
+  // `New Workspace` OPENS the form; `Create Workspace` is the submit button
+  // inside it, so clicking that first waits for a control that does not exist
+  // yet. Copied from the wrong line of `workspaces.spec.ts` the first time.
+  await page.click('button:has-text("New Workspace")')
   const toggles = page.getByTestId('hint-detail-toggle')
   // A positive count FIRST: every assertion below is about "one of these", and
   // a zero would make all of them vacuously true -- the repository's most

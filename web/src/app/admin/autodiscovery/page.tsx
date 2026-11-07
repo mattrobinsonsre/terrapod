@@ -1331,9 +1331,11 @@ export default function AutodiscoveryPage() {
         {/* Which inventory sources ansible may resolve on the runner (#2033).
             Terrapod itself never runs either kind, in either state. */}
         {/* ONE ordered select over both grants (#2413 F19), replacing two
-            yes/no selects whose combination nobody could reason about -- on the
-            only two settings that let third-party code run on a runner. Four
-            options, not the finding's three. */}
+            yes/no selects whose combination nobody could reason about: one of
+            the two permits an arbitrary executable from the repository to run
+            in the runner Job. NOT "the only settings that let third-party code
+            run on a runner" -- see `lib/dynamic-inventory.ts` for why that
+            framing is wrong. Four options, not the finding's three. */}
         <Field
           attr="dynamic-inventory-enabled"
           ctx={ruleCtx}

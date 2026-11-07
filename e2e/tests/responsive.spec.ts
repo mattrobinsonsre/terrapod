@@ -32,7 +32,7 @@ test.describe('Responsive harness (phone viewport)', () => {
     // touch, collapsing on a precise pointer. Asserted here because this is
     // the only project running a coarse pointer.
     await page.goto('/workspaces')
-    await page.click('button:has-text("Create Workspace")')
+    await page.click('button:has-text("New Workspace")')
     const toggle = page.getByTestId('hint-detail-toggle').first()
     await expect(toggle).toBeVisible({ timeout: 15_000 })
 
@@ -2545,9 +2545,11 @@ test.describe('Workspace form sections (#2253)', () => {
   test('dynamic inventory is ONE ordered select with four options (#2413 F19)', async ({
     page,
   }) => {
-    // Two adjacent booleans became one ordered control, on the only two
-    // settings that let third-party code run on a runner -- which is what made
-    // their combination worth being legible.
+    // Two adjacent booleans became one ordered control, because their
+    // combination is what nobody could reason about: one of the two permits an
+    // arbitrary executable from the repository to run in the runner Job. NOT
+    // "the only settings that let third-party code run on a runner", which an
+    // earlier version of this comment said -- see `lib/dynamic-inventory.ts`.
     //
     // FOUR options, not the finding's three. `scripts` without `plugins` is a
     // real configuration: the runner's `_enabled_plugins` appends the two
@@ -2572,6 +2574,15 @@ test.describe('Workspace form sections (#2253)', () => {
     // The second control is GONE rather than merely unused: leaving one behind
     // would let the pair disagree.
     await expect(page.getByTestId('ws-inventory-scripts-enabled')).toHaveCount(0)
+
+    // Rendered but DISABLED until the workspace declares a configure
+    // operation (#2413 F20: nothing is hidden by a gate). That is why the
+    // select cannot simply be operated here, and asserting both halves is
+    // stronger than ticking the box and moving on -- a regression that left it
+    // enabled would offer a control the workspace cannot use.
+    await expect(select).toBeDisabled()
+    await page.getByLabel('Configure', { exact: true }).check()
+    await expect(select).toBeEnabled()
 
     // And it is usable at phone width, which is where a four-option select
     // with a long last label would push a page sideways.
