@@ -1567,6 +1567,13 @@
             "boolean"
           ]
         },
+        "configure_after_apply": {
+          "description": "whether THIS run's apply is followed by an Ansible configure, overriding the workspace's standing configure_after_apply setting for one run. OMIT IT to leave the workspace to decide, which is almost always what you want. true runs plan, apply AND configure in one run -- so it changes real hosts after changing real infrastructure, and the configure half has no separate review point; only set it when the user has asked for all three. false runs plan and apply and SKIPS the configure on a workspace that normally runs it, which is the way to do just the first two phases. true is refused with a 422 on a plan-only or destroy run (there is no apply for a configure to follow) and on a workspace that declares no configure operation",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "is_configure": {
           "description": "run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet",
           "type": "boolean"

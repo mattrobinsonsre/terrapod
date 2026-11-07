@@ -16,8 +16,34 @@ automatic one is off until you turn it on:
 |---|---|---|
 | **Manual** | the Configure button on the workspace's Runs tab, `POST /api/v1/runs` with `is-configure: true`, or the `terrapod_run_create` MCP tool | the workspace's `default-playbook` against its `default-limit`, or whatever the invocation overrides |
 | **On push** (`auto-configure-enabled`) | a commit that changes a file under the workspace's `config-directory` | the declared defaults — a push carries no run options |
-| **After an apply** (`configure-after-apply`) | every apply on this workspace, on the **same run** | the declared defaults |
+| **After an apply** (`configure-after-apply`) | every apply on this workspace, on the **same run** — or one apply, when a run asks for it (below) | the declared defaults |
 | **On an inventory change** (the same `auto-configure-enabled`) | any change to the declared inventory that did **not** arrive through git — a host, group, membership or variable written through the API, the MCP tools, the UI, or by a Terraform apply declaring `terrapod_inventory_*` rows | the declared defaults |
+
+### Asking for one apply-then-configure, or declining one
+
+`configure-after-apply` on the **workspace** is a standing setting: every apply
+there is a composite. A single run can override it, in either direction, by
+sending the attribute of the same name on `POST /api/v1/runs`:
+
+| `configure-after-apply` on the run | What runs |
+|---|---|
+| **omitted** | whatever the workspace says. This is what the `terraform`/`tofu` CLI and a git push do — neither can pass a flag |
+| **`true`** | plan, apply **and** configure, on a workspace that does not normally chain them |
+| **`false`** | plan and apply, **skipping** the configure on a workspace that normally runs it |
+
+Three states rather than two, because omitting it and declining it are
+different requests: a client that sent `false` for "nothing asked" would stop
+every `configure-after-apply` workspace producing a composite. The SDK models
+it as `*bool` and the MCP tool's `configure_after_apply` is optional for the
+same reason.
+
+`true` is **refused with a 422** rather than ignored on a plan-only run or a
+destroy — there is no apply for a configure to follow — and on a workspace that
+declares no configure operation. The caller asked for an apply they would not
+get, so the refusal names which of the three it was.
+
+The workspace setting is still the only route for the CLI, which is why it
+stays.
 
 There is deliberately **no scheduled configure**. An operator who wants a
 periodic one drives `POST /api/v1/runs` from their own scheduler — anything
@@ -849,7 +875,8 @@ the local case. That is why the fix is a volume rather than a variable.
 | 403 naming `run:apply` | plan tier is not enough for a configure |
 | A push to the playbook does nothing | `auto-configure-enabled` is off, or the changed file is outside `config-directory` |
 | A configure ran against more hosts than expected | `default-limit` is empty, which means the whole inventory — check the Resolved view with the limit you intended |
-| An apply did not configure | `configure-after-apply` is off, or the apply was a destroy |
+| An apply did not configure | `configure-after-apply` is off on the workspace and the run did not ask for it, the run sent `configure-after-apply: false`, or the apply was a destroy |
+| 422 about `configure-after-apply` | the run asked for a composite on a plan-only run or a destroy, or on a workspace that declares no configure operation — the message says which |
 | A cloud module says it has no credentials | the playbook sets no cloud credential environment, or it points at the engine's `/var/run/terrapod/oidc` rather than a configure's `/tp/oidc` — read `TERRAPOD_OIDC_TOKEN_DIR` |
 | A cloud rejects the token with a signature error | the value was read with surrounding whitespace — `| trim` the file for the forms that take the token rather than a path |
 | `The specified OIDC token file does not exist` | Azure's `oidc_token_file_path` names a path that is not there, usually the engine's directory rather than a configure's |

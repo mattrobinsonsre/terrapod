@@ -552,3 +552,61 @@ func TestCreateRunAsksForAConfigure(t *testing.T) {
 		t.Errorf("options: %q %q", run.Playbook, run.Limit)
 	}
 }
+
+// The three states of ConfigureAfterApply (#2413 F12), each asserted on the
+// WIRE rather than on the struct.
+//
+// The absent case is the one that matters and the one a boolean field could not
+// express: the server distinguishes an absent key from a false one, so an SDK
+// that emitted `configure-after-apply: false` for an unset field would silently
+// stop every configure-after-apply workspace producing a composite. That is a
+// behaviour change for runs nobody asked to change, delivered by a client
+// upgrade, which is the worst shape a default can have.
+func TestCreateRunConfigureAfterApplyIsThreeState(t *testing.T) {
+	yes, no := true, false
+	for _, tc := range []struct {
+		name  string
+		field *bool
+		want  any // nil means the key must be ABSENT
+	}{
+		{"nil sends nothing", nil, nil},
+		{"true asks for a composite", &yes, true},
+		{"false declines it", &no, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var body map[string]any
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				w.Header().Set("Content-Type", "application/vnd.api+json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"data":{"id":"run-c","type":"runs","attributes":{"status":"queued"}}}`))
+			}))
+			defer srv.Close()
+
+			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.CreateRun(t.Context(), CreateRunRequest{
+				WorkspaceID:         "ws-app",
+				ConfigureAfterApply: tc.field,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			attrs, _ := body["data"].(map[string]any)["attributes"].(map[string]any)
+			got, present := attrs["configure-after-apply"]
+			if tc.want == nil {
+				if present {
+					t.Errorf("key sent for a nil field: %v -- the workspace setting would be overridden", attrs)
+				}
+				return
+			}
+			if !present {
+				t.Fatalf("key not sent: %v", attrs)
+			}
+			if got != tc.want {
+				t.Errorf("configure-after-apply = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -218,12 +218,32 @@ type CreateRunRequest struct {
 	// playbook against its inventory, with no plan and no apply. The workspace
 	// must declare a configure operation (configure-enabled) or the server
 	// answers 422.
-	//
-	// There is no field for a composite. An apply followed by a configure on
-	// one run is the workspace's own configure-after-apply setting, because the
-	// terraform/tofu CLI has no way to pass a flag and the composite exists so
-	// that a remote execution keeps streaming through the configure.
 	IsConfigure bool
+	// ConfigureAfterApply is the PER-RUN answer to the composite question, and
+	// it is a three-state pointer because all three states are things a caller
+	// means:
+	//
+	//   nil   -- nothing asked. The workspace's standing configure-after-apply
+	//            setting decides, which is what the terraform/tofu CLI and a
+	//            VCS push rely on: neither can pass a flag, and the composite
+	//            exists so a remote execution keeps streaming through the
+	//            configure.
+	//   true  -- a composite for THIS run, whatever the workspace says.
+	//   false -- a plain apply for THIS run, overriding a workspace that
+	//            declares the composite. The partial that lets somebody run
+	//            just the first two phases on a workspace that normally runs
+	//            all three.
+	//
+	// This comment used to say "there is no field for a composite", and that
+	// was true: the composite came solely from the standing setting, so asking
+	// for one run of apply-then-configure meant changing the workspace, running
+	// it, and changing it back (#2413 F12).
+	//
+	// true is refused with a 422 on a plan-only or destroy run -- there is no
+	// apply for a configure to follow -- and on a workspace that declares no
+	// configure operation. Refused rather than ignored: the caller asked for an
+	// apply they would not get.
+	ConfigureAfterApply *bool
 	// Playbook and Limit override the workspace's default-playbook and
 	// default-limit for this run only. Both are refused on a run that is not a
 	// configure rather than ignored.
@@ -298,6 +318,13 @@ func (c *Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, err
 	}
 	if req.IsConfigure {
 		attrs["is-configure"] = true
+	}
+	// Sent only when non-nil, which is what carries the third state: the server
+	// distinguishes an absent key from a false one, so emitting false here for
+	// a nil field would silently stop every configure-after-apply workspace
+	// producing a composite.
+	if req.ConfigureAfterApply != nil {
+		attrs["configure-after-apply"] = *req.ConfigureAfterApply
 	}
 	if req.Playbook != "" {
 		attrs["playbook"] = req.Playbook

@@ -94,8 +94,12 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		Refresh   *bool  `json:"refresh,omitempty" jsonschema:"refresh state before planning (default true)"`
 		// A configure has no plan-only form, so plan_only MUST be false with
 		// it -- the server refuses the pair rather than ignoring one.
-		IsConfigure bool   `json:"is_configure,omitempty" jsonschema:"run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet"`
-		Playbook    string `json:"playbook,omitempty" jsonschema:"the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure"`
+		IsConfigure bool `json:"is_configure,omitempty" jsonschema:"run the workspace's ANSIBLE PLAYBOOK against its inventory instead of a terraform/tofu plan or apply. THIS CHANGES REAL HOSTS -- it can restart services, rotate credentials and reboot machines -- and there is no plan to review first, so only set it when the user has explicitly asked for a configure. Requires plan_only=false and a workspace that declares a configure operation (configure_enabled), or the server answers 422. Narrow it with limit before running it against a whole fleet"`
+		// Three-state, and the pointer is what carries it: an absent field
+		// must not be sent as false, or every configure-after-apply workspace
+		// silently stops producing a composite.
+		ConfigureAfterApply *bool  `json:"configure_after_apply,omitempty" jsonschema:"whether THIS run's apply is followed by an Ansible configure, overriding the workspace's standing configure_after_apply setting for one run. OMIT IT to leave the workspace to decide, which is almost always what you want. true runs plan, apply AND configure in one run -- so it changes real hosts after changing real infrastructure, and the configure half has no separate review point; only set it when the user has asked for all three. false runs plan and apply and SKIPS the configure on a workspace that normally runs it, which is the way to do just the first two phases. true is refused with a 422 on a plan-only or destroy run (there is no apply for a configure to follow) and on a workspace that declares no configure operation"`
+		Playbook            string `json:"playbook,omitempty" jsonschema:"the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure"`
 		// The CLI's -var equivalent. Per-run, and higher precedence than the
 		// workspace's own variables for this run only -- it does not edit them.
 		Variables map[string]string `json:"variables,omitempty" jsonschema:"variables for THIS run only, as a key/value map -- the equivalent of the CLI's -var. They take precedence over the workspace's own variables for this run and do not change them. A key pinned by a priority variable set is REFUSED with an error naming it, rather than silently ignored, so an operator guardrail cannot be overridden here. Values are stored encrypted and are never read back, so pass a secret only when the run genuinely needs one"`
@@ -123,9 +127,12 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			AutoApply:   in.AutoApply,
 			Refresh:     in.Refresh,
 			IsConfigure: in.IsConfigure,
-			Playbook:    in.Playbook,
-			Limit:       in.Limit,
-			Variables:   in.Variables,
+			// Passed straight through, nil and all: the SDK sends the key only
+			// when non-nil, which is what preserves the third state.
+			ConfigureAfterApply: in.ConfigureAfterApply,
+			Playbook:            in.Playbook,
+			Limit:               in.Limit,
+			Variables:           in.Variables,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

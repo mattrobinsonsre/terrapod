@@ -912,9 +912,55 @@ async def create_run(
     # After every branch that can force `plan_only`, deliberately: a run forced
     # plan-only is not a configure, and asking before the forcing would gate it
     # as one.
+    #
+    # `configure-after-apply` is read as a TRISTATE (#2413 F12): absent means
+    # the workspace's standing setting decides, `true` asks for a composite
+    # for this run alone, and `false` asks for a plain apply on a workspace
+    # that declares one -- which is the partial the review asked for by name.
+    # `attrs.get(...)` cannot express that, so absence is distinguished here.
+    requested_after_apply: bool | None = None
+    if "configure-after-apply" in attrs:
+        raw_after = attrs["configure-after-apply"]
+        if not isinstance(raw_after, bool):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="'configure-after-apply' must be a boolean",
+            )
+        requested_after_apply = raw_after
+        # Refused rather than resolved to something smaller. Both exclusions
+        # are about there being no apply for a configure to follow, so a caller
+        # asking for a composite here asked for an apply they are not going to
+        # get -- and accepting the attribute and dropping it is the #2116 class.
+        if requested_after_apply and (plan_only or bool(attrs.get("is-destroy", False))):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "'configure-after-apply' asks for a configure to follow an apply, and "
+                    + (
+                        "this run is plan-only, so there is no apply to follow. Set "
+                        "'is-configure' for a configure on its own."
+                        if plan_only
+                        else "a destroy removes the hosts a configure would target, so there "
+                        "is nothing to configure afterwards."
+                    )
+                ),
+            )
+        # A composite needs the workspace to declare a configure operation at
+        # all, for the same reason `playbook` does below: without it the
+        # configure half cannot run, and the caller would get a silent apply.
+        if requested_after_apply and not bool(getattr(ws, "configure_enabled", False)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "'configure-after-apply' needs the workspace to declare a configure "
+                    "operation (configure-enabled)."
+                ),
+            )
+
     is_configure, _configure_after_apply = run_service.resolve_configure_shape(
         ws,
         requested_configure=bool(attrs.get("is-configure", False)),
+        requested_after_apply=requested_after_apply,
         plan_only=bool(plan_only),
         is_destroy=bool(attrs.get("is-destroy", False)),
     )
@@ -1014,6 +1060,7 @@ async def create_run(
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             save_plan=save_plan,
             is_configure=bool(attrs.get("is-configure", False)),
+            configure_after_apply=requested_after_apply,
             playbook=attrs.get("playbook", "") or "",
             ansible_limit=attrs.get("limit", "") or "",
             run_variables=attrs.get("variables"),
