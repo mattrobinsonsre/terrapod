@@ -26,6 +26,7 @@ that way is to wire a new setting up rather than add a line.
 
 from __future__ import annotations
 
+import functools
 import pathlib
 import re
 from collections.abc import Callable
@@ -263,8 +264,67 @@ def _go_json_tag(attr: str) -> tuple[str, ...]:
     return (f'json:"{snake}"', f'json:"{snake},')
 
 
+def _web_tsx(attr: str) -> tuple[str, ...]:
+    """The forms a `.tsx` form can offer an attribute in.
+
+    Two more than the quoted key, and each was a measured FALSE PASS rather
+    than a theoretical one.
+
+    **An unquoted property write.** A payload object in TypeScript takes a
+    single-word key as a plain property -- `u.labels = uLabels` -- and the
+    quoted matcher cannot see it. So `labels` was excused on the bulk-update
+    form as "handled by the dedicated label editor, not a named field" while
+    the form had rendered the editor and written the key all along: a reader
+    saw an excuse where the truth was that the gate's own matcher was blind.
+    Anchored on the ASSIGNMENT rather than on a bare `.attr`, because a `.tsx`
+    file reads other objects' properties too -- this very form renders
+    `w.labels` in its results table, which is not the form offering the
+    setting. Only ever matches a single-word attribute; a kebab key is not a
+    JavaScript identifier.
+
+    **An accepted ALIAS.** `agent-pool-ids` was excused as "pool assignment
+    needs per-pool RBAC; the API takes it, the fleet form does not" -- and the
+    form has a pool picker, sent under `agent-pool-id`, the single-pool
+    spelling the endpoint accepts for the same setting. Offering BOTH would let
+    an operator set two things that mean one thing, which is exactly why
+    `FIELDS` records the superseded spelling in `alsoAccepts` instead of
+    rendering a second control. A surface that offers a setting under a
+    spelling the API accepts for it offers the setting.
+
+    Deliberately NOT applied to the Python or Go surfaces, for the reason
+    `_SPELLING` exists at all: a Python file mentioning a column would satisfy
+    an unquoted matcher without offering the attribute, and MCP already spells
+    both pool keys independently -- widening it there would retire a check that
+    currently holds.
+
+    WHAT THIS STILL CANNOT SEE, stated rather than implied, because a gate read
+    as stronger than it is is worse than one read correctly. A TypeScript
+    `interface` declaring an API row's shape quotes the same keys the controls
+    do, so a page keeps satisfying the matcher after a control is deleted if a
+    type still names the attribute. Measured: on the fleet form, removing the
+    pool picker's payload write leaves `'agent-pool-id'` in
+    `interface WorkspaceSummary` and the gate stays green. Stripping type
+    declarations the way `_without_filter_builder` strips the filter would close
+    it there -- NOTHING on that page is satisfied only by a declaration -- and
+    would turn the rule form red on FORTY-SEVEN attributes, because its rule
+    template is typed with every key while its controls reach them through state
+    variables rather than key literals. So the two surfaces cannot take the same
+    strip today, and doing it for one of them would be an asymmetry whose only
+    reason is that the other would fail. It is a decision rather than a tidy-up,
+    which is why it is written down here instead of taken.
+    """
+    forms = list(_kebab_quoted(attr))
+    for alias in _aliases_by_attr().get(attr, ()):
+        forms.extend(_kebab_quoted(alias))
+    if attr.isidentifier():
+        forms.append(f".{attr} =")
+    return tuple(forms)
+
+
 _SPELLING: dict[str, Callable[[str], tuple[str, ...]]] = {
     "MCP workspace tools": _go_json_tag,
+    "bulk-update GUI": _web_tsx,
+    "autodiscovery GUI": _web_tsx,
 }
 
 
@@ -278,8 +338,14 @@ def _spellings(surface: str, attr: str) -> tuple[str, ...]:
 #: record that somebody forgot. An entry is cheap to add and must say why.
 _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
     "bulk-update GUI": {
-        "labels": "handled by the dedicated label editor, not a named field",
-        "agent-pool-ids": "pool assignment needs per-pool RBAC; the API takes it, the fleet form does not",
+        # `labels` and `agent-pool-ids` were excused here and both excuses were
+        # FALSE -- the form renders a label editor and a pool picker, and has
+        # all along. The first was a false PASS: with `labels` excused, deleting
+        # the editor would have failed nothing. The second was not, because the
+        # picker is sent as `agent-pool-id` and that key is checked in its own
+        # right, so the excuse merely told a reader something untrue -- which is
+        # the worse of the two to leave, since a false reason reads as
+        # considered. `_web_tsx` above is what lets the gate see both.
         "auto-apply": "deliberately not fleet-settable from a form: it arms unattended applies",
         "drift-ignore-rules": "a rule list needs per-workspace context a fleet form cannot show",
         "trigger-prefixes": "path lists are per-repository; a fleet-wide value is rarely meaningful",
@@ -337,10 +403,42 @@ _SURFACE_DEBT: dict[str, dict[str, str]] = {
 }
 
 
+def _without_filter_builder(src: str) -> str:
+    """`src` with any `buildFilter` body removed.
+
+    The fleet form reuses five attribute names as SELECTION predicates --
+    `f.labels = fLabels`, `f['agent-pool-id'] = ...` -- so the same key appears
+    on the page twice meaning two different things, and only one of them is the
+    form offering the setting. Without this the gate is satisfied by the filter:
+    measured, deleting the label editor and its payload write left it green,
+    because `buildFilter` still wrote the identical key. Two of the five
+    (`owner-email`, `name-prefix`) are not settable attributes at all, so they
+    were never checked either way.
+
+    Brace-matched rather than line-based: the body contains braces of its own,
+    and a regex over them backtracks. A file with no such builder is returned
+    unchanged, so this is a no-op on a surface that has none.
+    """
+    i = src.find("function buildFilter(")
+    if i == -1:
+        return src
+    j = src.index("{", src.index(")", i))
+    depth, k = 0, j
+    while k < len(src):
+        if src[k] == "{":
+            depth += 1
+        elif src[k] == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        k += 1
+    return src[:i] + src[k + 1 :]
+
+
 def _surface_sources() -> dict[str, str]:
     return {
-        "bulk-update GUI": _BULK_GUI.read_text(),
-        "autodiscovery GUI": _AD_GUI.read_text(),
+        "bulk-update GUI": _without_filter_builder(_BULK_GUI.read_text()),
+        "autodiscovery GUI": _without_filter_builder(_AD_GUI.read_text()),
         "autodiscovery API": _AD_API.read_text(),
         # The MCP tools an agent drives a workspace through (#2174). Added last
         # and the reason matters: this gate has enforced three surfaces since
@@ -379,6 +477,64 @@ class TestEverySettableAttributeReachesEverySurface:
             assert any(form in src for form in _spellings(surface, "ai-policy-mode")), (
                 f"ai-policy-mode is unreachable from {surface}"
             )
+
+    def test_the_web_matcher_sees_every_form_a_tsx_file_can_offer(self):
+        """The matcher's own fixtures, asserted rather than counted.
+
+        A coverage count over the tree cannot tell a doc dropping its last
+        bracket reference from the matcher losing the bracket alternative, and
+        it is the second that matters -- a narrowed matcher silently shrinks
+        what is checked, which is how both excuses above came to look like
+        decisions. So each form is pinned by a literal, including the ones that
+        must NOT match.
+        """
+        forms = _spellings("bulk-update GUI", "labels")
+        assert ".labels =" in forms, "the unquoted payload write is not matched"
+        assert "'labels'" in forms and '"labels"' in forms
+
+        pools = _spellings("bulk-update GUI", "agent-pool-ids")
+        assert "'agent-pool-id'" in pools, (
+            "the declared alias is not matched, so a surface offering the "
+            "single-pool spelling reads as not offering pool assignment at all"
+        )
+
+        # A kebab key is not a JavaScript identifier, so the unquoted form must
+        # not be invented for one -- `.config-directory =` is not expressible
+        # and a matcher emitting it would be looking for something that cannot
+        # occur.
+        assert not [f for f in _spellings("bulk-update GUI", "config-directory") if " =" in f]
+
+        # The widening is scoped: the Python and Go surfaces keep their own.
+        assert ".labels =" not in _spellings("autodiscovery API", "labels")
+        assert _spellings("MCP workspace tools", "labels") == ('json:"labels"', 'json:"labels,')
+
+    def test_the_filter_builder_is_not_evidence_of_a_setting_control(self):
+        """The strip, pinned, because it is what makes the matcher above able
+        to fail at all.
+
+        A fleet form's filter and its update write the same attribute names,
+        and a gate that reads both cannot tell "this form sets labels" from
+        "this form selects BY labels" -- so deleting the label editor left the
+        gate green until the filter builder came out of what it reads.
+        """
+        whole = _BULK_GUI.read_text()
+        stripped = _without_filter_builder(whole)
+        assert len(stripped) < len(whole), "nothing was stripped; find the builder"
+        assert "f.labels = fLabels" in whole
+        assert "f.labels = fLabels" not in stripped
+        # The update side is untouched, which is the half that must survive.
+        assert "u.labels = uLabels" in stripped
+        # And a surface with no filter builder is returned as-is.
+        assert _without_filter_builder("const x = 1\n") == "const x = 1\n"
+
+    def test_the_alias_parse_finds_the_declared_aliases(self):
+        """A floor. An `alsoAccepts` whose shape the parser stops matching
+        would make every alias widening above silently empty, and the gate
+        would then fail on a surface that offers the setting."""
+        by_attr = _aliases_by_attr()
+        assert by_attr, "no alsoAccepts parsed; the table declares some"
+        assert by_attr.get("agent-pool-ids") == ("agent-pool-id",), by_attr.get("agent-pool-ids")
+        assert "auto-apply" in by_attr.get("auto-apply-mode", ()), by_attr.get("auto-apply-mode")
 
     def test_no_exemption_names_an_attribute_that_is_not_settable(self):
         """A stale excuse hides the setting it used to describe."""
@@ -651,13 +807,36 @@ def _attrs_read_by(function_names: frozenset[str]) -> set[str]:
     return found
 
 
+@functools.lru_cache(maxsize=1)
+def _aliases_by_attr() -> dict[str, tuple[str, ...]]:
+    """Each canonical attribute's accepted older spellings, per `alsoAccepts`.
+
+    Walked line by line, so the attribute an `alsoAccepts` belongs to is the
+    last one declared above it. A nested-brace regex over this 600-line table
+    backtracks catastrophically, and the entries come in both a one-line and a
+    multi-line form, so neither shape may be assumed.
+
+    `_web_tsx` reads it, which is why it is parsed here rather than inside
+    `_declared_fields`: one producer, because two parses of the same
+    declaration are two things to drift.
+    """
+    out: dict[str, tuple[str, ...]] = {}
+    current: str | None = None
+    for line in _WS_FIELDS.read_text().splitlines():
+        found = re.search(r"\battr:\s*'([a-z][a-z0-9-]*)'", line)
+        if found:
+            current = found.group(1)
+        block = re.search(r"\balsoAccepts:\s*\[([^\]]*)\]", line)
+        if block and current:
+            out[current] = tuple(re.findall(r"'([a-z][a-z0-9-]*)'", block.group(1)))
+    return out
+
+
 def _declared_fields() -> tuple[set[str], set[str]]:
     """`(canonical attrs, accepted aliases)` declared in the shared field table."""
     src = _WS_FIELDS.read_text()
     canonical = set(re.findall(r"attr:\s*'([a-z][a-z0-9-]*)'", src))
-    aliases: set[str] = set()
-    for block in re.findall(r"alsoAccepts:\s*\[([^\]]*)\]", src):
-        aliases |= set(re.findall(r"'([a-z][a-z0-9-]*)'", block))
+    aliases = {a for forms in _aliases_by_attr().values() for a in forms}
     return canonical, aliases
 
 

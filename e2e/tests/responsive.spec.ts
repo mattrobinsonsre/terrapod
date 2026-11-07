@@ -1970,16 +1970,18 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await page.goto('/admin/autodiscovery')
     await expectNoHorizontalPageScroll(page)
 
-    // Two things have to happen before the editor exists: open the form, and
-    // expand the collapsed "Workspace template defaults" <details> the field
-    // lives in. The <details> is worth naming because it fails misleadingly in
-    // two different ways -- a closed one keeps its content in the DOM, so
-    // `getByText` finds the label and then fails `toBeVisible`, while
-    // `getByRole` reports "element(s) not found" because browsers drop that
-    // content from the accessibility tree. Neither message mentions a section.
+    // One thing has to happen before the editor exists: open the form. There
+    // used to be a second -- expanding the collapsed "Workspace template
+    // defaults" <details> that every templated field lived inside -- and
+    // #2413 F4 removed it, because sections carry navigability and collapse
+    // does not. The click is gone rather than left as a tolerated no-op: a
+    // guarded step for an element that cannot exist reads as a section nobody
+    // has checked for.
     //
-    // Both steps are inside the retry and both are guarded on the editor still
-    // being absent: clicking the summary a second time would collapse it again.
+    // The retry stays, and is about the click rather than the section: a
+    // client-component button right after `page.goto` can lose a pre-hydration
+    // click, and it is guarded on the editor still being absent so a second
+    // click cannot close a form the first one opened.
     const add = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(async () => {
       if ((await add.count()) > 0) {
@@ -1988,8 +1990,6 @@ test.describe('Per-workspace run identity (#1901)', () => {
       }
       const newRule = page.getByRole('button', { name: 'New Rule' })
       if ((await newRule.count()) > 0) await newRule.click()
-      const summary = page.getByText('Workspace template defaults')
-      if ((await summary.count()) > 0) await summary.click()
       await expect(add).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 20_000 })
 
@@ -2055,8 +2055,16 @@ test.describe('Ansible execution environments (#2154)', () => {
       await page.goto('/admin/autodiscovery')
       await expectNoHorizontalPageScroll(page)
 
-      // Same two steps and the same reasoning as the test above: open the form,
-      // then expand the collapsed template-defaults section the fields live in.
+      // Same single step and the same reasoning as the test above: open the
+      // form. Nothing collapses on it any more (#2413 F4).
+      //
+      // Both pickers are VISIBLE AND DISABLED here, and that is the point of
+      // #2413 F20 rather than an accident of the fixture: they belong to the
+      // Ansible group, every field of which gates on `configure-enabled`, and
+      // a brand-new rule has configure OFF. Seeing the option is how an
+      // operator learns it exists. So this asserts the ROLE and the offered
+      // set -- what the form is telling them -- and deliberately not that
+      // either control is editable in this state.
       const eeSelect = page.getByTestId('rule-ansible-ee')
       await expect(async () => {
         if ((await eeSelect.count()) > 0) {
@@ -2065,8 +2073,6 @@ test.describe('Ansible execution environments (#2154)', () => {
         }
         const newRule = page.getByRole('button', { name: 'New Rule' })
         if ((await newRule.count()) > 0) await newRule.click()
-        const summary = page.getByText('Workspace template defaults')
-        if ((await summary.count()) > 0) await summary.click()
         await expect(eeSelect).toBeVisible({ timeout: 1_000 })
       }).toPass({ timeout: 20_000 })
 
@@ -2160,9 +2166,12 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     // The fifth used to be the settings form, a `<fieldset>` — which defaults to
     // `min-inline-size: min-content` and will not shrink below its content
     // unless told to, which is how /admin/bulk-update once overflowed by 122px.
-    // That form is gone (#1929); the application's only remaining fieldset is on
+    // That form is gone (#1929); every fieldset the application still has is on
     // /admin/bulk-update, which this suite drives separately, so the case is
-    // still covered.
+    // still covered. Three of them since #2413 F4 — the filter, and the two
+    // that disable a list editor behind an off gate — and all three carry the
+    // `min-w-0` that is the whole fix, so "only remaining" is no longer the
+    // right wording even though the reasoning is unchanged.
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2erespinv'))
     const web = await seedInventoryGroup(token, wsId, 'web')
@@ -2206,9 +2215,9 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     }
 
     // The `<fieldset>` case used to be driven here, via the inventory settings
-    // form. That form is gone (#1929) and the application's only remaining
-    // fieldset is on `/admin/bulk-update`, which this suite already drives —
-    // so no coverage is lost by removing this block rather than relocating it.
+    // form. That form is gone (#1929) and every fieldset the application still
+    // has is on `/admin/bulk-update`, which this suite already drives — so no
+    // coverage is lost by removing this block rather than relocating it.
 
     // The variable table, whose values are unbroken identifier-ish runs.
     await page.getByRole('button', { name: 'Inventory variables', exact: true }).click()

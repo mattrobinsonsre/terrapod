@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   EE_UNKNOWN,
   fetchAnsibleExecutionEnvironments,
@@ -13,6 +13,12 @@ import { PageHeader } from '@/components/page-header'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
+import {
+  FIELD_BY_ATTR,
+  GROUPS,
+  type GroupId,
+} from '@/components/workspace-fields'
+import { Group, type GroupCtx } from '@/components/workspace-field-groups'
 import {
   StringListEditor,
   OidcAudiencesEditor,
@@ -76,7 +82,7 @@ interface VCSConnection {
 }
 
 const inputCls =
-  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
 const labelCls = 'block text-sm font-medium text-slate-300 mb-1'
 
 function fmtVal(v: unknown, noneLabel: string): string {
@@ -472,6 +478,910 @@ export default function BulkUpdatePage() {
     )
   }
 
+  /**
+   * The gate booleans this form can explicitly turn OFF, keyed as the API
+   * names the attribute.
+   *
+   * Keyed that way so `gateOff` below can read each field's `dependsOn` out of
+   * the shared registry rather than from a hand-kept list of gate/dependent
+   * pairs: a new `dependsOn` declared in `workspace-fields.ts` is honoured
+   * here the moment it is declared, which is the point of the registry holding
+   * the gate at all. Every tri-state boolean on this surface is listed, not
+   * only the ones that happen to gate something today.
+   */
+  const booleanValues: Record<string, string> = {
+    'plan-apply-enabled': uPlanApplyEnabled,
+    'configure-enabled': uConfigureEnabled,
+    'auto-configure-enabled': uAutoConfigureEnabled,
+    'configure-after-apply': uConfigureAfterApply,
+    'configure-all-hosts': uConfigureAllHosts,
+    'dynamic-inventory-enabled': uDynamicInventoryEnabled,
+    'inventory-scripts-enabled': uInventoryScriptsEnabled,
+    'ansible-host-key-checking': uAnsibleHostKeyChecking,
+    'terragrunt-enabled': uTerragruntEnabled,
+    'auto-merge': uAutoMerge,
+    'drift-detection-enabled': uDriftEnabled,
+    'pulumi-bind-plan': uBindPlan,
+    'debug-mode': uDebugMode,
+    'allow-fork-pr-plans': uAllowForkPrPlans,
+  }
+
+  /**
+   * Whether a field's gate is explicitly OFF here, so the control renders
+   * disabled-but-visible (#2413 F20).
+   *
+   * Deliberately NOT the shared `dependencyMet`/`fieldGateMet`, and the
+   * difference is the whole reason this exists. Those read an ABSENT gate as
+   * off, which is right on create and edit -- a workspace's
+   * `configure-enabled` is always a concrete boolean there -- and wrong here,
+   * because this form's selects are TRI-STATE and '' means "leave this alone".
+   * Handed '', `dependencyMet` returns false, so all thirteen Configure
+   * dependents would be disabled whenever Configure itself is untouched: that
+   * forbids the commonest fleet operation there is -- "I am not changing
+   * configure-enabled, but I do want to set the playbook across the fleet".
+   *
+   * So only an explicit 'false' disables a dependent. A gate this form does
+   * not offer at all (`vcs-connection-id`) can never be explicitly false, so
+   * its dependents stay editable -- correct, because each matched workspace
+   * has its own connection and the server merges the write against that row.
+   */
+  const gateOff = (attr: string): boolean => {
+    const dep = FIELD_BY_ATTR[attr]?.dependsOn
+    return dep !== undefined && booleanValues[dep] === 'false'
+  }
+
+  /**
+   * What `Group` reads off a `GroupCtx` -- which is `engine` and nothing else.
+   *
+   * `Group`'s only use of the context is dropping a section whose every field
+   * belongs to another engine. The matched set here is heterogeneous BY
+   * CONSTRUCTION: one filter can match Terraform and Pulumi workspaces at
+   * once, so there is no honest engine value to pass, and '' is the honest
+   * absence of one. Measured against the table: every group holds at least one
+   * engine-agnostic field, so no section is dropped by it; and `Group` passes
+   * `children` straight through, so the per-field engine filtering `Field`
+   * applies never reaches the controls below.
+   *
+   * The remaining members are what the type requires and this surface does not
+   * use, because the controls stay the page's own: `Field` was measured
+   * incompatible here on three counts it has no room for -- a tri-state
+   * "unchanged" value with no concrete value to show, a `uSet*` opt-in
+   * checkbox whose sentence is the only label six fields have, and a payload
+   * that must omit a key entirely rather than send a cleared one.
+   */
+  const groupCtx: GroupCtx = {
+    mode: 'create',
+    values: {},
+    onChange: () => {},
+    engine: '',
+    label: (attr) => attr,
+  }
+
+  /** A section's own hint, rendered by `Group` above its grid. */
+  const groupHint = (text: string) => <p className="text-xs text-slate-500 mb-3">{text}</p>
+
+  const groupDescription: Partial<Record<GroupId, ReactNode>> = {
+    operations: groupHint(tWs('fields.operationsHint')),
+    ansible: groupHint(tAd('ansibleConfigureHint')),
+  }
+
+  /**
+   * The fleet form's controls, keyed by the group the shared registry puts
+   * each attribute in (#2413 F4).
+   *
+   * Keyed rather than written out in order so the render below walks `GROUPS`
+   * itself and cannot drift from the table's order -- the same shape the
+   * create form uses. `identity` is absent and that is not an omission: `name`
+   * and `engine` are `NEVER_BULK_SETTABLE` (identity, not settings), so this
+   * surface contributes nothing to that group, and the render filters it out
+   * rather than printing a heading over an empty grid.
+   *
+   * Within a group the order is the registry's own, which is what makes the
+   * four forms read alike -- and incidentally what puts the orchestrator's CPU
+   * and memory requests back beside each other (#2413 F3).
+   *
+   * `min-w-0` on every wrapper: a grid item has `min-width: auto`, so a select
+   * whose longest option is a long translated string pushes the row past the
+   * viewport however `w-full` the control is.
+   */
+  const groupBody: Partial<Record<GroupId, ReactNode>> = {
+    execution: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.executionMode')}</label>
+          <select
+            value={uExecMode}
+            onChange={(e) => setUExecMode(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="local">local</option>
+            <option value="agent">agent</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.executionBackend')}</label>
+          <select
+            value={uExecBackend}
+            onChange={(e) => setUExecBackend(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="tofu">tofu</option>
+            <option value="terraform">terraform</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.terraformVersion')}</label>
+          <input
+            type="text"
+            value={uTfVersion}
+            onChange={(e) => setUTfVersion(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.autoApply')}</label>
+          <select
+            aria-label={t('update.autoApply')}
+            value={uAutoApplyMode}
+            onChange={(e) => setUAutoApplyMode(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="never">{tMode('never')}</option>
+            <option value="always">{tMode('always')}</option>
+            <option value="create">{tMode('create')}</option>
+            <option value="create_update">{tMode('createUpdate')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tAd('terragruntEnabled')}</label>
+          <select
+            value={uTerragruntEnabled}
+            onChange={(e) => setUTerragruntEnabled(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tAd('terragruntVersion')}</label>
+          <input
+            type="text"
+            value={uTerragruntVersion}
+            onChange={(e) => setUTerragruntVersion(e.target.value)}
+            placeholder={t('unchanged')}
+            disabled={gateOff('terragrunt-version')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('fields.bindPlan')}</label>
+          <select
+            value={uBindPlan}
+            onChange={(e) => setUBindPlan(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} title={tWs('fields.parallelismTitle')}>
+            {tWs('fields.parallelism')}
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={256}
+            value={uParallelism}
+            onChange={(e) => setUParallelism(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.cpuRequest')}</label>
+          <input
+            type="text"
+            value={uResourceCpu}
+            onChange={(e) => setUResourceCpu(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.memoryRequest')}</label>
+          <input
+            type="text"
+            value={uResourceMemory}
+            onChange={(e) => setUResourceMemory(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+      </>
+    ),
+
+    operations: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-plan-apply-enabled">
+            {tWs('fields.planApplyEnabled')}
+          </label>
+          <select
+            id="bu-plan-apply-enabled"
+            value={uPlanApplyEnabled}
+            onChange={(e) => setUPlanApplyEnabled(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tWs('fields.planApplyEnabledHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-configure-enabled">
+            {tWs('fields.configureEnabled')}
+          </label>
+          <select
+            id="bu-configure-enabled"
+            value={uConfigureEnabled}
+            onChange={(e) => setUConfigureEnabled(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tWs('fields.configureEnabledHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-auto-configure-enabled">
+            {tWs('fields.autoConfigureEnabled')}
+          </label>
+          <select
+            id="bu-auto-configure-enabled"
+            value={uAutoConfigureEnabled}
+            onChange={(e) => setUAutoConfigureEnabled(e.target.value)}
+            disabled={gateOff('auto-configure-enabled')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tWs('fields.autoConfigureEnabledHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-configure-after-apply">
+            {tWs('fields.configureAfterApply')}
+          </label>
+          <select
+            id="bu-configure-after-apply"
+            value={uConfigureAfterApply}
+            onChange={(e) => setUConfigureAfterApply(e.target.value)}
+            disabled={gateOff('configure-after-apply')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tWs('fields.configureAfterApplyHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-configure-all-hosts">
+            {tWs('fields.configureAllHosts')}
+          </label>
+          <select
+            id="bu-configure-all-hosts"
+            value={uConfigureAllHosts}
+            onChange={(e) => setUConfigureAllHosts(e.target.value)}
+            disabled={gateOff('configure-all-hosts')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tWs('fields.configureAllHostsHint')}</p>
+        </div>
+        {uWouldLeaveNoOperations && (
+          /* Guaranteed 422 for every matched workspace, so both submits are
+             blocked below and this is the sentence that explains it. Inside
+             the Operations grid, spanning it, because it is about the pair of
+             controls directly above rather than about the form.
+             Wrapped in a `<div>` because `Group`'s grid is a `<dl>`, which
+             permits `div` and not `p` -- the same wrapper every field already
+             renders. */
+          <div className="sm:col-span-2 min-w-0">
+            <p
+              className="rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+              data-testid="bu-operations-none"
+            >
+              {t('update.operationsNone')}
+            </p>
+          </div>
+        )}
+      </>
+    ),
+
+    ansible: (
+      <>
+        <div className="min-w-0">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetConfigDirectory}
+              onChange={(e) => setUSetConfigDirectory(e.target.checked)}
+              disabled={gateOff('config-directory')}
+            />
+            {t('update.setConfigDirectory')}
+          </label>
+          {/* A checkbox plus a box, not a select: '' is a real value
+              (the configuration version's root), so the gate has to be
+              out of band -- the same shape as the two run defaults
+              below. The third option #1929 needed here went with the
+              nullable column (#1966). */}
+          {uSetConfigDirectory && (
+            <>
+              <input
+                type="text"
+                value={uConfigDirectory}
+                onChange={(e) => setUConfigDirectory(e.target.value)}
+                placeholder={tWs('fields.configDirectoryPlaceholder')}
+                aria-label={tWs('fields.configDirectory')}
+                title={tWs('fields.configDirectoryTitle')}
+                disabled={gateOff('config-directory')}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {tWs('fields.configDirectoryRootHint')}
+              </p>
+            </>
+          )}
+        </div>
+        <div className="min-w-0">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetDefaultPlaybook}
+              onChange={(e) => setUSetDefaultPlaybook(e.target.checked)}
+              disabled={gateOff('default-playbook')}
+            />
+            {t('update.setDefaultPlaybook')}
+          </label>
+          {uSetDefaultPlaybook && (
+            <input
+              type="text"
+              value={uDefaultPlaybook}
+              onChange={(e) => setUDefaultPlaybook(e.target.value)}
+              placeholder={tWs('fields.defaultPlaybookPlaceholder')}
+              aria-label={tWs('fields.defaultPlaybook')}
+              title={tWs('fields.defaultPlaybookTitle')}
+              disabled={gateOff('default-playbook')}
+              className={inputCls}
+            />
+          )}
+        </div>
+        <div className="min-w-0">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetDefaultLimit}
+              onChange={(e) => setUSetDefaultLimit(e.target.checked)}
+              disabled={gateOff('default-limit')}
+            />
+            {t('update.setDefaultLimit')}
+          </label>
+          {uSetDefaultLimit && (
+            <input
+              type="text"
+              value={uDefaultLimit}
+              onChange={(e) => setUDefaultLimit(e.target.value)}
+              placeholder={tWs('fields.defaultLimitPlaceholder')}
+              aria-label={tWs('fields.defaultLimit')}
+              title={tWs('fields.defaultLimitTitle')}
+              disabled={gateOff('default-limit')}
+              className={inputCls}
+            />
+          )}
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetInventoryPaths}
+              onChange={(e) => setUSetInventoryPaths(e.target.checked)}
+              disabled={gateOff('inventory-paths')}
+            />
+            {t('update.setInventoryPaths')}
+          </label>
+          {uSetInventoryPaths && (
+            <fieldset disabled={gateOff('inventory-paths')} className="min-w-0 border-0 p-0 m-0 space-y-2">
+              <p className="text-xs text-slate-400">{tWs('fields.inventoryPathsHint')}</p>
+              <StringListEditor
+                values={uInventoryPaths}
+                onChange={setUInventoryPaths}
+                placeholder={tWs('fields.inventoryPathsPlaceholder')}
+                addLabel={tWs('fields.inventoryPathsAdd')}
+              />
+            </fieldset>
+          )}
+        </div>
+        {/* Which inventory sources ansible may resolve on the runner
+            (#2033). Terrapod itself never runs either kind, in either
+            state -- these say what the RUNNER is permitted to resolve. */}
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-dynamic-inventory-enabled">
+            {tWs('fields.dynamicInventoryEnabled')}
+          </label>
+          <select
+            id="bu-dynamic-inventory-enabled"
+            value={uDynamicInventoryEnabled}
+            onChange={(e) => setUDynamicInventoryEnabled(e.target.value)}
+            disabled={gateOff('dynamic-inventory-enabled')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {tWs('fields.dynamicInventoryEnabledHint')}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-inventory-scripts-enabled">
+            {tWs('fields.inventoryScriptsEnabled')}
+          </label>
+          <select
+            id="bu-inventory-scripts-enabled"
+            value={uInventoryScriptsEnabled}
+            onChange={(e) => setUInventoryScriptsEnabled(e.target.value)}
+            disabled={gateOff('inventory-scripts-enabled')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {tWs('fields.inventoryScriptsEnabledHint')}
+          </p>
+        </div>
+        {/* Whether a configure verifies the host key of the hosts it
+            targets (#2318). Tri-state like every select on this surface:
+            the column defaults TRUE, but "unchanged" is a real value
+            here, so a fleet write says nothing about a workspace the
+            operator left alone. */}
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-ansible-host-key-checking">
+            {tWs('fields.ansibleHostKeyChecking')}
+          </label>
+          <select
+            id="bu-ansible-host-key-checking"
+            value={uAnsibleHostKeyChecking}
+            onChange={(e) => setUAnsibleHostKeyChecking(e.target.value)}
+            disabled={gateOff('ansible-host-key-checking')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {tWs('fields.ansibleHostKeyCheckingHint')}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} title={tWs('fields.ansibleVersionTitle')}>
+            {tWs('fields.ansibleVersion')}
+          </label>
+          {envs.listing === 'complete' && envs.lines.length > 0 ? (
+            <select
+              value={uAnsibleVersion}
+              onChange={(e) => setUAnsibleVersion(e.target.value)}
+              disabled={gateOff('ansible-version')}
+              className={inputCls}
+            >
+              <option value="">{t('unchangedOption')}</option>
+              {envs.lines.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          ) : (
+            /* `unknown` means the server accepts ANY line, so free text is
+               correct -- an empty picker would block a fleet move the server
+               would have allowed. */
+            <input
+              type="text"
+              value={uAnsibleVersion}
+              onChange={(e) => setUAnsibleVersion(e.target.value)}
+              placeholder={t('unchanged')}
+              title={tWs('fields.ansibleVersionUnconfirmed')}
+              disabled={gateOff('ansible-version')}
+              className={inputCls}
+            />
+          )}
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} title={tWs('fields.ansibleExecutionEnvironmentTitle')}>
+            {tWs('fields.ansibleExecutionEnvironment')}
+          </label>
+          {/* Always a picker: operator labels come from configuration, not
+              from a registry, so they are authoritative even when the
+              built-in listing is unknown. */}
+          <select
+            value={uAnsibleEE}
+            onChange={(e) => setUAnsibleEE(e.target.value)}
+            disabled={envs.labels.length === 0 || gateOff('ansible-execution-environment')}
+            className={inputCls}
+          >
+            <option value="">
+              {envs.labels.length === 0
+                ? tWs('fields.ansibleExecutionEnvironmentNone')
+                : t('unchangedOption')}
+            </option>
+            {envs.labels.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              className="rounded border-slate-600 bg-slate-800"
+              checked={uSetAnsibleCollections}
+              onChange={(e) => setUSetAnsibleCollections(e.target.checked)}
+              disabled={gateOff('ansible-collections')}
+            />
+            {t('update.setAnsibleCollections')}
+          </label>
+          {uSetAnsibleCollections && (
+            <fieldset
+              disabled={gateOff('ansible-collections')}
+              className="min-w-0 border-0 p-0 m-0 space-y-2"
+            >
+              <p className="text-xs text-slate-400">{tWs('fields.ansibleCollectionsHint')}</p>
+              <StringListEditor
+                values={uAnsibleCollections}
+                onChange={setUAnsibleCollections}
+                placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
+                addLabel={tWs('fields.ansibleCollectionsAdd')}
+              />
+            </fieldset>
+          )}
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.eeCpuRequest')}</label>
+          <input
+            type="text"
+            value={uEeResourceCpu}
+            onChange={(e) => setUEeResourceCpu(e.target.value)}
+            placeholder={t('unchanged')}
+            disabled={gateOff('ee-resource-cpu')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{t('update.eeMemoryRequest')}</label>
+          <input
+            type="text"
+            value={uEeResourceMemory}
+            onChange={(e) => setUEeResourceMemory(e.target.value)}
+            placeholder={t('unchanged')}
+            disabled={gateOff('ee-resource-memory')}
+            className={inputCls}
+          />
+        </div>
+      </>
+    ),
+
+    pools: (
+      <div className="min-w-0">
+        <label className={labelCls}>{t('update.agentPool')}</label>
+        {/* Sent as `agent-pool-id`, the single-pool spelling the endpoint
+            accepts beside `agent-pool-ids` -- offering both would let an
+            operator set two things that mean one thing. */}
+        <select
+          value={uAgentPoolId}
+          onChange={(e) => setUAgentPoolId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">{t('unchangedOption')}</option>
+          {pools.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.attributes.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    ),
+
+    vcs: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('fields.vcsWorkflow')}</label>
+          <select
+            value={uVcsWorkflow}
+            onChange={(e) => setUVcsWorkflow(e.target.value)}
+            disabled={gateOff('vcs-workflow')}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="merge_then_apply">{tWs('fields.vcsWorkflowMergeThenApply')}</option>
+            <option value="apply_then_merge">{tWs('fields.vcsWorkflowApplyThenMerge')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('fields.autoMerge')}</label>
+          <select
+            value={uAutoMerge}
+            onChange={(e) => setUAutoMerge(e.target.value)}
+            disabled={gateOff('auto-merge')}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('fields.autoMergeStrategy')}</label>
+          <select
+            value={uAutoMergeStrategy}
+            onChange={(e) => setUAutoMergeStrategy(e.target.value)}
+            disabled={gateOff('auto-merge-strategy')}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="merge">merge</option>{/* i18n-ignore */}
+            <option value="squash">squash</option>{/* i18n-ignore */}
+            <option value="rebase">rebase</option>{/* i18n-ignore */}
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('allowForkPrPlans.title')}</label>
+          <select
+            value={uAllowForkPrPlans}
+            onChange={(e) => setUAllowForkPrPlans(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+      </>
+    ),
+
+    governance: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('drift.title')}</label>
+          <select
+            value={uDriftEnabled}
+            onChange={(e) => setUDriftEnabled(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('drift.checkInterval')}</label>
+          <input
+            type="number"
+            min={0}
+            value={uDriftInterval}
+            onChange={(e) => setUDriftInterval(e.target.value)}
+            placeholder={t('unchanged')}
+            disabled={gateOff('drift-detection-interval-seconds')}
+            className={inputCls}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('planExpiry.expireAfter')}</label>
+          <input
+            type="number"
+            min={0}
+            value={uPlanExpiry}
+            onChange={(e) => setUPlanExpiry(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+      </>
+    ),
+
+    ai: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{tAi('title')}</label>
+          <select
+            value={uAiSummaryMode}
+            onChange={(e) => setUAiSummaryMode(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="default">{tAi('modeDefault')}</option>
+            <option value="enabled">{tAi('modeEnabled')}</option>
+            <option value="disabled">{tAi('modeDisabled')}</option>
+          </select>
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <label className={labelCls}>
+            {tAi('contextLabel')} {tAi('contextLabelSuffix')}
+          </label>
+          <textarea
+            value={uAiSummaryContext}
+            onChange={(e) => setUAiSummaryContext(e.target.value)}
+            rows={3}
+            maxLength={4000}
+            placeholder={tAi('contextPlaceholder')}
+            className={inputCls}
+          />
+          <p className="mt-1 text-xs text-slate-400">{tAi('contextHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tAi('policyMode')}</label>
+          <select
+            value={uAiPolicyMode}
+            onChange={(e) => setUAiPolicyMode(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="default">{tAi('modeDefault')}</option>
+            <option value="enabled">{tAi('modeEnabled')}</option>
+            <option value="disabled">{tAi('modeDisabled')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">{tAi('policyModeNote')}</p>
+        </div>
+      </>
+    ),
+
+    security: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{tScan('engine')}</label>
+          <select
+            value={uScanEngine}
+            onChange={(e) => setUScanEngine(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="checkov">{tScan('engineCheckov')}</option>
+            <option value="trivy">{tScan('engineTrivy')}</option>
+            <option value="both">{tScan('engineBoth')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tScan('enforcement')}</label>
+          <select
+            value={uScanEnforcement}
+            onChange={(e) => setUScanEnforcement(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="off">{tScan('enforcementOff')}</option>
+            <option value="advisory">{tScan('enforcementAdvisory')}</option>
+            <option value="enforced">{tScan('enforcementEnforced')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tScan('threshold')}</label>
+          <select
+            value={uScanThreshold}
+            onChange={(e) => setUScanThreshold(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="critical">{tScan('thresholdCritical')}</option>
+            <option value="high">{tScan('thresholdHigh')}</option>
+            <option value="medium">{tScan('thresholdMedium')}</option>
+            <option value="low">{tScan('thresholdLow')}</option>
+          </select>
+        </div>
+      </>
+    ),
+
+    metadata: (
+      <>
+        <div className="min-w-0 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetLabels}
+              onChange={(e) => setUSetLabels(e.target.checked)}
+            />
+            {t('update.setLabels')}
+          </label>
+          {uSetLabels && <LabelsEditor labels={uLabels} onChange={setULabels} />}
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetVarFiles}
+              onChange={(e) => setUSetVarFiles(e.target.checked)}
+            />
+            {t('update.setVarFiles')}
+          </label>
+          {uSetVarFiles && (
+            <StringListEditor
+              values={uVarFiles}
+              onChange={setUVarFiles}
+              placeholder="env/prod.tfvars"
+              addLabel={t('update.addVarFile')}
+            />
+          )}
+        </div>
+      </>
+    ),
+
+    cloudIdentity: (
+      <div className="min-w-0 sm:col-span-2">
+        <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+          <input
+            type="checkbox"
+            checked={uSetOidcAudiences}
+            onChange={(e) => setUSetOidcAudiences(e.target.checked)}
+          />
+          {t('update.setOidcAudiences')}
+        </label>
+        {uSetOidcAudiences && (
+          <div className="space-y-2">
+            <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
+            <OidcAudiencesEditor
+              value={uOidcAudiences}
+              inert={!oidcDefaults.issuerEnabled}
+              onChange={setUOidcAudiences}
+              audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
+              addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
+            />
+          </div>
+        )}
+      </div>
+    ),
+
+    diagnostics: (
+      <>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('debugMode.title')}</label>
+          <select
+            value={uDebugMode}
+            onChange={(e) => setUDebugMode(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchanged')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('slack.channel')}</label>
+          <input
+            type="text"
+            value={uSlackChannel}
+            onChange={(e) => setUSlackChannel(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+        </div>
+      </>
+    ),
+  }
+
   return (
     <>
       <NavBar />
@@ -641,764 +1551,53 @@ export default function BulkUpdatePage() {
             {t('update.hint')}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>{t('update.terraformVersion')}</label>
-              <input
-                type="text"
-                value={uTfVersion}
-                onChange={(e) => setUTfVersion(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls} title={tWs('fields.ansibleVersionTitle')}>
-                {tWs('fields.ansibleVersion')}
-              </label>
-              {envs.listing === 'complete' && envs.lines.length > 0 ? (
-                <select
-                  value={uAnsibleVersion}
-                  onChange={(e) => setUAnsibleVersion(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  {envs.lines.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-              ) : (
-                /* `unknown` means the server accepts ANY line, so free text is
-                   correct -- an empty picker would block a fleet move the server
-                   would have allowed. */
-                <input
-                  type="text"
-                  value={uAnsibleVersion}
-                  onChange={(e) => setUAnsibleVersion(e.target.value)}
-                  placeholder={t('unchanged')}
-                  title={tWs('fields.ansibleVersionUnconfirmed')}
-                  className={inputCls}
-                />
-              )}
-            </div>
-            <div>
-              <label className={labelCls} title={tWs('fields.ansibleExecutionEnvironmentTitle')}>
-                {tWs('fields.ansibleExecutionEnvironment')}
-              </label>
-              {/* Always a picker: operator labels come from configuration, not
-                  from a registry, so they are authoritative even when the
-                  built-in listing is unknown. */}
-              <select
-                value={uAnsibleEE}
-                onChange={(e) => setUAnsibleEE(e.target.value)}
-                disabled={envs.labels.length === 0}
-                className={inputCls}
-              >
-                <option value="">
-                  {envs.labels.length === 0
-                    ? tWs('fields.ansibleExecutionEnvironmentNone')
-                    : t('unchangedOption')}
-                </option>
-                {envs.labels.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.executionBackend')}</label>
-              <select
-                value={uExecBackend}
-                onChange={(e) => setUExecBackend(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchangedOption')}</option>
-                <option value="tofu">tofu</option>
-                <option value="terraform">terraform</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.executionMode')}</label>
-              <select
-                value={uExecMode}
-                onChange={(e) => setUExecMode(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchangedOption')}</option>
-                <option value="local">local</option>
-                <option value="agent">agent</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.autoApply')}</label>
-              <select
-                aria-label={t('update.autoApply')}
-                value={uAutoApplyMode}
-                onChange={(e) => setUAutoApplyMode(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchangedOption')}</option>
-                <option value="never">{tMode('never')}</option>
-                <option value="always">{tMode('always')}</option>
-                <option value="create">{tMode('create')}</option>
-                <option value="create_update">{tMode('createUpdate')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.agentPool')}</label>
-              <select
-                value={uAgentPoolId}
-                onChange={(e) => setUAgentPoolId(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchangedOption')}</option>
-                {pools.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.attributes.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.cpuRequest')}</label>
-              <input
-                type="text"
-                value={uResourceCpu}
-                onChange={(e) => setUResourceCpu(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.memoryRequest')}</label>
-              <input
-                type="text"
-                value={uResourceMemory}
-                onChange={(e) => setUResourceMemory(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.eeCpuRequest')}</label>
-              <input
-                type="text"
-                value={uEeResourceCpu}
-                onChange={(e) => setUEeResourceCpu(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{t('update.eeMemoryRequest')}</label>
-              <input
-                type="text"
-                value={uEeResourceMemory}
-                onChange={(e) => setUEeResourceMemory(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-          </div>
+          {/* The shared sections, in the registry's own order (#2413 F4).
+              Four forms set workspace attributes and until now each invented
+              its own arrangement -- this one had ~35 controls in two unlabelled
+              grids with six heading-less separators, so the orchestrator's CPU
+              and memory requests sat nine fields apart (#2413 F3) and the only
+              two real headings were an `<h3>` pair the rest of the form had no
+              counterpart for (#2413 F5).
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
-            <div>
-              <label className={labelCls}>{tScan('enforcement')}</label>
-              <select
-                value={uScanEnforcement}
-                onChange={(e) => setUScanEnforcement(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="off">{tScan('enforcementOff')}</option>
-                <option value="advisory">{tScan('enforcementAdvisory')}</option>
-                <option value="enforced">{tScan('enforcementEnforced')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tScan('engine')}</label>
-              <select
-                value={uScanEngine}
-                onChange={(e) => setUScanEngine(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="checkov">{tScan('engineCheckov')}</option>
-                <option value="trivy">{tScan('engineTrivy')}</option>
-                <option value="both">{tScan('engineBoth')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tScan('threshold')}</label>
-              <select
-                value={uScanThreshold}
-                onChange={(e) => setUScanThreshold(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="critical">{tScan('thresholdCritical')}</option>
-                <option value="high">{tScan('thresholdHigh')}</option>
-                <option value="medium">{tScan('thresholdMedium')}</option>
-                <option value="low">{tScan('thresholdLow')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tAd('terragruntEnabled')}</label>
-              <select
-                value={uTerragruntEnabled}
-                onChange={(e) => setUTerragruntEnabled(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tAd('terragruntVersion')}</label>
-              <input
-                type="text"
-                value={uTerragruntVersion}
-                onChange={(e) => setUTerragruntVersion(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('fields.vcsWorkflow')}</label>
-              <select
-                value={uVcsWorkflow}
-                onChange={(e) => setUVcsWorkflow(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="merge_then_apply">{tWs('fields.vcsWorkflowMergeThenApply')}</option>
-                <option value="apply_then_merge">{tWs('fields.vcsWorkflowApplyThenMerge')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('fields.autoMerge')}</label>
-              <select
-                value={uAutoMerge}
-                onChange={(e) => setUAutoMerge(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('fields.autoMergeStrategy')}</label>
-              <select
-                value={uAutoMergeStrategy}
-                onChange={(e) => setUAutoMergeStrategy(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="merge">merge</option>{/* i18n-ignore */}
-                <option value="squash">squash</option>{/* i18n-ignore */}
-                <option value="rebase">rebase</option>{/* i18n-ignore */}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('drift.title')}</label>
-              <select
-                value={uDriftEnabled}
-                onChange={(e) => setUDriftEnabled(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('drift.checkInterval')}</label>
-              <input
-                type="number"
-                min={0}
-                value={uDriftInterval}
-                onChange={(e) => setUDriftInterval(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('planExpiry.expireAfter')}</label>
-              <input
-                type="number"
-                min={0}
-                value={uPlanExpiry}
-                onChange={(e) => setUPlanExpiry(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls} title={tWs('fields.parallelismTitle')}>
-                {tWs('fields.parallelism')}
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={256}
-                value={uParallelism}
-                onChange={(e) => setUParallelism(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('slack.channel')}</label>
-              <input
-                type="text"
-                value={uSlackChannel}
-                onChange={(e) => setUSlackChannel(e.target.value)}
-                placeholder={t('unchanged')}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('fields.bindPlan')}</label>
-              <select
-                value={uBindPlan}
-                onChange={(e) => setUBindPlan(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('debugMode.title')}</label>
-              <select
-                value={uDebugMode}
-                onChange={(e) => setUDebugMode(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tWs('allowForkPrPlans.title')}</label>
-              <select
-                value={uAllowForkPrPlans}
-                onChange={(e) => setUAllowForkPrPlans(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="true">{tCommon('yes')}</option>
-                <option value="false">{tCommon('no')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tAi('title')}</label>
-              <select
-                value={uAiSummaryMode}
-                onChange={(e) => setUAiSummaryMode(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="default">{tAi('modeDefault')}</option>
-                <option value="enabled">{tAi('modeEnabled')}</option>
-                <option value="disabled">{tAi('modeDisabled')}</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{tAi('policyMode')}</label>
-              <select
-                value={uAiPolicyMode}
-                onChange={(e) => setUAiPolicyMode(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('unchanged')}</option>
-                <option value="default">{tAi('modeDefault')}</option>
-                <option value="enabled">{tAi('modeEnabled')}</option>
-                <option value="disabled">{tAi('modeDisabled')}</option>
-              </select>
-              <p className="mt-1 text-xs text-slate-400">{tAi('policyModeNote')}</p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelCls}>
-                {tAi('contextLabel')} {tAi('contextLabelSuffix')}
-              </label>
-              <textarea
-                value={uAiSummaryContext}
-                onChange={(e) => setUAiSummaryContext(e.target.value)}
-                rows={3}
-                maxLength={4000}
-                placeholder={tAi('contextPlaceholder')}
-                className={inputCls}
-              />
-              <p className="mt-1 text-xs text-slate-400">{tAi('contextHint')}</p>
-            </div>
-          </div>
+              `Group` is shared; the CONTROLS are not, which is the line
+              `workspace-fields.ts` draws: which group an attribute belongs to
+              and which boolean gates it are properties of the ATTRIBUTE and the
+              same everywhere, while the control type and what an empty value
+              means are per surface. Both are load-bearing here -- a tri-state
+              select and a `uSet*` opt-in checkbox are how "leave this alone"
+              is said on a fleet form, and neither has a counterpart on a form
+              that sets one concrete value.
 
-          {/* Which operations the matched workspaces have (#1966). Its own
-              block above the Ansible one, because `configure-enabled` is the
-              declaration and the roots below are only where that operation
-              runs — the ordering #1929 did not have, and #1966 introduced. */}
-          <div className="pt-3 border-t border-slate-800">
-            <h3 className="text-sm font-medium text-slate-200 mb-1">{tWs('fields.operations')}</h3>
-            <p className="text-xs text-slate-500 mb-3">{tWs('fields.operationsHint')}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-plan-apply-enabled">
-                  {tWs('fields.planApplyEnabled')}
-                </label>
-                <select
-                  id="bu-plan-apply-enabled"
-                  value={uPlanApplyEnabled}
-                  onChange={(e) => setUPlanApplyEnabled(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.planApplyEnabledHint')}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-configure-enabled">
-                  {tWs('fields.configureEnabled')}
-                </label>
-                <select
-                  id="bu-configure-enabled"
-                  value={uConfigureEnabled}
-                  onChange={(e) => setUConfigureEnabled(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.configureEnabledHint')}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-auto-configure-enabled">
-                  {tWs('fields.autoConfigureEnabled')}
-                </label>
-                <select
-                  id="bu-auto-configure-enabled"
-                  value={uAutoConfigureEnabled}
-                  onChange={(e) => setUAutoConfigureEnabled(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.autoConfigureEnabledHint')}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-configure-after-apply">
-                  {tWs('fields.configureAfterApply')}
-                </label>
-                <select
-                  id="bu-configure-after-apply"
-                  value={uConfigureAfterApply}
-                  onChange={(e) => setUConfigureAfterApply(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.configureAfterApplyHint')}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-configure-all-hosts">
-                  {tWs('fields.configureAllHosts')}
-                </label>
-                <select
-                  id="bu-configure-all-hosts"
-                  value={uConfigureAllHosts}
-                  onChange={(e) => setUConfigureAllHosts(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.configureAllHostsHint')}
-                </p>
-              </div>
-            </div>
-            {uWouldLeaveNoOperations && (
-              // Guaranteed 422 for every matched workspace, so both submits are
-              // blocked below and this is the sentence that explains it.
-              <p
-                className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
-                data-testid="bu-operations-none"
-              >
-                {t('update.operationsNone')}
-              </p>
-            )}
-          </div>
+              A group whose every field is behind an off gate still renders,
+              with those fields disabled (#2413 F20): seeing the option is how
+              an operator learns it exists. */}
+          {GROUPS.filter((g) => groupBody[g]).map((g) => (
+            <Group
+              key={g}
+              id={g}
+              ctx={groupCtx}
+              title={tWs(`groups.${g}`)}
+              description={groupDescription[g]}
+            >
+              {groupBody[g]}
+            </Group>
+          ))}
 
-          {/* Where the configure operation runs, and what it does by
-              default (#1929) */}
-          <div className="pt-3 border-t border-slate-800">
-            <h3 className="text-sm font-medium text-slate-200 mb-1">{tAd('ansibleConfigure')}</h3>
-            <p className="text-xs text-slate-500 mb-3">{tAd('ansibleConfigureHint')}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* min-w-0: a grid item has min-width:auto, so a select whose
-                  longest option is a long translated string can push the row
-                  past the viewport however w-full the control is. */}
-              <div className="min-w-0">
-                <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={uSetConfigDirectory}
-                    onChange={(e) => setUSetConfigDirectory(e.target.checked)}
-                  />
-                  {t('update.setConfigDirectory')}
-                </label>
-                {/* A checkbox plus a box, not a select: '' is a real value
-                    (the configuration version's root), so the gate has to be
-                    out of band — the same shape as the two run defaults
-                    below. The third option #1929 needed here went with the
-                    nullable column (#1966). */}
-                {uSetConfigDirectory && (
-                  <>
-                    <input
-                      type="text"
-                      value={uConfigDirectory}
-                      onChange={(e) => setUConfigDirectory(e.target.value)}
-                      placeholder={tWs('fields.configDirectoryPlaceholder')}
-                      aria-label={tWs('fields.configDirectory')}
-                      title={tWs('fields.configDirectoryTitle')}
-                      className={inputCls}
-                    />
-                    <p className="mt-1 text-xs text-slate-400">
-                      {tWs('fields.configDirectoryRootHint')}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="mt-3">
-              <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-                <input
-                  type="checkbox"
-                  checked={uSetDefaultPlaybook}
-                  onChange={(e) => setUSetDefaultPlaybook(e.target.checked)}
-                />
-                {t('update.setDefaultPlaybook')}
-              </label>
-              {uSetDefaultPlaybook && (
-                <input
-                  type="text"
-                  value={uDefaultPlaybook}
-                  onChange={(e) => setUDefaultPlaybook(e.target.value)}
-                  placeholder={tWs('fields.defaultPlaybookPlaceholder')}
-                  aria-label={tWs('fields.defaultPlaybook')}
-                  title={tWs('fields.defaultPlaybookTitle')}
-                  className={inputCls}
-                />
-              )}
-            </div>
-            <div className="mt-3">
-              <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-                <input
-                  type="checkbox"
-                  checked={uSetDefaultLimit}
-                  onChange={(e) => setUSetDefaultLimit(e.target.checked)}
-                />
-                {t('update.setDefaultLimit')}
-              </label>
-              {uSetDefaultLimit && (
-                <input
-                  type="text"
-                  value={uDefaultLimit}
-                  onChange={(e) => setUDefaultLimit(e.target.value)}
-                  placeholder={tWs('fields.defaultLimitPlaceholder')}
-                  aria-label={tWs('fields.defaultLimit')}
-                  title={tWs('fields.defaultLimitTitle')}
-                  className={inputCls}
-                />
-              )}
-            </div>
-            {/* Which inventory sources ansible may resolve on the runner
-                (#2033). Terrapod itself never runs either kind, in either
-                state -- these say what the RUNNER is permitted to resolve. */}
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* min-w-0: a grid item has min-width:auto, so a select whose
-                  longest option is a long translated string can push the row
-                  past the viewport however w-full the control is. */}
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-dynamic-inventory-enabled">
-                  {tWs('fields.dynamicInventoryEnabled')}
-                </label>
-                <select
-                  id="bu-dynamic-inventory-enabled"
-                  value={uDynamicInventoryEnabled}
-                  onChange={(e) => setUDynamicInventoryEnabled(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.dynamicInventoryEnabledHint')}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-inventory-scripts-enabled">
-                  {tWs('fields.inventoryScriptsEnabled')}
-                </label>
-                <select
-                  id="bu-inventory-scripts-enabled"
-                  value={uInventoryScriptsEnabled}
-                  onChange={(e) => setUInventoryScriptsEnabled(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.inventoryScriptsEnabledHint')}
-                </p>
-              </div>
-              {/* Whether a configure verifies the host key of the hosts it
-                  targets (#2318). Tri-state like every select on this surface:
-                  the column defaults TRUE, but "unchanged" is a real value
-                  here, so a fleet write says nothing about a workspace the
-                  operator left alone. */}
-              <div className="min-w-0">
-                <label className={labelCls} htmlFor="bu-ansible-host-key-checking">
-                  {tWs('fields.ansibleHostKeyChecking')}
-                </label>
-                <select
-                  id="bu-ansible-host-key-checking"
-                  value={uAnsibleHostKeyChecking}
-                  onChange={(e) => setUAnsibleHostKeyChecking(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">{t('unchangedOption')}</option>
-                  <option value="true">{tCommon('yes')}</option>
-                  <option value="false">{tCommon('no')}</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-400">
-                  {tWs('fields.ansibleHostKeyCheckingHint')}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-              <input
-                type="checkbox"
-                checked={uSetInventoryPaths}
-                onChange={(e) => setUSetInventoryPaths(e.target.checked)}
-              />
-              {t('update.setInventoryPaths')}
-            </label>
-            {uSetInventoryPaths && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-400">{tWs('fields.inventoryPathsHint')}</p>
-                <StringListEditor
-                  values={uInventoryPaths}
-                  onChange={setUInventoryPaths}
-                  placeholder={tWs('fields.inventoryPathsPlaceholder')}
-                  addLabel={tWs('fields.inventoryPathsAdd')}
-                />
-              </div>
-            )}
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2 mt-3">
-              <input
-                type="checkbox"
-                className="rounded border-slate-600 bg-slate-800"
-                checked={uSetAnsibleCollections}
-                onChange={(e) => setUSetAnsibleCollections(e.target.checked)}
-              />
-              {t('update.setAnsibleCollections')}
-            </label>
-            {uSetAnsibleCollections && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-400">
-                  {tWs('fields.ansibleCollectionsHint')}
-                </p>
-                <StringListEditor
-                  values={uAnsibleCollections}
-                  onChange={setUAnsibleCollections}
-                  placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
-                  addLabel={tWs('fields.ansibleCollectionsAdd')}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-              <input
-                type="checkbox"
-                checked={uSetLabels}
-                onChange={(e) => setUSetLabels(e.target.checked)}
-              />
-              {t('update.setLabels')}
-            </label>
-            {uSetLabels && <LabelsEditor labels={uLabels} onChange={setULabels} />}
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-              <input
-                type="checkbox"
-                checked={uSetVarFiles}
-                onChange={(e) => setUSetVarFiles(e.target.checked)}
-              />
-              {t('update.setVarFiles')}
-            </label>
-            {uSetVarFiles && (
-              <StringListEditor
-                values={uVarFiles}
-                onChange={setUVarFiles}
-                placeholder="env/prod.tfvars"
-                addLabel={t('update.addVarFile')}
-              />
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
-              <input
-                type="checkbox"
-                checked={uSetOidcAudiences}
-                onChange={(e) => setUSetOidcAudiences(e.target.checked)}
-              />
-              {t('update.setOidcAudiences')}
-            </label>
-            {uSetOidcAudiences && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
-                <OidcAudiencesEditor
-                  value={uOidcAudiences}
-                  inert={!oidcDefaults.issuerEnabled}
-                  onChange={setUOidcAudiences}
-                  audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
-                  addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-800">
+          {/* Run tasks and notification configurations have NO entry in
+              `FIELDS`, so they cannot be rendered inside the registry-driven
+              loop above -- and that is correct rather than a gap. The table is
+              the workspace's own ATTRIBUTES; these two are collections attached
+              to a workspace and upserted by name, each with its own template
+              editor that owns its rows. They keep the section idiom so the form
+              reads as one thing, and they sit last because replacing a
+              collection wholesale across a match set is the heaviest thing on
+              the page. The headings reuse the workspace page's own tab names:
+              they are already translated in every catalogue and are the words
+              an operator has seen for exactly these two things. */}
+          <section className="min-w-0">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              {tWs('tabs.runTasks')}
+            </h4>
             <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
               <input
                 type="checkbox"
@@ -1410,9 +1609,12 @@ export default function BulkUpdatePage() {
             {uSetRunTasks && (
               <RunTaskTemplatesEditor items={uRunTasks} onChange={setURunTasks} />
             )}
-          </div>
+          </section>
 
-          <div className="pt-3 border-t border-slate-800">
+          <section className="min-w-0">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              {tWs('tabs.notifications')}
+            </h4>
             <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
               <input
                 type="checkbox"
@@ -1427,7 +1629,7 @@ export default function BulkUpdatePage() {
                 onChange={setUNotifications}
               />
             )}
-          </div>
+          </section>
 
           {/* BOTH actions are always present. The previous shape put a single
               button next to a `Dry run` checkbox that was ticked by default, so
