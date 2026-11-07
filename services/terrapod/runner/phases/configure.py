@@ -64,8 +64,20 @@ log = structlog.get_logger(__name__)
 #: of their file in force.
 _FORCED_ENV = {
     "ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED": "True",
-    # Colour is terminal control bytes in a log nobody views in a terminal.
-    "ANSIBLE_FORCE_COLOR": "0",
+    # Colour is FORCED ON, to match what terraform and tofu already produce
+    # (#2413 F18). This read "nobody views it in a terminal" and suppressed it,
+    # which was backwards: nobody views it in a terminal because they view it in
+    # a pane built to render ANSI. The run log viewer has a Colour toggle and a
+    # download that keeps or strips the codes, the plan and apply logs reach it
+    # with their colour intact -- the engine phases pass no `-no-color` -- and
+    # the configure log was the only one of the three that could never use it,
+    # so the toggle was a control that did nothing on that view.
+    #
+    # Forcing is required rather than merely allowed: the runner is not a tty,
+    # so ansible emits no colour unless told to. The stored artifact keeps the
+    # codes and stripping happens at the point of use, which is the pattern
+    # `cloud_identity.py` already argues for over suppressing at the source.
+    "ANSIBLE_FORCE_COLOR": "1",
     # A retry file is written next to the playbook, i.e. into the operator's
     # fetched tree, and nothing ever reads it back here.
     "ANSIBLE_RETRY_FILES_ENABLED": "False",

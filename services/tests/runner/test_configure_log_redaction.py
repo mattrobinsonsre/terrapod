@@ -605,3 +605,53 @@ class TestWhatRealAnsiblePutsInTheStream:
             # and must be there, or the value was dropped rather than censored
             # and some other no_log parameter could survive.
             assert b"VALUE_SPECIFIED_IN_NO_LOG_PARAMETER" in body
+
+
+class TestColourDoesNotDefeatRedaction:
+    """#2413 F18 forces `ANSIBLE_FORCE_COLOR=1`, so the stream now carries SGR
+    sequences. Redaction is a literal byte replace (`_redact`), so the question
+    is whether a colour code can land inside a secret and break the match.
+
+    Pinned rather than reasoned about, because the reasoning is a claim about
+    what ansible does to a line and the whole point of forcing colour was that
+    the old comment's claim about terminals turned out to be backwards.
+    """
+
+    def test_a_secret_inside_a_coloured_line_is_still_redacted(self):
+        """The case that actually occurs: ansible colours a WHOLE line, so the
+        SGR open sits at the start and the reset at the end, and any value in
+        between is contiguous."""
+        exec_subprocess.register_secret(JWT)
+        coloured = b"\x1b[0;32mok: [web1] => token=" + JWT.encode() + b"\x1b[0m\n"
+        assert JWT.encode() in coloured, (
+            "the fixture does not reproduce the shape: the raw secret must be present "
+            "before redaction, or this asserts nothing"
+        )
+        out = exec_subprocess._redact(coloured)
+        assert JWT.encode() not in out, "a secret inside a coloured line survived redaction"
+        assert out.startswith(b"\x1b[0;32m"), "redaction must not eat the colour codes"
+        assert out.endswith(b"\x1b[0m\n"), "the reset must survive too"
+
+    def test_a_colour_code_SPLITTING_a_secret_is_the_known_limit(self):
+        """The limit, pinned so it is a stated boundary rather than a surprise.
+
+        A literal replace cannot match a value an escape sequence has cut in
+        half. This does not happen today because ansible colours a line at a
+        time -- there is no per-token highlighting inside a result -- so a value
+        is never split. If that ever changes, or a callback starts colouring
+        sub-strings, this test fails and says what broke, which is the whole
+        reason to write the limit down instead of asserting safety.
+
+        The mitigation if it ever fires is NOT to redact a stripped copy: the
+        stored artifact has to keep its colour (that is the parity decision), so
+        redacting a stripped buffer and storing the original would upload the
+        secret. It would need an ANSI-tolerant matcher.
+        """
+        exec_subprocess.register_secret(JWT)
+        half = len(JWT) // 2
+        split = (JWT[:half] + "\x1b[0m" + JWT[half:]).encode()
+        out = exec_subprocess._redact(split)
+        assert out == split, (
+            "a split secret was redacted, so the matcher is no longer a literal "
+            "replace -- update this test and the F18 note with what it now does"
+        )

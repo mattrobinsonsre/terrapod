@@ -272,3 +272,57 @@ describe('pickerHostList', () => {
     )
   })
 })
+
+// ── #2413 F18: the tags must survive a COLOURED stream ────────────────────
+
+describe('a coloured configure log', () => {
+  // The configure now runs with `ANSIBLE_FORCE_COLOR=1`, to match what
+  // terraform and tofu already emit, so every line this parses can carry SGR
+  // sequences.
+  //
+  // It is safe by CONSTRUCTION rather than by luck, and that is what these pin:
+  // the callback builds `prefix + line` (`_tp_tag`), so the host field and the
+  // delimiter are always written BEFORE ansible's bytes. Colour can therefore
+  // only appear after the first ` | `, where it is opaque text to this parser.
+  // If the callback ever colours its own prefix, these fail.
+  const ESC = '\u001b'
+
+  it('keeps the host, and leaves the colour in the text', () => {
+    const log = [
+      HOST_LOG_HEADER,
+      `web1       ${HOST_LOG_DELIMITER}${ESC}[0;32mok: [web1]${ESC}[0m`,
+    ].join('\n')
+    const parsed = parseHostLog(log)
+    assert.equal(parsed.tagged, true)
+    assert.deepEqual(parsed.hosts, ['web1'])
+    assert.equal(parsed.lines[0].host, 'web1')
+    assert.equal(parsed.lines[0].text, `${ESC}[0;32mok: [web1]${ESC}[0m`)
+  })
+
+  it('does not invent a host from a colour code on a host-less line', () => {
+    // The failure worth ruling out: if an SGR sequence ever preceded the
+    // marker, `field === '~'` would be false and the picker would gain a host
+    // whose name is an escape sequence.
+    const log = [
+      HOST_LOG_HEADER,
+      `${HOST_LOG_HOSTLESS}          ${HOST_LOG_DELIMITER}${ESC}[0;34mTASK [say hello] ***${ESC}[0m`,
+    ].join('\n')
+    const parsed = parseHostLog(log)
+    assert.equal(parsed.lines[0].host, null)
+    assert.deepEqual(parsed.hosts, [], 'no host may be invented from a colour code')
+  })
+
+  it('keeps the host-less banners when filtered, colour and all', () => {
+    const log = [
+      HOST_LOG_HEADER,
+      `${HOST_LOG_HOSTLESS}          ${HOST_LOG_DELIMITER}${ESC}[0;34mTASK [one] ***${ESC}[0m`,
+      `web1       ${HOST_LOG_DELIMITER}${ESC}[0;32mchanged: [web1]${ESC}[0m`,
+      `web2       ${HOST_LOG_DELIMITER}${ESC}[0;32mchanged: [web2]${ESC}[0m`,
+    ].join('\n')
+    const only = filterHostLog(parseHostLog(log), 'web1')
+    assert.match(only, /TASK \[one\]/, 'a banner is the context a result attaches to')
+    assert.match(only, /changed: \[web1\]/)
+    assert.doesNotMatch(only, /web2/)
+    assert.ok(only.includes(ESC), 'colour is preserved through the filter')
+  })
+})
