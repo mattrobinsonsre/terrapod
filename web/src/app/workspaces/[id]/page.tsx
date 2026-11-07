@@ -663,7 +663,12 @@ function WorkspaceDetailContent() {
   // (#2413 F13). This file used to re-implement both tiers here and hand-roll a
   // third form inline, which is how two surfaces come to disagree about what
   // prompts where.
-  const { confirmDelete, confirmIrreversible, confirmTouchMutation } = useConfirm()
+  // `confirmIrreversible` is no longer destructured here: the configure button
+  // moved to the touch-only tier with #2413 F14, and nothing else on this page
+  // is on the both-modes-but-not-a-delete tier. The tier itself still has three
+  // callers elsewhere (the deleted-workspace restore, module autodiscovery, and
+  // the outstanding-hosts retry), so it is not a tier nothing reads.
+  const { confirmDelete, confirmTouchMutation } = useConfirm()
 
   // Runs
   const [runs, setRuns] = useState<RunItem[]>([])
@@ -2012,12 +2017,19 @@ function WorkspaceDetailContent() {
         ? t('runs.queueConfigureConfirmLimited', { limit: reach })
         : t('runs.queueConfigureConfirmAll')) +
       (dynamic ? ' ' + t('runs.queueConfigureConfirmDynamic') : '')
-    // BOTH modes, deliberately unchanged here. The decision is that the run
-    // buttons prompt on touch only -- but this sentence is currently the ONLY
-    // place a configure's reach is stated, so relaxing it before #2413 F14 puts
-    // the effective limit on the page would remove the information rather than
-    // move it. The two land together.
-    if (!confirmIrreversible(msg)) return
+    // TOUCH ONLY now, which is the decision for every run button: *"we're not
+    // having confirm prompts on those buttons on normal screens. There's time
+    // to cancel. We make it hard to fat-finger and we make it clear. Our users
+    // aren't children."* `handleQueuePlan` has always been this tier.
+    //
+    // It was the both-modes tier until F14, and the condition for relaxing it
+    // was written here: this sentence was the ONLY place a configure's reach
+    // was stated, so relaxing it first would have REMOVED that information
+    // rather than moved it. F14 puts the effective reach on the page beside
+    // the button, so the fact is now visible before the decision rather than
+    // after it -- which is the stronger arrangement, and the two landed
+    // together as the comment said they would.
+    if (!confirmTouchMutation(msg)) return
     setQueueingConfigure(true)
     setError('')
     try {
@@ -5115,6 +5127,40 @@ function WorkspaceDetailContent() {
                     </button>
                   )}
                 </div>
+                {/* What a configure would REACH, on the page (#2413 F14).
+                    Until now this sentence existed only inside the confirm
+                    dialog, so the one fact that decides whether a configure
+                    touches three hosts or three hundred was visible only after
+                    you had already decided to press the button -- and the
+                    Limit field that sets it is behind the Options panel.
+
+                    Rendered wherever a configure can be queued, and the
+                    no-limit case is the loud one: an empty limit means the
+                    whole inventory, which is the default and the widest
+                    possible reach. The dynamic-inventory caveat reuses the
+                    confirm's own sentence rather than a second copy -- where
+                    sources resolve on the runner, neither this page nor the API
+                    can say what the pattern expands to. */}
+                {attrs['configure-enabled'] && perms['can-queue-apply'] && (
+                  <p
+                    data-testid="ws-configure-reach"
+                    className={`mt-2 text-xs ${
+                      (configureLimit || attrs['default-limit'] || '').trim()
+                        ? 'text-slate-400'
+                        : 'text-amber-300'
+                    }`}
+                  >
+                    {(configureLimit || attrs['default-limit'] || '').trim()
+                      ? t('runs.configureReachLimited', {
+                          limit: (configureLimit || attrs['default-limit'] || '').trim(),
+                        })
+                      : t('runs.configureReachAll')}
+                    {(attrs['dynamic-inventory-enabled'] === true ||
+                      attrs['inventory-scripts-enabled'] === true) && (
+                      <> {t('runs.queueConfigureConfirmDynamic')}</>
+                    )}
+                  </p>
+                )}
                 {showPlanOptions && (
                   <div className="mt-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
                     <h4 className="text-sm font-medium text-slate-300 mb-3">{phaseWord('planOptions')}</h4>

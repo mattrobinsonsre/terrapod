@@ -2921,7 +2921,9 @@
       "typeConfigure": "konfigurer",
       "typeConfigureHint": "Kører playbooken mod inventaret. Ingen plan og ingen anvendelse.",
       "typeConfigureAfterApplyHint": "Efter anvendelsen følger en konfigurering i samme kørsel.",
-      "queueConfigureConfirmDynamic": "Dette arbejdsområde løser lagerkilder på runneren, så de værter den vil nå, er ikke kendt, før kørslen starter."
+      "queueConfigureConfirmDynamic": "Dette arbejdsområde løser lagerkilder på runneren, så de værter den vil nå, er ikke kendt, før kørslen starter.",
+      "configureReachAll": "En configure rammer HVER vært i inventaret — der er ikke sat nogen grænse.",
+      "configureReachLimited": "En configure rammer {limit}."
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

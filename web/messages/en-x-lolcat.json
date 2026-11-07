@@ -2921,7 +2921,9 @@
       "typeConfigure": "konfigur",
       "typeConfigureHint": "Runz teh playbook agenst teh inventree. No plan an no apply.",
       "typeConfigureAfterApplyHint": "Teh apply is followd by a konfigur on dis same run.",
-      "queueConfigureConfirmDynamic": "Dis workspace figurez out inventory sorces on da runner, so da hoomans it gonna touch is a mystry til da run startz. srsly."
+      "queueConfigureConfirmDynamic": "Dis workspace figurez out inventory sorces on da runner, so da hoomans it gonna touch is a mystry til da run startz. srsly.",
+      "configureReachAll": "Teh configgie gunna touch EVRY kitteh in teh inventree — no limitz set!",
+      "configureReachLimited": "Teh configgie gunna touch {limit}. kthx"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

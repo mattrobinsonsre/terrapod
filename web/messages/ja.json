@@ -2921,7 +2921,9 @@
       "typeConfigure": "構成",
       "typeConfigureHint": "インベントリに対してプレイブックを実行します。プランも適用もありません。",
       "typeConfigureAfterApplyHint": "この同じ実行内で、適用の後に構成が続きます。",
-      "queueConfigureConfirmDynamic": "このワークスペースはインベントリソースをランナー上で解決するため、到達するホストは実行が開始されるまで分かりません。"
+      "queueConfigureConfirmDynamic": "このワークスペースはインベントリソースをランナー上で解決するため、到達するホストは実行が開始されるまで分かりません。",
+      "configureReachAll": "Configure はインベントリの「すべて」のホストに適用されます。制限が設定されていません。",
+      "configureReachLimited": "Configure は {limit} に適用されます。"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

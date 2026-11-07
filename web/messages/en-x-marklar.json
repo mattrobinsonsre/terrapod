@@ -2921,7 +2921,9 @@
       "typeConfigure": "configure",
       "typeConfigureHint": "Runs the marklar against the marklar. No marklar and no marklar.",
       "typeConfigureAfterApplyHint": "The marklar is followed by a marklar on this same marklar.",
-      "queueConfigureConfirmDynamic": "This marklar resolves marklar marklars on the marklar, so the marklars it will reach are not known until the marklar starts."
+      "queueConfigureConfirmDynamic": "This marklar resolves marklar marklars on the marklar, so the marklars it will reach are not known until the marklar starts.",
+      "configureReachAll": "A marklar will reach EVERY marklar in the marklar — no marklar is set.",
+      "configureReachLimited": "A marklar will reach {limit}."
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

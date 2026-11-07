@@ -2921,7 +2921,9 @@
       "typeConfigure": "configuration",
       "typeConfigureHint": "Exécute le playbook sur l''inventaire. Aucun plan et aucune application.",
       "typeConfigureAfterApplyHint": "L''application est suivie d''une configuration dans cette même exécution.",
-      "queueConfigureConfirmDynamic": "Cet espace de travail résout les sources d''inventaire sur le runner, donc les hôtes qu''il atteindra ne sont pas connus avant le démarrage de l''exécution."
+      "queueConfigureConfirmDynamic": "Cet espace de travail résout les sources d''inventaire sur le runner, donc les hôtes qu''il atteindra ne sont pas connus avant le démarrage de l''exécution.",
+      "configureReachAll": "Une configuration touchera TOUS les hôtes de l’inventaire — aucune limite n’est définie.",
+      "configureReachLimited": "Une configuration touchera {limit}."
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

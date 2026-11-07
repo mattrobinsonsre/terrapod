@@ -2921,7 +2921,9 @@
       "typeConfigure": "configuração",
       "typeConfigureHint": "Executa o playbook contra o inventário. Sem plan e sem apply.",
       "typeConfigureAfterApplyHint": "O apply é seguido por uma configuração nesta mesma execução.",
-      "queueConfigureConfirmDynamic": "Este workspace resolve as fontes de inventário no runner, portanto os hosts que ele alcançará só são conhecidos quando a execução inicia."
+      "queueConfigureConfirmDynamic": "Este workspace resolve as fontes de inventário no runner, portanto os hosts que ele alcançará só são conhecidos quando a execução inicia.",
+      "configureReachAll": "Uma configuração alcançará TODOS os hosts do inventário — nenhum limite definido.",
+      "configureReachLimited": "Uma configuração alcançará {limit}."
     },
     "state": {
       "deleteConfirm": "Excluir a versão de estado #{serial}? Isso não pode ser desfeito.",

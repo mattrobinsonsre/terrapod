@@ -2921,7 +2921,9 @@
       "typeConfigure": "konfiguracja",
       "typeConfigureHint": "Uruchamia playbook na inwentarzu. Bez planu i bez zastosowania.",
       "typeConfigureAfterApplyHint": "Po zastosowaniu następuje konfiguracja w tym samym uruchomieniu.",
-      "queueConfigureConfirmDynamic": "Ta przestrzeń robocza rozwiązuje źródła inwentarza na runnerze, więc hosty, do których dotrze, nie są znane do rozpoczęcia uruchomienia."
+      "queueConfigureConfirmDynamic": "Ta przestrzeń robocza rozwiązuje źródła inwentarza na runnerze, więc hosty, do których dotrze, nie są znane do rozpoczęcia uruchomienia.",
+      "configureReachAll": "Konfiguracja obejmie WSZYSTKIE hosty w inwentarzu — nie ustawiono limitu.",
+      "configureReachLimited": "Konfiguracja obejmie {limit}."
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

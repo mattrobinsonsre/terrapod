@@ -2921,7 +2921,9 @@
       "typeConfigure": "konfigurace",
       "typeConfigureHint": "Spustí playbook proti inventáři. Bez plánu a bez použití.",
       "typeConfigureAfterApplyHint": "Po použití následuje konfigurace ve stejném běhu.",
-      "queueConfigureConfirmDynamic": "Tento pracovní prostor řeší zdroje inventáře na runneru, takže hosty, kterých se dotkne, nejsou známy až do začátku běhu."
+      "queueConfigureConfirmDynamic": "Tento pracovní prostor řeší zdroje inventáře na runneru, takže hosty, kterých se dotkne, nejsou známy až do začátku běhu.",
+      "configureReachAll": "Konfigurace zasáhne VŠECHNY hostitele v inventáři — není nastaven žádný limit.",
+      "configureReachLimited": "Konfigurace zasáhne {limit}."
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

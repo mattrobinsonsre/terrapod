@@ -1103,6 +1103,45 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText(rtName)).toBeVisible();
   });
 
+  test('touch: the Configure button prompts, and the prompt names the reach', async ({ page }) => {
+    // The coarse-pointer half of the run buttons' tier (#2413 F14). On a
+    // precise pointer the configure does NOT prompt — asserted in
+    // `configure-trigger.spec.ts`, which is the decision: *"we're not having
+    // confirm prompts on those buttons on normal screens."* On touch, where a
+    // mis-tap is easy, it does. This Pixel project is the only proof of that
+    // path, since the maintainer does not test on a real device.
+    //
+    // The reach is on the PAGE at this width too, which is what made the
+    // precise-pointer relaxation safe rather than lossy — so both are asserted
+    // here, in the one place where the dialog and the line coexist.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('cfg-touch'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'site.yml',
+      'default-limit': 'canary',
+    });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    const reach = page.getByTestId('ws-configure-reach');
+    await expect(reach).toBeVisible({ timeout: 15_000 });
+    await expect(reach).toContainText('canary');
+    await expectNoHorizontalPageScroll(page);
+
+    // Registered BEFORE the click, for the reason the test above gives:
+    // confirm() is synchronous and blocks the handler.
+    let msg = '';
+    page.once('dialog', async (d) => { msg = d.message(); await d.dismiss(); });
+    await page
+      .getByRole('button', { name: 'Configure', exact: true })
+      .filter({ visible: true })
+      .click();
+    // Names the limit rather than shouting about the whole estate — the
+    // contrast that makes the warning worth reading.
+    await expect.poll(() => msg, { timeout: 5_000 }).toContain('canary');
+    expect(msg).not.toContain('WHOLE');
+  });
+
   test('catalog browse page renders without horizontal scroll at phone width', async ({ page }) => {
     // The catalog browse page is a responsive card grid (or an empty state);
     // either way it must not scroll horizontally on a phone.

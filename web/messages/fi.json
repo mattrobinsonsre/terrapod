@@ -2921,7 +2921,9 @@
       "typeConfigure": "määritys",
       "typeConfigureHint": "Ajaa playbookin inventaariota vasten. Ei suunnitelmaa eikä käyttöönottoa.",
       "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla.",
-      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy."
+      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy.",
+      "configureReachAll": "Configure tavoittaa inventaarion KAIKKI koneet — rajausta ei ole asetettu.",
+      "configureReachLimited": "Configure tavoittaa {limit}."
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

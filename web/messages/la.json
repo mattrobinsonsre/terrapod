@@ -2921,7 +2921,9 @@
       "typeConfigure": "configuratio",
       "typeConfigureHint": "Libellum ludendi adversus inventarium exsequitur. Nullum consilium et nulla applicatio.",
       "typeConfigureAfterApplyHint": "Applicationem configuratio in hoc eodem cursu sequitur.",
-      "queueConfigureConfirmDynamic": "Hoc spatium operis fontes indicis in cursore resolvit, itaque hospites quos attinget ignoti sunt donec cursus incipiat."
+      "queueConfigureConfirmDynamic": "Hoc spatium operis fontes indicis in cursore resolvit, itaque hospites quos attinget ignoti sunt donec cursus incipiat.",
+      "configureReachAll": "Configuratio OMNES hospites inventarii attinget — nullus finis positus est.",
+      "configureReachLimited": "Configuratio {limit} attinget."
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",
