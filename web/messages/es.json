@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versión de Terragrunt",
       "dynamicInventoryMode": "Inventario dinámico",
-      "dynamicInventoryModeHint": "Los únicos ajustes que permiten ejecutar código de terceros en el runner. Terrapod nunca ejecuta un plugin ni un script, en ningún estado.",
+      "dynamicInventoryModeHint": "Permite un plugin de inventario declarado, un script ejecutable o ambos. Un script es un ejecutable arbitrario del repositorio; un plugin puede leerse antes de ejecutarse. Terrapod nunca ejecuta ninguno de los dos por sí mismo, y su propia vista del inventario pasa a ser parcial.",
       "dynamicInventoryModeNone": "Ninguno",
       "dynamicInventoryModePlugins": "Plugins declarados",
       "dynamicInventoryModeScripts": "Scripts ejecutables",

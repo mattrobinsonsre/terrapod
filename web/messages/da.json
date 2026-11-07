@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-version",
       "dynamicInventoryMode": "Dynamisk opgørelse",
-      "dynamicInventoryModeHint": "De eneste indstillinger, der lader tredjepartskode køre på runneren. Terrapod kører selv aldrig et plugin eller et script, i nogen tilstand.",
+      "dynamicInventoryModeHint": "Tillader et erklæret inventar-plugin, et kørbart script eller begge. Et script er en vilkårlig eksekverbar fil fra repositoriet; et plugin kan læses, før det kører. Terrapod kører aldrig selv nogen af dem, og dets eget billede af inventaret bliver ufuldstændigt.",
       "dynamicInventoryModeNone": "Ingen",
       "dynamicInventoryModePlugins": "Erklærede plugins",
       "dynamicInventoryModeScripts": "Kørbare scripts",

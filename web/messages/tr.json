@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt sürümü",
       "dynamicInventoryMode": "Dinamik envanter",
-      "dynamicInventoryModeHint": "Üçüncü taraf kodun çalıştırıcıda çalışmasına izin veren tek ayarlar. Terrapod hiçbir durumda kendisi bir eklenti veya betik çalıştırmaz.",
+      "dynamicInventoryModeHint": "Bildirilen bir envanter eklentisine, çalıştırılabilir bir betiğe ya da her ikisine izin verir. Betik, depodan gelen rastgele bir çalıştırılabilir dosyadır; eklenti ise çalışmadan önce okunabilir. Terrapod hiçbirini kendisi çalıştırmaz ve envantere dair kendi görünümü eksik hâle gelir.",
       "dynamicInventoryModeNone": "Yok",
       "dynamicInventoryModePlugins": "Bildirilen eklentiler",
       "dynamicInventoryModeScripts": "Çalıştırılabilir betikler",

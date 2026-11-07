@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versio",
       "dynamicInventoryMode": "Dynaaminen inventaario",
-      "dynamicInventoryModeHint": "Ainoat asetukset, jotka päästävät kolmannen osapuolen koodin suorittumaan ajurilla. Terrapod itse ei koskaan suorita laajennusta tai skriptiä, missään tilassa.",
+      "dynamicInventoryModeHint": "Sallii määritellyn inventaariolaajennuksen, suoritettavan skriptin tai molemmat. Skripti on mielivaltainen suoritettava tiedosto repositoriosta; laajennus voidaan lukea ennen suoritusta. Terrapod ei koskaan suorita kumpaakaan, ja sen oma näkymä inventaarioon muuttuu osittaiseksi.",
       "dynamicInventoryModeNone": "Ei mitään",
       "dynamicInventoryModePlugins": "Määritellyt laajennukset",
       "dynamicInventoryModeScripts": "Suoritettavat skriptit",

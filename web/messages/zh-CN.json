@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 版本",
       "dynamicInventoryMode": "动态清单",
-      "dynamicInventoryModeHint": "唯一允许第三方代码在运行器上执行的设置。Terrapod 本身在任何状态下都不会运行插件或脚本。",
+      "dynamicInventoryModeHint": "允许已声明的清单插件、可执行脚本，或两者都允许。脚本是仓库中的任意可执行文件；插件则在运行前可以读取。Terrapod 自身两者都不会运行，而此处显示的清单会变得不完整。",
       "dynamicInventoryModeNone": "无",
       "dynamicInventoryModePlugins": "已声明的插件",
       "dynamicInventoryModeScripts": "可执行脚本",

@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "نسخه Terragrunt",
       "dynamicInventoryMode": "فهرست پویا",
-      "dynamicInventoryModeHint": "تنها تنظیماتی که اجازه می‌دهند کد شخص ثالث روی اجراکننده اجرا شود. خود Terrapod در هیچ حالتی افزونه یا اسکریپتی را اجرا نمی‌کند.",
+      "dynamicInventoryModeHint": "اجازه می‌دهد یک افزونهٔ موجودی اعلام‌شده، یک اسکریپت اجرایی، یا هر دو مجاز باشند. اسکریپت یک فایل اجرایی دلخواه از مخزن است؛ افزونه پیش از اجرا قابل خواندن است. Terrapod هیچ‌یک را اجرا نمی‌کند و تصویر خودش از موجودی ناقص می‌شود.",
       "dynamicInventoryModeNone": "هیچ",
       "dynamicInventoryModePlugins": "افزونه‌های اعلام‌شده",
       "dynamicInventoryModeScripts": "اسکریپت‌های اجرایی",

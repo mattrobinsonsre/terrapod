@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versio Terragrunt",
       "dynamicInventoryMode": "Index dynamicus",
-      "dynamicInventoryModeHint": "Sola optiones quae codicem alienum in cursore exsequi sinunt. Terrapod ipse numquam plugin aut scriptum exsequitur, in nullo statu.",
+      "dynamicInventoryModeHint": "Plugin inventarii declaratum, scriptum exsecutabile, aut utrumque permittit. Scriptum est exsecutabile quodlibet ex repositorio; plugin ante exsecutionem legi potest. Terrapod ipse neutrum umquam exsequitur, et eius ipsius conspectus inventarii partialis fit.",
       "dynamicInventoryModeNone": "Nullum",
       "dynamicInventoryModePlugins": "Plugina declarata",
       "dynamicInventoryModeScripts": "Scripta exsecutabilia",

@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versie",
       "dynamicInventoryMode": "Dynamische inventaris",
-      "dynamicInventoryModeHint": "De enige instellingen die code van derden op de runner laten lopen. Terrapod zelf voert nooit een plugin of script uit, in geen enkele stand.",
+      "dynamicInventoryModeHint": "Staat een gedeclareerde inventaris-plug-in, een uitvoerbaar script of beide toe. Een script is een willekeurig uitvoerbaar bestand uit de repository; een plug-in kan vóór uitvoering gelezen worden. Terrapod voert zelf nooit een van beide uit, en zijn eigen beeld van de inventaris wordt onvolledig.",
       "dynamicInventoryModeNone": "Geen",
       "dynamicInventoryModePlugins": "Gedeclareerde plug-ins",
       "dynamicInventoryModeScripts": "Uitvoerbare scripts",

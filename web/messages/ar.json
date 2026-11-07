@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "إصدار Terragrunt",
       "dynamicInventoryMode": "الجرد الديناميكي",
-      "dynamicInventoryModeHint": "الإعدادات الوحيدة التي تسمح بتشغيل كود طرف ثالث على المنفّذ. لا يشغّل Terrapod نفسه أي إضافة أو سكربت، في أي حالة.",
+      "dynamicInventoryModeHint": "يسمح بإضافة جرد معلنة، أو سكربت قابل للتنفيذ، أو بكليهما. السكربت ملف تنفيذي عشوائي من المستودع؛ أما الإضافة فيمكن قراءتها قبل تشغيلها. لا يشغّل Terrapod أيًّا منهما، ويصبح تمثيله الخاص للجرد ناقصًا.",
       "dynamicInventoryModeNone": "لا شيء",
       "dynamicInventoryModePlugins": "الإضافات المعلنة",
       "dynamicInventoryModeScripts": "السكربتات القابلة للتنفيذ",

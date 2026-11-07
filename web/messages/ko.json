@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 버전",
       "dynamicInventoryMode": "동적 인벤토리",
-      "dynamicInventoryModeHint": "서드파티 코드를 러너에서 실행할 수 있게 하는 유일한 설정입니다. Terrapod 자체는 어떤 상태에서도 플러그인이나 스크립트를 실행하지 않습니다.",
+      "dynamicInventoryModeHint": "선언된 인벤토리 플러그인, 실행 가능한 스크립트 또는 둘 다를 허용합니다. 스크립트는 저장소에 있는 임의의 실행 파일이지만, 플러그인은 실행 전에 내용을 읽을 수 있습니다. Terrapod 자체는 둘 다 실행하지 않으며, 여기에 표시되는 인벤토리는 부분적인 것이 됩니다.",
       "dynamicInventoryModeNone": "없음",
       "dynamicInventoryModePlugins": "선언된 플러그인",
       "dynamicInventoryModeScripts": "실행 가능한 스크립트",

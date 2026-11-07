@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 版本",
       "dynamicInventoryMode": "動態清單",
-      "dynamicInventoryModeHint": "唯一允許第三方程式碼在執行器上執行的設定。Terrapod 本身在任何狀態下都不會執行外掛或指令碼。",
+      "dynamicInventoryModeHint": "允許已宣告的清單外掛、可執行指令碼，或兩者都允許。指令碼是儲存庫中的任意可執行檔；外掛則在執行前可以讀取。Terrapod 本身兩者都不會執行，而此處顯示的清單會變得不完整。",
       "dynamicInventoryModeNone": "無",
       "dynamicInventoryModePlugins": "已宣告的外掛",
       "dynamicInventoryModeScripts": "可執行指令碼",

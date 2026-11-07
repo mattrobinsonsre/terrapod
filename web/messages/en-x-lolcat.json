@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt vershun",
       "dynamicInventoryMode": "WIGGLY LIST",
-      "dynamicInventoryModeHint": "DA ONLY SETTINGZ WOT LETZ UVVER PEEPLZ CODE RUN ON DA RUNNER. TERRAPOD ITSELF NEVR RUNZ A PLUGIN OR A SKRIPT, IN NO STATE.",
+      "dynamicInventoryModeHint": "LETZ A DEKLAIRD INVENTOREE PLUGIN, A RUNNABUL SKRIPT, OR BOFF OV EM. A SKRIPT IZ SUM RANDUM RUNNABUL FING FRUM TEH REPOZITORY; A PLUGIN CAN BE RED B4 IT RUNZ. TERRAPOD NEVR RUNZ EEVER WUN, AN ITS OWN LOOK AT TEH INVENTOREE GETZ INKOMPLETE.",
       "dynamicInventoryModeNone": "NUFFIN",
       "dynamicInventoryModePlugins": "DECLARD PLUGINZ",
       "dynamicInventoryModeScripts": "RUNNABUL SKRIPTZ",

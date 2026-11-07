@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Fersiwn Terragrunt",
       "dynamicInventoryMode": "Rhestr ddynamig",
-      "dynamicInventoryModeHint": "Yr unig osodiadau sy’n gadael i god trydydd parti redeg ar y rhedwr. Nid yw Terrapod ei hun byth yn rhedeg ategyn na sgript, mewn unrhyw gyflwr.",
+      "dynamicInventoryModeHint": "Caniatáu ategyn rhestr eiddo datganedig, sgript weithredadwy, neu''r ddau. Mae sgript yn ffeil weithredadwy fympwyol o''r storfa; mae modd darllen ategyn cyn iddo redeg. Nid yw Terrapod byth yn rhedeg y naill na''r llall, ac mae ei olwg ei hun ar y rhestr eiddo yn dod yn anghyflawn.",
       "dynamicInventoryModeNone": "Dim",
       "dynamicInventoryModePlugins": "Ategion datganedig",
       "dynamicInventoryModeScripts": "Sgriptiau gweithredadwy",

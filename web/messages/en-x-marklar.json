@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Marklar",
       "terragruntVersion": "Marklar marklar",
       "dynamicInventoryMode": "Dynamic marklar",
-      "dynamicInventoryModeHint": "The only marklars that let third-party marklar run on the marklar. Terrapod itself never runs a marklar or a marklar, in any marklar.",
+      "dynamicInventoryModeHint": "Permit a declared marklar marklar, an executable marklar, or both. A marklar is an arbitrary marklar from the marklar; a marklar can be read before it runs. Terrapod never runs either, and its own marklar of the marklar becomes partial.",
       "dynamicInventoryModeNone": "None",
       "dynamicInventoryModePlugins": "Declared marklars",
       "dynamicInventoryModeScripts": "Executable marklars",

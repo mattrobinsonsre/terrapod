@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt version",
       "dynamicInventoryMode": "Shiftin’ manifest",
-      "dynamicInventoryModeHint": "Th’ only settin’s what let another crew’s code run on th’ runner. Terrapod ’erself never runs a plug nor a script, in no state.",
+      "dynamicInventoryModeHint": "Allow a declared manifest plug, a runnable script, or both. A script be any old runnable thing from th'' repository; a plug can be read afore it runs. Terrapod ''erself never runs either, an'' her own sight o'' th'' manifest turns part-reckoned.",
       "dynamicInventoryModeNone": "Nary a one",
       "dynamicInventoryModePlugins": "Declared plugs",
       "dynamicInventoryModeScripts": "Runnable scripts",

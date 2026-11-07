@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-version",
       "dynamicInventoryMode": "Dynamiskt inventarium",
-      "dynamicInventoryModeHint": "De enda inställningarna som låter tredjepartskod köras på runnern. Terrapod kör själv aldrig ett plugin eller ett skript, i något läge.",
+      "dynamicInventoryModeHint": "Tillåter ett deklarerat inventarie-plugin, ett körbart skript eller båda. Ett skript är en godtycklig körbar fil från repositoriet; ett plugin kan läsas innan det körs. Terrapod kör aldrig något av dem själv, och dess egen bild av inventariet blir ofullständig.",
       "dynamicInventoryModeNone": "Inga",
       "dynamicInventoryModePlugins": "Deklarerade plugin",
       "dynamicInventoryModeScripts": "Körbara skript",

@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "גרסת Terragrunt",
       "dynamicInventoryMode": "מאגר דינמי",
-      "dynamicInventoryModeHint": "ההגדרות היחידות שמאפשרות הרצת קוד של צד שלישי על המריץ. Terrapod עצמו אינו מריץ תוסף או סקריפט, באף מצב.",
+      "dynamicInventoryModeHint": "מתיר תוסף מאגר מוצהר, סקריפט בר־הרצה, או את שניהם. סקריפט הוא קובץ הרצה שרירותי ממאגר הקוד; תוסף אפשר לקרוא לפני ההרצה. Terrapod עצמו אינו מריץ אף אחד מהם, והמאגר כפי שהוא רואה אותו נעשה חלקי.",
       "dynamicInventoryModeNone": "ללא",
       "dynamicInventoryModePlugins": "תוספים מוצהרים",
       "dynamicInventoryModeScripts": "סקריפטים ברי־הרצה",

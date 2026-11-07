@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Версія Terragrunt",
       "dynamicInventoryMode": "Динамічний інвентар",
-      "dynamicInventoryModeHint": "Єдині налаштування, що дозволяють виконувати сторонній код на виконавці. Сам Terrapod ніколи не запускає плагін чи скрипт, у жодному стані.",
+      "dynamicInventoryModeHint": "Дозволяє оголошений плагін інвентаризації, виконуваний скрипт або і те, й інше. Скрипт — це довільний виконуваний файл із репозиторію; плагін можна прочитати до запуску. Terrapod ніколи не запускає ні того, ні іншого, а його власне уявлення про інвентар стає неповним.",
       "dynamicInventoryModeNone": "Немає",
       "dynamicInventoryModePlugins": "Оголошені плагіни",
       "dynamicInventoryModeScripts": "Виконувані скрипти",

@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Version, Terragrunt",
       "dynamicInventoryMode": "Inventory dynamic",
-      "dynamicInventoryModeHint": "The only settings that third-party code on the runner run let, these are. A plugin or a script, Terrapod itself never runs, in any state.",
+      "dynamicInventoryModeHint": "A declared inventory plugin, an executable script, or both, permit. An arbitrary executable from the repository, a script is; read before it runs, a plugin can be. Neither of them does Terrapod ever run, and partial its own view of the inventory becomes.",
       "dynamicInventoryModeNone": "None, there is",
       "dynamicInventoryModePlugins": "Plugins declared",
       "dynamicInventoryModeScripts": "Scripts executable",

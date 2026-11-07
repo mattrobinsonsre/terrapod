@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt バージョン",
       "dynamicInventoryMode": "動的インベントリ",
-      "dynamicInventoryModeHint": "サードパーティのコードをランナー上で実行させる唯一の設定です。Terrapod 自体はいかなる状態でもプラグインやスクリプトを実行しません。",
+      "dynamicInventoryModeHint": "宣言されたインベントリプラグイン、実行可能スクリプト、またはその両方を許可します。スクリプトはリポジトリ内の任意の実行ファイルですが、プラグインは実行前に内容を読めます。Terrapod 自身はどちらも実行せず、ここに表示されるインベントリは部分的なものとなります。",
       "dynamicInventoryModeNone": "なし",
       "dynamicInventoryModePlugins": "宣言済みプラグイン",
       "dynamicInventoryModeScripts": "実行可能スクリプト",

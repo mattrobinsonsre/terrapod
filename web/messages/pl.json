@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Wersja Terragrunt",
       "dynamicInventoryMode": "Dynamiczny inwentarz",
-      "dynamicInventoryModeHint": "Jedyne ustawienia pozwalające uruchomić kod zewnętrzny na runnerze. Sam Terrapod nigdy nie uruchamia wtyczki ani skryptu, w żadnym stanie.",
+      "dynamicInventoryModeHint": "Zezwala na zadeklarowaną wtyczkę inwentarza, skrypt wykonywalny albo jedno i drugie. Skrypt to dowolny plik wykonywalny z repozytorium; wtyczkę można przeczytać przed uruchomieniem. Terrapod nigdy nie uruchamia żadnego z nich, a jego własny obraz inwentarza staje się częściowy.",
       "dynamicInventoryModeNone": "Brak",
       "dynamicInventoryModePlugins": "Zadeklarowane wtyczki",
       "dynamicInventoryModeScripts": "Skrypty wykonywalne",

@@ -2686,7 +2686,7 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Verze Terragrunt",
       "dynamicInventoryMode": "Dynamický inventář",
-      "dynamicInventoryModeHint": "Jediná nastavení, která dovolují spustit kód třetí strany na runneru. Samotný Terrapod nikdy nespouští plugin ani skript, v žádném stavu.",
+      "dynamicInventoryModeHint": "Povolí deklarovaný plugin inventáře, spustitelný skript nebo obojí. Skript je libovolný spustitelný soubor z repozitáře; plugin lze přečíst před spuštěním. Terrapod nikdy nespouští ani jedno, ani druhé a jeho vlastní pohled na inventář se stává částečným.",
       "dynamicInventoryModeNone": "Žádné",
       "dynamicInventoryModePlugins": "Deklarované pluginy",
       "dynamicInventoryModeScripts": "Spustitelné skripty",
