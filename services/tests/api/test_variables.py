@@ -1900,11 +1900,17 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         assert resp.status_code in (200, 201), resp.text
 
     async def test_a_valid_machine_credential_is_stored(self):
+        # `known_hosts` rather than `user`, which #2413 F9 withdrew -- and it
+        # keeps the read-back assertion on a value that is not a secret.
         resp, created = await self._create_ws(
-            self._cred("web", self.MACHINE, {"private_key": "k", "user": "deploy"})
+            self._cred(
+                "web",
+                self.MACHINE,
+                {"private_key": "k", "known_hosts": "h.example.com ssh-ed25519 AAA"},
+            )
         )
         assert resp.status_code == 201, resp.text
-        assert json.loads(created["value"])["user"] == "deploy"
+        assert json.loads(created["value"])["known_hosts"].startswith("h.example.com")
 
     # ── the envelope, on every write path ──────────────────────────────
 
@@ -1967,7 +1973,14 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         assert resp.status_code == 201, resp.text
 
     async def test_a_machine_credential_with_no_way_to_authenticate_is_422(self):
-        resp, _ = await self._create_ws(self._cred("all", self.MACHINE, {"user": "deploy"}))
+        # `known_hosts` is a VALID field that authenticates nothing, which is
+        # what this test is about. It was `{"user": "deploy"}`, and since #2413
+        # F9 withdrew that field the envelope would be refused as unknown
+        # instead -- so the test would have gone on passing for a reason that
+        # has nothing to do with its name.
+        resp, _ = await self._create_ws(
+            self._cred("all", self.MACHINE, {"known_hosts": "h.example.com ssh-ed25519 AAA"})
+        )
         assert resp.status_code == 422
         assert "private_key" in resp.text
 

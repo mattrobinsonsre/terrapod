@@ -51,13 +51,6 @@ export function isCredentialCategory(category: string): boolean {
   )
 }
 
-// Ansible's own boolean spellings, mirroring `ansible_auth.parse_boolean`. A
-// value written through the provider or the CLI may use any of them, and a
-// tri-state select that read `yes` as "not set" would quietly offer to drop
-// privilege escalation on the next save.
-const ANSIBLE_TRUE = new Set(['true', 'yes', '1', 'on'])
-const ANSIBLE_FALSE = new Set(['false', 'no', '0', 'off'])
-
 type AnsibleEnvelope = Record<string, string>
 
 /** The stored value as an envelope; `{}` for anything unreadable. */
@@ -124,12 +117,6 @@ export function AnsibleCredentialFields({
   const set = (field: string, next: string) =>
     onChange(serializeAnsibleEnvelope({ ...fields, [field]: next }))
 
-  const becomeState = ANSIBLE_TRUE.has((fields.become ?? '').trim().toLowerCase())
-    ? 'true'
-    : ANSIBLE_FALSE.has((fields.become ?? '').trim().toLowerCase())
-      ? 'false'
-      : ''
-
   const secret = (field: string, rows: number, placeholder?: string) => (
     <SensitiveValueInput
       id={`${idPrefix}-ansible-${field}`}
@@ -156,17 +143,6 @@ export function AnsibleCredentialFields({
       placeholder={placeholder}
       rows={rows}
       className={`${INPUT} ${MONO} resize-y`}
-    />
-  )
-
-  const text = (field: string, placeholder?: string) => (
-    <input
-      id={`${idPrefix}-ansible-${field}`}
-      type="text"
-      value={fields[field] ?? ''}
-      onChange={(e) => set(field, e.target.value)}
-      placeholder={placeholder}
-      className={INPUT}
     />
   )
 
@@ -214,40 +190,16 @@ export function AnsibleCredentialFields({
           </label>
           {secret('password', 2)}
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}-ansible-user`} className={LABEL}>{t('user')}</label>
-          {text('user', 'ansible')}
-        </div>
-        <div>
-          <label htmlFor={`${idPrefix}-ansible-become`} className={LABEL}>{t('become')}</label>
-          <select
-            id={`${idPrefix}-ansible-become`}
-            className={INPUT}
-            value={becomeState}
-            onChange={(e) => set('become', e.target.value)}
-          >
-            {/* Three states, not a checkbox: unset is not the same as off.
-                An absent `become` leaves whatever the inventory or the
-                playbook already says, where `false` overrides it. */}
-            <option value="">{t('becomeUnset')}</option>
-            <option value="true">{t('becomeYes')}</option>
-            <option value="false">{t('becomeNo')}</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${idPrefix}-ansible-become_method`} className={LABEL}>
-            {t('becomeMethod')}
-          </label>
-          {/* Free text rather than a list: the methods are plugin-provided, so
-              a fixed list would refuse a deployment's own one. */}
-          {text('become_method', 'sudo')}
-        </div>
-        <div>
-          <label htmlFor={`${idPrefix}-ansible-become_user`} className={LABEL}>
-            {t('becomeUser')}
-          </label>
-          {text('become_user', 'root')}
-        </div>
+        {/* `user`, `become`, `become_method` and `become_user` used to be
+            here and are gone (#2413 F9). They are not secrets, and a
+            credential is for secrets: every one of them is an ordinary
+            connection setting with a first-class home in the inventory --
+            `ansible_user`, `ansible_become` and the rest -- where it is
+            visible, diffable and per-host. Offering them here made a second
+            place to say the same thing, and the two could disagree with the
+            credential silently winning, because a credential is injected
+            late and is write-only once saved. The server refuses all four
+            now, so a form offering them would meet a 422. */}
         <div>
           <label htmlFor={`${idPrefix}-ansible-become_password`} className={LABEL}>
             {t('becomePassword')}

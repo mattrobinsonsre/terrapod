@@ -17,7 +17,8 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { categoryKey, nativeCategoryKey } from '../src/lib/variable-category.ts'
 
@@ -246,8 +247,15 @@ test('the machine form writes exactly the fields the server accepts', () => {
     ...pythonSetMembers(SERVER_AUTH, 'MACHINE_FILE_FIELDS'),
     ...pythonSetMembers(SERVER_AUTH, 'MACHINE_VALUE_FIELDS'),
   ].sort()
-  assert.ok(expected.length >= 7, `read only ${expected.length} machine fields from the server`)
-  assert.ok(expected.includes('private_key'), 'the file-delivered field should be among them')
+  // Named rather than counted. This carried `length >= 7` -- a floor, so that
+  // a reader which parses nothing cannot pass on an empty set -- and #2413 F9
+  // narrowed the server to four, which would have meant lowering the floor.
+  // A floor that moves with the thing it guards stops guarding anything, and
+  // the set is small enough to name: the two FILE fields, plus the two VALUE
+  // fields, which are secrets and nothing else. `user`, `become`,
+  // `become_method` and `become_user` were here and are ordinary connection
+  // settings with a home in the inventory, so they are refused now.
+  assert.deepEqual(expected, ['become_password', 'known_hosts', 'password', 'private_key'])
   assert.deepEqual(formFields(panelBranches().machine), expected)
 })
 
@@ -323,8 +331,38 @@ test('every offered locale carries the whole Ansible credential namespace', () =
   const block = config.match(/export const locales = \[([\s\S]*?)\] as const/)
   assert.ok(block, 'could not find the `locales` array in src/i18n/config.ts')
   const offered = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+  // The namespace is exactly what the four consumers ASK for, asserted in
+  // both directions and derived from their source rather than floored.
+  //
+  // A floor (`keys.length >= 19`) is what this had, and it cannot see the
+  // defect it needed to: #2413 F9 removed four controls from the machine form
+  // and left seven keys with no reader, in thirty-two catalogues, which every
+  // gate passed because parity was intact. The other direction matters just as
+  // much -- a key a form requests and no catalogue carries renders as
+  // `MISSING_KEY`.
+  const requested = new Set<string>()
+  for (const f of readdirSync('src', { recursive: true, withFileTypes: true })) {
+    if (!f.isFile() || !/\.tsx?$/.test(f.name)) continue
+    const src = readFileSync(join(f.parentPath, f.name), 'utf8')
+    // Whatever each file binds the namespace to -- `t` in the field group,
+    // `ta` in the three pages that render a category pill.
+    for (const [, bound] of src.matchAll(
+      /const (\w+) = (?:use|get)Translations\('ansibleCredentials'\)/g,
+    )) {
+      for (const [, key] of src.matchAll(new RegExp(`\\b${bound}\\('([A-Za-z]+)'`, 'g'))) {
+        requested.add(key)
+      }
+    }
+  }
   const keys = Object.keys(EN_ANSIBLE)
-  assert.ok(keys.length >= 19, `expected the full namespace, read ${keys.length} keys`)
+  assert.ok(requested.size >= 10, `read only ${requested.size} requested keys -- matcher broken?`)
+  assert.deepEqual(
+    keys.slice().sort(),
+    [...requested].sort(),
+    'the namespace and what the forms request have diverged: a key with no ' +
+      'reader is translated into 32 catalogues for nothing, and a key with no ' +
+      'entry renders as MISSING_KEY',
+  )
   for (const loc of offered) {
     const cat = JSON.parse(readFileSync(`messages/${loc}.json`, 'utf8'))
     if (loc === 'en-GB') {
@@ -356,18 +394,17 @@ test('the novelty locales genuinely transform the credential copy', () => {
   // to reorder. The key is now `name` and the label `Credential name`, a
   // two-word noun phrase -- which yoda DOES move, by the catalogue's own
   // standing convention for exactly this shape (`vaultLabel` is
-  // `Label, Vault ID`; `becomeMethod` is `Method, escalation`). So the
+  // `Label, Vault ID`). So the
   // exemption is gone rather than carried over, and the test that backed it
   // went with it.
+  //
+  // Four entries went with #2413 F9 rather than being carried: the three
+  // marklar adjectives were `becomeUnset`/`becomeYes`/`becomeNo` and the yoda
+  // `user`, and all four keys are gone from the catalogues. A ledger entry for
+  // a key nothing iterates is dead weight that reads as considered.
   const exempt: Record<string, Record<string, string>> = {
-    'en-x-marklar': {
-      becomeUnset: 'adjectival — marklar replaces nouns, not adjectives',
-      becomeYes: 'adjectival — marklar replaces nouns, not adjectives',
-      becomeNo: 'adjectival — marklar replaces nouns, not adjectives',
-    },
     'en-x-yoda': {
       password: 'one word; there is no clause to reorder',
-      user: 'one word; there is no clause to reorder',
     },
   }
   const novelty = ['tlh', 'en-x-marklar', 'en-x-lolcat', 'en-x-leet', 'en-x-pirate', 'en-x-yoda']
@@ -390,9 +427,11 @@ test('the yoda credential name follows the catalogue own standing convention', (
   // two-word noun phrase. That is a claim about the catalogue, so it is
   // asserted rather than trusted — and it is what makes `Name, credential` the
   // expected shape rather than one translator's choice.
+  //
+  // `becomeMethod` was the second witness (`Method, escalation`) and its key
+  // is gone with #2413 F9, so `vaultLabel` carries the convention alone.
   const yoda = JSON.parse(readFileSync('messages/en-x-yoda.json', 'utf8')).ansibleCredentials
   assert.equal(yoda.vaultLabel, 'Label, Vault ID')
-  assert.equal(yoda.becomeMethod, 'Method, escalation')
   assert.equal(yoda.name, 'Name, credential')
 })
 

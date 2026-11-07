@@ -287,10 +287,19 @@ class TestAMachinePasswordHasNoMechanismBehindIt:
         assert b"prod" not in exec_subprocess._SECRETS
 
     def test_a_non_secret_field_is_never_registered_however_short(self, tmp_path):
-        """`user` is not a secret, and registering it would black out every line
-        of the log that names the account."""
-        ansible_auth.run(path=_auth_file(tmp_path, [_machine("web", user="deploy-service")]))
-        assert b"deploy-service" not in exec_subprocess._SECRETS
+        """A host's PUBLIC key is public, and registering it would black out the
+        one value an operator needs to read when a host key does not match.
+
+        The subject used to be `user`, which #2413 F9 withdrew -- a connection
+        setting is not a credential. The property it asserts did not go with
+        it: `known_hosts` is a machine-credential FILE field and deliberately
+        not a SECRET one, so it is the same test with a subject that exists."""
+        ansible_auth.run(
+            path=_auth_file(
+                tmp_path, [_machine("web", known_hosts="h.example.com ssh-ed25519 PUBLICKEY")]
+            )
+        )
+        assert b"PUBLICKEY" not in exec_subprocess._SECRETS
 
 
 class TestTheMachineCredential:
@@ -322,6 +331,43 @@ class TestTheMachineCredential:
         assert Path(resolved["web.private_key"]).read_text().endswith("\n")
 
     def test_a_value_field_resolves_to_its_own_value(self, tmp_path):
+        """Both of them, which is the whole set since #2413 F9: a value a
+        placeholder substitutes verbatim is a SECRET, and the three connection
+        settings that used to be here belong in the inventory."""
+        _, resolved = ansible_auth.run(
+            path=_auth_file(
+                tmp_path,
+                [
+                    _machine(
+                        "web",
+                        password="a-long-connection-password",
+                        become_password="a-long-escalation-password",
+                    )
+                ],
+            )
+        )
+        assert resolved == {
+            "web.password": "a-long-connection-password",
+            "web.become_password": "a-long-escalation-password",
+        }
+
+    def test_a_withdrawn_field_resolves_to_nothing_rather_than_to_its_value(self, tmp_path):
+        """#2413 F9 withdrew `user`, `become`, `become_method` and
+        `become_user`: a credential is for secrets, and all four are ordinary
+        connection settings with a first-class home in the inventory.
+
+        This is the SKEW case rather than a restatement of the API's refusal.
+        The API refuses them on a write now, so a NEW credential cannot carry
+        one -- but a credential stored before the narrowing still can, and this
+        phase reads what the listener wrote rather than re-validating it. The
+        phase resolves only the fields it knows, so a stored `user` produces no
+        `web.user` mapping at all: a document still referring to it substitutes
+        nothing, which is the safe direction. Silently resolving it would keep
+        the withdrawn behaviour alive for exactly the deployments that upgraded.
+
+        `become` previously resolved to the string `"true"`/`"false"` -- its own
+        normalisation of ansible's four spellings -- and that is gone with it.
+        """
         _, resolved = ansible_auth.run(
             path=_auth_file(
                 tmp_path,
@@ -330,35 +376,14 @@ class TestTheMachineCredential:
                         "web",
                         password="a-long-connection-password",
                         user="deploy",
+                        become="yes",
                         become_method="sudo",
                         become_user="root",
                     )
                 ],
             )
         )
-        assert resolved == {
-            "web.password": "a-long-connection-password",
-            "web.user": "deploy",
-            "web.become_method": "sudo",
-            "web.become_user": "root",
-        }
-
-    def test_become_resolves_to_a_string_ansible_reads_as_a_boolean(self, tmp_path):
-        """It is substituted INTO a document, so it has to be a string -- and
-        one ansible's own templating reads as true, not the operator's spelling
-        of it."""
-        _, resolved = ansible_auth.run(
-            path=_auth_file(
-                tmp_path, [_machine("web", password="a-long-connection-password", become="yes")]
-            )
-        )
-        assert resolved["web.become"] == "true"
-        _, off = ansible_auth.run(
-            path=_auth_file(
-                tmp_path, [_machine("web", password="a-long-connection-password", become="no")]
-            )
-        )
-        assert off["web.become"] == "false"
+        assert resolved == {"web.password": "a-long-connection-password"}
 
     def test_several_credentials_resolve_side_by_side(self, tmp_path):
         """Which is what makes per-host keys expressible at all: the operator
