@@ -797,13 +797,18 @@ export default function BulkUpdatePage() {
           /* Guaranteed 422 for every matched workspace, so both submits are
              blocked below and this is the sentence that explains it. Inside
              the Operations grid, spanning it, because it is about the pair of
-             controls directly above rather than about the form. */
-          <p
-            className="sm:col-span-2 min-w-0 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
-            data-testid="bu-operations-none"
-          >
-            {t('update.operationsNone')}
-          </p>
+             controls directly above rather than about the form.
+             Wrapped in a `<div>` because `Group`'s grid is a `<dl>`, which
+             permits `div` and not `p` -- the same wrapper every field already
+             renders. */
+          <div className="sm:col-span-2 min-w-0">
+            <p
+              className="rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+              data-testid="bu-operations-none"
+            >
+              {t('update.operationsNone')}
+            </p>
+          </div>
         )}
       </>
     ),
