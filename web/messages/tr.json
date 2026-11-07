@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Bir configure {limit} kapsamına ulaşır.",
       "queueFullRun": "Tam çalıştırma",
       "queueFullRunConfirm": "Bu çalışma alanı için plan, apply VE yapılandırma? Yapılandırma, apply gerçek altyapıyı değiştirdikten sonra gerçek ana makineleri değiştirir ve aralarında ayrı bir inceleme yoktur.",
-      "moreRunKinds": "Diğer çalıştırma türleri"
+      "moreRunKinds": "Diğer çalıştırma türleri",
+      "openExplainingPhase": "bunu açıklayan aşamanın günlüğünü aç"
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

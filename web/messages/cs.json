@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Konfigurace zasáhne {limit}.",
       "queueFullRun": "Úplné spuštění",
       "queueFullRunConfirm": "Plan, apply A konfigurace tohoto pracovního prostoru? Konfigurace změní skutečné hostitele poté, co apply změní skutečnou infrastrukturu, a mezi nimi není samostatná kontrola.",
-      "moreRunKinds": "Jiné druhy spuštění"
+      "moreRunKinds": "Jiné druhy spuštění",
+      "openExplainingPhase": "otevřít protokol fáze, která to vysvětluje"
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

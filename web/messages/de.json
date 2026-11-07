@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Eine Konfiguration erreicht {limit}.",
       "queueFullRun": "Vollständiger Lauf",
       "queueFullRunConfirm": "Plan, Apply UND Konfigurieren für diesen Workspace? Das Konfigurieren ändert echte Hosts, nachdem das Apply echte Infrastruktur geändert hat, und zwischen beiden gibt es keine separate Prüfung.",
-      "moreRunKinds": "Andere Laufarten"
+      "moreRunKinds": "Andere Laufarten",
+      "openExplainingPhase": "das Protokoll der Phase öffnen, die es erklärt"
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",

@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Uma configuração alcançará {limit}.",
       "queueFullRun": "Execução completa",
       "queueFullRunConfirm": "Plan, apply E configurar esta área de trabalho? A configuração altera anfitriões reais depois de o apply alterar infraestrutura real, sem revisão intermédia.",
-      "moreRunKinds": "Outros tipos de execução"
+      "moreRunKinds": "Outros tipos de execução",
+      "openExplainingPhase": "abrir o registo da fase que o explica"
     },
     "state": {
       "deleteConfirm": "Eliminar a versão de estado #{serial}? Isto não pode ser anulado.",

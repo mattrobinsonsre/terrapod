@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Bydd cyflunio yn cyrraedd {limit}.",
       "queueFullRun": "Rhediad Llawn",
       "queueFullRunConfirm": "Cynllunio, gweithredu A chyflunio’r gweithle hwn? Mae’r cyflunio yn newid gwesteiwyr go iawn ar ôl i’r gweithredu newid seilwaith go iawn, ac nid oes adolygiad ar wahân rhyngddynt.",
-      "moreRunKinds": "Mathau rhediad eraill"
+      "moreRunKinds": "Mathau rhediad eraill",
+      "openExplainingPhase": "agor log y cyfnod sy’n ei esbonio"
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

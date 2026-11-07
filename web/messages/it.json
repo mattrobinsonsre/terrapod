@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Una configurazione raggiungerà {limit}.",
       "queueFullRun": "Esecuzione completa",
       "queueFullRunConfirm": "Plan, apply E configurazione di questo workspace? La configurazione modifica host reali dopo che l’apply ha modificato infrastruttura reale, senza una revisione intermedia.",
-      "moreRunKinds": "Altri tipi di esecuzione"
+      "moreRunKinds": "Altri tipi di esecuzione",
+      "openExplainingPhase": "apri il log della fase che lo spiega"
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

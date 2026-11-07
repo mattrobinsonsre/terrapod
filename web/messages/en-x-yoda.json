@@ -2926,7 +2926,8 @@
       "configureReachLimited": "{limit}, a configure will reach.",
       "queueFullRun": "Everything, run",
       "queueFullRunConfirm": "Plan, apply and configure this workspace, you would? Real hosts the configure changes, after real infrastructure the apply changes — and between them, separate review there is none.",
-      "moreRunKinds": "Kinds of run, other"
+      "moreRunKinds": "Kinds of run, other",
+      "openExplainingPhase": "the log of the phase that explains it, open"
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Konfiguracja obejmie {limit}.",
       "queueFullRun": "Pełne uruchomienie",
       "queueFullRunConfirm": "Plan, apply I konfiguracja tej przestrzeni roboczej? Konfiguracja zmienia prawdziwe hosty po tym, jak apply zmieni prawdziwą infrastrukturę, i nie ma między nimi osobnego przeglądu.",
-      "moreRunKinds": "Inne rodzaje uruchomienia"
+      "moreRunKinds": "Inne rodzaje uruchomienia",
+      "openExplainingPhase": "otwórz dziennik etapu, który to wyjaśnia"
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

@@ -2926,7 +2926,8 @@
       "configureReachLimited": "En configure treffer {limit}.",
       "queueFullRun": "Full kjøring",
       "queueFullRunConfirm": "Plan, apply OG konfigurer dette arbeidsområdet? Konfigurasjonen endrer ekte verter etter at apply har endret ekte infrastruktur, og det er ingen separat gjennomgang imellom.",
-      "moreRunKinds": "Andre kjøretyper"
+      "moreRunKinds": "Andre kjøretyper",
+      "openExplainingPhase": "åpne loggen for fasen som forklarer det"
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

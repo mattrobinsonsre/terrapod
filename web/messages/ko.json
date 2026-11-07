@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Configure는 {limit}에 적용됩니다.",
       "queueFullRun": "전체 실행",
       "queueFullRunConfirm": "이 워크스페이스에서 플랜, 적용, 구성을 모두 실행하시겠습니까? 적용이 실제 인프라를 변경한 뒤 구성이 실제 호스트를 변경하며, 그 사이에 별도의 검토는 없습니다.",
-      "moreRunKinds": "다른 실행 종류"
+      "moreRunKinds": "다른 실행 종류",
+      "openExplainingPhase": "이를 설명하는 단계의 로그 열기"
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",

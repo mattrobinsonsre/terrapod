@@ -2926,7 +2926,8 @@
       "configureReachLimited": "Teh configgie gunna touch {limit}. kthx",
       "queueFullRun": "DO ALL TEH THINGS",
       "queueFullRunConfirm": "Plan, do it AN konfigur dis workspace? Teh konfigur touchez real kittehs after teh do-it touchez real infrastruktur, an no checkin in between. srsly?",
-      "moreRunKinds": "Uvver run kindz"
+      "moreRunKinds": "Uvver run kindz",
+      "openExplainingPhase": "OPEN TEH LOG OV DA PART WOT SPLAINS IT"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",
