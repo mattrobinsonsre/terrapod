@@ -3036,7 +3036,7 @@
         "label": "Inventory sections",
         "hosts": "Hosts",
         "groups": "Groups",
-        "vars": "Variables",
+        "vars": "Inventory variables",
         "resolved": "Resolved"
       },
       "actions": {

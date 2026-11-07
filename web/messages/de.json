@@ -3028,7 +3028,7 @@
         "label": "Inventarbereiche",
         "hosts": "Hosts",
         "groups": "Gruppen",
-        "vars": "Variablen",
+        "vars": "Inventarvariablen",
         "resolved": "Aufgelöst"
       },
       "actions": {

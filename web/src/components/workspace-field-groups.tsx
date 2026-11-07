@@ -43,7 +43,6 @@ import {
   fieldApplies,
   fieldGateMet,
   groupFields,
-  groupSummary,
   type FieldMode,
   type GroupId,
 } from '@/components/workspace-fields'
@@ -278,34 +277,37 @@ export function Field({
 }
 
 /**
- * The wrapper every group renders inside.
+ * The wrapper every group renders inside: a plain `<section>` with a heading,
+ * always.
  *
- * A plain `<section>` for a standard group; a `<details>` for an advanced one,
- * whose summary carries what the group holds so a collapsed group cannot
- * conceal a value. The indicator is derived from the values -- a count for a
- * list, set/unset for an optional scalar -- and never from a defaults table;
- * `workspace-fields.tsx` explains why at `Summary`.
+ * **Nothing collapses, anywhere** (#2413 F4). This used to render a `<details>`
+ * for a group whose every field was `advanced`, with a derived summary so a
+ * collapsed group could not conceal a value -- careful machinery for a
+ * mechanism that is now withdrawn. The maintainer's decision: *"sections make
+ * the complex forms navigable even without collapsing or hiding anything and I
+ * stand by that"*. Sections carry navigability; collapse does not, and it costs
+ * an interaction before an operator can see what a form offers.
  *
- * `<details>` rather than a `useState` disclosure so the browser owns the
- * open/closed state: it needs no URL round-trip, survives nothing, and is
- * exactly the kind of transient view state the URL-as-source-of-truth rule is
- * NOT about. `min-w-0` on the grid, because a grid item will not shrink below
- * its content without it -- the single CSS line behind a phone-width overflow
- * this repo has already met once on the autodiscovery page's own `<details>`.
+ * So `advanced`, `summary`, `groupIsAdvanced`, `groupSummary` and the `Summary`
+ * type all went with it rather than being left unread -- a flag nothing reads
+ * is this repository's most repeated defect, and the one that had a derived
+ * summary attached was going to read as load-bearing for a long time.
+ *
+ * `min-w-0` on the grid stays, and is not a leftover: a grid item will not
+ * shrink below its content without it, which is the single CSS line behind a
+ * phone-width overflow this repo has already met once.
  */
 export function Group({
   id,
   ctx,
   title,
   description,
-  advanced,
   children,
 }: {
   id: GroupId
   ctx: GroupCtx
   title: string
   description?: ReactNode
-  advanced?: boolean
   children: ReactNode
 }) {
   // Nothing here applies to this engine. A group whose every field is merely
@@ -319,33 +321,13 @@ export function Group({
     </dl>
   )
 
-  if (!advanced) {
-    return (
-      <section className="min-w-0">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-          {title}
-        </h4>
-        {description}
-        {body}
-      </section>
-    )
-  }
-
-  const held = groupSummary(id, ctx.engine, ctx.values, ctx.label)
   return (
-    <details className="min-w-0 rounded-lg border border-slate-700/60" data-testid={`ws-adv-${id}`}>
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <section className="min-w-0">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
         {title}
-        {held.length > 0 && (
-          <span className="ml-2 normal-case font-normal text-slate-500" data-testid={`ws-adv-${id}-held`}>
-            {held.map((h) => h.text).join(' · ')}
-          </span>
-        )}
-      </summary>
-      <div className="px-3 pb-3 min-w-0">
-        {description}
-        {body}
-      </div>
-    </details>
+      </h4>
+      {description}
+      {body}
+    </section>
   )
 }

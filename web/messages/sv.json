@@ -3028,7 +3028,7 @@
         "label": "Inventarieavsnitt",
         "hosts": "Värdar",
         "groups": "Grupper",
-        "vars": "Variabler",
+        "vars": "Inventarievariabler",
         "resolved": "Upplöst"
       },
       "actions": {

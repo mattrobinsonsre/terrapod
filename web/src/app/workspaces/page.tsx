@@ -40,7 +40,6 @@ import {
   GROUPS,
   LABEL_KEY,
   dependencyMet,
-  groupFields,
   toAttributes,
   type GroupId,
 } from '@/components/workspace-fields'
@@ -322,31 +321,7 @@ function createDefaults(engine: string): Record<string, unknown> {
   }
 }
 
-/**
- * The attributes the create form does not offer, with the reason.
- *
- * `owner-email` is accepted on PATCH and NOT by the create path, which sets
- * `owner_email=user.email` — the creator is the owner. Rendering it would take
- * an operator's input and silently ignore it, which is worse than its absence,
- * and ownership grants workspace admin so it is a platform-admin change made
- * deliberately afterwards rather than a field on a create form.
- */
-const CREATE_OMITS: ReadonlySet<string> = new Set(['owner-email'])
 
-/**
- * Whether a group collapses into a `<details>` in the create form.
- *
- * DERIVED from the shared table rather than listed here: a group whose every
- * rendered field is `advanced` holds nothing needed to create a workspace, so
- * it collapses — and `Group` puts what it holds in the summary, so a collapsed
- * group still cannot conceal a value. Deriving it means a field changing its
- * `advanced` flag, or a group gaining a plain field, moves this with it instead
- * of leaving a stale list behind.
- */
-function groupIsAdvanced(group: GroupId, engine: string): boolean {
-  const rendered = groupFields(group, engine).filter((f) => !CREATE_OMITS.has(f.attr))
-  return rendered.length > 0 && rendered.every((f) => f.advanced)
-}
 
 // Wrapped in <Suspense> at the bottom — `useSearchParams()` triggers Next.js's
 // CSR bailout, and without a boundary the whole page fails to build statically.
@@ -1661,7 +1636,18 @@ function WorkspacesPageInner() {
     ),
 
     metadata: (
-      /* `owner-email` is absent on purpose — see `CREATE_OMITS`. */
+      /* `owner-email` is absent on purpose, and this is the only thing that
+         omits it. It is accepted on PATCH and NOT by the create path, which
+         sets `owner_email=user.email` — the creator is the owner. Rendering it
+         would take an operator's input and silently ignore it, which is worse
+         than its absence; and ownership grants workspace admin, so it is a
+         platform-admin change made deliberately afterwards rather than a field
+         on a create form.
+
+         The reasoning lived in a `CREATE_OMITS` set above, whose only reader
+         was `groupIsAdvanced` — so when the collapsing went (#2413 F4) the set
+         became a constant nothing read, with the explanation for a real
+         decision inside it. Moved here, where the decision is taken. */
       <>
         <Field
           attr="labels"
@@ -1765,7 +1751,6 @@ function WorkspacesPageInner() {
                 id={g}
                 ctx={createCtx}
                 title={tDetail(`groups.${g}`)}
-                advanced={groupIsAdvanced(g, engine)}
               >
                 {groupBody[g]}
               </Group>

@@ -3028,7 +3028,7 @@
         "label": "清单分区",
         "hosts": "主机",
         "groups": "主机组",
-        "vars": "变量",
+        "vars": "清单变量",
         "resolved": "解析结果"
       },
       "actions": {

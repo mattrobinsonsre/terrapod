@@ -3028,7 +3028,7 @@
         "label": "Adrannau’r rhestr eiddo",
         "hosts": "Gwesteiwyr",
         "groups": "Grwpiau",
-        "vars": "Newidynnau",
+        "vars": "Newidynnau’r rhestr eiddo",
         "resolved": "Wedi’u datrys"
       },
       "actions": {

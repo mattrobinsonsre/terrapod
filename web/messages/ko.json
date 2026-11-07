@@ -3028,7 +3028,7 @@
         "label": "인벤토리 섹션",
         "hosts": "호스트",
         "groups": "그룹",
-        "vars": "변수",
+        "vars": "인벤토리 변수",
         "resolved": "해석 결과"
       },
       "actions": {

@@ -4,10 +4,10 @@
  * In `lib/` rather than beside the components because that is where this tree
  * puts logic a test can import: every file in `web/tests/` imports from
  * `src/lib/*.ts` and none imports a `.tsx`, since the runner is bare
- * `node --test` with no transpiler. `dependencyMet` and `groupSummary` are the
- * two pieces of real logic here -- which field is meaningful, and what a
- * collapsed group admits to holding -- and leaving them in a file holding JSX
- * meant neither could be unit-tested at all.
+ * `node --test` with no transpiler. `dependencyMet` is the piece of real
+ * logic here -- which field is meaningful -- and leaving it in a file holding
+ * JSX meant it could not be unit-tested at all. `groupSummary` was the second,
+ * and went with the collapsing (#2413 F4).
  *
  * `components/workspace-fields.tsx` re-exports everything here, so either
  * import path works and no consumer had to change.
@@ -28,19 +28,33 @@
  * that both forms read their field set from `FIELDS` below.
  *
  * `FIELDS` is therefore the single source of truth for which attribute belongs
- * to which group, whether it is advanced, and which boolean gates it. The
+ * to which group and which boolean gates it. The
  * parity gate reads it rather than a hand-kept list, so a new workspace
  * attribute that reaches one form and not the other fails a test instead of
  * being noticed years later.
  *
- * WHAT IS DELIBERATELY NOT SHARED. The autodiscovery rule form and the bulk
- * update form set the same attributes and are NOT built from this file. Their
- * idioms differ on purpose -- bulk update uses tri-state selects because
- * "unchanged" is a real value there, and autodiscovery leaves the Ansible
- * resource pair empty to mean "take the deployment default" -- so folding them
- * in would force one of those to lie. Create and edit both set a concrete
- * value for a single workspace, which is what makes them the pair that can
- * genuinely share.
+ * WHAT IS SHARED, AND WHAT IS NOT -- the line is STRUCTURE against CONTROL
+ * IDIOM, and this paragraph used to draw it in the wrong place (#2413 F4).
+ *
+ * It said the autodiscovery rule form and the bulk update form are "NOT built
+ * from this file", on the grounds that their idioms differ: bulk update uses
+ * tri-state selects because "unchanged" is a real value there, and
+ * autodiscovery leaves the Ansible resource pair empty to mean "take the
+ * deployment default", so folding them in would force one of those to lie.
+ *
+ * That reasoning is right, and it is about the CONTROL -- which input, and what
+ * an empty value means. It says nothing about STRUCTURE. Which group an
+ * attribute belongs to, in what order the groups come, and which boolean gates
+ * it are properties of the ATTRIBUTE, identical on every surface that sets it;
+ * and four forms disagreeing about where a field lives is the drift this file
+ * exists to stop. So:
+ *
+ *   - SHARED: `group`, `dependsOn`, and the order of `GROUPS`. The admin forms
+ *     read them and render their own controls inside the same sections.
+ *   - PER SURFACE: the control type, and what an empty value means there.
+ *
+ * Create and edit additionally share the controls themselves, because both set
+ * a concrete value for a single workspace.
  */
 
 
@@ -90,35 +104,14 @@ export const GROUPS = [
 
 export type GroupId = (typeof GROUPS)[number]
 
-/**
- * How a collapsed group says it holds something, without a defaults table.
- *
- * DERIVED FROM THE VALUE, never from a copy of the model's defaults (#2253's
- * one settled design property). An "auto-expand when non-default" rule needs
- * to know every default, and one copy of that already exists in
- * `admin/autodiscovery/page.tsx` -- a second would be exactly the kind of
- * ledger this repo keeps learning drifts. A count for a list and set/unset for
- * an optional scalar need nothing but the value itself.
- *
- * The cost, stated so nobody reads it as an oversight: a scalar with a real
- * default -- `parallelism`, `resource-cpu`, `resource-memory` -- cannot be
- * summarised this way, because "10" tells a reader nothing about whether
- * somebody chose it. Those carry `advanced: false` below and stay expanded.
- */
-export type Summary = 'count' | 'setOrUnset' | 'none'
-
 export interface FieldSpec {
   /** The API attribute name. The single source of truth for this field. */
   attr: string
   /** The DOM id both forms use, so one e2e locator serves both. */
   id: string
   group: GroupId
-  /** Sits inside a collapsed group. Never true for a value with a real default. */
-  advanced?: boolean
   /** The boolean attribute that makes this field meaningful. */
   dependsOn?: string
-  /** How a collapsed group summarises it. */
-  summary?: Summary
   /** Engines this field applies to; absent means all of them. */
   engines?: readonly string[]
   /**
@@ -216,7 +209,10 @@ export const FIELDS: readonly FieldSpec[] = [
     engines: ['terraform'],
   },
   { attr: 'pulumi-bind-plan', id: 'ws-bind-plan', group: 'execution', engines: ['pulumi'] },
-  // The three with real defaults: expanded, never collapsed, per `Summary`.
+  // The three with a real default. They used to be called out here because a
+  // value like "10" cannot be summarised as set-or-unset, which mattered while
+  // a group could collapse behind a summary. Nothing collapses now (#2413 F4),
+  // so they are ordinary fields and the note is kept only to say so.
   { attr: 'parallelism', id: 'ws-parallelism', group: 'execution' },
   { attr: 'resource-cpu', id: 'ws-cpu', group: 'execution' },
   { attr: 'resource-memory', id: 'ws-mem', group: 'execution' },
@@ -257,7 +253,6 @@ export const FIELDS: readonly FieldSpec[] = [
     id: 'ws-inventory-paths',
     group: 'ansible',
     dependsOn: 'configure-enabled',
-    summary: 'count',
   },
   // Which inventory SOURCES under those paths ansible may resolve (#2033).
   // Two switches rather than one, because a declared plugin config names a
@@ -298,7 +293,6 @@ export const FIELDS: readonly FieldSpec[] = [
     id: 'ws-ansible-collections',
     group: 'ansible',
     dependsOn: 'configure-enabled',
-    summary: 'count',
   },
   { attr: 'ee-resource-cpu', id: 'ws-ee-cpu', group: 'ansible', dependsOn: 'configure-enabled' },
   { attr: 'ee-resource-memory', id: 'ws-ee-mem', group: 'ansible', dependsOn: 'configure-enabled' },
@@ -308,7 +302,6 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'agent-pool-ids',
     id: 'ws-pool',
     group: 'pools',
-    summary: 'count',
     alsoAccepts: ['agent-pool-id'],
   },
 
@@ -340,8 +333,6 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'trigger-prefixes',
     id: 'ws-trigger-prefixes',
     group: 'vcs',
-    advanced: true,
-    summary: 'count',
     dependsOn: 'vcs-connection-id',
   },
 
@@ -357,8 +348,6 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'drift-ignore-rules',
     id: 'ws-drift-ignore-rules',
     group: 'governance',
-    advanced: true,
-    summary: 'count',
     // The third Terraform-only field the table had lost, and the one with the
     // sharpest evidence: `pulumi-workspace.spec.ts` asserts it absent at :326
     // and visible at :339, i.e. it uses this field's presence to tell the two
@@ -369,13 +358,11 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'plan-expiry-seconds',
     id: 'ws-plan-expiry',
     group: 'governance',
-    advanced: true,
-    summary: 'setOrUnset',
   },
 
   // --- ai ---------------------------------------------------------------
   { attr: 'ai-summary-mode', id: 'ws-ai-summary-mode', group: 'ai' },
-  { attr: 'ai-summary-context', id: 'ws-ai-summary-context', group: 'ai', summary: 'setOrUnset' },
+  { attr: 'ai-summary-context', id: 'ws-ai-summary-context', group: 'ai' },
   { attr: 'ai-policy-mode', id: 'ws-ai-policy-mode', group: 'ai' },
 
   // --- security scanning ------------------------------------------------
@@ -397,8 +384,6 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'security-scan-skip-rules',
     id: 'ws-scan-skip-rules',
     group: 'security',
-    advanced: true,
-    summary: 'count',
   },
 
   // --- metadata ---------------------------------------------------------
@@ -410,13 +395,11 @@ export const FIELDS: readonly FieldSpec[] = [
     // is rendered disabled for anyone else rather than hidden -- the field
     // is meaningful, the caller just may not change it.
   },
-  { attr: 'labels', id: 'ws-labels', group: 'metadata', advanced: true, summary: 'count' },
+  { attr: 'labels', id: 'ws-labels', group: 'metadata' },
   {
     attr: 'var-files',
     id: 'ws-var-files',
     group: 'metadata',
-    advanced: true,
-    summary: 'count',
     // Terraform only: `.tfvars` files. Same provenance as `execution-backend`
     // above -- gated `!isPulumi` on the edit tab and asserted absent by the
     // Pulumi spec.
@@ -428,13 +411,11 @@ export const FIELDS: readonly FieldSpec[] = [
     attr: 'oidc-audiences',
     id: 'ws-oidc-audiences',
     group: 'cloudIdentity',
-    advanced: true,
-    summary: 'count',
   },
 
   // --- diagnostics ------------------------------------------------------
-  { attr: 'debug-mode', id: 'ws-debug-mode', group: 'diagnostics', advanced: true },
-  { attr: 'slack-channel', id: 'ws-slack-channel', group: 'diagnostics', advanced: true, summary: 'setOrUnset' },
+  { attr: 'debug-mode', id: 'ws-debug-mode', group: 'diagnostics' },
+  { attr: 'slack-channel', id: 'ws-slack-channel', group: 'diagnostics' },
 ]
 
 /** `FIELDS` indexed by attribute, for the gate and for dependency lookups. */
@@ -500,46 +481,6 @@ export function dependencyMet(spec: FieldSpec, values: Record<string, unknown>):
   if (typeof gate === 'boolean') return gate
   if (typeof gate === 'string') return gate !== '' && gate !== 'false'
   return Boolean(gate)
-}
-
-/**
- * The one-line summary of a collapsed group, derived from the values alone.
- *
- * Returns the per-field fragments a caller joins; an empty array means the
- * group holds nothing worth announcing, so its summary shows only its name.
- * Never consults a defaults table -- see `Summary`.
- */
-export function groupSummary(
-  group: GroupId,
-  engine: string,
-  values: Record<string, unknown>,
-  label: (attr: string) => string,
-): { attr: string; text: string }[] {
-  const out: { attr: string; text: string }[] = []
-  for (const spec of groupFields(group, engine)) {
-    if (!spec.summary || spec.summary === 'none') continue
-    if (!dependencyMet(spec, values)) continue
-    const v = values[spec.attr]
-    if (spec.summary === 'count') {
-      // ARRAYS AND MAPS BOTH, because two of the five counted attributes are
-      // maps on the wire and an array-only count silently reported 0 for them:
-      // `labels` is `Mapped[dict[str, Any]]` and `oidc-audiences` is
-      // `Mapped[dict[str, list[str]]]`. So a collapsed Metadata group holding
-      // three labels announced nothing -- exactly the concealment this
-      // indicator exists to prevent, in the one direction that is invisible
-      // (a group that looks empty reads as empty).
-      const n = Array.isArray(v)
-        ? v.length
-        : typeof v === 'object' && v !== null
-          ? Object.keys(v as Record<string, unknown>).length
-          : 0
-      if (n > 0) out.push({ attr: spec.attr, text: `${label(spec.attr)} ${n}` })
-    } else if (spec.summary === 'setOrUnset') {
-      const set = v !== undefined && v !== null && v !== '' && v !== 0
-      if (set) out.push({ attr: spec.attr, text: label(spec.attr) })
-    }
-  }
-  return out
 }
 
 
