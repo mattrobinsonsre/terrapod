@@ -2921,7 +2921,12 @@
       "typeConfigure": "määritys",
       "typeConfigureHint": "Ajaa playbookin inventaariota vasten. Ei suunnitelmaa eikä käyttöönottoa.",
       "typeConfigureAfterApplyHint": "Käyttöönottoa seuraa määritys tällä samalla ajolla.",
-      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy."
+      "queueConfigureConfirmDynamic": "Tämä työtila selvittää inventaariolähteet runnerilla, joten isännät joihin se ulottuu eivät ole tiedossa ennen kuin ajo käynnistyy.",
+      "configureReachAll": "Configure tavoittaa inventaarion KAIKKI koneet — rajausta ei ole asetettu.",
+      "configureReachLimited": "Configure tavoittaa {limit}.",
+      "queueFullRun": "Täysi ajo",
+      "queueFullRunConfirm": "Plan, apply JA määritys tälle työtilalle? Määritys muuttaa oikeita koneita sen jälkeen kun apply on muuttanut oikeaa infrastruktuuria, eikä niiden välissä ole erillistä tarkistusta.",
+      "moreRunKinds": "Muut ajotyypit"
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

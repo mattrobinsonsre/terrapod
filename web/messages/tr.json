@@ -2921,7 +2921,12 @@
       "typeConfigure": "yapılandırma",
       "typeConfigureHint": "Playbook'u envantere karşı çalıştırır. Plan yok, uygulama yok.",
       "typeConfigureAfterApplyHint": "Uygulamanın ardından bu aynı çalıştırmada bir yapılandırma gelir.",
-      "queueConfigureConfirmDynamic": "Bu çalışma alanı envanter kaynaklarını runner üzerinde çözümler, bu nedenle ulaşacağı ana makineler çalışma başlayana kadar bilinmez."
+      "queueConfigureConfirmDynamic": "Bu çalışma alanı envanter kaynaklarını runner üzerinde çözümler, bu nedenle ulaşacağı ana makineler çalışma başlayana kadar bilinmez.",
+      "configureReachAll": "Bir configure, envanterdeki TÜM ana makinelere ulaşır — hiçbir sınır ayarlanmadı.",
+      "configureReachLimited": "Bir configure {limit} kapsamına ulaşır.",
+      "queueFullRun": "Tam çalıştırma",
+      "queueFullRunConfirm": "Bu çalışma alanı için plan, apply VE yapılandırma? Yapılandırma, apply gerçek altyapıyı değiştirdikten sonra gerçek ana makineleri değiştirir ve aralarında ayrı bir inceleme yoktur.",
+      "moreRunKinds": "Diğer çalıştırma türleri"
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

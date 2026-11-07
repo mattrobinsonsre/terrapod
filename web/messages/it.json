@@ -2921,7 +2921,12 @@
       "typeConfigure": "configurazione",
       "typeConfigureHint": "Esegue il playbook sull''inventario. Nessun plan e nessun apply.",
       "typeConfigureAfterApplyHint": "All''apply segue una configurazione in questa stessa esecuzione.",
-      "queueConfigureConfirmDynamic": "Questo workspace risolve le fonti di inventario sul runner, quindi gli host che raggiungerà non sono noti fino all''avvio dell''esecuzione."
+      "queueConfigureConfirmDynamic": "Questo workspace risolve le fonti di inventario sul runner, quindi gli host che raggiungerà non sono noti fino all''avvio dell''esecuzione.",
+      "configureReachAll": "Una configurazione raggiungerà TUTTI gli host dell’inventario: nessun limite impostato.",
+      "configureReachLimited": "Una configurazione raggiungerà {limit}.",
+      "queueFullRun": "Esecuzione completa",
+      "queueFullRunConfirm": "Plan, apply E configurazione di questo workspace? La configurazione modifica host reali dopo che l’apply ha modificato infrastruttura reale, senza una revisione intermedia.",
+      "moreRunKinds": "Altri tipi di esecuzione"
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

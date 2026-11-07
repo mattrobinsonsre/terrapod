@@ -17,6 +17,7 @@
  */
 import { test, expect, type Route } from '@playwright/test';
 import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
+import { queueRunKind } from '../helpers/run-kinds';
 
 test.describe('Run lifecycle UI', () => {
   test('workspace runs tab renders empty state cleanly', async ({ page }) => {
@@ -65,11 +66,22 @@ test.describe('Run lifecycle UI', () => {
 
     await page.goto(`/workspaces/${wsId}?tab=runs`);
 
-    // The decision that matters is on the surface, not behind "Options".
-    const plan = page.getByRole('button', { name: 'Plan', exact: true });
-    const planApply = page.getByRole('button', { name: 'Plan + apply', exact: true });
-    await expect(plan).toBeVisible({ timeout: 15_000 });
-    await expect(planApply).toBeVisible();
+    // The decision that matters is on the surface, not behind "Options" -- and
+    // since F12 the surface is a split button, so this test owns BOTH halves of
+    // that claim and reads the test ids directly rather than going through the
+    // helper. `Plan + apply` is the PRIMARY: the most complete kind this
+    // workspace declares, and therefore the one loud control (F10). `Plan` is a
+    // partial, so it is offered in the menu rather than on the row.
+    //
+    // Asserting the position is the point here. Every other spec says only
+    // "this kind is offered" and leaves the position to the derivation, which
+    // is why they use the helper and this one does not.
+    await expect(page.getByTestId('ws-run-planApply')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('ws-run-plan')).toHaveCount(0);
+
+    await page.getByTestId('ws-run-more').click();
+    await expect(page.getByTestId('ws-run-plan')).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // The checkbox it replaced must be gone — if it lingered, the two
     // mechanisms could disagree about what the next run is.
@@ -90,7 +102,7 @@ test.describe('Run lifecycle UI', () => {
     });
 
     await page.goto(`/workspaces/${wsId}?tab=runs`);
-    await page.getByRole('button', { name: 'Plan', exact: true }).click();
+    await queueRunKind(page, 'plan');
 
     await expect.poll(() => body, { timeout: 15_000 }).not.toBeNull();
     expect(JSON.parse(body!).data.attributes['plan-only']).toBe(true);

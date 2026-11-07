@@ -2929,7 +2929,12 @@
       "configureLimitHint": "Which hosts, groups or patterns to reach. Empty means every host in the inventory.",
       "typeConfigure": "configure",
       "typeConfigureHint": "Runs the playbook against the inventory. No plan and no apply.",
-      "typeConfigureAfterApplyHint": "The apply is followed by a configure on this same run."
+      "typeConfigureAfterApplyHint": "The apply is followed by a configure on this same run.",
+      "configureReachAll": "A configure will reach EVERY host in the inventory — no limit is set.",
+      "configureReachLimited": "A configure will reach {limit}.",
+      "queueFullRun": "Full Run",
+      "queueFullRunConfirm": "Plan, apply AND configure this workspace? The configure changes real hosts after the apply changes real infrastructure, and there is no separate review between them.",
+      "moreRunKinds": "Other run kinds"
     },
     "state": {
       "deleteConfirm": "Delete state version #{serial}? This cannot be undone.",

@@ -2921,7 +2921,12 @@
       "typeConfigure": "Qum",
       "typeConfigureHint": "tetlh-vaD Qu'' paq qaSmoH. nab ''ej lo'' Hutlh.",
       "typeConfigureAfterApplyHint": "Sar rapvamDaq lo'' tlha'' Qum.",
-      "queueConfigureConfirmDynamic": "DaH Qu'' Daq vumbogh inventory Daqmey Suqbogh runner Daq ghaj, vaj runmeH taghpa'' hostmey Sovlu''be''."
+      "queueConfigureConfirmDynamic": "DaH Qu'' Daq vumbogh inventory Daqmey Suqbogh runner Daq ghaj, vaj runmeH taghpa'' hostmey Sovlu''be''.",
+      "configureReachAll": "tetlh HochHom qachmey Sum configure — poQbe’ ngutlh.",
+      "configureReachLimited": "{limit} Sum configure.",
+      "queueFullRun": "naQ ta",
+      "queueFullRunConfirm": "nab, ta, Qum je Dalaj’a’? ta vumwI’mey teH choHpu’DI’, Qum qachmey teH choH; chaH joj Dojbe’ nughI.",
+      "moreRunKinds": "latlh ta Segh"
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

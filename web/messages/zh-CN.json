@@ -2921,7 +2921,12 @@
       "typeConfigure": "配置",
       "typeConfigureHint": "针对清单执行该 playbook。既没有计划，也没有应用。",
       "typeConfigureAfterApplyHint": "在这同一次运行中，应用之后紧接一次配置。",
-      "queueConfigureConfirmDynamic": "此工作区在运行器上解析清单源，因此在运行开始之前无法得知它将触及哪些主机。"
+      "queueConfigureConfirmDynamic": "此工作区在运行器上解析清单源，因此在运行开始之前无法得知它将触及哪些主机。",
+      "configureReachAll": "Configure 将作用于清单中的「所有」主机——未设置限制。",
+      "configureReachLimited": "Configure 将作用于 {limit}。",
+      "queueFullRun": "完整运行",
+      "queueFullRunConfirm": "对该工作区执行计划、应用和配置？应用更改真实基础设施后，配置会更改真实主机，两者之间没有单独的审查。",
+      "moreRunKinds": "其他运行类型"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

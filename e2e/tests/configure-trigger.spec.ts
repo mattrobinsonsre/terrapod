@@ -23,6 +23,11 @@
  */
 import { test, expect, type Dialog } from '@playwright/test'
 import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api'
+import {
+  revealRunKind,
+  expectRunKindOffered,
+  expectRunKindAbsent,
+} from '../helpers/run-kinds'
 
 /** Capture the next confirm()'s text and DISMISS it, so nothing is queued.
  *  Registered before the click: confirm() is synchronous and blocks the
@@ -95,41 +100,101 @@ test.describe('Configure triggers', () => {
     const wsId = await createWorkspace(token, uniqueName('e2enobtn'))
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    // `Plan`, not "Queue plan": the button's accessible name is
-    // `phases.terraform.words.queuePlan`, whose VALUE is `Plan` — the key name
-    // is not the label, and reading one off the other is what failed here.
-    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Configure', exact: true }).filter({ visible: true }),
-    ).toHaveCount(0)
+    // By KIND, not by label. The run button is a split button since F12, so
+    // `plan` is in the closed caret menu on a plain workspace and a locator on
+    // the accessible name resolves to nothing. `expectRunKindAbsent` opens the
+    // menu before asserting zero, which is the half that matters here: absent
+    // from the row and one click away are different things.
+    await expectRunKindOffered(page, 'plan')
+    await expectRunKindAbsent(page, 'configure')
   })
 
-  test('the Configure button warns that an empty limit means every host', async ({ page }) => {
+  test('the Configure button does NOT prompt on a precise pointer', async ({ page }) => {
+    // The decision, in the maintainer's words: *"we're not having confirm
+    // prompts on those buttons on normal screens. There's time to cancel. We
+    // make it hard to fat-finger and we make it clear. Our users aren't
+    // children."* `Plan` and `Plan + apply` have always been this tier; the
+    // configure was the outlier.
+    //
+    // What made it relaxable is F14 below: its reach is on the PAGE now, so the
+    // information moved rather than went. The two scope assertions that used to
+    // live here -- "WHOLE inventory" and "canary" -- are the F14 tests below,
+    // which read the page instead of a dialog. The touch tier keeps its own
+    // coverage in `responsive.spec.ts`, the only project running a coarse
+    // pointer.
+    //
+    // Asserted by DISMISSING anything that does appear, so a regression that
+    // reinstated the prompt fails here rather than hanging: an unhandled dialog
+    // blocks every later Playwright action on the page.
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2ecfgbtn'), {
+    const wsId = await createWorkspace(token, uniqueName('e2ecfgnoprompt'), {
       'configure-enabled': true,
       'config-directory': 'ansible',
       'default-playbook': 'site.yml',
     })
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    const button = page
-      .getByRole('button', { name: 'Configure', exact: true })
-      .filter({ visible: true })
-    await expect(button).toBeVisible({ timeout: 15_000 })
+    // Revealed before the dialog capture is armed, because revealing opens the
+    // caret menu and that is a click of its own -- arming first would leave the
+    // capture watching the wrong interaction.
+    const button = await revealRunKind(page, 'configure')
+
+    // Asserted on the POST rather than on the Runs list, and that is not a
+    // weakening -- it is the difference between testing this button and testing
+    // the server's configuration-version requirement. A bare workspace has no
+    // uploaded configuration, so queueing a configure against it answers
+    // `422 Workspace has no uploaded configuration` (measured against a live
+    // instance). The old version of this test DISMISSED the prompt, so it never
+    // reached the POST and never met that -- relaxing the prompt is what
+    // exposed it, which is the whole reason a test that blocks the action it is
+    // about proves less than it looks.
+    //
+    // The request is also the stronger claim. "No dialog appeared" alone passes
+    // on a button that does nothing at all, which is the one regression this
+    // test exists to catch.
+    let body: string | null = null
+    await page.route('**/api/*/runs', async (route) => {
+      if (route.request().method() === 'POST') body = route.request().postData()
+      await route.continue()
+    })
 
     const dialog = captureAndDismiss(page)
     await button.click()
-    await expect.poll(() => dialog.text, { timeout: 10_000 }).not.toBeNull()
-    // The workspace declares no default limit, so this configure would reach
-    // the whole inventory — which is the thing to say before it runs.
-    expect(dialog.text).toContain('WHOLE')
-    expect(dialog.text).toContain('cannot be undone')
+
+    await expect.poll(() => body, { timeout: 15_000 }).not.toBeNull()
+    expect(JSON.parse(body!).data.attributes['is-configure']).toBe(true)
+    expect(dialog.text).toBeNull()
   })
 
-  test('a declared default limit is what the warning names', async ({ page }) => {
+  // ── the reach is on the PAGE, not only in the dialog (#2413 F14) ──────
+  //
+  // It used to exist only inside the confirm, so the one fact that decides
+  // whether a configure touches three hosts or three hundred was visible only
+  // after you had decided to press the button -- and the Limit field that sets
+  // it is behind the Options panel. That is also what made the confirm
+  // un-relaxable: dropping it would have removed the information rather than
+  // moved it.
+
+  test('a workspace with no default limit says so on the page, before any click', async ({
+    page,
+  }) => {
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2ecfglim'), {
+    const wsId = await createWorkspace(token, uniqueName('e2ereachall'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'site.yml',
+    })
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+    const reach = page.getByTestId('ws-configure-reach')
+    await expect(reach).toBeVisible({ timeout: 15_000 })
+    // The widest possible reach, and the default, so it is the loud one.
+    await expect(reach).toContainText('EVERY')
+  })
+
+  test('a declared default limit is what the page names', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2ereachlim'), {
       'configure-enabled': true,
       'config-directory': 'ansible',
       'default-playbook': 'site.yml',
@@ -137,18 +202,26 @@ test.describe('Configure triggers', () => {
     })
 
     await page.goto(`/workspaces/${wsId}?tab=runs`)
-    const button = page
-      .getByRole('button', { name: 'Configure', exact: true })
-      .filter({ visible: true })
-    await expect(button).toBeVisible({ timeout: 15_000 })
-
-    const dialog = captureAndDismiss(page)
-    await button.click()
-    await expect.poll(() => dialog.text, { timeout: 10_000 }).not.toBeNull()
-    // The contrast with the test above, and the reason both exist: a workspace
-    // whose limit names a canary group cannot be widened by a trigger, and the
-    // dialog has to reflect that rather than shouting about the whole estate.
-    expect(dialog.text).toContain('canary')
-    expect(dialog.text).not.toContain('WHOLE')
+    const reach = page.getByTestId('ws-configure-reach')
+    await expect(reach).toBeVisible({ timeout: 15_000 })
+    await expect(reach).toContainText('canary')
+    // The contrast, and the reason both tests exist: a workspace whose limit
+    // names a canary group must not be described as reaching everything.
+    await expect(reach).not.toContainText('EVERY')
   })
+
+  test('a workspace with no configure operation says nothing about reach', async ({ page }) => {
+    // Data-gated on the operation, like the buttons: a terraform-only
+    // workspace pays nothing for Ansible being present.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2enoreach'))
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+    // Anchored on the run button having rendered at all, so the absent reach
+    // line below is a statement about the workspace rather than about a page
+    // that had not finished loading.
+    await expectRunKindOffered(page, 'plan')
+    await expect(page.getByTestId('ws-configure-reach')).toHaveCount(0)
+  })
+
 })

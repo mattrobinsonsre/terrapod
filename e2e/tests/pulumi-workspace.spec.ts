@@ -19,6 +19,7 @@ import {
   uniqueName,
 } from '../helpers/api';
 import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
+import { revealRunKind, expectRunKindOffered } from '../helpers/run-kinds';
 
 test.describe('Pulumi workspace', () => {
   test('appears in the list, opens, and saves an edit', async ({ page }) => {
@@ -187,17 +188,19 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     const tfId = await createWorkspace(token, uniqueName('e2e-tf-q'));
 
     await page.goto(`/workspaces/${tfId}?tab=runs`);
-    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible();
+    // The engine decides the WORDS; the derivation decides the POSITION. So
+    // read the labels off the elements the kinds resolve to, rather than
+    // locating by label and inferring the engine from whether it was found.
+    await expect(await revealRunKind(page, 'planApply', 20_000)).toHaveText('Plan + apply');
+    await expect(await revealRunKind(page, 'plan')).toHaveText('Plan');
 
     await page.goto(`/workspaces/${pulumiId}?tab=runs`);
-    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole('button', { name: 'Preview + update', exact: true })).toBeVisible();
-    // The Terraform words are not merely additional — they are gone.
+    await expect(await revealRunKind(page, 'planApply', 20_000)).toHaveText('Preview + update');
+    await expect(await revealRunKind(page, 'plan')).toHaveText('Preview');
+    // The Terraform words are not merely additional — they are gone. Asserted
+    // with the menu already open (`revealRunKind` above left it so), because a
+    // count of zero over a closed menu would pass on a Pulumi workspace that
+    // still said `Plan` one click down.
     await expect(page.getByRole('button', { name: 'Plan', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toHaveCount(0);
   });
@@ -281,9 +284,12 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     await page.goto(`/workspaces/${wsId}?tab=runs`);
-    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // `Preview` is the PARTIAL on a Pulumi workspace -- the primary is
+    // `Preview + update` -- so it lives in the caret menu. `expectRunKindOffered`
+    // reveals it, asserts it, and closes the menu behind itself, which matters
+    // here: the menu is absolutely positioned, and at phone width where this row
+    // wraps it would sit over the Options button clicked on the next line.
+    await expectRunKindOffered(page, 'plan', 20_000);
     await page.getByRole('button', { name: 'Options', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Preview Options' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
