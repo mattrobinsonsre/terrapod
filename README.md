@@ -5,11 +5,12 @@
 [![Latest release](https://img.shields.io/github/v/release/mattrobinsonsre/terrapod?sort=semver&include_prereleases&label=release)](https://github.com/mattrobinsonsre/terrapod/releases/latest)
 
 > **Status.** The stable line is **1.11.x** — that is what `helm install` gives you
-> and what the Quick Start below installs. **2.0 is in alpha**; Pulumi and Ansible
-> support land there and are **not** in 1.11.x. The release badge above includes
-> pre-releases, so it currently shows the alpha.
+> and what the Quick Start below installs. **2.0 is in pre-release**; Pulumi and
+> Ansible support land there and are **not** in 1.11.x. The release badge above
+> includes pre-releases, so it may show a 2.0 pre-release rather than the stable
+> line.
 
-**A free, open-source, self-hosted alternative to Terraform Enterprise and Terraform Cloud (HCP Terraform)** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt — which, **from 2.0 (in alpha)**, also runs **Pulumi** programs and **Ansible** playbooks through that same workspace, RBAC, policy and audit model. Not a fork of any engine; it orchestrates them.
+**A free, open-source, self-hosted alternative to Terraform Enterprise and Terraform Cloud (HCP Terraform)** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt — which, **from 2.0**, also runs **Pulumi** programs and **Ansible** playbooks through that same workspace, RBAC and audit model (**policy and scanning are plan-shaped and do not gate a standalone configure** — see [Ansible: where it is not coerced](docs/ansible.md#where-ansible-is-not-coerced-and-why)). Not a fork of any engine; it orchestrates them.
 
 - **Point your existing `cloud` block at it.** Terrapod implements the slice of the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) that `terraform` and `tofu` actually consume — the `cloud`/`remote` backend protocol, as the CLI speaks it via [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) — so CLI runs and CI/CD usually move across with zero code changes. That slice is the compatibility target: everything beyond it is Terrapod's own API rather than a reimplementation of the full TFE V2 surface.
 - **Your state and secrets never leave your boundary.** Versioned remote state in your Postgres and object store, cloud credentials via Kubernetes workload identity — nothing long-lived, nothing vendor-held.
@@ -38,14 +39,26 @@ on a populated UI, not an empty list:
 ![Signing in, the workspace list, and a completed run showing its changes, monthly cost, AI risk verdict, policy result and security scan](docs/images/eval-demo.gif)
 
 ```sh
+git clone https://github.com/mattrobinsonsre/terrapod && cd terrapod
+
 make eval          # create a local cluster + install Terrapod, then port-forward
 # → open http://localhost:8080  (login: admin / terrapod)
+#   NOTE: this does NOT return — it holds a port-forward. Use a second terminal.
 
-make eval-down     # delete the whole thing when you're done
+make eval-down     # in that second terminal, when you're done
 ```
 
-Prerequisites: Docker, `kubectl`, `helm`, and either `kind` or `k3d`. The
-quickstart pulls released images, so the only wait is the image download.
+Prerequisites: `git`, `make`, Docker, `kubectl`, `helm`, and either `kind` or
+`k3d`. **`make eval` installs the chart from the clone**, so the repository is
+required — it is not a released-chart install. Expect **5–10 minutes** and at
+least **4 GB** of free memory: the API pod alone requests 2Gi, and a queued plan
+starts a runner Job asking for another 2Gi.
+
+It pulls released *images* against the *clone's* chart, and the two are versioned
+independently — so on a 2.0 pre-release branch you get 2.0 templates against
+whatever `latest` currently points at. Set `TERRAPOD_VERSION` to pin the images
+to a release that matches, and see
+[Getting started](docs/getting-started.md) for the fuller walkthrough.
 
 > This is an **evaluation** profile — single-replica in-cluster datastores, a
 > known password, no HA or backups. For a real deployment see
@@ -143,7 +156,8 @@ The de-risking signals, in one place:
 ## Features
 
 Everything below is implemented and in `main`. Rows marked **2.0** are in the
-2.0 alpha and are not in the stable 1.11.x line; everything else ships in 1.11.x.
+a 2.0 pre-release and are not in the stable 1.11.x line; everything else ships in
+1.11.x.
 
 ### Core platform
 

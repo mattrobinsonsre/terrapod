@@ -6,6 +6,12 @@ Terrapod provides the collaboration, governance, state management, and UI layer 
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
+> **Which line this tree documents.** These pages document **2.0**, which is in
+> pre-release. The stable line is **1.11.x**, and the features marked below as
+> 2.0 — Pulumi, Ansible, and Ansible-first catalog provisioning — are **not in
+> it**: a 1.11.x API refuses their attributes as unknown. Every other page here
+> describes behaviour the stable line has too.
+
 ![Workspaces](images/workspaces.png)
 
 ---

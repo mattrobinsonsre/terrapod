@@ -1,5 +1,9 @@
 # Pulumi workspaces and runs
 
+> **This page documents the 2.0 line.** Pulumi support ships in **2.0**, which is
+> in pre-release; it is **not** in the stable 1.11.x line. If you installed the
+> stable line, nothing here applies yet.
+
 Terrapod is a Terraform and OpenTofu orchestrator that also runs Pulumi. A
 Pulumi workspace is coerced into the same flow as every other workspace — one
 workspace per stack, a run with a phase you review and a phase that executes

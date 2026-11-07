@@ -418,7 +418,7 @@ their real consumer is Terrapod's own web UI (`routers/variables.py` names the t
 pages). **Whether they still belong on the frozen surface is an open question, tracked
 on #2368** — nothing has moved, and nothing should move without that decision.
 
-The one thing `tfci` genuinely needs that the CLI does not is `workspace output list`,
+One of the two things `tfci` genuinely needs that the CLI does not is `workspace output list`,
 which reads `GET /workspaces/{id}/current-state-version-outputs` — served since #2376.
 
 | Method | Path | go-tfe method | Caller |

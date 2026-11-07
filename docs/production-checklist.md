@@ -43,7 +43,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 ## Networking & Isolation
 
 - [ ] **Network policies are enabled** -- Terrapod ships four NetworkPolicies (API, web, listener, runner) that restrict traffic between components. Runners are explicitly denied access to PostgreSQL and Redis. Requires a CNI plugin (Calico, Cilium, Weave Net). See [Security Hardening: Network Policies](security-hardening.md#network-policies).
-- [ ] **Rate limiting is enabled** -- Enabled by default (`rate_limit.enabled: true`). Review thresholds: 100 req/min general, 10 req/min auth endpoints. See [Security Hardening: Rate Limiting](security-hardening.md#rate-limiting).
+- [ ] **Rate limiting is enabled** -- Enabled by default (`rate_limit.enabled: true`). Review **all five** thresholds, because the defaults are not one number: `requests_per_minute: 100` is **unauthenticated only**, `authenticated_requests_per_minute: 1000`, `auth_requests_per_minute: 10`, `distinct_credentials_per_minute: 200`, and **`runner_requests_per_minute: 0`, which means runner traffic is UNCAPPED by default** — deliberate, since a runner is first-party and a throttled one stalls a run, but it is the tier to think about if your runners are not on a trusted network. See [Security Hardening: Rate Limiting](security-hardening.md#rate-limiting).
 - [ ] **Ingress routes only to the web frontend** -- The BFF pattern means the API is never directly exposed. Verify no additional ingress rules expose port 8000.
 
 ---
@@ -93,6 +93,40 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **Graceful termination period is sufficient** -- Default 120 seconds. Increase for workspaces with large provider downloads or slow applies. See [Deployment: Graceful Termination](deployment.md#runner-jobs).
 
 ---
+
+## Ansible (if you run configure operations)
+
+Only relevant where a workspace sets `configure-enabled`. A configure is
+**apply-equivalent** — it needs `run:apply`, changes real hosts, and reaches
+machines outside the cluster — so it deserves its own pass.
+
+- [ ] **You know which governance gates do NOT apply** — none of OPA policy sets,
+      IaC security scanning, the AI policy gate or post-plan run tasks fires on a
+      standalone configure, and a composite apply-then-configure gates only the
+      Terraform half. See
+      [Ansible: where it is not coerced](ansible.md#where-ansible-is-not-coerced-and-why).
+      What governs a configure is RBAC at creation, the `--limit` blast radius,
+      and the playbook being reviewed repository code.
+- [ ] **Every configure-enabled workspace has a `default-limit`** — an empty one
+      means **every host in the inventory**. The Runs tab states the reach before
+      the button is pressed, but the setting is where you decide it.
+- [ ] **Host-key verification is left on** — `ansible-host-key-checking` defaults
+      true, which is ansible's own behaviour. Turning it off accepts any key a
+      host presents, so the connection can be intercepted; supply the host's key
+      via a `known_hosts` credential field instead. See
+      [Running a Configure](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
+- [ ] **Dynamic inventory stays off unless you need it** — both switches permit
+      repository code to resolve the inventory on the runner, and
+      `inventory-scripts-enabled` permits an **arbitrary executable** with the
+      Job's cloud identity, before the playbook runs. The narrower option reads a
+      declared plugin configuration that can be inspected first.
+- [ ] **Credentials carry secrets only** — the machine credential holds exactly
+      `private_key`, `known_hosts`, `password`, `become_password`. Connection
+      settings (`ansible_user`, `ansible_become`, …) belong in the inventory,
+      where they are visible in a diff and settable per host.
+- [ ] **The execution environment is one you trust** — an operator-supplied EE is
+      trusted code, the same posture as a custom runner image, and is not covered
+      by Terrapod's own vulnerability re-scan.
 
 ## Audit & Compliance
 

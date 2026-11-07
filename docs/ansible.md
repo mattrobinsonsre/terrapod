@@ -1,5 +1,12 @@
 # Ansible on Terrapod
 
+> **This page documents the 2.0 line.** Ansible support ships in **2.0**, which
+> is in pre-release; it is **not** in the stable 1.11.x line, so
+> `configure_enabled` and everything on this page is refused by a 1.11.x API as
+> an unknown attribute. If you installed the stable line, nothing here applies
+> yet. See the [Status note in the README](../README.md#terrapod) for which line
+> is which.
+
 Terrapod runs Ansible as a **configure operation**: a first-class thing a
 workspace does, alongside plan and apply, against an inventory the workspace
 declares. This page is the story end to end — what a configure is, what a
@@ -205,7 +212,63 @@ containers and managed services declared in OpenTofu or Terraform, a configure
 has little to do, and that is the right answer rather than a gap. Terrapod is an
 OpenTofu/Terraform orchestrator first; Ansible is supported by coercing it into
 the same flow — one workspace per unit of work, a reviewed decision then an
-executing operation, one RBAC, policy and audit model — as far as Ansible allows.
+executing operation, one RBAC and audit model — as far as Ansible allows. The
+governance gates are the part Ansible does not reach, and the next section says
+exactly which and why.
+
+## Where Ansible is not coerced, and why
+
+Terrapod coerces Ansible into the Terraform flow as far as Ansible allows, and
+this section is the honest list of where that stops. The sibling section for the
+other engine is [Where Pulumi is not coerced, and
+why](pulumi.md#where-pulumi-is-not-coerced-and-why).
+
+### The four post-plan gates do not fire on a configure
+
+**None of OPA policy sets, IaC security scanning, the AI policy gate or post-plan
+run tasks runs on a standalone configure.** All four sit at the post-plan
+boundary, and a configure has no plan to sit behind: it goes `queued` →
+`configuring` → `applied`, with RBAC at creation as the only check.
+
+A **composite** apply-then-configure is the case to understand, because it looks
+governed and is only half governed: the gates run on the **Terraform plan**, the
+run is confirmed, and then the playbook executes with no further gate. A green
+policy check on that run is a statement about the infrastructure, not about the
+playbook.
+
+There is also **no not-evaluated signal**, which is a gap rather than a decision.
+A Pulumi preview carries `meta.not-evaluated-reason` so a reader can see that a
+gate was skipped; that mechanism keys on the workspace's **engine**, and a
+configure is an operation rather than an engine (see the first section), so
+nothing emits a reason for it. Until that changes, the absence of a policy result
+on a configure means the gates never ran — not that they passed.
+
+### What does govern a configure
+
+Not nothing, and the controls are deliberately the ones a configure can actually
+have:
+
+| control | what it does |
+|---|---|
+| **RBAC at creation** | a configure needs `run:apply`, because it changes real hosts and is apply-equivalent. It is not gated at plan tier |
+| **The limit** | `--limit`, from the run or the workspace's `default-limit`, is the blast radius, and the Runs tab states it before you press the button — an empty default means every host in the inventory |
+| **The playbook is repository code** | it arrives in a configuration version, so it is reviewed in a pull request like any other change, and a VCS-connected workspace cannot run a playbook that is not committed |
+| **Audit** | every run, every credential resolution and every host result is recorded, exactly as for an apply |
+
+As [There is no plan for a configure](#there-is-no-plan-for-a-configure) puts it,
+what you review is the playbook and the limit — and those are doing the job a
+plan does elsewhere. The difference this section adds is that **the automated
+gates are not doing it with them**.
+
+### Why not simply run the gates anyway
+
+Each of the four reads a **Terraform plan JSON** and answers a question about
+resource changes. A playbook produces no such document, and `--check` is not a
+plan — it is a dry run whose result nothing links to a later execution. Pointing
+OPA at a configure would mean either inventing a plan-shaped artefact for it or
+writing a second, differently-shaped policy surface; both are real designs and
+neither is what "the same policy model" means. Saying so is better than implying
+a coverage we do not have.
 
 ## A terraform-only deployment pays nothing for any of this
 
