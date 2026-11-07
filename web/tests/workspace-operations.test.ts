@@ -95,10 +95,25 @@ test('both booleans reach the two fleet surfaces the parity gate checks', () => 
   ] as const) {
     for (const attr of ['plan-apply-enabled', 'configure-enabled']) {
       assert.ok(src.includes(`'${attr}'`), `${name} does not write ${attr}`)
+      // A control, not just a payload key. TWO accepted spellings, because the
+      // admin forms no longer build their controls the same way: one writes the
+      // id by hand, and a form that has adopted the shared field sections
+      // (#2413 F4) renders a `Field`, which takes the id from `FIELD_BY_ATTR`
+      // and leaves the page naming only the attribute. The workspace editor's
+      // own assertion further down made exactly this move, for exactly this
+      // reason.
+      //
+      // Accepting both is not a weakening: `attr="…"` is only a control if the
+      // table declares that attribute, and the last test in this file asserts
+      // the table's side -- the id AND the label key -- by name. Neither half
+      // alone can see a page that names an attribute the table does not carry.
+      const byHand = new RegExp(`id="(bu|ad)-${attr}"`)
+      const fromTable = new RegExp(`attr="${attr}"`)
+      assert.ok(
+        byHand.test(src) || fromTable.test(src),
+        `${name} has no ${attr} control: neither id="(bu|ad)-${attr}" nor attr="${attr}"`,
+      )
     }
-    // A control, not just a payload key: the id is what the label points at.
-    assert.match(src, /id="(bu|ad)-plan-apply-enabled"/, `${name} has no plan/apply control`)
-    assert.match(src, /id="(bu|ad)-configure-enabled"/, `${name} has no configure control`)
   }
 })
 

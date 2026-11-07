@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import {
   EE_UNKNOWN,
   fetchAnsibleExecutionEnvironments,
@@ -25,6 +26,14 @@ import {
   type RunTaskSpec,
   type NotificationSpec,
 } from '@/components/template-editors'
+import {
+  CREATE_INPUT,
+  FIELD_BY_ATTR,
+  GROUPS,
+  LABEL_KEY,
+  type GroupId,
+} from '@/components/workspace-fields'
+import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
@@ -132,6 +141,69 @@ interface ExecutionHookRef {
 
 type SortKey = 'name' | 'repo' | 'pattern' | 'enabled' | 'created'
 
+/**
+ * Settings the rule fixes rather than offers.
+ *
+ * `execution-mode` is the only one: autodiscovery is VCS-driven, so a
+ * materialised workspace is always agent-executed. Rendered DISABLED rather
+ * than omitted, for the same reason a field behind an off gate is (#2413 F20)
+ * -- seeing the setting is how an operator learns the rule has made that
+ * choice for them, where an absent control reads as a missing feature.
+ */
+const RULE_READ_ONLY: ReadonlySet<string> = new Set(['execution-mode'])
+
+/**
+ * A templated boolean, as a yes/no `<select>`.
+ *
+ * THE CONTROL IDIOM IS PER SURFACE and the structure is shared (#2413 F4):
+ * `lib/workspace-fields.ts` says which group a boolean belongs to and which
+ * other boolean gates it, and this form keeps its own input. The select is
+ * what the newest blocks on this form already chose, and the reason holds:
+ * a rule writes a CONCRETE value onto every workspace it materialises, so
+ * "yes" and "no" are the two things an operator is choosing between and a
+ * checkbox renders the second as an absence.
+ *
+ * One component rather than eleven hand-written selects, because the eleven
+ * are where the two would drift. The gate arrives from `Field`, which wraps a
+ * bespoke control in a disabled `<fieldset>` when it is unmet -- so this only
+ * has to honour `busy` and `readOnly` itself.
+ */
+function RuleYesNo({ attr, ctx }: { attr: string; ctx: GroupCtx }) {
+  // Its own `useTranslations` rather than two props, so a call site is
+  // `<RuleYesNo attr=... ctx=... />` and nothing else. That spelling is
+  // load-bearing: `workspace-operations.test.ts` reads this file as TEXT for a
+  // control per operation boolean, and a helper taking the attribute as an
+  // argument -- `yesNo('configure-enabled')` -- made the attribute invisible to
+  // it. The gate caught it, which is the gate working.
+  //
+  // And this comment writes the example WITHOUT the real quoted form on
+  // purpose: spelling it here would satisfy that gate from prose, so deleting
+  // the control below would leave it green. That is the same defect one layer
+  // up, and it is the one this file keeps meeting.
+  const tCommon = useTranslations('runDetail.common')
+  const id = FIELD_BY_ATTR[attr]?.id ?? attr
+  return (
+    <Field
+      attr={attr}
+      ctx={ctx}
+      kind="select"
+      control={
+        <select
+          id={id}
+          data-testid={id}
+          value={ctx.values[attr] ? 'true' : 'false'}
+          disabled={ctx.busy || ctx.readOnly?.has(attr)}
+          onChange={(e) => ctx.onChange(attr, e.target.value === 'true')}
+          className={CREATE_INPUT}
+        >
+          <option value="true">{tCommon('yes')}</option>
+          <option value="false">{tCommon('no')}</option>
+        </select>
+      }
+    />
+  )
+}
+
 export default function AutodiscoveryPage() {
   const router = useRouter()
   const t = useTranslations('adminAutodiscovery')
@@ -139,8 +211,8 @@ export default function AutodiscoveryPage() {
   // Reuses the workspace page's own labels (#1763) so a rule's template and the
   // setting it produces are described in the same words, in every locale.
   const tWs = useTranslations('workspaceDetail')
-  // A generic yes/no pair that already exists in every locale.
-  const tCommon = useTranslations('runDetail.common')
+  // The yes/no pair the templated booleans need is read by `RuleYesNo` itself,
+  // so the page no longer binds `runDetail.common`.
   const fmt = useFormat()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
@@ -699,6 +771,802 @@ export default function AutodiscoveryPage() {
     }
   }
 
+  // ── the workspace template, in the shared sections (#2413 F4) ───────────
+  //
+  // The rule's own fields -- what it scans and what it does with what it finds
+  // -- stay hand-written above. Everything it TEMPLATES onto the workspaces it
+  // materialises is rendered from `FIELDS`, in `GROUPS` order, by the same
+  // `Group`/`Field` pair the create form and the Configuration tab use.
+  //
+  // What that buys, and it is the whole of F3, F5 and F6 as well as F4:
+  //
+  //   - the orchestrator's CPU and memory requests are adjacent, because the
+  //     table says they are, instead of being separated by the Ansible pair
+  //     and the engine picker (F3);
+  //   - a section title is a real `<h4>` rather than a `<label>` pointing at
+  //     nothing, and there is one per group instead of four spanning three or
+  //     four groups each (F5);
+  //   - a field whose gate is unmet renders DISABLED (F6 as #2413 F20 reshaped
+  //     it) -- so with Configure set to No the whole Ansible block is visible
+  //     and untypeable, where before all of it rendered live and the
+  //     materialised workspace ignored every value;
+  //   - nothing collapses: the `<details>` this replaced hid the entire
+  //     template behind one click (F4).
+  //
+  // Four fields the table declares are deliberately NOT rendered here, and
+  // each is a judgement rather than an omission:
+  //
+  //   `name` and `working-directory` -- the rule DERIVES both, from
+  //     `name-template` and from the directory a match was found in. Offering
+  //     either would take a value the materialiser overwrites.
+  //   `vcs-connection-id`, `vcs-repo-url`, `vcs-branch` -- these are the
+  //     rule's own SCAN TARGET, above, not a template. A rule has exactly one
+  //     and the workspaces it creates inherit it, so a second control would
+  //     be two ways to say one thing.
+  //   `trigger-prefixes` and `security-scan-skip-rules` -- exempt in
+  //     `test_workspace_setting_parity.py` with a reason each.
+  //
+  // `vcs-connection-id` is still in `ruleValues` below even though it has no
+  // control: three vcs fields gate on it, so leaving it out would disable the
+  // VCS workflow and auto-merge controls on every rule for ever.
+
+  /**
+   * The template's current values, keyed as the API names the attribute.
+   *
+   * A projection of the form's own state rather than a second store: the
+   * payload in `handleSubmit` is still built from the `useState` values, so
+   * this cannot drift into being the source of truth for what gets saved.
+   * Booleans are real booleans -- `RuleYesNo` renders the yes/no pair itself,
+   * and `dependencyMet` reads a boolean gate directly.
+   */
+  const ruleValues: Record<string, unknown> = {
+    engine,
+    'execution-mode': executionMode,
+    'execution-backend': executionBackend,
+    'engine-version': terraformVersion,
+    'auto-apply-mode': autoApplyMode,
+    'terragrunt-enabled': terragruntEnabled,
+    'terragrunt-version': terragruntVersion,
+    'pulumi-bind-plan': bindPlan,
+    parallelism,
+    'resource-cpu': resourceCpu,
+    'resource-memory': resourceMemory,
+    'plan-apply-enabled': planApplyEnabled,
+    'configure-enabled': configureEnabled,
+    'auto-configure-enabled': autoConfigureEnabled,
+    'configure-after-apply': configureAfterApply,
+    'configure-all-hosts': configureAllHosts,
+    'config-directory': configDirectory,
+    'default-playbook': defaultPlaybook,
+    'default-limit': defaultLimit,
+    'inventory-paths': inventoryPaths,
+    'dynamic-inventory-enabled': dynamicInventoryEnabled,
+    'inventory-scripts-enabled': inventoryScriptsEnabled,
+    'ansible-host-key-checking': ansibleHostKeyChecking,
+    'ansible-version': ansibleVersion,
+    'ansible-execution-environment': ansibleEE,
+    'ansible-collections': ansibleCollections,
+    'ee-resource-cpu': eeResourceCpu,
+    'ee-resource-memory': eeResourceMemory,
+    'agent-pool-ids': agentPoolId,
+    // No control of its own -- the rule's connection is chosen above. Here
+    // because `vcs-workflow` and `auto-merge` gate on it.
+    'vcs-connection-id': vcsConnectionId,
+    'vcs-workflow': ruleVcsWorkflow,
+    'auto-merge': ruleAutoMerge,
+    'auto-merge-strategy': ruleAutoMergeStrategy,
+    'allow-fork-pr-plans': ruleAllowForkPrPlans,
+    'drift-detection-enabled': driftEnabled,
+    'drift-detection-interval-seconds': driftInterval,
+    'drift-ignore-rules': driftIgnoreRules,
+    'plan-expiry-seconds': planExpiry,
+    'ai-summary-mode': aiSummaryMode,
+    'ai-summary-context': aiSummaryContext,
+    'ai-policy-mode': aiPolicyMode,
+    'security-scan-engine': scanEngine,
+    'security-scan-enforcement': scanEnforcement,
+    'security-scan-severity-threshold': scanThreshold,
+    'owner-email': ownerEmail,
+    labels,
+    'var-files': varFiles,
+    'oidc-audiences': oidcAudiences,
+    'debug-mode': ruleDebugMode,
+    'slack-channel': ruleSlackChannel,
+  }
+
+  /**
+   * One dispatch for every control in the template, bespoke ones included.
+   *
+   * Every attribute this form renders has a case -- including the ones whose
+   * control is hand-written below, which route through here rather than
+   * calling their setter inline. A control that set its own state directly
+   * would be the one place a future switch to a `Field` primitive silently
+   * stopped writing anything, and a no-op control is indistinguishable from a
+   * working one until a save comes back without the value.
+   *
+   * `execution-mode` has no case because it is read-only: `RULE_READ_ONLY`
+   * disables it, so its `onChange` cannot fire.
+   */
+  function setRuleValue(attr: string, v: unknown) {
+    const s = String(v ?? '')
+    const b = Boolean(v)
+    switch (attr) {
+      case 'engine': setEngine(s); break
+      case 'execution-backend': setExecutionBackend(s as 'tofu' | 'terraform'); break
+      case 'engine-version': setTerraformVersion(s); break
+      case 'auto-apply-mode': setAutoApplyMode(s); break
+      case 'terragrunt-enabled': setTerragruntEnabled(b); break
+      case 'terragrunt-version': setTerragruntVersion(s); break
+      case 'pulumi-bind-plan': setBindPlan(b); break
+      case 'parallelism': setParallelism(s); break
+      case 'resource-cpu': setResourceCpu(s); break
+      case 'resource-memory': setResourceMemory(s); break
+      case 'plan-apply-enabled': setPlanApplyEnabled(b); break
+      case 'configure-enabled': setConfigureEnabled(b); break
+      case 'auto-configure-enabled': setAutoConfigureEnabled(b); break
+      case 'configure-after-apply': setConfigureAfterApply(b); break
+      case 'configure-all-hosts': setConfigureAllHosts(b); break
+      case 'config-directory': setConfigDirectory(s); break
+      case 'default-playbook': setDefaultPlaybook(s); break
+      case 'default-limit': setDefaultLimit(s); break
+      case 'inventory-paths': setInventoryPaths(v as string[]); break
+      case 'dynamic-inventory-enabled': setDynamicInventoryEnabled(b); break
+      case 'inventory-scripts-enabled': setInventoryScriptsEnabled(b); break
+      case 'ansible-host-key-checking': setAnsibleHostKeyChecking(b); break
+      case 'ansible-version': setAnsibleVersion(s); break
+      case 'ansible-execution-environment': setAnsibleEE(s); break
+      case 'ansible-collections': setAnsibleCollections(v as string[]); break
+      case 'ee-resource-cpu': setEeResourceCpu(s); break
+      case 'ee-resource-memory': setEeResourceMemory(s); break
+      case 'agent-pool-ids': setAgentPoolId(s); break
+      case 'vcs-workflow': setRuleVcsWorkflow(s); break
+      case 'auto-merge': setRuleAutoMerge(b); break
+      case 'auto-merge-strategy': setRuleAutoMergeStrategy(s); break
+      case 'allow-fork-pr-plans': setRuleAllowForkPrPlans(b); break
+      case 'drift-detection-enabled': setDriftEnabled(b); break
+      case 'drift-detection-interval-seconds': setDriftInterval(Number(v)); break
+      case 'drift-ignore-rules': setDriftIgnoreRules(v as string[]); break
+      case 'plan-expiry-seconds': setPlanExpiry(s); break
+      case 'ai-summary-mode': setAiSummaryMode(s); break
+      case 'ai-summary-context': setAiSummaryContext(s); break
+      case 'ai-policy-mode': setAiPolicyMode(s); break
+      case 'security-scan-engine': setScanEngine(s); break
+      case 'security-scan-enforcement': setScanEnforcement(s); break
+      case 'security-scan-severity-threshold': setScanThreshold(s); break
+      case 'owner-email': setOwnerEmail(s); break
+      case 'labels': setLabels(v as Record<string, string>); break
+      case 'var-files': setVarFiles(v as string[]); break
+      case 'oidc-audiences': setOidcAudiences(sanitizeOidcAudiences(v as OidcAudiences)); break
+      case 'debug-mode': setRuleDebugMode(b); break
+      case 'slack-channel': setRuleSlackChannel(s); break
+    }
+  }
+
+  /**
+   * The label for a templated attribute.
+   *
+   * `LABEL_KEY` by default, so a rule's template and the setting it produces
+   * are described in the same words in every locale -- the reason this page
+   * already reads `workspaceDetail` rather than carrying its own copies.
+   *
+   * Two overrides, both because the CONTROL differs in cardinality and the
+   * shared label would then be wrong rather than merely different:
+   * `agent-pool-ids` is a list on a workspace and a single pool here, and
+   * `engine-version` is the version of whichever engine the rule templates,
+   * which the rule form has always named after the tool.
+   */
+  function ruleLabel(attr: string): string {
+    if (attr === 'agent-pool-ids') return t('form.agentPool')
+    if (attr === 'engine-version') return t('form.terraformVersion')
+    return tWs(LABEL_KEY[attr])
+  }
+
+  const hintText = (node: ReactNode) => <p className="mt-1 text-xs text-slate-500">{node}</p>
+
+  /**
+   * The explanatory line under a templated field.
+   *
+   * Every one of these already existed on this form or on the create form, so
+   * nothing here is a new string in 32 catalogues.
+   *
+   * Four of them are a `title=` this form used to hang on a label, moved to a
+   * visible line: `ansible-version`, `ansible-execution-environment`,
+   * `default-playbook` and `default-limit` each explained themselves on hover
+   * only, which AGENTS.md forbids, and `Field` has no label `title` to hang
+   * them on. Moved rather than dropped -- the information is what an operator
+   * needs to pick a value. `config-directory` keeps only its short line and
+   * loses the 257-character `configDirectoryTitle`, matching the create form:
+   * it already has an always-on sentence, and the mechanism behind it is
+   * exactly what #2413 F15's ⓘ is for.
+   */
+  function ruleHint(attr: string): ReactNode {
+    switch (attr) {
+      case 'execution-mode':
+        return hintText(t('form.executionModeHint'))
+      case 'pulumi-bind-plan':
+        // `t.rich`, not `t`: this key carries a <docs> link, and plain `t`
+        // throws FORMATTING_ERROR on a missing tag. The create form records
+        // the same trap -- bind-plan renders for Pulumi only, so a form that
+        // defaults to Terraform never reveals it until somebody switches.
+        return (
+          <p className="mt-1 text-xs text-slate-500">
+            {tWs.rich('fields.bindPlanHelp', {
+              docs: (chunks) => (
+                <a
+                  href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-400 hover:text-brand-300 underline"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        )
+      case 'plan-apply-enabled':
+        return hintText(tWs('fields.planApplyEnabledHint'))
+      case 'configure-enabled':
+        return hintText(tWs('fields.configureEnabledHint'))
+      case 'auto-configure-enabled':
+        return hintText(tWs('fields.autoConfigureEnabledHint'))
+      case 'configure-after-apply':
+        return hintText(tWs('fields.configureAfterApplyHint'))
+      case 'configure-all-hosts':
+        return hintText(tWs('fields.configureAllHostsHint'))
+      case 'config-directory':
+        return hintText(tWs('fields.configDirectoryRootHint'))
+      case 'default-playbook':
+        return hintText(tWs('fields.defaultPlaybookTitle'))
+      case 'default-limit':
+        return hintText(tWs('fields.defaultLimitTitle'))
+      case 'inventory-paths':
+        return hintText(tWs('fields.inventoryPathsHint'))
+      case 'dynamic-inventory-enabled':
+        return hintText(tWs('fields.dynamicInventoryEnabledHint'))
+      case 'inventory-scripts-enabled':
+        return hintText(tWs('fields.inventoryScriptsEnabledHint'))
+      case 'ansible-host-key-checking':
+        return hintText(tWs('fields.ansibleHostKeyCheckingHint'))
+      case 'ansible-version':
+        return hintText(
+          envs.listing === 'complete' && envs.lines.length > 0
+            ? tWs('fields.ansibleVersionTitle')
+            : // The `unknown` branch says BOTH things: what the field is for,
+              // and that the offered set could not be confirmed. The second
+              // used to be a `title` on the input, which is where an operator
+              // looking at an unexpected free-text box would never find it.
+              `${tWs('fields.ansibleVersionTitle')} ${tWs('fields.ansibleVersionUnconfirmed')}`,
+        )
+      case 'ansible-execution-environment':
+        return hintText(tWs('fields.ansibleExecutionEnvironmentTitle'))
+      case 'ansible-collections':
+        return hintText(tWs('fields.ansibleCollectionsHint'))
+      case 'var-files':
+        // `t.rich`: carries a <code> tag.
+        return (
+          <p className="mt-1 text-xs text-slate-500">
+            {t.rich('form.varFilesHint', { code: (c) => <code>{c}</code> })}
+          </p>
+        )
+      case 'oidc-audiences':
+        return hintText(t('form.oidcAudiencesHint'))
+      case 'ai-summary-context':
+        return hintText(tWs('aiSummary.contextHint'))
+      case 'debug-mode':
+        return hintText(t('form.debugModeHint'))
+      case 'allow-fork-pr-plans':
+        return hintText(t('form.allowForkPrPlansHint'))
+      case 'plan-expiry-seconds':
+        return undefined
+      default:
+        return undefined
+    }
+  }
+
+  const ruleCtx: GroupCtx = {
+    mode: 'create',
+    values: ruleValues,
+    onChange: setRuleValue,
+    engine,
+    label: ruleLabel,
+    hint: ruleHint,
+    readOnly: RULE_READ_ONLY,
+    busy: submitting,
+  }
+
+  // Option sets. Every label is a `t(...)` call or a wire identifier read out
+  // of an array, never a literal in the JSX below -- a raw literal would be a
+  // new entry in the hardcoded-string allowlist.
+  const engineOptions = [
+    { value: 'terraform', label: tWs('fields.engineTerraform') },
+    { value: 'pulumi', label: tWs('fields.enginePulumi') },
+  ]
+  // Only agent: autodiscovery is VCS-driven, so there is one value and
+  // `RULE_READ_ONLY` disables the control rather than hiding the choice.
+  const execModeOptions = [{ value: 'agent', label: tWs('fields.execModeAgent') }]
+  // The two Terraform-family binaries. Product names, so not translated in any
+  // catalogue; read from here rather than written into the JSX so they are not
+  // new hardcoded literals either.
+  const backendOptions = [
+    { value: 'tofu', label: 'OpenTofu' },
+    { value: 'terraform', label: 'Terraform' },
+  ]
+  const autoApplyOptions = [
+    { value: 'never', label: tMode('never') },
+    { value: 'always', label: tMode('always') },
+    { value: 'create', label: tMode('create') },
+    { value: 'create_update', label: tMode('createUpdate') },
+  ]
+  const vcsWorkflowOptions = [
+    { value: 'merge_then_apply', label: tWs('fields.vcsWorkflowMergeThenApply') },
+    { value: 'apply_then_merge', label: tWs('fields.vcsWorkflowApplyThenMerge') },
+  ]
+  // Git's own merge-method names, as the API spells them.
+  const mergeStrategyOptions = ['merge', 'squash', 'rebase'].map((s) => ({ value: s, label: s }))
+  const aiModeOptions = [
+    { value: 'default', label: tWs('aiSummary.modeDefault') },
+    { value: 'enabled', label: tWs('aiSummary.modeEnabled') },
+    { value: 'disabled', label: tWs('aiSummary.modeDisabled') },
+  ]
+  const scanEnforcementOptions = [
+    { value: 'off', label: tWs('securityScan.enforcementOff') },
+    { value: 'advisory', label: tWs('securityScan.enforcementAdvisory') },
+    { value: 'enforced', label: tWs('securityScan.enforcementEnforced') },
+  ]
+  const scanEngineOptions = [
+    { value: 'checkov', label: tWs('securityScan.engineCheckov') },
+    { value: 'trivy', label: tWs('securityScan.engineTrivy') },
+    { value: 'both', label: tWs('securityScan.engineBoth') },
+  ]
+  const scanThresholdOptions = [
+    { value: 'critical', label: tWs('securityScan.thresholdCritical') },
+    { value: 'high', label: tWs('securityScan.thresholdHigh') },
+    { value: 'medium', label: tWs('securityScan.thresholdMedium') },
+    { value: 'low', label: tWs('securityScan.thresholdLow') },
+  ]
+
+  /**
+   * A group's own sentence, where one exists.
+   *
+   * The four sections this replaced each carried a line of prose, and three of
+   * them said the same thing -- "applied to every workspace this rule creates"
+   * -- which now appears once above the whole template rather than three times
+   * inside it. What stays is the two that say something specific to their
+   * group, plus the both-operations-off banner, which belongs beside the two
+   * controls it is about rather than beside the Save button it disables.
+   */
+  function groupDescription(g: GroupId): ReactNode {
+    if (g === 'operations') {
+      return (
+        <>
+          <p className="mb-2 text-xs text-slate-500">{tWs('fields.operationsHint')}</p>
+          {ruleHasNoOperations && (
+            <p
+              className="mb-2 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
+              data-testid="ad-operations-none"
+            >
+              {tWs('fields.operationsNone')}
+            </p>
+          )}
+        </>
+      )
+    }
+    if (g === 'ansible') {
+      return <p className="mb-2 text-xs text-slate-500">{t('form.ansibleConfigureHint')}</p>
+    }
+    return undefined
+  }
+
+  /**
+   * The groups' contents, keyed by group so the render walks `GROUPS` and
+   * keeps this form in the table's order.
+   */
+  const groupBody: Record<GroupId, ReactNode> = {
+    // `name` is absent: the rule derives every workspace name from
+    // `name-template` above, so a control here would be overwritten.
+    identity: <Field attr="engine" ctx={ruleCtx} kind="select" options={engineOptions} />,
+
+    execution: (
+      <>
+        <Field attr="execution-mode" ctx={ruleCtx} kind="select" options={execModeOptions} />
+        <Field attr="execution-backend" ctx={ruleCtx} kind="select" options={backendOptions} />
+        <Field attr="engine-version" ctx={ruleCtx} kind="text" />
+        {/* `working-directory` is absent: the rule sets it to the directory a
+            match was found in, so an operator's value would be overwritten. */}
+        <Field attr="auto-apply-mode" ctx={ruleCtx} kind="select" options={autoApplyOptions} />
+        {/* Was a checkbox with the version input tucked underneath it, labelled
+            only by `aria-label` (#2413 F4). Two fields, two real labels. */}
+        <Field attr="terragrunt-enabled" ctx={ruleCtx} kind="checkbox" />
+        <Field
+          attr="terragrunt-version"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.terragruntVersionPlaceholder')}
+        />
+        <RuleYesNo attr="pulumi-bind-plan" ctx={ruleCtx} />
+        {/* The three the orchestrator sizes itself with, adjacent because the
+            table says they are -- they used to be separated by the Ansible
+            pair and the engine picker (#2413 F3). */}
+        <Field attr="parallelism" ctx={ruleCtx} kind="number" min={1} max={256} />
+        <Field attr="resource-cpu" ctx={ruleCtx} kind="text" />
+        <Field attr="resource-memory" ctx={ruleCtx} kind="text" />
+      </>
+    ),
+
+    operations: (
+      <>
+        <RuleYesNo attr="plan-apply-enabled" ctx={ruleCtx} />
+        <RuleYesNo attr="configure-enabled" ctx={ruleCtx} />
+        <RuleYesNo attr="auto-configure-enabled" ctx={ruleCtx} />
+        <RuleYesNo attr="configure-after-apply" ctx={ruleCtx} />
+        <RuleYesNo attr="configure-all-hosts" ctx={ruleCtx} />
+      </>
+    ),
+
+    // Every field here gates on `configure-enabled`, so with Configure set to
+    // No the whole block renders disabled rather than live-and-ignored
+    // (#2413 F6, in the shape #2413 F20 gave it).
+    ansible: (
+      <>
+        <Field
+          attr="config-directory"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.configDirectoryPlaceholder')}
+        />
+        <Field
+          attr="default-playbook"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.defaultPlaybookPlaceholder')}
+        />
+        <Field
+          attr="default-limit"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.defaultLimitPlaceholder')}
+        />
+        <Field
+          attr="inventory-paths"
+          ctx={ruleCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={inventoryPaths}
+              onChange={(next) => setRuleValue('inventory-paths', next)}
+              placeholder={tWs('fields.inventoryPathsPlaceholder')}
+              addLabel={tWs('fields.inventoryPathsAdd')}
+            />
+          }
+        />
+        {/* Which inventory sources ansible may resolve on the runner (#2033).
+            Terrapod itself never runs either kind, in either state. */}
+        <RuleYesNo attr="dynamic-inventory-enabled" ctx={ruleCtx} />
+        <RuleYesNo attr="inventory-scripts-enabled" ctx={ruleCtx} />
+        {/* Defaults to yes, which is both the rule column's default and
+            ansible's own behaviour (#2318). */}
+        <RuleYesNo attr="ansible-host-key-checking" ctx={ruleCtx} />
+        <Field
+          attr="ansible-version"
+          ctx={ruleCtx}
+          kind="text"
+          control={
+            envs.listing === 'complete' && envs.lines.length > 0 ? (
+              <select
+                id="ws-ansible-version"
+                data-testid="rule-ansible-version"
+                value={ansibleVersion}
+                disabled={submitting}
+                onChange={(e) => setRuleValue('ansible-version', e.target.value)}
+                className={CREATE_INPUT}
+              >
+                <option value="">{t('form.none')}</option>
+                {envs.lines.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              /* `unknown` means the server accepts ANY line, so free text is
+                 correct here -- an empty picker would block work the server
+                 would have allowed. The placeholder names a LINE, not a patch:
+                 a patch pins an immutable execution-environment tag, which
+                 never receives a patched rebuild (#2413 F1). */
+              <input
+                id="ws-ansible-version"
+                data-testid="rule-ansible-version"
+                value={ansibleVersion}
+                disabled={submitting}
+                onChange={(e) => setRuleValue('ansible-version', e.target.value)}
+                placeholder={tWs('fields.ansibleVersionPlaceholder')}
+                className={CREATE_INPUT}
+              />
+            )
+          }
+        />
+        <Field
+          attr="ansible-execution-environment"
+          ctx={ruleCtx}
+          kind="select"
+          control={
+            /* Always a picker: operator labels come from configuration, not
+               from a registry, so they are authoritative even when the
+               built-in listing is unknown. A label the deployment has not
+               configured is refused at the write. */
+            <select
+              id="ws-ansible-ee"
+              data-testid="rule-ansible-ee"
+              value={ansibleEE}
+              disabled={submitting || envs.labels.length === 0}
+              onChange={(e) => setRuleValue('ansible-execution-environment', e.target.value)}
+              className={CREATE_INPUT}
+            >
+              <option value="">
+                {envs.labels.length === 0
+                  ? tWs('fields.ansibleExecutionEnvironmentNone')
+                  : t('form.none')}
+              </option>
+              {envs.labels.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          }
+        />
+        {/* The wire shape is `{name, version?}` objects; the editor holds
+            `name:version` lines and `handleSubmit` parses them, which is the
+            same helper pair the create form uses. */}
+        <Field
+          attr="ansible-collections"
+          ctx={ruleCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={ansibleCollections}
+              onChange={(next) => setRuleValue('ansible-collections', next)}
+              placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
+              addLabel={tWs('fields.ansibleCollectionsAdd')}
+            />
+          }
+        />
+        {/* Empty is a real value and means "inherit the deployment default"
+            (#2154), which is why neither is pre-filled. */}
+        <Field
+          attr="ee-resource-cpu"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={t('form.eeInherit')}
+        />
+        <Field
+          attr="ee-resource-memory"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={t('form.eeInherit')}
+        />
+      </>
+    ),
+
+    pools: (
+      /* ONE pool, where a workspace holds a set: the rule template carries a
+         single `agent-pool-id`, so the label is this form's own rather than
+         the shared plural. Exempt in `test_workspace_setting_parity.py` for
+         exactly that reason. */
+      <Field
+        attr="agent-pool-ids"
+        ctx={ruleCtx}
+        kind="select"
+        control={
+          <select
+            id="ws-pool"
+            data-testid="ws-pool"
+            value={agentPoolId}
+            disabled={submitting}
+            onChange={(e) => setRuleValue('agent-pool-ids', e.target.value)}
+            className={CREATE_INPUT}
+          >
+            <option value="">{t('form.none')}</option>
+            {pools.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.attributes.name}
+              </option>
+            ))}
+          </select>
+        }
+      />
+    ),
+
+    // The rule's own connection, repository and branch are its SCAN TARGET and
+    // stay above. What is templated is how a materialised workspace treats the
+    // pull requests it sees.
+    //
+    // Three different gates among the four, and the third is the interesting
+    // one: the workflow and auto-merge gate on `vcs-connection-id`, so they
+    // are disabled until the rule's connection is chosen above; the strategy
+    // gates on auto-merge; and `allow-fork-pr-plans` gates on NOTHING, by the
+    // table's own decision -- it is a feature's own toggle, and hiding or
+    // disabling one of those removes the only way to discover the feature
+    // exists, where a dependent only loses something meaningless.
+    vcs: (
+      <>
+        <Field attr="vcs-workflow" ctx={ruleCtx} kind="select" options={vcsWorkflowOptions} />
+        <Field attr="auto-merge" ctx={ruleCtx} kind="checkbox" />
+        <Field
+          attr="auto-merge-strategy"
+          ctx={ruleCtx}
+          kind="select"
+          options={mergeStrategyOptions}
+        />
+        <Field attr="allow-fork-pr-plans" ctx={ruleCtx} kind="checkbox" />
+      </>
+    ),
+
+    governance: (
+      <>
+        <Field attr="drift-detection-enabled" ctx={ruleCtx} kind="checkbox" />
+        <Field
+          attr="drift-detection-interval-seconds"
+          ctx={ruleCtx}
+          kind="number"
+          min={0}
+        />
+        <Field
+          attr="drift-ignore-rules"
+          ctx={ruleCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={driftIgnoreRules}
+              onChange={(next) => setRuleValue('drift-ignore-rules', next)}
+              // A Terraform address, not UX copy — identical in every locale.
+              placeholder="aws_instance.web.tags[&quot;LastSeen&quot;]" // i18n-ignore
+              addLabel={t('form.addDriftIgnoreRule')}
+            />
+          }
+        />
+        <Field
+          attr="plan-expiry-seconds"
+          ctx={ruleCtx}
+          kind="number"
+          control={
+            /* The state is a STRING whose emptiness means "no expiry", and
+               `handleSubmit` sends null for it. The number primitive coerces
+               with `Number()`, so clearing the box would send 0 -- a real
+               value, and not the one the operator asked for. */
+            <input
+              id="ws-plan-expiry"
+              data-testid="ws-plan-expiry"
+              type="number"
+              min={0}
+              value={planExpiry}
+              disabled={submitting}
+              onChange={(e) => setRuleValue('plan-expiry-seconds', e.target.value)}
+              placeholder={t('form.noExpiry')}
+              className={CREATE_INPUT}
+            />
+          }
+        />
+      </>
+    ),
+
+    ai: (
+      <>
+        <Field attr="ai-summary-mode" ctx={ruleCtx} kind="select" options={aiModeOptions} />
+        <Field attr="ai-policy-mode" ctx={ruleCtx} kind="select" options={aiModeOptions} />
+        {/* Free prose up to 4000 characters, so a textarea rather than the
+            single-line primitive. */}
+        <Field
+          attr="ai-summary-context"
+          ctx={ruleCtx}
+          kind="text"
+          control={
+            <textarea
+              id="ws-ai-summary-context"
+              data-testid="ws-ai-summary-context"
+              rows={3}
+              maxLength={4000}
+              value={aiSummaryContext}
+              disabled={submitting}
+              onChange={(e) => setRuleValue('ai-summary-context', e.target.value)}
+              placeholder={tWs('aiSummary.contextPlaceholder')}
+              className={CREATE_INPUT}
+            />
+          }
+        />
+      </>
+    ),
+
+    security: (
+      <>
+        <Field
+          attr="security-scan-enforcement"
+          ctx={ruleCtx}
+          kind="select"
+          options={scanEnforcementOptions}
+        />
+        <Field
+          attr="security-scan-engine"
+          ctx={ruleCtx}
+          kind="select"
+          options={scanEngineOptions}
+        />
+        <Field
+          attr="security-scan-severity-threshold"
+          ctx={ruleCtx}
+          kind="select"
+          options={scanThresholdOptions}
+        />
+        {/* `security-scan-skip-rules` is absent and exempt: a skip list is
+            per-workspace reasoning, not a rule default. */}
+      </>
+    ),
+
+    metadata: (
+      <>
+        {/* Offered here, unlike on the create form: that path sets
+            `owner_email` to the creator, where a rule materialises workspaces
+            nobody is sitting in front of, so the template is the only place an
+            owner can be named. */}
+        <Field attr="owner-email" ctx={ruleCtx} kind="text" placeholder="platform@example.com" />
+        <Field
+          attr="labels"
+          ctx={ruleCtx}
+          kind="text"
+          control={
+            <LabelsEditor labels={labels} onChange={(next) => setRuleValue('labels', next)} />
+          }
+        />
+        <Field
+          attr="var-files"
+          ctx={ruleCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={varFiles}
+              onChange={(next) => setRuleValue('var-files', next)}
+              placeholder="env/prod.tfvars" // i18n-ignore
+              addLabel={t('form.addVarFile')}
+            />
+          }
+        />
+      </>
+    ),
+
+    cloudIdentity: (
+      /* A map of provider configuration to its audiences, not a list -- one
+         token is minted per key. No provenance partition on this surface: the
+         value IS the override, so there is nothing to subtract. */
+      <Field
+        attr="oidc-audiences"
+        ctx={ruleCtx}
+        kind="text"
+        control={
+          <OidcAudiencesEditor
+            value={oidcAudiences}
+            inert={!oidcDefaults.issuerEnabled}
+            onChange={(next) => setRuleValue('oidc-audiences', next)}
+            audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
+            addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
+          />
+        }
+      />
+    ),
+
+    diagnostics: (
+      <>
+        <Field attr="debug-mode" ctx={ruleCtx} kind="checkbox" />
+        <Field
+          attr="slack-channel"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('slack.channelPlaceholder')}
+        />
+      </>
+    ),
+  }
+
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
 
   return (
@@ -816,775 +1684,91 @@ export default function AutodiscoveryPage() {
               <p className="text-xs text-slate-500 mt-1">{t.rich('form.nameTemplateHint', { code: (c) => <code>{c}</code>, path: () => <code>{'{path}'}</code>, root: () => <code>{'{root}'}</code> })}</p>
             </div>
 
-            <details className="group">
-              <summary className="text-sm text-slate-300 cursor-pointer">{t('form.templateDefaults')}</summary>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.executionMode')}</label>
-                  <input
-                    value="agent"
-                    disabled
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded px-3 py-2 text-sm text-slate-500"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">{t('form.executionModeHint')}</p>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.agentPool')}</label>
-                  <select
-                    value={agentPoolId}
-                    onChange={e => setAgentPoolId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="">{t('form.none')}</option>
-                    {pools.map(p => (
-                      <option key={p.id} value={p.id}>{p.attributes.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.executionBackend')}</label>
-                  <select
-                    value={executionBackend}
-                    onChange={e => setExecutionBackend(e.target.value as 'tofu' | 'terraform')}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="tofu">tofu</option>
-                    <option value="terraform">terraform</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.terraformVersion')}</label>
-                  <input
-                    value={terraformVersion}
-                    onChange={e => setTerraformVersion(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm text-slate-300 mb-1"
-                    title={tWs('fields.ansibleVersionTitle')}
-                  >
-                    {tWs('fields.ansibleVersion')}
-                  </label>
-                  {envs.listing === 'complete' && envs.lines.length > 0 ? (
-                    <select
-                      data-testid="rule-ansible-version"
-                      value={ansibleVersion}
-                      onChange={e => setAnsibleVersion(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="">{t('form.none')}</option>
-                      {envs.lines.map(l => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    /* `unknown` means the server accepts ANY line, so a free-text
-                       input is correct here -- an empty picker would block work
-                       the server would have allowed. */
-                    <input
-                      data-testid="rule-ansible-version"
-                      value={ansibleVersion}
-                      onChange={e => setAnsibleVersion(e.target.value)}
-                      placeholder={tWs('fields.ansibleVersionPlaceholder')}
-                      title={tWs('fields.ansibleVersionUnconfirmed')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    />
-                  )}
-                </div>
-                <div>
-                  <label
-                    className="block text-sm text-slate-300 mb-1"
-                    title={tWs('fields.ansibleExecutionEnvironmentTitle')}
-                  >
-                    {tWs('fields.ansibleExecutionEnvironment')}
-                  </label>
-                  {/* Always a picker: operator labels come from configuration,
-                      not from a registry, so they are authoritative even when the
-                      built-in listing is unknown. A label the deployment has not
-                      configured is refused at the write, so there is nothing to
-                      gain from letting one be typed. */}
-                  <select
-                    data-testid="rule-ansible-ee"
-                    value={ansibleEE}
-                    onChange={e => setAnsibleEE(e.target.value)}
-                    disabled={envs.labels.length === 0}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="">
-                      {envs.labels.length === 0
-                        ? tWs('fields.ansibleExecutionEnvironmentNone')
-                        : t('form.none')}
-                    </option>
-                    {envs.labels.map(l => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.cpuRequest')}</label>
-                  <input
-                    value={resourceCpu}
-                    onChange={e => setResourceCpu(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.eeCpuRequest')}</label>
-                  <input
-                    value={eeResourceCpu}
-                    onChange={e => setEeResourceCpu(e.target.value)}
-                    placeholder={t('form.eeInherit')}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.eeMemoryRequest')}</label>
-                  <input
-                    value={eeResourceMemory}
-                    onChange={e => setEeResourceMemory(e.target.value)}
-                    placeholder={t('form.eeInherit')}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{tWs('fields.engine')}</label>
-                  <select
-                    value={engine}
-                    onChange={e => setEngine(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="terraform">{tWs('fields.engineTerraform')}</option>
-                    <option value="pulumi">{tWs('fields.enginePulumi')}</option>
-                  </select>
-                </div>
-                {/* Pulumi's own setting. Hidden on a Terraform rule because the
-                    API refuses it there (#1813) — offering it would invite a
-                    422, or worse a value that looks saved and never applies. */}
-                {engine === 'pulumi' && (
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1" title={tWs('fields.bindPlanHelp')}>
-                    {tWs('fields.bindPlan')}
-                  </label>
-                  <select
-                    value={bindPlan ? 'true' : 'false'}
-                    onChange={e => setBindPlan(e.target.value === 'true')}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="false">{tCommon('no')}</option>
-                    <option value="true">{tCommon('yes')}</option>
-                  </select>
-                </div>
-                )}
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.parallelism')}</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={256}
-                    value={parallelism}
-                    onChange={e => setParallelism(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.memoryRequest')}</label>
-                  <input
-                    value={resourceMemory}
-                    onChange={e => setResourceMemory(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('form.ownerEmail')}</label>
-                  <input
-                    value={ownerEmail}
-                    onChange={e => setOwnerEmail(e.target.value)}
-                    placeholder="platform@example.com"
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="flex items-center gap-4 pt-6">
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    {t('form.autoApply')}
-                    <select
-                      value={autoApplyMode}
-                      onChange={e => setAutoApplyMode(e.target.value)}
-                      className="px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"
-                    >
-                      <option value="never">{tMode('never')}</option>
-                      <option value="always">{tMode('always')}</option>
-                      <option value="create">{tMode('create')}</option>
-                      <option value="create_update">{tMode('createUpdate')}</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={enabled}
-                      onChange={e => setEnabled(e.target.checked)}
-                    />
-                    {t('form.enabled')}
-                  </label>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.onDirectoryDelete')}</label>
+            {/* The rule's own lifecycle: what it does when a matched
+                directory disappears, and whether it scans at all. Both are
+                properties of the RULE rather than of the workspaces it
+                materialises, so they stay beside the scan target above and
+                outside the template below. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="min-w-0">
+                <label htmlFor="ad-on-directory-delete" className="block text-sm text-slate-300 mb-1">
+                  {t('form.onDirectoryDelete')}
+                </label>
                 <select
+                  id="ad-on-directory-delete"
                   value={onDirectoryDelete}
                   onChange={e => setOnDirectoryDelete(e.target.value as 'flag' | 'destroy')}
-                  className="w-full sm:w-1/2 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                 >
                   <option value="flag">{t('form.onDeleteFlag')}</option>
                   <option value="destroy">{t('form.onDeleteDestroy')}</option>
                 </select>
-                <p className="text-xs text-slate-500 mt-1">
-                  {t('form.onDirectoryDeleteHint')}
-                </p>
+                <p className="text-xs text-slate-500 mt-1">{t('form.onDirectoryDeleteHint')}</p>
                 {onDirectoryDelete === 'destroy' && (
                   <p className="text-xs text-red-400 mt-2 font-medium">
                     {t('form.onDeleteDestroyWarning')}
                   </p>
                 )}
               </div>
-              <div className="mt-4">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.labels')}</label>
-                <LabelsEditor labels={labels} onChange={setLabels} />
+              {/* Top-aligned rather than bottom-aligned: the cell beside it grows a
+                  hint and, on `destroy`, a warning, so `items-end` would walk this
+                  down the row as the sibling changes height. */}
+              <div className="min-w-0">
+                <label className="flex min-h-11 items-center gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={e => setEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-1 focus:ring-brand-500"
+                  />
+                  {t('form.enabled')}
+                </label>
               </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.varFiles')}</label>
-                <p className="text-xs text-slate-500 mb-2">{t.rich('form.varFilesHint', { code: (c) => <code>{c}</code> })}</p>
-                <StringListEditor
-                  values={varFiles}
-                  onChange={setVarFiles}
-                  placeholder="env/prod.tfvars"
-                  addLabel={t('form.addVarFile')}
-                />
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.oidcAudiences')}</label>
-                <p className="text-xs text-slate-500 mb-2">{t('form.oidcAudiencesHint')}</p>
-                <OidcAudiencesEditor
-                  value={oidcAudiences}
-                  inert={!oidcDefaults.issuerEnabled}
-                  onChange={setOidcAudiences}
-                  audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
-                  addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
-                />
-              </div>
-              {/* Which operations every workspace this rule materialises has
-                  (#1966). Its own block above the Ansible one, because
-                  `configure-enabled` is the declaration and the roots below
-                  are only where that operation runs.
+            </div>
 
-                  Yes/no selects rather than checkboxes, matching every other
-                  boolean on this form — `pulumi-bind-plan` above is the
-                  nearest sibling. */}
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{tWs('fields.operations')}</label>
-                <p className="text-xs text-slate-500 mb-2">{tWs('fields.operationsHint')}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="min-w-0">
-                    <label htmlFor="ad-plan-apply-enabled" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.planApplyEnabled')}
-                    </label>
-                    <select
-                      id="ad-plan-apply-enabled"
-                      value={planApplyEnabled ? 'true' : 'false'}
-                      onChange={e => setPlanApplyEnabled(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.planApplyEnabledHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-configure-enabled" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.configureEnabled')}
-                    </label>
-                    <select
-                      id="ad-configure-enabled"
-                      value={configureEnabled ? 'true' : 'false'}
-                      onChange={e => setConfigureEnabled(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.configureEnabledHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-auto-configure-enabled" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.autoConfigureEnabled')}
-                    </label>
-                    <select
-                      id="ad-auto-configure-enabled"
-                      value={autoConfigureEnabled ? 'true' : 'false'}
-                      onChange={e => setAutoConfigureEnabled(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.autoConfigureEnabledHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-configure-after-apply" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.configureAfterApply')}
-                    </label>
-                    <select
-                      id="ad-configure-after-apply"
-                      value={configureAfterApply ? 'true' : 'false'}
-                      onChange={e => setConfigureAfterApply(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.configureAfterApplyHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-configure-all-hosts" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.configureAllHosts')}
-                    </label>
-                    <select
-                      id="ad-configure-all-hosts"
-                      value={configureAllHosts ? 'true' : 'false'}
-                      onChange={e => setConfigureAllHosts(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.configureAllHostsHint')}
-                    </p>
-                  </div>
-                </div>
-                {ruleHasNoOperations && (
-                  // Save is disabled below; this is the sentence that says why.
-                  <p
-                    className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
-                    data-testid="ad-operations-none"
-                  >
-                    {tWs('fields.operationsNone')}
-                  </p>
-                )}
-              </div>
-              {/* Where the configure operation runs in every workspace this
-                  rule materialises, and what it does by default (#1929). */}
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.ansibleConfigure')}</label>
-                <p className="text-xs text-slate-500 mb-2">{t('form.ansibleConfigureHint')}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* min-w-0: a grid item has min-width:auto, so a select
-                      whose longest option is a long translated string can
-                      push the row past the viewport however w-full it is. */}
-                  <div className="min-w-0">
-                    <label htmlFor="ad-config-directory" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.configDirectory')}
-                    </label>
-                    {/* A plain text box: the path is just a path and '' is the
-                        configuration version's root. #1929's mode select chose
-                        between null and '' — that declaration is
-                        `configure-enabled` above now (#1966). */}
-                    <input
-                      id="ad-config-directory"
-                      value={configDirectory}
-                      onChange={e => setConfigDirectory(e.target.value)}
-                      placeholder={tWs('fields.configDirectoryPlaceholder')}
-                      title={tWs('fields.configDirectoryTitle')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.configDirectoryRootHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-default-playbook" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.defaultPlaybook')}
-                    </label>
-                    <input
-                      id="ad-default-playbook"
-                      value={defaultPlaybook}
-                      onChange={e => setDefaultPlaybook(e.target.value)}
-                      placeholder={tWs('fields.defaultPlaybookPlaceholder')}
-                      title={tWs('fields.defaultPlaybookTitle')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-default-limit" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.defaultLimit')}
-                    </label>
-                    <input
-                      id="ad-default-limit"
-                      value={defaultLimit}
-                      onChange={e => setDefaultLimit(e.target.value)}
-                      placeholder={tWs('fields.defaultLimitPlaceholder')}
-                      title={tWs('fields.defaultLimitTitle')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    />
-                  </div>
-                  {/* Which inventory sources ansible may resolve on the
-                      runner (#2033). Terrapod itself never runs either kind,
-                      in either state -- these say what the RUNNER is
-                      permitted to resolve. A yes/no select rather than a
-                      tri-state one: a rule templates a concrete value onto
-                      every workspace it materialises, so there is no
-                      "leave alone" to express. */}
-                  <div className="min-w-0">
-                    <label htmlFor="ad-dynamic-inventory-enabled" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.dynamicInventoryEnabled')}
-                    </label>
-                    <select
-                      id="ad-dynamic-inventory-enabled"
-                      value={dynamicInventoryEnabled ? 'true' : 'false'}
-                      onChange={e => setDynamicInventoryEnabled(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.dynamicInventoryEnabledHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="ad-inventory-scripts-enabled" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.inventoryScriptsEnabled')}
-                    </label>
-                    <select
-                      id="ad-inventory-scripts-enabled"
-                      value={inventoryScriptsEnabled ? 'true' : 'false'}
-                      onChange={e => setInventoryScriptsEnabled(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.inventoryScriptsEnabledHint')}
-                    </p>
-                  </div>
-                  {/* Whether a configure verifies the host key of the hosts
-                      it targets (#2318). Defaults to yes, which is both the
-                      rule column's default and ansible's own behaviour. */}
-                  <div className="min-w-0">
-                    <label htmlFor="ad-ansible-host-key-checking" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.ansibleHostKeyChecking')}
-                    </label>
-                    <select
-                      id="ad-ansible-host-key-checking"
-                      value={ansibleHostKeyChecking ? 'true' : 'false'}
-                      onChange={e => setAnsibleHostKeyChecking(e.target.value === 'true')}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                    >
-                      <option value="true">{tCommon('yes')}</option>
-                      <option value="false">{tCommon('no')}</option>
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {tWs('fields.ansibleHostKeyCheckingHint')}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs text-slate-500 mb-1">
-                    {tWs('fields.inventoryPaths')}
-                  </label>
-                  <p className="text-xs text-slate-500 mb-2">{tWs('fields.inventoryPathsHint')}</p>
-                  <StringListEditor
-                    values={inventoryPaths}
-                    onChange={setInventoryPaths}
-                    placeholder={tWs('fields.inventoryPathsPlaceholder')}
-                    addLabel={tWs('fields.inventoryPathsAdd')}
-                  />
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs text-slate-500 mb-1">
-                    {tWs('fields.ansibleCollections')}
-                  </label>
-                  <p className="text-xs text-slate-500 mb-2">
-                    {tWs('fields.ansibleCollectionsHint')}
-                  </p>
-                  <StringListEditor
-                    values={ansibleCollections}
-                    onChange={setAnsibleCollections}
-                    placeholder={tWs('fields.ansibleCollectionsPlaceholder')}
-                    addLabel={tWs('fields.ansibleCollectionsAdd')}
-                  />
-                </div>
+            {/* ── The workspace template, in the shared sections (#2413 F4) ──
+                Was a `<details>` holding four hand-written sections whose
+                titles were `<label>`s pointing at nothing. It is now the
+                twelve `GROUPS` in the table's own order, each a real `<h4>`,
+                and NOTHING COLLAPSES: the maintainer's decision is that
+                sections carry navigability and collapse does not, so an
+                operator sees what the form offers without an interaction
+                first.
+
+                The heading and the sentence are the `<summary>`'s own words
+                and the one the three "applied to every workspace this rule
+                creates" lines all said, kept once at the top of the block they
+                are true of rather than repeated inside it. */}
+            <section className="space-y-4 border-t border-slate-800 pt-4 min-w-0">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-200">
+                  {t('form.templateDefaults')}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">{t('form.governanceHint')}</p>
               </div>
 
-              {/* The rest of the templated workspace settings (#1763) */}
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.execution')}</label>
-                <p className="text-xs text-slate-500 mb-2">{t('form.governanceHint')}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="flex items-center gap-2 text-xs text-slate-400">
-                      <input
-                        type="checkbox"
-                        checked={terragruntEnabled}
-                        onChange={(e) => setTerragruntEnabled(e.target.checked)}
-                      />
-                      {t('form.terragruntEnabled')}
-                    </label>
-                    <input
-                      type="text"
-                      aria-label={t('form.terragruntVersion')}
-                      value={terragruntVersion}
-                      onChange={(e) => setTerragruntVersion(e.target.value)}
-                      placeholder={tWs('fields.terragruntVersionPlaceholder')}
-                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="ad-vcs-workflow" className="block text-xs text-slate-500 mb-1">
-                      {tWs('fields.vcsWorkflow')}
-                    </label>
-                    <select
-                      id="ad-vcs-workflow"
-                      value={ruleVcsWorkflow}
-                      onChange={(e) => setRuleVcsWorkflow(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="merge_then_apply">{tWs('fields.vcsWorkflowMergeThenApply')}</option>
-                      <option value="apply_then_merge">{tWs('fields.vcsWorkflowApplyThenMerge')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-xs text-slate-400">
-                      <input
-                        type="checkbox"
-                        checked={ruleAutoMerge}
-                        onChange={(e) => setRuleAutoMerge(e.target.checked)}
-                      />
-                      {tWs('fields.autoMerge')}
-                    </label>
-                    <select
-                      aria-label={tWs('fields.autoMergeStrategy')}
-                      value={ruleAutoMergeStrategy}
-                      onChange={(e) => setRuleAutoMergeStrategy(e.target.value)}
-                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
-                    >
-                      <option value="merge">merge</option>{/* i18n-ignore */}
-                      <option value="squash">squash</option>{/* i18n-ignore */}
-                      <option value="rebase">rebase</option>{/* i18n-ignore */}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-xs text-slate-400">
-                      <input
-                        type="checkbox"
-                        checked={driftEnabled}
-                        onChange={(e) => setDriftEnabled(e.target.checked)}
-                      />
-                      {tWs('drift.title')}
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      aria-label={tWs('drift.checkInterval')}
-                      value={driftInterval}
-                      onChange={(e) => setDriftInterval(Number(e.target.value))}
-                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="ad-plan-expiry" className="block text-xs text-slate-500 mb-1">
-                      {tWs('planExpiry.expireAfter')}
-                    </label>
-                    <input
-                      id="ad-plan-expiry"
-                      type="number"
-                      min={0}
-                      value={planExpiry}
-                      onChange={(e) => setPlanExpiry(e.target.value)}
-                      placeholder={t('form.noExpiry')}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="ad-slack" className="block text-xs text-slate-500 mb-1">
-                      {tWs('slack.channel')}
-                    </label>
-                    <input
-                      id="ad-slack"
-                      type="text"
-                      value={ruleSlackChannel}
-                      onChange={(e) => setRuleSlackChannel(e.target.value)}
-                      placeholder={tWs('slack.channelPlaceholder')}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="ad-debug-mode" className="block text-xs text-slate-500 mb-1">
-                      {tWs('debugMode.label')}
-                    </label>
-                    <label className="flex items-center gap-2 mt-2">
-                      <input
-                        id="ad-debug-mode"
-                        type="checkbox"
-                        checked={ruleDebugMode}
-                        onChange={(e) => setRuleDebugMode(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
-                      />
-                      <span className="text-sm text-slate-200">
-                        {ruleDebugMode ? tWs('common.enabled') : tWs('common.disabled')}
-                      </span>
-                    </label>
-                    <p className="text-xs text-slate-500 mt-1">{t('form.debugModeHint')}</p>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="ad-allow-fork-pr-plans"
-                      className="block text-xs text-slate-500 mb-1"
-                    >
-                      {tWs('allowForkPrPlans.label')}
-                    </label>
-                    <label className="flex items-center gap-2 mt-2">
-                      <input
-                        id="ad-allow-fork-pr-plans"
-                        type="checkbox"
-                        checked={ruleAllowForkPrPlans}
-                        onChange={(e) => setRuleAllowForkPrPlans(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
-                      />
-                      <span className="text-sm text-slate-200">
-                        {ruleAllowForkPrPlans ? tWs('common.enabled') : tWs('common.disabled')}
-                      </span>
-                    </label>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t('form.allowForkPrPlansHint')}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs text-slate-500 mb-1">
-                    {tWs('fields.driftIgnoreRules')}
-                  </label>
-                  <StringListEditor
-                    values={driftIgnoreRules}
-                    onChange={setDriftIgnoreRules}
-                    // A Terraform address, not UX copy — identical in every locale.
-                    placeholder="aws_instance.web.tags[&quot;LastSeen&quot;]" // i18n-ignore
-                    addLabel={t('form.addDriftIgnoreRule')}
-                  />
-                </div>
-              </div>
+              {GROUPS.map((g) => (
+                <Group
+                  key={g}
+                  id={g}
+                  ctx={ruleCtx}
+                  title={tWs(`groups.${g}`)}
+                  description={groupDescription(g)}
+                >
+                  {groupBody[g]}
+                </Group>
+              ))}
 
-              {/* Templated onto every workspace the rule creates (#1763) */}
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.governance')}</label>
-                <p className="text-xs text-slate-500 mb-2">{t('form.governanceHint')}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="ad-scan-enforcement" className="block text-xs text-slate-500 mb-1">
-                      {t('form.scanEnforcement')}
-                    </label>
-                    <select
-                      id="ad-scan-enforcement"
-                      value={scanEnforcement}
-                      onChange={(e) => setScanEnforcement(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="off">{t('form.scanOff')}</option>
-                      <option value="advisory">{t('form.scanAdvisory')}</option>
-                      <option value="enforced">{t('form.scanEnforced')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="ad-scan-engine" className="block text-xs text-slate-500 mb-1">
-                      {t('form.scanEngine')}
-                    </label>
-                    <select
-                      id="ad-scan-engine"
-                      value={scanEngine}
-                      onChange={(e) => setScanEngine(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      {/* Product names, not UX copy — identical in every locale. */}
-                      <option value="checkov">Checkov</option>{/* i18n-ignore */}
-                      <option value="trivy">Trivy</option>{/* i18n-ignore */}
-                      <option value="both">{t('form.scanEngineBoth')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="ad-scan-threshold" className="block text-xs text-slate-500 mb-1">
-                      {t('form.scanThreshold')}
-                    </label>
-                    <select
-                      id="ad-scan-threshold"
-                      value={scanThreshold}
-                      onChange={(e) => setScanThreshold(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="critical">{t('form.severityCritical')}</option>
-                      <option value="high">{t('form.severityHigh')}</option>
-                      <option value="medium">{t('form.severityMedium')}</option>
-                      <option value="low">{t('form.severityLow')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="ad-ai-summary" className="block text-xs text-slate-500 mb-1">
-                      {t('form.aiSummaryMode')}
-                    </label>
-                    <select
-                      id="ad-ai-summary"
-                      value={aiSummaryMode}
-                      onChange={(e) => setAiSummaryMode(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="default">{t('form.aiSummaryDefault')}</option>
-                      <option value="enabled">{t('form.aiSummaryEnabled')}</option>
-                      <option value="disabled">{t('form.aiSummaryDisabled')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="ad-ai-policy" className="block text-xs text-slate-500 mb-1">
-                      {tWs('aiSummary.policyMode')}
-                    </label>
-                    <select
-                      id="ad-ai-policy"
-                      value={aiPolicyMode}
-                      onChange={(e) => setAiPolicyMode(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="default">{tWs('aiSummary.modeDefault')}</option>
-                      <option value="enabled">{tWs('aiSummary.modeEnabled')}</option>
-                      <option value="disabled">{tWs('aiSummary.modeDisabled')}</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="ad-ai-context" className="block text-xs text-slate-500 mb-1">
-                      {tWs('aiSummary.contextLabel')} {tWs('aiSummary.contextLabelSuffix')}
-                    </label>
-                    <textarea
-                      id="ad-ai-context"
-                      value={aiSummaryContext}
-                      onChange={(e) => setAiSummaryContext(e.target.value)}
-                      rows={3}
-                      maxLength={4000}
-                      placeholder={tWs('aiSummary.contextPlaceholder')}
-                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                    <p className="mt-1 text-xs text-slate-500">{tWs('aiSummary.contextHint')}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.executionHooks')}</label>
+              {/* The three collections the field table has no group for, and
+                  deliberately: each is a list of OTHER resources the rule
+                  attaches to what it creates rather than a workspace setting
+                  with a value, so none is in `FIELDS` and none is checked by
+                  the parity gate. They keep the group idiom -- a real heading
+                  and a section -- so the form reads as one list of sections. */}
+              <section className="min-w-0">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  {t('form.executionHooks')}
+                </h4>
                 <p className="text-xs text-slate-500 mb-2">
                   {t.rich('form.executionHooksHint', { page: (c) => <span className="text-slate-400">{c}</span> })}
                 </p>
@@ -1638,19 +1822,25 @@ export default function AutodiscoveryPage() {
                       <span className="text-amber-400/80">{t('form.hookNotInLibrary')}</span>
                     </label>
                   ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.runTaskTemplates')}</label>
+              </section>
+
+              <section className="min-w-0">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  {t('form.runTaskTemplates')}
+                </h4>
                 <RunTaskTemplatesEditor items={runTaskTemplates} onChange={setRunTaskTemplates} />
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">{t('form.notificationTemplates')}</label>
+              </section>
+
+              <section className="min-w-0">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  {t('form.notificationTemplates')}
+                </h4>
                 <NotificationTemplatesEditor
                   items={notificationTemplates}
                   onChange={setNotificationTemplates}
                 />
-              </div>
-            </details>
+              </section>
+            </section>
 
             <div className="flex gap-2 pt-2">
               <button
