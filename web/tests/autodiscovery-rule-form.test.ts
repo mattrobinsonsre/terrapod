@@ -50,6 +50,43 @@ function body(name: string): string {
 const settersCalled = (src: string): Set<string> =>
   new Set([...src.matchAll(/\b(set[A-Z]\w*)\(/g)].map((m) => m[1]))
 
+test('resetForm clears every field openEditForm seeds', () => {
+  const seeded = settersCalled(body('openEditForm'))
+  const cleared = settersCalled(body('resetForm'))
+
+  // A floor, so a renamed function or a changed brace shape fails here rather
+  // than passing on an empty subject — the way this whole class of gate stops
+  // meaning anything.
+  assert.ok(
+    seeded.size >= 55,
+    `only ${seeded.size} setters found in openEditForm; the matcher has stopped matching`,
+  )
+
+  const missing = [...seeded].filter((s) => s !== 'setShowForm' && !cleared.has(s)).sort()
+  assert.deepEqual(
+    missing,
+    [],
+    `resetForm leaves ${missing.length} field(s) holding the previously edited rule's ` +
+      `value, so "New Rule" inherits them: ${missing.join(', ')}`,
+  )
+})
+
+test('resetForm does not clear more than the form holds', () => {
+  // The other direction, which keeps the first test honest: if `resetForm`
+  // grew a setter `openEditForm` does not seed, then one of the two is wrong
+  // about what the form contains and the subject above is no longer derived
+  // from the form at all.
+  const seeded = settersCalled(body('openEditForm'))
+  const cleared = settersCalled(body('resetForm'))
+  const extra = [...cleared].filter((s) => !seeded.has(s)).sort()
+  assert.deepEqual(
+    extra,
+    [],
+    `resetForm clears field(s) openEditForm never seeds: ${extra.join(', ')}. ` +
+      `Either the edit path is missing a seed, or these are not form fields.`,
+  )
+})
+
 // ── the shared sections (#2413 F4) ────────────────────────────────────────
 
 test('the rule form renders the shared groups rather than its own sections', () => {

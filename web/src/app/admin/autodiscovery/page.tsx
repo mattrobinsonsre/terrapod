@@ -391,6 +391,27 @@ export default function AutodiscoveryPage() {
     }
   }
 
+  /**
+   * Back to a brand-new rule's defaults -- EVERY field, which it was not.
+   *
+   * Fifteen of the form's sixty-one fields were never cleared, so clicking
+   * New Rule after editing one carried the edited rule's values into it:
+   * its engine, its parallelism, its execution-environment sizing, all three
+   * configure-start booleans, BOTH dynamic-inventory grants, host-key
+   * checking, its collections, its AI policy and context, and its fork-PR
+   * grant. Two of those are grants that let third-party code run on a runner
+   * and one decides whether a pull request from a fork gets a speculative
+   * plan, so inheriting them silently is not a cosmetic defect -- and it got
+   * sharper when the template stopped being collapsed (#2413 F4), because a
+   * stale value is now on the screen rather than behind a click.
+   *
+   * `openEditForm` seeds all sixty-one. That asymmetry is what
+   * `autodiscovery-rule-form.test.ts` now pins, deriving BOTH sides from this
+   * file so the next field added cannot be left out of one of them.
+   *
+   * Every value below is the field's own `useState` initialiser, which is what
+   * "brand new" means here.
+   */
   function resetForm() {
     setEditingId(null)
     setName('')
@@ -404,19 +425,34 @@ export default function AutodiscoveryPage() {
     setExecutionMode('agent')
     setAgentPoolId('')
     setExecutionBackend('tofu')
+    setEngine('terraform')
+    setBindPlan(false)
+    setParallelism('10')
     setTerraformVersion('1.13')
     setAnsibleVersion('')
     setAnsibleEE('')
+    setAnsibleCollections([])
     // Back to the model's column defaults (#1966), which is what a brand-new
     // rule means by not mentioning them.
     setPlanApplyEnabled(true)
     setConfigureEnabled(false)
+    setAutoConfigureEnabled(false)
+    setConfigureAfterApply(false)
+    setConfigureAllHosts(false)
     setConfigDirectory('')
     setInventoryPaths([])
     setDefaultPlaybook('')
     setDefaultLimit('')
+    // The two grants that decide what the RUNNER may resolve (#2033), and the
+    // one whose default is TRUE because that is ansible's own behaviour
+    // (#2318). All three were among the fifteen.
+    setDynamicInventoryEnabled(false)
+    setInventoryScriptsEnabled(false)
+    setAnsibleHostKeyChecking(true)
     setResourceCpu('1')
     setResourceMemory('2Gi')
+    setEeResourceCpu('')
+    setEeResourceMemory('')
     setAutoApplyMode('never')
     setOnDirectoryDelete('flag')
     setLabels({})
@@ -428,6 +464,8 @@ export default function AutodiscoveryPage() {
     setScanEngine('checkov')
     setScanThreshold('high')
     setAiSummaryMode('default')
+    setAiPolicyMode('default')
+    setAiSummaryContext('')
     setTerragruntEnabled(false)
     setTerragruntVersion('1.0')
     setRuleVcsWorkflow('merge_then_apply')
@@ -439,6 +477,7 @@ export default function AutodiscoveryPage() {
     setPlanExpiry('')
     setRuleSlackChannel('')
     setRuleDebugMode(false)
+    setRuleAllowForkPrPlans(false)
     setRunTaskTemplates([])
     setNotificationTemplates([])
   }
