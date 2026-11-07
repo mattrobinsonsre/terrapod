@@ -278,6 +278,53 @@ test.describe('the configure log', () => {
     await expect(pane).toContainText('...ignoring')
   })
 
+  // ── the filter has an address (#2413 F17) ─────────────────────────────
+  //
+  // `hostFilter` was `useState`-only, so "the configure log, filtered to this
+  // host" could not be linked to, survive a reload, or be shared -- which
+  // AGENTS.md forbids outright for view state, and this is view state by the
+  // panel's own description: it changes what the pane CONTAINS. It is also the
+  // prerequisite for the result-indicator links, which are all of the form
+  // `?view=configure&host=<name>`.
+
+  test('a host in the URL arrives already filtered, without touching the picker', async ({ page }) => {
+    // The deep-link case, and the one a result-indicator link depends on.
+    await stubRun(page, { body: TAGGED_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure&host=web2`)
+
+    await expect(page.getByTestId('log-hosts-configure')).toHaveValue('web2')
+    const pane = paneText(page)
+    await expect(pane).toContainText('hello from web2')
+    await expect(pane).not.toContainText('hello from web1')
+  })
+
+  test('selecting a host puts it in the URL, and All hosts takes it out', async ({ page }) => {
+    // The other half: a filter nobody can produce a link TO is as unshareable
+    // as one that does not survive a reload.
+    await stubRun(page, { body: TAGGED_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+    await expect(page).not.toHaveURL(/[?&]host=/)
+
+    await page.getByTestId('log-hosts-configure').selectOption('web1')
+    await expect(page).toHaveURL(/[?&]host=web1/)
+    // `view` is not disturbed -- the two params are independent.
+    await expect(page).toHaveURL(/[?&]view=configure/)
+
+    await page.getByTestId('log-hosts-configure').selectOption('')
+    await expect(page).not.toHaveURL(/[?&]host=/)
+  })
+
+  test('a reload keeps the filter, which is the whole point of the param', async ({ page }) => {
+    await stubRun(page, { body: TAGGED_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+    await page.getByTestId('log-hosts-configure').selectOption('db1')
+    await expect(page).toHaveURL(/[?&]host=db1/)
+
+    await page.reload()
+    await expect(page.getByTestId('log-hosts-configure')).toHaveValue('db1')
+    await expect(paneText(page)).toContainText('hello from db1')
+  })
+
   test('falls back to the traditional view when the runner did not tag the log', async ({ page }) => {
     // An older runner image. The switch is simply not offered; the log still
     // renders in full. Showing an empty per-host pane instead would be worse
