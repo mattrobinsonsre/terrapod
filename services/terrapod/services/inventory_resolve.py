@@ -62,6 +62,7 @@ from terrapod.config import settings
 # sides of one run come to disagree about what a configure targeted (#1972).
 # Serialising stays here: that module must import nothing, because the runner
 # image ships no PyYAML (see its docstring).
+from terrapod.services.inventory_provenance import parse_graph
 from terrapod.services.inventory_render import build_inventory_document
 from terrapod.storage.keys import config_version_key, resolved_inventory_key
 
@@ -658,7 +659,36 @@ async def run_ansible_inventory(
     catch. Relative paths in the operator's `ansible.cfg` also resolve against
     the cwd rather than against the config file.
     """
-    argv = [ansible_inventory_binary(), "--list"]
+    out = await _invoke_ansible_inventory(
+        ["--list"], sources, scratch=scratch, limit=limit, cwd=cwd, provenance=provenance
+    )
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError as exc:
+        raise InventoryResolutionFailed(
+            "ansible-inventory produced output that is not JSON"
+        ) from exc
+
+
+async def _invoke_ansible_inventory(
+    action: list[str],
+    sources: list[Path],
+    *,
+    scratch: Path,
+    limit: str | None = None,
+    cwd: Path | None = None,
+    provenance: _InventorySources | None = None,
+) -> bytes:
+    """One producer for the subprocess, so the two actions cannot drift.
+
+    `--list` and `--graph --vars` differ only in the action flags and in how the
+    output is read; everything that decides WHAT ansible sees -- the `-i` order,
+    the cwd, the environment, the timeout, the refusal text -- is the same
+    question and is answered once here. Two copies would be two chances for the
+    attribution run to see a different inventory from the resolution it explains,
+    which is the one way provenance could be confidently wrong.
+    """
+    argv = [ansible_inventory_binary(), *action]
     if limit:
         argv += ["--limit", limit]
     for source in sources:
@@ -684,12 +714,34 @@ async def run_ansible_inventory(
         lead = _refusal_lead(proc.returncode, sources, scratch, provenance)
         raise InventoryResolutionFailed(f"{lead} ansible said: {detail}")
 
-    try:
-        return json.loads(out)
-    except json.JSONDecodeError as exc:
-        raise InventoryResolutionFailed(
-            "ansible-inventory produced output that is not JSON"
-        ) from exc
+    return out
+
+
+async def run_ansible_graph(
+    sources: list[Path],
+    *,
+    scratch: Path,
+    cwd: Path | None = None,
+    provenance: _InventorySources | None = None,
+) -> str:
+    """`ansible-inventory --graph --vars`, as text (#2413 F8).
+
+    The only source of per-LEVEL attribution. Measured against the shipped core
+    2.21.6: `--list` carries no group vars at all -- its output has `children`
+    and `hosts` per group and no `vars` key -- so the JSON cannot say where a
+    variable came from, and `--graph` ignores `--yaml` and `--toml`, both of
+    which emit this same text tree. So the text is not a lazy choice; it is the
+    only form on offer.
+
+    **No `--limit`.** A limited graph would attribute only the variables of the
+    hosts that survived the pattern, and provenance is asked about the inventory
+    rather than about a target set. The resolution it explains may well be
+    limited; the attribution is not.
+    """
+    out = await _invoke_ansible_inventory(
+        ["--graph", "--vars"], sources, scratch=scratch, cwd=cwd, provenance=provenance
+    )
+    return out.decode(errors="replace")
 
 
 # ── Reading ansible's output ─────────────────────────────────────────────────
@@ -1153,7 +1205,13 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
     )
 
 
-async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> dict[str, Any]:
+async def resolve(
+    db,
+    workspace_id: uuid.UUID,
+    *,
+    limit: str | None = None,
+    provenance: bool = False,
+) -> dict[str, Any]:
     """The workspace's inventory, resolved by ansible, cached in Redis.
 
     Reads nothing from, and writes nothing to, any inventory table: the
@@ -1175,7 +1233,10 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
         git_sha = await _resolve_git_sha(db, ws)
 
     rev = await platform_rev(db, workspace_id)
-    key = cache_key(workspace_id, rev, git_sha, limit)
+    # `provenance` is PART OF THE KEY, not a post-filter: the two answers differ
+    # in content, so one entry serving both would hand a provenance reader a
+    # document with no levels in it, or the reverse.
+    key = cache_key(workspace_id, rev, git_sha, limit) + (":prov" if provenance else "")
 
     redis = get_redis_client()
     cached = await redis.get(key)
@@ -1188,6 +1249,7 @@ async def resolve(db, workspace_id: uuid.UUID, *, limit: str | None = None) -> d
         ws=ws,
         git_sha=git_sha,
         limit=limit,
+        want_levels=provenance,
     )
     await redis.setex(key, CACHE_TTL_SECONDS, json.dumps(resolved))
     return resolved
@@ -1322,6 +1384,7 @@ async def _resolve_uncached(
     limit: str | None,
     config_version_id: uuid.UUID | None = None,
     handoff: bool = False,
+    want_levels: bool = False,
 ) -> dict[str, Any]:
     """Render, materialise, run ansible, read the output. One scratch directory.
 
@@ -1395,6 +1458,15 @@ async def _resolve_uncached(
             sources, scratch=workdir, limit=limit, cwd=cwd, provenance=provenance
         )
         resolved = _with_skipped(normalise(document), skipped)
+        if want_levels:
+            # In the SAME scratch directory, over the SAME sources and cwd, so
+            # the attribution cannot describe a different inventory from the
+            # resolution beside it (#2413 F8). A second invocation, which is
+            # why it is opt-in rather than folded into every read -- the same
+            # reasoning `handoff` carries two lines below.
+            resolved["var-levels"] = parse_graph(
+                await run_ansible_graph(sources, scratch=workdir, cwd=cwd, provenance=provenance)
+            )
         if handoff and skipped and provenance is not None:
             resolved = _with_handoff(
                 resolved,

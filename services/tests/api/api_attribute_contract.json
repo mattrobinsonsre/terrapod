@@ -421,7 +421,8 @@
     "groups",
     "host-count",
     "hosts",
-    "limit"
+    "limit",
+    "var-provenance"
   ],
   "module_autodiscovery_rules._preview_json": [
     "entries",

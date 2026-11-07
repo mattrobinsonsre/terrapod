@@ -63,7 +63,17 @@ REAL_GRAPH = """@all:
 """
 
 # From `--list` on the same inventory: bare group names, real JSON types.
-CHILDREN = {"all": ["ungrouped", "prod", "staging"], "prod": ["prod_web", "prod_db"]}
+# From `--list` on the same inventory, AS THE RESOLVED PAYLOAD SERVES IT: bare
+# group names, real JSON types, and **no `all` key** -- `normalise()` drops
+# ansible's implicit root, so a real two-level inventory serves
+# `{"prod": ["prod_web"]}` and nothing above it.
+#
+# The first version of this fixture carried `"all": [...]`, which is what the
+# raw `--list` output has. That made it MORE GENEROUS than the thing it stands
+# for: every unit test passed while the live route credited the host for every
+# global variable, because the ancestry walk could never reach `all`. The
+# fixture has to be what the caller actually hands over.
+CHILDREN = {"prod": ["prod_web", "prod_db"]}
 GROUPS_OF = {"web1": ["prod_web"], "web2": ["prod_web"], "db1": ["prod_db"], "stg1": ["staging"]}
 HOSTVARS = {
     "web1": {
@@ -222,12 +232,28 @@ class TestAttribute:
             effective={"shared": "IDENTICAL"},
             groups_of_node=["prod"],
             at_level=parse_graph(graph),
-            children={"all": ["ungrouped", "prod"]},
+            children={},  # as served: no implicit `all`
         )["shared"]
         # Both levels are in the chain, shallowest first...
         assert [c["level"] for c in got["chain"]] == ["all", "prod"]
         # ...and the DEEPEST is the one credited.
         assert got["origin"] == "prod"
+
+    def test_a_global_variable_is_attributed_to_the_implicit_all(self) -> None:
+        """`all` is rooted implicitly, because the structure never declares it.
+
+        The resolved payload's `group-children` carries only declared nesting --
+        `normalise()` drops ansible's own `all` and `ungrouped` -- so an ancestry
+        walk over it alone stops below `all` and a `group_vars/all` value, which
+        is what a workspace's global vars render to, finds no level and credits
+        the host.
+
+        Measured on a live instance before the fix: `region = eu` came back
+        `origin=here chain=(none)`.
+        """
+        got = _attr("web2")["region"]
+        assert got["origin"] == "all"
+        assert [c["level"] for c in got["chain"]] == ["all"]
 
     def test_a_group_node_with_an_unexplained_value_says_so(self) -> None:
         # For a GROUP the node itself is in the chain, so nothing matching means

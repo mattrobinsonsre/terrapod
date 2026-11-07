@@ -81,6 +81,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import inventory_service as inv
+from terrapod.services.inventory_provenance import attribute as attribute_vars
 from terrapod.services.inventory_resolution import InventoryValidationError
 from terrapod.services.inventory_resolve import (
     AnsibleUnavailable,
@@ -1384,6 +1385,7 @@ for _kind in _VAR_KINDS:
 async def show_resolved_inventory(
     workspace_id: str = Path(...),
     limit: str | None = None,
+    provenance: bool = False,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -1415,7 +1417,7 @@ async def show_resolved_inventory(
         raise HTTPException(status_code=422, detail="limit must be a string")
 
     try:
-        resolved = await resolve_inventory(db, ws.id, limit=limit or None)
+        resolved = await resolve_inventory(db, ws.id, limit=limit or None, provenance=provenance)
     except InventorySourceRefused as exc:
         # 422, not 503: the resolution did not fail, it was declined, and the
         # operator has something to do about it.
@@ -1449,6 +1451,30 @@ async def show_resolved_inventory(
     }
     if limit:
         attrs["limit"] = limit
+
+    if provenance:
+        # Attributed HERE rather than handed over raw, so no consumer
+        # re-implements the walk (#2413 F8). The levels are ansible's own
+        # answer; turning them into "which level supplied this value" is one
+        # derivation and it belongs in one place.
+        levels = resolved.get("var-levels") or {}
+        children = resolved.get("children", {}) or {}
+        groups_of: dict[str, list[str]] = {}
+        for group, members in groups.items():
+            for host in members:
+                groups_of.setdefault(host, []).append(group)
+        attrs["var-provenance"] = {
+            host: attribute_vars(
+                node=host,
+                is_host=True,
+                effective=host_vars or {},
+                groups_of_node=groups_of.get(host, []),
+                at_level=levels,
+                children=children,
+            )
+            for host, host_vars in hosts.items()
+        }
+
     return JSONResponse(
         content={
             "data": {
