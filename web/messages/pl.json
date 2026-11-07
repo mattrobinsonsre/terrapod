@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Zastosuj limit",
         "limitClear": "Wyczyść",
-        "limitApplied": "Ograniczono do {limit}. Wszystko poniżej to, co obejmuje ten wzorzec."
+        "limitApplied": "Ograniczono do {limit}. Wszystko poniżej to, co obejmuje ten wzorzec.",
+        "treeHeading": "Struktura",
+        "ungroupedHeading": "Hosty bez grupy",
+        "varsHeading": "Rozwiązane zmienne",
+        "varsHeadingFor": "Rozwiązane zmienne — {node}",
+        "selectPrompt": "Wybierz host, aby zobaczyć jego zmienne i pochodzenie każdej z nich.",
+        "groupHasNoOwnVars": "Ansible scala zmienne grupy w każdy z jej hostów, więc grupa nie ma własnych rozwiązanych zmiennych. Jej bezpośrednie hosty:",
+        "originHere": "ustawiona na tym hoście",
+        "originGroup": "z {group}",
+        "originUnknown": "źródła nie da się ustalić",
+        "originBeat": "(wygrywa z {levels})"
       },
       "errors": {
         "load": "Nie udało się wczytać inwentarza",

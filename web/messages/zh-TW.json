@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "套用 limit",
         "limitClear": "清除",
-        "limitApplied": "已限定為 {limit}。下方的內容全部是該模式所選取的。"
+        "limitApplied": "已限定為 {limit}。下方的內容全部是該模式所選取的。",
+        "treeHeading": "結構",
+        "ungroupedHeading": "未分組主機",
+        "varsHeading": "已解析變數",
+        "varsHeadingFor": "已解析變數 — {node}",
+        "selectPrompt": "選擇一台主機以查看其變數及每個變數的來源。",
+        "groupHasNoOwnVars": "Ansible 會將群組的變數合併到其每台主機中，因此群組本身沒有已解析的變數。其直接主機：",
+        "originHere": "在此主機上設定",
+        "originGroup": "來自 {group}",
+        "originUnknown": "無法判定來源",
+        "originBeat": "（覆蓋 {levels}）"
       },
       "errors": {
         "load": "載入清單失敗",

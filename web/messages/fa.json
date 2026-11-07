@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "اعمال limit",
         "limitClear": "پاک کردن",
-        "limitApplied": "محدود به {limit}. هر چه پایین‌تر است همان است که آن الگو هدف می‌گیرد."
+        "limitApplied": "محدود به {limit}. هر چه پایین‌تر است همان است که آن الگو هدف می‌گیرد.",
+        "treeHeading": "ساختار",
+        "ungroupedHeading": "میزبان‌های بدون گروه",
+        "varsHeading": "متغیرهای حل‌شده",
+        "varsHeadingFor": "متغیرهای حل‌شده — {node}",
+        "selectPrompt": "یک میزبان را انتخاب کنید تا متغیرهای آن و منبع هر یک را ببینید.",
+        "groupHasNoOwnVars": "Ansible متغیرهای یک گروه را در هر یک از میزبان‌های آن ادغام می‌کند، بنابراین گروه متغیر حل‌شدهٔ مستقلی ندارد. میزبان‌های مستقیم آن:",
+        "originHere": "روی این میزبان تنظیم شده",
+        "originGroup": "از {group}",
+        "originUnknown": "منبع قابل انتساب نیست",
+        "originBeat": "({levels} را نقض می‌کند)"
       },
       "errors": {
         "load": "بارگذاری موجودی ناموفق بود",

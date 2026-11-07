@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Tillämpa limit",
         "limitClear": "Rensa",
-        "limitApplied": "Begränsat till {limit}. Allt nedan är vad det mönstret träffar."
+        "limitApplied": "Begränsat till {limit}. Allt nedan är vad det mönstret träffar.",
+        "treeHeading": "Struktur",
+        "ungroupedHeading": "Värdar utan grupp",
+        "varsHeading": "Upplösta variabler",
+        "varsHeadingFor": "Upplösta variabler — {node}",
+        "selectPrompt": "Välj en värd för att se dess variabler och var var och en kommer från.",
+        "groupHasNoOwnVars": "Ansible slår samman en grupps variabler i var och en av dess värdar, så en grupp har inga egna upplösta variabler. Dess direkta värdar:",
+        "originHere": "satt på denna värd",
+        "originGroup": "från {group}",
+        "originUnknown": "källan kan inte härledas",
+        "originBeat": "(slår {levels})"
       },
       "errors": {
         "load": "Det gick inte att läsa in inventariet",

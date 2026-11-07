@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "limit 적용",
         "limitClear": "지우기",
-        "limitApplied": "{limit}(으)로 제한했습니다. 아래의 모든 것이 그 패턴이 대상으로 하는 것입니다."
+        "limitApplied": "{limit}(으)로 제한했습니다. 아래의 모든 것이 그 패턴이 대상으로 하는 것입니다.",
+        "treeHeading": "구조",
+        "ungroupedHeading": "그룹이 없는 호스트",
+        "varsHeading": "확인된 변수",
+        "varsHeadingFor": "확인된 변수 — {node}",
+        "selectPrompt": "호스트를 선택하면 변수와 각 변수의 출처가 표시됩니다.",
+        "groupHasNoOwnVars": "Ansible은 그룹의 변수를 각 호스트에 병합하므로 그룹 자체에는 확인된 변수가 없습니다. 직접 속한 호스트:",
+        "originHere": "이 호스트에서 설정",
+        "originGroup": "{group}에서",
+        "originUnknown": "출처를 확인할 수 없음",
+        "originBeat": "({levels}을(를) 재정의)"
       },
       "errors": {
         "load": "인벤토리를 불러오지 못했습니다",

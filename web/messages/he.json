@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "החלת ההגבלה",
         "limitClear": "ניקוי",
-        "limitApplied": "מוגבל ל-{limit}. כל מה שלמטה הוא מה שהתבנית הזו מכוונת אליו."
+        "limitApplied": "מוגבל ל-{limit}. כל מה שלמטה הוא מה שהתבנית הזו מכוונת אליו.",
+        "treeHeading": "מבנה",
+        "ungroupedHeading": "מאחסנים ללא קבוצה",
+        "varsHeading": "משתנים מיושבים",
+        "varsHeadingFor": "משתנים מיושבים — {node}",
+        "selectPrompt": "בחר מאחסן כדי לראות את המשתנים שלו ואת מקור כל אחד מהם.",
+        "groupHasNoOwnVars": "Ansible ממזג את משתני הקבוצה לכל אחד מהמאחסנים שלה, כך שלקבוצה אין משתנים מיושבים משל עצמה. המאחסנים הישירים שלה:",
+        "originHere": "הוגדר על מאחסן זה",
+        "originGroup": "מתוך {group}",
+        "originUnknown": "לא ניתן לשייך מקור",
+        "originBeat": "(גובר על {levels})"
       },
       "errors": {
         "load": "טעינת המלאי נכשלה",

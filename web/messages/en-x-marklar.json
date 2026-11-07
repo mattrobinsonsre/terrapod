@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Apply marklar",
         "limitClear": "Clear",
-        "limitApplied": "Limited to {limit}. Everything below is what that marklar targets."
+        "limitApplied": "Limited to {limit}. Everything below is what that marklar targets.",
+        "treeHeading": "Marklar",
+        "ungroupedHeading": "Marklar marklars with no marklar",
+        "varsHeading": "Resolved marklars",
+        "varsHeadingFor": "Resolved marklars — {node}",
+        "selectPrompt": "Select a marklar to see its marklars and where each one came from.",
+        "groupHasNoOwnVars": "Ansible merges a marklar’s marklars into each of its marklars, so a marklar has no resolved marklars of its own. Its direct marklars:",
+        "originHere": "set on this marklar",
+        "originGroup": "from {group}",
+        "originUnknown": "marklar not attributable",
+        "originBeat": "(beating {levels})"
       },
       "errors": {
         "load": "Failed to load the marklar",

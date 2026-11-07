@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Cymhwyso’r limit",
         "limitClear": "Clirio",
-        "limitApplied": "Wedi’i gyfyngu i {limit}. Mae popeth isod yn yr hyn y mae’r patrwm hwnnw’n ei dargedu."
+        "limitApplied": "Wedi’i gyfyngu i {limit}. Mae popeth isod yn yr hyn y mae’r patrwm hwnnw’n ei dargedu.",
+        "treeHeading": "Strwythur",
+        "ungroupedHeading": "Gwesteiwyr heb grŵp",
+        "varsHeading": "Newidynnau datrysedig",
+        "varsHeadingFor": "Newidynnau datrysedig — {node}",
+        "selectPrompt": "Dewiswch westeiwr i weld ei newidynnau a tharddiad pob un.",
+        "groupHasNoOwnVars": "Mae Ansible yn cyfuno newidynnau grŵp i bob un o’i westeiwyr, felly nid oes gan grŵp newidynnau datrysedig ei hun. Ei westeiwyr uniongyrchol:",
+        "originHere": "gosodwyd ar y gwesteiwr hwn",
+        "originGroup": "o {group}",
+        "originUnknown": "ni ellir priodoli’r ffynhonnell",
+        "originBeat": "(yn trechu {levels})"
       },
       "errors": {
         "load": "Methwyd llwytho’r rhestr eiddo",

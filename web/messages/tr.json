@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Limiti uygula",
         "limitClear": "Temizle",
-        "limitApplied": "{limit} ile sınırlandı. Aşağıdaki her şey, bu desenin hedeflediğidir."
+        "limitApplied": "{limit} ile sınırlandı. Aşağıdaki her şey, bu desenin hedeflediğidir.",
+        "treeHeading": "Yapı",
+        "ungroupedHeading": "Grubu olmayan ana makineler",
+        "varsHeading": "Çözümlenen değişkenler",
+        "varsHeadingFor": "Çözümlenen değişkenler — {node}",
+        "selectPrompt": "Değişkenlerini ve her birinin kaynağını görmek için bir ana makine seçin.",
+        "groupHasNoOwnVars": "Ansible bir grubun değişkenlerini her ana makinesine birleştirir, bu nedenle bir grubun kendine ait çözümlenmiş değişkeni yoktur. Doğrudan ana makineleri:",
+        "originHere": "bu ana makinede ayarlandı",
+        "originGroup": "{group} kaynağından",
+        "originUnknown": "kaynak atfedilemiyor",
+        "originBeat": "({levels} yerine geçer)"
       },
       "errors": {
         "load": "Envanter yüklenemedi",

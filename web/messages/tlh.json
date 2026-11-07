@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "per lan",
         "limitClear": "teq",
-        "limitApplied": "{limit} per lanlu''. bIngDaq Hoch, per SIchbogh."
+        "limitApplied": "{limit} per lanlu''. bIngDaq Hoch, per SIchbogh.",
+        "treeHeading": "naghHom",
+        "ungroupedHeading": "ghom Hutlhbogh De'wI'mey",
+        "varsHeading": "bopbogh chenmoHwI'mey",
+        "varsHeadingFor": "bopbogh chenmoHwI'mey — {node}",
+        "selectPrompt": "De'wI' wIv 'ej chenmoHwI'meyDaj mojaqmeyDaj je legh.",
+        "groupHasNoOwnVars": "ghom chenmoHwI'mey De'wI'Daj Hoch Ansible muv, vaj ghom chenmoHwI'mey Daj Hutlh. De'wI'meyDaj:",
+        "originHere": "De'wI'vamDaq lan",
+        "originGroup": "{group} vo'",
+        "originUnknown": "mojaq Sovbe'lu'",
+        "originBeat": "({levels} jey)"
       },
       "errors": {
         "load": "tetlh ghelmeH lujpu''",

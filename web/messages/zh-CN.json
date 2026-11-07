@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "应用 limit",
         "limitClear": "清除",
-        "limitApplied": "已限定为 {limit}。下方的内容全部是该模式所选中的。"
+        "limitApplied": "已限定为 {limit}。下方的内容全部是该模式所选中的。",
+        "treeHeading": "结构",
+        "ungroupedHeading": "未分组主机",
+        "varsHeading": "已解析变量",
+        "varsHeadingFor": "已解析变量 — {node}",
+        "selectPrompt": "选择一台主机以查看其变量及每个变量的来源。",
+        "groupHasNoOwnVars": "Ansible 会将组的变量合并到其每台主机中，因此组本身没有已解析的变量。其直接主机：",
+        "originHere": "在此主机上设置",
+        "originGroup": "来自 {group}",
+        "originUnknown": "无法确定来源",
+        "originBeat": "（覆盖 {levels}）"
       },
       "errors": {
         "load": "加载清单失败",

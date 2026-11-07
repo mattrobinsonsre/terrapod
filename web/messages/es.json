@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Aplicar límite",
         "limitClear": "Borrar",
-        "limitApplied": "Limitado a {limit}. Todo lo que hay debajo es a lo que apunta ese patrón."
+        "limitApplied": "Limitado a {limit}. Todo lo que hay debajo es a lo que apunta ese patrón.",
+        "treeHeading": "Estructura",
+        "ungroupedHeading": "Hosts sin grupo",
+        "varsHeading": "Variables resueltas",
+        "varsHeadingFor": "Variables resueltas — {node}",
+        "selectPrompt": "Seleccione un host para ver sus variables y de dónde proviene cada una.",
+        "groupHasNoOwnVars": "Ansible fusiona las variables de un grupo en cada uno de sus hosts, por lo que un grupo no tiene variables resueltas propias. Sus hosts directos:",
+        "originHere": "definida en este host",
+        "originGroup": "desde {group}",
+        "originUnknown": "origen no atribuible",
+        "originBeat": "(prevalece sobre {levels})"
       },
       "errors": {
         "load": "No se pudo cargar el inventario",

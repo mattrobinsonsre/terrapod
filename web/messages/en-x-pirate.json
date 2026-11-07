@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Lay th'' limit on",
         "limitClear": "Strike it",
-        "limitApplied": "Held to {limit}. All below be what that pattern strikes."
+        "limitApplied": "Held to {limit}. All below be what that pattern strikes.",
+        "treeHeading": "Riggin’",
+        "ungroupedHeading": "Hosts wi’ no crew",
+        "varsHeading": "Settled vittles",
+        "varsHeadingFor": "Settled vittles — {node}",
+        "selectPrompt": "Pick a host t’ see its vittles an’ whence each one came.",
+        "groupHasNoOwnVars": "Ansible pours a crew’s vittles into every host o’ that crew, so a crew has no settled vittles o’ its own. Its own hosts:",
+        "originHere": "set upon this host",
+        "originGroup": "outta {group}",
+        "originUnknown": "whence it came be unknown",
+        "originBeat": "(besting {levels})"
       },
       "errors": {
         "load": "Could not fetch th'' manifest",

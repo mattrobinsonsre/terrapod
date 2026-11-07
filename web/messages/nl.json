@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Limit toepassen",
         "limitClear": "Wissen",
-        "limitApplied": "Beperkt tot {limit}. Alles hieronder is wat dat patroon selecteert."
+        "limitApplied": "Beperkt tot {limit}. Alles hieronder is wat dat patroon selecteert.",
+        "treeHeading": "Structuur",
+        "ungroupedHeading": "Hosts zonder groep",
+        "varsHeading": "Opgeloste variabelen",
+        "varsHeadingFor": "Opgeloste variabelen — {node}",
+        "selectPrompt": "Selecteer een host om de variabelen en hun herkomst te zien.",
+        "groupHasNoOwnVars": "Ansible voegt de variabelen van een groep samen in elk van haar hosts, dus een groep heeft geen eigen opgeloste variabelen. Haar directe hosts:",
+        "originHere": "ingesteld op deze host",
+        "originGroup": "uit {group}",
+        "originUnknown": "bron niet toe te wijzen",
+        "originBeat": "(verslaat {levels})"
       },
       "errors": {
         "load": "Kan de inventaris niet laden",

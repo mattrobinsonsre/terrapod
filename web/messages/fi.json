@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Käytä rajausta",
         "limitClear": "Tyhjennä",
-        "limitApplied": "Rajattu kuviolla {limit}. Kaikki alla oleva on se, mihin kuvio kohdistuu."
+        "limitApplied": "Rajattu kuviolla {limit}. Kaikki alla oleva on se, mihin kuvio kohdistuu.",
+        "treeHeading": "Rakenne",
+        "ungroupedHeading": "Ryhmättömät isännät",
+        "varsHeading": "Ratkaistut muuttujat",
+        "varsHeadingFor": "Ratkaistut muuttujat — {node}",
+        "selectPrompt": "Valitse isäntä nähdäksesi sen muuttujat ja kunkin alkuperän.",
+        "groupHasNoOwnVars": "Ansible yhdistää ryhmän muuttujat jokaiseen sen isäntään, joten ryhmällä ei ole omia ratkaistuja muuttujia. Sen suorat isännät:",
+        "originHere": "asetettu tällä isännällä",
+        "originGroup": "lähteestä {group}",
+        "originUnknown": "lähdettä ei voi määrittää",
+        "originBeat": "(voittaa {levels})"
       },
       "errors": {
         "load": "Inventaarion lataaminen epäonnistui",

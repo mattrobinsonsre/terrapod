@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "limit を適用",
         "limitClear": "クリア",
-        "limitApplied": "{limit} に絞り込んでいます。以下はそのパターンが対象とするものすべてです。"
+        "limitApplied": "{limit} に絞り込んでいます。以下はそのパターンが対象とするものすべてです。",
+        "treeHeading": "構造",
+        "ungroupedHeading": "グループ未所属のホスト",
+        "varsHeading": "解決済み変数",
+        "varsHeadingFor": "解決済み変数 — {node}",
+        "selectPrompt": "ホストを選択すると、その変数と各変数の出所が表示されます。",
+        "groupHasNoOwnVars": "Ansible はグループの変数を各ホストに統合するため、グループ自体には解決済み変数がありません。直接所属するホスト:",
+        "originHere": "このホストで設定",
+        "originGroup": "{group} から",
+        "originUnknown": "出所を特定できません",
+        "originBeat": "({levels} を上書き)"
       },
       "errors": {
         "load": "インベントリの読み込みに失敗しました",

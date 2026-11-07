@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Použít limit",
         "limitClear": "Vymazat",
-        "limitApplied": "Omezeno na {limit}. Vše níže je to, na co tento vzor míří."
+        "limitApplied": "Omezeno na {limit}. Vše níže je to, na co tento vzor míří.",
+        "treeHeading": "Struktura",
+        "ungroupedHeading": "Hosty bez skupiny",
+        "varsHeading": "Vyřešené proměnné",
+        "varsHeadingFor": "Vyřešené proměnné — {node}",
+        "selectPrompt": "Vyberte hosta, abyste viděli jeho proměnné a původ každé z nich.",
+        "groupHasNoOwnVars": "Ansible slučuje proměnné skupiny do každého z jejích hostů, takže skupina nemá vlastní vyřešené proměnné. Její přímí hosté:",
+        "originHere": "nastaveno na tomto hostovi",
+        "originGroup": "z {group}",
+        "originUnknown": "zdroj nelze určit",
+        "originBeat": "(přebíjí {levels})"
       },
       "errors": {
         "load": "Nepodařilo se načíst inventář",

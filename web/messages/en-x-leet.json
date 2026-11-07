@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "w3b:!w3b-2",
         "limitApply": "4pply l1m17",
         "limitClear": "Cl34r",
-        "limitApplied": "L1m173d 70 {limit}. 3v3ry7h1ng b3l0w 15 wh47 7h47 p4773rn 74rg375."
+        "limitApplied": "L1m173d 70 {limit}. 3v3ry7h1ng b3l0w 15 wh47 7h47 p4773rn 74rg375.",
+        "treeHeading": "57ruc7ur3",
+        "ungroupedHeading": "Ungr0up3d h0575",
+        "varsHeading": "R350lv3d v4r14bl35",
+        "varsHeadingFor": "R350lv3d v4r14bl35 — {node}",
+        "selectPrompt": "53l3c7 4 h057 70 533 175 v4r14bl35 4nd wh3r3 34ch 0n3 c4m3 fr0m.",
+        "groupHasNoOwnVars": "4n51bl3 m3rg35 4 gr0up'5 v4r14bl35 1n70 34ch 0f 175 h0575, 50 4 gr0up h45 n0 r350lv3d v4r14bl35 0f 175 0wn. 175 d1r3c7 h0575:",
+        "originHere": "537 0n 7h15 h057",
+        "originGroup": "fr0m {group}",
+        "originUnknown": "50urc3 n07 477r1bu74bl3",
+        "originBeat": "(b3471ng {levels})"
       },
       "errors": {
         "load": "F41l3d 70 l04d 7h3 1nv3n70ry",

@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Aplicar o limite",
         "limitClear": "Limpar",
-        "limitApplied": "Limitado a {limit}. Tudo o que está abaixo é o que esse padrão seleciona."
+        "limitApplied": "Limitado a {limit}. Tudo o que está abaixo é o que esse padrão seleciona.",
+        "treeHeading": "Estrutura",
+        "ungroupedHeading": "Anfitriões sem grupo",
+        "varsHeading": "Variáveis resolvidas",
+        "varsHeadingFor": "Variáveis resolvidas — {node}",
+        "selectPrompt": "Selecione um anfitrião para ver as suas variáveis e a origem de cada uma.",
+        "groupHasNoOwnVars": "O Ansible funde as variáveis de um grupo em cada um dos seus anfitriões, pelo que um grupo não tem variáveis resolvidas próprias. Os seus anfitriões diretos:",
+        "originHere": "definida neste anfitrião",
+        "originGroup": "de {group}",
+        "originUnknown": "origem não atribuível",
+        "originBeat": "(prevalece sobre {levels})"
       },
       "errors": {
         "load": "Falha ao carregar o inventário",

@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Do teh limit",
         "limitClear": "Wipe it",
-        "limitApplied": "Limitd 2 {limit}. Evrythin down ther is wut dat patturn hitz."
+        "limitApplied": "Limitd 2 {limit}. Evrythin down ther is wut dat patturn hitz.",
+        "treeHeading": "SHAEP OV TEH THING",
+        "ungroupedHeading": "HOSTZ WIF NO GRUPE",
+        "varsHeading": "SORTD OUT VARIABLZ",
+        "varsHeadingFor": "SORTD OUT VARIABLZ — {node}",
+        "selectPrompt": "PIK A HOST 2 SEE ITS VARIABLZ AN WHERE EECH WUN COMD FROM.",
+        "groupHasNoOwnVars": "ANSIBLE SMOOSHZ A GRUPES VARIABLZ IN2 EVRY HOST OV DAT GRUPE, SO A GRUPE HAZ NO SORTD OUT VARIABLZ OV ITS OWN. ITS OWN HOSTZ:",
+        "originHere": "SETTD ON DIS HOST",
+        "originGroup": "FROM {group}",
+        "originUnknown": "CANT TELL WHERE IT COMD FROM",
+        "originBeat": "(BEATD {levels})"
       },
       "errors": {
         "load": "Culdnt get teh inventree",

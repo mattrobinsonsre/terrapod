@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "Anvend limit",
         "limitClear": "Ryd",
-        "limitApplied": "Begrænset til {limit}. Alt nedenfor er, hvad det mønster rammer."
+        "limitApplied": "Begrænset til {limit}. Alt nedenfor er, hvad det mønster rammer.",
+        "treeHeading": "Struktur",
+        "ungroupedHeading": "Værter uden gruppe",
+        "varsHeading": "Opløste variabler",
+        "varsHeadingFor": "Opløste variabler — {node}",
+        "selectPrompt": "Vælg en vært for at se dens variabler, og hvor hver af dem kommer fra.",
+        "groupHasNoOwnVars": "Ansible fletter en gruppes variabler ind i hver af dens værter, så en gruppe har ingen egne opløste variabler. Dens direkte værter:",
+        "originHere": "sat på denne vært",
+        "originGroup": "fra {group}",
+        "originUnknown": "kilden kan ikke henføres",
+        "originBeat": "(slår {levels})"
       },
       "errors": {
         "load": "Kunne ikke indlæse inventaret",

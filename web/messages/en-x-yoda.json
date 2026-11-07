@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "The limit, apply",
         "limitClear": "Clear",
-        "limitApplied": "To {limit}, limited. What that pattern targets, everything below is."
+        "limitApplied": "To {limit}, limited. What that pattern targets, everything below is.",
+        "treeHeading": "Structure, the",
+        "ungroupedHeading": "Hosts ungrouped, these are",
+        "varsHeading": "Variables resolved, these are",
+        "varsHeadingFor": "Variables resolved — {node}",
+        "selectPrompt": "A host select, and its variables and whence each came, see you will.",
+        "groupHasNoOwnVars": "Into each of its hosts a group’s variables Ansible merges, so resolved variables of its own a group has not. Its direct hosts, these are:",
+        "originHere": "on this host, set it was",
+        "originGroup": "from {group}, it comes",
+        "originUnknown": "attributed, the source cannot be",
+        "originBeat": "(beaten, {levels} were)"
       },
       "errors": {
         "load": "Load the inventory, we could not",

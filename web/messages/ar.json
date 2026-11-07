@@ -3125,7 +3125,17 @@
         "limitPlaceholder": "web:!web-2",
         "limitApply": "تطبيق الحدّ",
         "limitClear": "مسح",
-        "limitApplied": "محدود إلى {limit}. وكل ما يلي هو ما يستهدفه هذا النمط."
+        "limitApplied": "محدود إلى {limit}. وكل ما يلي هو ما يستهدفه هذا النمط.",
+        "treeHeading": "البنية",
+        "ungroupedHeading": "مضيفون بلا مجموعة",
+        "varsHeading": "المتغيّرات المحسومة",
+        "varsHeadingFor": "المتغيّرات المحسومة — {node}",
+        "selectPrompt": "اختر مضيفًا لعرض متغيّراته ومصدر كل منها.",
+        "groupHasNoOwnVars": "يدمج Ansible متغيّرات المجموعة في كل مضيف من مضيفيها، لذا لا تملك المجموعة متغيّرات محسومة خاصة بها. مضيفوها المباشرون:",
+        "originHere": "مُعيَّن على هذا المضيف",
+        "originGroup": "من {group}",
+        "originUnknown": "المصدر غير قابل للعزو",
+        "originBeat": "(يتجاوز {levels})"
       },
       "errors": {
         "load": "فشل تحميل المخزون",
