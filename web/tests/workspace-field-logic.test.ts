@@ -26,6 +26,8 @@
 //
 // Run with: npm run test:unit
 
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -255,4 +257,86 @@ test('both predicates fail closed on an attribute nothing describes', () => {
   // A control nothing declares must not render and must not be editable.
   assert.equal(fieldApplies('no-such-attribute', 'terraform'), false)
   assert.equal(fieldGateMet('no-such-attribute', {}), false)
+})
+
+// ---------------------------------------------------------------------------
+// The gate reaches a BESPOKE control too (#2413 F20).
+//
+// `Field` accepts a `control` prop for the editors the primitives cannot
+// express -- the per-row path lists, the version datalists, the labels editor,
+// the Enabled/Disabled toggles. A bespoke control builds its own `<input>`, so
+// `Control`'s `disabled` cannot reach it, and 38 call sites across the two
+// forms pass one. That is a RENDER property rather than a pure one, so it is
+// asserted against the implementation: the e2e caught the two configure
+// triggers rendering under F20 and accepting input, after every pure test
+// above passed.
+//
+// Measured (Playwright, real Chromium, with a positive control): a control
+// with no `disabled` of its own inside `<fieldset disabled>` satisfies
+// `toBeDisabled()`, while `input.disabled` is `false` -- the IDL property does
+// not inherit and the CSS `:disabled` definition does. So a test asserting
+// `.disabled` on the element would report the opposite of the truth.
+
+const GROUPS_SRC = readFileSync(
+  join(import.meta.dirname, '..', 'src', 'components', 'workspace-field-groups.tsx'),
+  'utf8',
+)
+
+test('WsField is rendered only by Field, so the gate has no bypass', () => {
+  // The whole reason `Field` can be the chokepoint. Reaching for the lower
+  // primitive directly would render a label and a control with no gate and no
+  // engine check, and nothing else would notice.
+  const files = readdirSync(join(import.meta.dirname, '..', 'src'), {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter((d) => d.isFile() && d.name.endsWith('.tsx'))
+    .map((d) => join(d.parentPath, d.name))
+  // Line comments stripped first: a comment ABOUT the chokepoint must not
+  // fail the gate that guards it, or the lesson is "edit the test".
+  const users = files.filter((f) =>
+    readFileSync(f, 'utf8')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .includes('<WsField'),
+  )
+  assert.deepEqual(
+    users.map((f) => f.split('/').pop()),
+    ['workspace-field-groups.tsx'],
+    'a second WsField caller is a control with no gate -- render it through Field',
+  )
+})
+
+test('a bespoke control is rendered under the gate, never bare', () => {
+  // `{control ?? (<Control .../>)}` is the ungated form this replaces: it
+  // hands the caller's own input straight to `WsField`, so `fieldGateMet` is
+  // consulted for a primitive and skipped for everything bespoke.
+  assert.ok(
+    !GROUPS_SRC.includes('{control ?? ('),
+    'the bare `control ??` form is back -- a bespoke control now escapes the gate',
+  )
+  assert.match(
+    GROUPS_SRC,
+    /\{control \?[\s\S]{0,40}gateMet \?/,
+    'the bespoke branch must choose on gateMet',
+  )
+  assert.match(
+    GROUPS_SRC,
+    /<fieldset disabled className="min-w-0/,
+    'the gated-off branch must wrap in a disabled fieldset, and keep min-w-0: a ' +
+      'fieldset defaults to min-inline-size: min-content and will not shrink at phone width',
+  )
+})
+
+test('the two forms really do pass bespoke controls, so the gate does work', () => {
+  // A floor. Without it the assertions above pass on a tree where nothing
+  // passes `control` at all, which is the shape that makes a gate decorative.
+  const callers = [
+    join(import.meta.dirname, '..', 'src', 'app', 'workspaces', 'page.tsx'),
+    join(import.meta.dirname, '..', 'src', 'app', 'workspaces', '[id]', 'page.tsx'),
+  ]
+  const total = callers.reduce(
+    (n, f) => n + (readFileSync(f, 'utf8').match(/control=\{/g) ?? []).length,
+    0,
+  )
+  assert.ok(total >= 30, `only ${total} bespoke controls found -- expected the two forms' ~38`)
 })

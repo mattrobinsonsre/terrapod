@@ -2793,8 +2793,19 @@ function WorkspaceDetailContent() {
    *  both grid columns, which keep their own `sm:col-span-2` wrapper because
    *  `WsField` has no way to widen one — a list editor squeezed into half a
    *  row is a worse outcome than a hand-written wrapper. */
-  const settingsShows = (attr: string): boolean =>
+  const settingsGateMet = (attr: string): boolean =>
     dependencyMet(FIELD_BY_ATTR[attr], settingsValues)
+
+  /** Whether the trigger-prefix editor accepts input.
+   *
+   *  Its own const because that editor is three hand-written controls rather
+   *  than a `Field`, and a `<dl>` forbids a `<fieldset>` between itself and
+   *  its `dt`/`dd` -- so the single disabled wrapper the `Field` chokepoint
+   *  uses for a bespoke control is not available here and each control has to
+   *  carry the gate. Opacity alone was NOT enough: it looked disabled and
+   *  still accepted clicks, which is exactly the defect #2413 F20's own e2e
+   *  caught on the two configure triggers. */
+  const prefixesEditable = !saving && settingsGateMet('trigger-prefixes')
 
   /** The Enabled/Disabled toggle every boolean in this card renders.
    *
@@ -3904,7 +3915,9 @@ function WorkspaceDetailContent() {
                       </dd>
                     </div>
                   )}
-                  {settingsShows('trigger-prefixes') && (
+                  {/* Rendered whatever the gate says (#2413 F20): a VCS-less
+                      workspace shows the field disabled, because an operator
+                      learns the option exists by seeing it. */}
                     <div className="sm:col-span-2 min-w-0">
                       <dt className="text-xs text-slate-500 mb-1">{t('fields.triggerPrefixes')}</dt>
                       {settingsEditing ? (
@@ -3914,8 +3927,9 @@ function WorkspaceDetailContent() {
                             <div key={f} className="flex items-center gap-2">
                               <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
                               <button
+                                disabled={!prefixesEditable}
                                 onClick={() => setEditTriggerPrefixes(editTriggerPrefixes.filter((_, j) => j !== i))}
-                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               >{t('actions.remove')}</button>
                             </div>
                           ))}
@@ -3935,7 +3949,8 @@ function WorkspaceDetailContent() {
                                 }
                               }}
                               placeholder={t('fields.triggerPrefixesPlaceholder')}
-                              className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                              disabled={!prefixesEditable}
+                              className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <button
                               onClick={() => {
@@ -3947,7 +3962,8 @@ function WorkspaceDetailContent() {
                                   setNewTriggerPrefix('')
                                 }
                               }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
+                              disabled={!prefixesEditable}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             >{t('actions.add')}</button>
                           </div>
                         </dd>
@@ -3965,7 +3981,6 @@ function WorkspaceDetailContent() {
                         </dd>
                       )}
                     </div>
-                  )}
                 </Group>
 
                 {/* Terraform's alone (#1561): the rules are globs over

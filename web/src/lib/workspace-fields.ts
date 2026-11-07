@@ -51,10 +51,17 @@
 // definition list and the create form is a roomier standalone form -- and
 // collapsing them would change the look of both surfaces in a change that is
 // supposed to be about structure.
+//
+// Both carry a visible disabled state, which #2413 F20 made load-bearing
+// rather than cosmetic: a field whose gate is off is now RENDERED instead of
+// removed, so the operator has to be able to see that it cannot be typed into.
+// Without this the dark-theme native disabled rendering is nearly
+// indistinguishable from an ordinary input, and "disabled but visible" reads
+// as "enabled and ignoring me".
 export const EDIT_INPUT =
-  'mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500'
+  'mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed'
 export const CREATE_INPUT =
-  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
 
 /**
  * Which form is rendering.
