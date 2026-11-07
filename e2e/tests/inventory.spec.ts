@@ -284,16 +284,44 @@ test.describe('Workspace Inventory tab', () => {
     await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)
     await expect(page.getByText(/This resolution dates from/i)).toHaveCount(0)
 
-    // A host's resolved variables, after the merge.
-    await expect(page.getByText(/ansible_user=deploy/).first()).toBeVisible()
+    // ── the structure is a TREE, and a variable says where it came from ──
+    //
+    // This replaces three assertions on the old display: `ansible_user=deploy`
+    // (a space-joined `k=v` run), and the two separate `Group membership` /
+    // `Group nesting` headings. One tree carries all of it, and carries the
+    // nesting TRANSITIVELY -- which the old nesting display could not, showing
+    // one hop while its own hint promised reach (#2413 F8).
+    await expect(page.getByTestId('inv-tree-group-frontend')).toBeVisible()
+    await expect(page.getByTestId('inv-tree-group-web')).toBeVisible()
+    // `web-1` is two levels down: frontend > web > web-1. Its presence is the
+    // transitive claim.
+    await expect(page.getByTestId('inv-tree-host-web-1')).toBeVisible()
+    await expect(page.getByTestId('inv-tree-host-web-2')).toBeVisible()
 
-    // Direct membership only, said in as many words — and the nesting rendered
-    // beside it, so `frontend` reporting no hosts of its own cannot be read as
-    // "frontend is empty".
-    await expect(page.getByRole('heading', { name: 'Group membership' })).toBeVisible()
-    await expect(page.getByText(/Direct membership only/i)).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Group nesting' })).toBeVisible()
-    await expect(page.getByText('frontend').filter({ visible: true }).first()).toBeVisible()
+    // Nothing is selected yet, so the view asks rather than guessing.
+    await expect(page.getByTestId('inv-node-vars')).toHaveCount(0)
+
+    await page.getByTestId('inv-tree-host-web-1').click()
+
+    // YAML, so a value is quoted and cannot be misread -- the whole of the
+    // ambiguity the old display had.
+    const vars = page.getByTestId('inv-node-vars')
+    await expect(vars).toBeVisible()
+    await expect(vars).toContainText('ansible_user: "deploy"')
+    // AND where it came from, which is why a resolved view exists at all. It
+    // was seeded on the host, so nothing in the chain explains it.
+    await expect(vars).toContainText('set on this host')
+
+    // The selection is in the URL, so this is a shareable link.
+    await expect(page).toHaveURL(/node=web-1/)
+
+    // Selecting a GROUP reports its members rather than inventing a merge:
+    // ansible merges group variables into each host, which is what makes a
+    // host the unit a resolved value belongs to. `frontend` holds no host
+    // directly, so this also proves "no direct hosts" is not read as empty.
+    await page.getByTestId('inv-tree-group-frontend').click()
+    await expect(page.getByText(/no resolved variables of its own/i)).toBeVisible()
+    await expect(page.getByText('no direct hosts')).toBeVisible()
   })
 
   test('a limit expands through nesting, and a ~regex is expanded rather than refused', async ({

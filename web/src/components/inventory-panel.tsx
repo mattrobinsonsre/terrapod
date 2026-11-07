@@ -60,6 +60,12 @@ import { useConfirm } from '@/lib/use-confirm'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { EmptyState } from '@/components/empty-state'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
+import {
+  buildTree,
+  varYamlLine,
+  type TreeNode,
+  type VarProvenance,
+} from '@/lib/inventory-tree'
 import { StatChip } from '@/components/stat-chip'
 
 /* ── Wire types ─────────────────────────────────────────────────────────────
@@ -109,7 +115,18 @@ interface ResolvedAttrs {
   'host-count': number
   'group-count': number
   limit?: string
+  /** Per host, per key: where the value came from (#2413 F8).
+   *
+   *  `origin` is the level that supplied it, `'here'` when the host itself set
+   *  it, or `'unattributable'` when nothing in the chain explains it. `chain`
+   *  is every level that sets the key, SHALLOWEST FIRST -- ansible's own
+   *  precedence order, so the last entry is what the origin beat.
+   *
+   *  Served only with `?provenance=1`, because it costs the API a second
+   *  ansible invocation. */
+  'var-provenance'?: Record<string, Record<string, VarProvenance>>
 }
+
 
 /* ── Styling tokens ─────────────────────────────────────────────────────────
    One definition each, so a row action on the hosts table and the same action
@@ -1467,15 +1484,11 @@ function GroupDetailView({
   )
 }
 
-/** Host variables as one readable `key=value` run. Values are not prose. */
-function formatVars(vars: Record<string, unknown>): string {
-  return Object.entries(vars)
-    .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-    .join(' ')
-}
 
 function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadKey: number }) {
   const t = useTranslations('workspaceDetail.inventory')
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [limit, setLimit] = useState('')
   // Only an APPLIED limit reaches the request. Typing one must not re-resolve on
@@ -1490,7 +1503,14 @@ function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadK
     setLoading(true)
     setError('')
     try {
-      const qs = applied ? `?limit=${encodeURIComponent(applied)}` : ''
+      // `provenance` always on this view: it is the whole reason a RESOLVED
+      // view exists rather than a list of declared rows -- a merged value with
+      // no origin cannot be acted on. The cost is one extra ansible invocation
+      // per cache fill, which is why the API makes it opt-in and why no other
+      // caller asks.
+      const qs = applied
+        ? `?provenance=1&limit=${encodeURIComponent(applied)}`
+        : '?provenance=1'
       const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inventory/resolved${qs}`)
       if (!res.ok) {
         setResolved(null)
@@ -1515,11 +1535,36 @@ function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadK
   }, [load, reloadKey])
 
   const hostNames = resolved ? Object.keys(resolved.hosts).sort() : []
-  const groupNames = resolved ? Object.keys(resolved.groups).sort() : []
   const nesting = resolved?.['group-children'] ?? {}
-  const nestingParents = Object.keys(nesting)
-    .filter((p) => (nesting[p] ?? []).length > 0)
-    .sort()
+
+  // The tree is derived from what the API already serves -- direct membership,
+  // the nesting, and the full host set -- so the structure half of F8 needed no
+  // server work at all.
+  const tree = useMemo(
+    () => buildTree(resolved?.groups ?? {}, nesting, hostNames),
+    // `nesting` and `hostNames` are rebuilt from `resolved` on every render, so
+    // `resolved` is the honest dependency; listing the derived values would
+    // recompute on every render and say nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resolved],
+  )
+
+  // THE SELECTION IS IN THE URL, so a reload, the back button and a shared link
+  // all land on the same node -- the house rule for tab and view state, and it
+  // matters more here than usual: "look at web1's variables" is the sentence
+  // this view exists to answer, and it should be a link.
+  const selected = searchParams.get('node') ?? ''
+  const selectNode = useCallback(
+    (name: string) => {
+      const next = new URLSearchParams(searchParams.toString())
+      // Clicking the selected node again clears it, so the prompt comes back
+      // rather than leaving no way out of a selection.
+      if (name === selected) next.delete('node')
+      else next.set('node', name)
+      router.replace(`?${next.toString()}`, { scroll: false })
+    },
+    [router, searchParams, selected],
+  )
 
   return (
     <div className="space-y-6">
@@ -1581,71 +1626,218 @@ function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadK
             {hostNames.length === 0 ? (
               <p className="mt-3 text-sm text-slate-500">{t('resolved.noHosts')}</p>
             ) : (
-              <dl className="mt-4 space-y-2">
-                {hostNames.map((h) => (
-                  <div key={h} className="flex flex-wrap items-baseline gap-2">
-                    <dt className="font-mono text-xs text-slate-200" dir="ltr">
-                      {h}
-                    </dt>
-                    <dd className="min-w-0 font-mono text-xs break-words text-slate-400" dir="ltr">
-                      {Object.keys(resolved.hosts[h] ?? {}).length === 0
-                        ? t('resolved.noVars')
-                        : formatVars(resolved.hosts[h] ?? {})}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <InventoryTree
+                  roots={tree.roots}
+                  ungrouped={tree.ungrouped}
+                  selected={selected}
+                  onSelect={selectNode}
+                />
+                <NodeVars
+                  node={selected}
+                  hosts={resolved.hosts}
+                  provenance={resolved['var-provenance']}
+                  members={resolved.groups}
+                />
+              </div>
             )}
           </>
         )}
       </Section>
+    </div>
+  )
+}
 
-      {!loading && resolved && (
-        <Section heading={t('resolved.groupsHeading')} body={t('resolved.directOnly')}>
-          {groupNames.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">{t('resolved.noGroups')}</p>
-          ) : (
-            <dl className="mt-3 space-y-2">
-              {groupNames.map((g) => (
-                <div key={g} className="flex flex-wrap items-baseline gap-2">
-                  <dt className="font-mono text-xs text-slate-200" dir="ltr">
-                    {g}
-                  </dt>
-                  <dd className="min-w-0 font-mono text-xs break-words text-slate-400" dir="ltr">
-                    {(resolved.groups[g] ?? []).length === 0
-                      ? t('resolved.noDirectMembers')
-                      : (resolved.groups[g] ?? []).join(', ')}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </Section>
+/**
+ * The structure, as a tree.
+ *
+ * Fully expanded: nothing collapses (#2413 F4), so the shape is visible rather
+ * than behind a disclosure. `<ul>`/`<li>` because that is what a tree is, so a
+ * screen reader reads the nesting instead of an indentation it cannot see --
+ * which is the half the previous `name: a, b, c` display could not express at
+ * all.
+ *
+ * Each node is a `<button>`: selecting one is an action, and the selection is
+ * the only way to read a node's variables.
+ */
+function InventoryTree({
+  roots,
+  ungrouped,
+  selected,
+  onSelect,
+}: {
+  roots: TreeNode[]
+  ungrouped: string[]
+  selected: string
+  onSelect: (name: string) => void
+}) {
+  const t = useTranslations('workspaceDetail.inventory')
+  const row = (n: TreeNode | { name: string; kind: 'host'; children: [] }) => {
+    const isSel = selected === n.name
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(n.name)}
+        aria-current={isSel ? 'true' : undefined}
+        data-testid={`inv-tree-${n.kind}-${n.name}`}
+        className={`inline-flex min-h-11 items-center gap-2 rounded px-2 py-1 text-start font-mono text-xs sm:min-h-0 ${
+          isSel ? 'bg-brand-700/30 text-brand-100' : 'text-slate-300 hover:bg-slate-700/40'
+        }`}
+        dir="ltr"
+      >
+        <span aria-hidden="true" className="text-slate-500">
+          {n.kind === 'group' ? '\u25BE' : '\u2022'}
+        </span>
+        {n.name}
+      </button>
+    )
+  }
+
+  const node = (n: TreeNode) => (
+    <li key={`${n.kind}:${n.name}`} className="min-w-0">
+      {row(n)}
+      {n.children.length > 0 && (
+        <ul className="ms-4 border-s border-slate-700/60 ps-2">{n.children.map(node)}</ul>
       )}
+    </li>
+  )
 
-      {!loading && resolved && (
-        <Section heading={t('resolved.nestingHeading')} body={t('resolved.nestingBody')}>
-          {nestingParents.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">{t('resolved.noNesting')}</p>
-          ) : (
-            <dl className="mt-3 space-y-2">
-              {nestingParents.map((p) => (
-                <div key={p} className="flex flex-wrap items-baseline gap-2">
-                  <dt className="font-mono text-xs text-slate-200" dir="ltr">
-                    {p}
-                  </dt>
-                  <dd className="min-w-0 font-mono text-xs break-words text-slate-400" dir="ltr">
-                    {(nesting[p] ?? []).join(', ')}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </Section>
+  return (
+    <div className="min-w-0">
+      <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {t('resolved.treeHeading')}
+      </h5>
+      <ul className="min-w-0 space-y-0.5">{roots.map(node)}</ul>
+      {ungrouped.length > 0 && (
+        <>
+          {/* Ansible's implicit `ungrouped`, named rather than derived in the
+              tree: these hosts are in no group, so they have no parent to hang
+              under, and omitting them would hide a host from a view whose job
+              is to show every host. */}
+          <h5 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t('resolved.ungroupedHeading')}
+          </h5>
+          <ul className="min-w-0 space-y-0.5">
+            {ungrouped.map((h) => (
+              <li key={h} className="min-w-0">
+                {row({ name: h, kind: 'host', children: [] })}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )
 }
+
+/**
+ * One node's variables, as YAML, with each value's origin as a comment.
+ *
+ * YAML because that is the format the thing being described is written in, and
+ * `JSON.stringify` on the value because JSON is valid YAML -- so a value
+ * containing a space, a colon or a `#` is quoted correctly and cannot be
+ * misread. The display this replaces space-joined `k=v` pairs, which is
+ * ambiguous for exactly those values and `ansible_ssh_common_args` has all
+ * three.
+ *
+ * The comment is the point. A resolved view exists to answer "where did this
+ * come from", and a merged value without that answer is not actionable: the
+ * operator still has to go and look. `origin` is a level name, `here` when the
+ * node itself set it, or `unattributable` when nothing in the chain explains
+ * it -- which is a real answer and is rendered as one rather than hidden.
+ */
+function NodeVars({
+  node,
+  hosts,
+  provenance,
+  members,
+}: {
+  node: string
+  hosts: Record<string, Record<string, unknown>>
+  provenance: Record<string, Record<string, VarProvenance>> | undefined
+  members: Record<string, string[]>
+}) {
+  const t = useTranslations('workspaceDetail.inventory')
+
+  if (!node) {
+    return (
+      <div className="min-w-0">
+        <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {t('resolved.varsHeading')}
+        </h5>
+        <p className="text-sm text-slate-500">{t('resolved.selectPrompt')}</p>
+      </div>
+    )
+  }
+
+  const isHost = node in hosts
+  const vars = isHost ? (hosts[node] ?? {}) : {}
+  const prov = provenance?.[node] ?? {}
+  const keys = Object.keys(vars).sort()
+
+  return (
+    <div className="min-w-0">
+      <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {t('resolved.varsHeadingFor', { node })}
+      </h5>
+      {!isHost ? (
+        /* A GROUP's own variables are not served separately -- ansible merges
+           them into each host, which is what makes a host the unit a resolved
+           value belongs to. So a selected group reports its members and points
+           at them, rather than inventing a merge of its own. */
+        <div className="text-sm text-slate-400">
+          <p>{t('resolved.groupHasNoOwnVars')}</p>
+          <p className="mt-2 font-mono text-xs text-slate-300" dir="ltr">
+            {(members[node] ?? []).length === 0
+              ? t('resolved.noDirectMembers')
+              : (members[node] ?? []).join(', ')}
+          </p>
+        </div>
+      ) : keys.length === 0 ? (
+        <p className="text-sm text-slate-500">{t('resolved.noVars')}</p>
+      ) : (
+        <pre
+          className="min-w-0 overflow-x-auto rounded-lg bg-slate-950/60 p-3 font-mono text-xs leading-relaxed text-slate-200"
+          dir="ltr"
+          data-testid="inv-node-vars"
+        >
+          {keys.map((k) => {
+            const pv = prov[k]
+            const origin = !pv
+              ? null
+              : pv.origin === 'here'
+                ? t('resolved.originHere')
+                : pv.origin === 'unattributable'
+                  ? t('resolved.originUnknown')
+                  : t('resolved.originGroup', { group: pv.origin })
+            // Everything the origin BEAT, so the reader sees the precedence
+            // rather than just the winner -- which is what makes a host
+            // override legible as an override.
+            const beaten =
+              pv && pv.chain.length > 0 && pv.origin !== pv.chain[pv.chain.length - 1].level
+                ? t('resolved.originBeat', {
+                    levels: pv.chain.map((c) => c.level).join(', '),
+                  })
+                : ''
+            return (
+              <div key={k} className="whitespace-pre-wrap break-words">
+                <span>{varYamlLine(k, pv, vars[k])}</span>
+                {origin && (
+                  <span className="text-slate-500">
+                    {'  # '}
+                    {origin}
+                    {beaten ? ` ${beaten}` : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 
 /* ── The tab ────────────────────────────────────────────────────────────────- */
 
