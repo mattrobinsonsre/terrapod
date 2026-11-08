@@ -228,9 +228,23 @@ class TestTaskStageIdempotency:
         rid, wid = _rid(run_id), _wid(ws_id)
 
         # The "winner": a stage already committed for (run, post_plan).
+        #
+        # ADOPTED rather than inserted. From 2.0 `tfe_post_plan_decisions`
+        # defaults on, so `create_run` above has already RESERVED this run's
+        # post-plan stage (#2425) and a second insert collides on
+        # `uq_task_stages_run_stage` in the test's own setup — which reads as a
+        # product defect and is this fixture racing the reservation. The
+        # reserved row IS the committed stage this test needs; promoting it to
+        # `running` is what the real winner would have done.
         async with get_db_session() as db:
-            winner = TaskStage(run_id=rid, stage="post_plan", status="running")
-            db.add(winner)
+            winner = await db.scalar(
+                select(TaskStage).where(TaskStage.run_id == rid, TaskStage.stage == "post_plan")
+            )
+            if winner is None:  # the 1.x vocabulary reserves nothing
+                winner = TaskStage(run_id=rid, stage="post_plan", status="running")
+                db.add(winner)
+            else:
+                winner.status = "running"
             await db.commit()
             winner_id = winner.id
 
