@@ -181,6 +181,200 @@ that talks to a cloud API need not carry a static key.
 → [Ansible credentials](ansible-credentials.md), and [cloud credentials for a
 configure](ansible-configure.md#cloud-credentials-a-configure-gets-its-own-federated-identity).
 
+## One worked example, from nothing to a configure that runs
+
+Everything above is a separate page, and each of those pages is about one piece.
+This is the shape the pieces make together: a workspace that declares a configure,
+the inventory it targets, the credential that reaches the hosts, and the
+placeholder that joins the last two — the smallest complete thing, with nothing
+left to click.
+
+It is written as OpenTofu/Terraform because that is the idiom every piece already
+has: the seven inventory structures and both credential categories are
+first-class resources, so a configure is declarable in full rather than
+half-declared and half-configured. The same objects are reachable from the API,
+the Pulumi provider, the MCP tools and the UI.
+
+```hcl
+# The two objects this hangs off already exist: the pool whose listener will run
+# the Job, and the VCS connection the playbook is fetched through. A configure
+# runs server-side, so a pool is not optional.
+data "terrapod_agent_pool" "fleet" {
+  name = "fleet-pool"
+}
+
+data "terrapod_vcs_connection" "github" {
+  name = "platform"
+}
+
+# 1 — the workspace DECLARES the operation. `configure_enabled` is the
+# declaration; `config_directory` is the Ansible root inside the repository and
+# is what the rest of it is relative to. Nothing here runs anything yet.
+#
+# `plan_apply_enabled = false` makes this a configure-only workspace: a playbook
+# and an inventory, no state to manage. Leave it at its default (`true`) instead
+# and you have the both-operations shape, where an apply can hand straight over.
+resource "terrapod_workspace" "fleet" {
+  name = "web-fleet"
+
+  plan_apply_enabled = false
+  configure_enabled  = true
+
+  config_directory = "ansible"  # ansible.cfg, playbooks and any committed inventory
+  default_playbook = "site.yml" # relative to config_directory
+  default_limit    = "canary"   # the blast radius -- a group declared below
+
+  agent_pool_id     = data.terrapod_agent_pool.fleet.id
+  vcs_connection_id = data.terrapod_vcs_connection.github.id
+  vcs_repo_url      = "https://github.com/example/web-fleet"
+  vcs_branch        = "main"
+}
+
+# 2 — the groups. `canary` is the one `default_limit` names, and declaring it is
+# not optional: a `--limit` naming a group that does not exist leaves ansible
+# with nothing to target and the run fails. See the note under
+# `default-limit` in Running a configure.
+resource "terrapod_inventory_group" "web" {
+  workspace_id = terrapod_workspace.fleet.id
+  name         = "web"
+}
+
+resource "terrapod_inventory_group" "canary" {
+  workspace_id = terrapod_workspace.fleet.id
+  name         = "canary"
+}
+
+# 3 — the hosts. A host carries its NAME and nothing else; `ansible_host` is a
+# variable like any other, so the address is a row rather than a field.
+locals {
+  web_hosts = {
+    web1 = "10.0.1.11"
+    web2 = "10.0.1.12"
+  }
+}
+
+resource "terrapod_inventory_host" "web" {
+  for_each = local.web_hosts
+
+  workspace_id = terrapod_workspace.fleet.id
+  name         = each.key
+}
+
+resource "terrapod_inventory_host_var" "address" {
+  for_each = local.web_hosts
+
+  host_id = terrapod_inventory_host.web[each.key].id
+  key     = "ansible_host"
+  value   = each.value
+}
+
+# 4 — membership. Every host is in `web`; only `web1` is in `canary`, which is
+# what makes the default limit a canary rather than a synonym for everything.
+resource "terrapod_inventory_host_group" "web_members" {
+  for_each = local.web_hosts
+
+  host_id  = terrapod_inventory_host.web[each.key].id
+  group_id = terrapod_inventory_group.web.id
+}
+
+resource "terrapod_inventory_host_group" "canary_member" {
+  host_id  = terrapod_inventory_host.web["web1"].id
+  group_id = terrapod_inventory_group.canary.id
+}
+
+# 5 — the connection settings that are NOT secrets, as group variables. They
+# live here rather than on the credential deliberately: each is visible in a
+# diff, reviewable in a pull request, and settable per host or per group.
+#
+# The two placeholders are the join. `${terrapod:<name>.<field>}` is resolved at
+# run time against the credential named below, and for `private_key` and
+# `known_hosts` it substitutes the PATH of a 0600 file Terrapod writes -- the key
+# material itself never enters the inventory document.
+resource "terrapod_inventory_group_var" "web_user" {
+  group_id = terrapod_inventory_group.web.id
+  key      = "ansible_user"
+  value    = "deploy"
+}
+
+resource "terrapod_inventory_group_var" "web_become" {
+  group_id   = terrapod_inventory_group.web.id
+  key        = "ansible_become"
+  value      = "true"
+  structured = true # a YAML boolean rather than the string "true"
+}
+
+resource "terrapod_inventory_group_var" "web_key_file" {
+  group_id = terrapod_inventory_group.web.id
+  key      = "ansible_ssh_private_key_file"
+  value    = "$${terrapod:web-key.private_key}"
+}
+
+resource "terrapod_inventory_group_var" "web_known_hosts" {
+  group_id = terrapod_inventory_group.web.id
+  key      = "ansible_ssh_common_args"
+  value    = "-o UserKnownHostsFile=$${terrapod:web-key.known_hosts}"
+}
+
+# 6 — the credential: secrets only, plus the one public file. Its `key` is the
+# credential's NAME -- what ${terrapod:web-key.private_key} above refers to --
+# and says nothing about where it is used; the inventory says that, by writing a
+# placeholder wherever the value is wanted. At least one of `private_key` or
+# `password` is required, and an unrecognised field is refused with a 422 rather
+# than silently ignored.
+resource "terrapod_variable" "web_key" {
+  workspace_id = terrapod_workspace.fleet.id
+  key          = "web-key"
+  category     = "ansible_machine_auth"
+  sensitive    = true
+
+  value = jsonencode({
+    private_key = file("~/.ssh/fleet")
+    known_hosts = <<-EOT
+      10.0.1.11 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
+      10.0.1.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
+    EOT
+  })
+}
+```
+
+Note the `$${` in step 5. A Terrapod placeholder and OpenTofu's own
+interpolation (Terraform's too) use the same `${...}` syntax, so the dollar has
+to be escaped or the engine tries to resolve it and fails on an unknown name.
+Written through the API, the UI or the MCP tools there is nothing to escape — it
+is `${terrapod:...}` verbatim.
+
+**What you have after `tofu apply`** is a workspace with a configure operation,
+two hosts, two groups, and a credential nothing can read back. What you do not
+have is a run: every trigger is off by default and this configuration turns none
+of them on, so nothing has happened to the hosts yet.
+
+**Before starting one**, ask what it would target — the limit is doing the job a
+plan does elsewhere, so this is the review step rather than a convenience:
+
+```sh
+curl -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  "$TERRAPOD_URL/api/v1/workspaces/$WS/inventory/resolved?limit=canary"
+```
+
+That should come back with `web1` and nothing else. The Inventory tab's Resolved
+view is the same answer, and `data "terrapod_inventory_resolved"` is the same
+answer in a plan. **A `host_count` of zero means the pattern matched nothing**,
+which is the one result worth stopping on.
+
+Then press **Configure** on the run page, or turn on a trigger
+([`auto_configure_enabled`](ansible-configure.md#turning-it-on) for a push,
+`configure_after_apply` for an apply). The run goes `queued` → `configuring` →
+`applied`, and its **Hosts** tab carries one row per host.
+
+→ Each step in full: [the seven
+structures](ansible-inventory.md#the-seven-structures) and [managing them as
+code](ansible-inventory.md#managing-it-as-code); [turning a configure
+on](ansible-configure.md#turning-it-on) and [what `default-limit`
+means](ansible-configure.md#default-limit-is-the-blast-radius-and-empty-means-everything);
+[the credential envelope](ansible-credentials.md#the-envelope) and [where the
+placeholder may
+point](ansible-credentials.md#key-is-the-credentials-name-and-the-inventory-says-where-it-is-used).
+
 ## There is no plan for a configure
 
 Ansible has **no separable plan**. There is no artifact that says what a playbook

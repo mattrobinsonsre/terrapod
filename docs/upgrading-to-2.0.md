@@ -13,6 +13,92 @@ major. Everything else stays additive, exactly as in a minor.
 
 If a surface is not listed here, it did not change.
 
+## Pre-flight: the entries with an order
+
+**The rest of this page is a catalogue, not a procedure.** Most of it can be read
+and acted on whenever suits you. A handful of entries cannot, because the window
+in which they are doable closes at the upgrade — and the sequencing for each is
+stated inside its own section, where you reach it after the point at which it
+mattered. Read front to back and acting as you go, the IdP re-registration below
+arrives *after* you have locked yourself out of the UI.
+
+So this is the ordered subset and nothing else. It is not a summary: an entry
+absent from here needs no particular timing, and every row sends you to the full
+section rather than restating it. Work through the condition in the middle column
+first — most rows do not apply to most deployments.
+
+### Before you upgrade, or you lose access
+
+| Do this | If | Why it cannot wait |
+|---|---|---|
+| [Register the `/api/v1` SSO callback and SAML ACS URLs with your IdP](#sso-callback-urls-move-to-apiv1--re-register-them-with-your-idp-first), keeping the old ones | you use OIDC or SAML | the IdP validates the `redirect_uri` against its own allow-list, so there is nothing Terrapod can serve that makes the switch safe. Local admin is your only way back in |
+| [Set the five SAML assertion checks to `true` on your current release and confirm a login](#the-five-saml-assertion-checks-are-strict-by-default) | you use SAML | they default to `true` from 2.0; a provider that cannot satisfy one stops being able to log in, and doing it beforehand means the defaults and your config already agree |
+| [Check your provider sends `email_verified`](#an-oidc-login-needs-an-email-the-provider-vouches-for), and set `require_email_verified: false` if it does not | you use OIDC | a login whose claims omit the field is refused from 2.0, and some providers verify the address without sending it |
+| [Grant `admin` / `audit` deliberately](#an-idp-group-can-no-longer-grant-admin-or-audit) — the entry's `SELECT` runs on your current release | your administrators get their role from an IdP group name | a bare group name stops granting a built-in role at the upgrade, and the grant is what you would need in order to put it back |
+| [Supply a CA bundle, or pin `ssl_mode: require`](#cloud-iam-database-auth-verifies-the-server-by-default) | `database.auth_mode` is one of the cloud-IAM modes **and** you have not set `database.ssl_mode` | the mode becomes `verify-full`, and verification needs CA material the system trust store may not carry — the API then cannot reach its database at all. **This is the one row whose own section does not frame it as a sequencing step**; it reads as a configuration note and has the blast radius of one |
+| [Upgrade every listener in every pool first, or set `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) | you run server-side execution and a pool may still hold a pre-2.0 listener image | a listener that does not sign gets `401` on every call including the event stream, so **the pool goes quiet rather than noisy**: nothing connects, nothing claims a run, and no error says why |
+
+### Before you upgrade, or something breaks quietly
+
+| Do this | If | Why it cannot wait |
+|---|---|---|
+| Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
+| Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
+| [Check your own EE images can function as uid 1000](#an-execution-environment-must-run-as-uid-1000) | you set `api.config.ansible.execution_environments`. Terrapod's own published images need nothing | the sidecar's startup probe asserts it, so a non-conforming image fails at pod start — which is better than mid-playbook, but it is still every configure on that workspace |
+| [Grant module `registry:read`](#downloading-a-protected-configuration-version-archive-needs-module-registryread-too) | anyone downloads configuration-version archives from workspaces provisioned by a **self-contained** catalog item | the grant exists on your current release, so doing it first means nobody meets the new `403` |
+| [Point consumers at the catalog surface](#a-human-read-of-a-catalog-instances-variables-no-longer-returns-their-values) | a script or an agent reads `/variables` on a catalog-provisioned workspace and uses the values | the route, the attribute names and the status code are all unchanged — only the content becomes `null`, so nothing reports it |
+| [Assign the set, make it global, or grant `audit`](#listing-variable-sets-is-filtered-by-workspace-reach) | a **non-admin** needs to see a variable set that is assigned to no workspace | a set that reaches no workspace becomes visible to `admin` and `audit` only, and a read by id answers `404` rather than `403` |
+| [Move a configuration that branches on the run phase](#tf_var_terrapod_run_phase-is-no-longer-exported) onto the token's `phase` claim or an apply-only variable | a configuration declares `variable "terrapod_run_phase"` **and** the workspace uses per-workspace cloud identity | the export is gone the moment you upgrade, so from then on the variable takes its `default` — the branch still evaluates, and picks the same side in both phases. The trust-policy route is already the recommended one and works on your current release |
+| [Look for a key held in more than one category](#a-variable-is-identified-by-its-category-and-key-together) across a workspace and the variable sets reaching it | you have variable sets | nothing breaks, but a variable set entry that a workspace variable of the same key used to make *absent from the run* will now be delivered. Knowing which runs change is only cheap beforehand |
+
+### Decide before you start
+
+| Decide | Why it is a decision rather than a step |
+|---|---|
+| [How many API replicas to run through the rollout](#two-columns-are-renamed-so-the-api-rollout-has-a-brief-window-of-errors) | two columns are renamed in place, so between the pre-upgrade migration hook and the last old pod being replaced there are replicas selecting a column that is gone. It is seconds to a couple of minutes and it self-heals — but the mitigation is to scale the API to **one** replica, and a single replica is replaced rather than overlapped, so there is no window at all. That has to be chosen before you begin, not after you notice |
+| [Whether `require_strong_secrets` stays on](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) | a deployment that has executed runs **adopts** its old derived signing key, and that switch now fires on an adopted key — which is exactly the state the upgrade lands in. So either supply `api.tokenSigningKey` at the same time as the upgrade, or leave the switch off until you have |
+| [Whether you may need to roll back](#a-variable-is-identified-by-its-category-and-key-together) | the downgrade removes variables a 1.x schema cannot represent — the surplus when one key is held in two categories — keeping the oldest row per key and printing each removal. It is a rollback that costs something rather than one that refuses, which is the right trade and worth knowing in advance |
+
+### Only possible after the upgrade
+
+| Do this | Why not before |
+|---|---|
+| [Find the API tokens with no recorded provider and re-mint them](#an-api-tokens-roles-are-resolved-against-the-provider-it-was-minted-under) | that entry's `SELECT` reads `api_tokens.identity_provider`, and the column is **added by a 2.0 migration** — so the query cannot run until the migration has. Until they are re-minted, automation using one resolves to no roles and gets `403` |
+| Confirm an SSO login works, then [remove the old callback URLs from your IdP](#sso-callback-urls-move-to-apiv1--re-register-them-with-your-idp-first) | with both values registered the upgrade is a no-op at the IdP, and the old ones are what a fallback to `legacy_callback_url: true` would need. Removing them is the last step, and it is optional |
+| [Remove `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) once every pool is on a 2.0 listener | it is a relaxation held open for the rollout, and it is the kind that stays set for a year if nobody writes it down |
+| [Delete the old `<release>-token-signing` Secret](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) — **only after confirming you do not reference it** from `api.tokenSigningKey.existingSecret` | Helm leaves it behind on purpose (`helm.sh/resource-policy: keep`). It is inert once you are on 2.0 **unless it is the key you supply**, in which case it is live |
+
+Two things to expect rather than do: [sessions open across the upgrade are capped
+from their own sign-in
+time](#a-web-session-ends-when-the-roles-behind-it-change-and-has-a-hard-ceiling),
+so some will end shortly after you upgrade rather than at the 24-hour mark; and
+[the UI opens in the light
+theme](#the-uis-default-theme-is-light-and-dark-is-a-source-edit), which no gate,
+snapshot or test reports because nothing fails.
+
+### Two orderings that are **not** tied to the upgrade
+
+Worth saying, because both look like upgrade steps and are not:
+
+- **The deprecated path aliases are not removed in 2.0**, so there is
+  [nothing to do first](#the-deprecated-path-aliases-are-still-served--they-are-not-removed-in-20)
+  and no deadline here. The one ordering that does apply is within your own
+  migration: re-register a webhook against the canonical path **before** dropping
+  the alias entries from `webhookIngress.paths`, or every webhook registered
+  against the old path breaks.
+- **The client-side type changes move when you move the client**, not when you
+  move the server: [label rules becoming a list per
+  key](#label-rules-take-a-list-of-values-per-key), [an explicit `= ""` clearing
+  an optional string](#an-explicit---clears-an-optional-string-and-removing-the-line-no-longer-does),
+  and [`GetVariableByKey` taking a
+  category](#a-variable-is-identified-by-its-category-and-key-together). The
+  first is a type in HCL over a shape the server always stored and still accepts
+  either way; the second is settled inside the provider; the third is a filter
+  the SDK applies to a list it already fetches. So none of the three obliges you
+  to move the server and your clients together — see
+  [versioning-and-support.md](versioning-and-support.md) for the skew Terrapod
+  does promise.
+
 ## Breaking changes
 
 ### `TF_VAR_terrapod_run_phase` is no longer exported
