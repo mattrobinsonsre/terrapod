@@ -910,12 +910,20 @@ def _workspace_json(
             # of "which phase explains this", and it takes any dict carrying
             # these keys.
             # Filtered on the DATETIME, not on the formatted string.
-            # `_rfc3339(None)` returns `""`, so the obvious `if v is not None`
-            # over formatted values drops nothing and emits `"planning-at": ""`
-            # for a phase that never ran -- which reads as a value. The run
-            # document's own `status-timestamps` has that exact dead filter and
-            # does emit the empty strings; `explainingPhase` survives it only
-            # because it tests truthiness rather than presence.
+            # `_rfc3339(None)` returns `""`, so an `if v is not None` over
+            # formatted values would drop nothing and emit `"planning-at": ""`
+            # for a phase that never ran -- which reads as a value.
+            #
+            # This comment used to add that the run document's own
+            # `status-timestamps` "has that exact dead filter and does emit the
+            # empty strings". **That was false**, and it is recorded here rather
+            # than deleted because it is re-derivable from a glance at this file
+            # and the next reader might "fix" a filter that is already correct.
+            # Measured: `routers/runs.py` filters that dict on `if v`, which is
+            # truthy and so drops `""`; `git log --all -S "if v is not None"`
+            # over that file returns nothing, with a working control, so the
+            # string has never been in it. The run document has never emitted an
+            # empty timestamp.
             "phase-started-at": {
                 key: _rfc3339(started)
                 for key, started in (
