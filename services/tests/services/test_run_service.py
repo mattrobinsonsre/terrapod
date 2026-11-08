@@ -157,6 +157,40 @@ def _mock_run(**kwargs):
     return run
 
 
+@pytest.fixture
+def _stub_post_plan_stages():
+    """`create_run` reserves the run's post-plan task stage and a terminal
+    `transition_run` cancels it, both gated on `runs.tfe_post_plan_decisions`
+    -- on by default from 2.0 (#2425). These tests drive the run lifecycle
+    against a mocked session that does not model task-stage rows, so stub both
+    helpers: the reservation and the cancellation have their own dedicated
+    tests in `tests/integration/test_post_plan_decisions_integration.py`
+    (`TestTheStageExistsFromTheStart`), which drive them through the real API
+    against a real database.
+
+    Stubbed rather than selecting the 1.x vocabulary with
+    `tfe_post_plan_decisions=False`, which would leave the shipped 2.0 default
+    -- what every operator now gets -- exercised by almost nothing. These
+    tests are about apply transitions, cancellation and the configure half,
+    where the post-plan vocabulary is irrelevant either way.
+
+    Both mocks are yielded, so a test that wants to pin the wiring can assert
+    on the calls; `TestTransitionRun` and `TestCreateRun` each do.
+    """
+    with (
+        patch(
+            "terrapod.services.run_task_service.reserve_task_stage",
+            new_callable=AsyncMock,
+        ) as reserve,
+        patch(
+            "terrapod.services.run_task_service.cancel_pending_stages",
+            new_callable=AsyncMock,
+        ) as cancel,
+    ):
+        yield SimpleNamespace(reserve=reserve, cancel=cancel)
+
+
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestTransitionRun:
     async def test_valid_transition_updates_status(self):
         db = AsyncMock(spec=AsyncSession)
@@ -408,7 +442,28 @@ class TestTransitionRun:
         await transition_run(db, run, "errored")
         assert run.apply_finished_at is not None
 
+    async def test_a_terminal_transition_cancels_the_reserved_post_plan_stage(
+        self, _stub_post_plan_stages
+    ):
+        """#2425: the stage is reserved at creation, so a run that ends before
+        the stage ever starts has to cancel it -- left `pending`, the CLI
+        polls it forever."""
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC))
+        await transition_run(db, run, "errored")
+        _stub_post_plan_stages.cancel.assert_awaited_once_with(db, run.id)
 
+    async def test_a_non_terminal_transition_cancels_nothing(self, _stub_post_plan_stages):
+        """The pair of the above, and the half that is easy to lose: a run
+        still moving through the lifecycle has a stage that may yet start, so
+        cancelling here would discard a live gate."""
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued")
+        await transition_run(db, run, "planning")
+        _stub_post_plan_stages.cancel.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestTerminalTransitionNudge:
     """#750 — a run reaching a terminal state frees runner capacity, so its
     pool is nudged with a fresh run_available to re-drive any backlog."""
@@ -470,6 +525,7 @@ def _mock_workspace(**kwargs):
     return ws
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCreateRun:
     @patch("terrapod.services.run_service.Run")
     async def test_creates_run_with_defaults(self, MockRun):
@@ -627,6 +683,20 @@ class TestCreateRun:
         assert MockRun.call_args[1]["engine_version"] == "1.12"
         db.add.assert_called_once_with(instance)
 
+    @patch("terrapod.services.run_service.Run")
+    async def test_the_post_plan_stage_is_reserved(self, MockRun, _stub_post_plan_stages):
+        """#1704/#2425: in the Terraform Enterprise vocabulary the stage exists
+        from the start, because the CLI reads a run's stages once right after
+        creating it and never sees one added later."""
+        db = AsyncMock(spec=AsyncSession)
+        ws = _mock_workspace()
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws, message="initial run")
+        _stub_post_plan_stages.reserve.assert_awaited_once_with(db, instance.id, ws.id, "post_plan")
+
 
 # ── confirm_run / discard_run / cancel_run ─────────────────────────────
 
@@ -731,6 +801,7 @@ class TestConfirmRun:
             await confirm_run(db, run)
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestAPlanOnlyRunCannotReachAnApplyByAnyPath:
     """The guard has to live where every caller funnels through.
 
@@ -780,6 +851,7 @@ class TestAPlanOnlyRunCannotReachAnApplyByAnyPath:
         assert result.status == "confirmed"
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestDiscardRun:
     async def test_discards_planned_run(self):
         db = AsyncMock(spec=AsyncSession)
@@ -801,6 +873,7 @@ class TestDiscardRun:
             await discard_run(db, run)
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCancelRun:
     async def test_cancels_non_terminal_run(self):
         db = AsyncMock(spec=AsyncSession)
@@ -1017,6 +1090,7 @@ def _mock_db():
     return db
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCompletePlan:
     """`complete_plan` is the shared landing point for both the runner-driven
     `/plan-result` POST and the reconciler-driven listener Job-status path.
@@ -1135,6 +1209,7 @@ class TestCompletePlan:
         assert result.status == "planning"
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCompleteApply:
     @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
@@ -1633,6 +1708,7 @@ class TestATerminalTransitionRevokesTheRunsRunnerTokens:
         assert result.status == "applied"
 
 
+@pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestAStandaloneConfigureIsNotAStateChange:
     """`applied` is a configure's terminal too, and three side effects on that
     transition are about tofu/terraform state having moved (#1974).
