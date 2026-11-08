@@ -884,7 +884,10 @@ field ResolvedInventory.HostCount int `json:"host-count"`
 field ResolvedInventory.Hosts map[string]map[string]any `json:"hosts,omitempty"`
 field ResolvedInventory.ID string `json:"id"`
 field ResolvedInventory.Limit string `json:"limit,omitempty"`
+field ResolvedInventory.VarProvenance map[string]map[string]VarOrigin `json:"var-provenance,omitempty"`
 field ResolvedInventory.WorkspaceID string `json:"workspace-id,omitempty"`
+field ResolvedInventoryOptions.Limit string
+field ResolvedInventoryOptions.Provenance bool
 field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
@@ -1362,6 +1365,11 @@ field VCSLabelTotal.Key string `json:"key"`
 field VCSLabelTotal.Label string `json:"label"`
 field VCSLabelTotal.Value string `json:"value"`
 field ValidationError.Detail string
+field VarOrigin.Chain []VarOriginLevel `json:"chain"`
+field VarOrigin.Origin string `json:"origin"`
+field VarOrigin.Value any `json:"value"`
+field VarOriginLevel.Level string `json:"level"`
+field VarOriginLevel.Value any `json:"value"`
 field Variable.ApplyOnly bool `json:"apply-only"`
 field Variable.Category string `json:"category"`
 field Variable.ConfigureOnly bool `json:"configure-only"`
@@ -1762,6 +1770,7 @@ method (*Client) GetRegistryProvider(ctx context.Context, name string) (*Registr
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
 method (*Client) GetResolvedInventory( ctx context.Context, workspaceID string, ) (*ResolvedInventory, error)
 method (*Client) GetResolvedInventoryWithLimit( ctx context.Context, workspaceID, limit string, ) (*ResolvedInventory, error)
+method (*Client) GetResolvedInventoryWithOptions( ctx context.Context, workspaceID string, opts ResolvedInventoryOptions, ) (*ResolvedInventory, error)
 method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
@@ -2076,6 +2085,7 @@ type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
 type ResolvedInventory struct
+type ResolvedInventoryOptions struct
 type Resource struct
 type ResourceAccess struct
 type ResourceAccessRole struct
@@ -2129,6 +2139,8 @@ type VCSConnection struct
 type VCSConsumer struct
 type VCSLabelTotal struct
 type ValidationError struct
+type VarOrigin struct
+type VarOriginLevel struct
 type Variable struct
 type VariableSet struct
 type VariableSetVariable struct

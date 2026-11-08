@@ -189,7 +189,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_get",
-		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), which agent pool executed it (and which pools could have), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
+		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), which agent pool executed it (and which pools could have), `run-variable-keys` naming the variables this run overrode with `-var` or `-var-file` (the KEYS only -- the values are never echoed, because nothing records which of them were secrets), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {

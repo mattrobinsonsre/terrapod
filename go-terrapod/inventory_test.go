@@ -676,6 +676,98 @@ func TestAVarlessHostSurvivesResolution(t *testing.T) {
 	}
 }
 
+func TestGetResolvedInventoryWithOptions(t *testing.T) {
+	// `var-provenance` reached the server and the web UI and no other consumer
+	// (#2425 §4.1), so the provider data source and MCP could not see it either
+	// -- and MCP's caller is the one most likely to be asked "where does this
+	// host variable come from". The server derives it precisely SO no consumer
+	// re-implements the walk, which makes the omission worse than a gap: the
+	// derivation exists and was unreachable.
+	body := `{"data":{"id":"ws-abc","type":"resolved-inventories","attributes":{
+	  "hosts":{"web-01":{"ansible_user":"deploy","port":8080}},
+	  "groups":{"web":["web-01"]},"group-children":{},
+	  "host-count":1,"group-count":1,"limit":"web",
+	  "var-provenance":{"web-01":{
+	    "ansible_user":{"value":"deploy","origin":"@web",
+	      "chain":[{"level":"@all","value":"root"},{"level":"@web","value":"deploy"}]},
+	    "port":{"value":8080,"origin":"here","chain":[{"level":"here","value":8080}]},
+	    "opaque":{"value":{"a":1},"origin":"unattributable","chain":[]}}}},
+	  "relationships":{"workspace":{"data":{"id":"ws-abc","type":"workspaces"}}}}}`
+	c, got := inventoryServer(t, http.StatusOK, body)
+
+	r, err := c.GetResolvedInventoryWithOptions(t.Context(), "ws-abc",
+		ResolvedInventoryOptions{Limit: "web", Provenance: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantReq(t, got, http.MethodGet, "/api/v1/workspaces/ws-abc/inventory/resolved")
+
+	// BOTH parameters, which is the combination neither existing method can ask
+	// for and the reason this one exists.
+	q, err := url.ParseQuery(got.query)
+	if err != nil {
+		t.Fatalf("query is not parseable: %q", got.query)
+	}
+	if q.Get("limit") != "web" {
+		t.Errorf("limit = %q, want %q", q.Get("limit"), "web")
+	}
+	if q.Get("provenance") != "true" {
+		t.Errorf("provenance = %q, want %q", q.Get("provenance"), "true")
+	}
+
+	host := r.VarProvenance["web-01"]
+	if len(host) != 3 {
+		t.Fatalf("var-provenance for web-01 = %+v, want 3 keys", host)
+	}
+	// The winning level, which is the whole question the attribute answers.
+	if host["ansible_user"].Origin != "@web" {
+		t.Errorf("ansible_user origin = %q, want @web", host["ansible_user"].Origin)
+	}
+	// The CHAIN, not just the winner: "set on @all and overridden on @web" is a
+	// different answer from "only ever set on @web", and a parser that dropped
+	// the chain would read identically on the line above.
+	if len(host["ansible_user"].Chain) != 2 ||
+		host["ansible_user"].Chain[0].Level != "@all" ||
+		host["ansible_user"].Chain[1].Value != "deploy" {
+		t.Errorf("ansible_user chain = %+v, want @all=root then @web=deploy",
+			host["ansible_user"].Chain)
+	}
+	// `here` and `unattributable` are the two non-group origins, and both are
+	// real answers rather than failures -- `unattributable` is the server
+	// declining to guess when ansible's printing of a container cannot be
+	// compared to real JSON.
+	if host["port"].Origin != "here" {
+		t.Errorf("port origin = %q, want here", host["port"].Origin)
+	}
+	if host["opaque"].Origin != "unattributable" || len(host["opaque"].Chain) != 0 {
+		t.Errorf("opaque = %+v, want unattributable with an empty chain", host["opaque"])
+	}
+}
+
+func TestGetResolvedInventoryWithOptionsSendsNoQueryWhenEmpty(t *testing.T) {
+	// An empty options struct must be GetResolvedInventory, not a request with
+	// `provenance=false` on it: the server reads an absent parameter as off, and
+	// a caller that wants neither option should not pay for a query string.
+	body := `{"data":{"id":"ws-abc","type":"resolved-inventories","attributes":{
+	  "hosts":{"web-01":{}},"groups":{},"group-children":{},
+	  "host-count":1,"group-count":0}}}`
+	c, got := inventoryServer(t, http.StatusOK, body)
+
+	r, err := c.GetResolvedInventoryWithOptions(t.Context(), "ws-abc",
+		ResolvedInventoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.query != "" {
+		t.Errorf("query = %q, want empty", got.query)
+	}
+	// And provenance is nil rather than an empty map, so a caller can tell "not
+	// asked for" from "asked for and nothing to attribute".
+	if r.VarProvenance != nil {
+		t.Errorf("VarProvenance = %+v, want nil when not asked for", r.VarProvenance)
+	}
+}
+
 func TestGetResolvedInventoryWithLimit(t *testing.T) {
 	body := `{"data":{"id":"ws-abc","type":"resolved-inventories","attributes":{
 	  "hosts":{"web-01":{}},"groups":{"web":["web-01"]},"group-children":{},

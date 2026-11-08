@@ -779,6 +779,10 @@
           "description": "an ansible --limit pattern to apply: host names, group names, globs, 'all', comma- or colon-separated terms, '!' to exclude, '\u0026' to intersect, '~' for a regex. Omit it to resolve the whole inventory",
           "type": "string"
         },
+        "provenance": {
+          "description": "also report WHERE each host variable came from: per key, the chain of levels that set it and which one won. Set this when asked why a host has the value it has, or which group to change to alter it -- the answer is not derivable from the merged variables alone. Costs a second ansible invocation, so it is off by default",
+          "type": "boolean"
+        },
         "workspace_id": {
           "description": "the workspace id (ws-...) whose inventory to resolve",
           "type": "string"

@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -186,6 +187,53 @@ type ResolvedInventory struct {
 	GroupChildren map[string][]string `json:"group-children,omitempty"`
 	// Limit is echoed back when the resolution was asked with one.
 	Limit string `json:"limit,omitempty"`
+	// VarProvenance says, per host and per variable, WHERE the value came from.
+	// Present only when the resolution was asked with Provenance; nil otherwise,
+	// because the server derives it on request rather than always.
+	//
+	// The server does the walk so no consumer re-implements it: the two sources
+	// spell a group differently (`--graph` writes `@prod_web`, `--list` writes
+	// `prod_web`), and an unprefixed lookup reports every variable as set on the
+	// node itself -- a plausible wrong answer that no hand-written fixture
+	// catches.
+	VarProvenance map[string]map[string]VarOrigin `json:"var-provenance,omitempty"`
+}
+
+// VarOrigin is one variable's resolved value and the levels that set it.
+//
+// Origin is the level that WON -- a group as `@name`, or `"here"` for a value
+// set on the node itself, or `"unattributable"`. The last is not a failure: the
+// comparison is between real JSON and ansible's own printing of the same value,
+// which agrees for scalars and may not for a container, so declining to guess is
+// the honest answer.
+type VarOrigin struct {
+	Value  any              `json:"value"`
+	Chain  []VarOriginLevel `json:"chain"`
+	Origin string           `json:"origin"`
+}
+
+// VarOriginLevel is one link in a variable's precedence chain: the level that
+// set it, and the value it set there. Shallowest group first, ansible's order.
+type VarOriginLevel struct {
+	Level string `json:"level"`
+	Value any    `json:"value"`
+}
+
+// ResolvedInventoryOptions are the resolution's optional query parameters.
+//
+// A struct rather than a third `...With` method, because the two parameters
+// COMBINE -- "what would this limit target, and where does each variable on
+// those hosts come from" is one question and neither existing method can ask
+// it. GetResolvedInventory and GetResolvedInventoryWithLimit stay exactly as
+// they are: they are on a published surface, and a caller that wants neither
+// option should not have to name a zero value.
+type ResolvedInventoryOptions struct {
+	// Limit is an ansible `--limit` pattern, expanded by ansible itself.
+	Limit string
+	// Provenance asks the server to attribute every variable to the level that
+	// set it. It costs a second ansible invocation (`--graph --vars`), so it is
+	// opt-in rather than always on.
+	Provenance bool
 }
 
 // CreateInventoryVarRequest declares one variable.
@@ -676,6 +724,37 @@ func (c *Client) GetResolvedInventoryWithLimit(
 	return parseResolvedInventory(data)
 }
 
+// GetResolvedInventoryWithOptions resolves with any combination of the options.
+//
+// The only way to ask for a limit AND provenance together, which is the
+// combination an operator actually wants: "these are the hosts a configure would
+// touch, and this is where each of their variables came from".
+//
+// With no options set this is GetResolvedInventory -- the server reads an absent
+// parameter as off, so an empty struct sends no query string at all.
+func (c *Client) GetResolvedInventoryWithOptions(
+	ctx context.Context, workspaceID string, opts ResolvedInventoryOptions,
+) (*ResolvedInventory, error) {
+	path := inventoryWorkspacePath(workspaceID, "resolved")
+	q := url.Values{}
+	if opts.Limit != "" {
+		q.Set("limit", opts.Limit)
+	}
+	if opts.Provenance {
+		// `true`, not `1`: FastAPI parses both, and the spelled-out form is what
+		// the route's own signature declares.
+		q.Set("provenance", "true")
+	}
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	data, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return parseResolvedInventory(data)
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 func inventoryWorkspacePath(workspaceID, leaf string) string {
@@ -979,6 +1058,21 @@ func parseResolvedInventory(body []byte) (*ResolvedInventory, error) {
 				out.Hosts[name] = map[string]any{}
 			}
 		}
+	}
+	if prov := GetObjectAttr(res, "var-provenance"); prov != nil {
+		// Unmarshalled through the typed shape rather than walked by hand: the
+		// per-key object carries a `chain` of objects, and hand-walking a
+		// `map[string]any` is where a numeric value becomes a float64 and a
+		// missing key becomes a zero that reads as an answer.
+		raw, err := json.Marshal(prov)
+		if err != nil {
+			return nil, fmt.Errorf("re-marshal var-provenance: %w", err)
+		}
+		var parsed map[string]map[string]VarOrigin
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return nil, fmt.Errorf("parse var-provenance: %w", err)
+		}
+		out.VarProvenance = parsed
 	}
 	return out, nil
 }
