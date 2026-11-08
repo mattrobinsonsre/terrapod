@@ -13,6 +13,7 @@ import { getAuthState, getUserId, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
+import { useConfirm } from '@/lib/use-confirm'
 
 interface Token {
   id: string
@@ -48,6 +49,7 @@ const KIND_BADGE: Record<string, string> = {
 export default function TokensPage() {
   const router = useRouter()
   const t = useTranslations('settings')
+  const { confirmIrreversible } = useConfirm()
   const fmt = useFormat()
   const kindLabel = (kind: string) =>
     t(`tokens.kinds.${KIND_BADGE[kind] ? kind : 'interactive'}.label`)
@@ -176,7 +178,7 @@ export default function TokensPage() {
   }
 
   async function handleRotate(tokenId: string) {
-    if (!confirm(t('tokens.confirmRotate'))) return
+    if (!confirmIrreversible(t('tokens.confirmRotate'))) return
     setRotatingId(tokenId)
     setError('')
     setCreatedToken(null)
@@ -215,7 +217,8 @@ export default function TokensPage() {
 
   async function handleBulkRevoke() {
     if (selected.size === 0) return
-    if (!confirm(t('tokens.confirmBulkRevoke', { count: selected.size }))) return
+    if (!confirmIrreversible(t('tokens.confirmBulkRevoke', { count: selected.size })))
+      return
     setRevoking(true)
     setError('')
     try {

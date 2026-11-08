@@ -187,7 +187,19 @@ class TestTheFoldIsPassedAtEveryCallSite:
                 if not (isinstance(call, ast.Call) and "_run_json" in ast.unparse(call.func)):
                     continue
                 for k in call.keywords:
+                    # The VALUE, not merely that it is a literal (#2425 §2.2).
+                    # `isinstance(..., ast.Constant)` alone collects `tfe=True`
+                    # into a set called `hardcoded_false`, so flipping
+                    # `next_run`'s argument left this assertion satisfied -- and
+                    # the runner protocol would then receive the TFE-folded
+                    # `applying` where the listener needs the real `configuring`.
                     if k.arg == "tfe" and isinstance(k.value, ast.Constant):
+                        assert k.value.value is False, (
+                            f"{fn.name}:{call.lineno} hardcodes `tfe={k.value.value!r}`. Only "
+                            "`False` may be hardcoded, and only by the runner-protocol "
+                            "endpoints: `True` here serves the frozen surface's folded "
+                            "status to the runner, which cannot act on it."
+                        )
                         hardcoded_false.add(fn.name)
         assert hardcoded_false == {"next_run", "update_run_status"}, (
             "only the runner-protocol endpoints may hardcode the surface; a route handler "

@@ -60,28 +60,6 @@ def _guard() -> ast.FunctionDef:
     )
 
 
-def _replaced_names() -> set[str]:
-    """The names the fixture actually swaps out.
-
-    Read from the collection literals it ITERATES, never from its source text. A
-    substring check over the body is satisfied by the refusal message, which names
-    every accessor on purpose so the error can tell the author what to patch -- so
-    `"_get_core_api" in source` stayed true after the guard stopped replacing it,
-    and the first version of this test passed under exactly that mutation. "Does
-    the source mention X" is the weak form of "does the code do X to X", and this
-    is the file where that distinction is the entire subject.
-    """
-    out: set[str] = set()
-    for node in ast.walk(_guard()):
-        if isinstance(node, ast.Tuple | ast.List):
-            out |= {
-                element.value
-                for element in node.elts
-                if isinstance(element, ast.Constant) and isinstance(element.value, str)
-            }
-    return out
-
-
 def _cleared_globals() -> set[str]:
     """Module globals the fixture sets to None on `job_manager`.
 
@@ -118,29 +96,119 @@ def test_the_guard_is_autouse() -> None:
     )
 
 
+def _refusing_sentinel():
+    """The single function the fixture installs on every door it closes.
+
+    Taken from a loader rather than named: the fixture builds one `_refuse`
+    closure and `setattr`s it everywhere, so identity with it is what says a
+    particular door was closed. `load_incluster_config` is the reference because
+    `test_the_guard_refuses_config_loading...` asserts independently that it
+    refuses, so if this reference were ever wrong that test says so first.
+    """
+    from kubernetes import config as k8s_config
+
+    return k8s_config.load_incluster_config
+
+
 def test_the_guard_refuses_every_client_accessor_job_manager_defines() -> None:
+    """RUN the accessors, and check IDENTITY -- the raise alone is masked (#2425 §2.1).
+
+    The previous version parsed the fixture for string literals in any tuple or
+    list and never tied a name to its `setattr`. So replacing the
+    `for name in saved_accessors: setattr(...)` loop with one explicit
+    `setattr(job_manager, "_get_batch_api", _refuse)` left the tuple literal
+    standing and the test green -- with `_get_core_api` wide open, which is the
+    accessor behind `listener`'s three `create_namespaced_secret` calls and
+    `identity`'s `replace_namespaced_secret`. An unpatched test on a workstation
+    pointed at a live cluster could overwrite a listener's credential Secret.
+
+    **Calling it is not enough on its own, and that is the interesting part.**
+    An unreplaced `_get_core_api` still raises here, because it loads config
+    first and the loader guard refuses THAT -- so `pytest.raises` passes under
+    the very mutation this test exists to catch. Defence in depth doing its job
+    is what makes the outer door's absence invisible.
+
+    So both: the call proves the object refuses, and identity with the fixture's
+    one `_refuse` closure proves this particular door is the one that was closed
+    rather than a deeper one catching the fall. Deriving the accessor list from
+    `job_manager`'s own source means an accessor added tomorrow is covered with
+    no edit here.
+    """
+    from terrapod.runner import job_manager
+
     accessors = _accessors()
     assert len(accessors) >= 2, (
         f"found only {accessors} in job_manager; the reader for `_get_*_api` has stopped "
         "reading, so this test is asserting nothing."
     )
-    missing = sorted(accessors - _replaced_names())
-    assert not missing, (
-        f"`job_manager` defines {sorted(accessors)} and the guard replaces {missing} "
-        "nowhere, so that door is open. The accessor it forgot the first time was "
-        "`_get_core_api`, which is the one that WRITES Secrets -- `listener`'s three "
-        "`create_namespaced_secret` calls and `identity`'s `replace_namespaced_secret` "
-        "all go through it."
-    )
+    refuse = _refusing_sentinel()
+    for name in sorted(accessors):
+        door = getattr(job_manager, name)
+        assert door is refuse, (
+            f"`job_manager.{name}` is not the guard's refusing function, so that door is "
+            "open. It may still raise -- config loading is refused underneath it -- which "
+            "is exactly why this asserts identity. The accessor the guard forgot the "
+            "first time was `_get_core_api`, the one that WRITES Secrets."
+        )
+        with pytest.raises(RuntimeError, match="reached the real Kubernetes client"):
+            door()
 
 
 def test_the_guard_refuses_config_loading_so_a_new_client_is_covered_too() -> None:
-    missing = sorted({"load_incluster_config", "load_kube_config"} - _replaced_names())
-    assert not missing, (
-        f"the guard replaces {missing} nowhere. That is what closes the CLASS: "
-        "`component_status._sample_blocking` builds its own `CoreV1Api`, `AppsV1Api` and "
-        "`PolicyV1Api` after its own `load_kube_config()` and never goes through "
-        "job_manager, so refusing the accessors alone cannot see it."
+    """Also run, and this is the clause that closes the CLASS.
+
+    `component_status._sample_blocking` builds its own `CoreV1Api`, `AppsV1Api`
+    and `PolicyV1Api` after its own `load_kube_config()` and never goes through
+    `job_manager`, so refusing the accessors alone cannot see it. A Kubernetes
+    client cannot be built without loading config first, which is what makes this
+    cover a client written somewhere new.
+    """
+    from kubernetes import config as k8s_config
+
+    for name in ("load_incluster_config", "load_kube_config"):
+        with pytest.raises(RuntimeError, match="reached the real Kubernetes client"):
+            getattr(k8s_config, name)()
+
+
+def test_no_module_imports_a_config_loader_BY_NAME() -> None:
+    """A by-name import evades the fixture entirely.
+
+    The guard replaces `kubernetes.config.load_kube_config` as a module
+    ATTRIBUTE, so `from kubernetes import config` then `config.load_kube_config()`
+    is covered -- the lookup happens at call time, through the patched module.
+    `from kubernetes.config import load_kube_config` is not: it binds the real
+    function into the importing module at import time, before any fixture runs,
+    and nothing the guard does afterwards can reach that binding.
+
+    Nothing does this today, so it is preventative rather than a fix -- and worth
+    having precisely because the evasion is silent: the offending module would
+    reach a real cluster while every other test in this file still passed.
+    """
+    import ast as _ast
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "terrapod"
+    loaders = {"load_incluster_config", "load_kube_config"}
+    offenders: list[str] = []
+    scanned = 0
+    for path in sorted(root.rglob("*.py")):
+        scanned += 1
+        for node in _ast.walk(_ast.parse(path.read_text())):
+            if not isinstance(node, _ast.ImportFrom):
+                continue
+            if not (node.module or "").startswith("kubernetes"):
+                continue
+            for alias in node.names:
+                if alias.name in loaders:
+                    offenders.append(f"{path.relative_to(root)}:{node.lineno} {alias.name}")
+    # A floor, because a walk that stops walking must fail rather than pass on
+    # nothing -- this repository's most repeated gate defect.
+    assert scanned >= 100, f"only scanned {scanned} modules; the walk is in the wrong place"
+    assert not offenders, (
+        "these import a Kubernetes config loader by name, which binds the real function at "
+        "import time and cannot be patched by `_no_real_kubernetes`:\n  "
+        + "\n  ".join(offenders)
+        + "\nImport the module instead -- `from kubernetes import config` -- and call "
+        "`config.load_kube_config()`, so the lookup goes through the patched attribute."
     )
 
 

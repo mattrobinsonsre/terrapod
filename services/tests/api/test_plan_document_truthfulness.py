@@ -72,13 +72,34 @@ class TestEveryStatusMapsToOneGoTfeCanSwitchOn:
         assert _plan_status(_run("configuring", True)) == "finished"
 
     def test_no_status_escapes_as_itself(self) -> None:
-        """Derived from the state machine rather than a list kept by hand."""
+        """Derived from the state machine rather than a list kept by hand.
+
+        That sentence was here before #2425 §2.5 and was not true: the set was
+        two literal lines and `VALID_TRANSITIONS` was never read, so adding a
+        status to the machine without a `_plan_status` case left this green --
+        and `_plan_status` ends `return s`, so the new value would reach
+        `go-tfe` verbatim, which is the single thing this test exists to stop.
+
+        It is read off the map now, both sides of it: a status can appear only
+        as a transition TARGET (`configuring` arrived that way), so taking the
+        keys alone would miss exactly the kind of addition this is about. The
+        two sets were identical the day this was fixed, which is the point --
+        a hand-kept list is correct until it is not, and nothing says when.
+        """
         from terrapod.services import run_service
 
         # Every status the state machine can produce, from its own transition map.
-        statuses = {"pending", "queued", "planning", "planned", "confirmed", "applying"}
-        statuses |= {"configuring", "canceling", "applied", "errored", "canceled", "discarded"}
+        statuses = set(run_service.VALID_TRANSITIONS)
+        statuses |= {
+            target for targets in run_service.VALID_TRANSITIONS.values() for target in targets
+        }
         statuses |= set(run_service.TERMINAL_STATES)
+        # A floor, so a map that stops being readable fails here rather than
+        # passing on an empty subject.
+        assert len(statuses) >= 10, (
+            f"derived only {sorted(statuses)} from VALID_TRANSITIONS; the reader has "
+            "stopped reading and this test is asserting nothing"
+        )
 
         # The phase statuses go-tfe declares for a plan.
         allowed = {
