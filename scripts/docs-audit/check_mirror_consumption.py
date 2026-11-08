@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -75,6 +76,112 @@ MIN_REFERENCES = 20
 #: earlier one on the same line.
 OPT_IN_DEFAULT = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:-$")
 
+#: The images the fixtures below are written against. Deliberately fixed rather
+#: than read from `mirror-images.txt`: a fixture whose subject moves when the list
+#: moves is not a fixture, and the point here is to pin the MATCHER.
+SELF_TEST_IMAGES = ("semgrep/semgrep:1.117", "node:24-alpine")
+
+#: Literal lines the verdict must read the stated way, as
+#: `(line, occurrences examined, images judged to bypass the mirror)`.
+#:
+#: This is the gate on the gate, and it exists because the floors below cannot do
+#: this job: `MIN_REFERENCES` proves the subject is non-empty and says nothing
+#: about whether either pass-rule still discriminates. Narrow a rule and the scan
+#: reports correct sites as defects; widen one and it reports nothing -- and both
+#: keep the floor satisfied, because the occurrences are still being counted.
+#:
+#: `examined` is pinned as well as the verdict, because the comment skip is only
+#: visible there: if comments stopped being skipped the counts would rise and the
+#: prose in these files -- which names the upstream image precisely in order to
+#: explain the mirroring -- would be read as a pull.
+SELF_TEST: list[tuple[str, int, list[str]]] = [
+    # The convention: read through an override whose default is upstream.
+    ('    "${SEMGREP_IMAGE:-semgrep/semgrep:1.117}" \\', 1, []),
+    # Already pointed at the mirror, for a single-segment image -- the mirror
+    # path still contains the reference, so the `MIRROR_PREFIX` rule is what
+    # passes it.
+    ("      image: ghcr.io/mattrobinsonsre/mirror/node:24-alpine", 1, []),
+    # Measured, and NOT what reading the code suggests: for a MULTI-segment
+    # image the published mirror path is flattened (`semgrep-semgrep`), so it no
+    # longer contains the literal `semgrep/semgrep:1.117` and is not examined at
+    # all. Pinned because it means the `MIRROR_PREFIX` rule is load-bearing only
+    # for the single-segment entries; the five multi-segment ones reach the
+    # mirror through the override form above, and a hand-written un-flattened
+    # mirror path -- which nothing publishes -- would pass on the prefix alone.
+    ("      image: ghcr.io/mattrobinsonsre/mirror/semgrep-semgrep:1.117", 0, []),
+    ("      image: ghcr.io/mattrobinsonsre/mirror/semgrep/semgrep:1.117", 1, []),
+    # The defect: a bare reference with no indirection at all.
+    ("      image: semgrep/semgrep:1.117", 1, ["semgrep/semgrep:1.117"]),
+    # The #2361 shape -- an `env:` assignment pointing upstream, which is what
+    # `release-rescan.yml` held for `SEMGREP_IMAGE`.
+    ("        SEMGREP_IMAGE: semgrep/semgrep:1.117", 1, ["semgrep/semgrep:1.117"]),
+    # The anchoring: `OPT_IN_DEFAULT` must be the default OF this reference, not
+    # of some earlier expansion on the same line. Drop the `$` anchor and this
+    # line starts passing.
+    (
+        "      run: docker run ${OTHER:-x} semgrep/semgrep:1.117",
+        1,
+        ["semgrep/semgrep:1.117"],
+    ),
+    # Two references on one line are two verdicts, not one.
+    (
+        "      run: docker run node:24-alpine && docker run semgrep/semgrep:1.117",
+        2,
+        ["semgrep/semgrep:1.117", "node:24-alpine"],
+    ),
+    # Must NOT be examined: a comment names the upstream image to explain the
+    # mirroring. Nothing is pulled by prose.
+    ("  # mirrored daily from semgrep/semgrep:1.117", 0, []),
+    ("# node:24-alpine is on the list above", 0, []),
+    # Must NOT be examined: an image that is not on the list is not our business,
+    # so the matcher stays scoped to what the mirror actually publishes.
+    ("      image: python:3.9-slim", 0, []),
+]
+
+
+def line_verdict(line: str, images: Sequence[str]) -> tuple[int, list[str]]:
+    """One workflow line: how many references it carries, and which bypass.
+
+    The scan below calls this for every line of every workflow, so the fixtures
+    in `SELF_TEST` exercise the same code the real run does rather than a
+    restatement of it.
+    """
+    if line.lstrip().startswith("#"):
+        return 0, []
+    examined = 0
+    bypassing: list[str] = []
+    for image in images:
+        for match in re.finditer(re.escape(image), line):
+            examined += 1
+            before = line[: match.start()]
+            if before.endswith(MIRROR_PREFIX):
+                continue
+            if OPT_IN_DEFAULT.search(before):
+                continue
+            bypassing.append(image)
+    return examined, bypassing
+
+
+def self_test() -> list[str]:
+    """Assert the fixtures BEFORE the scan, so a narrowed rule says which line.
+
+    Running this first matters: a matcher that has stopped reading a form
+    otherwise just checks less, silently, and reports OK over whatever it can
+    still see.
+    """
+    out: list[str] = []
+    for line, want_examined, want_bypassing in SELF_TEST:
+        got_examined, got_bypassing = line_verdict(line, SELF_TEST_IMAGES)
+        if got_examined != want_examined or got_bypassing != want_bypassing:
+            out.append(
+                f"the verdict for {line!r} has changed: expected "
+                f"{want_examined} reference(s) and {want_bypassing}, got "
+                f"{got_examined} and {got_bypassing}. Fix the rule rather than "
+                f"the fixture -- a form this gate cannot read is a form it does "
+                f"not check."
+            )
+    return out
+
 
 def mirrored_form(image: str) -> str:
     """The destination `mirror-images.yml` publishes `image` to.
@@ -89,7 +196,35 @@ def mirrored_form(image: str) -> str:
     return f"{MIRROR_PREFIX}{repo.replace('/', '-')}:{tag}"
 
 
+#: The flattening, pinned. Only the failure MESSAGE reads this, so nothing else
+#: would notice it diverging from the workflow's own `${repo//\//-}` -- and a
+#: message naming a path the mirror does not publish sends the reader to a 404.
+FORM_SELF_TEST: list[tuple[str, str]] = [
+    ("semgrep/semgrep:1.117", f"{MIRROR_PREFIX}semgrep-semgrep:1.117"),
+    ("registry:2", f"{MIRROR_PREFIX}registry:2"),
+    (
+        "mcr.microsoft.com/playwright:v1.58.2-noble",
+        f"{MIRROR_PREFIX}mcr.microsoft.com-playwright:v1.58.2-noble",
+    ),
+]
+
+
 def main() -> int:
+    blockers = self_test()
+    for image, want in FORM_SELF_TEST:
+        got = mirrored_form(image)
+        if got != want:
+            blockers.append(
+                f"mirrored_form({image!r}) now gives {got!r}, not {want!r}. The "
+                f"flattening has diverged from the mirror workflow's own rule, so "
+                f"the failure message would name a path nothing publishes."
+            )
+    if blockers:
+        print("FAIL — this gate cannot do its job:\n")
+        for blocker in blockers:
+            print(f"  {blocker}")
+        return 1
+
     listing = ROOT / IMAGE_LIST
     if not listing.is_file():
         print(f"FAIL — {IMAGE_LIST} does not exist")
@@ -126,21 +261,14 @@ def main() -> int:
     for path in workflows:
         rel = path.relative_to(ROOT)
         for number, line in enumerate(path.read_text().splitlines(), start=1):
-            if line.lstrip().startswith("#"):
-                continue
-            for image in images:
-                for match in re.finditer(re.escape(image), line):
-                    examined += 1
-                    before = line[: match.start()]
-                    if before.endswith(MIRROR_PREFIX):
-                        continue
-                    if OPT_IN_DEFAULT.search(before):
-                        continue
-                    problems.append(
-                        f"{rel}:{number} pulls {image} from upstream, though it "
-                        f"is mirrored at {mirrored_form(image)}\n"
-                        f"    {line.strip()}"
-                    )
+            here, bypassing = line_verdict(line, images)
+            examined += here
+            for image in bypassing:
+                problems.append(
+                    f"{rel}:{number} pulls {image} from upstream, though it "
+                    f"is mirrored at {mirrored_form(image)}\n"
+                    f"    {line.strip()}"
+                )
 
     if examined < MIN_REFERENCES:
         print(
@@ -164,7 +292,9 @@ def main() -> int:
 
     print(
         f"OK — {len(images)} mirrored image(s), {examined} reference(s) across "
-        f"{len(workflows)} workflow file(s), none bypassing the mirror"
+        f"{len(workflows)} workflow file(s), none bypassing the mirror; "
+        f"{len(SELF_TEST)} verdict fixture(s) and {len(FORM_SELF_TEST)} "
+        f"flattening fixture(s) hold"
     )
     return 0
 
