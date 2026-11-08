@@ -2073,7 +2073,7 @@ function RunDetailPageInner() {
         <button
           onClick={remediateDrift}
           disabled={!!actionLoading}
-          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900/40 disabled:text-amber-600/70 text-white transition-colors"
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-500/80 disabled:bg-amber-900/40 disabled:text-amber-600/70 text-black transition-colors"
           title={word('driftRemediateTitle')}
         >
           {actionLoading === 'remediate' ? t('actions.queuing') : word('driftRemediate')}
@@ -2097,7 +2097,7 @@ function RunDetailPageInner() {
         <button
           onClick={() => requestAction('confirm')}
           disabled={!!actionLoading}
-          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-green-400 text-white transition-colors"
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-green-500 hover:bg-green-500/80 disabled:bg-green-800 disabled:text-green-400 text-black transition-colors"
         >
           {actionLoading === 'confirm' ? t('actions.confirming') : (
             <>
@@ -2111,7 +2111,7 @@ function RunDetailPageInner() {
         <button
           onClick={() => requestAction('discard')}
           disabled={!!actionLoading}
-          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-slate-600 hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-400 text-white transition-colors"
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-400 text-slate-200 transition-colors"
         >
           {actionLoading === 'discard' ? t('actions.discarding') : t('actions.discard')}
         </button>

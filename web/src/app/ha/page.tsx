@@ -263,8 +263,8 @@ export default function HAPage() {
                     <div
                       className={`mb-4 rounded-lg px-3 py-2 text-sm ${
                         status['in-sync']
-                          ? 'bg-emerald-950/40 text-emerald-200'
-                          : 'bg-amber-950/40 text-amber-200'
+                          ? 'bg-emerald-900/40 text-emerald-200'
+                          : 'bg-amber-900/40 text-amber-200'
                       }`}
                     >
                       {status['in-sync']
@@ -320,7 +320,7 @@ export default function HAPage() {
                         {status['backfilling-classes'].map((c) => (
                           <li
                             key={c}
-                            className="rounded bg-amber-950/40 px-2 py-1 font-mono text-xs text-amber-200"
+                            className="rounded bg-amber-900/40 px-2 py-1 font-mono text-xs text-amber-200"
                           >
                             {c}
                           </li>
@@ -367,7 +367,7 @@ export default function HAPage() {
                             {t('components.ready', { ready: c.ready, desired: c.desired })}
                           </span>
                           {c.pdb && c['pdb-permits-disruption'] === false && (
-                            <span className="rounded bg-amber-950/40 px-2 py-0.5 text-xs text-amber-200">
+                            <span className="rounded bg-amber-900/40 px-2 py-0.5 text-xs text-amber-200">
                               {t('components.pdbBlocks')}
                             </span>
                           )}
@@ -411,7 +411,7 @@ export default function HAPage() {
                   {pools.some((p) => p.status !== 'online') && (
                     // Named rather than left for the reader to spot: a pool with
                     // no live listener is the thing being looked for.
-                    <p className="mt-4 rounded-lg bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+                    <p className="mt-4 rounded-lg bg-amber-900/40 px-3 py-2 text-sm text-amber-200">
                       {t('listeners.offlineWarning', {
                         pools: pools
                           .filter((p) => p.status !== 'online')

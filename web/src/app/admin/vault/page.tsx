@@ -72,9 +72,9 @@ interface Meta {
 type Tone = 'good' | 'bad' | 'warn' | 'neutral'
 
 const TONE: Record<Tone, string> = {
-  good: 'bg-emerald-950/50 text-emerald-300 border-emerald-800',
+  good: 'bg-emerald-900/50 text-emerald-300 border-emerald-800',
   bad: 'bg-red-950/50 text-red-300 border-red-800',
-  warn: 'bg-amber-950/50 text-amber-300 border-amber-800',
+  warn: 'bg-amber-900/50 text-amber-300 border-amber-800',
   neutral: 'bg-slate-800 text-slate-300 border-slate-600',
 }
 

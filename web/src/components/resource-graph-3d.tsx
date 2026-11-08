@@ -236,7 +236,7 @@ function ToolBtn({ onClick, active, children }: { onClick: () => void; active?: 
       onClick={onClick}
       className={`text-[11px] font-medium px-2.5 py-1.5 rounded-lg backdrop-blur ${
         active
-          ? 'bg-brand-500/30 text-brand-200 outline outline-1 outline-brand-500/50'
+          ? 'bg-brand-500/30 text-brand-100 outline outline-1 outline-brand-500/50'
           : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/90'
       }`}
     >

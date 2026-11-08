@@ -229,7 +229,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
           description={t('subtitle', { createdBy: ps.attributes['created-by'] || t('unknown') })}
           actions={
             <button onClick={deleteSet}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 text-red-200 transition-colors">
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-200 transition-colors">
               {t('actions.deleteSet')}
             </button>
           }
@@ -390,7 +390,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
                     if (res.ok) load()
                   } catch {}
                 }}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-700 hover:bg-indigo-600 text-white transition-colors"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
               >
                 {t('actions.syncNow')}
               </button>

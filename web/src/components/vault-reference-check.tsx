@@ -32,10 +32,10 @@ export interface VaultCheckResult {
 }
 
 const STATUS_STYLE: Record<CheckItem['status'], { cls: string; icon: LucideIcon }> = {
-  pass: { cls: 'bg-emerald-950/50 text-emerald-300 border-emerald-800', icon: CheckCircle2 },
+  pass: { cls: 'bg-emerald-900/50 text-emerald-300 border-emerald-800', icon: CheckCircle2 },
   fail: { cls: 'bg-red-950/50 text-red-300 border-red-800', icon: XCircle },
   skipped: { cls: 'bg-slate-800 text-slate-300 border-slate-600', icon: CircleSlash },
-  unknown: { cls: 'bg-amber-950/50 text-amber-300 border-amber-800', icon: HelpCircle },
+  unknown: { cls: 'bg-amber-900/50 text-amber-300 border-amber-800', icon: HelpCircle },
 }
 
 const NAME_KEYS: Record<string, string> = {

@@ -261,7 +261,7 @@ function LoginContent() {
                 <button
                   key={provider.name}
                   onClick={() => startExternalLogin(provider.name)}
-                  className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-700 hover:bg-brand-600 text-white"
+                  className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-600 hover:bg-brand-600/80 text-white"
                 >
                   {t('signInWith', { provider: provider.name })}
                 </button>

@@ -1037,7 +1037,7 @@ export default function CatalogItemPage() {
                 type="button"
                 onClick={handleOrphan}
                 disabled={orphanBusy || orphanConfirm !== orphanInstance.attributes.name}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
               >
                 {orphanBusy ? t('orphan.orphaning') : t('orphan.submit')}
               </button>

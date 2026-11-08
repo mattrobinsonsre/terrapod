@@ -518,7 +518,7 @@ export default function UsersPage() {
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
                             a['is-active']
                               ? 'bg-green-900/50 text-green-300 hover:bg-green-900/80'
-                              : 'bg-red-900/50 text-red-300 hover:bg-red-900/80'
+                              : 'bg-red-900/50 text-red-300 hover:bg-red-900/60'
                           }`}
                         >
                           {a['is-active'] ? t('status.active') : t('status.inactive')}

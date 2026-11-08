@@ -119,9 +119,9 @@ const ICONS = {
 } as const
 
 const TONES = {
-  ok: 'border-emerald-800/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70',
-  warn: 'border-amber-700/60 bg-amber-950/50 text-amber-200 hover:bg-amber-950/80',
-  passive: 'border-sky-800/60 bg-sky-950/40 text-sky-300 hover:bg-sky-950/70',
+  ok: 'border-emerald-800/60 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/70',
+  warn: 'border-amber-700/60 bg-amber-900/50 text-amber-200 hover:bg-amber-900/80',
+  passive: 'border-sky-800/60 bg-sky-900/40 text-sky-300 hover:bg-sky-900/70',
   down: 'border-red-800/60 bg-red-950/50 text-red-200 hover:bg-red-950/80',
 } as const
 

@@ -4266,7 +4266,7 @@ function WorkspaceDetailContent() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => { setLockoutWarning(''); setEditLabels(attrs.labels || {}); }}
-                      className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                      className="px-3 py-1 rounded text-xs text-slate-300 hover:text-slate-100 bg-slate-700 hover:bg-slate-600"
                     >
                       {t('lockout.revertLabels')}
                     </button>
@@ -4307,7 +4307,7 @@ function WorkspaceDetailContent() {
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       attrs.locked
                         ? 'bg-amber-900/40 hover:bg-amber-900/60 text-amber-300'
-                        : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
                     }`}
                   >
                     {attrs.locked ? t('lock.unlock') : t('lock.lock')}
@@ -4326,8 +4326,8 @@ function WorkspaceDetailContent() {
                     disabled={savingDrift}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       attrs['drift-detection-enabled']
-                        ? 'bg-green-600 hover:bg-green-500 text-white'
-                        : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
+                        ? 'bg-green-500 hover:bg-green-500/80 text-black'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
                     }`}
                   >
                     {savingDrift ? t('actions.savingEllipsis') : attrs['drift-detection-enabled'] ? t('common.enabled') : t('common.disabled')}

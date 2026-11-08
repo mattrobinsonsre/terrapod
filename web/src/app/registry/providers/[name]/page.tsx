@@ -243,7 +243,7 @@ export default function ProviderDetailPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setLockoutWarning(''); setEditLabels(providerMeta.attributes.labels || {}); }}
-                    className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                    className="px-3 py-1 rounded text-xs text-slate-300 hover:text-slate-100 bg-slate-700 hover:bg-slate-600"
                   >
                     {t('meta.revertLabels')}
                   </button>
