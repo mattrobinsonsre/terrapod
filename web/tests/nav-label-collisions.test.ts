@@ -38,6 +38,10 @@ const NOT_A_DESTINATION = new Set(['label', 'selectLabel'])
 describe('the workspace tab strip and the inventory sub-nav share no label', () => {
   it('holds in every locale that carries both', () => {
     let checked = 0
+    /** Locales that cannot tell their own tabs apart, which this cannot hold
+     *  to telling them apart from a sub-nav. Collected rather than skipped, and
+     *  asserted below against the one locale where it is the joke working. */
+    const selfColliding: string[] = []
     for (const loc of locales) {
       const cat = JSON.parse(
         readFileSync(join(import.meta.dirname, '..', 'messages', `${loc}.json`), 'utf8'),
@@ -57,7 +61,16 @@ describe('the workspace tab strip and the inventory sub-nav share no label', () 
       // lossy locale exempts itself; a real locale that starts colliding with
       // itself has a worse problem than this gate.
       const values = destinations.map(([, v]) => v.trim().toLowerCase())
-      if (new Set(values).size !== values.length) continue
+      if (new Set(values).size !== values.length) {
+        // RECORDED, not silently skipped (#2425 §2.6). The exemption itself is
+        // sound -- `en-x-marklar` replaces every noun with one word, so its tab
+        // strip legitimately reads "Marklar", "Marklars" and "Run marklars" --
+        // but `continue` meant a REAL locale that started colliding with itself
+        // dropped out of the gate with nothing saying so, and the floor below
+        // carried enough slack to absorb it. The set is asserted after the loop.
+        selfColliding.push(loc)
+        continue
+      }
       checked += 1
       const tabLabels = new Map<string, string>()
       for (const [k, v] of destinations) tabLabels.set(v.trim().toLowerCase(), k)
@@ -72,6 +85,21 @@ describe('the workspace tab strip and the inventory sub-nav share no label', () 
         )
       }
     }
+    // Exactly the lossy locale, and nothing else. A silent `continue` is how a
+    // real locale's collision becomes invisible; an assertion makes adding a
+    // second lossy locale a deliberate edit with a reason, which is what the
+    // old comment promised ("a second lossy locale exempts itself") and what
+    // nothing enforced.
+    assert.deepEqual(
+      selfColliding.sort(),
+      ['en-x-marklar'],
+      'these locales cannot tell their own workspace tabs apart, so this gate skipped ' +
+        'them: ' +
+        selfColliding.join(', ') +
+        '. `en-x-marklar` is expected -- it replaces every noun with one word. Any ' +
+        'other locale here has a worse problem than this gate and needs fixing, not ' +
+        'adding to this list.',
+    )
     // A floor, so a renamed block cannot make this pass on nothing.
     assert.ok(checked >= 29, `only ${checked} locales carry both blocks and distinguish their own tabs`)
   })
