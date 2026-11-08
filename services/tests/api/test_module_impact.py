@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -11,6 +12,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 from terrapod.storage import get_storage
+from tests.post_plan_stubs import stub_post_plan_view_reads, stub_run_lifecycle_task_stages
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -190,6 +192,16 @@ def _make_app(user, mock_db=None, mock_storage=None):
 
 
 class TestRunJsonModuleOverrides:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_side_effects(self):
+        """`create_run` reserves a post-plan task stage and `show_run` builds the
+        TFE post-plan view now that `runs.tfe_post_plan_decisions` defaults on
+        (#2425). Both query a DB this test mocks narrowly, and neither is its
+        subject -- the module overrides are -- so both are stubbed. See
+        `tests/post_plan_stubs.py` for why, and for where they ARE covered."""
+        with stub_run_lifecycle_task_stages(), stub_post_plan_view_reads():
+            yield
+
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")

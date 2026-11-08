@@ -393,7 +393,7 @@ lost is the audit trail the caller tried to leave.
 
 These are CLI-aware (run progress display branches on relationships) but only exercised when the relationship is present on the run. Terrapod does not implement cost estimates in this shape, or Sentinel. Its OPA policy sets and security scan are served as **policy checks**, and run tasks as **task stages** (#1704).
 
-The run lists both in its relationships only in the Terraform Enterprise post-plan vocabulary (`api.config.runs.tfe_post_plan_decisions`, the default from 2.0), because that is what makes the CLI act on them; the same setting makes a held run report `policy_override` / `post_plan_awaiting_decision`, the statuses on which the CLI's confirm loop offers an override. See [post-plan-decisions.md](post-plan-decisions.md).
+The run lists both in its relationships only in the Terraform Enterprise post-plan vocabulary (`api.config.runs.tfe_post_plan_decisions`, on by default from 2.0.0), because that is what makes the CLI act on them; the same setting makes a held run report `policy_override` / `post_plan_awaiting_decision`, the statuses on which the CLI's confirm loop offers an override. See [post-plan-decisions.md](post-plan-decisions.md).
 
 | Method | Path | go-tfe method | Caller |
 |---|---|---|---|

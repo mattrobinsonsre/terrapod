@@ -857,15 +857,17 @@ class AuthConfig(BaseSettings):
         description="Base URL for IDP callbacks (externally-reachable URL)",
     )
     legacy_callback_url: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Build the SSO callback and SAML ACS URLs on the deprecated "
             "/api/terrapod/v1 prefix instead of the canonical /api/v1 (#1529). "
-            "Defaults to true so upgrading cannot break SSO: these URLs are "
-            "registered with your identity provider, which validates them "
-            "against its own allow-list, so serving both prefixes does NOT "
-            "make the switch safe on its own. Register the /api/v1 URLs with "
-            "your IdP first, then set this to false. The default flips in 2.0.0."
+            "Defaulted to true through 1.x so upgrading could not break SSO, "
+            "and FLIPPED to false in 2.0.0. These URLs are registered with "
+            "your identity provider, which validates them against its own "
+            "allow-list, so Terrapod serving both prefixes does NOT make the "
+            "switch safe on its own: register the /api/v1 URLs with your IdP "
+            "BEFORE upgrading, or set this back to true explicitly until you "
+            "have. See docs/upgrading-to-2.0.md."
         ),
     )
     sso: SSOConfig = Field(default_factory=SSOConfig)
@@ -1966,7 +1968,7 @@ class RunsConfig(BaseModel):
     """How runs are reported (#1704)."""
 
     tfe_post_plan_decisions: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Report a run that a post-plan gate stops the way Terraform "
             "Enterprise does: the statuses post_plan_running, "
@@ -1976,7 +1978,9 @@ class RunsConfig(BaseModel):
             "A failed mandatory run task then holds the run for a decision "
             "instead of erroring it. A client can ask for either behaviour per "
             "request with the X-Terrapod-Post-Plan-Decisions header (tfe or "
-            "legacy); the hold applies to every run. The default flips in 2.0.0."
+            "legacy); the hold applies to every run. Defaulted to false "
+            "through 1.x and FLIPPED to true in 2.0.0; set it back to false "
+            "explicitly to keep the 1.x vocabulary."
         ),
     )
 

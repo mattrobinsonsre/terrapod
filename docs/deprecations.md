@@ -188,11 +188,14 @@ are *registered with your identity provider*, which validates what Terrapod send
 against its own allow-list. Terrapod serving both prefixes does not help: an
 unregistered `redirect_uri` is refused **at the IdP**, before the request reaches
 us. So the callback URL is governed by an explicit switch,
-`api.config.auth.legacy_callback_url`, which defaults to `true` (the old prefix).
+`api.config.auth.legacy_callback_url`. It defaulted to `true` (the old prefix)
+through 1.x and **defaults to `false` from 2.0.0**.
 
 To move it: add `{callback_base_url}/api/v1/auth/callback` — and
 `/api/v1/auth/saml/acs` if you use SAML — to your IdP's allowed URLs **first**,
-then set `legacy_callback_url: false`. The default flips in 2.0.0; see
+then set `legacy_callback_url: false` — or, from 2.0.0, simply take the new
+default. Upgrading to 2.0.0 moves these URLs **for you**, so do the IdP
+registration first or set the switch back to `true` explicitly; see
 [upgrading-to-2.0.md](upgrading-to-2.0.md).
 
 ## Behaviour changes in v1.10.0
@@ -395,9 +398,11 @@ time" as a stuck run, key it on `blocked-by` instead. A run with a non-null
 `blocked-by` is waiting for a decision, not stuck. Code that reads `blocked-by`
 keeps working unchanged in 2.0.
 
-**Opting in early:** releases that carry `api.config.runs.tfe_post_plan_decisions`
-can report the new statuses now, for the whole deployment (set it to `true`) or
-for one client (send `X-Terrapod-Post-Plan-Decisions: tfe`). The same setting
+**Choosing the vocabulary:** 2.0.0 reports the new statuses by default
+(`api.config.runs.tfe_post_plan_decisions`, `false` through 1.x). On a 1.x
+release you can opt in early, for the whole deployment (set it to `true`) or for
+one client (send `X-Terrapod-Post-Plan-Decisions: tfe`); from 2.0.0 the same
+switch takes you back (`false`, or `X-Terrapod-Post-Plan-Decisions: legacy`). The same setting
 makes a failed mandatory run task hold the run instead of erroring it. See
 [post-plan-decisions.md](post-plan-decisions.md) and
 [upgrading-to-2.0.md](upgrading-to-2.0.md).

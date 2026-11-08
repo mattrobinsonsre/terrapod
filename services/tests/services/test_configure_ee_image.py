@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.db.models import DEFAULT_ANSIBLE_LINE
 from terrapod.services import ansible_ee_service, inventory_resolve
 from terrapod.services.run_service import create_run
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 _REPO = "ghcr.io/example/terrapod-ee"
 
@@ -84,6 +85,16 @@ async def _make(ws, **kw) -> dict:
 
 @pytest.mark.asyncio
 class TestAConfigureCarriesItsEnvironment:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     async def test_a_standalone_configure_gets_an_ee_image(self):
         with patch.object(ansible_ee_service.settings.ansible, "ee_repository", _REPO):
             kwargs = await _make(_ws(plan_apply_enabled=False), is_configure=True)
@@ -138,6 +149,16 @@ class TestAConfigureCarriesItsEnvironment:
 
 @pytest.mark.asyncio
 class TestAPlanOrApplyCarriesNone:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     async def test_a_plan_apply_run_gets_no_ee_image(self):
         """The negative half, and it is not cosmetic.
 

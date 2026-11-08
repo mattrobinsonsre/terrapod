@@ -34,6 +34,19 @@ def tfe_vocabulary():
         yield
 
 
+@pytest.fixture
+def legacy_vocabulary():
+    """Explicit, because the DEFAULT flipped to the TFE vocabulary in 2.0.
+
+    A 1.x-behaviour test used to need no fixture at all and so was really
+    asserting the default. That reads as "this is what Terrapod does" when it
+    means "this is what Terrapod does today", and it silently became a test of
+    the other vocabulary the moment the default moved.
+    """
+    with patch.object(settings.runs, "tfe_post_plan_decisions", False):
+        yield
+
+
 async def _add_post_plan_task(client, ws_id: str) -> None:
     resp = await client.post(
         f"/api/v1/workspaces/{ws_id}/run-tasks",
@@ -81,7 +94,7 @@ class TestTheStageExistsFromTheStart:
         ids = [d["id"] for d in resp.json()["data"]["relationships"]["task-stages"]["data"]]
         assert ids == [f"ts-{stages[0].id}"]
 
-    async def test_1_x_reserves_nothing(self, app, client):
+    async def test_1_x_reserves_nothing(self, app, client, legacy_vocabulary):
         set_auth(app, admin_user())
         ws_id = await _create_workspace(client, "ppd-no-reserve")
         await _add_post_plan_task(client, ws_id)

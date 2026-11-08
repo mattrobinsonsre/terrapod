@@ -209,10 +209,20 @@ class TestTheSSOCallbackSwitch:
     consequence of the routing change.
     """
 
-    def test_defaults_to_the_legacy_prefix_so_upgrading_cannot_break_sso(self) -> None:
+    def test_the_default_moved_to_the_canonical_prefix_in_2_0(self) -> None:
+        """It was True through 1.x, for the reason in this class's docstring.
+
+        2.0 is a major, so it is where the deprecated prefix stops being the
+        default -- and an operator who has not re-registered their IdP URLs
+        sets it back to True explicitly, which is what the upgrade guide
+        lists first. The assertion is kept rather than deleted because the
+        value IS the behaviour here: an accidental flip either way locks
+        somebody out of the UI, in one direction on upgrade and in the other
+        for anyone who prepared for it.
+        """
         from terrapod.config import Settings
 
-        assert Settings().auth.legacy_callback_url is True
+        assert Settings().auth.legacy_callback_url is False
 
     def test_the_switch_selects_the_prefix(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from terrapod.api.routers import auth as auth_router

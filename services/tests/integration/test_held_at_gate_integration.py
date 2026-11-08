@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
+from terrapod.config import settings
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.services import security_scan_service
@@ -56,19 +57,40 @@ async def _status(rid: uuid.UUID) -> str:
 
 
 class TestARunHeldByAnEnforcedScan:
-    async def test_reports_the_gate_and_a_finished_plan(self, app, client):
+    @pytest.mark.parametrize(
+        ("tfe", "want_status"),
+        [(False, "planning"), (True, "policy_override")],
+        ids=["1.x vocabulary", "tfe vocabulary"],
+    )
+    async def test_reports_the_gate_and_a_finished_plan(self, app, client, tfe, want_status):
+        """The gate and the finished plan are reported; only the STATUS differs.
+
+        `runs.tfe_post_plan_decisions` flipped to `true` in 2.0 (#2425), so a
+        run an enforced scan holds reports `policy_override` on
+        `/api/tfe/v2` where it used to report `planning`. That is the whole
+        point of the flip -- the 1.x answer is indistinguishable from work in
+        progress, which is why a held run could not be discarded.
+
+        Parametrised over BOTH rather than repointed at the new default,
+        because the property under test is that the gate is visible and the
+        plan is finished, and that holds either way. A test pinned to one
+        value passes again the next time a default moves while saying nothing
+        about the operator who set it back -- and `blocked-by` being identical
+        across both is the part the upgrade guide promises.
+        """
         set_auth(app, admin_user())
-        ws_id = await _create_workspace(client, "held-report")
+        ws_id = await _create_workspace(client, f"held-report-{'tfe' if tfe else 'legacy'}")
         run = await _create_run(client, ws_id)
         await _hold_at_scan_gate(run["id"])
 
-        resp = await client.get(f"/api/v2/runs/{run['id']}", headers=AUTH)
-        assert resp.status_code == 200, resp.text
-        attrs = resp.json()["data"]["attributes"]
-        assert attrs["status"] == "planning"
-        assert attrs["blocked-by"] == "security-scan"
-        assert attrs["actions"]["is-discardable"] is True
-        assert attrs["actions"]["is-confirmable"] is False
+        with patch.object(settings.runs, "tfe_post_plan_decisions", tfe):
+            resp = await client.get(f"/api/v2/runs/{run['id']}", headers=AUTH)
+            assert resp.status_code == 200, resp.text
+            attrs = resp.json()["data"]["attributes"]
+            assert attrs["status"] == want_status
+            assert attrs["blocked-by"] == "security-scan"
+            assert attrs["actions"]["is-discardable"] is True
+            assert attrs["actions"]["is-confirmable"] is False
 
         plan_id = resp.json()["data"]["relationships"]["plan"]["data"]["id"]
         plan = await client.get(f"/api/v2/plans/{plan_id}", headers=AUTH)

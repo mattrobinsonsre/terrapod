@@ -23,6 +23,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.db.session import get_db
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 pytestmark = pytest.mark.asyncio
 
@@ -205,6 +206,16 @@ class TestConcurrency:
     """Refuse-to-start. A 409 on begin ends the CLI immediately, printing the
     service's message verbatim — so the message is the whole explanation."""
 
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     async def test_a_second_update_is_refused_while_one_is_in_flight(self) -> None:
         from terrapod.api.routers.pulumi_service import _begin_update
 
@@ -320,6 +331,16 @@ class TestAnAgentRunIsNotWhatTheseGuardsRefuse:
     only on its own run's workspace (`_runner_caps_on`, #1880), and
     `_authorized_stack` has already required it before execution reaches here.
     """
+
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
 
     async def test_it_is_not_refused_by_the_lock_it_would_itself_be_holding(self) -> None:
         """`take_workspace_lock` refuses while a run on this workspace is

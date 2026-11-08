@@ -61,10 +61,10 @@ The deployment-wide default is a Helm value:
 api:
   config:
     runs:
-      tfe_post_plan_decisions: false   # true for the Terraform Enterprise vocabulary
+      tfe_post_plan_decisions: true    # false for the 1.x vocabulary
 ```
 
-It defaults to `false` in 1.x and flips to `true` in 2.0.0; see
+It defaulted to `false` in 1.x and **defaults to `true` from 2.0.0**; see
 [upgrading-to-2.0.md](upgrading-to-2.0.md). The setting also decides whether a
 failed mandatory run task holds or errors a run.
 

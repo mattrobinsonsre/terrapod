@@ -648,7 +648,9 @@ data:
     {{- end }}
     {{- if .Values.api.config.runs }}
     runs:
-      tfe_post_plan_decisions: {{ .Values.api.config.runs.tfe_post_plan_decisions | default false }}
+      {{- if hasKey .Values.api.config.runs "tfe_post_plan_decisions" }}
+      tfe_post_plan_decisions: {{ .Values.api.config.runs.tfe_post_plan_decisions }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.slack }}
     slack:

@@ -411,7 +411,7 @@ curl -X POST https://terrapod.local/api/tfe/v2/task-stages/ts-id/actions/overrid
 This sets the stage status to `overridden` and moves the run on at once.
 
 By default a failed mandatory post-plan task errors the run. With
-`api.config.runs.tfe_post_plan_decisions: true` (the default from 2.0) it holds
+`api.config.runs.tfe_post_plan_decisions: true` (on by default from 2.0.0) it holds
 the run instead, reported as `post_plan_awaiting_decision`, so it can be
 overridden later or discarded, and `tofu apply` shows the task results and
 offers the override — see [post-plan-decisions.md](post-plan-decisions.md).
