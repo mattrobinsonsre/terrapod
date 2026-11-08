@@ -27,6 +27,7 @@
     "expires-at",
     "is-revoked",
     "max-uses",
+    "token",
     "use-count"
   ],
   "ai_policy._evaluation_json": [
@@ -995,6 +996,30 @@
     "pending",
     "running"
   ],
+  "runs.native_run_queue": [
+    "position-in-queue"
+  ],
+  "runs.next_run": [
+    "ansible-auth",
+    "ansible-collections",
+    "cost-default-region",
+    "cost-estimation",
+    "debug-mode",
+    "dynamic-inventory-enabled",
+    "engine",
+    "env-vars",
+    "execution-hooks",
+    "git-auth",
+    "inventory-scripts-enabled",
+    "phase",
+    "pulumi-bind-plan",
+    "pulumi-stack",
+    "terraform-vars",
+    "var-files",
+    "vault-files",
+    "working-directory",
+    "workspace-id"
+  ],
   "runs.post_cost_summary_message": [
     "content",
     "translated"
@@ -1034,6 +1059,9 @@
     "translated",
     "updated-at"
   ],
+  "runs.show_run": [
+    "last-output-at"
+  ],
   "security_scanning._scan_json": [
     "created-at",
     "enforcement-level",
@@ -1060,6 +1088,9 @@
     "sensitive",
     "type",
     "value"
+  ],
+  "tfe_v2._queue_item_json": [
+    "position-in-queue"
   ],
   "tfe_v2._state_version_json": [
     "created-at",

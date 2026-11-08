@@ -104,11 +104,57 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
     return var_keys
 
 
+def _chain_block_keys(fn: ast.AST, block: str) -> set[str]:
+    """Keys written through a SUBSCRIPT CHAIN, e.g.
+    ``document["data"]["attributes"]["position-in-queue"] = position``.
+
+    `_local_dict_keys` follows one level (``name["key"] = ...``) because that is
+    the shape it was written for. A chain whose target sits two or more levels
+    deep has a Subscript — not a Name — as its `.value`, so it matched nothing,
+    and an attribute added that way was pinned by this snapshot at all: the
+    serializer's literal dict is complete and the injection happens after it.
+
+    Measured when this was added: four attributes across three routers were
+    invisible, and they are not minor ones. `agent_pools._token_json` returns
+    the raw join `token` exactly once, on create, so a rename breaks every
+    listener bootstrap; `runs.show_run` injects `last-output-at`, which is what
+    the UI reads to tell a quiet configure from a stalled one; and
+    `position-in-queue` is the single attribute the two run-queue routes exist
+    to produce. #2425 section 4.6 reported one of the four, as "a worked example
+    of a snapshot pinning less than it appears to" -- so the example is the
+    point, and the fix is the chain rather than the instance.
+
+    The rule is deliberately narrow: the segment BEFORE the final key must be
+    the block's own name. That is what makes it a write into this block rather
+    than a guess about any nested dict, and it needs no exemption ledger.
+    """
+    found: set[str] = set()
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Assign):
+            continue
+        for tgt in node.targets:
+            if not isinstance(tgt, ast.Subscript) or isinstance(tgt.value, ast.Name):
+                continue
+            if not (isinstance(tgt.slice, ast.Constant) and isinstance(tgt.slice.value, str)):
+                continue
+            parent = tgt.value
+            if not isinstance(parent, ast.Subscript):
+                continue
+            if not (isinstance(parent.slice, ast.Constant) and parent.slice.value == block):
+                continue
+            found.add(tgt.slice.value)
+            if isinstance(node.value, ast.Dict):
+                found |= _dict_literal_keys(node.value, _prefix=f"{tgt.slice.value}.")
+    return found
+
+
 def _block_of_function(fn: ast.AST, block: str) -> set[str] | None:
     """Return the string keys of the function's ``block`` dict — whether written
-    inline (``"attributes": {...}``) or via a local variable
-    (``attrs = {...}; "attributes": attrs``) — or None if it has no such block."""
+    inline (``"attributes": {...}``), via a local variable
+    (``attrs = {...}; "attributes": attrs``), or through a subscript chain into
+    an already-built document — or None if it has no such block."""
     var_keys = _local_dict_keys(fn)
+    chained = _chain_block_keys(fn, block)
     for node in ast.walk(fn):
         if not isinstance(node, ast.Dict):
             continue
@@ -116,10 +162,12 @@ def _block_of_function(fn: ast.AST, block: str) -> set[str] | None:
             if not (isinstance(key, ast.Constant) and key.value == block):
                 continue
             if isinstance(value, ast.Dict):
-                return _dict_literal_keys(value)
+                return _dict_literal_keys(value) | chained
             if isinstance(value, ast.Name) and value.id in var_keys:
-                return var_keys[value.id]
-    return None
+                return var_keys[value.id] | chained
+    # A function that only INJECTS into a document another function built has
+    # no block of its own, and its keys belong to that document all the same.
+    return chained or None
 
 
 def _attributes_of_function(fn: ast.AST) -> set[str] | None:
@@ -269,3 +317,62 @@ def test_nested_extraction_covers_the_variable_form() -> None:
     ).body[0]
     keys = _attributes_of_function(fn)
     assert keys == {"a", "nested", "nested.leaf", "later", "later.also"}
+
+
+def test_a_subscript_chain_into_an_existing_document_is_extracted() -> None:
+    """``document["data"]["attributes"]["k"] = v`` -- the shape that was invisible.
+
+    A route that calls another serializer and then injects one attribute has no
+    ``"attributes"`` literal of its own, so this is the only thing standing
+    between such an attribute and no gate at all (#2425 section 4.6).
+    """
+    fn = ast.parse(
+        "def s(x):\n"
+        "    document = build(x)\n"
+        "    document['data']['attributes']['position-in-queue'] = 3\n"
+        "    document['data']['attributes']['extra'] = {'leaf': 1}\n"
+        "    return document['data']\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"position-in-queue", "extra", "extra.leaf"}
+
+
+def test_a_chain_injection_unions_with_the_function_s_own_block() -> None:
+    """A serializer that builds its block AND injects into it keeps both."""
+    fn = ast.parse(
+        "def s(x):\n"
+        "    result = {'attributes': {'use-count': 1}}\n"
+        "    result['attributes']['token'] = raw\n"
+        "    return result\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"use-count", "token"}
+
+
+def test_a_chain_rule_reads_the_block_before_the_key_not_any_nesting() -> None:
+    """The segment before the final key must BE the block.
+
+    Without that clause the rule would claim any key written into any nested
+    dict, which is a guess rather than a reading -- and it would put
+    ``relationships`` and ``links`` keys into the attribute contract.
+    """
+    fn = ast.parse(
+        "def s(x):\n"
+        "    d = build(x)\n"
+        "    d['data']['relationships']['workspace'] = ref\n"
+        "    d['data']['links']['self'] = url\n"
+        "    d['meta']['pagination'] = page\n"
+        "    return d\n"
+    ).body[0]
+    assert _attributes_of_function(fn) is None
+    assert _meta_of_function(fn) == {"pagination"}
+
+
+def test_a_chain_rule_ignores_a_computed_key() -> None:
+    """A key the extractor cannot read is not a key it may invent."""
+    fn = ast.parse(
+        "def s(x):\n"
+        "    d = build(x)\n"
+        "    d['data']['attributes'][name] = v\n"
+        "    d['data']['attributes']['known'] = v\n"
+        "    return d\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"known"}

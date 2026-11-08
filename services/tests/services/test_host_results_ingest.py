@@ -335,6 +335,46 @@ class TestThePerHostPartition:
             expected = "".join(json.dumps(r) + "\n" for r in records if r["host"] == host)
             assert _partition(puts, run, host) == expected.encode()
 
+    async def test_the_release_stack_grows_with_hosts_not_with_writes(self):
+        """One registration per HOST, however many times its handle reopens.
+
+        Past `MAX_OPEN_PARTITION_FILES` hosts the LRU miss rate approaches
+        100%, so registering each `open` made the release stack grow with the
+        number of WRITES -- ~10,000 callbacks for a 500-host play with 20
+        tasks, held for the whole ingest (#2425). The sibling test above is
+        what proves the reopen still appends correctly; this one is only about
+        the growth.
+
+        It reads the stack's private callback deque deliberately. The property
+        IS that structure's size, and the alternatives -- asserting a memory
+        figure, or counting `open` calls -- either cannot be measured in a test
+        or restate the implementation more loosely than this does.
+        """
+        depths = []
+        real = host_results_service._Partitioner
+
+        class _Spy(real):
+            def add(self, host, raw):
+                super().add(host, raw)
+                depths.append(len(self._stack._exit_callbacks))
+
+        hosts = ("web1", "web2", "web3")
+        records = [{"kind": "ok", "host": host, "seq": seq} for seq, host in enumerate(hosts * 4)]
+        with (
+            patch.object(host_results_service, "MAX_OPEN_PARTITION_FILES", 2),
+            patch.object(host_results_service, "_Partitioner", _Spy),
+        ):
+            _, run, puts = await _ingest_capturing(records)
+
+        assert len(records) == 12, "the point is that writes outnumber hosts"
+        assert max(depths) == len(hosts), (
+            f"the stack reached {max(depths)} entries for {len(hosts)} hosts "
+            f"over {len(records)} writes -- it is growing per write"
+        )
+        # And every partition is still complete, so the bound was not bought
+        # by dropping a reopen.
+        assert len(puts) == len(hosts)
+
     async def test_the_partition_is_NOT_only_the_failures(self):
         """The trap. Rows hold `failed`/`unreachable`; the partition holds all.
 
