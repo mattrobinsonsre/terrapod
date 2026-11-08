@@ -87,7 +87,8 @@
       "engineHelp": "Hvilken motor som kjører dette arbeidsområdet. Ikke kjøre-backenden, som velger binærfilen innenfor Terraform-motoren.",
       "namePatternPulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Pek CLI-en mot den med <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Pek CLI-en mot den med <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "To deler atskilt av '::' — project::stack."
     },
     "stats": {
       "total": "Totalt",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Holdes tilbake fra en plan og leveres bare til en apply. En plan kjører konfigurasjonens kode, så en legitimasjon som bare apply trenger, bør ikke ligge i miljøet til en plan.",
       "configureOnly": "Bare konfigurer",
       "configureOnlyHint": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply. Flåtens egen legitimasjon — en SSH-nøkkel til maskinparken, et become-passord — hører ikke hjemme i noen av dem.",
-      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer."
+      "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer.",
+      "configureOnlyLead": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply.",
+      "applyOnlyLead": "Holdes tilbake fra en plan og leveres bare til en apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Slått på som standard, slik Ansible selv gjør. Svekker en beskyttelse når den er av: enhver nøkkel en vert viser fram godtas, slik at forbindelsen kan avlyttes.",
       "bindPlanLead": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk.",
       "configDirectoryLead": "Hvor ansible.cfg, playbookene, roles/, group_vars/ og host_vars/ ligger, relativt til depotroten. Tomt betyr roten selv.",
-      "ansibleCollectionsLead": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version."
+      "ansibleCollectionsLead": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Et av denne installasjonens egne kjøremiljøer, via etikett. Å angi et overstyrer arbeidsområdets Ansible-versjon.",
+      "labelsLead": "Etiketter har en dobbeltrolle: de er det etikettbasert RBAC samsvarer mot, og de er de «tags» en cloud-blokk kan velge et arbeidsområde med.",
+      "nameTitlePulumiLead": "To deler atskilt av '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer.",
       "vaultFileLead": "Variabelen inneholder filens sti, ikke hemmeligheten.",
       "vaultFileTemplateLead": "Hver plassholder erstattes med det feltet fra denne ene lesingen fra OpenBao/Vault.",
-      "gitSshLead": "Autentiserer private git::ssh://-modulkilder som samsvarer med mønsteret ovenfor, med en deploy-nøkkel."
+      "gitSshLead": "Autentiserer private git::ssh://-modulkilder som samsvarer med mønsteret ovenfor, med en deploy-nøkkel.",
+      "configureOnlyLead": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply.",
+      "applyOnlyLead": "Holdes tilbake fra en plan og leveres bare til en apply."
     },
     "runs": {
       "options": "Alternativer",

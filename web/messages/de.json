@@ -87,7 +87,8 @@
       "engineHelp": "Welche Engine diesen Workspace ausführt. Nicht das Ausführungs-Backend, das die Binärdatei innerhalb der Terraform-Engine auswählt.",
       "namePatternPulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Richten Sie die CLI mit <code>pulumi stack select default/project/stack</code> darauf aus."
+      "pulumiNameHint": "Richten Sie die CLI mit <code>pulumi stack select default/project/stack</code> darauf aus.",
+      "namePatternPulumiLead": "Zwei durch '::' getrennte Teile — project::stack."
     },
     "stats": {
       "total": "Gesamt",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Wird einem plan entzogen und nur an einen apply geliefert. Ein plan führt den Code der Konfiguration aus, daher sollte ein Zugangsdatum, das nur der apply braucht, nicht in der Umgebung eines plan liegen.",
       "configureOnly": "Nur Konfigurieren",
       "configureOnlyHint": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen. Das Zugangsdatum der Flotte selbst — ein SSH-Schlüssel zum Bestand, ein become-Passwort — hat in keinem von beiden etwas zu suchen.",
-      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren."
+      "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren.",
+      "configureOnlyLead": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen.",
+      "applyOnlyLead": "Wird einem plan entzogen und nur an einen apply geliefert."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Standardmäßig an, wie Ansible es selbst tut. Schwächt eine Schutzmaßnahme ab, wenn aus: Jeder Schlüssel, den ein Host vorzeigt, wird akzeptiert, sodass die Verbindung abgehört werden kann.",
       "bindPlanLead": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat; was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden.",
       "configDirectoryLead": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer bedeutet das Wurzelverzeichnis selbst.",
-      "ansibleCollectionsLead": "Collections, die vor einem Configure installiert werden, eine pro Zeile als namespace.name oder namespace.name:version."
+      "ansibleCollectionsLead": "Collections, die vor einem Configure installiert werden, eine pro Zeile als namespace.name oder namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Eine der eigenen Ausführungsumgebungen dieser Installation, per Label. Das Setzen einer Umgebung überschreibt die Ansible-Version des Workspace.",
+      "labelsLead": "Beschriftungen erfüllen einen doppelten Zweck: Nach ihnen richtet sich die beschriftungsbasierte RBAC-Zuordnung, und sie sind die Tags, über die ein cloud-Block einen Workspace auswählen kann.",
+      "nameTitlePulumiLead": "Zwei durch '::' getrennte Teile — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren.",
       "vaultFileLead": "Die Variable enthält den Pfad der Datei, nicht das Secret.",
       "vaultFileTemplateLead": "Jeder Platzhalter wird durch das entsprechende Feld aus diesem einen OpenBao/Vault-Lesevorgang ersetzt.",
-      "gitSshLead": "Authentifiziert private git::ssh://-Modulquellen, die dem obigen Muster entsprechen, mit einem Deploy-Key."
+      "gitSshLead": "Authentifiziert private git::ssh://-Modulquellen, die dem obigen Muster entsprechen, mit einem Deploy-Key.",
+      "configureOnlyLead": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen.",
+      "applyOnlyLead": "Wird einem plan entzogen und nur an einen apply geliefert."
     },
     "runs": {
       "options": "Optionen",

@@ -87,7 +87,8 @@
       "engineHelp": "המנוע שמריץ סביבת עבודה זו. לא קצה העורף להרצה, שבוחר את הקובץ הבינארי בתוך מנוע Terraform.",
       "namePatternPulumi": "שני חלקים המופרדים ב-'::' — project::stack. אותיות, ספרות, מקפים וקווים תחתונים בלבד; כל חלק חייב להתחיל באות או בספרה.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "כוונו את ה-CLI אליו עם <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "כוונו את ה-CLI אליו עם <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "שני חלקים המופרדים ב-'::' — project::stack."
     },
     "stats": {
       "total": "סה\"כ",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "נמנע מ-plan ונמסר רק ל-apply. plan מריץ את הקוד של התצורה, ולכן פרטי התחברות שרק ה-apply זקוק להם לא צריכים להימצא בסביבה של plan.",
       "configureOnly": "תצורה בלבד",
       "configureOnlyHint": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply. פרטי ההתחברות של הצי עצמו — מפתח SSH למערך, סיסמת become — אינם שייכים לאף אחד מהשניים.",
-      "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד."
+      "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד.",
+      "configureOnlyLead": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply.",
+      "applyOnlyLead": "נמנע מ-plan ונמסר רק ל-apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "מופעלת כברירת מחדל, כפי ש-Ansible עושה בעצמו. כיבוי שלה מרפה הגנה: כל מפתח שמארח מציג מתקבל, ולכן אפשר ליירט את החיבור.",
       "bindPlanLead": "כשהאפשרות פעילה, העדכון מחיל בדיוק את התוכנית שהתצוגה המקדימה שמרה, כך שכל מה שהשתנה מאז התצוגה המקדימה מכשיל את העדכון במקום להיות מוחל.",
       "configDirectoryLead": "המקום שבו נמצאים ansible.cfg, ספרי ההרצה, roles/, group_vars/ ו-host_vars/, ביחס לשורש המאגר. ריק פירושו השורש עצמו.",
-      "ansibleCollectionsLead": "אוספים שמותקנים לפני הרצת configure, אחד בכל שורה בצורה namespace.name או namespace.name:version."
+      "ansibleCollectionsLead": "אוספים שמותקנים לפני הרצת configure, אחד בכל שורה בצורה namespace.name או namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "אחת מסביבות ההרצה של פריסה זו, לפי תווית. הגדרתה עוקפת את גרסת Ansible של סביבת העבודה.",
+      "labelsLead": "התוויות ממלאות תפקיד כפול: הן מה ש-RBAC מבוסס-תוויות מתאים לפיו, והן ה\"tags\" שבלוק cloud יכול לבחור לפיהם סביבת עבודה.",
+      "nameTitlePulumiLead": "שני חלקים המופרדים ב-'::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד.",
       "vaultFileLead": "המשתנה מחזיק את נתיב הקובץ, לא את הסוד.",
       "vaultFileTemplateLead": "כל מציין מקום מוחלף בשדה הזה מקריאת OpenBao/Vault האחת הזו.",
-      "gitSshLead": "לאימות מקורות מודול פרטיים מסוג git::ssh:// שתואמים לתבנית שלמעלה, באמצעות מפתח פריסה."
+      "gitSshLead": "לאימות מקורות מודול פרטיים מסוג git::ssh:// שתואמים לתבנית שלמעלה, באמצעות מפתח פריסה.",
+      "configureOnlyLead": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply.",
+      "applyOnlyLead": "נמנע מ-plan ונמסר רק ל-apply."
     },
     "runs": {
       "options": "אפשרויות",

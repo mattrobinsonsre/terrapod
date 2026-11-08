@@ -87,7 +87,8 @@
       "engineHelp": "Bu çalışma alanını hangi motorun çalıştıracağı. Terraform motoru içindeki ikili dosyayı seçen yürütme arka ucu ile aynı şey değildir.",
       "namePatternPulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "CLI''ı <code>pulumi stack select default/project/stack</code> ile ona yönlendirin."
+      "pulumiNameHint": "CLI''ı <code>pulumi stack select default/project/stack</code> ile ona yönlendirin.",
+      "namePatternPulumiLead": "'::' ile ayrılmış iki bölüm — project::stack."
     },
     "stats": {
       "total": "Toplam",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir. plan, yapılandırmanın kodunu çalıştırdığı için yalnızca apply'ın ihtiyaç duyduğu bir kimlik bilgisi plan ortamında bulunmamalıdır.",
       "configureOnly": "Yalnızca yapılandırma",
       "configureOnlyHint": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır. Filonun kendi kimlik bilgisi — makinelere giden SSH anahtarı, become parolası — bunların hiçbiriyle ilgili değildir.",
-      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır."
+      "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır.",
+      "configureOnlyLead": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır.",
+      "applyOnlyLead": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Öntanımlı olarak açıktır; Ansible''ın kendi davranışı da budur. Kapatıldığında bir korumayı gevşetir: bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir.",
       "bindPlanLead": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar.",
       "configDirectoryLead": "ansible.cfg, playbook''lar, roles/, group_vars/ ve host_vars/ dosyalarının depo kökünden göreli olarak bulunduğu yer. Boş bırakmak kökün kendisi anlamına gelir.",
-      "ansibleCollectionsLead": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde."
+      "ansibleCollectionsLead": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde.",
+      "ansibleExecutionEnvironmentLead": "Bu kurulumun kendi yürütme ortamlarından biri, etiketle. Ayarlanması, çalışma alanının Ansible sürümünü geçersiz kılar.",
+      "labelsLead": "Etiketler çifte görev yapar: etikete dayalı RBAC bunlar üzerinden eşleşir ve bir cloud bloğunun bir çalışma alanını seçebildiği \"tag\"ler de bunlardır.",
+      "nameTitlePulumiLead": "'::' ile ayrılmış iki bölüm — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır.",
       "vaultFileLead": "Değişken gizli değeri değil, dosyanın yolunu tutar.",
       "vaultFileTemplateLead": "Her yer tutucu, bu tek OpenBao/Vault okumasındaki o alanla değiştirilir.",
-      "gitSshLead": "Yukarıdaki desene uyan özel git::ssh:// modül kaynaklarının kimliğini bir dağıtım anahtarıyla doğrular."
+      "gitSshLead": "Yukarıdaki desene uyan özel git::ssh:// modül kaynaklarının kimliğini bir dağıtım anahtarıyla doğrular.",
+      "configureOnlyLead": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır.",
+      "applyOnlyLead": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir."
     },
     "runs": {
       "options": "Seçenekler",

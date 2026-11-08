@@ -1005,7 +1005,7 @@ export default function BulkUpdatePage() {
           )}
         </div>
         <div className="min-w-0">
-          <label className={labelCls} title={tWs('fields.ansibleExecutionEnvironmentTitle')}>
+          <label className={labelCls}>
             {tWs('fields.ansibleExecutionEnvironment')}
           </label>
           {/* Always a picker: operator labels come from configuration, not
@@ -1026,6 +1026,10 @@ export default function BulkUpdatePage() {
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
+          {/* Was a hover `title` on the label (#2432). The override it
+              describes is the whole reason to set the field, so it belongs on
+              screen rather than behind a pointer. */}
+          {tieredHint(tWs, 'fields.ansibleExecutionEnvironmentTitle')}
         </div>
         <div className="min-w-0 sm:col-span-2">
           <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">

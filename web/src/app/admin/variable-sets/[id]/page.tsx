@@ -898,7 +898,7 @@ export default function VariableSetDetailPage() {
                             <span className="inline-flex items-center gap-2">
                               {v.attributes.key}
                               {v.attributes['apply-only'] && (
-                                <span title={t('detail.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
+                                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
                               )}
                               {/* A third slot means a key can now be held
                                   THREE times, so the badge is what tells
@@ -906,7 +906,7 @@ export default function VariableSetDetailPage() {
                                   than amber, so the two slots are
                                   distinguishable at a glance. */}
                               {v.attributes['configure-only'] && (
-                                <span title={t('detail.configureOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
+                                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
                               )}
                             </span>
                           </td>
@@ -961,10 +961,10 @@ export default function VariableSetDetailPage() {
                           <span className="text-sm font-mono font-medium text-slate-200 break-all">
                             {v.attributes.key}
                             {v.attributes['apply-only'] && (
-                              <span title={t('detail.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
+                              <span className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('detail.applyOnly')}</span>
                             )}
                             {v.attributes['configure-only'] && (
-                              <span title={t('detail.configureOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
+                              <span className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('detail.configureOnly')}</span>
                             )}
                           </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

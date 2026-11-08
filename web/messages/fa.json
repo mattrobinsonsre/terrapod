@@ -87,7 +87,8 @@
       "engineHelp": "کدام موتور این فضای کاری را اجرا می‌کند. با بک‌اند اجرا که فایل باینری را درون موتور Terraform انتخاب می‌کند تفاوت دارد.",
       "namePatternPulumi": "دو بخش جداشده با '::' — project::stack. فقط حروف، اعداد، خط تیره و زیرخط؛ هر بخش باید با یک حرف یا عدد آغاز شود.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "CLI را با <code>pulumi stack select default/project/stack</code> به آن هدایت کنید."
+      "pulumiNameHint": "CLI را با <code>pulumi stack select default/project/stack</code> به آن هدایت کنید.",
+      "namePatternPulumiLead": "دو بخش جداشده با '::' — project::stack."
     },
     "stats": {
       "total": "کل",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود. plan کد پیکربندی را اجرا می‌کند، بنابراین اعتبارنامه‌ای که تنها apply به آن نیاز دارد نباید در محیط plan باشد.",
       "configureOnly": "فقط پیکربندی",
       "configureOnlyHint": "تنها به پیکربندی تحویل داده می‌شود و هم از plan و هم از apply دریغ می‌شود. اعتبارنامهٔ خودِ ناوگان — کلید SSH به مجموعه، گذرواژهٔ become — به هیچ‌کدام از آن دو ربطی ندارد.",
-      "phaseSlotExclusive": "هر متغیر در هر زمان تنها یک جایگاه دارد. «فقط apply» به apply و پیکربندی می‌رسد و «فقط پیکربندی» تنها به پیکربندی می‌رسد."
+      "phaseSlotExclusive": "هر متغیر در هر زمان تنها یک جایگاه دارد. «فقط apply» به apply و پیکربندی می‌رسد و «فقط پیکربندی» تنها به پیکربندی می‌رسد.",
+      "configureOnlyLead": "تنها به پیکربندی تحویل داده می‌شود و هم از plan و هم از apply دریغ می‌شود.",
+      "applyOnlyLead": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "به‌طور پیش‌فرض روشن است، همان‌طور که خود Ansible رفتار می‌کند. خاموش‌کردنش یک حفاظ را سست می‌کند: هر کلیدی که میزبان ارائه دهد پذیرفته می‌شود و بنابراین می‌توان اتصال را شنود کرد.",
       "bindPlanLead": "وقتی روشن است، به‌روزرسانی دقیقاً همان طرحی را اعمال می‌کند که پیش‌نمایش ذخیره کرده است؛ پس هر چیزی که پس از پیش‌نمایش تغییر کرده باشد، به‌جای اعمال شدن، به‌روزرسانی را ناموفق می‌کند.",
       "configDirectoryLead": "جایی که ansible.cfg، پلی‌بوک‌ها، roles/، group_vars/ و host_vars/ قرار دارند، نسبت به ریشه مخزن. خالی بودن به‌معنای خودِ ریشه است.",
-      "ansibleCollectionsLead": "مجموعه‌هایی که پیش از اجرای configure نصب می‌شوند، در هر خط یکی به شکل namespace.name یا namespace.name:version."
+      "ansibleCollectionsLead": "مجموعه‌هایی که پیش از اجرای configure نصب می‌شوند، در هر خط یکی به شکل namespace.name یا namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "یکی از محیط‌های اجرای خودِ این استقرار، با برچسب. تعیین آن نسخهٔ Ansible فضای کاری را لغو می‌کند.",
+      "labelsLead": "برچسب‌ها دو نقش دارند: RBAC مبتنی بر برچسب بر اساس آن‌ها تطبیق می‌دهد، و همان «تگ‌هایی» هستند که یک بلوک cloud می‌تواند با آن‌ها فضای کاری را انتخاب کند.",
+      "nameTitlePulumiLead": "دو بخش جداشده با '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "مجوزدهی به مخزن VCS شما واگذار شده است.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "هر متغیر در هر زمان تنها یک جایگاه دارد. «فقط apply» به apply و پیکربندی می‌رسد و «فقط پیکربندی» تنها به پیکربندی می‌رسد.",
       "vaultFileLead": "متغیر مسیر فایل را نگه می‌دارد، نه راز را.",
       "vaultFileTemplateLead": "هر جای‌نگهدار با همان فیلد از همین یک بار خواندن OpenBao/Vault جایگزین می‌شود.",
-      "gitSshLead": "برای احراز هویت منابع ماژول خصوصی از نوع git::ssh:// که با الگوی بالا مطابقت دارند، با یک کلید استقرار."
+      "gitSshLead": "برای احراز هویت منابع ماژول خصوصی از نوع git::ssh:// که با الگوی بالا مطابقت دارند، با یک کلید استقرار.",
+      "configureOnlyLead": "تنها به پیکربندی تحویل داده می‌شود و هم از plan و هم از apply دریغ می‌شود.",
+      "applyOnlyLead": "از plan دریغ می‌شود و تنها به apply تحویل داده می‌شود."
     },
     "runs": {
       "options": "گزینه‌ها",

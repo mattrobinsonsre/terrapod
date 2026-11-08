@@ -87,7 +87,8 @@
       "engineHelp": "このワークスペースを実行するエンジンです。Terraform エンジン内のバイナリを選ぶ実行バックエンドとは異なります。",
       "namePatternPulumi": "'::' で区切られた 2 つの部分 — project::stack。使用できるのは英数字、ハイフン、アンダースコアのみで、各部分は英字または数字で始まる必要があります。",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> で CLI をこのワークスペースに向けます。"
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> で CLI をこのワークスペースに向けます。",
+      "namePatternPulumiLead": "'::' で区切られた 2 つの部分 — project::stack。"
     },
     "stats": {
       "total": "合計",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "plan には渡さず、apply にのみ渡します。plan は構成のコードを実行するため、apply だけが必要とする資格情報を plan の環境に置くべきではありません。",
       "configureOnly": "構成のみ",
       "configureOnlyHint": "構成にのみ渡し、plan にも apply にも渡しません。フリート自体の資格情報 — 設備への SSH 鍵や become パスワード — は、そのどちらにも関係ありません。",
-      "phaseSlotExclusive": "変数が入るスロットは一度にひとつだけです。「apply のみ」は apply と構成に届き、「構成のみ」は構成だけに届きます。"
+      "phaseSlotExclusive": "変数が入るスロットは一度にひとつだけです。「apply のみ」は apply と構成に届き、「構成のみ」は構成だけに届きます。",
+      "configureOnlyLead": "構成にのみ渡し、plan にも apply にも渡しません。",
+      "applyOnlyLead": "plan には渡さず、apply にのみ渡します。"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "既定で有効であり、これは Ansible 自身の動作です。無効にすると保護を緩めます: ホストが提示するどの鍵も受け入れられるため、接続を傍受されるおそれがあります。",
       "bindPlanLead": "オンにすると、更新はプレビューが保存したプランをそのまま適用します。プレビュー以降に変化したものがあれば、適用されずに更新が失敗します。",
       "configDirectoryLead": "ansible.cfg、プレイブック、roles/、group_vars/、host_vars/ の場所をリポジトリのルートからの相対パスで指定します。空のままならルート自体を意味します。",
-      "ansibleCollectionsLead": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。"
+      "ansibleCollectionsLead": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。",
+      "ansibleExecutionEnvironmentLead": "このデプロイメント独自の実行環境をラベルで指定します。指定すると、ワークスペースの Ansible バージョンより優先されます。",
+      "labelsLead": "ラベルは二重の役割を果たします: ラベルベースのRBACが一致を判定する対象であり、cloud ブロックがワークスペースを選択する際の「tags」でもあります。",
+      "nameTitlePulumiLead": "'::' で区切られた 2 つの部分 — project::stack。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "変数が入るスロットは一度にひとつだけです。「apply のみ」は apply と構成に届き、「構成のみ」は構成だけに届きます。",
       "vaultFileLead": "変数にはシークレットではなくファイルのパスが入ります。",
       "vaultFileTemplateLead": "各プレースホルダーは、この 1 回の OpenBao/Vault 読み取りから得たそのフィールドに置き換えられます。",
-      "gitSshLead": "上記のパターンに一致するプライベートな git::ssh:// モジュールソースを、デプロイキーで認証します。"
+      "gitSshLead": "上記のパターンに一致するプライベートな git::ssh:// モジュールソースを、デプロイキーで認証します。",
+      "configureOnlyLead": "構成にのみ渡し、plan にも apply にも渡しません。",
+      "applyOnlyLead": "plan には渡さず、apply にのみ渡します。"
     },
     "runs": {
       "options": "オプション",

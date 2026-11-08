@@ -87,7 +87,8 @@
       "engineHelp": "執行此工作區的引擎。不同於執行後端，後者用於在 Terraform 引擎內選擇二進位檔。",
       "namePatternPulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 讓 CLI 指向它。"
+      "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 讓 CLI 指向它。",
+      "namePatternPulumiLead": "由 '::' 分隔的兩部分 — project::stack。"
     },
     "stats": {
       "total": "總計",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "對 plan 隱藏，僅交付給 apply。plan 會執行組態中的程式碼，因此只有 apply 需要的憑證不應出現在 plan 的環境中。",
       "configureOnly": "僅設定",
       "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
-      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。"
+      "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。",
+      "configureOnlyLead": "僅交付給設定，對 plan 與 apply 皆隱藏。",
+      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。"
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "預設開啟，這也是 Ansible 自身的行為。關閉會放寬一項保護：主機出示的任何金鑰都會被接受，連線因而可能被攔截。",
       "bindPlanLead": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。",
       "configDirectoryLead": "ansible.cfg、playbook、roles/、group_vars/ 與 host_vars/ 所在的位置，相對於儲存庫根目錄。留空即表示根目錄本身。",
-      "ansibleCollectionsLead": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。"
+      "ansibleCollectionsLead": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。",
+      "ansibleExecutionEnvironmentLead": "透過標籤指定本部署自有的執行環境。設定後會覆蓋該工作區的 Ansible 版本。",
+      "labelsLead": "標籤具有雙重作用：既是基於標籤的 RBAC 的匹配依據，也是 cloud 塊據以選擇工作區的 \"tags\"。",
+      "nameTitlePulumiLead": "由 '::' 分隔的兩部分 — project::stack。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。",
       "vaultFileLead": "變數保存的是檔案路徑，而不是密鑰。",
       "vaultFileTemplateLead": "每個預留位置都會替換為這一次 OpenBao/Vault 讀取中的對應欄位。",
-      "gitSshLead": "使用部署金鑰對符合上方比對樣式的私有 git::ssh:// 模組來源進行驗證。"
+      "gitSshLead": "使用部署金鑰對符合上方比對樣式的私有 git::ssh:// 模組來源進行驗證。",
+      "configureOnlyLead": "僅交付給設定，對 plan 與 apply 皆隱藏。",
+      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。"
     },
     "runs": {
       "options": "選項",

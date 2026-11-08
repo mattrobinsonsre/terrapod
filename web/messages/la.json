@@ -87,7 +87,8 @@
       "engineHelp": "Quae machina hoc spatium operis exsequitur. Non instrumentum exsecutionis, quod binarium intra machinam Terraform eligit.",
       "namePatternPulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Instrumentum CLI eo dirige per <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Instrumentum CLI eo dirige per <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Duae partes signo '::' divisae — project::stack."
     },
     "stats": {
       "total": "Summa",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "A plan retinetur et soli apply traditur. plan codicem configurationis exsequitur, ideo credentia quae soli apply necessaria sunt in ambitu plan esse non debent.",
       "configureOnly": "Tantum configurare",
       "configureOnlyHint": "Soli configurare traditur et tam a plan quam ab apply retinetur. Credentia ipsius classis — clavis SSH ad praedium, tessera become — in neutro quicquam agunt.",
-      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit."
+      "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit.",
+      "configureOnlyLead": "Soli configurare traditur et tam a plan quam ab apply retinetur.",
+      "applyOnlyLead": "A plan retinetur et soli apply traditur."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Praedefinite accensa, sicut ipse Ansible facit. Praesidium relaxat cum exstincta est: quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest.",
       "bindPlanLead": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur.",
       "configDirectoryLead": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum ipsam radicem significat.",
-      "ansibleCollectionsLead": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version."
+      "ansibleCollectionsLead": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Unus ex ambitibus exsecutionis huius institutionis, per titulum. Unum statuere versionem Ansible loci operis supervertit.",
+      "labelsLead": "Tituli duplex officium praestant: ad eos convenientia RBAC titulo-basata respicit, et ipsi sunt \"tags\" quibus blocus cloud locum operis eligere potest.",
+      "nameTitlePulumiLead": "Duae partes signo '::' divisae — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit.",
       "vaultFileLead": "Variabilis semitam fasciculi tenet, non arcanum.",
       "vaultFileTemplateLead": "Quisque locum tenens eo campo ex hac una lectione OpenBao/Vault substituitur.",
-      "gitSshLead": "Fontes modulorum privatos git::ssh:// qui exemplari supra posito conveniunt clave emissaria authentica."
+      "gitSshLead": "Fontes modulorum privatos git::ssh:// qui exemplari supra posito conveniunt clave emissaria authentica.",
+      "configureOnlyLead": "Soli configurare traditur et tam a plan quam ab apply retinetur.",
+      "applyOnlyLead": "A plan retinetur et soli apply traditur."
     },
     "runs": {
       "options": "Optiones",

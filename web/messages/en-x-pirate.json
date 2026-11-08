@@ -87,7 +87,8 @@
       "engineHelp": "Which engine be drivin' this workspace, matey. Not the execution backend, which picks the binary within the Terraform engine.",
       "namePatternPulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Point yer CLI at it with <code>pulumi stack select default/project/stack</code>, matey."
+      "pulumiNameHint": "Point yer CLI at it with <code>pulumi stack select default/project/stack</code>, matey.",
+      "namePatternPulumiLead": "Two parts split by '::' — project::stack, matey."
     },
     "stats": {
       "total": "Total",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Kept from a plan an' handed only to an apply. A plan runs the code o' yer configuration, so a key only the apply be needin' has no business in a plan's hold.",
       "configureOnly": "Riggin' only, matey",
       "configureOnlyHint": "Handed only to a riggin', an' kept from a plan an' from an apply alike. The fleet's own key — an SSH key to the whole squadron, a become password — has no business in either one.",
-      "phaseSlotExclusive": "A variable sits in but one berth at a time. Apply only, matey reaches an apply an' a riggin'; Riggin' only, matey reaches a riggin' alone."
+      "phaseSlotExclusive": "A variable sits in but one berth at a time. Apply only, matey reaches an apply an' a riggin'; Riggin' only, matey reaches a riggin' alone.",
+      "configureOnlyLead": "Handed only to a riggin', an' kept from a plan an' from an apply.",
+      "applyOnlyLead": "Kept from a plan an' handed only to an apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "On by default, as Ansible does on its own. Slackens a guard when struck: any key a host waves at ye be taken, so th'' line can be listened in on.",
       "bindPlanLead": "Hoisted, th'' update applies exactly th'' plan th'' preview stowed away, so anythin'' that shifted since th'' preview scuttles th'' update instead o'' bein'' applied.",
       "configDirectoryLead": "Where ansible.cfg, th'' playbooks, roles/, group_vars/ an'' host_vars/ be stowed, reckoned from th'' cargo hold root. Empty means th'' root itself.",
-      "ansibleCollectionsLead": "Hoards hauled aboard afore a configure sets sail, one per line as namespace.name or namespace.name:version."
+      "ansibleCollectionsLead": "Hoards hauled aboard afore a configure sets sail, one per line as namespace.name or namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "One o' this here deployment's own execution quarters, by label. Settin' one overrides th' workspace's Ansible version, arr.",
+      "labelsLead": "Labels do double duty, matey: they be what label-based RBAC matches on, an' they be the tags a cloud block can pick a work-deck by.",
+      "nameTitlePulumiLead": "Two parts split by '::' — project::stack, matey."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "A variable sits in but one berth at a time. Apply only, matey reaches an apply an' a riggin'; Riggin' only, matey reaches a riggin' alone.",
       "vaultFileLead": "Th'' variable carries th'' scroll''s course, not th'' secret.",
       "vaultFileTemplateLead": "Every marker be swapped fer that field from this one haul out o'' th'' OpenBao/Vault.",
-      "gitSshLead": "Vouch fer private git::ssh:// module sources matchin'' th'' pattern above wi'' a deploy key."
+      "gitSshLead": "Vouch fer private git::ssh:// module sources matchin'' th'' pattern above wi'' a deploy key.",
+      "configureOnlyLead": "Handed only to a riggin', an' kept from a plan an' from an apply.",
+      "applyOnlyLead": "Kept from a plan an' handed only to an apply."
     },
     "runs": {
       "options": "Options",

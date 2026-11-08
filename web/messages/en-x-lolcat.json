@@ -87,7 +87,8 @@
       "engineHelp": "Wich enginz runz dis werkspace. Not teh execushun bakend, wich pikz teh binry insyde teh Terraform enginz.",
       "namePatternPulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
       "namePlaceholderPulumi": "mah-projekt::dev",
-      "pulumiNameHint": "Point teh CLI at it wif <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Point teh CLI at it wif <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX"
     },
     "stats": {
       "total": "Total",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Hidden from da plan an only gived to da apply. Plan runz da code of ur config, so a sekrit only da apply needz shud not be in da planz enviroment. srsly.",
       "configureOnly": "konfigur onlee",
       "configureOnlyHint": "Only gived to da konfigur, an hidden from da plan AN da apply. Da fleetz own sekrit — a SSH key to all da boxes, a become passwurd — haz no bizniz in either one. srsly.",
-      "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all."
+      "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all.",
+      "configureOnlyLead": "Only gived to da konfigur, an hidden from da plan AN da apply.",
+      "applyOnlyLead": "Hidden from da plan an only gived to da apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "On by defalt, jus liek Ansible duz all by itself. Loosenz a protekshun wen off: any key teh host showz u getz accepted, so sumwun can lissen in on teh konekshun.",
       "bindPlanLead": "On, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd.",
       "configDirectoryLead": "Wher ansible.cfg an teh playbookz an roles/ an group_vars/ an host_vars/ livez, relativ ta teh reepo root. Empteh meenz teh root itself.",
-      "ansibleCollectionsLead": "Collekshunz wot gets instolled b4 a configyur runz, wun per line liek namespace.name or namespace.name:version."
+      "ansibleCollectionsLead": "Collekshunz wot gets instolled b4 a configyur runz, wun per line liek namespace.name or namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Wan of dis deploymentz own execushun enviromentz, by labul. Settin wan overridez teh werkspacez Ansibul vershun. srsly",
+      "labelsLead": "Labulz do dubble dooty: dey iz wot labul-based RBAC matchez on, an dey iz teh tagz a cloud blok can pik a werkspace by. srsly",
+      "nameTitlePulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all.",
       "vaultFileLead": "Da variabul haz da fielz paff, not da sekrit.",
       "vaultFileTemplateLead": "Evry plaecholdr getz swapd wif dat feeld frum dis wun OpenBao/Vault reed.",
-      "gitSshLead": "Authentikayt privat git::ssh:// modyool sorsez wot match teh pattrn abuv wif a deploy key."
+      "gitSshLead": "Authentikayt privat git::ssh:// modyool sorsez wot match teh pattrn abuv wif a deploy key.",
+      "configureOnlyLead": "Only gived to da konfigur, an hidden from da plan AN da apply.",
+      "applyOnlyLead": "Hidden from da plan an only gived to da apply."
     },
     "runs": {
       "options": "Opshunz",

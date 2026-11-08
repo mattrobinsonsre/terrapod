@@ -87,7 +87,8 @@
       "engineHelp": "Welke engine deze workspace uitvoert. Niet de uitvoeringsbackend, die het binaire bestand binnen de Terraform-engine kiest.",
       "namePatternPulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Richt de CLI erop met <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Richt de CLI erop met <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Twee delen gescheiden door '::' — project::stack."
     },
     "stats": {
       "total": "Totaal",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd. Een plan voert de code van de configuratie uit, dus een credential die alleen de apply nodig heeft, hoort niet in de omgeving van een plan.",
       "configureOnly": "Alleen configureren",
       "configureOnlyHint": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden. De credential van de vloot zelf — een SSH-sleutel naar het machinepark, een become-wachtwoord — hoort in geen van beide thuis.",
-      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren."
+      "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren.",
+      "configureOnlyLead": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden.",
+      "applyOnlyLead": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Staat standaard aan, zoals Ansible zelf doet. Versoepelt een beveiliging als dit uit staat: elke sleutel die een host aanbiedt wordt geaccepteerd, zodat de verbinding kan worden afgeluisterd.",
       "bindPlanLead": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast.",
       "configDirectoryLead": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Leeg betekent de wortel zelf.",
-      "ansibleCollectionsLead": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version."
+      "ansibleCollectionsLead": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Een van de eigen uitvoeringsomgevingen van deze installatie, op label. Er een instellen overschrijft de Ansible-versie van de workspace.",
+      "labelsLead": "Labels doen dubbel werk: de label-gebaseerde RBAC matcht erop, en ze zijn de tags waarmee een cloud-blok een workspace kan selecteren.",
+      "nameTitlePulumiLead": "Twee delen gescheiden door '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren.",
       "vaultFileLead": "De variabele bevat het pad van het bestand, niet het geheim.",
       "vaultFileTemplateLead": "Elke placeholder wordt vervangen door dat veld uit deze ene OpenBao/Vault-leesactie.",
-      "gitSshLead": "Authenticeert privé git::ssh://-modulebronnen die overeenkomen met het patroon hierboven, met een deploy key."
+      "gitSshLead": "Authenticeert privé git::ssh://-modulebronnen die overeenkomen met het patroon hierboven, met een deploy key.",
+      "configureOnlyLead": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden.",
+      "applyOnlyLead": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd."
     },
     "runs": {
       "options": "Opties",

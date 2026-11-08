@@ -87,7 +87,8 @@
       "engineHelp": "Hvilken motor der kører dette arbejdsområde. Ikke eksekverings-backend, som vælger binæren inden for Terraform-motoren.",
       "namePatternPulumi": "To dele adskilt af '::' — project::stack. Kun bogstaver, tal, bindestreger og understregninger; hver del skal begynde med et bogstav eller tal.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Peg CLI''en på den med <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Peg CLI''en på den med <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "To dele adskilt af '::' — project::stack."
     },
     "stats": {
       "total": "I alt",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Tilbageholdes fra en plan og leveres kun til en apply. En plan kører konfigurationens kode, så en legitimation, som kun apply har brug for, bør ikke ligge i en plans miljø.",
       "configureOnly": "Kun konfigurer",
       "configureOnlyHint": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply. Flådens egen legitimation — en SSH-nøgle til maskinparken, en become-adgangskode — hører ikke hjemme i nogen af dem.",
-      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer."
+      "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer.",
+      "configureOnlyLead": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply.",
+      "applyOnlyLead": "Tilbageholdes fra en plan og leveres kun til en apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Slået til som standard, som Ansible selv gør. Løsner en beskyttelse, når den er slået fra: enhver nøgle, en vært viser frem, accepteres, så forbindelsen kan aflyttes.",
       "bindPlanLead": "Når den er slået til, anvender opdateringen præcis den plan, forhåndsvisningen gemte, så alt, der har ændret sig siden forhåndsvisningen, får opdateringen til at fejle i stedet for at blive anvendt.",
       "configDirectoryLead": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Tomt betyder roden selv.",
-      "ansibleCollectionsLead": "Samlinger der installeres, før en configure kører, én pr. linje som namespace.name eller namespace.name:version."
+      "ansibleCollectionsLead": "Samlinger der installeres, før en configure kører, én pr. linje som namespace.name eller namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Et af denne installations egne eksekveringsmiljøer, via etiket. At angive et tilsidesætter arbejdsområdets Ansible-version.",
+      "labelsLead": "Labels har en dobbeltfunktion: de er det, den label-baserede RBAC-matchning går efter, og de er de tags, som en cloud-blok kan vælge et arbejdsområde ud fra.",
+      "nameTitlePulumiLead": "To dele adskilt af '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer.",
       "vaultFileLead": "Variablen indeholder filens sti, ikke hemmeligheden.",
       "vaultFileTemplateLead": "Hver pladsholder erstattes med det felt fra denne ene læsning fra OpenBao/Vault.",
-      "gitSshLead": "Autentificerer private git::ssh://-modulkilder, der matcher mønstret ovenfor, med en deploy-nøgle."
+      "gitSshLead": "Autentificerer private git::ssh://-modulkilder, der matcher mønstret ovenfor, med en deploy-nøgle.",
+      "configureOnlyLead": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply.",
+      "applyOnlyLead": "Tilbageholdes fra en plan og leveres kun til en apply."
     },
     "runs": {
       "options": "Indstillinger",

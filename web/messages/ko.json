@@ -87,7 +87,8 @@
       "engineHelp": "이 워크스페이스를 실행하는 엔진입니다. Terraform 엔진 내에서 바이너리를 선택하는 실행 백엔드와는 다릅니다.",
       "namePatternPulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> 명령으로 CLI가 이 워크스페이스를 가리키게 하세요."
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> 명령으로 CLI가 이 워크스페이스를 가리키게 하세요.",
+      "namePatternPulumiLead": "'::' 로 구분된 두 부분 — project::stack."
     },
     "stats": {
       "total": "전체",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "plan에는 전달하지 않고 apply에만 전달합니다. plan은 구성의 코드를 실행하므로 apply만 필요한 자격 증명은 plan 환경에 두지 않아야 합니다.",
       "configureOnly": "구성 전용",
       "configureOnlyHint": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다. 플릿 자체의 자격 증명 — 설비에 대한 SSH 키나 become 암호 — 은 둘 중 어느 쪽과도 상관이 없습니다.",
-      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다."
+      "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다.",
+      "configureOnlyLead": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다.",
+      "applyOnlyLead": "plan에는 전달하지 않고 apply에만 전달합니다."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "기본적으로 켜져 있으며, 이는 Ansible 자체의 동작입니다. 끄면 보호를 완화합니다: 호스트가 제시하는 어떤 키든 받아들여지므로 연결이 가로채일 수 있습니다.",
       "bindPlanLead": "켜면 업데이트는 미리보기가 저장한 계획을 그대로 적용하므로, 미리보기 이후 바뀐 것이 있으면 적용되는 대신 업데이트가 실패합니다.",
       "configDirectoryLead": "ansible.cfg, 플레이북, roles/, group_vars/, host_vars/ 가 있는 위치를 저장소 루트 기준 상대 경로로 지정합니다. 비워 두면 루트 자체를 뜻합니다.",
-      "ansibleCollectionsLead": "구성 실행 전에 설치되는 컬렉션으로, 한 줄에 하나씩 namespace.name 또는 namespace.name:version 형식으로 입력합니다."
+      "ansibleCollectionsLead": "구성 실행 전에 설치되는 컬렉션으로, 한 줄에 하나씩 namespace.name 또는 namespace.name:version 형식으로 입력합니다.",
+      "ansibleExecutionEnvironmentLead": "이 배포의 자체 실행 환경을 레이블로 지정합니다. 지정하면 워크스페이스의 Ansible 버전보다 우선합니다.",
+      "labelsLead": "라벨은 두 가지 역할을 합니다: 라벨 기반 RBAC가 매칭하는 대상이자, cloud 블록이 워크스페이스를 선택할 때 쓰는 \"태그\"입니다.",
+      "nameTitlePulumiLead": "'::' 로 구분된 두 부분 — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다.",
       "vaultFileLead": "변수에는 시크릿이 아니라 파일 경로가 들어갑니다.",
       "vaultFileTemplateLead": "각 자리 표시자는 이 한 번의 OpenBao/Vault 읽기에서 가져온 해당 필드로 바뀝니다.",
-      "gitSshLead": "위의 패턴과 일치하는 비공개 git::ssh:// 모듈 소스를 배포 키로 인증합니다."
+      "gitSshLead": "위의 패턴과 일치하는 비공개 git::ssh:// 모듈 소스를 배포 키로 인증합니다.",
+      "configureOnlyLead": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다.",
+      "applyOnlyLead": "plan에는 전달하지 않고 apply에만 전달합니다."
     },
     "runs": {
       "options": "옵션",
