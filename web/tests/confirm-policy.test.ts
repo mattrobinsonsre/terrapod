@@ -37,6 +37,30 @@ const files = walk(SRC).map((full) => ({
   src: readFileSync(full, 'utf8'),
 }))
 
+/** The source with comments and string literals blanked, line numbers intact.
+ *
+ *  A mention in prose is not a call, and prose is unavoidable here: every file
+ *  that confirms anything explains the two-tier policy in a comment, and the
+ *  policy's name IS the primitive's. Measured, a matcher without this reports
+ *  three false positives -- a `{/* ... *\/}` JSX block comment whose
+ *  continuation lines carry no leading asterisk, and two `hint-tiers.ts` ledger
+ *  entries whose VALUES read "a confirm() body". Skipping lines that merely
+ *  START with a comment marker catches none of the three.
+ *
+ *  Replaced with spaces rather than removed, so a reported line number is the
+ *  line in the file -- a gate that points at the wrong line is one nobody
+ *  trusts. A real call survives: `confirm(t('x'))` becomes `confirm(t(' '))`.
+ */
+function blankProse(src: string): string {
+  const keepNewlines = (m: string) => m.replace(/[^\n]/g, ' ')
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, keepNewlines)
+    .replace(/\/\/[^\n]*/g, keepNewlines)
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, keepNewlines)
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, keepNewlines)
+    .replace(/`(?:[^`\\]|\\.)*`/g, keepNewlines)
+}
+
 test('the file list is not empty — a floor, so a moved directory cannot pass on nothing', () => {
   assert.ok(files.length > 50, `expected to walk the whole of src, saw ${files.length} files`)
   assert.ok(
@@ -45,16 +69,67 @@ test('the file list is not empty — a floor, so a moved directory cannot pass o
   )
 })
 
-test('only the hook calls window.confirm', () => {
+test('only the hook calls the confirm primitive, qualified OR bare', () => {
+  // It used to match `window.confirm` alone (#2425 §2.3), so a bare global
+  // `confirm(...)` passed -- and four did: two token actions and two policy-set
+  // deletes. Each happened to prompt in both modes, which is the right tier for
+  // an irreversible action, so nothing looked wrong; what was wrong is that the
+  // tier was decided at the call site instead of by the one producer, which is
+  // the state this whole file exists to prevent.
+  //
+  // `\bconfirm\s*\(` does not match `confirmDelete(`, `confirmIrreversible(`,
+  // `confirmTouchMutation(` or `useConfirm(`: the regex needs the open paren
+  // immediately after `confirm`, and the word boundary is case-sensitive.
+  const PRIMITIVE = /\bwindow\.confirm\s*\(|(?<![.\w])confirm\s*\(/
   const offenders = files
-    .filter((f) => f.rel !== HOOK && /window\.confirm/.test(f.src))
-    .map((f) => f.rel)
+    .filter((f) => f.rel !== HOOK)
+    .flatMap((f) =>
+      blankProse(f.src)
+        .split('\n')
+        .map((line, i) => ({ line, n: i + 1 }))
+        .filter(({ line }) => PRIMITIVE.test(line))
+        .map(({ n }) => `${f.rel}:${n}`),
+    )
   assert.deepEqual(
     offenders,
     [],
     'these call the primitive directly instead of a tier from useConfirm(): ' +
       offenders.join(', '),
   )
+})
+
+test('prose is blanked and line numbers survive it', () => {
+  const src = ["const a = 1", "// confirm(x)", "/* confirm(y)", "   confirm(z) */", "const s = 'confirm(w)'", "if (!confirm(real)) return"].join('\n')
+  const out = blankProse(src)
+  assert.equal(out.split('\n').length, 6, 'line count changed, so reported numbers would be wrong')
+  const PRIMITIVE = /\bwindow\.confirm\s*\(|(?<![.\w])confirm\s*\(/
+  const hits = out.split('\n').map((l, i) => (PRIMITIVE.test(l) ? i + 1 : 0)).filter(Boolean)
+  assert.deepEqual(hits, [6], 'only the real call on line 6 should survive')
+})
+
+test('the primitive matcher discriminates — fixtures, not a count', () => {
+  // The recorded lesson from §2.4: a matcher that silently narrows shrinks what
+  // is checked and nothing says so. A count over the tree cannot tell a removed
+  // call from a broken pattern, so each form is pinned by a literal.
+  const PRIMITIVE = /\bwindow\.confirm\s*\(|(?<![.\w])confirm\s*\(/
+  for (const bad of [
+    'if (!confirm(t("x"))) return',
+    'if (!window.confirm(t("x"))) return',
+    'const ok = confirm ("spaced")',
+    '  if (!confirm(msg)) return',
+  ]) {
+    assert.ok(PRIMITIVE.test(bad), `should have matched: ${bad}`)
+  }
+  for (const good of [
+    'if (!confirmDelete(t("x"))) return',
+    'if (!confirmIrreversible(t("x"))) return',
+    'if (!confirmTouchMutation(t("x"))) return',
+    'const { confirmDelete } = useConfirm()',
+    'await page.confirm(x)',
+    'const reconfirm = confirmed',
+  ]) {
+    assert.ok(!PRIMITIVE.test(good), `should NOT have matched: ${good}`)
+  }
 })
 
 test('no file defines its own copy of a tier', () => {
@@ -86,3 +161,21 @@ test('the hook still offers all three tiers, and both-modes is one function', ()
     'confirmDelete and confirmIrreversible must be the same function',
   )
 })
+
+// ── what this file deliberately does NOT assert ──────────────────────────────
+//
+// "every handler issuing a destructive mutation carries a tier call in the same
+// function body" is the property #2425 §2.3 really wants, and it is not
+// committable as written. The derivable subject is the message keys -- every
+// `*Confirm` key should sit inside a tier call -- and measured against the tree
+// that is 13 false positives out of 28: `runs.needsConfirm` is a badge label,
+// `runs.destroyAllConfirm` is a span, `queuePlanConfirm` is a phase word, the
+// two `state.*Confirm` keys render inside a bespoke dialog component rather than
+// a native prompt, and two more are `hint-tiers.ts` ledger entries.
+//
+// A gate whose findings are mostly correct code teaches people to silence it
+// (the #1915 precedent), so the gap is documented here instead of enforced. What
+// IS enforced -- one producer, no local redefinition, no direct primitive, and
+// all three tiers present -- means a handler that does confirm cannot confirm
+// INCONSISTENTLY. Whether it confirms at all is reviewed, and the phone-width
+// suite drives the touch tier end to end.

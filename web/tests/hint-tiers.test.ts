@@ -112,13 +112,26 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
   // It is the half that would otherwise be missed, because the other test goes
   // green the moment a lead exists.
 
+  /** The registry itself, by RESOLVED path (#2425 §2.4).
+   *
+   *  It was `file.includes('hint-tiers')`, which matches the whole path -- so
+   *  anything under a directory whose name contained that string was silently
+   *  exempt. A substring over a path is never the check; the file is one file
+   *  and can be named. */
+  const REGISTRY = path.resolve(here, '..', 'src', 'lib', 'hint-tiers.ts')
+
   const SRC = (() => {
     const out: Record<string, string> = {}
     const walk = (dir: string) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name)
         if (e.isDirectory()) walk(p)
-        else if (e.name.endsWith('.tsx')) out[p] = readFileSync(p, 'utf8')
+        // `.ts` as well as `.tsx` (#2425 §2.4). A render needs JSX, but a plain
+        // `.ts` helper can perfectly well return `t(key)` as a string for a
+        // component to place -- and that would have been outside this walk
+        // entirely. Widening it is also what makes the two exemptions below
+        // load-bearing rather than inert: the registry is a `.ts` file.
+        else if (e.name.endsWith('.tsx') || e.name.endsWith('.ts')) out[p] = readFileSync(p, 'utf8')
       }
     }
     walk(path.join(here, '..', 'src'))
@@ -161,16 +174,29 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
           if (!line.includes(`'${key}'`)) continue
           // A map ENTRY is not a render -- the surface's own resolver reads the
           // map and calls `tieredHint`, which is where the tiering happens.
-          if (/^\s*'[a-z0-9-]+':\s*'/.test(line)) continue
-          // The registry and this test itself.
-          if (file.includes('hint-tiers')) continue
+          //
+          // The character class used to be `[a-z0-9-]+`, which matches no real
+          // key: every one of them carries a dot and a capital
+          // (`fields.oidcAudiencesHint`). So this clause was inert, and the
+          // registry was being carried by the path substring below instead.
+          if (/^\s*'?[A-Za-z0-9_.-]+'?:\s*'/.test(line)) continue
+          // The registry, by resolved path rather than by substring.
+          if (path.resolve(file) === REGISTRY) continue
+          // No WINDOW (#2425 §2.4). It was "any `tieredHint(` within six lines
+          // above", so an untiered render placed below an unrelated tiered one
+          // passed -- and this file derives a declaration boundary for its other
+          // clause specifically to avoid a threshold, saying so in a comment.
+          // This was the one place the threshold survived.
+          //
+          // Measured before removing it rather than argued: at window 6, 2, 1
+          // and 0 the offender set is IDENTICAL, and the single site that needs
+          // more than its own line is covered by `delegatingHelpers` below --
+          // which reads each declaration's body to a real boundary. So the
+          // window was buying nothing and hiding something.
           const tiered =
             /tieredHint\(|HintWithDetail|detail=\{/.test(line) ||
             helpers.some((h) => line.includes(`${h}(`))
-          // A `.rich(` render spans lines, so look at the statement around it.
-          const near = lines.slice(Math.max(0, i - 6), i + 2).join('\n')
-          const tieredNear = /tieredHint\(|HintWithDetail|detail=\{/.test(near)
-          if (!tiered && !tieredNear) {
+          if (!tiered) {
             offenders.push(`${path.relative(path.join(here, '..'), file)}:${i + 1}  ${key}`)
           }
         }

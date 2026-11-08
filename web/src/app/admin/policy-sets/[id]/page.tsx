@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useConfirm } from '@/lib/use-confirm'
 
 interface Policy {
   id: string
@@ -69,6 +70,7 @@ function linesToList(text: string): string[] {
 export default function PolicySetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const t = useTranslations('policySetDetail')
+  const { confirmDelete } = useConfirm()
   const router = useRouter()
   const [ps, setPs] = useState<PolicySet | null>(null)
   const [loading, setLoading] = useState(true)
@@ -177,7 +179,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
   }
 
   async function deleteSet() {
-    if (!confirm(t('confirm.deleteSet'))) return
+    if (!confirmDelete(t('confirm.deleteSet'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/policy-sets/${id}`, { method: 'DELETE' })
       if (!res.ok && res.status !== 204) throw new Error(t('errors.deleteStatus', { status: res.status }))
@@ -449,6 +451,7 @@ function PolicyCard({ policy, onChanged, onError }: {
   onError: (m: string) => void
 }) {
   const t = useTranslations('policySetDetail')
+  const { confirmDelete } = useConfirm()
   const [rego, setRego] = useState(policy.attributes.rego)
   const [desc, setDesc] = useState(policy.attributes.description || '')
   const [saving, setSaving] = useState(false)
@@ -476,7 +479,7 @@ function PolicyCard({ policy, onChanged, onError }: {
   }
 
   async function remove() {
-    if (!confirm(t('confirm.deletePolicy', { name: policy.attributes.name }))) return
+    if (!confirmDelete(t('confirm.deletePolicy', { name: policy.attributes.name }))) return
     onError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/policies/${policy.id}`, { method: 'DELETE' })
