@@ -1256,7 +1256,8 @@ State version responses include a `created-by` attribute (email of the user who 
       "md5": "...",
       "size": 1234,
       "created-at": "2026-01-01T00:00:00Z",
-      "created-by": "user@example.com"
+      "created-by": "user@example.com",
+      "resources-processed": true
     },
     "relationships": {
       "run": {
@@ -1266,6 +1267,19 @@ State version responses include a `created-by` attribute (email of the user who 
   }
 }
 ```
+
+`resources-processed` is **always `true`**, and it is not a placeholder.
+
+In Terraform Enterprise it reports whether an asynchronous resource-indexing
+phase has finished, and a client polls until it flips. Terrapod has no such
+phase — a state version is complete the moment its content upload returns — so
+`true` is the honest answer rather than a convenient one, and there is no value
+of it a caller should wait for.
+
+**Omitting it is not neutral**, which is why it is here: `tfci workspace output
+list` polls its whole five-minute budget waiting for a `true` that never arrives,
+then fails. It is also not sourced from `resource_count`, which is `NULL` for
+every Terraform version by design.
 
 ### Delete State Version (Terrapod Extension)
 
@@ -2587,7 +2601,27 @@ Returns entities tagged with exactly `key=value`, grouped by type.
 GET /api/tfe/v2/workspaces/{id}/vars
 ```
 
-**Required permission:** `read` on the workspace. Sensitive values are never returned.
+**Required permission:** `read` on the workspace. Sensitive values are never
+returned.
+
+> **On a catalog-managed workspace, a NON-sensitive variable can come back masked
+> too, and this is the one most likely to be read as a bug (#2425 §5.5).** A
+> static `native`/`terraform` variable returns `value: null`, `sensitive: true`
+> and `version-id: null` when the item marked it sensitive, when the item **hid**
+> it, or when the item's definition can no longer be tied to this instance — the
+> last being deliberately fail-closed, because guessing which inputs were hidden
+> at provision time is exactly the guess that would leak one.
+>
+> So `sensitive: true` here means "withheld", not "the author marked this
+> secret", and a consumer that reads a value and writes it somewhere starts
+> writing `null`. The route, the attribute names and the status code are all
+> unchanged, so nothing reports it.
+>
+> Read catalog inputs from the catalog surface instead — `GET
+> /api/v1/catalog-instances/{ws_id}` returns the non-sensitive subset
+> explicitly, which is an honest answer rather than a masked one, and a
+> reconfigure that omits `input-values` keeps the stored set. See [Service
+> Catalog](service-catalog.md) and [Upgrading to 2.0](upgrading-to-2.0.md).
 
 ### Create Variable
 

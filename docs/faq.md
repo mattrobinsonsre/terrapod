@@ -304,6 +304,32 @@ its own state store, run lifecycle, registry, RBAC, and UI, and runs execution o
 its own outbound-only Kubernetes runners. Atlantis is webhook-driven in its own
 server; Digger runs inside your existing CI. See [Alternatives](alternatives.md).
 
+## Can I make the UI dark? Where is the theme setting?
+
+There is no setting, and that is the answer rather than a gap.
+
+The web UI defaults to **light** from 2.0 (it defaulted to dark through 1.x), and
+dark is kept but is **a source edit, not a configuration value** — there is no
+Helm value, no config key and no per-user preference that selects it. Adding
+`className="dark"` to the `<html>` element in `web/src/app/layout.tsx` restores
+it, and restores it exactly rather than approximately: the dark values are
+Tailwind's own plus the `brand` ramp, and light is a single
+`:root:not(.dark)` override that wins on specificity, so the class takes the
+override out of play and leaves the stock values.
+
+**And it does not follow the viewer's own preference either.** `globals.css`
+carries no `prefers-color-scheme` block and nothing writes a `data-theme`
+override — measured, zero occurrences anywhere under `web/` — so a browser set to
+dark still gets the light UI. The deployment's build decides, for everyone.
+
+That is worth saying plainly rather than leaving someone to discover it: "the
+default is light" invites the reading that a preference would win, and none does.
+
+This question is here because the thing an operator goes looking for does not
+exist, so searching for it finds nothing and reads as a missing feature. The
+reasoning behind the change, and the exact edit, are in [Upgrading to
+2.0](upgrading-to-2.0.md).
+
 ## What does Terrapod cost to run?
 
 The software is free. You pay only for the infrastructure it runs on (a Kubernetes

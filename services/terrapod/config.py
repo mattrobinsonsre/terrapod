@@ -1273,13 +1273,13 @@ class PlatformToolsConfig(BaseModel):
     """
 
     opa_version: str = Field(
-        default="1.22.0",
+        default="1.22.2",
         description="OPA version used for policy evaluation on the runner and Rego "
         "syntax validation on the API. Exact version — no partial resolution. "
         "Review this at every minor release.",
     )
     trivy_version: str = Field(
-        default="0.76.1",
+        default="0.76.2",
         description="Trivy version used for IaC security scanning on the runner "
         "(only fetched when trivy is the selected engine). Exact version.",
     )
