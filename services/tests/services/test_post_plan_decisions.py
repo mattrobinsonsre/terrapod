@@ -58,10 +58,17 @@ class TestWhoGetsTheTfeVocabulary:
         with patch.object(post_plan_decisions.settings.runs, "tfe_post_plan_decisions", True):
             assert post_plan_decisions.reports_tfe_post_plan(None) is True
 
-    def test_it_defaults_off_until_2_0(self):
+    def test_it_defaults_on_from_2_0(self):
+        """Off through 1.x, on from 2.0 -- the flip this test used to await.
+
+        Worth an assertion of its own rather than leaving it to the matrix
+        above, which patches the setting and so cannot see the default at
+        all: the whole point of the flip is what an operator gets WITHOUT
+        configuring anything.
+        """
         from terrapod.config import RunsConfig
 
-        assert RunsConfig().tfe_post_plan_decisions is False
+        assert RunsConfig().tfe_post_plan_decisions is True
 
 
 class TestTheTfeStatusOfAHeldRun:

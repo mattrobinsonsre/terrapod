@@ -203,12 +203,13 @@ logs and proxies.
 the UI if you skip it**, so it is listed first deliberately.
 
 `api.config.auth.legacy_callback_url` selects which prefix Terrapod builds its
-IdP-facing URLs on, and **its default has not flipped yet** — it is `true`
-today, so those URLs are still built on the deprecated `/api/terrapod/v1`
-prefix. 2.0.0 is where it becomes `false` and they move to the canonical
-`/api/v1`; the setting's own description says so ("The default flips in
-2.0.0"), which is why this is listed as a change to prepare for rather than one
-you can already see. When it flips:
+IdP-facing URLs on, and **its default is now `false`** — it was `true` through
+1.x, and 2.0.0 flipped it, so those URLs move to the canonical `/api/v1` the
+moment you upgrade. **This is not a change to prepare for at your leisure: it
+takes effect on the upgrade itself**, so do step 1 below before you roll the
+new version, or SSO stops working until you do.
+
+What moves:
 
 ```
 before:  {callback_base_url}/api/terrapod/v1/auth/callback
@@ -361,11 +362,11 @@ run. The `tofu`/`terraform` CLI is not affected, except that it now does the
 right thing.
 
 `api.config.runs.tfe_post_plan_decisions` selects this reporting, and **its
-default has not flipped yet** — it is `false` today, so the new statuses are
-opt-in until it does. 2.0.0 is where it becomes `true`; both the setting's own
-description and the chart's comment beside it say so, which is why this is listed
-as a change to prepare for rather than one you can already see. With it on, a run
-that a post-plan gate holds reports:
+default is now `true`** — it was `false` through 1.x, and 2.0.0 flipped it, so
+the new statuses arrive on the upgrade rather than when you opt in. Nothing is
+locked out by it; what changes is the `status` a script or dashboard reads back
+for a held run. Set it to `false` explicitly to keep the 1.x vocabulary. A run
+that a post-plan gate holds now reports:
 
 | before | after |
 |---|---|

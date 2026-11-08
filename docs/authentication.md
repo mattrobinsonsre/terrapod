@@ -90,8 +90,10 @@ Return session token + redirect URL
 > **Register BOTH callback URLs.** Terrapod serves its API at `/api/v1` and, for
 > the deprecation window, at `/api/terrapod/v1`. Which one it *sends* your IdP as
 > the `redirect_uri` is set by `api.config.auth.legacy_callback_url`, which
-> **defaults to `true`** (the `/api/terrapod/v1` form) so that upgrading cannot
-> break an existing deployment.
+> **defaults to `false`** from 2.0.0 (the canonical `/api/v1` form). It
+> defaulted to `true` through 1.x so that upgrading within that line could not
+> break an existing deployment; crossing to 2.0.0 is where it moves, which is
+> why registering both is the safe thing to do.
 >
 > Your IdP validates that value against its own allow-list, so Terrapod serving
 > both prefixes does not help — an unregistered `redirect_uri` is refused **at the

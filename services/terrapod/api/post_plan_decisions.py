@@ -6,7 +6,8 @@ Terraform Enterprise vocabulary reports `post_plan_running`,
 checks and task stages so the `tofu`/`terraform` CLI can show them and offer an
 override.
 
-`api.config.runs.tfe_post_plan_decisions` sets the default (it flips in 2.0.0).
+`api.config.runs.tfe_post_plan_decisions` sets the default, and it is TRUE from
+2.0.0 (it was false through 1.x).
 A client can ask for either vocabulary per request, which is how a consumer
 moves ahead of the flip -- or holds back after it -- without waiting for the
 operator. The CLI cannot send a header, so it follows the default.

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from terrapod.api.prefixes import NATIVE_LEGACY_PREFIX, NATIVE_PREFIX
 from terrapod.api.routers import auth as auth_router
 from terrapod.auth.connectors.saml import SAMLConnector
 from terrapod.config import SAMLProviderConfig
@@ -67,20 +68,35 @@ class TestTheAcsUrlIsResolvedOnce:
         )
         assert "//auth" not in auth_router._saml_acs_url(_saml()).removeprefix("https://")
 
-    def test_it_is_built_on_the_native_prefix_this_line_serves(self) -> None:
-        """One native prefix here, so there is no switch to follow.
+    @pytest.mark.parametrize(
+        ("legacy", "want_prefix", "not_in"),
+        [(True, NATIVE_LEGACY_PREFIX, "/api/v1/"), (False, NATIVE_PREFIX, "/api/terrapod/v1/")],
+    )
+    def test_it_follows_the_switch_in_BOTH_directions(
+        self, monkeypatch: pytest.MonkeyPatch, legacy: bool, want_prefix: str, not_in: str
+    ) -> None:
+        """The ACS URL is built on whichever prefix `legacy_callback_url` picks.
 
-        On the 2.x line this reads `auth.legacy_callback_url` to choose between
-        two native prefixes. This line serves `/api/terrapod/v1` alone, so the
-        ACS URL is built from `terrapod_prefix` directly — and the thing worth
-        pinning is that it names the prefix an assertion can actually be posted
-        to, since the URL is also what the operator registers with the IDP.
+        This asserted `terrapod_prefix` and that `/api/v1/` was ABSENT, with a
+        docstring saying "this line serves `/api/terrapod/v1` alone" -- which is
+        a RELEASE LINE's reasoning carried here byte for byte. On main both
+        native prefixes are served and `_saml_acs_url` goes through
+        `_sso_url_prefix`, as its own docstring says. So the old assertion was
+        describing the other line and passing only because the default happened
+        to select that prefix; flipping the default in 2.0 is what exposed it.
+
+        Parametrised rather than asserting the new default, because the property
+        is that the URL FOLLOWS the switch. A test pinned to one value passes
+        again the next time the default moves while saying nothing about the
+        half that matters: the operator who sets it back.
         """
-        from terrapod.config import settings as live
-
+        monkeypatch.setattr(auth_router.settings.auth, "legacy_callback_url", legacy)
+        monkeypatch.setattr(
+            auth_router.settings.auth, "callback_base_url", "https://terrapod.example.com"
+        )
         url = auth_router._saml_acs_url(_saml())
-        assert url.endswith(f"{live.terrapod_prefix}/auth/saml/acs")
-        assert "/api/v1/" not in url
+        assert url.endswith(f"{want_prefix}/auth/saml/acs")
+        assert not_in not in url
 
 
 class TestTheIdpIsToldWhereToPost:
