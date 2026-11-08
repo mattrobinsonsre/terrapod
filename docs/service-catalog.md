@@ -62,7 +62,7 @@ provider "aws" {
 output "vpc_id" { value = module.this.vpc_id }
 ```
 
-The inputs the user supplied on the provision form become the workspace's **Terraform variables** (`category = terraform`). Sensitive inputs are stored as sensitive variables. The workspace is marked **catalog-managed** by its `catalog_item_id` — that flag is what activates the guardrails described below.
+The inputs the user supplied on the provision form become the workspace's **Terraform variables** (`category = terraform`). Sensitive inputs are stored as sensitive variables — and a **non-sensitive** one can still read back masked: a static variable on a catalog-managed workspace returns `value: null, sensitive: true` when the item marked it sensitive, when the item HID it, or when the item's definition can no longer be tied to this instance (fail-closed, because guessing which inputs were hidden at provision time is the guess that would leak one). So `sensitive: true` on this surface means "withheld" rather than "the author marked this secret", and the catalog surface rather than the workspace's variables is where to read an input back. The workspace is marked **catalog-managed** by its `catalog_item_id` — that flag is what activates the guardrails described below.
 
 Because the wrapper is generated server-side and the workspace is agent-mode + non-VCS, runs execute on your agent pools exactly like any other agent run: a plan, an approval (or auto-apply), and an apply.
 
