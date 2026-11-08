@@ -43,6 +43,22 @@ is reviewed, not gated -- and the safer thing to write is no per-verb claim at
 all, because a key read through a shared helper is consumed wherever that helper
 is called.
 
+The three floors below prove the claims and the catalogues are non-empty and
+say nothing about whether any predicate discriminates (#2425 §2.7). A table
+reader that quietly stops seeing one marker spelling still counts twenty-odd
+claims from the rest; a key reader that drops one AST shape still finds plenty;
+and the comparison itself -- the read-check in both directions, plus the refusal
+of a both-ways claim that names no verb -- has no floor at all. So `SELF_TEST_*`
+pins each form and each decision against literal fixtures, asserted BEFORE the
+document is read, including inputs that must NOT be read.
+
+Two of those fixtures exist because this gate has already been wrong in exactly
+those places: a row whose cell contains a marker's words must not reclassify the
+rows below it (#2425 §5.2, which failed the gate on a `tags` row nobody had
+touched), and a both-ways claim with no verb named must be refused rather than
+silencing both read-checks (found by mutating `serial` into the not-consumed
+table and watching the gate pass).
+
 STDLIB ONLY: it reads the document as text and the routers with `ast`.
 """
 
@@ -96,15 +112,18 @@ MIN_CONSUMED = 20
 MIN_NOT_CONSUMED = 8
 
 
-def read_keys(path: pathlib.Path, fn_names: list[str]) -> tuple[set[str], set[str]]:
+def read_keys_from_source(src: str, fn_names: list[str]) -> tuple[set[str], set[str]]:
     """Every string key the named functions read off a request body.
 
     Returns (keys, missing_function_names). A `.get("x")` on anything, plus
     `"x" in thing` -- deliberately broad, because the question is whether the
     handler looks at the key at all, and narrowing by receiver name is how a
     gate comes to miss a read through a differently-named local.
+
+    Pure, over source text, so `SELF_TEST_READS` drives exactly what the scan
+    drives rather than a paraphrase of it.
     """
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(src)
     byname: dict[str, ast.AST] = {}
     for n in ast.walk(tree):
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -145,6 +164,10 @@ def read_keys(path: pathlib.Path, fn_names: list[str]) -> tuple[set[str], set[st
     return keys, missing
 
 
+def read_keys(path: pathlib.Path, fn_names: list[str]) -> tuple[set[str], set[str]]:
+    return read_keys_from_source(path.read_text(), fn_names)
+
+
 #: An attribute claimed BOTH consumed and not-consumed is only credible if its
 #: not-consumed row says which verb is which. Without that the reader cannot use
 #: it either, and -- the reason this is enforced -- leaving the consumed row in
@@ -152,18 +175,194 @@ def read_keys(path: pathlib.Path, fn_names: list[str]) -> tuple[set[str], set[st
 #: `serial` into the not-consumed table and watching the gate pass.
 ASYMMETRY = re.compile(r"\b(?:POST|PATCH|PUT|create|update|on `POST`|on `PATCH`)\b")
 
+#: A heading that is not a real catalogue, so the fixtures below do not depend
+#: on what `HANDLERS` happens to hold today.
+_FIXTURE_HEADING = "Fixture attributes"
 
-def catalogues(doc: str) -> dict[str, dict[str, set[str]]]:
+#: Markdown -> `(consumed, not_consumed)` the table reader must yield.
+SELF_TEST_TABLES: list[tuple[str, list[str], list[str]]] = [
+    # The consumed marker, and only the FIRST cell is read -- the go-tfe field
+    # in column two is a Go name, not a wire attribute.
+    (
+        f"### {_FIXTURE_HEADING}\n\n"
+        "Consumed, on both `POST` and `PATCH` unless noted:\n\n"
+        "| Attribute | go-tfe field | Terrapod behaviour |\n|---|---|---|\n"
+        "| `name` | `name-field` | The workspace name |\n"
+        "| `auto-apply` | `AutoApply` | Apply without confirmation |\n",
+        ["auto-apply", "name"],
+        [],
+    ),
+    # Both not-consumed marker spellings.
+    (
+        f"### {_FIXTURE_HEADING}\n\n"
+        "**Accepted and not consumed** — the class that is a defect:\n\n"
+        "| Attribute | go-tfe field | What happens |\n|---|---|---|\n"
+        "| `vcs-repo` | `VCSRepo` | Dropped. |\n",
+        [],
+        ["vcs-repo"],
+    ),
+    (
+        f"### {_FIXTURE_HEADING}\n\n"
+        "**Not supported — Terrapod has no such feature.**\n\n"
+        "| Attribute | go-tfe field |\n|---|---|\n"
+        "| `hyok-enabled` | `HYOKEnabled` |\n",
+        [],
+        ["hyok-enabled"],
+    ),
+    # THE RECORDED DEFECT (#2425 §5.2): A TABLE ROW IS NEVER A MARKER. A cell
+    # containing a marker's words used to reclassify every row BELOW it, which
+    # failed this gate on `tags` -- a row nobody had touched.
+    (
+        f"### {_FIXTURE_HEADING}\n\n"
+        "Consumed, on both `POST` and `PATCH` unless noted:\n\n"
+        "| Attribute | go-tfe field | Terrapod behaviour |\n|---|---|---|\n"
+        "| `vcs-repo` | `VCSRepo` | Not supported on the native surface either |\n"
+        "| `tags` | `Tags` | Accepted and not consumed is what the row below used to say |\n"
+        "| `name` | `Name` | Still consumed |\n",
+        ["name", "tags", "vcs-repo"],
+        [],
+    ),
+    # Several names in one cell, as the auto-destroy row really is.
+    (
+        f"### {_FIXTURE_HEADING}\n\n"
+        "**Not supported — Terrapod has no such feature.**\n\n"
+        "| Attribute | go-tfe field |\n|---|---|\n"
+        "| `auto-destroy-at`, `auto-destroy-activity-duration` | the `AutoDestroy*` set |\n",
+        [],
+        ["auto-destroy-activity-duration", "auto-destroy-at"],
+    ),
+    # MUST NOT MATCH: a heading that is not a catalogue contributes nothing, so
+    # the fixture heading is absent and both sets come back empty.
+    (
+        "### Some other subsection\n\nConsumed:\n\n| Attribute |\n|---|\n| `smuggled-in` |\n",
+        [],
+        [],
+    ),
+    # MUST NOT MATCH: header and separator rows, and a wire attribute must be
+    # lower-case -- `Name` in the first cell is a Go field, not an attribute.
+    (
+        f"### {_FIXTURE_HEADING}\n\nConsumed:\n\n"
+        "| Attribute | go-tfe field |\n|---|---|\n| `Name` | `Name` |\n",
+        [],
+        [],
+    ),
+]
+
+#: A not-consumed row -> whether it names the verb that drops the attribute. The
+#: pair is the discrimination: without it, a duplicated row silences the read
+#: check, which is how `serial` passed when it was mutated into both tables.
+SELF_TEST_ASYMMETRY: list[tuple[str, bool]] = [
+    ("| `terraform-version` | `TerraformVersion` | Dropped on `POST`, consumed on `PATCH` |", True),
+    ("| `tags` | `Tags` | Dropped on create. |", True),
+    ("| `serial` | `Serial` | Dropped. |", False),
+    ("| `vcs-repo` | `VCSRepo` | Dropped; the caller's whole intent is lost |", False),
+]
+
+#: `(source, functions, keys, missing)` the key reader must yield.
+SELF_TEST_READS: list[tuple[str, tuple[str, ...], list[str], list[str]]] = [
+    ('def f(body):\n    return body.get("comment")\n', ("f",), ["comment"], []),
+    ('def f(body):\n    return body["lineage"]\n', ("f",), ["lineage"], []),
+    ('def f(body):\n    if "serial" in body:\n        pass\n', ("f",), ["serial"], []),
+    ('def f(body):\n    if "serial" not in body:\n        pass\n', ("f",), ["serial"], []),
+    # The recorded loop form: the keys are in the iterable, never in the `.get`,
+    # so a constant-argument walk alone reports a true claim as unread.
+    (
+        'def f(body):\n    for key in ("reason", "Info", "Operation"):\n        body.get(key)\n',
+        ("f",),
+        ["Info", "Operation", "reason"],
+        [],
+    ),
+    # A read inside a nested function still counts: the question is whether the
+    # route looks at the key, not which frame does.
+    (
+        'def outer(body):\n    def inner():\n        return body.get("nested")\n'
+        "    return inner()\n",
+        ("outer",),
+        ["nested"],
+        [],
+    ),
+    # Deliberately broad: a `.get` on any receiver, because narrowing by
+    # receiver name is how a gate misses a read through a renamed local.
+    ('def f(req):\n    return req.headers.get("x-run-id")\n', ("f",), ["x-run-id"], []),
+    # MUST NOT MATCH: a key read by a function that was not named. This is the
+    # scoping property -- without it the gate would pass any claim satisfied
+    # anywhere in the module.
+    (
+        'def a(body):\n    return body.get("mine")\n\n\n'
+        'def b(body):\n    return body.get("theirs")\n',
+        ("a",),
+        ["mine"],
+        [],
+    ),
+    # A renamed handler is reported, not silently skipped.
+    (
+        'def a(body):\n    return body.get("mine")\n',
+        ("a", "gone"),
+        ["mine"],
+        ["gone"],
+    ),
+    # MUST NOT MATCH: a non-constant key cannot be checked. A documented limit.
+    ("def f(body, k):\n    return body.get(k)\n", ("f",), [], []),
+]
+
+#: `(label, claims, keys, expected problem count)`. The floors cannot see any of
+#: this: they count claims, not whether the comparison discriminates.
+SELF_TEST_DECISION: list[tuple[str, dict[str, set[str]], set[str], int]] = [
+    ("consumed and read", {"consumed": {"name"}, "not_consumed": set()}, {"name"}, 0),
+    # The #1903 shape: the catalogue promises a read nobody performs.
+    ("consumed, not read", {"consumed": {"name"}, "not_consumed": set()}, set(), 1),
+    ("not consumed, not read", {"consumed": set(), "not_consumed": {"tags"}}, set(), 0),
+    # The direction that rots: a wrong REASON, which reads as considered.
+    ("not consumed, but read", {"consumed": set(), "not_consumed": {"tags"}}, {"tags"}, 1),
+    # Claimed both ways WITHOUT a verb: refused, because accepting it would
+    # silence both read-checks for that attribute. Measured, the count is TWO
+    # either way, and that is the property rather than an accident: the
+    # attribute stays in both read-checks, and the two claims contradict each
+    # other, so exactly one of them must also fire whichever way `keys` falls --
+    # "consumed but not read" when it is unread, "not consumed but is read"
+    # when it is read. Both key states are pinned so a change that silences one
+    # arm is visible.
+    (
+        "both ways, no verb, unread",
+        {"consumed": {"serial"}, "not_consumed": {"serial"}, "_rowtext": {"serial": "Dropped."}},
+        set(),
+        2,
+    ),
+    (
+        "both ways, no verb, read",
+        {"consumed": {"serial"}, "not_consumed": {"serial"}, "_rowtext": {"serial": "Dropped."}},
+        {"serial"},
+        2,
+    ),
+    # Claimed both ways WITH a verb: legitimate, and neither read-check applies.
+    (
+        "both ways, verb named",
+        {
+            "consumed": {"terraform-version"},
+            "not_consumed": {"terraform-version"},
+            "_rowtext": {"terraform-version": "Dropped on `POST`, consumed on `PATCH`"},
+        },
+        set(),
+        0,
+    ),
+]
+
+
+def catalogues(
+    doc: str, headings: dict[str, object] | None = None
+) -> dict[str, dict[str, set[str]]]:
     """Heading -> {"consumed": {...}, "not_consumed": {...}}.
 
     A table's class comes from the nearest preceding prose marker, because that
-    is what a reader goes by too.
+    is what a reader goes by too. `headings` exists so the fixtures can use a
+    synthetic heading rather than depending on what `HANDLERS` happens to hold.
     """
+    wanted = HANDLERS if headings is None else headings
     out: dict[str, dict[str, set[str]]] = {}
     blocks = re.split(r"^### ", doc, flags=re.M)[1:]
     for b in blocks:
         heading = b.split("\n", 1)[0].strip()
-        if heading not in HANDLERS:
+        if heading not in wanted:
             continue
         cls = "consumed"
         found = {"consumed": set(), "not_consumed": set()}
@@ -196,7 +395,114 @@ def catalogues(doc: str) -> dict[str, dict[str, set[str]]]:
     return out
 
 
+def claim_problems(
+    heading: str,
+    claims: dict[str, set[str]],
+    keys: set[str],
+    handler_files: list[str],
+) -> tuple[list[str], int, int]:
+    """Both read-checks for one catalogue, plus the claimed-both-ways refusal.
+
+    Pure, over the derived sets, because this is the half no floor can see: the
+    counts below prove the claims are non-empty and say nothing about whether
+    the comparison discriminates. `(problems, n_consumed_checked,
+    n_not_consumed_checked)`.
+    """
+    problems: list[str] = []
+    # An attribute in BOTH tables is the asymmetric case -- consumed on one
+    # verb and dropped on another (`terraform-version` on workspaces). Both
+    # claims are true, so neither read-check applies; it is derived from the
+    # document rather than exempted by hand.
+    rowtext: dict[str, str] = claims.get("_rowtext", {})  # type: ignore[assignment]
+    both = set()
+    for a in sorted(claims["consumed"] & claims["not_consumed"]):
+        if ASYMMETRY.search(rowtext.get(a, "")):
+            both.add(a)
+        else:
+            problems.append(
+                f"[{heading}] CLAIMED BOTH WAYS WITHOUT SAYING WHICH VERB: `{a}`\n"
+                "      It is in the consumed table and the not-consumed table, and the "
+                "not-consumed row names no verb. Either say which route drops it (as "
+                "`terraform-version` does) or remove the wrong row -- as written, a reader "
+                "cannot tell, and the duplicate silences this gate's read check."
+            )
+
+    n_consumed = n_not = 0
+    for a in sorted(claims["consumed"] - both):
+        n_consumed += 1
+        if a not in keys:
+            problems.append(
+                f"[{heading}] CLAIMED CONSUMED BUT NOT READ: `{a}`\n"
+                f"      No handler in {','.join(handler_files)} reads it. Either the "
+                "catalogue is wrong, or the code stopped reading it and the document now "
+                "promises behaviour that is gone."
+            )
+    for a in sorted(claims["not_consumed"] - both):
+        n_not += 1
+        if a in keys:
+            problems.append(
+                f"[{heading}] CLAIMED NOT CONSUMED BUT IS READ: `{a}`\n"
+                "      The catalogue tells an integrator we drop it and we do not. Move the "
+                "row to the consumed table and say what we do with it."
+            )
+    return problems, n_consumed, n_not
+
+
+def self_test() -> list[str]:
+    """Pin the table reader, the key reader and the decision, before any scan.
+
+    The three floors prove the claims and the catalogues are non-empty and say
+    nothing about whether any predicate discriminates (#2425 §2.7). A table
+    reader that quietly stops seeing one marker spelling still counts twenty-odd
+    claims from the others; a key reader that drops one AST shape still finds
+    plenty. These fixtures are what pin the individual forms.
+    """
+    out: list[str] = []
+    for text, want_consumed, want_not in SELF_TEST_TABLES:
+        cats = catalogues(text, {_FIXTURE_HEADING: {}})
+        got = cats.get(_FIXTURE_HEADING, {"consumed": set(), "not_consumed": set()})
+        if sorted(got["consumed"]) != sorted(want_consumed) or sorted(
+            got["not_consumed"]
+        ) != sorted(want_not):
+            out.append(
+                f"the table reader no longer reads {text!r} the way it must: expected "
+                f"consumed={sorted(want_consumed)} not_consumed={sorted(want_not)}, read "
+                f"consumed={sorted(got['consumed'])} not_consumed={sorted(got['not_consumed'])}."
+            )
+    for row, want_verb in SELF_TEST_ASYMMETRY:
+        if bool(ASYMMETRY.search(row)) is not want_verb:
+            out.append(
+                f"ASYMMETRY no longer decides {row!r} the way it must: expected "
+                f"names-a-verb={want_verb}."
+            )
+    for src, fns, want_keys, want_missing in SELF_TEST_READS:
+        got_keys, got_missing = read_keys_from_source(src, list(fns))
+        if sorted(got_keys) != sorted(want_keys) or sorted(got_missing) != sorted(want_missing):
+            out.append(
+                f"the key reader no longer reads {src!r} for {list(fns)} the way it must: "
+                f"expected keys={sorted(want_keys)} missing={sorted(want_missing)}, read "
+                f"keys={sorted(got_keys)} missing={sorted(got_missing)}."
+            )
+    for label, claims, keys, want_n in SELF_TEST_DECISION:
+        got_problems, _, _ = claim_problems("fixture", dict(claims), set(keys), ["x.py"])
+        if len(got_problems) != want_n:
+            out.append(
+                f"the claim decision for {label} reported {len(got_problems)} problem(s), "
+                f"not {want_n}: {got_problems}"
+            )
+    return out
+
+
 def main() -> int:
+    # The gate's own health first: a reader or a comparison that has stopped
+    # discriminating makes every claim below meaningless.
+    broken = self_test()
+    if broken:
+        print("the CLI-surface-body-claims gate cannot do its job:")
+        for problem in broken:
+            print(f"  - {problem}")
+        return 1
+
     doc = DOC.read_text()
     cats = catalogues(doc)
     problems: list[str] = []
@@ -224,41 +530,10 @@ def main() -> int:
                     "or it silently stops checking that route."
                 )
 
-        # An attribute in BOTH tables is the asymmetric case -- consumed on one
-        # verb and dropped on another (`terraform-version` on workspaces). Both
-        # claims are true, so neither read-check applies; it is derived from the
-        # document rather than exempted by hand.
-        rowtext: dict[str, str] = claims.get("_rowtext", {})  # type: ignore[assignment]
-        both = set()
-        for a in claims["consumed"] & claims["not_consumed"]:
-            if ASYMMETRY.search(rowtext.get(a, "")):
-                both.add(a)
-            else:
-                problems.append(
-                    f"[{heading}] CLAIMED BOTH WAYS WITHOUT SAYING WHICH VERB: `{a}`\n"
-                    "      It is in the consumed table and the not-consumed table, and the "
-                    "not-consumed row names no verb. Either say which route drops it (as "
-                    "`terraform-version` does) or remove the wrong row -- as written, a reader "
-                    "cannot tell, and the duplicate silences this gate's read check."
-                )
-
-        for a in sorted(claims["consumed"] - both):
-            n_consumed += 1
-            if a not in keys:
-                problems.append(
-                    f"[{heading}] CLAIMED CONSUMED BUT NOT READ: `{a}`\n"
-                    f"      No handler in {','.join(HANDLERS[heading])} reads it. Either the "
-                    "catalogue is wrong, or the code stopped reading it and the document now "
-                    "promises behaviour that is gone."
-                )
-        for a in sorted(claims["not_consumed"] - both):
-            n_not += 1
-            if a in keys:
-                problems.append(
-                    f"[{heading}] CLAIMED NOT CONSUMED BUT IS READ: `{a}`\n"
-                    "      The catalogue tells an integrator we drop it and we do not. Move the "
-                    "row to the consumed table and say what we do with it."
-                )
+        got_problems, c, n = claim_problems(heading, claims, keys, list(HANDLERS[heading]))
+        problems += got_problems
+        n_consumed += c
+        n_not += n
 
     if n_consumed < MIN_CONSUMED:
         problems.append(
@@ -277,7 +552,9 @@ def main() -> int:
 
     print(
         f"OK — {len(cats)} body catalogue(s): {n_consumed} consumed claim(s) all read, "
-        f"{n_not} not-consumed claim(s) all absent."
+        f"{n_not} not-consumed claim(s) all absent. "
+        f"{len(SELF_TEST_TABLES) + len(SELF_TEST_ASYMMETRY) + len(SELF_TEST_READS) + len(SELF_TEST_DECISION)} "
+        "reader and decision fixtures hold."
     )
     return 0
 
