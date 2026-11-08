@@ -122,7 +122,6 @@ resource "terrapod_variable" "web_key" {
   category     = "ansible_machine_auth"
   sensitive    = true
   value = jsonencode({
-    user        = "deploy"
     private_key = file("~/.ssh/fleet")
     known_hosts = <<-EOT
       web1.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
@@ -341,7 +340,7 @@ Setting `value_source: "vault"` on either category is refused with a 422, and th
 reason is structural: **a credential in these categories is a JSON object, while
 an OpenBao/Vault reference resolves to a single field.** A reference is one
 `{mount, path, field}` read producing one string — there is no shape in which it
-could deliver `{"user": …, "private_key": …, "become": …}`.
+could deliver `{"private_key": …, "known_hosts": …, "become_password": …}`.
 
 If you want the secret to live in OpenBao/Vault rather than in Terrapod, put the
 credential's own secret fields there and reference them from a `static` value —
@@ -736,6 +735,9 @@ reason this is a feature rather than a gap:
 
 ## See also
 
+- [Ansible on Terrapod](ansible.md#one-worked-example-from-nothing-to-a-configure-that-runs) — the worked example that declares a
+  workspace, its inventory and this credential together, with the placeholder
+  joining them
 - [Running a configure](runners.md#what-a-configure-actually-runs) — the one
   command a configure runs, and the settings it forces
 - [Ansible inventory](ansible-inventory.md) — the hosts, groups and variables a placeholder is written into,

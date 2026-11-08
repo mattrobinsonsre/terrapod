@@ -76,6 +76,11 @@ resource "terrapod_workspace" "fleet" {
 nothing without it. All three default to **false** for an existing workspace,
 so upgrading changes nothing about what runs.
 
+This block is the workspace half on its own. For the whole of it in one piece —
+these settings plus the inventory rows, the credential and the placeholder that
+joins them — see [one worked example, from nothing to a configure that
+runs](ansible.md#one-worked-example-from-nothing-to-a-configure-that-runs).
+
 ### Or let the service catalog turn it on for you
 
 A [catalog item](service-catalog.md#provisioning-an-ansible-first-workspace) can
@@ -174,6 +179,42 @@ rather than prevention:
 A workspace whose `default-limit` names a canary group **cannot be made to fire
 wider by a git push**, because a push carries no run options. If you want an
 estate-wide auto-configure, leave the limit empty on purpose.
+
+### A `default-limit` that matches nothing
+
+Nothing checks the limit against the inventory, and that is not an oversight
+either: `--limit` is ansible's own pattern syntax — `:`, `!`, `&`, `~` and
+wildcards are all meaningful in it — so a format rule imposed here would refuse
+patterns ansible accepts, and a *membership* check would have to reimplement the
+expansion ansible is doing. The value is stored byte for byte, and the group it
+names is resolved at run time by ansible.
+
+So the state in the heading is reachable, and it is the ordinary state when you
+set `default-limit` while writing the workspace and declare the inventory
+afterwards. What you see depends on which of the two you ask:
+
+| You ask | What happens |
+|---|---|
+| the resolved read, [`?limit=<pattern>`](ansible-inventory.md#the---limit-preview) | **zero hosts, and no error.** `ansible-inventory` exits 0 with an empty host set and a `Could not match supplied host pattern` warning on stderr, which Terrapod reads only on a non-zero exit — so the warning is not surfaced. `host-count: 0` is the signal, and it is the whole reason to look before running |
+| a configure run | **the run errors**, from ansible itself: `ERROR! Specified inventory, host pattern and/or --limit leaves us with no hosts to target.` — exit 1, with the `Could not match supplied host pattern, ignoring: <your limit>` warning above it naming the pattern. Nothing is configured, and the log says why |
+
+The exception is a workspace with **no hosts at all**. Ansible distinguishes
+"your limit excluded everything" from "there was nothing to exclude": with an
+empty inventory the limit is not treated as a mistake, the play reports
+`skipping: no hosts matched`, and the run **succeeds** having done nothing. So a
+brand-new configure-only workspace is green before its inventory exists, and goes
+red the moment it has hosts the limit does not reach.
+
+Both rows and the exception were measured on `ansible-core` **2.16.19 and
+2.18.3**, which answer identically — same text, same exit codes. If you are
+scripting against this, match the `Could not match supplied host pattern`
+warning rather than the error: it names your own pattern, so it tells you *which*
+limit missed.
+
+**A configure the platform derived cannot land here**, which is why this is about
+`default-limit` rather than about limits in general — a derived limit is computed
+from a resolution Terrapod already performed, so it can only ever name hosts that
+resolution contained. See the next section.
 
 ## A configure the platform derived targets only the hosts that changed
 
