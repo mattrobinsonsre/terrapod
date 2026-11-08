@@ -1109,7 +1109,10 @@ export default function AutodiscoveryPage() {
               `${tWs('fields.ansibleVersionTitle')} ${tWs('fields.ansibleVersionUnconfirmed')}`,
         )
       case 'ansible-execution-environment':
-        return hintText(tWs('fields.ansibleExecutionEnvironmentTitle'))
+        // Tiered since #2432: it was 198 characters, and the half that matters
+        // -- that setting one OVERRIDES the workspace's Ansible version -- is
+        // now on screen rather than only in the detail.
+        return tieredHint(tWs, 'fields.ansibleExecutionEnvironmentTitle')
       case 'ansible-collections':
         return tieredHint(tWs, 'fields.ansibleCollectionsHint')
       case 'var-files':

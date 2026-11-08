@@ -28,6 +28,8 @@
 
 import { useTranslations } from 'next-intl'
 
+import { tieredHint } from '@/components/hint-with-detail'
+
 export interface PhaseSlotState {
   applyOnly: boolean
   configureOnly: boolean
@@ -48,9 +50,15 @@ export function PhaseSlotFlags({
   const t = useTranslations(namespace)
   return (
     <>
+      {/* The explanation of each slot was a 166/176-character hover `title` on
+          these labels until #2432 -- unreachable on touch and invisible to a
+          keyboard, which is what AGENTS.md forbids for explanation. It is a
+          tiered hint now: what the slot does on screen, the reasoning behind
+          the icon. The keys are bare because `t` is bound to the slot's own
+          namespace, and the registry resolves one entry against both
+          surfaces. */}
       <label
         className={`flex items-center gap-2 ${state.configureOnly ? 'opacity-60' : 'cursor-pointer'}`}
-        title={t('applyOnlyHint')}
       >
         <input
           type="checkbox"
@@ -61,9 +69,9 @@ export function PhaseSlotFlags({
         />
         <span className={labelClassName}>{t('applyOnly')}</span>
       </label>
+      {tieredHint(t, 'applyOnlyHint')}
       <label
         className={`flex items-center gap-2 ${state.applyOnly ? 'opacity-60' : 'cursor-pointer'}`}
-        title={t('configureOnlyHint')}
       >
         <input
           type="checkbox"
@@ -74,6 +82,7 @@ export function PhaseSlotFlags({
         />
         <span className={labelClassName}>{t('configureOnly')}</span>
       </label>
+      {tieredHint(t, 'configureOnlyHint')}
     </>
   )
 }

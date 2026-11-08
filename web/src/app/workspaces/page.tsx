@@ -1053,6 +1053,14 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.configureAfterApplyHint'))
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
+      case 'name':
+        // The engine decides the rule, so it cannot be a static entry. The
+        // input keeps the CRISP form in its `title` because a `title` beside a
+        // `pattern` is the browser's constraint-validation message; the full
+        // rule is here, on screen, rather than only on hover (#2432).
+        return engine === 'pulumi'
+          ? tieredHint(t, 'form.namePatternPulumi')
+          : hintText(t('form.namePattern'))
       case 'config-directory':
         return tieredHint(tDetail, 'fields.configDirectoryTitle')
       case 'inventory-paths':
@@ -1212,7 +1220,7 @@ function WorkspacesPageInner() {
               pattern={engine === 'pulumi'
                 ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*'
                 : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
-              title={engine === 'pulumi' ? t('form.namePatternPulumi') : t('form.namePattern')}
+              title={engine === 'pulumi' ? t('form.namePatternPulumiLead') : t('form.namePattern')}
               placeholder={engine === 'pulumi' ? t('form.namePlaceholderPulumi') : t('form.namePlaceholder')}
               className={CREATE_INPUT}
             />

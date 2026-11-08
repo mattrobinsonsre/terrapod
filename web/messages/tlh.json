@@ -87,7 +87,8 @@
       "engineHelp": "Dochvam vangbogh QuQ. vangmeH mIw 'oHbe'.",
       "namePatternPulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> yIlo''."
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> yIlo''.",
+      "namePatternPulumiLead": "cha' 'ay' '::' Sepbogh — project::stack."
     },
     "stats": {
       "total": "naQ",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "nab vIghoj 'ach lo' neH vInob. configuration De' qon nab, vaj lo' neH poQbogh De' nab 'ebmeyDaq tu'lu'be'nIS.",
       "configureOnly": "Qum neH",
       "configureOnlyHint": "Qum neH vInob; nab je lo' je vIghoj. Duj De' — SSH ngaQHa'moHwI', become mu'qaD — nab 'ebDaq lo' 'ebDaq je tu'lu'be'nIS.",
-      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch."
+      "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch.",
+      "configureOnlyLead": "Qum neH vInob; nab je lo' je vIghoj.",
+      "applyOnlyLead": "nab vIghoj 'ach lo' neH vInob."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "motlh chu''lu'', Ansible Dotlh je. chu''Ha''lu''DI'' ''avwI'' tunmoH: host nobbogh ngaQHa''moHwI'' Hoch lajlu'', vaj rar HIvlaH.",
       "bindPlanLead": "chu''lu''DI'', chovnatlh polbogh nab ''e'' ta''qu''lu''. vaj chovnatlh ret choHlu''bogh Hoch lajbe''lu'', ''ej ta'' luj.",
       "configDirectoryLead": "ansible.cfg, Qu'' paqmey, roles/, group_vars/ je host_vars/ Daq, qawHaq mung-vo''. chImchugh, mung ''e'' ''oS.",
-      "ansibleCollectionsLead": "configure qaSpa'' lan ta''lu''bogh ghomHommey, wa'' per Dagh namespace.name ghap namespace.name:version."
+      "ansibleCollectionsLead": "configure qaSpa'' lan ta''lu''bogh ghomHommey, wa'' per Dagh namespace.name ghap namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "naDev vumwI' Daqmey wa', per lo'taHvIS. wa' yIwIv 'ej Qumwo' Ansible mI' lulIj.",
+      "labelsLead": "permey cha' Qu' ta': label-RBAC rurmoHmeH, 'ej cloud 'ay' Qumwo' wIvmeH \"tags\" moj.",
+      "nameTitlePulumiLead": "cha' 'ay' '::' Sepbogh — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch.",
       "vaultFileLead": "ghItlh He ngaS choH, pegh ngaSbe''.",
       "vaultFileTemplateLead": "Hoch Daq, OpenBao/Vault laDlu''bogh wa''vam-vo'' Say''vetlh lIS.",
-      "gitSshLead": "Dung per rurbogh pegh git::ssh:// Segh mungmey yIchaw''; lI''meH ngaQHa''wI'' yIlo''."
+      "gitSshLead": "Dung per rurbogh pegh git::ssh:// Segh mungmey yIchaw''; lI''meH ngaQHa''wI'' yIlo''.",
+      "configureOnlyLead": "Qum neH vInob; nab je lo' je vIghoj.",
+      "applyOnlyLead": "nab vIghoj 'ach lo' neH vInob."
     },
     "runs": {
       "options": "wIvmey",

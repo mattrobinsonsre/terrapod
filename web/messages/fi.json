@@ -87,7 +87,8 @@
       "engineHelp": "Mikä moottori suorittaa tämän työtilan. Ei suoritustaustajärjestelmä, joka valitsee binäärin Terraform-moottorin sisällä.",
       "namePatternPulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Osoita CLI siihen komennolla <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Osoita CLI siihen komennolla <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Kaksi osaa erotettuna merkeillä '::' — project::stack."
     },
     "stats": {
       "total": "Yhteensä",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle. plan suorittaa konfiguraation koodin, joten vain apply:n tarvitsemat tunnistetiedot eivät kuulu plan-vaiheen ympäristöön.",
       "configureOnly": "Vain määritys",
       "configureOnlyHint": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta. Laitekannan oma tunnistetieto — SSH-avain koneille, become-salasana — ei kuulu kumpaankaan niistä.",
-      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen."
+      "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen.",
+      "configureOnlyLead": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta.",
+      "applyOnlyLead": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Päällä oletuksena, mikä on Ansiblen oma toimintatapa. Pois päältä se löysentää suojausta: mikä tahansa isännän esittämä avain hyväksytään, jolloin yhteyttä voidaan salakuunnella.",
       "bindPlanLead": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin.",
       "configDirectoryLead": "Missä ansible.cfg, playbookit, roles/, group_vars/ ja host_vars/ sijaitsevat, suhteessa tietovaraston juureen. Tyhjä tarkoittaa juurta itseään.",
-      "ansibleCollectionsLead": "Kokoelmat, jotka asennetaan ennen configuren suoritusta, yksi riviä kohden muodossa namespace.name tai namespace.name:version."
+      "ansibleCollectionsLead": "Kokoelmat, jotka asennetaan ennen configuren suoritusta, yksi riviä kohden muodossa namespace.name tai namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Yksi tämän asennuksen omista suoritusympäristöistä, nimiöllä. Sen asettaminen ohittaa työtilan Ansible-version.",
+      "labelsLead": "Tunnisteilla on kaksi tehtävää: tunnisteperustainen RBAC vastaa niihin, ja ne ovat myös ne \"tagit\", joiden perusteella cloud-lohko voi valita työtilan.",
+      "nameTitlePulumiLead": "Kaksi osaa erotettuna merkeillä '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen.",
       "vaultFileLead": "Muuttuja sisältää tiedoston polun, ei salaisuutta.",
       "vaultFileTemplateLead": "Jokainen paikkamerkki korvataan kyseisellä kentällä tästä yhdestä OpenBao/Vault-lukukerrasta.",
-      "gitSshLead": "Todentaa käyttöönottoavaimella yksityiset moduulilähteet, jotka alkavat git::ssh:// ja vastaavat yllä olevaa mallia."
+      "gitSshLead": "Todentaa käyttöönottoavaimella yksityiset moduulilähteet, jotka alkavat git::ssh:// ja vastaavat yllä olevaa mallia.",
+      "configureOnlyLead": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta.",
+      "applyOnlyLead": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle."
     },
     "runs": {
       "options": "Vaihtoehdot",

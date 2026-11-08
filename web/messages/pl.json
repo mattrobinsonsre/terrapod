@@ -87,7 +87,8 @@
       "engineHelp": "Który silnik uruchamia tę przestrzeń roboczą. Nie backend wykonawczy, który wybiera plik binarny w silniku Terraform.",
       "namePatternPulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Wskaż go w CLI poleceniem <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Wskaż go w CLI poleceniem <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Dwie części oddzielone '::' — project::stack."
     },
     "stats": {
       "total": "Łącznie",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Wstrzymywana przy plan i dostarczana tylko do apply. plan wykonuje kod konfiguracji, więc dane uwierzytelniające potrzebne tylko apply nie powinny znajdować się w środowisku plan.",
       "configureOnly": "Tylko konfiguracja",
       "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
-      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji."
+      "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji.",
+      "configureOnlyLead": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply.",
+      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Domyślnie włączone, tak jak robi to samo Ansible. Po wyłączeniu osłabia zabezpieczenie: przyjmowany jest dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone.",
       "bindPlanLead": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane.",
       "configDirectoryLead": "Gdzie znajdują się ansible.cfg, playbooki, roles/, group_vars/ i host_vars/, względem katalogu głównego repozytorium. Puste oznacza sam katalog główny.",
-      "ansibleCollectionsLead": "Kolekcje instalowane przed uruchomieniem configure, po jednej w wierszu jako namespace.name lub namespace.name:version."
+      "ansibleCollectionsLead": "Kolekcje instalowane przed uruchomieniem configure, po jednej w wierszu jako namespace.name lub namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Jedno z własnych środowisk wykonawczych tej instalacji, według etykiety. Jego ustawienie nadpisuje wersję Ansible obszaru roboczego.",
+      "labelsLead": "Etykiety pełnią podwójną rolę: to po nich dopasowuje RBAC oparty na etykietach i to one są \"tagami\", po których blok cloud może wybrać obszar roboczy.",
+      "nameTitlePulumiLead": "Dwie części oddzielone '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji.",
       "vaultFileLead": "Zmienna zawiera ścieżkę pliku, a nie sekret.",
       "vaultFileTemplateLead": "Każdy symbol zastępczy jest zastępowany tym polem z tego jednego odczytu z OpenBao/Vault.",
-      "gitSshLead": "Uwierzytelnia prywatne źródła modułów git::ssh:// zgodne z powyższym wzorcem za pomocą klucza wdrożeniowego."
+      "gitSshLead": "Uwierzytelnia prywatne źródła modułów git::ssh:// zgodne z powyższym wzorcem za pomocą klucza wdrożeniowego.",
+      "configureOnlyLead": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply.",
+      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply."
     },
     "runs": {
       "options": "Opcje",

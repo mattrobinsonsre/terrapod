@@ -2779,6 +2779,13 @@ function WorkspaceDetailContent() {
         </p>
       )
     }
+    // The name rule depends on the engine, so it cannot be a static map entry.
+    // The hover `title` on the input keeps the CRISP form (the lead) because a
+    // `title` beside a `pattern` is the browser's constraint-validation
+    // message and shows on a failed submit; the full rule is here, on screen,
+    // where it is reachable without hovering or failing (#2432).
+    if (attr === 'name')
+      return tieredHint(t, isPulumi ? 'fields.nameTitlePulumi' : 'fields.nameTitle')
     const key = SETTINGS_HINTS[attr]
     // A hint that only makes sense beside a control, which is where the old
     // markup put it too — a read view that repeated it would be noise.
@@ -3295,7 +3302,7 @@ function WorkspaceDetailContent() {
                         // A Pulumi workspace is named project::stack, which the plain rule rejects.
                         pattern={isPulumi ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*' : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
                         maxLength={90}
-                        title={isPulumi ? t('fields.nameTitlePulumi') : t('fields.nameTitle')}
+                        title={isPulumi ? t('fields.nameTitlePulumiLead') : t('fields.nameTitle')}
                         className={EDIT_INPUT}
                       />
                     }
@@ -3863,12 +3870,17 @@ function WorkspaceDetailContent() {
                     }
                   />
                   <div className="sm:col-span-2 min-w-0">
-                    <dt className="text-xs text-slate-500 mb-1" title={t('fields.labelsTitle')}>
+                    <dt className="text-xs text-slate-500 mb-1">
                       {t('fields.labels')}
                     </dt>
                     {settingsEditing ? (
                       <dd className="mt-1">
                         <LabelsEditor labels={editLabels} onChange={setEditLabels} />
+                        {/* In the `dd` rather than under the `dt`: a `p`
+                            between a `dt` and its `dd` is not valid inside a
+                            `dl`. Was a 155-character hover on the term
+                            (#2432). */}
+                        {tieredHint(t, 'fields.labelsTitle')}
                       </dd>
                     ) : (
                       <dd className="mt-1">
@@ -5063,7 +5075,7 @@ function WorkspaceDetailContent() {
                             <span className="inline-flex items-center gap-2">
                               {v.attributes.key}
                               {v.attributes['apply-only'] && (
-                                <span title={t('variables.applyOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
                               )}
                               {/* A third slot means a key can now be held
                                   THREE times, so the badge carries more
@@ -5074,7 +5086,7 @@ function WorkspaceDetailContent() {
                                   amber so the two slots are distinguishable
                                   at a glance on adjacent rows. */}
                               {v.attributes['configure-only'] && (
-                                <span title={t('variables.configureOnlyHint')} className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
+                                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
                               )}
                             </span>
                           </td>
@@ -5135,10 +5147,10 @@ function WorkspaceDetailContent() {
                           <span className="text-sm font-mono font-medium text-slate-200 break-all">
                             {v.attributes.key}
                             {v.attributes['apply-only'] && (
-                              <span title={t('variables.applyOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
+                              <span className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('variables.applyOnly')}</span>
                             )}
                             {v.attributes['configure-only'] && (
-                              <span title={t('variables.configureOnlyHint')} className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
+                              <span className="ms-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/50 text-teal-300">{t('variables.configureOnly')}</span>
                             )}
                           </span>
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

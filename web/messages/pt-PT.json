@@ -87,7 +87,8 @@
       "engineHelp": "Que motor executa esta área de trabalho. Não o backend de execução, que escolhe o binário dentro do motor do Terraform.",
       "namePatternPulumi": "Duas partes separadas por '::' — project::stack. Apenas letras, números, hífenes e sublinhados; cada parte deve começar por uma letra ou número.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Aponte a CLI para ele com <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Aponte a CLI para ele com <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Duas partes separadas por '::' — project::stack."
     },
     "stats": {
       "total": "Total",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Retida de um plan e entregue apenas a um apply. Um plan executa o código da configuração, pelo que uma credencial de que só o apply necessita não deveria estar no ambiente de um plan.",
       "configureOnly": "Apenas configurar",
       "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan como de um apply. A credencial da própria frota — uma chave SSH do parque, uma palavra-passe become — não tem nada que fazer em nenhum dos dois.",
-      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar de cada vez. Apenas apply alcança um apply e um configurar; Apenas configurar alcança apenas um configurar."
+      "phaseSlotExclusive": "Uma variável ocupa apenas um lugar de cada vez. Apenas apply alcança um apply e um configurar; Apenas configurar alcança apenas um configurar.",
+      "configureOnlyLead": "Entregue apenas a um configurar e retida tanto de um plan como de um apply.",
+      "applyOnlyLead": "Retida de um plan e entregue apenas a um apply."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Ativada por predefinição, como o Ansible faz por si. Afrouxa uma proteção quando desativada: é aceite qualquer chave que um anfitrião apresente, pelo que a ligação pode ser interceptada.",
       "bindPlanLead": "Quando ativado, a atualização aplica exatamente o plano que a pré-visualização guardou, pelo que tudo o que tenha mudado desde a pré-visualização faz falhar a atualização em vez de ser aplicado.",
       "configDirectoryLead": "Onde se encontram ansible.cfg, os playbooks, roles/, group_vars/ e host_vars/, relativamente à raiz do repositório. Vazio significa a própria raiz.",
-      "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version."
+      "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Um dos ambientes de execução próprios desta instalação, por etiqueta. Definir um substitui a versão do Ansible do workspace.",
+      "labelsLead": "As etiquetas têm dupla função: são aquilo com que a correspondência de RBAC por etiqueta é feita, e são as \"tags\" pelas quais um bloco cloud pode selecionar um workspace.",
+      "nameTitlePulumiLead": "Duas partes separadas por '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Uma variável ocupa apenas um lugar de cada vez. Apenas apply alcança um apply e um configurar; Apenas configurar alcança apenas um configurar.",
       "vaultFileLead": "A variável contém o caminho do ficheiro, não o segredo.",
       "vaultFileTemplateLead": "Cada marcador é substituído por esse campo desta única leitura do OpenBao/Vault.",
-      "gitSshLead": "Autentique com uma chave de implementação as origens de módulo privadas git::ssh:// que correspondam ao padrão indicado acima."
+      "gitSshLead": "Autentique com uma chave de implementação as origens de módulo privadas git::ssh:// que correspondam ao padrão indicado acima.",
+      "configureOnlyLead": "Entregue apenas a um configurar e retida tanto de um plan como de um apply.",
+      "applyOnlyLead": "Retida de um plan e entregue apenas a um apply."
     },
     "runs": {
       "options": "Opções",

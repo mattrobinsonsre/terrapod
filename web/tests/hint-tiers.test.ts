@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { HINT_LEADS, LONG, NOT_TIERED } from '../src/lib/hint-tiers.ts'
+import { HINT_LEADS, LONG, NOT_TIERED, TITLE_EXPLANATION } from '../src/lib/hint-tiers.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const en = JSON.parse(readFileSync(path.join(here, '..', 'messages', 'en.json'), 'utf8'))
@@ -278,11 +278,18 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
     // and no gate, which is how a commitment made in a closing comment stops
     // existing. This is the gate.
     //
-    // The threshold is the registry's own `LONG`, imported rather than
-    // restated, so "explanation" means the same thing here as it does for a
-    // registered hint. Measured when written: 66 native title= keys resolve,
-    // the longest is 198 characters, and NONE reaches the threshold -- so this
-    // ratchets from a clean baseline with no ledger and nothing to migrate.
+    // The threshold is `TITLE_EXPLANATION`, not the registry's `LONG`, and it
+    // is LOWER. It was `LONG` when this clause was written, which made it
+    // forbid only a hover longer than anything anyone had written: 66 keys
+    // resolved, the longest was 198, and the threshold was 250 -- so the gate
+    // could not fail. #2432 migrated the eight that were over 120 and lowered
+    // the bar to match, which is what makes this bite. Measured after the
+    // migration: every resolving native title= is under it.
+    //
+    // The asymmetry with `LONG` is deliberate and is argued where the constant
+    // is declared: the same words are worse in a hover than on screen, so the
+    // length at which a hover stops being acceptable is lower than the length
+    // at which an on-screen hint wants a disclosure.
     //
     // A hover tooltip is invisible on touch, which is why the length matters:
     // a short label read aloud by a screen reader is a label, and a paragraph
@@ -298,7 +305,7 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
         // at rather than asserting which one it was.
         const matches = Object.keys(ALL).filter((f) => f === key || f.endsWith(`.${key}`))
         for (const full of matches) {
-          if (ALL[full].length >= LONG) {
+          if (ALL[full].length >= TITLE_EXPLANATION) {
             offenders.push(
               `${path.relative(path.join(here, '..'), file)}:${line}  ${full} ` +
                 `(${ALL[full].length} chars)`,
@@ -314,7 +321,7 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
     assert.deepEqual(
       offenders,
       [],
-      `an explanation at or over ${LONG} chars is delivered as a native title=, ` +
+      `an explanation at or over ${TITLE_EXPLANATION} chars is delivered as a native title=, ` +
         `which a touch user cannot reach. Use tieredHint instead:\n  ${offenders.join('\n  ')}`,
     )
   })

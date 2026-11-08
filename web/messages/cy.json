@@ -87,7 +87,8 @@
       "engineHelp": "Pa beiriant sy'n rhedeg y gweithle hwn. Nid y backend gweithredu, sy'n dewis y ffeil ddeuaidd o fewn peiriant Terraform.",
       "namePatternPulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
       "namePlaceholderPulumi": "my-project::dev",
-      "pulumiNameHint": "Cyfeiriwch y CLI ato gyda <code>pulumi stack select default/project/stack</code>."
+      "pulumiNameHint": "Cyfeiriwch y CLI ato gyda <code>pulumi stack select default/project/stack</code>.",
+      "namePatternPulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack."
     },
     "stats": {
       "total": "Cyfanswm",
@@ -1030,7 +1031,9 @@
       "applyOnlyHint": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig. Mae cynllun yn rhedeg cod y cyfluniad, felly ni ddylai tystlythyr sydd ond ar angen gweithredu fod yn amgylchedd cynllun.",
       "configureOnly": "Cyflunio yn unig",
       "configureOnlyHint": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu. Nid oes a wnelo tystlythyr y fflyd ei hun — allwedd SSH i'r ystad, cyfrinair become — â'r naill na'r llall.",
-      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd."
+      "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd.",
+      "configureOnlyLead": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu.",
+      "applyOnlyLead": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig."
     }
   },
   "adminAutodiscovery": {
@@ -2704,7 +2707,10 @@
       "ansibleHostKeyCheckingLead": "Ymlaen yn ddiofyn, fel y mae Ansible yn ei wneud ohono'i hun. Mae diffodd hwn yn llacio amddiffyniad: derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad.",
       "bindPlanLead": "Pan fydd ymlaen, mae'r diweddariad yn gweithredu'r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu'r diweddariad yn hytrach na chael ei weithredu.",
       "configDirectoryLead": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Mae gwag yn golygu'r gwraidd ei hun.",
-      "ansibleCollectionsLead": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version."
+      "ansibleCollectionsLead": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version.",
+      "ansibleExecutionEnvironmentLead": "Un o amgylcheddau gweithredu'r gosodiad hwn, drwy label. Mae gosod un yn disodli fersiwn Ansible y gweithle.",
+      "labelsLead": "Mae labeli yn gwneud gwaith deublyg: cyfateb RBAC yn seiliedig ar labeli, a'r \"tagiau\" y gall bloc cloud ddewis gweithfan drwyddynt.",
+      "nameTitlePulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -2861,7 +2867,9 @@
       "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd.",
       "vaultFileLead": "Mae'r newidyn yn dal llwybr y ffeil, nid y gyfrinach.",
       "vaultFileTemplateLead": "Mae pob dalfan yn cael ei disodli gan y maes hwnnw o'r un darlleniad OpenBao/Vault hwn.",
-      "gitSshLead": "Dilysu ffynonellau modiwl preifat git::ssh:// sy'n cyfateb i'r patrwm uchod drwy allwedd gosod."
+      "gitSshLead": "Dilysu ffynonellau modiwl preifat git::ssh:// sy'n cyfateb i'r patrwm uchod drwy allwedd gosod.",
+      "configureOnlyLead": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu.",
+      "applyOnlyLead": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig."
     },
     "runs": {
       "options": "Opsiynau",

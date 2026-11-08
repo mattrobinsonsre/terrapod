@@ -28,6 +28,25 @@
 export const LONG = 250
 
 /**
+ * The length at or above which a native `title=` is an EXPLANATION rather than
+ * a label, and so must not be delivered as a hover at all.
+ *
+ * Lower than `LONG` on purpose, and the asymmetry is the point. A long hint
+ * rendered on screen is readable by everyone and merely wants a disclosure, so
+ * 250 is a fair bar for "deserves a lead". A hover is strictly worse than that
+ * for the same words: it is unreachable on touch and invisible to a keyboard,
+ * so the length at which it stops being acceptable is lower.
+ *
+ * Measured when the eight were migrated (#2432): every native `title=` that
+ * resolves to a catalogue key is now under this, the longest being a short
+ * label on an icon button. So this ratchets from a clean baseline, with no
+ * ledger and nothing exempted — and unlike `LONG` it catches the next
+ * 150-character hover, which was the whole reason to migrate rather than
+ * leave the gate forbidding only what nobody had written.
+ */
+export const TITLE_EXPLANATION = 120
+
+/**
  * Long hint key → its short lead key, both relative to the same namespace.
  *
  * Keyed by the hint rather than by the field, because a hint is what has a
@@ -49,6 +68,22 @@ export const HINT_LEADS: Record<string, string> = {
   'variables.vaultFileHint': 'variables.vaultFileLead',
   'variables.vaultFileTemplateHint': 'variables.vaultFileTemplateLead',
   'variables.gitSshHint': 'variables.gitSshLead',
+  // Migrated out of a hover `title=` (#2432, following #2413 F15). Each was an
+  // explanation of 139-198 characters delivered only on hover, which is
+  // unreachable on touch and invisible to a keyboard.
+  'fields.ansibleExecutionEnvironmentTitle': 'fields.ansibleExecutionEnvironmentLead',
+  'fields.labelsTitle': 'fields.labelsLead',
+  'fields.nameTitlePulumi': 'fields.nameTitlePulumiLead',
+  // The apply-only / configure-only pair, BARE rather than namespace-qualified:
+  // `PhaseSlotFlags` binds `t` to the slot's own namespace, so it calls
+  // `t('applyOnlyHint')`, and the suffix match above resolves one entry against
+  // both `adminVariableSets.detail.*` and `workspaceDetail.variables.*`. One
+  // entry, one wording, two surfaces — which is the argument for a single
+  // registry rather than a per-surface split.
+  applyOnlyHint: 'applyOnlyLead',
+  configureOnlyHint: 'configureOnlyLead',
+  // workspaces (the create form)
+  'form.namePatternPulumi': 'form.namePatternPulumiLead',
   // ansibleCredentials
   knownHostsHint: 'knownHostsLead',
   machineHint: 'machineLead',
