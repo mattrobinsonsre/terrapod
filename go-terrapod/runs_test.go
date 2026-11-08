@@ -722,3 +722,230 @@ func TestCreateRunConfigureAfterApplyIsThreeState(t *testing.T) {
 		})
 	}
 }
+
+// ── Run variables (#2425 §4.3) ───────────────────────────────────────────────
+//
+// `CreateRunRequest.Variables` is a map in Go and a sorted list of objects on
+// the wire, and `Run.RunVariableKeys` is the read side. Both shipped without a
+// wire test while their sibling `ConfigureAfterApply` got a thorough one in the
+// same commit, which is the gap §4.3 records.
+//
+// A transform between two shapes is exactly where a test earns its keep: the
+// struct round-trips through itself whatever the transform does, so only the
+// body the server receives can say whether it is right.
+
+// bodyCapturingRunServer returns a client and a pointer to the raw bytes of the
+// last request body -- RAW, not a decoded map, because one of the properties
+// under test is about byte stability and a map cannot express ordering.
+func bodyCapturingRunServer(t *testing.T) (*Client, *[]byte) {
+	t.Helper()
+	var raw []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"run-v","type":"runs","attributes":{"status":"queued"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c, &raw
+}
+
+// variablesOnTheWire pulls the `variables` attribute out of a captured body,
+// reporting separately whether the key was present at all -- the absent case is
+// a distinct assertion and `nil, true` must not read as `nil, false`.
+func variablesOnTheWire(t *testing.T, raw []byte) ([]map[string]string, bool) {
+	t.Helper()
+	var body struct {
+		Data struct {
+			Attributes map[string]json.RawMessage `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("undecodable body %q: %v", raw, err)
+	}
+	enc, present := body.Data.Attributes["variables"]
+	if !present {
+		return nil, false
+	}
+	var out []map[string]string
+	if err := json.Unmarshal(enc, &out); err != nil {
+		t.Fatalf("variables is not a list of objects: %q: %v", enc, err)
+	}
+	return out, true
+}
+
+// Sorted by KEY, and the same request twice is the same bytes.
+//
+// Both halves are needed and neither implies the other. Go randomises map
+// iteration, so an unsorted implementation produces a different permutation per
+// call: the byte-stability half is what catches it, and with five keys a run of
+// identical bodies is not luck. The sorted-order half is what catches a sort
+// that is descending, or by value, which would be perfectly stable and wrong.
+func TestCreateRunVariablesAreSortedAndByteStable(t *testing.T) {
+	c, raw := bodyCapturingRunServer(t)
+	// Inserted in scrambled order, and deliberately NOT in an order a stable
+	// pass-through would sort into by accident.
+	req := CreateRunRequest{
+		WorkspaceID: "ws-app",
+		Variables: map[string]string{
+			"region": "eu-west-1",
+			"az":     "a",
+			"zone":   "z",
+			"count":  "3",
+			"name":   "app",
+		},
+	}
+	wantKeys := []string{"az", "count", "name", "region", "zone"}
+
+	var first []byte
+	for i := range 20 {
+		if _, err := c.CreateRun(t.Context(), req); err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			first = append([]byte(nil), *raw...)
+			continue
+		}
+		if string(*raw) != string(first) {
+			t.Fatalf("call %d sent different bytes:\n first: %s\n  this: %s", i, first, *raw)
+		}
+	}
+
+	vars, present := variablesOnTheWire(t, first)
+	if !present {
+		t.Fatal("variables was not sent at all")
+	}
+	if len(vars) != len(wantKeys) {
+		t.Fatalf("sent %d entries, want %d: %+v", len(vars), len(wantKeys), vars)
+	}
+	for i, want := range wantKeys {
+		if vars[i]["key"] != want {
+			t.Errorf("entry %d key = %q, want %q (order: %+v)", i, vars[i]["key"], want, vars)
+		}
+		if vars[i]["value"] != req.Variables[want] {
+			t.Errorf("entry %d value = %q, want %q", i, vars[i]["value"], req.Variables[want])
+		}
+	}
+	// The entry carries exactly the two keys the server reads. An extra key
+	// would be accepted and ignored today and is a wire claim nobody made.
+	for i, e := range vars {
+		if len(e) != 2 {
+			t.Errorf("entry %d = %+v, want exactly key+value", i, e)
+		}
+	}
+}
+
+// Absent, not empty -- and the distinction is the server's, not a style choice:
+// it treats an empty array as a no-op, so sending one would work and would rely
+// on that. Sending nothing says the same thing without the dependency.
+func TestCreateRunVariablesAreOmittedWhenThereAreNone(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		vars map[string]string
+	}{
+		{"nil map", nil},
+		{"empty map", map[string]string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, raw := bodyCapturingRunServer(t)
+			if _, err := c.CreateRun(t.Context(), CreateRunRequest{
+				WorkspaceID: "ws-app",
+				Variables:   tc.vars,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if _, present := variablesOnTheWire(t, *raw); present {
+				t.Errorf("variables was sent for %s: %s", tc.name, *raw)
+			}
+		})
+	}
+}
+
+// A value is sent verbatim, including an EMPTY one.
+//
+// The empty-string case is the one worth pinning: the omission above is decided
+// by the number of entries, not by their contents, so `{"msg": ""}` is a
+// variable the operator set to the empty string and must arrive. A reader who
+// assumed the emptiness check went one level deeper would drop it, and the run
+// would plan against whatever the workspace variable said instead -- which is
+// the dropped-`-var` defect this field exists to fix, by a new door.
+func TestCreateRunVariableValuesAreSentVerbatim(t *testing.T) {
+	c, raw := bodyCapturingRunServer(t)
+	in := map[string]string{
+		"empty":   "",
+		"quoted":  `a "b" c`,
+		"newline": "one\ntwo",
+		"unicode": "région-é",
+		"jsonish": `{"not":"parsed"}`,
+	}
+	if _, err := c.CreateRun(t.Context(), CreateRunRequest{
+		WorkspaceID: "ws-app",
+		Variables:   in,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	vars, present := variablesOnTheWire(t, *raw)
+	if !present {
+		t.Fatal("variables was not sent")
+	}
+	if len(vars) != len(in) {
+		t.Fatalf("sent %d entries, want %d: %+v", len(vars), len(in), vars)
+	}
+	for _, e := range vars {
+		if want := in[e["key"]]; e["value"] != want {
+			t.Errorf("%q = %q, want %q", e["key"], e["value"], want)
+		}
+	}
+}
+
+// The read side: `run-variable-keys` parses, and its absence is nil rather than
+// a panic or a one-element slice holding "".
+//
+// The server emits the KEYS and never the values, deliberately -- a run
+// variable may be a secret and `RunVariable` carries no sensitive flag, so
+// there is nothing to decide which to withhold. A consumer reading this field
+// learns which variables were overridden and cannot learn what they were, and
+// the test says so because the obvious next request is "and the values".
+func TestRunParsesRunVariableKeys(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		attrs string
+		want  []string
+	}{
+		{"present", `{"status":"planned","run-variable-keys":["region","name"]}`, []string{"region", "name"}},
+		{"absent", `{"status":"planned"}`, nil},
+		{"null", `{"status":"planned","run-variable-keys":null}`, nil},
+		{"empty list", `{"status":"planned","run-variable-keys":[]}`, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/vnd.api+json")
+				_, _ = fmt.Fprintf(w, `{"data":{"id":"run-k","type":"runs","attributes":%s}}`, tc.attrs)
+			}))
+			defer srv.Close()
+			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			run, err := c.GetRun(t.Context(), "run-k")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(run.RunVariableKeys) != len(tc.want) {
+				t.Fatalf("keys = %#v, want %#v", run.RunVariableKeys, tc.want)
+			}
+			for i, want := range tc.want {
+				if run.RunVariableKeys[i] != want {
+					t.Errorf("keys[%d] = %q, want %q", i, run.RunVariableKeys[i], want)
+				}
+			}
+			// Order is the server's, so it is asserted as given above rather
+			// than sorted here: the API emits the keys in the order the run
+			// recorded them, and a consumer re-sorting is a consumer's choice.
+		})
+	}
+}
