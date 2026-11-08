@@ -64,10 +64,21 @@ async def test_the_query_filters_on_upload_status() -> None:
     # The WHERE clause, not the whole statement: `str(select(Model))` renders
     # every column of the table, so asserting on the statement passes even with
     # the filter deleted.
-    where = str(db.execute.await_args.args[0].whereclause)
-    assert "upload_status" in where, (
-        "the download query does not filter on upload_status, so a half-published "
-        f"version is served a URL to an object that is not there. WHERE: {where}"
+    stmt = db.execute.await_args.args[0]
+    where = str(stmt.whereclause)
+    # The COMPARISON and its bound value, not merely that the column is named
+    # (#2425 §2.6). `"upload_status" in where` is satisfied by
+    # `upload_status != "deleted"`, which serves a URL for a half-published
+    # version -- an object that is not there -- and is the one thing this test
+    # exists to stop.
+    assert "upload_status = " in where, (
+        "the download query does not test upload_status for EQUALITY, so a filter like "
+        f'`!= "deleted"` would still serve a half-published version. WHERE: {where}'
+    )
+    params = set(stmt.compile().params.values())
+    assert "uploaded" in params, (
+        "the download query filters on upload_status but not against 'uploaded'; the "
+        f"bound values are {sorted(map(str, params))}"
     )
     assert "version" in where and "module_id" in where
 

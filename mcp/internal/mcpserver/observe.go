@@ -111,6 +111,62 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, w, nil
 	})
 
+	// ── terrapod_run_queue ───────────────────────────────────────────
+	type runQueueIn struct {
+		PageSize int `json:"page_size,omitempty" jsonschema:"max queued runs to return (default: the whole queue)"`
+	}
+	type queuedRunOut struct {
+		ID              string `json:"id"`
+		WorkspaceID     string `json:"workspace_id"`
+		Status          string `json:"status"`
+		PositionInQueue int    `json:"position_in_queue"`
+	}
+	type runQueueOut struct {
+		// Count is how many of the queue THIS caller can see; Pending and
+		// Running describe the whole deployment, which is what makes
+		// `position - running` the number of runs ahead of one of yours.
+		Count   int            `json:"count"`
+		Pending int            `json:"pending"`
+		Running int            `json:"running"`
+		Queue   []queuedRunOut `json:"queue"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_queue",
+		Description: "Why a run has not started yet: the deployment's run queue, oldest first, with each run's POSITION, plus how many runs are pending and running overall. " +
+			"This is the answer to 'my run is queued, how long' — `position_in_queue` minus `running` is how many runs are ahead of it. A run sitting at position 1 with `running` already at the deployment's capacity is waiting for a slot; a run with no position at all is not queued, and terrapod_run_get will say which phase it is in instead. " +
+			"Oldest first, the opposite of terrapod_run_list, because a queue is served in the order it was joined: position 1 has been waiting longest. " +
+			"Which runs are LISTED is filtered by your read access on each run's workspace, and the POSITIONS are not — a position counted over your visible slice would understate the wait it reports, so a run of yours at position 9 may show only three runs ahead of it that you can see. `pending` and `running` are deployment-wide for the same reason; they are two integers about load and carry no identity. " +
+			"Terraform/OpenTofu runs only: the queue is the one the `terraform`/`tofu` cloud backend reads, and both doors onto it share one population so a run has one position rather than a different one per surface. A Pulumi or Ansible run that is waiting will not appear here.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runQueueIn) (*mcp.CallToolResult, runQueueOut, error) {
+		queued, err := c.ListRunQueue(ctx, 0, in.PageSize)
+		if err != nil {
+			return errResult(err), runQueueOut{}, nil
+		}
+		capacity, err := c.GetRunCapacity(ctx)
+		if err != nil {
+			return errResult(err), runQueueOut{}, nil
+		}
+		// Empty slice rather than nil: an empty queue is a real and useful
+		// answer -- "nothing is waiting, so the wait is not the reason" -- and
+		// `null` fails the derived output schema.
+		out := runQueueOut{
+			Count:   len(queued),
+			Pending: capacity.Pending,
+			Running: capacity.Running,
+			Queue:   make([]queuedRunOut, 0, len(queued)),
+		}
+		for _, q := range queued {
+			out.Queue = append(out.Queue, queuedRunOut{
+				ID:              q.ID,
+				WorkspaceID:     q.WorkspaceID,
+				Status:          q.Status,
+				PositionInQueue: q.PositionInQueue,
+			})
+		}
+		return nil, out, nil
+	})
+
 	// ── terrapod_run_list ────────────────────────────────────────────
 	type runListIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose runs to list"`
@@ -189,7 +245,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_get",
-		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), which agent pool executed it (and which pools could have), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
+		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), which agent pool executed it (and which pools could have), `run-variable-keys` naming the variables this run overrode with `-var` or `-var-file` (the KEYS only -- the values are never echoed, because nothing records which of them were secrets), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {

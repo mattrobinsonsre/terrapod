@@ -601,19 +601,34 @@ async def organization_run_queue(
     Oldest first: a queue is served in the order it was joined, which is the
     opposite of every other run listing here.
     """
-    queue = await run_service.organization_run_queue(db)
+    visible = await visible_run_queue(db, user)
+    items = [_queue_item_json(run, position, engine=engine) for run, position, engine in visible]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta}, headers=_tfe_headers())
 
+
+async def visible_run_queue(
+    db: AsyncSession, user: AuthenticatedUser
+) -> list[tuple[Run, int, str]]:
+    """The queue as this caller may see it: `(run, position, engine)`, oldest first.
+
+    One producer, because the native route serves the same queue (#2425 §4.4) and
+    the two halves that matter here are easy to get subtly different: WHICH runs
+    are listed is filtered by reach, and the POSITIONS are not. A second copy of
+    this loop would eventually count positions over the caller's visible slice,
+    which understates the wait it is reporting.
+
+    The engine comes back with each row because `_run_json` requires it with no
+    default (#1536), and resolving it here is what keeps the workspace loaded
+    once per DISTINCT workspace: a queue of fifty runs on one workspace must not
+    be fifty lookups, and resolving capabilities per run is the O(fleet) shape
+    #1056 forbids.
+    """
     preloaded = await fetch_custom_roles(db, user.roles)
     token_preloaded = await fetch_custom_roles(db, user.pinned_roles or [])
-    # One workspace load per DISTINCT workspace, answering both questions it is
-    # needed for -- may the caller read this run, and which engine does
-    # `_run_json` serialise it as (required with no default, #1536). The queue is
-    # small by nature, but a queue of fifty runs on one workspace must not be
-    # fifty lookups, and resolving capabilities per run is the O(fleet) shape
-    # #1056 forbids.
     seen: dict[uuid.UUID, tuple[bool, str]] = {}
-    items = []
-    for run, position in queue:
+    out: list[tuple[Run, int, str]] = []
+    for run, position in await run_service.organization_run_queue(db):
         if run.workspace_id not in seen:
             ws = await db.get(Workspace, run.workspace_id)
             caps = (
@@ -634,10 +649,8 @@ async def organization_run_queue(
         may_read, engine = seen[run.workspace_id]
         if not may_read:
             continue
-        items.append(_queue_item_json(run, position, engine=engine))
-
-    page_items, meta = paginate(items, request)
-    return JSONResponse(content={"data": page_items, "meta": meta}, headers=_tfe_headers())
+        out.append((run, position, engine))
+    return out
 
 
 @router.get("/organizations/default/capacity")

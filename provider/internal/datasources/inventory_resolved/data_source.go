@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -45,7 +46,9 @@ type inventoryResolvedDataSource struct {
 type inventoryResolvedModel struct {
 	WorkspaceID   types.String `tfsdk:"workspace_id"`
 	Limit         types.String `tfsdk:"limit"`
+	Provenance    types.Bool   `tfsdk:"provenance"`
 	Hosts         types.Map    `tfsdk:"hosts"`
+	VarProvenance types.Map    `tfsdk:"var_provenance"`
 	Groups        types.Map    `tfsdk:"groups"`
 	GroupChildren types.Map    `tfsdk:"group_children"`
 	HostCount     types.Int64  `tfsdk:"host_count"`
@@ -85,6 +88,14 @@ func (d *inventoryResolvedDataSource) Schema(_ context.Context, _ datasource.Sch
 					"the authoritative answer to \"what would this target\".",
 				Optional: true,
 			},
+			"provenance": schema.BoolAttribute{
+				Description: "Ask the server to attribute every host variable to the level that set it, " +
+					"populating `var_provenance`. Off by default because it costs a second ansible " +
+					"invocation (`--graph --vars`), and it composes with `limit` — \"these are the hosts a " +
+					"configure would touch, and this is where each of their variables came from\" is one " +
+					"question.",
+				Optional: true,
+			},
 			"hosts": schema.MapAttribute{
 				Description: "Every host, keyed on its inventory hostname, to its resolved variables. " +
 					"Exhaustive — a host with no variables is present with an empty map, deliberately unlike " +
@@ -93,6 +104,20 @@ func (d *inventoryResolvedDataSource) Schema(_ context.Context, _ datasource.Sch
 					"string and JSON-encoded otherwise, because a Terraform map is homogeneous.",
 				Computed:    true,
 				ElementType: types.MapType{ElemType: types.StringType},
+			},
+			"var_provenance": schema.MapAttribute{
+				Description: "Per host, per variable, WHERE the merged value came from — the answer to \"why " +
+					"does this host have this value\" and \"which group do I change\", neither of which is " +
+					"derivable from `hosts`, because the merge has already discarded what it overrode. " +
+					"Empty unless `provenance` is set. `origin` is the level that WON: a group by NAME, or " +
+					"`here` for a value the host itself set. `chain` is every level that set the key, " +
+					"shallowest group first, in ansible's own precedence order — so everything `origin` beat. " +
+					"Values are rendered as `hosts` renders them: a string verbatim, anything else " +
+					"JSON-encoded. ANSIBLE attributes these, not Terrapod: the levels come from " +
+					"`ansible-inventory --graph --vars`, and the server does the walk so no consumer " +
+					"re-implements a second precedence rule that could diverge from ansible silently.",
+				Computed:    true,
+				ElementType: types.MapType{ElemType: types.ObjectType{AttrTypes: varOriginAttrTypes()}},
 			},
 			"groups": schema.MapAttribute{
 				Description: "Each group's DIRECT member hosts, keyed on group name. Ansible does not flatten " +
@@ -165,15 +190,15 @@ func (d *inventoryResolvedDataSource) Read(ctx context.Context, req datasource.R
 		limit = config.Limit.ValueString()
 	}
 
-	var (
-		resolved *terrapod.ResolvedInventory
-		err      error
-	)
-	if limit != "" {
-		resolved, err = d.tc.GetResolvedInventoryWithLimit(ctx, workspaceID, limit)
-	} else {
-		resolved, err = d.tc.GetResolvedInventory(ctx, workspaceID)
-	}
+	// One call for every combination, including both parameters together, which
+	// neither of the older single-option methods can ask for. An empty options
+	// struct sends no query string at all, so asking for neither is byte-for-byte
+	// the request this data source made before `provenance` existed.
+	resolved, err := d.tc.GetResolvedInventoryWithOptions(ctx, workspaceID,
+		terrapod.ResolvedInventoryOptions{
+			Limit:      limit,
+			Provenance: !config.Provenance.IsNull() && config.Provenance.ValueBool(),
+		})
 	if err != nil {
 		// Fails closed, on purpose. Reporting an empty inventory instead would
 		// let a configure target too little while looking like it worked.
@@ -214,7 +239,84 @@ func readIntoModel(ctx context.Context, r *terrapod.ResolvedInventory, m *invent
 	diags.Append(d...)
 	m.GroupChildren = children
 
+	prov, d := flattenProvenance(r.VarProvenance)
+	diags.Append(d...)
+	m.VarProvenance = prov
+
 	return diags
+}
+
+// varOriginAttrTypes is the shape of one attributed variable, declared once so
+// the schema and the projection cannot disagree about it — a mismatch between
+// those two is a runtime type error, not a compile failure.
+func varOriginAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"value":  types.StringType,
+		"origin": types.StringType,
+		"chain":  types.ListType{ElemType: types.ObjectType{AttrTypes: chainLinkAttrTypes()}},
+	}
+}
+
+// chainLinkAttrTypes is one link in a precedence chain: the level, and the value
+// it set there.
+func chainLinkAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"level": types.StringType,
+		"value": types.StringType,
+	}
+}
+
+// flattenProvenance projects the attribution, host by host.
+//
+// An EMPTY map when nothing was asked for, never null, so a configuration that
+// forgot `provenance = true` reads "no such key" rather than erroring about a
+// null collection — the same reasoning every other collection here follows. The
+// cost is that "not asked" and "asked, and no host carries a variable" read
+// alike; both mean there is nothing to read, and the attribute's description
+// names the remedy.
+//
+// A chain link's value is rendered through renderValue like every other
+// inventory value. The server stringifies it on the way out — the levels are
+// parsed from ansible's own text — but the SDK types it as arbitrary JSON, and
+// rendering it the same way as `hosts` is correct either way rather than relying
+// on which of the two is true today.
+func flattenProvenance(in map[string]map[string]terrapod.VarOrigin) (types.Map, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	originType := types.ObjectType{AttrTypes: varOriginAttrTypes()}
+	perHostType := types.MapType{ElemType: originType}
+	linkType := types.ObjectType{AttrTypes: chainLinkAttrTypes()}
+
+	hosts := make(map[string]attr.Value, len(in))
+	for host, vars := range in {
+		attributed := make(map[string]attr.Value, len(vars))
+		for key, origin := range vars {
+			links := make([]attr.Value, 0, len(origin.Chain))
+			for _, link := range origin.Chain {
+				obj, d := types.ObjectValue(chainLinkAttrTypes(), map[string]attr.Value{
+					"level": types.StringValue(link.Level),
+					"value": types.StringValue(renderValue(link.Value)),
+				})
+				diags.Append(d...)
+				links = append(links, obj)
+			}
+			chain, d := types.ListValue(linkType, links)
+			diags.Append(d...)
+			obj, d := types.ObjectValue(varOriginAttrTypes(), map[string]attr.Value{
+				"value":  types.StringValue(renderValue(origin.Value)),
+				"origin": types.StringValue(origin.Origin),
+				"chain":  chain,
+			})
+			diags.Append(d...)
+			attributed[key] = obj
+		}
+		perHost, d := types.MapValue(originType, attributed)
+		diags.Append(d...)
+		hosts[host] = perHost
+	}
+
+	out, d := types.MapValue(perHostType, hosts)
+	diags.Append(d...)
+	return out, diags
 }
 
 // flattenHosts renders each host's variables as strings.

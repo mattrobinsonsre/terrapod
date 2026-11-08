@@ -230,6 +230,118 @@ func TestListWorkspaceRuns(t *testing.T) {
 	}
 }
 
+// ── The run queue (#2425 §4.4) ───────────────────────────────────────────────
+//
+// Wire tests, because §4.3 of the same issue is about SDK methods that shipped
+// without them -- `CreateRunRequest.Variables` does a non-trivial transform and
+// had none, while its sibling `ConfigureAfterApply` got a thorough one in the
+// same commit. A method added in the PR that records that is not going out the
+// same way.
+
+func newQueueFixture(t *testing.T) (*Client, *struct{ path string }) {
+	t.Helper()
+	got := &struct{ path string }{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.path = r.URL.RequestURI()
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		switch r.URL.Path {
+		case "/api/v1/run-queue":
+			// Two runs, positions 1 and 3 -- NOT 1 and 2. The gap is the point:
+			// positions are counted over the whole queue while the listing is
+			// filtered by reach, so a consumer must not renumber what it reads
+			// or infer the queue's length from the slice it was given.
+			_, _ = w.Write([]byte(`{"data":[
+			  {"id":"run-aaaa","type":"runs","attributes":{
+			     "status":"queued","position-in-queue":1},
+			   "relationships":{"workspace":{"data":{"id":"ws-app","type":"workspaces"}}}},
+			  {"id":"run-bbbb","type":"runs","attributes":{
+			     "status":"confirmed","position-in-queue":3},
+			   "relationships":{"workspace":{"data":{"id":"ws-other","type":"workspaces"}}}}],
+			  "meta":{"pagination":{"current-page":1,"page-size":20,"total-count":2,"total-pages":1}}}`))
+		case "/api/v1/run-capacity":
+			_, _ = w.Write([]byte(`{"data":{"id":"default","type":"run-capacity",
+			  "attributes":{"pending":4,"running":2}}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c, got
+}
+
+func TestListRunQueue(t *testing.T) {
+	c, got := newQueueFixture(t)
+	queue, err := c.ListRunQueue(t.Context(), 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The NATIVE path. Until #2425 the queue was reachable only at
+	// `/api/tfe/v2/organizations/default/runs/queue`, and the whole point of
+	// the method is that it is not that.
+	if got.path != "/api/v1/run-queue" {
+		t.Errorf("path = %q, want /api/v1/run-queue", got.path)
+	}
+	if len(queue) != 2 {
+		t.Fatalf("queue = %+v, want 2 entries", queue)
+	}
+	// The embedded Run is parsed, not just the position: a QueuedRun that
+	// carried a position and an empty Run would satisfy a position-only
+	// assertion while being useless.
+	if queue[0].ID != "run-aaaa" || queue[0].Status != "queued" ||
+		queue[0].WorkspaceID != "ws-app" {
+		t.Errorf("queue[0] = %+v, want the run parsed too", queue[0])
+	}
+	if queue[0].PositionInQueue != 1 || queue[1].PositionInQueue != 3 {
+		t.Errorf("positions = %d, %d; want 1 and 3 -- the gap is deliberate",
+			queue[0].PositionInQueue, queue[1].PositionInQueue)
+	}
+}
+
+func TestListRunQueuePagesWhenAsked(t *testing.T) {
+	c, got := newQueueFixture(t)
+	if _, err := c.ListRunQueue(t.Context(), 2, 50); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"page%5Bnumber%5D=2", "page%5Bsize%5D=50"} {
+		if !strings.Contains(got.path, want) {
+			t.Errorf("path %q is missing %s", got.path, want)
+		}
+	}
+}
+
+func TestListRunQueueSendsNoQueryByDefault(t *testing.T) {
+	// The whole queue, with no page parameters -- the contrast that makes the
+	// test above about PAGING rather than about the path having a query string.
+	c, got := newQueueFixture(t)
+	if _, err := c.ListRunQueue(t.Context(), 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got.path, "?") {
+		t.Errorf("path = %q, want no query string", got.path)
+	}
+}
+
+func TestGetRunCapacity(t *testing.T) {
+	c, got := newQueueFixture(t)
+	capacity, err := c.GetRunCapacity(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.path != "/api/v1/run-capacity" {
+		t.Errorf("path = %q, want /api/v1/run-capacity", got.path)
+	}
+	// Ints, not strings: `position - running` is arithmetic, and a consumer
+	// doing it on a string gets a compile error at best and a concatenation at
+	// worst in a language that allows it.
+	if capacity.Pending != 4 || capacity.Running != 2 {
+		t.Errorf("capacity = %+v, want pending 4 running 2", capacity)
+	}
+}
+
 func TestRunActions(t *testing.T) {
 	c := newRunsFixture(t)
 	for _, tc := range []struct {

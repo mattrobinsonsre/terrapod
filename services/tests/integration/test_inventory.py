@@ -115,6 +115,19 @@ async def _host_var(client, host_id: str, key: str, value: str = "v", **attrs):
     )
 
 
+async def _group_var(client, group_id: str, key: str, value: str = "v", **attrs):
+    return await client.post(
+        f"{V1}/inventory-groups/{group_id}/vars",
+        json={
+            "data": {
+                "type": "inventory-group-vars",
+                "attributes": {"key": key, "value": value, **attrs},
+            }
+        },
+        headers=AUTH,
+    )
+
+
 def _no_ansible() -> bool:
     """Whether a WORKING ansible-inventory is absent.
 
@@ -750,3 +763,137 @@ class TestTheResolvedRead:
         ]["attributes"]
         for gone in ("taken-at", "produced-by", "api-resolvable"):
             assert gone not in attrs
+
+
+class TestProvenanceAnswersWhereAValueCameFrom:
+    """`?provenance` had no test at any tier (#2425 §4.1).
+
+    It is an optional parameter that gates an alternate code path, which is the
+    AGENTS.md routing rule verbatim and the #1244 precedent: an optional
+    parameter makes the BYPASS the default, tests take defaults, and so the path
+    ships with every pre-existing test skipping it. `var-provenance` appeared in
+    exactly one place in the tree -- the attribute snapshot -- and nothing drove
+    it.
+
+    Integration rather than services-api, because the answer is **ansible's**:
+    the attribution reads `ansible-inventory --graph --vars` and compares it to
+    `--list`, and the two spell a group differently (`@prod_web` against
+    `prod_web`). A mocked resolution would assert the shape of a document this
+    code did not produce, which is the one thing that cannot catch the defect
+    that spelling caused.
+    """
+
+    async def test_it_is_absent_unless_asked_for(self, client, app):
+        """The contrast, and the reason the parameter exists: attribution costs a
+        second ansible invocation, so a read that does not want it must not pay
+        for it -- and a caller must be able to tell "not asked for" from "asked
+        for and nothing to attribute"."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        host = await _mk_host(client, ws, "web-1")
+        await _host_var(client, host, "ansible_user", "deploy")
+
+        plain = await client.get(f"{V1}/workspaces/{ws}/inventory/resolved", headers=AUTH)
+        assert plain.status_code == 200, plain.text
+        assert "var-provenance" not in plain.json()["data"]["attributes"]
+
+    async def test_a_group_value_is_attributed_to_the_group_not_the_host(self, client, app):
+        """The whole point: the merged variables cannot answer this.
+
+        `hosts` reports `ansible_user: deploy` either way -- the merge has
+        already discarded where it came from -- so "which group do I change to
+        alter this" is answerable only from the attribution. The level is the PLAIN
+        group name: `--graph` spells a group `@web` and the server looks it up
+        that way, because an unprefixed lookup misses every group and reports
+        every variable as set on the host itself -- but
+        `inventory_provenance.attribute` strips the sigil on the way out, on the
+        stated grounds that it is "how `--graph` spells a group, not something a
+        reader of the view should meet". Asserted because I wrote `@web` first,
+        from the lookup rather than from the emitted shape.
+        """
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        host = await _mk_host(client, ws, "web-1")
+        group = await _mk_group(client, ws, "web")
+        await _member(client, group, host)
+        await _group_var(client, group, "ansible_user", "deploy")
+
+        resp = await client.get(
+            f"{V1}/workspaces/{ws}/inventory/resolved?provenance=true", headers=AUTH
+        )
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        # The merged view, unchanged by asking for attribution.
+        assert attrs["hosts"]["web-1"]["ansible_user"] == "deploy"
+
+        prov = attrs["var-provenance"]["web-1"]["ansible_user"]
+        assert prov["value"] == "deploy"
+        assert prov["origin"] == "web", (
+            "the value was set on the group, so the group is what won; `here` would mean "
+            f"the host set it itself, which it did not. Got {prov!r}"
+        )
+        assert [link["level"] for link in prov["chain"]] == ["web"]
+
+    async def test_a_host_value_overriding_a_group_reports_both_levels(self, client, app):
+        """A chain, not just a winner. "Set on the group and overridden on the
+        host" is a different answer from "only ever set on the host", and the
+        `origin` alone reads identically for both -- so an implementation that
+        dropped the chain would pass a test that checked only the winner."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        host = await _mk_host(client, ws, "web-1")
+        group = await _mk_group(client, ws, "web")
+        await _member(client, group, host)
+        await _group_var(client, group, "ansible_user", "root")
+        await _host_var(client, host, "ansible_user", "deploy")
+
+        attrs = (
+            await client.get(
+                f"{V1}/workspaces/{ws}/inventory/resolved?provenance=true", headers=AUTH
+            )
+        ).json()["data"]["attributes"]
+        prov = attrs["var-provenance"]["web-1"]["ansible_user"]
+        # Ansible's precedence: a host variable beats a group variable.
+        assert prov["value"] == "deploy"
+        assert prov["origin"] == "here"
+        levels = [link["level"] for link in prov["chain"]]
+        assert "web" in levels, (
+            "the overridden group value is missing from the chain, so this cannot tell "
+            f"an override from a value only ever set on the host. Got {prov!r}"
+        )
+        assert (
+            dict(zip(levels, [link["value"] for link in prov["chain"]], strict=True))["web"]
+            == "root"
+        )
+
+    async def test_asking_with_a_limit_attributes_only_what_the_limit_selected(self, client, app):
+        """Both parameters together, which is the combination an operator wants:
+        "these are the hosts a configure would touch, and this is where each of
+        their variables came from". Neither parameter alone can ask it."""
+        if _no_ansible():
+            pytest.skip("no working ansible-inventory")
+        set_auth(app, admin_user())
+        ws = await _workspace(client)
+        group = await _mk_group(client, ws, "web")
+        for name in ("web-1", "web-2"):
+            host = await _mk_host(client, ws, name)
+            await _member(client, group, host)
+        await _group_var(client, group, "ansible_user", "deploy")
+
+        attrs = (
+            await client.get(
+                f"{V1}/workspaces/{ws}/inventory/resolved?limit=web-1&provenance=true",
+                headers=AUTH,
+            )
+        ).json()["data"]["attributes"]
+        assert sorted(attrs["hosts"]) == ["web-1"]
+        assert sorted(attrs["var-provenance"]) == ["web-1"], (
+            "attribution must cover exactly the limited host set; reporting web-2 would "
+            "describe a host this answer says is not targeted"
+        )

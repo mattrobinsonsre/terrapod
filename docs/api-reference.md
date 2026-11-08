@@ -255,13 +255,32 @@ Returns feature flags (all enabled for Terrapod).
 ### Run Queue and Capacity
 
 ```
+GET /api/v1/run-queue
+GET /api/v1/run-capacity
 GET /api/tfe/v2/organizations/default/runs/queue
 GET /api/tfe/v2/organizations/default/capacity
 ```
 
-TFE-compatible only, and **not mounted natively** — a native path would carry an
-`organizations/default` segment, which Terrapod does not have (single
-organization, [architecture principle 9](architecture.md#why-a-single-organization)).
+**Two doors onto one queue, serving one population.** The TFE pair is what the
+`terraform`/`tofu` cloud backend reads; the native pair is for everything else.
+
+The native paths were missing until #2425, and the reason recorded for their
+absence was that *a native path would carry an `organizations/default` segment,
+which Terrapod does not have* — true of the **path** and not of the data. The
+counts and the positions carry no identity, so the org segment was the whole
+obstacle, and these paths simply do not have one ([architecture principle
+9](architecture.md#why-a-single-organization) is satisfied by not having it
+rather than by not serving the data).
+
+Neither is under `/runs/`: a queue is a view over runs and a capacity is two
+integers about load, so neither is a run resource — and `/runs/queue` would sit
+behind `/runs/{run_id}`, which resolves `queue` as a run id.
+
+**The population is identical by construction**, through one shared producer. So
+a run has one position rather than a different one per surface, and the engine
+filter below applies to both. The one deliberate difference is the serialisation:
+the native document reports a run's **real** status where the frozen surface
+folds it to a value `go-tfe` can switch on.
 
 The `terraform`/`tofu` cloud backend reads these while a run is waiting, to tell
 the practitioner how far down the queue it is. A 404 from either is **fatal**:
@@ -290,6 +309,19 @@ reads is your own, which you can always see.
 **Capacity** reports two integers and is deliberately **not** filtered by who is
 asking, for the same reason: the CLI subtracts `running` from a queue position, so
 both numbers have to describe the same population.
+
+The native document's `type` is `run-capacity` rather than
+`organization-capacity`, because there is no organization in the native
+vocabulary; its `id` is still `default`, which is what the TFE document's
+`primary` field means.
+
+**Terraform runs only, on both surfaces.** The engine filter is in the shared
+query, not in either route: the queue document grew out of the frozen surface,
+where a Pulumi or Ansible status is not a value `go-tfe` can switch on. A waiting
+Pulumi or Ansible run therefore appears in neither, and a native queue covering
+every engine would compute positions over a different population — so the same
+run would have two positions depending on which route you asked. Equal
+populations is what makes these two routes consistent.
 
 ```json
 {
@@ -6311,7 +6343,7 @@ Every list route in this section supports the standard `page[number]` / `page[si
 ### Show Resolved Inventory
 
 ```
-GET /api/v1/workspaces/{id}/inventory/resolved[?limit=<pattern>]
+GET /api/v1/workspaces/{id}/inventory/resolved[?limit=<pattern>][&provenance=true]
 ```
 
 Requires `inventory:read`; unphased for a runner token. **Resolved by ansible, not by Terrapod** — `ansible-inventory --list` does the merge, the precedence, the group DAG, the derivation of `all` and `ungrouped`, and with `?limit=` the expansion of a `--limit` pattern, so the answer is ansible's own, `~regex` terms included.
@@ -6344,10 +6376,40 @@ Requires `inventory:read`; unphased for a runner token. **Resolved by ansible, n
 | `group-children` | The nesting, carried rather than resolved. Taking the transitive closure would be Terrapod computing the group DAG, which is ansible's job |
 | `host-count`, `group-count` | The sizes of the two maps above |
 | `limit` | Echoed back when `?limit=` was supplied |
+| `var-provenance` | Present only with `?provenance=true`. Per host, per variable, where the merged value came from — see below |
 
 **`?limit=<pattern>` is the authoritative "what would this target"**, and it is the one that expands **through** nesting — so it, not a group's host list, is how the effective set of a parent group is read. The pattern goes straight to `ansible-inventory --limit`: host names, group names, `all` and `*`, globs, comma- or colon-separated terms, `!` exclusion, `&` intersection, and `~regex`.
 
 This is the safety surface rather than a convenience: auto-configure is deliberately broad — at scale the hazard is hosts left unconfigured, not hosts configured — so visibility is the control, and the question has to be answerable before anything runs.
+
+**`?provenance=true` answers "why does this host have this value" and "which group do I change"** — neither of which is derivable from `hosts`, because the merge has already discarded what it overrode. It adds `var-provenance`: per host, per variable, the chain of levels that set the key and which one **won**. It composes with `?limit=`, so "these are the hosts a configure would touch, and this is where each of their variables came from" is one request.
+
+```json
+{
+  "var-provenance": {
+    "web-01": {
+      "ansible_user": {
+        "value": "deploy",
+        "origin": "web",
+        "chain": [
+          {"level": "all", "value": "root"},
+          {"level": "web", "value": "deploy"}
+        ]
+      }
+    }
+  }
+}
+```
+
+`chain` is every level that set the key, **shallowest group first — ansible's own precedence order**, so it is everything `origin` beat. A value no level in the ancestry explains carries an empty `chain`.
+
+| `origin` | Meaning |
+|---|---|
+| a level name | The group that supplied the winning value, **by its plain name** — `web`, never `@web`. The sigil is how `ansible-inventory --graph` spells a group and is stripped on the way out, so a consumer matching on `@web` matches nothing while looking like it works |
+| `here` | The node itself set it. For a host that **includes a value overriding a group**: a host's own `host_vars` are invisible in the graph, because the host's line shows its already-effective set — so the beaten group stays in `chain` while `origin` reads `here`. `here` is therefore an origin and never a level, so it never appears in `chain` |
+| `unattributable` | Terrapod **declined to guess**, which is a real answer rather than a failure: the comparison is between real JSON and ansible's own printing of the same value, which agrees for scalars and may not for a container. It is what a level that is **not** a host reports when nothing explains its value; since this route attributes hosts, an unexplained value here reads `here` instead |
+
+**Ansible attributes these, not Terrapod** — the levels come from `ansible-inventory --graph --vars`, because `--list` carries no group variables at all and so cannot say where anything came from. That is a **second** ansible invocation, which is why this is opt-in rather than always on. Terrapod does the walk once, server-side, deliberately so that no consumer re-implements it: a second precedence implementation would diverge from ansible silently, and this is the one view that exists to be trusted about exactly that.
 
 Statuses worth knowing, because the three say different things:
 

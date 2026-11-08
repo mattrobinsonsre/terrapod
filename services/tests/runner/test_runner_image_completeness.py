@@ -136,9 +136,41 @@ def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
     return seen
 
 
+def _fixtures_or_fail(*needed: tuple[object, str]) -> None:
+    """Refuse, rather than skip, when a fixture this file reads is missing.
+
+    Thirteen `pytest.skip` guards used to stand here, eight of them saying the
+    `Tiltfile` "is not shipped in the test image". **It is** --
+    `docker/Dockerfile.test` carries `COPY Tiltfile ./Tiltfile`, and it copies
+    `docker/` twice -- so not one of those conditions can arise in either layout,
+    and the only way to reach them is for somebody to rename or delete the file.
+    At which point all thirteen went quiet together, including "every
+    third-party module the Job imports is installed in the image" (#2425 §2.6).
+
+    A skip is right for a fixture that is legitimately absent somewhere. These
+    are present in both layouts by construction, so absence is a defect in the
+    tree and has to read as one.
+    """
+    missing = [what for value, what in needed if value is None or not _present(value)]
+    if missing:
+        pytest.fail(
+            "this file reads fixtures that are shipped in BOTH layouts -- a checkout and "
+            f"the test image -- and these are missing: {', '.join(missing)}. "
+            "`docker/Dockerfile.test` copies `docker/` and `Tiltfile`, so this is not an "
+            "image that omits them: something in the tree has been renamed or removed, "
+            "and skipping would take every test in this file with it."
+        )
+
+
+def _present(value: object) -> bool:
+    """True for a path that exists, and for any non-path sentinel."""
+    return value.exists() if isinstance(value, pathlib.Path) else True
+
+
 def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
-    if ROOT is None or RUNNER is None or ENTRYPOINT is None:
-        pytest.skip("this tree has no docker/ or no runner package to check")
+    _fixtures_or_fail(
+        (ROOT, "docker/"), (RUNNER, "the runner package"), (ENTRYPOINT, "the Job entrypoint")
+    )
     dockerfile = DOCKERFILE.read_text()
     missing = []
     for mod in sorted(_runner_imports_reachable_from(ENTRYPOINT)):
@@ -168,8 +200,9 @@ def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
 
 def test_every_other_terrapod_module_the_job_imports_is_in_the_runner_image() -> None:
     """Non-runner imports must also be present in the image's COPY list."""
-    if ROOT is None or RUNNER is None or ENTRYPOINT is None:
-        pytest.skip("this tree has no docker/ or no runner package to check")
+    _fixtures_or_fail(
+        (ROOT, "docker/"), (RUNNER, "the runner package"), (ENTRYPOINT, "the Job entrypoint")
+    )
     dockerfile = DOCKERFILE.read_text()
     _runner_imports_reachable_from(ENTRYPOINT)
     assert _OTHER_TERRAPOD, (
@@ -203,8 +236,7 @@ def test_the_tiltfile_deps_match_the_dockerfile() -> None:
 
     The test image carries the Tiltfile so this also guards the dev image in CI.
     """
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in the test image")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     dockerfile = DOCKERFILE.read_text()
     tiltfile = TILTFILE.read_text()
     copied = {
@@ -221,8 +253,7 @@ def test_the_tiltfile_deps_match_the_dockerfile() -> None:
 
 def test_kind_runner_image_is_loaded_before_jobs_start() -> None:
     """A host-only build fails with ErrImageNeverPull inside kind (#1990)."""
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tiltfile = TILTFILE.read_text()
     assert "_kind = k8s_context() == 'kind-kind'" in tiltfile
     assert (
@@ -234,8 +265,7 @@ def test_kind_runner_image_is_loaded_before_jobs_start() -> None:
 
 def test_tilt_go_images_meet_module_minimum_patch_versions() -> None:
     """A floating Go image tag may lag behind the modules' required patch."""
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tiltfile = TILTFILE.read_text()
     for build, module in (("QUERY_BUILD", "query"), ("EE_AGENT_BUILD", "ee-agent")):
         go_mod = ROOT / module / "go.mod"
@@ -253,8 +283,7 @@ def test_tilt_go_images_meet_module_minimum_patch_versions() -> None:
 
 def test_tilt_go_builds_do_not_write_into_watched_source() -> None:
     """A build output inside ee-agent/ retriggers its own local_resource forever."""
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tiltfile = TILTFILE.read_text()
     for build, source, output in (
         ("QUERY_BUILD", "query", "query-bin/terrapod-query"),
@@ -268,8 +297,7 @@ def test_tilt_go_builds_do_not_write_into_watched_source() -> None:
 
 
 def test_tilt_builds_provider_from_local_git_tags_without_watching_its_output() -> None:
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tiltfile = TILTFILE.read_text()
     assert "str(local(\"git tag --list 'v[0-9]*' --sort=-version:refname\"))" in tiltfile
     assert "_PROVIDER_TAG = _PROVIDER_TAGS.split('\\n')[0]" in tiltfile
@@ -297,8 +325,7 @@ def test_tilt_builds_provider_from_local_git_tags_without_watching_its_output() 
 
 
 def test_tilt_down_does_not_run_local_setup_or_builds() -> None:
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tree = ast.parse(TILTFILE.read_text())
     guarded = []
     for statement in tree.body:
@@ -326,8 +353,7 @@ def test_tilt_down_does_not_run_local_setup_or_builds() -> None:
 
 
 def test_existing_dev_certificates_do_not_require_mkcert() -> None:
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     setup = (
         TILTFILE.read_text().split("'setup-certificates',", 1)[1].split("labels=['setup'],", 1)[0]
     )
@@ -337,8 +363,7 @@ def test_existing_dev_certificates_do_not_require_mkcert() -> None:
 
 def test_seed_dev_provider_waits_for_storage_pvc_before_start() -> None:
     """The helper pod cannot mount a PVC Tilt has not applied yet (#1990)."""
-    if ROOT is None or not TILTFILE.is_file():
-        pytest.skip("Tiltfile is not shipped in this tree")
+    _fixtures_or_fail((ROOT, "docker/"), (TILTFILE, "Tiltfile"))
     tiltfile = TILTFILE.read_text()
     seed = tiltfile.split("'seed-dev-provider-cache',", 1)[1].split("labels=['setup'],", 1)[0]
     assert "resource_deps=['build-provider-binary', 'uncategorized']" in seed
@@ -352,11 +377,9 @@ def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
     copy `docker/` in, so the guard could not run at all; restoring that COPY is
     what makes it a gate rather than a local convenience. Nothing pinned it.
     """
-    if ROOT is None:
-        pytest.skip("no docker/ in this tree")
+    _fixtures_or_fail((ROOT, "docker/"))
     test_image = ROOT / "docker" / "Dockerfile.test"
-    if not test_image.is_file():
-        pytest.skip("Dockerfile.test is not shipped here")
+    _fixtures_or_fail((test_image, "docker/Dockerfile.test"))
     assert "COPY docker" in test_image.read_text(), (
         "docker/Dockerfile.test no longer copies `docker/` into the test image, so "
         "test_every_module_the_job_imports_is_in_the_runner_image SKIPS in CI and "
@@ -369,7 +392,33 @@ def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
 
 
 # Third-party dependencies are the other half of runner-image completeness.
-REQUIREMENTS = (ROOT / "services" / "requirements-runner.txt") if ROOT else None
+#
+# TWO LAYOUTS, like `RUNNER` above, and this one was missing its second
+# candidate. `docker/Dockerfile.test` copies the three requirements files to
+# `./` -- so in the image the file is at `/app/requirements-runner.txt` while
+# `ROOT / "services" / ...` resolves to `/app/services/...`, which is not there.
+#
+# The consequence, which is what #2425 §2.6 was really about: the guard below
+# carried `pytest.skip("no docker/ or requirements-runner.txt in this tree")`,
+# so **"every third-party module the Job imports is installed in the image" had
+# never once run in CI**. It passed in a checkout, skipped in the image, and the
+# skip's stated reason was true -- the file genuinely was not where it looked.
+# Turning the skip into a failure is what surfaced it.
+REQUIREMENTS = (
+    next(
+        (
+            p
+            for p in (
+                ROOT / "services" / "requirements-runner.txt",
+                ROOT / "requirements-runner.txt",
+            )
+            if p.is_file()
+        ),
+        None,
+    )
+    if ROOT
+    else None
+)
 
 
 def _terrapod_package_root() -> pathlib.Path | None:
@@ -421,8 +470,11 @@ def _third_party_imports_reachable_from(start: pathlib.Path) -> dict[str, str]:
 
 def test_every_third_party_module_the_job_imports_is_installed_in_the_image() -> None:
     """Catch transitive imports missing from the runner's pinned requirements."""
-    if ROOT is None or ENTRYPOINT is None or not REQUIREMENTS.is_file():
-        pytest.skip("no docker/ or requirements-runner.txt in this tree")
+    _fixtures_or_fail(
+        (ROOT, "docker/"),
+        (ENTRYPOINT, "the Job entrypoint"),
+        (REQUIREMENTS, "requirements-runner.txt"),
+    )
 
     pinned = {
         line.split("==")[0].strip().lower().replace("_", "-")

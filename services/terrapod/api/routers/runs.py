@@ -51,7 +51,7 @@ from terrapod.api.dependencies import (
 from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
-from terrapod.api.pagination import build_meta
+from terrapod.api.pagination import build_meta, paginate
 from terrapod.api.prefixes import TFE_PREFIX, is_tfe_path
 from terrapod.api.serialization import engine_version_attr
 from terrapod.auth import capabilities as cap
@@ -1207,6 +1207,126 @@ async def _tfe_task_stages_included(
         included.append(tfe_task_stage_json(ts, run, can_override=can_override))
         included.extend(tfe_task_result_json(r) for r in ts.results)
     return included
+
+
+# ── The run queue, natively (#2425 §4.4) ─────────────────────────────────────
+#
+# On `extensions_router`, which `app.py` mounts with `include_terrapod` ALONE.
+# `router` is mounted on BOTH surfaces, so a queue route there would also answer
+# at `/api/tfe/v2/runs/queue` -- a TFE path no CLI consumes, serving a document
+# with native statuses in it. `test_the_two_native_callers_are_the_runner_protocol_ones`
+# caught exactly that when this was first written on `router`, which is the gate
+# #2425 §2.2 strengthened doing its job on the next change after it landed.
+#
+# `/run-queue`, NOT `/runs/queue`, and this is measured rather than stylistic.
+# `app.py` includes `router` before `extensions_router`, FastAPI matches in
+# declaration order, and `/runs/{run_id}` is on `router` -- so `/runs/queue`
+# resolved to `show_run` with `run_id="queue"`. Proven by asking the mounted app
+# which route it matches, after a comment I had written claiming the ordering
+# held: it did not, and the only reason this is not a 404 in production is that
+# the path changed.
+#
+# A sibling of `/run-capacity` rather than a child of `/runs/` also says the
+# honest thing about both: neither is a run resource. One is a view OVER runs
+# and the other is two integers about load, and nesting either under `/runs/`
+# buys a path segment in exchange for an ordering dependency on an include
+# order fifty lines away in another module.
+
+
+@extensions_router.get("/run-queue")
+async def native_run_queue(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The deployment's run queue, with each run's position.
+
+    The same queue `/api/tfe/v2/organizations/default/runs/queue` serves, which
+    until now was the ONLY door to it -- so the `terraform`/`tofu` cloud backend
+    could tell a waiting practitioner how far down they were and nothing else
+    could. An agent asked "why has my run not started" could list runs and not
+    see the queue at all.
+
+    The reason that surface was the only one is recorded as *"a native path would
+    carry an `organizations/default` segment, which Terrapod does not have"* --
+    true of the PATH and not of the data. The counts and positions carry no
+    identity, as the TFE route's own docstring says, so the org segment was the
+    whole obstacle and this route simply does not have one.
+
+    **Same population, deliberately.** `visible_run_queue` is the one producer:
+    which runs are LISTED is filtered by the caller's `run:read`, the POSITIONS
+    are computed over the whole queue, and the queue is Terraform-only because
+    the underlying query is. That last is worth knowing rather than fixing here:
+    a native queue covering every engine would compute positions over a
+    different population, so the same run would have two different positions
+    depending on which route you asked. Equal populations is the property that
+    makes these two routes consistent, and widening one of them is a decision
+    rather than a tidy-up.
+
+    Serialised for the surface that asked, which on this router is always the
+    native one -- so the status is the real one: a native consumer wants
+    `configuring` rather than the folded `applying`, which is the #1988 split.
+
+    DERIVED from the request rather than hardcoded `tfe=False`, even though this
+    route cannot be reached on the frozen surface. Hardcoding would be correct
+    today and would make the handler assert its own mounting, which is a fact
+    fifty lines away in `app.py`; `is_tfe_path` is right however it is mounted,
+    and it keeps the one gate on this out of the business of maintaining a list
+    of handlers allowed to know better.
+
+    Oldest first -- a queue is served in the order it was joined, the opposite of
+    every other run listing here.
+    """
+    from terrapod.api.routers.tfe_v2 import visible_run_queue
+
+    tfe = is_tfe_path(request.url.path)
+    items = []
+    for run, position, engine in await visible_run_queue(db, user):
+        document = _run_json(run, engine=engine, tfe=tfe)
+        # Attached here rather than inside `_run_json`, for the reason that
+        # function's TFE sibling gives: a run read through `GET /runs/{id}` has
+        # no position to report, and emitting a hardcoded 0 there while this
+        # list says 3 would be two answers to one question.
+        document["data"]["attributes"]["position-in-queue"] = position
+        items.append(document["data"])
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@extensions_router.get("/run-capacity")
+async def native_run_capacity(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """How many runs are waiting and running, deployment-wide.
+
+    The native door to what `/api/tfe/v2/organizations/default/capacity` serves.
+    Two integers about load, carrying no identity -- which is why neither route
+    filters them by who is asking, and why the org segment was the only thing
+    keeping this off the native surface.
+
+    `pending` is `WAITING_STATES`, which includes a run whose configuration
+    version is still uploading; `running` is `EXECUTING_STATES`. The same
+    population as the queue above, so `position - running` is the number of runs
+    ahead of yours, exactly as the cloud backend computes it.
+
+    NOT under `/runs/`, because it is not a run resource and a `/runs/capacity`
+    path would sit in front of `/runs/{run_id}` claiming a run id that reads
+    like a word. The id is `default`, the organization name, matching what the
+    TFE document's `primary` field means.
+    """
+    from terrapod.api.dependencies import DEFAULT_ORG
+
+    pending, running = await run_service.organization_run_capacity(db)
+    return JSONResponse(
+        content={
+            "data": {
+                "id": DEFAULT_ORG,
+                "type": "run-capacity",
+                "attributes": {"pending": pending, "running": running},
+            }
+        }
+    )
 
 
 @router.get("/runs/{run_id}")

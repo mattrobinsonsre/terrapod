@@ -585,9 +585,10 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 
    **This count is not the admission figure and is normally higher than it.**
    Admission ignores a Job that is being deleted, one that has finished but not
-   yet been reaped (`runners.ttlSecondsAfterFinished`, which the Resolution section
-   suggests lowering precisely because those linger), and one that has had no pod for more than a
-   minute, which is how a Job blocked by a `ResourceQuota` stops holding a slot.
+   yet been reaped (`runners.ttlSecondsAfterFinished` governs how long those
+   linger in `kubectl`, and **not** whether they hold a slot — they do not), and
+   one that has had no pod for more than a minute, which is how a Job blocked by
+   a `ResourceQuota` stops holding a slot.
    `kubectl` shows all of them. So a count above `listener.maxConcurrent` is the
    expected reading, not a broken cap. Note also that the label is on the
    **Jobs**; runner *pods* carry `terrapod.io/run-id` and `terrapod.io/phase`
@@ -649,8 +650,22 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 3. **Reduce per-workspace resources** if Jobs are requesting more than needed:
    Update `resource_cpu` and `resource_memory` on workspaces via the API.
 
-4. **Increase Job TTL cleanup** if completed Jobs are consuming scheduler slots:
-   Set `runners.ttlSecondsAfterFinished` to a lower value.
+4. **A completed Job is not consuming a slot, so the TTL is not the lever.**
+   This step used to say to lower `runners.ttlSecondsAfterFinished` "if completed
+   Jobs are consuming scheduler slots". They are not: `_job_occupies_a_slot`
+   answers **no** for a terminal Job — "the controller is done with it" — so a
+   reaped Job and an unreaped one admit identically and the TTL changes only how
+   long one stays visible in `kubectl`.
+
+   It is worth knowing because the cross-reference above made it look checked.
+   If the count you are reading is higher than `maxConcurrent`, see the note in
+   step 1: `kubectl` shows Jobs admission ignores, and that is the expected
+   reading rather than a broken cap.
+
+   **What does hold a slot** is a Job with a pod — running, Pending or
+   unschedulable — plus one created in the last minute whose pod does not exist
+   yet. So an unschedulable Job IS occupancy, which is the scheduling path
+   below, not a cleanup problem.
 
 ### Verification
 

@@ -193,6 +193,7 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 	type resolvedIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose inventory to resolve"`
 		Limit       string `json:"limit,omitempty" jsonschema:"an ansible --limit pattern to apply: host names, group names, globs, 'all', comma- or colon-separated terms, '!' to exclude, '&' to intersect, '~' for a regex. Omit it to resolve the whole inventory"`
+		Provenance  bool   `json:"provenance,omitempty" jsonschema:"also report WHERE each host variable came from: per key, the chain of levels that set it and which one won. Set this when asked why a host has the value it has, or which group to change to alter it -- the answer is not derivable from the merged variables alone. Costs a second ansible invocation, so it is off by default"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_inventory_resolved",
@@ -202,6 +203,7 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 			"`hosts` is EXHAUSTIVE — it includes a host with no variables, deliberately unlike ansible's own `_meta.hostvars`, which omits one entirely; enumerating a host set from ansible's shape loses hosts silently. " +
 			"ANSIBLE produces this, not Terrapod: the declared rows are rendered to one document and `ansible-inventory --list` is run over that and the git source, so the precedence rules and the group DAG are ansible's. " +
 			"It is LIVE and there is nothing to refresh. Every source is static, so Terrapod resolves the rows to answer this call — the hosts you read are the hosts as they are. There is deliberately no timestamp and no freshness field. " +
+			"Pass `provenance` to get `var_provenance`: per host, per variable, the chain of levels that set it and which one WON (a group by name, or `here` for a value the host set itself). That is the answer to 'why does this host have this value' and to 'which group do I change' — neither is derivable from the merged variables, because the merge has already discarded what it overrode. A host that OVERRIDES a group reads `here` with the beaten group still in its `chain`, which is how you tell an override from a value only ever set on the host; there is never a `here` link in a chain, because a chain is built from group levels alone. " +
 			"An error here is a real error and never an empty host set: a configure targeting too little is worse than no answer, so this fails closed.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in resolvedIn) (*mcp.CallToolResult, *terrapod.ResolvedInventory, error) {
@@ -212,11 +214,11 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 			resolved *terrapod.ResolvedInventory
 			err      error
 		)
-		if in.Limit == "" {
-			resolved, err = c.GetResolvedInventory(ctx, in.WorkspaceID)
-		} else {
-			resolved, err = c.GetResolvedInventoryWithLimit(ctx, in.WorkspaceID, in.Limit)
-		}
+		// One call for every combination, including limit AND provenance
+		// together -- "these are the hosts a configure would touch, and this is
+		// where each of their variables came from" is one question.
+		resolved, err = c.GetResolvedInventoryWithOptions(ctx, in.WorkspaceID,
+			terrapod.ResolvedInventoryOptions{Limit: in.Limit, Provenance: in.Provenance})
 		if err != nil {
 			return errResult(err), nil, nil
 		}

@@ -20,10 +20,28 @@ The second direction is the one that rots. If someone wires up the run-action
 `comment`, the catalogue goes on telling an integrator it is dropped -- a wrong
 REASON, which reads as considered and survives review.
 
-**What it deliberately cannot do**: tell you HashiCorp has added a field to an
-`*Options` struct. That needs the go-tfe source, which would make a
-documentation gate depend on a Go module cache, so it stays a step in the
-document's own maintenance procedure.
+**What it deliberately cannot do**, and both have cost something:
+
+Tell you HashiCorp has added a field to an `*Options` struct. That needs the
+go-tfe source, which would make a documentation gate depend on a Go module
+cache, so it stays a step in the document's own maintenance procedure.
+
+Tell a PER-VERB claim from a per-heading one. `HANDLERS` maps a heading to the
+set of functions serving it, so "Workspace create/PATCH attributes" is satisfied
+when EITHER `_create_workspace_impl` or `update_workspace` reads a key -- which
+is how the catalogue came to say `terraform-version` was *"Dropped on `POST`,
+consumed on `PATCH`"* while both verbs honoured it (#2425 §5.2). The row passed
+here via the update path.
+
+Splitting the mapping per verb would not fix it either, and that is the harder
+half: both handlers read that key through the shared `engine_version_attr`, so
+the literal appears in NEITHER function and an AST search of either one finds
+nothing. A gate that followed every helper call would be a call-graph walk, and
+the recorded reason this file reads literals is that a narrower matcher which
+stops matching fails loudly rather than passing on nothing. So a per-verb claim
+is reviewed, not gated -- and the safer thing to write is no per-verb claim at
+all, because a key read through a shared helper is consumed wherever that helper
+is called.
 
 STDLIB ONLY: it reads the document as text and the routers with `ast`.
 """
@@ -151,12 +169,22 @@ def catalogues(doc: str) -> dict[str, dict[str, set[str]]]:
         found = {"consumed": set(), "not_consumed": set()}
         rowtext: dict[str, str] = {}
         for line in b.split("\n"):
-            low = line.lower()
-            if "accepted and not consumed" in low or "not supported" in low:
-                cls = "not_consumed"
-            elif re.match(r"^consumed\b", low) or "consumed, on both" in low:
-                cls = "consumed"
-            if not line.startswith("| `"):
+            # A TABLE ROW IS NEVER A MARKER (#2425 §5.2). The marker checks used
+            # to run on every line, so a row whose cell contained a marker's
+            # words reclassified every row BELOW it -- measured: rewriting the
+            # `terraform-version` row to read "Consumed, on both verbs" moved
+            # three rows out of the not-consumed table and failed this gate on
+            # `tags`, which nobody had touched. The classification is prose's to
+            # make, so only prose is read for it.
+            if line.startswith("|"):
+                if not line.startswith("| `"):
+                    continue
+            else:
+                low = line.lower()
+                if "accepted and not consumed" in low or "not supported" in low:
+                    cls = "not_consumed"
+                elif re.match(r"^consumed\b", low) or "consumed, on both" in low:
+                    cls = "consumed"
                 continue
             cell = line.split("|")[1]
             for name in re.findall(r"`([a-z0-9][a-z0-9.\-]*)`", cell):

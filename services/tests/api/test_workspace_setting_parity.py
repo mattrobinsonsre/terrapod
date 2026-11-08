@@ -316,6 +316,23 @@ def _web_tsx(attr: str) -> tuple[str, ...]:
     forms = list(_kebab_quoted(attr))
     for alias in _aliases_by_attr().get(attr, ()):
         forms.extend(_kebab_quoted(alias))
+    # BOTH directions (#2425 §4.5). An `alsoAccepts` entry says `attr`
+    # supersedes `alias`, and `workspace-fields.ts` is explicit that the
+    # superseded spelling is deliberately never rendered anywhere -- "offering
+    # the superseded spelling as a SECOND control would let an operator set two
+    # things that mean one thing, so each is listed here rather than rendered".
+    #
+    # So the canonical control is the ONLY thing that can satisfy a superseded
+    # key, and looking for the superseded key alone finds nothing on any
+    # surface. One-way widening is why `auto-apply` carried a bulk-GUI
+    # exemption reading "deliberately not fleet-settable from a form: it arms
+    # unattended applies" -- which was false: the form offers the mode selector,
+    # the router writes BOTH columns from it, and `never` is how you turn it
+    # off. A false reason reads as considered, which is the worse of the two to
+    # leave standing.
+    for canonical, aliases in _aliases_by_attr().items():
+        if attr in aliases:
+            forms.extend(_kebab_quoted(canonical))
     if attr.isidentifier():
         forms.append(f".{attr} =")
     return tuple(forms)
@@ -346,7 +363,6 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
         # right, so the excuse merely told a reader something untrue -- which is
         # the worse of the two to leave, since a false reason reads as
         # considered. `_web_tsx` above is what lets the gate see both.
-        "auto-apply": "deliberately not fleet-settable from a form: it arms unattended applies",
         "drift-ignore-rules": "a rule list needs per-workspace context a fleet form cannot show",
         "trigger-prefixes": "path lists are per-repository; a fleet-wide value is rarely meaningful",
         "security-scan-skip-rules": "a skip list is per-workspace reasoning, not a fleet default",

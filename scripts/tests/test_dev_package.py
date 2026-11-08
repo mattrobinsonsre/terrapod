@@ -135,5 +135,34 @@ def test_dev_package_rejects_pinned_source_without_overwriting_output(package):
 
 
 def test_dev_provider_build_does_not_stamp_unrelated_git_changes():
+    """Asserted on the RECIPE LINE, not as a substring of the file (#2425 §2.6).
+
+    `"go build -buildvcs=false -trimpath" in makefile` is satisfied by the
+    string sitting in a comment -- including the comment that explains why the
+    flag is there -- so deleting the flag from the command and leaving the
+    rationale above it was green. Without `-buildvcs=false` the binary is
+    stamped with the repository's VCS state, so an unrelated dirty file changes
+    its bytes and `dev-package` produces a different artifact for the same
+    provider source, which is the whole thing this guards.
+
+    A make RECIPE is a line indented with a TAB under a target; a comment starts
+    with `#`. Both are exact, so this needs no heuristic.
+    """
     makefile = (ROOT / "provider/GNUmakefile").read_text()
-    assert "go build -buildvcs=false -trimpath" in makefile
+    recipes = [
+        line.lstrip("\t")
+        for line in makefile.splitlines()
+        if line.startswith("\t") and not line.lstrip("\t").startswith("#")
+    ]
+    # A floor, so a reformatted Makefile fails here rather than passing on an
+    # empty subject.
+    assert len(recipes) >= 3, f"found only {recipes} recipe lines; the reader has drifted"
+    builds = [line for line in recipes if line.startswith("go build")]
+    assert builds, f"no `go build` recipe line at all; recipes are {recipes}"
+    for line in builds:
+        for flag in ("-buildvcs=false", "-trimpath"):
+            assert flag in line, (
+                f"the `go build` recipe is missing {flag}: {line!r}. Without "
+                "`-buildvcs=false` an unrelated dirty file changes the binary's bytes, "
+                "so the same provider source produces a different artifact."
+            )

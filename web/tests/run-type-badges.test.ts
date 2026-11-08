@@ -40,10 +40,26 @@ const BADGE = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-me
  * badge that was there as missing. A matcher that fails toward a FINDING is the
  * expensive direction, so it scans the whole prefix and refuses rather than
  * guessing when it cannot find a tag.
+ *
+ * **It looks for ANY element, not for `<span` (#2425 §2.6.)** It used to search
+ * `lastIndexOf('<span', at)`, which does not fail when the label's own element
+ * is something else -- it walks PAST it to the preceding sibling, and on this
+ * page the preceding sibling is usually a badge. So un-badging a label by
+ * changing its `<span>` to a `<div>` kept the gate green while reading the
+ * neighbour's classes, which is the one mistake it exists to catch.
+ *
+ * The nearest preceding `<` that starts an element is the enclosing tag: JSX
+ * cannot put a `<` inside an attribute value unescaped, and a closing `</` is
+ * not an opening tag, so the scan is exact rather than heuristic.
  */
 function openingTag(at: number): string {
-  const tag = PAGE.lastIndexOf('<span', at)
-  assert.ok(tag >= 0 && tag < at, `no enclosing <span> found before offset ${at}`)
+  const prefix = PAGE.slice(0, at)
+  const tag = prefix.search(/<[A-Za-z][^<]*$/)
+  assert.ok(
+    tag >= 0,
+    `no enclosing element found before offset ${at}; the label is not inside a tag, ` +
+      'which means this page no longer has the shape this gate reads',
+  )
   return PAGE.slice(tag, at)
 }
 
