@@ -400,6 +400,96 @@ func (c *Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, page
 	return out, nil
 }
 
+// ── The run queue (#2425 §4.4) ───────────────────────────────────────────────
+
+// QueuedRun is one run in the deployment's queue, with its position.
+//
+// PositionInQueue is over the WHOLE queue, not the caller's visible slice: it is
+// the number the feature exists to produce, and a position counted over a
+// filtered list understates the wait it reports. Which runs are LISTED is
+// filtered by the caller's run:read on each run's workspace.
+type QueuedRun struct {
+	Run
+	// PositionInQueue is 1 for the run that has been waiting longest.
+	PositionInQueue int `json:"position-in-queue"`
+}
+
+// RunCapacity is how many runs are waiting and running, deployment-wide.
+//
+// Two integers about load, carrying no identity -- which is why this is not
+// filtered by who is asking. `PositionInQueue - Running` is how many runs are
+// ahead of yours, which is what the cloud backend displays to a waiting
+// practitioner.
+type RunCapacity struct {
+	Pending int `json:"pending"`
+	Running int `json:"running"`
+}
+
+// ListRunQueue reads the deployment's run queue, OLDEST FIRST.
+//
+// The opposite order to every other run listing here, deliberately: a queue is
+// served in the order it was joined, so position 1 is the run that has been
+// waiting longest. A history listing wants the newest; this wants the next.
+//
+// **Terraform runs only**, because the underlying query is. The queue document
+// grew out of the TFE surface, where a Pulumi or Ansible status is not a value
+// `go-tfe` can switch on -- and both routes share one population deliberately,
+// so a run has one position rather than a different one per surface.
+//
+// Until #2425 this was reachable only at
+// `/api/tfe/v2/organizations/default/runs/queue`, so the `terraform`/`tofu`
+// cloud backend could read it and nothing else could.
+func (c *Client) ListRunQueue(
+	ctx context.Context, pageNumber, pageSize int,
+) ([]QueuedRun, error) {
+	path := "/api/v1/run-queue"
+	q := url.Values{}
+	if pageNumber > 0 {
+		q.Set("page[number]", strconv.Itoa(pageNumber))
+	}
+	if pageSize > 0 {
+		q.Set("page[size]", strconv.Itoa(pageSize))
+	}
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	data, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse run queue: %w", err)
+	}
+	out := make([]QueuedRun, 0, len(resources))
+	for i := range resources {
+		out = append(out, QueuedRun{
+			Run:             *runFromResource(&resources[i]),
+			PositionInQueue: int(GetIntAttr(&resources[i], "position-in-queue")),
+		})
+	}
+	return out, nil
+}
+
+// GetRunCapacity reads the deployment's pending and running run counts.
+//
+// The same population the queue positions are computed over, which is what
+// makes `position - running` the number of runs ahead of yours.
+func (c *Client) GetRunCapacity(ctx context.Context) (*RunCapacity, error) {
+	data, err := c.Get(ctx, "/api/v1/run-capacity")
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse run-capacity response: %w", err)
+	}
+	return &RunCapacity{
+		Pending: int(GetIntAttr(res, "pending")),
+		Running: int(GetIntAttr(res, "running")),
+	}, nil
+}
+
 // ApplyRun confirms a planned run, moving it to apply. Returns *ValidationError
 // (422) or *ConflictError (409) when the run/workspace state forbids it (e.g. a
 // CLI confirm on a VCS-connected workspace, or a manually-locked workspace).

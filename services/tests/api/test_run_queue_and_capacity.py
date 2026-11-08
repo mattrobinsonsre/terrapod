@@ -45,6 +45,12 @@ _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 QUEUE = "/api/tfe/v2/organizations/default/runs/queue"
 CAPACITY = "/api/tfe/v2/organizations/default/capacity"
+#: The native doors to the same two answers (#2425 §4.4). Not under `/runs/`:
+#: neither is a run resource, and `/runs/queue` resolved to `show_run` with
+#: `run_id="queue"` because `app.py` includes `router` before
+#: `extensions_router` and FastAPI matches in declaration order.
+NATIVE_QUEUE = "/api/v1/run-queue"
+NATIVE_CAPACITY = "/api/v1/run-capacity"
 
 
 def _user(roles=None):
@@ -407,3 +413,145 @@ class TestBothAreOnTheCompatibilitySurfaceOnly:
         for prefix in (TFE_PREFIX, TFE_LEGACY_PREFIX):
             for suffix in ("/organizations/default/runs/queue", "/organizations/default/capacity"):
                 assert prefix + suffix in paths, f"{prefix}{suffix} is not served"
+
+
+class TestTheNativeDoorsServeTheSameTwoAnswers:
+    """#2425 §4.4: the queue was reachable only through `/api/tfe/v2`.
+
+    So the `terraform`/`tofu` cloud backend could tell a waiting practitioner how
+    far down the queue they were, and nothing else could -- an agent asked "why
+    has my run not started" could list runs and not see the queue at all. The
+    recorded reason was *"a native path would carry an `organizations/default`
+    segment, which Terrapod does not have"*, which is true of the PATH and not of
+    the data: the counts and positions carry no identity, as the TFE route's own
+    docstring says.
+
+    **The population is identical by construction**, through the one
+    `visible_run_queue` producer, and that is the property these tests exist to
+    hold. Two routes over two different populations would give the same run two
+    different positions depending on which you asked, and the engine filter --
+    which makes the queue Terraform-only -- is in the shared query rather than in
+    either route.
+    """
+
+    async def test_the_native_queue_emits_the_same_positions(self):
+        ws = _ws()
+        queue = [(_run(ws.id), 1), (_run(ws.id), 2), (_run(ws.id), 3)]
+        app, db = _app(_user())
+        resp = await _get_json(
+            app, db, NATIVE_QUEUE, queue, (3, 0), lambda *a, **k: caps_for_level("read"), [ws]
+        )
+        assert resp.status_code == 200, resp.text
+        assert [d["attributes"]["position-in-queue"] for d in resp.json()["data"]] == [1, 2, 3]
+
+    async def test_the_native_queue_is_filtered_by_reach_too(self):
+        """The filter is the shared producer's, so this is really asserting that
+        the native route goes through it rather than re-querying."""
+        hidden, mine = _ws(), _ws()
+        queue = [(_run(hidden.id), 1), (_run(hidden.id), 2), (_run(mine.id), 3)]
+        app, db = _app(_user())
+
+        def caps(db_, user, ws, **kw):
+            return caps_for_level("read") if ws.id == mine.id else frozenset()
+
+        resp = await _get_json(app, db, NATIVE_QUEUE, queue, (3, 0), caps, [hidden, mine])
+        assert resp.status_code == 200, resp.text
+        data = resp.json()["data"]
+        assert len(data) == 1, data
+        # Position 3, not 1: the reach filter decides what is LISTED and the
+        # position is over the whole queue, on this surface as on the other.
+        assert data[0]["attributes"]["position-in-queue"] == 3
+
+    async def test_the_native_queue_reports_the_REAL_status(self):
+        """The one deliberate difference between the two documents.
+
+        A `queued` run folds to `plan_queued` or `apply_queued` on the frozen
+        surface, because `go-tfe` switches on a fixed set. Natively it must be
+        the real status, which is the #1988 split -- and the route derives the
+        surface from the request rather than hardcoding it, so this would also
+        hold if it were ever dual-mounted.
+        """
+        ws = _ws()
+        queue = [(_run(ws.id, status="queued"), 1)]
+        app, db = _app(_user())
+        native = await _get_json(
+            app, db, NATIVE_QUEUE, queue, (1, 0), lambda *a, **k: caps_for_level("read"), [ws]
+        )
+        app2, db2 = _app(_user())
+        frozen = await _get_json(
+            app2, db2, QUEUE, queue, (1, 0), lambda *a, **k: caps_for_level("read"), [ws]
+        )
+        assert native.json()["data"][0]["attributes"]["status"] == "queued"
+        folded = frozen.json()["data"][0]["attributes"]["status"]
+        assert folded != "queued", (
+            "the frozen surface must fold a status `go-tfe` cannot switch on; if it stops "
+            f"folding, this test is no longer a contrast. Got {folded!r}"
+        )
+
+    async def test_the_native_capacity_reports_the_same_two_integers(self):
+        app, db = _app(_user())
+        resp = await _get_json(
+            app, db, NATIVE_CAPACITY, [], (7, 2), lambda *a, **k: caps_for_level("read"), []
+        )
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs == {"pending": 7, "running": 2}
+
+    async def test_neither_native_route_carries_an_org_segment(self):
+        """Architecture principle 9, and the reason these paths are not a
+        dual-mount of the TFE ones. A `dual_router` entry would have put
+        `organizations/default` on the native surface, which is the #1898 shape
+        -- an org segment arriving as a side effect of a mount rather than as a
+        path anyone wrote."""
+        for path in (NATIVE_QUEUE, NATIVE_CAPACITY):
+            assert "organizations" not in path, path
+
+    async def test_the_queue_is_absent_from_the_frozen_surface(self):
+        """On `extensions_router`, which is `include_terrapod` alone.
+
+        `router` is mounted on BOTH surfaces, so declaring these there would
+        have answered at `/api/tfe/v2/run-queue` as well -- a TFE path no CLI
+        consumes, serving a document whose statuses are native.
+        `test_the_two_native_callers_are_the_runner_protocol_ones` caught that
+        when this was first written on `router`.
+        """
+        from terrapod.api.app import app as mounted
+
+        paths = {r.path for r in mounted.routes if hasattr(r, "path")}
+        assert "/api/v1/run-queue" in paths
+        assert "/api/tfe/v2/run-queue" not in paths
+        assert "/api/tfe/v2/run-capacity" not in paths
+
+    async def test_the_native_path_resolves_to_the_native_handler(self):
+        """Measured, because the first version did not.
+
+        `/runs/queue` resolved to `show_run` with `run_id="queue"`: `app.py`
+        includes `router` before `extensions_router`, FastAPI matches in
+        declaration order, and `/runs/{run_id}` is on `router`. A comment of mine
+        claimed the ordering held; asking the mounted app which route it matches
+        is what settled it.
+        """
+        from fastapi.routing import APIRoute
+
+        from terrapod.api.app import app as mounted
+
+        for path, want in (
+            (NATIVE_QUEUE, "native_run_queue"),
+            (NATIVE_CAPACITY, "native_run_capacity"),
+        ):
+            hit = None
+            for route in mounted.routes:
+                if isinstance(route, APIRoute):
+                    match, _ = route.matches(
+                        {
+                            "type": "http",
+                            "method": "GET",
+                            "path": path,
+                            "headers": [],
+                            "query_string": b"",
+                        }
+                    )
+                    if str(match).endswith("FULL"):
+                        hit = route.endpoint.__name__
+                        break
+            assert hit == want, f"{path} resolves to {hit}, not {want}"

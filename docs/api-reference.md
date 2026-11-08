@@ -255,13 +255,32 @@ Returns feature flags (all enabled for Terrapod).
 ### Run Queue and Capacity
 
 ```
+GET /api/v1/run-queue
+GET /api/v1/run-capacity
 GET /api/tfe/v2/organizations/default/runs/queue
 GET /api/tfe/v2/organizations/default/capacity
 ```
 
-TFE-compatible only, and **not mounted natively** — a native path would carry an
-`organizations/default` segment, which Terrapod does not have (single
-organization, [architecture principle 9](architecture.md#why-a-single-organization)).
+**Two doors onto one queue, serving one population.** The TFE pair is what the
+`terraform`/`tofu` cloud backend reads; the native pair is for everything else.
+
+The native paths were missing until #2425, and the reason recorded for their
+absence was that *a native path would carry an `organizations/default` segment,
+which Terrapod does not have* — true of the **path** and not of the data. The
+counts and the positions carry no identity, so the org segment was the whole
+obstacle, and these paths simply do not have one ([architecture principle
+9](architecture.md#why-a-single-organization) is satisfied by not having it
+rather than by not serving the data).
+
+Neither is under `/runs/`: a queue is a view over runs and a capacity is two
+integers about load, so neither is a run resource — and `/runs/queue` would sit
+behind `/runs/{run_id}`, which resolves `queue` as a run id.
+
+**The population is identical by construction**, through one shared producer. So
+a run has one position rather than a different one per surface, and the engine
+filter below applies to both. The one deliberate difference is the serialisation:
+the native document reports a run's **real** status where the frozen surface
+folds it to a value `go-tfe` can switch on.
 
 The `terraform`/`tofu` cloud backend reads these while a run is waiting, to tell
 the practitioner how far down the queue it is. A 404 from either is **fatal**:
@@ -290,6 +309,19 @@ reads is your own, which you can always see.
 **Capacity** reports two integers and is deliberately **not** filtered by who is
 asking, for the same reason: the CLI subtracts `running` from a queue position, so
 both numbers have to describe the same population.
+
+The native document's `type` is `run-capacity` rather than
+`organization-capacity`, because there is no organization in the native
+vocabulary; its `id` is still `default`, which is what the TFE document's
+`primary` field means.
+
+**Terraform runs only, on both surfaces.** The engine filter is in the shared
+query, not in either route: the queue document grew out of the frozen surface,
+where a Pulumi or Ansible status is not a value `go-tfe` can switch on. A waiting
+Pulumi or Ansible run therefore appears in neither, and a native queue covering
+every engine would compute positions over a different population — so the same
+run would have two positions depending on which route you asked. Equal
+populations is what makes these two routes consistent.
 
 ```json
 {

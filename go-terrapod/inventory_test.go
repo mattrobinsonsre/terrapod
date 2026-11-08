@@ -688,10 +688,11 @@ func TestGetResolvedInventoryWithOptions(t *testing.T) {
 	  "groups":{"web":["web-01"]},"group-children":{},
 	  "host-count":1,"group-count":1,"limit":"web",
 	  "var-provenance":{"web-01":{
-	    "ansible_user":{"value":"deploy","origin":"@web",
-	      "chain":[{"level":"@all","value":"root"},{"level":"@web","value":"deploy"}]},
-	    "port":{"value":8080,"origin":"here","chain":[{"level":"here","value":8080}]},
-	    "opaque":{"value":{"a":1},"origin":"unattributable","chain":[]}}}},
+	    "ansible_user":{"value":"deploy","origin":"web",
+	      "chain":[{"level":"all","value":"root"},{"level":"web","value":"deploy"}]},
+	    "port":{"value":8080,"origin":"here",
+	      "chain":[{"level":"web","value":"80"}]},
+	    "opaque":{"value":{"a":1},"origin":"here","chain":[]}}}},
 	  "relationships":{"workspace":{"data":{"id":"ws-abc","type":"workspaces"}}}}}`
 	c, got := inventoryServer(t, http.StatusOK, body)
 
@@ -720,27 +721,41 @@ func TestGetResolvedInventoryWithOptions(t *testing.T) {
 		t.Fatalf("var-provenance for web-01 = %+v, want 3 keys", host)
 	}
 	// The winning level, which is the whole question the attribute answers.
-	if host["ansible_user"].Origin != "@web" {
-		t.Errorf("ansible_user origin = %q, want @web", host["ansible_user"].Origin)
+	// The PLAIN group name. The server looks a group up as `@web`, because that
+	// is how `--graph` spells one, and strips the sigil on the way out -- this
+	// fixture said `@web` until #2425, which made the SDK's own test contradict
+	// the doc comment on `VarOrigin` directly.
+	if host["ansible_user"].Origin != "web" {
+		t.Errorf("ansible_user origin = %q, want web", host["ansible_user"].Origin)
 	}
-	// The CHAIN, not just the winner: "set on @all and overridden on @web" is a
-	// different answer from "only ever set on @web", and a parser that dropped
+	// The CHAIN, not just the winner: "set on all and overridden on web" is a
+	// different answer from "only ever set on web", and a parser that dropped
 	// the chain would read identically on the line above.
 	if len(host["ansible_user"].Chain) != 2 ||
-		host["ansible_user"].Chain[0].Level != "@all" ||
+		host["ansible_user"].Chain[0].Level != "all" ||
 		host["ansible_user"].Chain[1].Value != "deploy" {
-		t.Errorf("ansible_user chain = %+v, want @all=root then @web=deploy",
+		t.Errorf("ansible_user chain = %+v, want all=root then web=deploy",
 			host["ansible_user"].Chain)
 	}
-	// `here` and `unattributable` are the two non-group origins, and both are
-	// real answers rather than failures -- `unattributable` is the server
-	// declining to guess when ansible's printing of a container cannot be
-	// compared to real JSON.
+	// `here` with the BEATEN group still in the chain, which is the shape a host
+	// override really has: `chain` is built from the ancestry groups alone, so
+	// there is never a `here` LINK -- `here` is an origin and nothing else. This
+	// fixture carried `{"level":"here"}`, a payload the server cannot produce.
 	if host["port"].Origin != "here" {
 		t.Errorf("port origin = %q, want here", host["port"].Origin)
 	}
-	if host["opaque"].Origin != "unattributable" || len(host["opaque"].Chain) != 0 {
-		t.Errorf("opaque = %+v, want unattributable with an empty chain", host["opaque"])
+	if len(host["port"].Chain) != 1 || host["port"].Chain[0].Level != "web" {
+		t.Errorf("port chain = %+v, want the beaten group `web`", host["port"].Chain)
+	}
+	// An unexplained value on a HOST is `here`, not `unattributable`. The router
+	// attributes hosts -- `is_host=True` unconditionally, and `is_host=False`
+	// appears nowhere in production -- and `attribute()` ends
+	// `origin = "here" if is_host else "unattributable"`. So `unattributable` is
+	// reachable only for a GROUP, which this route does not attribute; the type
+	// carries the string because the service can produce it and the route may
+	// attribute groups later.
+	if host["opaque"].Origin != "here" || len(host["opaque"].Chain) != 0 {
+		t.Errorf("opaque = %+v, want here with an empty chain", host["opaque"])
 	}
 }
 

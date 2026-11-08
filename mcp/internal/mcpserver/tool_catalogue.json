@@ -1799,6 +1799,20 @@
     }
   },
   {
+    "name": "terrapod_run_queue",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "description": "max queued runs to return (default: the whole queue)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_retry",
     "destructive": true,
     "input_schema": {

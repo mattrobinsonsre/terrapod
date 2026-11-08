@@ -843,6 +843,8 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
+field QueuedRun.PositionInQueue int `json:"position-in-queue"`
+field QueuedRun.Run
 field RegisteredModuleRef.Name string `json:"name"`
 field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
@@ -1023,6 +1025,8 @@ field RunActions.IsCancelable bool `json:"is-cancelable"`
 field RunActions.IsConfirmable bool `json:"is-confirmable"`
 field RunActions.IsDiscardable bool `json:"is-discardable"`
 field RunActions.IsRetryable bool `json:"is-retryable"`
+field RunCapacity.Pending int `json:"pending"`
+field RunCapacity.Running int `json:"running"`
 field RunComplianceReport.CreatedAt string `json:"created-at"`
 field RunComplianceReport.ExecutionBackend string `json:"execution-backend"`
 field RunComplianceReport.ID string `json:"id"`
@@ -1777,6 +1781,7 @@ method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, rol
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPolicyStatus, error)
+method (*Client) GetRunCapacity(ctx context.Context) (*RunCapacity, error)
 method (*Client) GetRunComplianceReport(ctx context.Context, runID string) (*RunComplianceReport, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
@@ -1859,6 +1864,7 @@ method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) (
 method (*Client) ListRunHostEvents(ctx context.Context, runID, host string) ([]*RunHostEvent, error)
 method (*Client) ListRunHostResults(ctx context.Context, runID string) ([]*RunHostResult, error)
 method (*Client) ListRunPolicyChecks(ctx context.Context, runID string) ([]PolicyCheck, error)
+method (*Client) ListRunQueue( ctx context.Context, pageNumber, pageSize int, ) ([]QueuedRun, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
@@ -2078,6 +2084,7 @@ type PolicyCheckSummary struct
 type PolicyEvaluationDetail struct
 type PolicySet struct
 type ProviderTemplate struct
+type QueuedRun struct
 type RegisteredModuleRef struct
 type RegistryModule struct
 type RegistryProvider struct
@@ -2099,6 +2106,7 @@ type RoleReachOptions struct
 type RoleReachWorkspace struct
 type Run struct
 type RunActions struct
+type RunCapacity struct
 type RunComplianceReport struct
 type RunHostEvent struct
 type RunHostResult struct

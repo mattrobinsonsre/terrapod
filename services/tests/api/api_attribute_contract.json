@@ -991,6 +991,10 @@
     "outstanding.count",
     "outstanding.hosts"
   ],
+  "runs.native_run_capacity": [
+    "pending",
+    "running"
+  ],
   "runs.post_cost_summary_message": [
     "content",
     "translated"

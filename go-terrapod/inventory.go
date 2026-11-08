@@ -202,13 +202,23 @@ type ResolvedInventory struct {
 // VarOrigin is one variable's resolved value and the levels that set it.
 //
 // Origin is the level that WON -- a group by its PLAIN name, or `"here"` for a
-// value set on the node itself, or `"unattributable"`. The server looks a group
-// up as `@name`, because that is how `ansible-inventory --graph` spells one, and
-// strips the sigil on the way out: an artefact of the graph format rather than
-// something a reader of this view should meet. The last is not a failure: the
-// comparison is between real JSON and ansible's own printing of the same value,
-// which agrees for scalars and may not for a container, so declining to guess is
-// the honest answer.
+// value the node set itself. The server looks a group up as `@name`, because that
+// is how `ansible-inventory --graph` spells one, and strips the sigil on the way
+// out: an artefact of the graph format rather than something a reader of this
+// view should meet.
+//
+// `"unattributable"` exists in the vocabulary and the resolved-inventory route
+// does not produce it. `attribute()` ends `origin = "here" if is_host else
+// "unattributable"`, and that route attributes HOSTS -- `is_host=True`
+// unconditionally, with `is_host=False` nowhere in production -- so an
+// unexplained value on a host reads `here`. It is reachable only for a group,
+// which nothing attributes today. Handle it rather than assert against it: the
+// service can produce it, and the route may attribute groups later.
+//
+// Chain is built from the ancestry GROUPS alone, so there is never a `here`
+// link. A host that overrides a group reports `origin: "here"` with the beaten
+// group still in the chain, which is how you tell an override from a value only
+// ever set on the host.
 type VarOrigin struct {
 	Value  any              `json:"value"`
 	Chain  []VarOriginLevel `json:"chain"`
@@ -217,6 +227,11 @@ type VarOrigin struct {
 
 // VarOriginLevel is one link in a variable's precedence chain: the level that
 // set it, and the value it set there. Shallowest group first, ansible's order.
+//
+// Value is `any` and is always a STRING today: it comes from ansible's `--graph
+// --vars` text, which the server parses rather than re-types. Only VarOrigin's
+// own Value is genuinely arbitrary JSON -- it comes from `--list`. Typed loosely
+// because a caller that handles both is correct either way.
 type VarOriginLevel struct {
 	Level string `json:"level"`
 	Value any    `json:"value"`
