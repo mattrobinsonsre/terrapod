@@ -14,6 +14,7 @@ import pytest
 
 from terrapod.services import ha_role, run_service
 from terrapod.services.ha_role import NotLeaderError
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 pytestmark = pytest.mark.asyncio
 
@@ -128,6 +129,16 @@ class TestEveryGatedEntryPointRefuses:
 
 class TestLeaderStillWorks:
     """The far more dangerous direction: the gate must not refuse a real leader."""
+
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
 
     @patch("terrapod.services.ha_role.settings")
     async def test_gate_does_not_refuse_the_default_role(self, mock_settings):

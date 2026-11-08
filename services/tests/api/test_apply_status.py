@@ -33,10 +33,12 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.routers.runs import _apply_json, _apply_status
 from terrapod.services.run_service import transition_run
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 NOW = datetime.now(UTC)
 
@@ -125,6 +127,16 @@ class TestThePremiseTheFixRestsOn:
     assumed, because the previous branch was a correct reading of a premise
     nobody had checked.
     """
+
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
 
     def _run_for_transition(self, status: str, **kw):
         run = MagicMock()

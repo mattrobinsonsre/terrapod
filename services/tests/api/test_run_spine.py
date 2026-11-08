@@ -46,6 +46,7 @@ from terrapod.services.run_service import (
     refuse_plan_only_configure,
 )
 from terrapod.storage.keys import apply_log_key, configure_log_key, plan_log_key
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 NOW = datetime.now(UTC)
 
@@ -244,6 +245,16 @@ class TestConfiguringSitsBetweenApplyingAndApplied:
 
 
 class TestTheConfigureTimestamps:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     async def test_entering_configuring_stamps_the_start(self):
         db = AsyncMock(spec=AsyncSession)
         run = _run("applying", apply_started_at=NOW)

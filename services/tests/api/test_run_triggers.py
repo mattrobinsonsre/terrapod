@@ -4,12 +4,14 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -518,6 +520,16 @@ class TestDeleteRunTrigger:
 
 
 class TestFireRunTriggers:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     @patch("terrapod.services.run_service.queue_run")
     @patch("terrapod.services.run_service.create_run")
     async def test_fire_triggers_on_apply(self, mock_create, mock_queue):

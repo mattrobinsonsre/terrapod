@@ -355,26 +355,53 @@ class TestHandleSucceeded:
         assert ws.locked is True  # not the run's lock to release (#1705)
         mock_persist.assert_called_once_with(run, "apply")
 
-    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
-    @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
-    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
-    @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_post_plan_task_stage_failed_errors_run(
-        self, mock_transition, mock_create_stage, mock_resolve, mock_persist
-    ):
+    async def _drive_a_failed_post_plan_stage(self, *, tfe: bool):
+        """Drive the reconciler's success path into a failed post-plan stage.
+
+        The vocabulary is selected explicitly rather than inherited from the
+        default, because the vocabulary is what decides the outcome here:
+        `tfe_post_plan_decisions` flipped to true in 2.0 (#2425), and a test
+        pinned to one value passes again the next time a default moves while
+        saying nothing about the operator who set it back.
+        """
         db = AsyncMock()
         run = _mock_run(status="planning")
-        stage = MagicMock()
-        stage.id = uuid.uuid4()
-        mock_create_stage.return_value = stage
-        mock_resolve.return_value = "failed"
-        mock_transition.return_value = run
+        stage = MagicMock(id=uuid.uuid4())
+        with (
+            patch("terrapod.config.settings.runs.tfe_post_plan_decisions", tfe),
+            patch(_PERSIST_PATCH, new_callable=AsyncMock),
+            patch(
+                "terrapod.services.run_task_service.create_task_stage",
+                AsyncMock(return_value=stage),
+            ),
+            patch(
+                "terrapod.services.run_task_service.resolve_stage",
+                AsyncMock(return_value="failed"),
+            ),
+            patch(
+                "terrapod.services.run_service.transition_run",
+                AsyncMock(return_value=run),
+            ) as transition,
+        ):
+            await _handle_succeeded(db, run, _outcome_for(run))
+        return db, run, transition
 
-        await _handle_succeeded(db, run, _outcome_for(run))
-
-        mock_transition.assert_called_once_with(
+    async def test_post_plan_task_stage_failed_errors_run_in_the_1_x_vocabulary(self):
+        """1.x has no decision to wait for, so a failed mandatory stage is fatal."""
+        db, run, transition = await self._drive_a_failed_post_plan_stage(tfe=False)
+        transition.assert_called_once_with(
             db, run, "errored", error_message="Post-plan task stage failed"
         )
+
+    async def test_post_plan_task_stage_failed_holds_the_run_in_the_tfe_vocabulary(self):
+        """2.0 holds such a run for an override or a discard instead, which is
+        what the CLI expects -- so the reconciler must NOT error it. Asserted on
+        the reconciler path specifically: `TestAFailedMandatoryRunTask` in
+        test_post_plan_decisions.py pins the decision itself (both vocabularies
+        and the plan-only case), and this pins that the reconciler reaches it.
+        """
+        _db, _run, transition = await self._drive_a_failed_post_plan_stage(tfe=True)
+        transition.assert_not_called()
 
 
 # ── _handle_failed ────────────────────────────────────────────────────

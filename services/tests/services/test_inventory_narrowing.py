@@ -31,6 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services import inventory_narrowing as narrow
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 
 def _ws(**kw):
@@ -462,6 +463,16 @@ def _full_ws(**kw):
 
 @pytest.mark.asyncio
 class TestCreateRunNarrowsADerivedConfigure:
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` and `transition_run` reserve and cancel a post-plan task
+        stage now that `runs.tfe_post_plan_decisions` defaults on (#2425). These
+        tests drive the run lifecycle against a narrow mocked DB and have no
+        opinion about stages, so the side effect is stubbed rather than modelled
+        -- see `tests/post_plan_stubs.py` for why, and for where it IS covered."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
     async def _create(self, ws, **kw):
         """Create a run; return (the Run instance, the patched limit_for)."""
         import uuid as _uuid
