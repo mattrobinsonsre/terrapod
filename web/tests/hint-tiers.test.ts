@@ -209,6 +209,116 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
     )
   })
 
+  /** Every `t('…')` key inside a native `title=` attribute, with its file and
+   *  line.
+   *
+   *  NATIVE means the attribute sits on a lowercase JSX element. A `title=` on
+   *  a Capitalised name is a component PROP -- `<PageHeader title=…>` renders a
+   *  heading, not a browser tooltip -- and conflating the two would make this
+   *  clause fire on every page's own title.
+   *
+   *  The attribute's expression is read by BALANCING braces rather than by a
+   *  regex ending at the first `}`, because the real tree writes
+   *  `title={cond ? t('a') : undefined}` and a first-`}` reader would see
+   *  neither key. It then collects every key in that expression, so a
+   *  conditional with a long arm and a short one is caught on the long arm. */
+  const nativeTitleKeys = (src: string): { key: string; line: number }[] => {
+    const out: { key: string; line: number }[] = []
+    for (const m of src.matchAll(/\btitle=\{/g)) {
+      // The nearest preceding tag open decides native vs prop.
+      let tag: string | null = null
+      for (const om of src.slice(0, m.index!).matchAll(/<([A-Za-z][A-Za-z0-9.]*)/g)) tag = om[1]
+      if (!tag || !/^[a-z]/.test(tag)) continue
+      let depth = 1
+      let i = m.index! + m[0].length
+      for (; i < src.length && depth > 0; i++) {
+        if (src[i] === '{') depth++
+        else if (src[i] === '}') depth--
+      }
+      const expr = src.slice(m.index! + m[0].length, i - 1)
+      const line = src.slice(0, m.index!).split('\n').length
+      for (const km of expr.matchAll(/\bt[A-Za-z]*\(\s*'([A-Za-z0-9_.]+)'/g)) {
+        out.push({ key: km[1], line })
+      }
+    }
+    return out
+  }
+
+  // The matcher is self-tested on literals BEFORE it is pointed at the tree,
+  // because the thing it can get wrong -- native versus prop -- produces a
+  // silently smaller subject rather than an error (#2406). A count over the
+  // tree cannot distinguish "no offenders" from "matched nothing".
+  it('the native-versus-prop matcher classifies correctly', () => {
+    const cases: [string, string[]][] = [
+      ["<span title={t('a.b')}>x</span>", ['a.b']],
+      ["<input\n  title={t('a.b')}\n/>", ['a.b']],
+      ["<button title={cond ? t('a.b') : t('c.d')}>x</button>", ['a.b', 'c.d']],
+      ["<label title={tWs('a.b')}>x</label>", ['a.b']],
+      // A component prop, including a namespaced one -- not a tooltip.
+      ["<PageHeader title={t('a.b')} />", []],
+      ["<Foo.Bar title={t('a.b')} />", []],
+      // Nested: the outer div is native, the inner component is NOT -- so only
+      // the div's key is collected. This fixture was written the other way and
+      // the self-test caught it, which is the whole argument for having one.
+      ["<div title={t('a.b')}><PageHeader title={t('c.d')} /></div>", ['a.b']],
+      // A literal carries no key to resolve, and is not this clause's subject.
+      ['<span title="plain">x</span>', []],
+      // No enclosing tag at all.
+      ["const x = { title: t('a.b') }", []],
+    ]
+    for (const [source, want] of cases) {
+      const got = nativeTitleKeys(source).map((r) => r.key)
+      assert.deepEqual(got, want, `classified ${JSON.stringify(source)} as ${JSON.stringify(got)}`)
+    }
+  })
+
+  it('no explanation is delivered as a hover-only native title=', () => {
+    // F15 committed to migrating the native `title=` explanations and to
+    // adding "no new `title=` for explanation meanwhile" -- with no artifact
+    // and no gate, which is how a commitment made in a closing comment stops
+    // existing. This is the gate.
+    //
+    // The threshold is the registry's own `LONG`, imported rather than
+    // restated, so "explanation" means the same thing here as it does for a
+    // registered hint. Measured when written: 66 native title= keys resolve,
+    // the longest is 198 characters, and NONE reaches the threshold -- so this
+    // ratchets from a clean baseline with no ledger and nothing to migrate.
+    //
+    // A hover tooltip is invisible on touch, which is why the length matters:
+    // a short label read aloud by a screen reader is a label, and a paragraph
+    // that only appears on hover is information a phone user cannot reach.
+    const offenders: string[] = []
+    let examined = 0
+    for (const [file, src] of Object.entries(SRC)) {
+      for (const { key, line } of nativeTitleKeys(src)) {
+        examined++
+        // The call is namespace-relative, so resolve on the dotted suffix the
+        // same way the lead lookup above does. Several keys can share a
+        // suffix; every match is reported, so the message names what to look
+        // at rather than asserting which one it was.
+        const matches = Object.keys(ALL).filter((f) => f === key || f.endsWith(`.${key}`))
+        for (const full of matches) {
+          if (ALL[full].length >= LONG) {
+            offenders.push(
+              `${path.relative(path.join(here, '..'), file)}:${line}  ${full} ` +
+                `(${ALL[full].length} chars)`,
+            )
+          }
+        }
+      }
+    }
+    assert.ok(
+      examined >= 50,
+      `only ${examined} native title= keys examined; the matcher has stopped matching`,
+    )
+    assert.deepEqual(
+      offenders,
+      [],
+      `an explanation at or over ${LONG} chars is delivered as a native title=, ` +
+        `which a touch user cannot reach. Use tieredHint instead:\n  ${offenders.join('\n  ')}`,
+    )
+  })
+
   it('and the walk actually sees the sources, so a pass means something', () => {
     // A floor: a matcher that stops matching must fail rather than pass on
     // nothing, which is this repository's most repeated gate defect.
