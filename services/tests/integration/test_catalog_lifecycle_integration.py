@@ -114,7 +114,20 @@ async def test_root_cv_and_module_pr_keep_origin_after_module_deletion(app):
         assert denied.value.status_code == 404
 
 
-async def test_module_pr_comment_rows_use_only_originating_module_and_poller_head(app):
+async def test_module_pr_comment_rows_come_from_the_poller_head_and_include_a_retry(app):
+    """The poller establishes the head; the rows are whatever sits AT it.
+
+    Those are two questions and this test used to answer both with "poller
+    only" -- it asserted `[head_id]` while a user retry of the same SHA, created
+    later, existed in the same PR (#2425 §1.2). The commit status came from
+    that retry and said success, so the comment a reviewer reads kept the
+    original outcome for ever, and the poller never replaced it because its
+    idempotency guard matches on (workspace, module, pr_number, head_sha).
+
+    What still holds, and is still asserted below: a retry of an OLDER revision
+    cannot become the head however recently it was created, and two modules
+    sharing a consumer and a PR number keep separate rows.
+    """
     now = datetime.now(UTC)
     async with get_db_session() as db:
         ws = Workspace(name=f"pr-comment-{uuid.uuid4().hex[:8]}", execution_mode="agent")
@@ -168,7 +181,8 @@ async def test_module_pr_comment_rows_use_only_originating_module_and_poller_hea
         db.add_all([old, head, foreign, *retries])
         await db.commit()
         ws_id, first_id, second_id = ws.id, first.id, second.id
-        head_id, foreign_id = head.id, foreign.id
+        foreign_id = foreign.id
+        head_retry_id = retries[1].id  # user retry, head SHA, newest
 
     async with get_db_session() as db:
         with patch.object(
@@ -176,13 +190,20 @@ async def test_module_pr_comment_rows_use_only_originating_module_and_poller_hea
             "_row_for",
             new=AsyncMock(side_effect=lambda _db, _ws, run: run.id),
         ):
+            # The retry AT THE HEAD is the row: same SHA as `head`, created
+            # later, so it is the current answer for this workspace.
             assert await vcs_status_comment._collect_module_rows(db, [ws_id], 7, first_id) == [
-                head_id
+                head_retry_id
             ]
+            # And the head is still the POLLER's. `retries[0]` is at the OLD SHA
+            # and is the newest run of all, so if the head were read off
+            # whatever sorted first this would come back non-empty -- which is
+            # the stale comment this guard exists to prevent.
             assert (
                 await vcs_status_comment._collect_module_rows(db, [ws_id], 7, first_id, "a" * 40)
                 == []
             )
+            # Unchanged: two modules sharing one consumer and one PR number.
             assert await vcs_status_comment._collect_module_rows(db, [ws_id], 7, second_id) == [
                 foreign_id
             ]

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
 from terrapod.services.vcs_status_comment import _plan_summary
 
 
@@ -1567,8 +1568,14 @@ class TestAModulePrAlsoGetsOneComment:
         assert "42" in sql, sql
         assert module_id in seen["params"].values()
         assert "runs.module_impact_module_id" in seen["where"], sql
-        assert "runs.created_by" in seen["where"], sql
-        assert "module-impact-analysis" in seen["params"].values()
+        # And `created_by` is NOT a filter (#2425 §1.2). It answers which runs
+        # establish the PR head, which is a different question from which runs
+        # are shown -- filtering on it excluded a retry AT THE HEAD permanently,
+        # so the commit status said success while this comment kept the original
+        # error for ever. Asserted as an absence because that is the fix: a
+        # reinstated predicate here is the defect returning.
+        assert "runs.created_by" not in seen["where"], sql
+        assert MODULE_IMPACT_POLLER_CREATED_BY not in seen["params"].values()
 
     async def test_retry_of_old_head_does_not_replace_new_module_pr_comment(self):
         from terrapod.services import vcs_status_comment as mod
@@ -1597,16 +1604,16 @@ class TestAModulePrAlsoGetsOneComment:
         db = MagicMock()
 
         async def execute(stmt):
-            # Model the DB applying the creator predicate and creation-time sort.
-            where = str(stmt.whereclause)
-            params = stmt.compile().params.values()
-            selected = (
-                [run for run in visible_runs if run.created_by == "module-impact-analysis"]
-                if "runs.created_by" in where and "module-impact-analysis" in params
-                else visible_runs
-            )
+            # Just the creation-time sort. The query no longer carries a creator
+            # predicate for the DB to apply (#2425 §1.2), so modelling one here
+            # would be modelling a filter that is gone -- and it is exactly what
+            # made the third block below pass while the comment was wrong.
+            assert "runs.created_by" not in str(stmt.whereclause)
             return _FakeResult(
-                [(run, ws) for run in sorted(selected, key=lambda r: r.created_at, reverse=True)]
+                [
+                    (run, ws)
+                    for run in sorted(visible_runs, key=lambda r: r.created_at, reverse=True)
+                ]
             )
 
         db.execute = AsyncMock(side_effect=execute)
@@ -1638,11 +1645,28 @@ class TestAModulePrAlsoGetsOneComment:
             assert not h.gh.updated, "a late completion for head A rewrote head B"
             assert "| +2 |" in h.gh.posted[0]["body"]
 
-            visible_runs.append(runs[3])  # Even a same-head retry is not the PR row.
+            # A retry AT THE HEAD is the row now (#2425 §1.2), and the two
+            # blocks above are why this is not a loosening: the head still comes
+            # from a poller run, so a retry of an older revision cannot become
+            # the head however recently it was created.
+            #
+            # This block asserted the opposite until #2425 -- "even a same-head
+            # retry is not the PR row" -- and the hazard that reasoning was
+            # guarding is real and still guarded above. What it also did was
+            # leave the one thing a reviewer reads contradicting the commit
+            # status: the retry posts `success` through `_post_module_vcs_status`
+            # (it carries the SHA and the module id), while this comment kept the
+            # original error, and the poller never replaces it because its
+            # idempotency guard matches on (workspace, module, pr, head_sha).
+            # Someone who retries a run has asked for a different outcome; the
+            # comment showing the old one is the defect, not a safeguard.
+            visible_runs.append(runs[3])  # A retry at head B, created last.
             await mod.refresh_module_pr_comment(db, h.conn, "org/module", 42, [ws.id], module_id)
+            # One update, not two: the head-A retry in the block above correctly
+            # does not rewrite, so this is the first and only rewrite.
             assert len(h.gh.updated) == 1
-            assert "| +2 |" in h.gh.posted[0]["body"]
-            assert "| +4 |" not in h.gh.posted[0]["body"]
+            assert "| +4 |" in h.gh.posted[0]["body"], "the retry at the head is not shown"
+            assert "| +2 |" not in h.gh.posted[0]["body"], "the superseded original is still shown"
 
     async def test_two_modules_same_workspace_and_pr_number_keep_separate_rows_after_retention(
         self,
@@ -1657,6 +1681,10 @@ class TestAModulePrAlsoGetsOneComment:
                 vcs_commit_sha=sha,
                 module_overrides=None,
                 workspace_id=ws.id,
+                # Set explicitly because the head is now read off the poller
+                # runs; an unset attribute on a SimpleNamespace raises rather
+                # than defaulting, which is the behaviour we want from a fixture.
+                created_by=MODULE_IMPACT_POLLER_CREATED_BY,
             )
             for module_id, sha in ((first_id, "a" * 40), (second_id, "b" * 40))
         ]
@@ -1687,8 +1715,16 @@ class TestAModulePrAlsoGetsOneComment:
         from terrapod.services import vcs_status_comment as mod
 
         module_id = uuid.uuid4()
-        newest = SimpleNamespace(workspace_id=uuid.uuid4(), vcs_commit_sha="b" * 40)
-        old = SimpleNamespace(workspace_id=uuid.uuid4(), vcs_commit_sha="a" * 40)
+        newest = SimpleNamespace(
+            workspace_id=uuid.uuid4(),
+            vcs_commit_sha="b" * 40,
+            created_by=MODULE_IMPACT_POLLER_CREATED_BY,
+        )
+        old = SimpleNamespace(
+            workspace_id=uuid.uuid4(),
+            vcs_commit_sha="a" * 40,
+            created_by=MODULE_IMPACT_POLLER_CREATED_BY,
+        )
         db = MagicMock()
         db.execute = AsyncMock(
             return_value=_FakeResult(

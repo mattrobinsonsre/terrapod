@@ -40,6 +40,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_links, vcs_provider
+from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
 from terrapod.services.scheduler import enqueue_trigger
 
 logger = get_logger(__name__)
@@ -667,8 +668,23 @@ async def _collect_module_rows(
 
     PR numbers belong to a repository, not a workspace. The durable module id
     prevents two linked modules' same-numbered PRs from sharing rows, even after
-    override tarballs have been purged. Only poller-created runs establish the
-    PR head: a user retry of an older run has a newer creation time but an old SHA.
+    override tarballs have been purged.
+
+    **Only poller-created runs establish the PR head, and that is a different
+    question from which runs are SHOWN** (#2425 §1.2). A user retry has a newer
+    creation time and whatever SHA its original carried, so it cannot be trusted
+    to say what the head is -- but at the head it is exactly what a reviewer
+    wants to see, and `created_by` in the WHERE excluded it, permanently. The
+    commit status came from the retry and said success while this comment, the
+    thing anyone actually reads, kept the original error for ever: the poller
+    will not replace it either, because its idempotency guard matches on
+    `(workspace, module, pr_number, head_sha)`.
+
+    So the marker decides the head and the SHA decides the rows. Note the head
+    cannot be read off `candidates[0]` once retries are in the list -- a retry of
+    an OLDER run is created now, so it would sort first and make its stale SHA
+    the head, rewriting the comment with exactly the rows this is meant to keep
+    out.
     """
     ids = list(workspace_ids or [])
     if not ids:
@@ -679,7 +695,13 @@ async def _collect_module_rows(
         .where(
             Run.workspace_id.in_(ids),
             Run.source == "module-test",
-            Run.created_by == "module-impact-analysis",
+            # The id is REQUIRED, with no fallback to the override coordinate
+            # (#2425 §1.3). `module_impact_service._attributed_to` has one and
+            # must not be reached for: an override key names a coordinate, and
+            # after a module is deleted that coordinate can belong to another
+            # module -- so a fallback here would put one module's run details in
+            # another module's pull request. A pre-upgrade run with a NULL id is
+            # left out of the comment, which is the migration's stated intent.
             Run.module_impact_module_id == module_id,
             Run.vcs_pull_request_number == pr_number,
         )
@@ -688,7 +710,12 @@ async def _collect_module_rows(
     candidates = result.all()
     if not candidates:
         return []
-    newest_sha = candidates[0][0].vcs_commit_sha
+    # The head comes from a POLLER run, never from whatever sorted first: only
+    # the poller creates a run at the head. Falling back to `candidates[0]` when
+    # there is no poller run keeps the pre-#2425 behaviour for a PR whose
+    # original runs have been reaped, where a retry is all there is.
+    poller = [run for run, _ in candidates if run.created_by == MODULE_IMPACT_POLLER_CREATED_BY]
+    newest_sha = (poller[0] if poller else candidates[0][0]).vcs_commit_sha
     if head_sha and head_sha != newest_sha:
         return []  # A late status from an older PR revision must not rewrite the comment.
     latest: dict[uuid.UUID, tuple[Workspace, Run]] = {}

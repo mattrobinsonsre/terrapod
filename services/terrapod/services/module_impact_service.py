@@ -21,7 +21,7 @@ import uuid
 import zlib
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -250,6 +250,52 @@ async def _poll_module_prs(
     await db.flush()
 
 
+def _module_coord(module: RegistryModule) -> str:
+    """The key `module_overrides` is written under.
+
+    One producer: it is composed at the write site and read back by the three
+    predicates below, and two copies is how they come to disagree.
+    """
+    return f"{module.namespace}/{module.name}/{module.provider}"
+
+
+def _attributed_to(module: RegistryModule):
+    """Runs belonging to `module` -- by id, or by override key when the id is NULL.
+
+    `Run.module_impact_module_id` arrived nullable with no backfill (#2425 §1.3),
+    deliberately: the migration's own comment says why, and it is a security
+    reason rather than an omission. An override key carries a *coordinate*, and
+    after a module is deleted the same coordinate can name a different module --
+    so deriving the id from it would attribute a historical run to whoever holds
+    that coordinate now.
+
+    **That makes this predicate safe HERE and unsafe for a posting path.** These
+    three callers cancel a run or suppress a duplicate, both scoped by
+    `workspace_id` and `vcs_pull_request_number` as well, so a mis-attribution
+    costs at worst a cancellation inside one PR of one workspace and discloses
+    nothing. The two paths that post -- `_enqueue_module_vcs_status`'s own guard
+    and `vcs_status_comment._collect_module_rows` -- deliberately still require
+    the id, because a wrong answer there routes a run's details to another
+    repository. Do not "make them consistent": the asymmetry is the point, and
+    each carries a comment saying so.
+
+    Without this, a run in flight across the upgrade that adds the column is
+    never cancelled when its PR closes or a new commit lands, and never
+    suppressed as a duplicate -- so the next poll queues a second plan for every
+    linked workspace.
+    """
+    coord = _module_coord(module)
+    return or_(
+        Run.module_impact_module_id == module.id,
+        and_(
+            Run.module_impact_module_id.is_(None),
+            # `->` yields SQL NULL for a missing key, and for a NULL column, so
+            # this is a key-presence test on both counts.
+            Run.module_overrides[coord].isnot(None),
+        ),
+    )
+
+
 async def _cancel_stale_module_runs(
     db: AsyncSession,
     module: RegistryModule,
@@ -261,7 +307,7 @@ async def _cancel_stale_module_runs(
             select(Run).where(
                 Run.workspace_id == link.workspace_id,
                 Run.source == "module-test",
-                Run.module_impact_module_id == module.id,
+                _attributed_to(module),
                 Run.vcs_pull_request_number == pr_number,
                 run_service.pr_closure_cancels_sql(Run),
             )
@@ -513,7 +559,7 @@ async def _queue_module_pr_run(
             source="module-test",
             plan_only=True,
             configuration_version_id=cv_id,
-            created_by="module-impact-analysis",
+            created_by=run_service.MODULE_IMPACT_POLLER_CREATED_BY,
         )
     except run_service.PlanApplyNotEnabled:
         return None
@@ -611,7 +657,7 @@ async def _create_module_test_runs(
     await storage.put(override_key, archive_bytes, "application/gzip")
 
     # Build overrides dict for this module
-    module_coord = f"{module.namespace}/{module.name}/{module.provider}"
+    module_coord = _module_coord(module)
     overrides = {module_coord: override_key}
 
     # Cancel existing non-terminal module-test runs for this PR (superseded)
@@ -620,7 +666,7 @@ async def _create_module_test_runs(
             select(Run).where(
                 Run.workspace_id == link.workspace_id,
                 Run.source == "module-test",
-                Run.module_impact_module_id == module.id,
+                _attributed_to(module),
                 Run.vcs_pull_request_number == pr.number,
                 Run.status.notin_(run_service.TERMINAL_STATES),
                 Run.vcs_commit_sha.is_distinct_from(pr.head_sha),
@@ -661,7 +707,7 @@ async def _create_module_test_runs(
                     Run.workspace_id == ws.id,
                     Run.source == "module-test",
                     Run.status != "canceled",
-                    Run.module_impact_module_id == module.id,
+                    _attributed_to(module),
                     Run.vcs_pull_request_number == pr.number,
                     Run.vcs_commit_sha == pr.head_sha,
                 )
@@ -861,7 +907,7 @@ async def trigger_linked_workspace_runs(
                 source="module-publish",
                 plan_only=False,
                 configuration_version_id=cv_id,
-                created_by="module-impact-analysis",
+                created_by=run_service.MODULE_IMPACT_POLLER_CREATED_BY,
             )
         except run_service.PlanApplyNotEnabled:
             logger.info(
@@ -920,6 +966,13 @@ async def handle_module_test_completed(payload: dict) -> None:
 
         # A legacy override records only a coordinate; after deletion, that
         # coordinate can belong to another module and must not route a status.
+        #
+        # So NO `_attributed_to` fallback here, deliberately, and the asymmetry
+        # with the three predicates that do have one is the point (#2425 §1.3):
+        # they cancel a run or suppress a duplicate, already scoped to one
+        # workspace and one PR, where a wrong answer costs a cancellation and
+        # discloses nothing. This posts to a repository, so a wrong answer sends
+        # a run's details to somebody else's. Unattributed is the right outcome.
         if not run.module_impact_module_id:
             return
         module = await db.get(RegistryModule, run.module_impact_module_id)

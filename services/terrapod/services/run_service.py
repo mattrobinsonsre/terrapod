@@ -219,6 +219,20 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
 
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
 
+#: `Run.created_by` on a module-impact run the POLLER created (#2425 §1.2).
+#:
+#: Here rather than in `module_impact_service`, where the two writers are,
+#: because `vcs_status_comment` has to distinguish on it and cannot import that
+#: module -- `module_impact_service` imports IT, so the dependency only runs one
+#: way. This module is where the rest of the shared run vocabulary already lives.
+#:
+#: It answers exactly one question: which runs establish a module PR's head SHA.
+#: A retry carries whatever SHA its original had and is created now, so it sorts
+#: first by creation time while saying nothing about the head. Using it to decide
+#: which runs are DISPLAYED is the defect §1.2 is about, so it belongs in a
+#: comparison and never in a WHERE clause over the rows to show.
+MODULE_IMPACT_POLLER_CREATED_BY = "module-impact-analysis"
+
 
 class PlanOnlyConfigureConflict(ValueError):
     """`plan_only` was asked for on a configure run (#1988).
