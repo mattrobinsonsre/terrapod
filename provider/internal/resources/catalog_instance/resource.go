@@ -39,7 +39,6 @@ package catalog_instance
 import (
 	"context"
 	"fmt"
-	"maps"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -220,9 +219,33 @@ func (r *catalogInstanceResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	plan.ID = types.StringValue(inst.ID)
-	plan.UpdateBlockVersion = types.StringNull()
-	plan.UpdateBlockReason = types.StringNull()
+	// Read the provision response back into the model rather than persisting the
+	// plan as it stands. version_pin, execution_backend and engine_version are
+	// all Optional + Computed with no Default, so a config that omits them --
+	// the documented usage, "omit to take the deployment's default" -- plans
+	// UNKNOWN, and UseStateForUnknown cannot fire on a create because there is
+	// no prior state. Persisting the plan therefore left three unknowns in state
+	// and Terraform refused the result: "the provider still indicated an unknown
+	// value", once per attribute, on every apply. The instance was provisioned
+	// server-side first, so each attempt orphaned a workspace and left the
+	// resource tainted -- which makes the next apply destroy and recreate it and
+	// fail identically. Every sibling resource reads back; this one was the
+	// deviation (#2425 section 1.1).
+	//
+	// The shared readback is correct here and that is a property of the provision
+	// response rather than an accident: measured against a live instance, it
+	// carries name, agent-pool-id, labels, catalog-update-block,
+	// catalog-version-pin, execution-backend and engine-version. It omits
+	// input-values and auto-apply, which the readback treats as "keep what the
+	// caller configured" -- the right answer on a create. And a CONFIGURED
+	// engine_version must not be overwritten: the server resolves a partial
+	// value ("1.13" came back as "1.13.9"), so the readback's guard, which takes
+	// the server's answer only when nothing was configured, is what keeps this
+	// from being the inconsistent-result failure in a different attribute.
+	resp.Diagnostics.Append(readCatalogInstanceIntoModel(ctx, inst, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -368,21 +391,40 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 		m.AgentPoolID = types.StringValue(pool)
 	}
 
-	// Merge the server-returned inputs OVER the prior state rather than
-	// replacing wholesale. The server's input-values deliberately OMIT
-	// sensitive inputs (they're write-only — encrypted at rest, never
-	// round-tripped, like TFE sensitive variables). A wholesale replace would
-	// drop every sensitive key from state, producing a perpetual plan diff and
-	// a needless re-apply each run. So we keep prior-state keys the server
-	// didn't return (the sensitive ones) and overlay the non-sensitive values
-	// the server does report. (Tradeoff: an externally-removed non-sensitive
-	// key isn't detected on refresh — acceptable, since catalog workspaces are
-	// config-managed and their variables are only mutated via reconfigure.)
+	// input_values in state is the set the PRACTITIONER manages, and the server's
+	// is neither a subset nor a superset of it, so this is an overlay in both
+	// directions rather than a replace.
+	//
+	// It omits sensitive inputs, which are write-only — encrypted at rest, never
+	// round-tripped, like TFE sensitive variables. A wholesale replace would
+	// drop every sensitive key from state, producing a perpetual plan diff and a
+	// needless re-apply each run. So a prior-state key the server does not
+	// return is KEPT.
+	//
+	// And it ADDS the module's own variable defaults, which it materialises as
+	// workspace variables — measured: a module declaring
+	// `variable "name" { default = "probe" }` reports `name=probe` on an
+	// instance whose configuration set no inputs at all. Copying the map
+	// wholesale therefore introduced keys no configuration has, and because
+	// input_values is Optional (not Computed) the next plan wanted them gone: a
+	// permanent in-place update, on every plan, for any module whose variables
+	// have defaults — which is most of them, and the only workaround was to
+	// restate every default in the configuration (#2425 section 1.1). So a
+	// server key the state does not hold is IGNORED.
+	//
+	// The cost is symmetric and is the reason both halves are safe: neither an
+	// input added out of band nor one removed out of band is detected on
+	// refresh, because a catalog workspace's variables are config-managed and
+	// only mutated through reconfigure.
 	merged := map[string]string{}
 	if !m.InputValues.IsNull() && !m.InputValues.IsUnknown() {
 		diags.Append(m.InputValues.ElementsAs(ctx, &merged, false)...)
 	}
-	maps.Copy(merged, attrStringMap(inst.Attributes, "input-values"))
+	for key, served := range attrStringMap(inst.Attributes, "input-values") {
+		if _, held := merged[key]; held {
+			merged[key] = served
+		}
+	}
 	if len(merged) > 0 {
 		mv, d := types.MapValueFrom(ctx, types.StringType, merged)
 		diags.Append(d...)
