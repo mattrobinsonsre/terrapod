@@ -445,6 +445,9 @@ jobs:
       - name: (docs-audit) the CLI-surface body catalogues match the handlers
         run: python3 scripts/docs-audit/check_cli_body_claims.py
 
+      - name: (docs-audit) every remote download retries
+        run: python3 scripts/docs-audit/check_download_retries.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
@@ -3187,7 +3190,7 @@ jobs:
           set -euo pipefail
           ver=1.13.1
           sha=8ccbc6f8ee21d2827715f3c6e08a9b3e0209b1e62057c05067ef117e047c1a80
-          curl -fsSLo tofu.zip \
+          curl --retry 6 --retry-delay 4 --retry-all-errors -fsSLo tofu.zip \
             "https://github.com/opentofu/opentofu/releases/download/v${ver}/tofu_${ver}_linux_amd64.zip"
           echo "${sha}  tofu.zip" | sha256sum -c - \
             || { echo "tofu checksum mismatch -- bump the version and the checksum together"; exit 1; }
@@ -3198,7 +3201,7 @@ jobs:
       - name: Install k3d
         run: |
           set -euo pipefail
-          curl -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
+          curl --retry 6 --retry-delay 4 --retry-all-errors -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
           echo "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0  ./k3d" | sha256sum -c - \
             || { echo "k3d checksum mismatch -- bump the version and the checksum together"; exit 1; }
           chmod +x ./k3d && sudo mv ./k3d /usr/local/bin/k3d
@@ -3485,13 +3488,13 @@ jobs:
           # and the checksum together — the upstream checksum files are
           # <url>.sha256sum for kind and checksums.txt for k3d.
           if [ "${{ matrix.tool }}" = "kind" ]; then
-            curl -fsSLo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+            curl --retry 6 --retry-delay 4 --retry-all-errors -fsSLo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
             echo "50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54  ./kind" \
               | sha256sum -c -
             sudo install -m 0755 ./kind /usr/local/bin/kind && rm -f ./kind
           else
             # Download the pinned k3d release binary directly (no curl|bash).
-            curl -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
+            curl --retry 6 --retry-delay 4 --retry-all-errors -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
             echo "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0  ./k3d" \
               | sha256sum -c -
             sudo install -m 0755 ./k3d /usr/local/bin/k3d && rm -f ./k3d
@@ -4317,7 +4320,7 @@ jobs:
           # installer-pinning half of GHSA-34pp-q7wp-3j54). Bump the version and
           # the checksum together — upstream publishes checksums.txt.
           crane_url=https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz
-          curl -fsSLo /tmp/crane.tar.gz "$crane_url"
+          curl --retry 6 --retry-delay 4 --retry-all-errors -fsSLo /tmp/crane.tar.gz "$crane_url"
           echo "36c67a932f489b3f2724b64af90b599a8ef2aa7b004872597373c0ad694dc059  /tmp/crane.tar.gz" \
             | sha256sum -c -
           tar -xzf /tmp/crane.tar.gz -C /tmp crane
@@ -5184,7 +5187,7 @@ jobs:
           SYFT_VERSION=v1.46.0
           SYFT_INSTALLER_COMMIT=b15c5dbfe2bb21c9d73002c1056a829c8c411c75
           SYFT_INSTALLER_SHA256=8a277b4b4dc21809ecd9a0e4926f4d7319affc6451a607fdeb3e5e1fbd9bc573
-          curl -sSfL -o "$RUNNER_TEMP/syft-install.sh" \
+          curl --retry 6 --retry-delay 4 --retry-all-errors -sSfL -o "$RUNNER_TEMP/syft-install.sh" \
             "https://raw.githubusercontent.com/anchore/syft/${SYFT_INSTALLER_COMMIT}/install.sh"
           echo "${SYFT_INSTALLER_SHA256}  $RUNNER_TEMP/syft-install.sh" | sha256sum -c -
           sh "$RUNNER_TEMP/syft-install.sh" -b /usr/local/bin "$SYFT_VERSION"
@@ -5952,7 +5955,7 @@ jobs:
         run: |
           set -euo pipefail
           version=3.272.0
-          curl -fsSL -o pulumi.tar.gz \
+          curl --retry 6 --retry-delay 4 --retry-all-errors -fsSL -o pulumi.tar.gz \
             "https://github.com/pulumi/pulumi/releases/download/v${version}/pulumi-v${version}-linux-x64.tar.gz"
           tar -xzf pulumi.tar.gz
           sudo install -m 0755 pulumi/pulumi /usr/local/bin/pulumi

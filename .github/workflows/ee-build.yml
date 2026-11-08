@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           version=v0.21.2
-          curl -fsSL -o crane.tar.gz \
+          curl --retry 6 --retry-delay 4 --retry-all-errors -fsSL -o crane.tar.gz \
             "https://github.com/google/go-containerregistry/releases/download/${version}/go-containerregistry_Linux_x86_64.tar.gz"
           tar -xzf crane.tar.gz crane
           sudo install -m 0755 crane /usr/local/bin/crane
