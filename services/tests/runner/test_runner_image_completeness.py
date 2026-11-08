@@ -392,7 +392,33 @@ def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
 
 
 # Third-party dependencies are the other half of runner-image completeness.
-REQUIREMENTS = (ROOT / "services" / "requirements-runner.txt") if ROOT else None
+#
+# TWO LAYOUTS, like `RUNNER` above, and this one was missing its second
+# candidate. `docker/Dockerfile.test` copies the three requirements files to
+# `./` -- so in the image the file is at `/app/requirements-runner.txt` while
+# `ROOT / "services" / ...` resolves to `/app/services/...`, which is not there.
+#
+# The consequence, which is what #2425 §2.6 was really about: the guard below
+# carried `pytest.skip("no docker/ or requirements-runner.txt in this tree")`,
+# so **"every third-party module the Job imports is installed in the image" had
+# never once run in CI**. It passed in a checkout, skipped in the image, and the
+# skip's stated reason was true -- the file genuinely was not where it looked.
+# Turning the skip into a failure is what surfaced it.
+REQUIREMENTS = (
+    next(
+        (
+            p
+            for p in (
+                ROOT / "services" / "requirements-runner.txt",
+                ROOT / "requirements-runner.txt",
+            )
+            if p.is_file()
+        ),
+        None,
+    )
+    if ROOT
+    else None
+)
 
 
 def _terrapod_package_root() -> pathlib.Path | None:
