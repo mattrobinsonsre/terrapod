@@ -161,6 +161,35 @@ MACHINE_VALUE_FIELDS: frozenset[str] = frozenset({"password", "become_password"}
 MACHINE_FIELDS = MACHINE_FILE_FIELDS | MACHINE_VALUE_FIELDS
 VAULT_FIELDS = frozenset({"password"})
 
+#: Fields this category USED to carry, refused on write and TOLERATED on read.
+#:
+#: The asymmetry is the point, and it is this project's standing rule: validate
+#: at the write boundary, tolerate on the read side. Narrowing the set without it
+#: silently disarmed every credential already written with one of these -- the
+#: envelope was refused, `delivery_entries` dropped the whole credential, the
+#: runner reported "no credentials were declared, which is an ordinary
+#: configure", and every host came back unreachable naming neither the
+#: credential nor the field. `validate_envelope`'s own comment warns against
+#: exactly that outcome, which is how a guard came to cause the thing it was
+#: written to prevent.
+#:
+#: So a stored envelope carrying one of these still delivers its SECRETS, and a
+#: new write naming one is still a 422. A placeholder referring to a retired
+#: field does not silently blank: `configure_inventory._refuse_unresolved`
+#: refuses the run and names every reference it could not resolve, which is the
+#: loud, actionable failure an operator needs in order to move the setting into
+#: the inventory where it belongs.
+#:
+#: Not a data migration, deliberately. `variables.value` is `EncryptedText`, so
+#: stripping stored envelopes means decrypting and re-encrypting inside Alembic
+#: -- and this project keeps key handling in the API precisely because a
+#: migration reconstructing it differs in ways that stay invisible until
+#: something stops validating. Tolerating on read needs no key and no downtime,
+#: and the form repairs a row the next time anyone edits it.
+RETIRED_MACHINE_FIELDS: frozenset[str] = frozenset(
+    {"user", "become", "become_method", "become_user"}
+)
+
 #: The fields whose value is secret, so the runner can register them with the
 #: log redactor without re-deriving which is which.
 MACHINE_SECRET_FIELDS = frozenset({"private_key", "password", "become_password"})
@@ -182,7 +211,9 @@ def is_ansible_auth(category: str) -> bool:
     return category in (MACHINE_CATEGORY, VAULT_CATEGORY)
 
 
-def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
+def validate_envelope(
+    category: str, key: str, value: str, *, tolerate_retired: bool = False
+) -> dict[str, Any]:
     """Return the parsed envelope for a credential write, or raise.
 
     Args:
@@ -218,6 +249,13 @@ def validate_envelope(category: str, key: str, value: str) -> dict[str, Any]:
         )
 
     allowed = MACHINE_FIELDS if category == MACHINE_CATEGORY else VAULT_FIELDS
+    if tolerate_retired and category == MACHINE_CATEGORY:
+        # Dropped BEFORE the unknown check, so a legacy envelope reads as the
+        # narrowed one it would be if written today. The caller gets the stripped
+        # dict back and delivers that, so nothing downstream -- the per-run
+        # Secret, the credential files, the redactor registry -- ever sees a
+        # field it has no home for.
+        parsed = {k: v for k, v in parsed.items() if k not in RETIRED_MACHINE_FIELDS}
     unknown = sorted(set(parsed) - allowed)
     if unknown:
         # Refused rather than ignored: a credential field under a name nothing
@@ -259,24 +297,83 @@ def delivery_entries(resolved: Any) -> list[dict[str, str]]:
     and `.value` rather than imported, because this module is pure and importing
     the dataclass would pull the service layer into the runner image.
 
-    A malformed envelope is **dropped with a warning left to the caller** rather
-    than raised here: it was already refused at the write boundary by
-    `_credential_envelope_guard`, so a bad one at this point means a row written
-    before that guard existed, and failing the whole run for it would make a
-    historical row un-runnable rather than merely inert. The runner still raises
-    for a credential that was DECLARED and could not be applied (#1442) -- the
-    two are different: this is "unreadable", that is "readable and unusable".
+    Nothing is DROPPED here, and that is the whole of #2425 §0.3. There are two
+    classes of stored envelope this can meet, and they are different problems
+    with different right answers:
+
+    **It carries a field the platform has since retired.** `user`, `become`,
+    `become_method` and `become_user` were valid when 2.0.0-alpha.1 shipped and
+    are not fields any more. The retired names are stripped and the usable
+    remainder is delivered, so an alpha credential goes on working and needs no
+    migration and no operator action. It is re-serialised only in that case, so
+    an ordinary credential is still carried byte-for-byte as stored.
+
+    **It is unreadable, or usable for nothing.** Not JSON at all; an object with
+    no `private_key` and no `password`; a field whose value is not a string. The
+    entry is delivered UNCHANGED so that the runner refuses the configure and
+    names it: `phases/ansible_auth.run` collects every such failure and raises
+    `AnsibleAuthUnavailable` with the category, the key and the reason.
+
+    This used to `continue` for both, with the stated reason that a bad envelope
+    here meant a row predating the write guard, so failing the run would make a
+    historical row un-runnable rather than merely inert. The narrowing is what
+    falsified that: the commonest bad envelope became a perfectly good credential
+    with one retired field, dropping it disarmed the fleet, and "merely inert"
+    read to the operator as a configure whose every host was unreachable, naming
+    neither the credential nor the field. The first class above removes the
+    reason the drop existed; the second is the `declared and unusable is fatal`
+    contract this module already documents and the runner already implements
+    (#1442).
+
+    ABSENT credentials remain not an error: that is the ordinary state of a
+    configure against hosts the EE can already reach.
     """
     out: list[dict[str, str]] = []
     for v in resolved:
         category = getattr(v, "category", "")
         if not is_ansible_auth(category):
             continue
+        key = getattr(v, "key", "")
+        raw = getattr(v, "value", "")
         try:
-            validate_envelope(category, getattr(v, "key", ""), getattr(v, "value", ""))
-        except AnsibleAuthError:
+            envelope = validate_envelope(category, key, raw, tolerate_retired=True)
+        except AnsibleAuthError as exc:
+            # DELIVERED ANYWAY, not dropped (#2425 §0.3).
+            #
+            # This used to `continue`, on the stated grounds that a bad envelope
+            # here meant a row written before the guard existed. That premise
+            # stopped being true the moment the field set narrowed, and the cost
+            # was the exact failure the validator's own comment warns about: the
+            # credential vanished, the runner reported "no credentials were
+            # declared, which is an ordinary configure", and the operator's only
+            # signal was a wholly unreachable fleet naming nothing.
+            #
+            # The runner already has the right behaviour for this and the module
+            # docstring already claims it -- a credential DECLARED and unusable
+            # is fatal, with every failure named at once. So passing the entry
+            # through unchanged is what makes that true: the runner's
+            # `phases/ansible_auth.run` collects it into `failures` and raises
+            # `AnsibleAuthUnavailable` naming the category, the key and the
+            # reason. Unchanged and not the stripped form, so what it reports is
+            # the real problem.
+            #
+            # And NOTHING is logged here, deliberately. This module is
+            # stdlib-only because it ships in the runner image, where a
+            # module-level import of anything heavier breaks every run
+            # (`TestItIsPure`) -- so there is no logger to reach for. Nor is one
+            # wanted: the run error above reaches the operator in the run log
+            # they are already reading, where an API-pod warning would not.
+            #
+            # ABSENT credentials remain not an error -- that is the ordinary
+            # state of a configure against hosts the EE can already reach, and
+            # nothing here changes it.
+            del exc  # named for the reader; the runner reports the real reason
+            out.append({"category": category, "key": key, "value": raw})
             continue
-        out.append({"category": category, "key": v.key, "value": v.value})
+        # Re-serialised ONLY when something was stripped, so an ordinary
+        # credential is delivered byte-for-byte as stored.
+        stripped = json.dumps(envelope) if set(envelope) != set(json.loads(raw)) else raw
+        out.append({"category": category, "key": key, "value": stripped})
     return out
 
 
