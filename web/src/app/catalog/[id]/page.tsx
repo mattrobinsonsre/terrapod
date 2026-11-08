@@ -609,7 +609,7 @@ export default function CatalogItemPage() {
                 type="button"
                 onClick={() => runPending('confirm')}
                 disabled={pendingBusy}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
               >
                 {pendingBusy ? t('pending.working') : t('pending.confirmApply')}
               </button>
@@ -775,7 +775,7 @@ export default function CatalogItemPage() {
             <button
               type="submit"
               disabled={provisioning || !form || formSelection !== provVersion}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors btn-smoke"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors btn-smoke"
             >
               {provisioning ? t('provision.provisioning') : t('provision.submit')}
             </button>
@@ -960,7 +960,7 @@ export default function CatalogItemPage() {
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setReconfigInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
-                <button type="submit" disabled={reconfigBusy || !reconfigForm || reconfigFormSelection !== reconfigVersion} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                <button type="submit" disabled={reconfigBusy || !reconfigForm || reconfigFormSelection !== reconfigVersion} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {reconfigBusy ? t('reconfigure.queuing') : t('reconfigure.queueRun')}
                 </button>
               </div>
@@ -994,7 +994,7 @@ export default function CatalogItemPage() {
             </label>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setDestroyInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
-              <button type="button" onClick={handleDestroy} disabled={destroyBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:text-red-400 text-white transition-colors">
+              <button type="button" onClick={handleDestroy} disabled={destroyBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:bg-red-900 disabled:text-red-400 text-white transition-colors">
                 {destroyBusy ? t('reconfigure.queuing') : t('instances.destroy')}
               </button>
             </div>

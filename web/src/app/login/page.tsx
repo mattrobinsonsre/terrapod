@@ -239,7 +239,7 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white btn-smoke"
+                    className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white btn-smoke"
                   >
                     {submitting ? t('signingIn') : t('signIn')}
                   </button>

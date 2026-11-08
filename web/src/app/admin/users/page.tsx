@@ -185,7 +185,7 @@ function UserForm({
         <button
           type="submit"
           disabled={submitting || (!!password && !passwordValid)}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
         >
           {submitting ? t('actions.creating') : t('actions.createUser')}
         </button>
@@ -244,7 +244,7 @@ function PasswordResetForm({
         <button
           type="submit"
           disabled={submitting || !passwordValid}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
         >
           {submitting ? t('actions.saving') : t('actions.resetPassword')}
         </button>
@@ -453,7 +453,7 @@ export default function UsersPage() {
         <div className="flex justify-end mb-4">
           <button
             onClick={() => { setShowCreate(!showCreate); setError(''); setSuccess('') }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
           >
             {showCreate ? t('actions.cancel') : t('actions.createUser')}
           </button>
@@ -501,7 +501,7 @@ export default function UsersPage() {
                               onChange={(e) => setEditDisplayName(e.target.value)}
                               className="px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 w-40"
                             />
-                            <button onClick={handleSaveEdit} disabled={savingEdit} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
+                            <button onClick={handleSaveEdit} disabled={savingEdit} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors disabled:opacity-50">
                               {savingEdit ? t('actions.saving') : t('actions.save')}
                             </button>
                             <button onClick={() => setEditingEmail(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">

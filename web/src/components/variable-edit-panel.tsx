@@ -291,7 +291,7 @@ export function VariableEditPanel({
           <button
             onClick={onSave}
             disabled={saving}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white"
+            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white"
           >
             {saving ? tc('saving') : tc('save')}
           </button>

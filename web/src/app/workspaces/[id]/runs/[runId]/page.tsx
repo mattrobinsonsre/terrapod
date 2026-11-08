@@ -2083,7 +2083,7 @@ function RunDetailPageInner() {
         <button
           onClick={() => requestAction('retry')}
           disabled={!!actionLoading}
-          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
         >
           {actionLoading === 'retry' ? t('actions.retrying') : (
             <>
@@ -2120,7 +2120,7 @@ function RunDetailPageInner() {
         <button
           onClick={() => requestAction('cancel')}
           disabled={!!actionLoading}
-          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
         >
           {actionLoading === 'cancel' ? t('actions.canceling') : (
             <>

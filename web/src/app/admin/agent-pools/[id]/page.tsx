@@ -386,7 +386,7 @@ export default function AgentPoolDetailPage() {
                 ) : (
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.cancel')}</button>
-                    <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors disabled:opacity-50">
                       {saving ? t('actions.saving') : t('actions.save')}
                     </button>
                   </div>
@@ -466,7 +466,7 @@ export default function AgentPoolDetailPage() {
                     <div className="flex gap-2">
                       <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">{t('actions.cancel')}</button>
                       <button onClick={handleDelete} disabled={deleting}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 text-white transition-colors">
                         {deleting ? t('actions.deleting') : t('actions.confirmDelete')}
                       </button>
                     </div>
@@ -483,7 +483,7 @@ export default function AgentPoolDetailPage() {
             <div className="flex justify-end mb-4">
               <button
                 onClick={() => { setShowCreateToken(!showCreateToken); setCreatedToken(null) }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
               >
                 {showCreateToken ? t('actions.cancel') : t('tokens.create')}
               </button>
@@ -514,7 +514,7 @@ export default function AgentPoolDetailPage() {
                   </div>
                 </div>
                 <button type="submit" disabled={creatingToken}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {creatingToken ? t('actions.creating') : t('tokens.create')}
                 </button>
               </form>

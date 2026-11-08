@@ -686,7 +686,7 @@ export default function RolesPage() {
             <div className="flex justify-end mb-4">
               <button
                 onClick={() => setShowCreateRole(!showCreateRole)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
               >
                 {showCreateRole ? t('actions.cancel') : t('actions.createRole')}
               </button>
@@ -791,7 +791,7 @@ export default function RolesPage() {
                   rule={ruleFrom(roleAllowLabels, roleAllowNames, roleDenyLabels, roleDenyNames, roleCaps, roleAllowAll)}
                 />
                 <button type="submit" disabled={creatingRole}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {creatingRole ? t('actions.creating') : t('actions.createRole')}
                 </button>
               </form>
@@ -814,7 +814,7 @@ export default function RolesPage() {
                             <h3 className="text-sm font-medium text-slate-200">{role.name}</h3>
                             <div className="flex gap-2">
                               <button onClick={() => setEditingRole(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
-                              <button onClick={handleSaveRole} disabled={savingRole} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
+                              <button onClick={handleSaveRole} disabled={savingRole} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white">
                                 {savingRole ? t('actions.saving') : t('actions.save')}
                               </button>
                             </div>
@@ -984,7 +984,7 @@ export default function RolesPage() {
             <div className="flex justify-end mb-4">
               <button
                 onClick={() => setShowCreateAssignment(!showCreateAssignment)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
               >
                 {showCreateAssignment ? t('actions.cancel') : t('actions.addAssignment')}
               </button>
@@ -1031,7 +1031,7 @@ export default function RolesPage() {
                   </div>
                 </div>
                 <button type="submit" disabled={creatingAssignment || assignRoles.length === 0}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {creatingAssignment ? t('actions.saving') : t('actions.setRoles')}
                 </button>
               </form>

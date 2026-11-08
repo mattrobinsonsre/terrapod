@@ -230,7 +230,7 @@ export default function AuditLogPage() {
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
             >
               {t('filters.apply')}
             </button>

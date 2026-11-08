@@ -536,7 +536,7 @@ export default function ModuleDetailPage() {
                   {modPerms['can-create-version'] && (
                     <button
                       onClick={() => { setShowUpload(!showUpload); setShowVcs(false) }}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors flex items-center gap-2"
                     >
                       <Upload size={16} />
                       {showUpload ? t('moduleDetail.cancel') : t('moduleDetail.uploadVersion')}
@@ -617,7 +617,7 @@ export default function ModuleDetailPage() {
                 <button
                   onClick={handleUpload}
                   disabled={uploading || !uploadVersion || selectedFiles.length === 0}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors flex items-center gap-2"
                 >
                   <Upload size={16} />
                   {uploading ? t('moduleDetail.upload.uploading') : t('moduleDetail.upload.upload')}
@@ -701,7 +701,7 @@ export default function ModuleDetailPage() {
                   <button
                     onClick={handleSaveVcs}
                     disabled={savingVcs || !vcsConnectionId || !vcsRepoUrl}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                   >
                     {savingVcs ? t('moduleDetail.vcs.saving') : t('moduleDetail.vcs.saveConfiguration')}
                   </button>
@@ -811,7 +811,7 @@ export default function ModuleDetailPage() {
                 ) : (
                   <div className="flex gap-2">
                     <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('meta.cancel')}</button>
-                    <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? t('meta.saving') : t('meta.save')}</button>
+                    <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? t('meta.saving') : t('meta.save')}</button>
                   </div>
                 )}
               </div>
@@ -846,7 +846,7 @@ export default function ModuleDetailPage() {
                     <button
                       onClick={() => handleSaveMeta(true)}
                       disabled={savingMeta}
-                      className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                      className="px-3 py-1 rounded text-xs text-amber-200 bg-amber-900/40 hover:bg-amber-900/60"
                     >
                       {savingMeta ? t('meta.saving') : t('meta.saveAnyway')}
                     </button>
@@ -1033,7 +1033,7 @@ export default function ModuleDetailPage() {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 text-white transition-colors"
                 >
                   {t('moduleDetail.deleteDialog.confirm')}
                 </button>

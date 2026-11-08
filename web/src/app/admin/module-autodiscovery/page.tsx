@@ -655,7 +655,7 @@ export default function ModuleAutodiscoveryPage() {
               <button
                 type="button"
                 onClick={() => { resetForm(); setShowForm(true) }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
               >
                 {tw('actions.newRule')}
               </button>
@@ -811,7 +811,7 @@ export default function ModuleAutodiscoveryPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-600/80 text-white text-sm font-medium disabled:opacity-50"
               >
                 {submitting ? tw('form.saving') : (editingId ? tw('actions.update') : tw('actions.create'))}
               </button>
@@ -892,7 +892,7 @@ export default function ModuleAutodiscoveryPage() {
                     type="button"
                     onClick={() => register(false)}
                     disabled={preview.registering || preview.selected.length === 0}
-                    className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-600/80 text-white text-sm font-medium disabled:opacity-50"
                   >
                     {preview.registering ? td('registering') : td('register', { count: preview.selected.length })}
                   </button>

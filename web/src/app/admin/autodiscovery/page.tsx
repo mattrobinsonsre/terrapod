@@ -1677,7 +1677,7 @@ export default function AutodiscoveryPage() {
           actions={
             <button
               onClick={() => (showForm ? setShowForm(false) : openCreateForm())}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
             >
               {showForm ? t('actions.cancel') : t('actions.newRule')}
             </button>
@@ -1947,7 +1947,7 @@ export default function AutodiscoveryPage() {
                 // inert workspaces on every scan (#1966), so saving it is
                 // blocked and the banner beside the controls says why.
                 disabled={submitting || ruleHasNoOperations}
-                className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-600/80 text-white text-sm font-medium disabled:opacity-50"
               >
                 {submitting ? t('form.saving') : (editingId ? t('actions.update') : t('actions.create'))}
               </button>
@@ -2050,7 +2050,7 @@ export default function AutodiscoveryPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(deleteId)}
-                  className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-sm"
+                  className="px-4 py-2 rounded bg-red-600 hover:bg-red-600/80 text-white text-sm"
                 >
                   {t('actions.delete')}
                 </button>
@@ -2147,7 +2147,7 @@ export default function AutodiscoveryPage() {
                   <button
                     onClick={handleProvision}
                     disabled={previewModal.scanning}
-                    className="px-4 py-2 rounded bg-brand-600 hover:bg-brand-500 text-white text-sm disabled:opacity-50"
+                    className="px-4 py-2 rounded bg-brand-600 hover:bg-brand-600/80 text-white text-sm disabled:opacity-50"
                   >
                     {previewModal.scanning
                       ? t('preview.provisioning')

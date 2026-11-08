@@ -3258,7 +3258,7 @@ function WorkspaceDetailContent() {
                       // server (#1966), so the save is blocked here rather than
                       // sent to fail. The banner below says why.
                       disabled={saving || editHasNoOperations}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                     >
                       {saving ? t('actions.saving') : t('settings.saveChanges')}
                     </button>
@@ -4273,7 +4273,7 @@ function WorkspaceDetailContent() {
                     <button
                       onClick={() => handleSave(true)}
                       disabled={saving}
-                      className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                      className="px-3 py-1 rounded text-xs text-amber-200 bg-amber-900/40 hover:bg-amber-900/60"
                     >
                       {saving ? t('actions.savingEllipsis') : t('lockout.saveAnyway')}
                     </button>
@@ -4401,7 +4401,7 @@ function WorkspaceDetailContent() {
                     <button
                       onClick={handleCheckDriftNow}
                       disabled={checkingDrift || attrs.locked}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                       title={attrs.locked ? t('common.workspaceLocked') : phaseWord('driftCheckNowTitle')}
                     >
                       {checkingDrift ? t('actions.queuing') : t('drift.checkNow')}
@@ -4773,7 +4773,7 @@ function WorkspaceDetailContent() {
                       <button
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 text-white transition-colors"
                       >
                         {deleting ? t('actions.deleting') : t('delete.confirm')}
                       </button>
@@ -4797,7 +4797,7 @@ function WorkspaceDetailContent() {
               <div className="flex justify-end mb-4">
                 <button
                   onClick={() => { setShowAddVar(!showAddVar); ensureVaultAvailability() }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
                 >
                   {showAddVar ? t('actions.cancel') : t('variables.addVariable')}
                 </button>
@@ -5008,7 +5008,7 @@ function WorkspaceDetailContent() {
                   </div>
                 )}
 
-                <button type="submit" disabled={addingVar} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                <button type="submit" disabled={addingVar} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {addingVar ? t('actions.adding') : t('variables.addVariable')}
                 </button>
               </form>
@@ -5209,7 +5209,7 @@ function WorkspaceDetailContent() {
                       <button
                         onClick={handleQueueDestroy}
                         disabled={queueingDestroy}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:bg-red-800 text-white transition-colors"
                       >
                         {queueingDestroy ? t('actions.queuing') : t('runs.confirmDestroy')}
                       </button>
@@ -5241,7 +5241,7 @@ function WorkspaceDetailContent() {
                     menuLabel={t('runs.moreRunKinds')}
                     busyLabel={t('actions.queuing')}
                     busy={queueingPlan || queueingConfigure}
-                    primaryClassName="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                    primaryClassName="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                   />
                 </div>
                 {/* What a configure would REACH, on the page (#2413 F14).
@@ -5755,9 +5755,16 @@ function WorkspaceDetailContent() {
                         setStateActionLoading(null)
                       }
                     }}
-                    className={`px-3 py-1.5 rounded text-xs font-medium text-white transition-colors ${
+                    // The INK moved into the arms. It was a shared `text-white`,
+                    // which is right for red and wrong for amber: no amber stop
+                    // carries white at AA on both themes (amber-600 is 3.20:1 on
+                    // dark, amber-400 1.72:1), because the light remap inverts
+                    // the ramp so a stop change moves in opposite directions on
+                    // the two. Black on amber-500 clears both with margin --
+                    // 9.84/6.56 base, 6.96/8.04 on the hover.
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                       confirmStateAction.action === 'delete'
-                        ? 'bg-red-600 hover:bg-red-500'
+                        ? 'bg-red-600 hover:bg-red-600/80 text-white'
                         // Solid, not a /40 tint. amber-900 is #ffb900 on light --
                         // a pale yellow -- so 40% of it under the text-white in the
                         // outer segment above measured 1.33:1 and the label was
@@ -5773,7 +5780,7 @@ function WorkspaceDetailContent() {
                         // token names and blinded the gate to the very fill it was
                         // explaining. The matcher now brace-matches instead, so this
                         // is belt and braces rather than the only thing holding it.
-                        : 'bg-amber-600 hover:bg-amber-400'
+                        : 'bg-amber-500 hover:bg-amber-500/80 text-black'
                     }`}
                   >
                     {stateActionLoading ? t('actions.processing') : confirmStateAction.action === 'delete' ? t('state.confirmDelete') : t('state.confirmRollback')}
@@ -5791,7 +5798,7 @@ function WorkspaceDetailContent() {
             {/* Upload state button */}
             {perms['can-create-state-versions'] && (
               <div className="flex justify-end mb-4">
-                <label className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors cursor-pointer">
+                <label className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors cursor-pointer">
                   {t('state.uploadState')}
                   <input
                     type="file"
@@ -6240,7 +6247,7 @@ function WorkspaceDetailContent() {
               <div className="flex justify-end mb-4">
                 <button
                   onClick={() => setShowAddNotif(!showAddNotif)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
                 >
                   {showAddNotif ? t('actions.cancel') : t('notifications.addNotification')}
                 </button>
@@ -6301,7 +6308,7 @@ function WorkspaceDetailContent() {
                     ))}
                   </div>
                 </div>
-                <button type="submit" disabled={addingNotif} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                <button type="submit" disabled={addingNotif} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {addingNotif ? t('actions.creating') : t('notifications.createNotification')}
                 </button>
               </form>
@@ -6399,7 +6406,7 @@ function WorkspaceDetailContent() {
               <div className="flex justify-end mb-4">
                 <button
                   onClick={() => setShowAddRunTask(!showAddRunTask)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors"
                 >
                   {showAddRunTask ? t('actions.cancel') : t('runTasks.addRunTask')}
                 </button>
@@ -6445,7 +6452,7 @@ function WorkspaceDetailContent() {
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
-                <button type="submit" disabled={addingRunTask} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                <button type="submit" disabled={addingRunTask} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {addingRunTask ? t('actions.creating') : t('runTasks.createRunTask')}
                 </button>
               </form>

@@ -359,7 +359,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
             </div>
           )}
           <button type="submit" disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white transition-colors">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 text-white transition-colors">
             {saving ? t('actions.saving') : t('actions.saveSettings')}
           </button>
         </form>
@@ -402,7 +402,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
           <h2 className="text-sm font-semibold text-slate-200">{t('policies.heading', { count: policies.length })}</h2>
           {ps.attributes.source !== 'vcs' && (
             <button onClick={() => setShowAddPolicy(!showAddPolicy)}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors">
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors">
               {showAddPolicy ? t('actions.cancel') : t('actions.addPolicy')}
             </button>
           )}
@@ -425,7 +425,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
               {t.rich('addPolicy.regoHint', { code: (chunks) => <code className="text-slate-400">{chunks}</code> })}
             </p>
             <button type="submit" disabled={npSaving}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white transition-colors">
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 text-white transition-colors">
               {npSaving ? t('actions.validatingRego') : t('actions.addPolicy')}
             </button>
           </form>
@@ -501,7 +501,7 @@ function PolicyCard({ policy, onChanged, onError }: {
       <textarea value={rego} onChange={(e) => setRego(e.target.value)} rows={10} spellCheck={false}
         className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-900 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
       <button onClick={save} disabled={!dirty || saving}
-        className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors">
+        className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors">
         {saving ? t('actions.validatingRego') : t('actions.savePolicy')}
       </button>
     </div>
