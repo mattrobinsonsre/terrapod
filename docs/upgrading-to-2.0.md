@@ -1063,6 +1063,85 @@ probe, ahead of the binary checks, so a non-conforming image fails at pod start 
 uid — rather than part way through a playbook on a file it cannot read, which is where the
 older, looser contract would have sent you.
 
+### A machine credential holds secrets only — four connection fields are gone
+
+**Affects:** an `ansible_machine_auth` credential written against a pre-release
+build of 2.0, and any inventory referring to one of the four fields below. **The
+category never shipped in a 1.x release**, so an upgrade from 1.x has nothing to
+do; this is for alpha and beta adopters, whose inventories may contain
+`${terrapod:web-key.user}`.
+
+`user`, `become`, `become_method` and `become_user` are no longer fields of the
+category. What remains is `private_key`, `known_hosts`, `password` and
+`become_password` — secrets, plus the one file that is not a secret because a
+host's public key is public.
+
+**The rule the four failed is that a credential holds what must not reach the
+resolved inventory.** None of them is secret and none is a file, so substituting
+one put a plain value into the resolved inventory — the opposite of what the
+category is for. The placeholder is pull-based, so an inventory author was
+already writing `${terrapod:web-key.user}` by hand; for a non-secret that is
+strictly worse than writing `ansible_user: deploy` in the same file, which has
+identical visibility, one less indirection and one home for the value instead of
+two. Become settings also differ legitimately per host and per group, while a
+credential is referenced by name from many hosts.
+
+`become_password` stays, because it is a secret and ansible has no
+`ansible_become_password_file` — so it can only ever be a variable, which is
+exactly why it needs the log redactor.
+
+**Move each value into the inventory**, where it is visible in a diff and
+settable per host or per group:
+
+| was, in the credential | now, as an inventory variable |
+|---|---|
+| `user` | `ansible_user` |
+| `become` | `ansible_become` |
+| `become_method` | `ansible_become_method` |
+| `become_user` | `ansible_become_user` |
+
+```yaml
+# before -- the credential carried the connection settings, and the inventory
+# pulled them back out one placeholder at a time
+all:
+  hosts:
+    web1:
+      ansible_user: "${terrapod:web-key.user}"
+      ansible_become: "${terrapod:web-key.become}"
+      ansible_ssh_private_key_file: "${terrapod:web-key.private_key}"
+
+# after -- the non-secrets are written where they are read, and the credential
+# is referenced only for the secret it holds
+all:
+  hosts:
+    web1:
+      ansible_user: deploy
+      ansible_become: true
+      ansible_ssh_private_key_file: "${terrapod:web-key.private_key}"
+```
+
+**Nothing stops working while you do this, and nothing is silently dropped.** The
+two halves are deliberately asymmetric:
+
+| | |
+|---|---|
+| a stored credential carrying a retired field | the retired names are stripped on read and the **secrets are still delivered**, so the credential goes on working. No migration, and no action needed until you edit it |
+| editing that credential in the UI | the form writes the narrowed envelope back, so any edit at all cleans the row up. You do not have to find the retired fields — the inputs are already gone |
+| writing one through the API with a retired field | `422`, naming the field and listing the ones the category carries |
+| an inventory still referring to `${terrapod:web-key.user}` | the configure is **refused before anything runs**, naming every reference it could not resolve |
+
+That last row is the one to plan around: it is a loud, actionable failure rather
+than a silent one, but it is still a failure, so an inventory referring to a
+retired field needs the edit above before its next configure.
+
+There was a window in which this was not true. On `v2.0.0-alpha.1` a stored
+credential carrying a retired field was refused on read and then **dropped
+without an error or a log line** — the runner reported that no credentials had
+been declared, and every host came back unreachable naming neither the credential
+nor the field. If you are upgrading from alpha.1 and saw that, the credential
+itself was never damaged: it delivers again on this release with nothing to
+repair.
+
 ### An explicit `= ""` clears an optional string, and removing the line no longer does
 
 **Affects:** Terraform configurations that clear an optional string attribute by

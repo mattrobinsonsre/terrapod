@@ -286,12 +286,61 @@ class TestDeliveryEntries:
             (aa.MACHINE_CATEGORY, "web"),
         ]
 
-    def test_a_row_written_before_the_write_guard_existed_is_dropped_not_fatal(self):
-        """Failing the run for it would make a historical row un-runnable rather
-        than merely inert. A credential that is readable and UNUSABLE is the
-        different case, and the runner raises for that one."""
+    def test_an_unreadable_row_is_DELIVERED_so_the_runner_names_it(self):
+        """It used to be dropped here, and #2425 §0.3 is why it is not.
+
+        The old reason was that a bad envelope at this point meant a row written
+        before the write guard existed, so failing the run for it would make a
+        historical row un-runnable rather than merely inert. What falsified that
+        is the narrowing: the commonest bad envelope became a good credential
+        carrying one retired field, dropping it disarmed the fleet, and "merely
+        inert" reached the operator as a configure whose every host was
+        unreachable naming nothing.
+
+        So the entry goes through UNCHANGED and the runner refuses:
+        `phases/ansible_auth.run` collects it into `failures` and raises
+        `AnsibleAuthUnavailable` naming the category, the key and the reason.
+        Unchanged rather than stripped, so what it reports is the real problem.
+
+        The retired-field class -- the one that made this worth changing -- is
+        delivered and WORKS; `test_retired_credential_fields.py` is that half.
+        """
         rows = [*self._rows(), self._Row(aa.VAULT_CATEGORY, "legacy", "not json")]
-        assert all(e["key"] != "legacy" for e in aa.delivery_entries(rows))
+        out = aa.delivery_entries(rows)
+        legacy = [e for e in out if e["key"] == "legacy"]
+        assert legacy, "an unreadable credential must not be dropped silently"
+        # Byte-for-byte, so the runner's error quotes what is actually stored.
+        assert legacy[0]["value"] == "not json"
+        # And it has not cost the good credentials beside it their delivery.
+        assert [e["key"] for e in out] == ["prod", "web", "legacy"]
+
+    def test_nothing_in_this_module_can_log_because_it_ships_in_the_runner(self):
+        """The no-drop decision above deliberately emits no warning.
+
+        A log line was the obvious way to make the drop non-silent, and it is
+        not available: this module is stdlib-only (`TestItIsPure`) because a
+        module-level import here breaks every run, not merely every configure.
+        Nor is it wanted -- the run error reaches the operator in the log they
+        are already reading.
+
+        It needs its OWN test rather than leaning on `TestItIsPure`, because the
+        tempting form is a stdlib one: `logging.getLogger(__name__)` imports
+        nothing third-party, so the purity gate passes on it. Measured -- that
+        mutation fails here and nowhere else.
+        """
+        import ast
+        import pathlib
+
+        tree = ast.parse(pathlib.Path(aa.__file__).read_text())
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and isinstance(n.func.value, ast.Name)
+            and n.func.value.id in {"logger", "log", "logging"}
+        ]
+        assert not calls, f"ansible_auth.py logs at {[n.lineno for n in calls]}"
 
     def test_the_value_is_carried_byte_for_byte(self):
         """Never reserialised: the runner parses it, and a round trip through

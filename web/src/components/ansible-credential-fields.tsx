@@ -18,6 +18,7 @@
 import { useTranslations } from 'next-intl'
 import { tieredHint } from '@/components/hint-with-detail'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { parseAnsibleEnvelope, serializeAnsibleEnvelope } from '@/lib/ansible-envelope'
 
 // Defined here rather than imported, which is this tree's own convention for a
 // field-group component: `vault-file-delivery-fields.tsx` carries its own `LABEL`
@@ -50,43 +51,6 @@ export function isCredentialCategory(category: string): boolean {
     category === 'git_ssh_auth' ||
     isAnsibleAuthCategory(category)
   )
-}
-
-type AnsibleEnvelope = Record<string, string>
-
-/** The stored value as an envelope; `{}` for anything unreadable. */
-function parseAnsibleEnvelope(value: string): AnsibleEnvelope {
-  if (!value.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(value)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    const out: AnsibleEnvelope = {}
-    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof v === 'string') out[k] = v
-    }
-    return out
-  } catch {
-    return {}
-  }
-}
-
-/**
- * The envelope as the API stores it, or `''` when every field is empty.
- *
- * Empty fields are OMITTED rather than sent as empty strings: the server reads
- * `private_key: ""` as a supplied-but-empty key and refuses the credential for
- * having neither secret, which names the wrong problem. And an envelope with
- * nothing in it serialises to `''`, not `'{}'`, because the edit path sends
- * `value` only when it is non-empty — so clearing every field leaves the
- * stored credential alone instead of replacing it with an empty object the
- * server would refuse.
- */
-function serializeAnsibleEnvelope(fields: AnsibleEnvelope): string {
-  const out: AnsibleEnvelope = {}
-  for (const [k, v] of Object.entries(fields)) {
-    if (v !== '') out[k] = v
-  }
-  return Object.keys(out).length ? JSON.stringify(out) : ''
 }
 
 /**
