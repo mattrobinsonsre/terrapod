@@ -195,14 +195,17 @@ type ResolvedInventory struct {
 	// spell a group differently (`--graph` writes `@prod_web`, `--list` writes
 	// `prod_web`), and an unprefixed lookup reports every variable as set on the
 	// node itself -- a plausible wrong answer that no hand-written fixture
-	// catches.
+	// catches. What arrives here is the reconciled view, group names plain.
 	VarProvenance map[string]map[string]VarOrigin `json:"var-provenance,omitempty"`
 }
 
 // VarOrigin is one variable's resolved value and the levels that set it.
 //
-// Origin is the level that WON -- a group as `@name`, or `"here"` for a value
-// set on the node itself, or `"unattributable"`. The last is not a failure: the
+// Origin is the level that WON -- a group by its PLAIN name, or `"here"` for a
+// value set on the node itself, or `"unattributable"`. The server looks a group
+// up as `@name`, because that is how `ansible-inventory --graph` spells one, and
+// strips the sigil on the way out: an artefact of the graph format rather than
+// something a reader of this view should meet. The last is not a failure: the
 // comparison is between real JSON and ansible's own printing of the same value,
 // which agrees for scalars and may not for a container, so declining to guess is
 // the honest answer.
