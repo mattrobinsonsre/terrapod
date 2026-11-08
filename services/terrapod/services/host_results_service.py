@@ -157,11 +157,25 @@ class _Partitioner:
         self._dir = tempfile.mkdtemp(prefix="tp-hostevents-", dir=_resolve_tmpdir())
         self._handles: dict[str, Any] = {}
         self._open_handles: OrderedDict[str, Any] = OrderedDict()
-        # Every handle this object opens is registered here the moment it is
-        # opened, so releasing them is one call rather than three hand-written
-        # loops that each had to remember the others. `cleanup` closes the
-        # stack; the LRU below and `flush` still close individual handles
-        # early, and closing an already-closed file is a no-op.
+        # Every host this object opens a file for is registered here once, so
+        # releasing them is one call rather than three hand-written loops that
+        # each had to remember the others. `cleanup` closes the stack; the LRU
+        # below and `flush` still close individual handles early, and closing
+        # an already-closed file is a no-op.
+        #
+        # ONE entry per HOST, not one per `open`. `add` reopens a handle after
+        # an LRU eviction, so registering each open made the stack grow with
+        # the number of WRITES: past MAX_OPEN_PARTITION_FILES hosts the miss
+        # rate approaches 100%, and a 500-host play with 20 tasks accumulated
+        # ~10,000 callbacks held for the whole ingest (#2425 section 4 noted
+        # this as a performance note rather than a defect, and it is -- the
+        # callbacks are released at cleanup). It is still the thing this class
+        # exists to avoid: the docstring above says the partition is buffered
+        # to disk so the API pod's memory does not scale with the operator's
+        # estate, and a per-write callback list scales with it by a smaller
+        # constant. A per-host callback closes whatever handle that host
+        # currently holds, so the release guarantee is unchanged and remains
+        # pinned by `TestEveryHandleAndTheTempDirectoryAreReleased`.
         #
         # This replaced a SIM115 suppression on the `open` below. The handle
         # genuinely outlives that frame, so the noqa was honest -- but CodeQL
@@ -199,7 +213,12 @@ class _Partitioner:
             # were opened and then all closed. Name the test rather than just
             # asserting the property, so the next triage reads the proof
             # instead of re-deriving it.
-            handle = self._stack.enter_context(open(path, "ab" if handle is not None else "wb"))
+            # Registered BEFORE the open, so a raising `open` cannot leave an
+            # unreleased handle: the callback reads whatever the dict holds at
+            # cleanup time, and `None` is a no-op.
+            if host not in self._handles:
+                self._stack.callback(self._close_current, host)
+            handle = open(path, "ab" if handle is not None else "wb")
             self._handles[host] = handle
             self._open_handles[host] = handle
         else:
@@ -207,6 +226,17 @@ class _Partitioner:
         handle.write(raw)
         if not raw.endswith(b"\n"):
             handle.write(b"\n")
+
+    def _close_current(self, host: str) -> None:
+        """Close whichever handle this host holds now, if any.
+
+        Registered on the stack once per host. An earlier handle for the same
+        host was already closed by the LRU eviction that replaced it, so every
+        handle is closed exactly once by one of eviction, `flush`, or this.
+        """
+        handle = self._handles.get(host)
+        if handle is not None:
+            handle.close()
 
     async def flush(self) -> int:
         """Upload one object per host. Returns how many were written."""
