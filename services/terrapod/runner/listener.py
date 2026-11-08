@@ -98,10 +98,16 @@ class RunnerListener:
         # learn the same fact -- the API no longer accepts this cert -- and
         # there must be exactly one re-join trigger between them.
         self._auth_failures = 0
-        # `_rejoin` deletes the credentials Secret, and now has two reporters,
-        # so it is serialised. The generation counter lets a caller that waited
-        # on the lock see that someone else already re-joined and skip, rather
-        # than burning a second join-token use for nothing.
+        # `_rejoin` WRITES OVER the credentials Secret -- it does not delete it,
+        # and this comment said "deletes" until #2425 §5.1. The order reversed in
+        # the same range (`rejoin_identity` joins BEFORE touching the Secret, so
+        # a failed join leaves the listener where it was), and both this comment
+        # and the one at the counter below were added two days before that.
+        #
+        # It has two reporters, so it is serialised. The generation counter lets
+        # a caller that waited on the lock see that someone else already
+        # re-joined and skip, rather than burning a second join-token use for
+        # nothing.
         self._rejoin_lock = asyncio.Lock()
         self._rejoin_generation = 0
         #: Monotonic clock of the last re-join ATTEMPT, successful or not, so the
@@ -369,17 +375,24 @@ class RunnerListener:
             # Rate-limit the ATTEMPT rather than clearing the counter.
             #
             # The counter deliberately survives a failed re-join
-            # (`test_a_failed_re_join_reports_false_and_does_not_clear_the_count`)
-            # because `_rejoin_unlocked` clears the credentials Secret before it
-            # re-establishes: a listener whose re-join failed has no identity at
-            # all, so making it wait for another full threshold of rejections
-            # prolongs an outage it cannot otherwise leave.
+            # (`test_a_failed_re_join_reports_false_and_does_not_clear_the_count`),
+            # and the REASON changed under it (#2425 §5.1). It used to be that
+            # `_rejoin_unlocked` cleared the Secret first, so a failed re-join
+            # left the listener with no identity at all. It no longer does: the
+            # join happens BEFORE the Secret is touched, precisely so a failed
+            # join is not destructive.
+            #
+            # The behaviour is still right and the premise is now the weaker one:
+            # the listener keeps its old credential and the API is still
+            # REJECTING it, so it cannot work either way. Making it wait for
+            # another full threshold of rejections prolongs an outage it cannot
+            # otherwise leave.
             #
             # The cost of that, left unbounded, is that EVERY later rejection
-            # re-entered this path -- one every 30-90s -- each time deleting the
-            # Secret and spending another join-token use. On a pool whose token
-            # has `max_uses: 1` the first failed re-join then made the listener
-            # permanently unjoinable.
+            # re-entered this path -- one every 30-90s -- each time spending
+            # another join-token use. On a pool whose token has `max_uses: 1`
+            # the first failed re-join then made the listener permanently
+            # unjoinable.
             #
             # A floor on the interval keeps both properties: recovery is still
             # attempted promptly rather than after another three rejections, and

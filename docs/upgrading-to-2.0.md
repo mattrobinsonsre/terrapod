@@ -1262,6 +1262,49 @@ workspaces `registry:read` on the modules behind those items. During a mixed
 version rollout an older replica keeps serving the old behaviour, so the
 tightening appears gradually rather than at one instant.
 
+### Reading a catalog item no longer returns its authored defaults and choices
+
+**Affects:** anything reading `/api/v1/catalog-items` or
+`/api/v1/catalog-items/{id}` — a third-party script, an agent, or a provider
+binary built before the change. Provisioning and reconfiguring are unaffected.
+
+A catalog item's `variable-options` entries are **projected to six keys** on an
+ordinary read — `name`, `hidden`, `sensitive`, `description`, `type`, `required`
+— so an entry's authored `default` and its `options` list are no longer in the
+document. A provider template's `body` comes back `null` by the same rule.
+
+The reason is the same one that moved a catalog instance's variable values (the
+entry above): an item exists to narrow a module, and part of narrowing it is
+fixing inputs the provisioner must not choose or must not see. An authored
+default and a choice list are that authoring, and returning them to every reader
+made the `hidden` and `sensitive` overlays advisory. Unknown metadata is dropped
+rather than filtered, because a nested default or choice list inside a key
+nobody has enumerated is still the authoring.
+
+**This is the kind of change least likely to be noticed before it bites**, and
+the reason is worth stating plainly: the route, the attribute names and the
+status code are all unchanged. Only the content moves, so **no contract snapshot
+and no schema check reports it**. A consumer that reads `variable-options[].default`
+and writes it somewhere will start writing nothing at all.
+
+**To recover them**, ask explicitly and hold platform `admin`:
+
+```
+GET /api/v1/catalog-items/{id}?include-sensitive-values=true
+```
+
+A caller without platform `admin` asking for them gets **403**, not a quietly
+reduced document — the refusal is the answer, because a silent projection is
+what this entry is about.
+
+**What to do.** If you are choosing a value for an input, the
+**interface** surface is the one to read: `GET /api/v1/catalog-items/{id}/interface`
+answers "what may I supply here" for a chosen version, which is the question a
+default and a choice list were being used to answer indirectly. The Terraform
+provider, the web UI, go-terrapod and the MCP tools were all moved to send or
+document the opt-in, so an up-to-date consumer needs no change; a script of your
+own that was reading the plain document does.
+
 ### A human read of a catalog instance's variables no longer returns their values
 
 **Affects:** anything reading `/variables` on a workspace provisioned from a

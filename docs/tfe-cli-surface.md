@@ -136,7 +136,7 @@ Consumed, on both `POST` and `PATCH` unless noted:
 | `agent-pool-id` | `AgentPoolID` | Resolved through `_resolve_pool_set_attrs`, shared by both paths |
 | `working-directory` | `WorkingDirectory` | The Terraform root |
 | `trigger-prefixes` | `TriggerPrefixes` | Path scoping for VCS triggers |
-| `terraform-version` | `TerraformVersion` | **`PATCH` only** — see the finding below |
+| `terraform-version` | `TerraformVersion` | The name `engine-version` had when Terraform was the only engine, and **not** a deprecation: `tofu`, `terraform` and `tfci` send and read it, so accepting both is permanent. Both verbs read it through the shared `engine_version_attr`, which prefers `engine-version`; supplying both with different values is a **422** rather than a silent precedence rule, and an empty string means "the deployment's default" rather than an absence |
 
 **An attribute `go-tfe` defines and Terrapod does not consume must be listed
 here as unsupported, or refused — never accepted and ignored.** The same rule as
@@ -150,8 +150,15 @@ decision, because the caller's intent is dropped and the response is still a
 | Attribute | go-tfe field | What happens |
 |---|---|---|
 | `vcs-repo` | `VCSRepo` | Dropped. Terrapod *has* VCS connections — it expresses them as `vcs-connection-id` + `vcs-repo-url` on the native surface — so unlike the rows below this is a feature we have in a shape we do not accept. A create that drops it returns `2xx` having ignored the caller's whole intent, and the identical bug class was fixed once on this surface for `vcs-connection-id` |
-| `terraform-version` | `TerraformVersion` | Dropped **on `POST`**, consumed on `PATCH`. `_create_workspace_impl` reads 59 attribute keys and this is not one of them; `update_workspace` reads both it and the `engine-version` alias. So the same attribute in the same body means two different things depending on the verb, which is the shape no route table can show |
 | `tags` / `tag-bindings` | `Tags`, `TagBindings` | Dropped on create. The tag *routes* are served (`relationships/tags`), so tags set in a create body are silently absent from a workspace whose tags can then be set a request later |
+
+`terraform-version` was in this table too until #2425 §5.2, as *"Dropped on
+`POST`, consumed on `PATCH`"*. It is consumed on both, and the claim was wrong in
+the direction that matters: it told a `go-tfe` client its `WorkspaceCreateOptions.TerraformVersion`
+was ignored when it was honoured. The key is not a literal anywhere in the create
+path — both verbs read it through `engine_version_attr` — which is exactly how a
+reader counting attribute literals in that function concluded it was absent, and
+why `check_cli_body_claims.py` could not catch it either.
 
 **Not supported — Terrapod has no such feature.** Absent because the capability
 does not exist, which is a design subset rather than a gap:
