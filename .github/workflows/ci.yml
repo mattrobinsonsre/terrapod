@@ -462,7 +462,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
-      - run: pip install pytest
+      # `httpx` and the terrapod config deps are here as well as on the
+      # platform-tool step below, because `scripts/tests` now covers
+      # `check-platform-tool-artifacts.py`, which imports both. The later step
+      # KEEPS its own install deliberately: a release gate should not come to
+      # depend on a test step above it having run.
+      - run: pip install pytest httpx pydantic pydantic-settings pyyaml structlog pgpy standard-imghdr
 
       - name: (rescan-test) Run the re-scan and register-review script tests
         run: python -m pytest scripts/tests -v

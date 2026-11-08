@@ -39,6 +39,7 @@ after it ships.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -83,24 +84,55 @@ def claimed_assets(version_override: str | None) -> list[tuple[str, str, str, st
     return out
 
 
-def reachable(client: httpx.Client, url: str) -> tuple[bool, str]:
-    """Is the artifact there? HEAD, falling back to a ranged GET.
+#: How many times a TRANSPORT failure is retried before the check gives up and
+#: says it could not tell. AGENTS.md makes bounded backoff/retry a hard
+#: requirement for every outbound call Terrapod makes, and this script was the
+#: one that did not: a single timeout decided a release was unpublished.
+TRANSPORT_ATTEMPTS = 3
+TRANSPORT_BACKOFF = 2.0  # seconds, doubled per attempt
 
-    A release-asset redirect chain does not always honour HEAD — some object
-    stores answer 403 to a HEAD they would serve as a GET — so a HEAD failure is
-    retried as a one-byte ranged GET before it is believed. Reporting a
-    published asset as missing would send someone to fix a release that is fine.
+
+def reachable(client: httpx.Client, url: str) -> tuple[str, str]:
+    """Is the artifact there? Returns `ok`, `absent`, or `unverified`.
+
+    THREE outcomes rather than two, and the third is the point. This used to
+    return a bool, so a timeout and a 404 were the same answer and the failure
+    message said "not published" either way — a claim a transport error does not
+    establish. During a GitHub release-CDN incident that fails every PR with a
+    message sending the reader to fix a version pin that is perfectly fine, which
+    is precisely what this function's own docstring warns against. It happened:
+    `trivy 0.76.2` was reported unpublished while being published, with 47 assets
+    and both of the claimed ones present.
+
+    So an HTTP STATUS is evidence about the artifact and a transport error is
+    evidence about the network, and they are reported separately. The build fails
+    on either — fail-closed is right for a release gate, because an unverifiable
+    claim is not a verified one — but the operator is told which they have.
+
+    A HEAD failure is still retried as a one-byte ranged GET before it is
+    believed, because some object stores answer 403 to a HEAD they would serve as
+    a GET. A transport error is retried with backoff, which is what distinguishes
+    "the CDN was briefly unwell" from "the network cannot reach it at all".
     """
-    try:
-        resp = client.head(url, follow_redirects=True, timeout=30.0)
-        if resp.status_code == 200:
-            return True, "HEAD 200"
-        resp = client.get(url, follow_redirects=True, timeout=30.0, headers={"Range": "bytes=0-0"})
-        if resp.status_code in (200, 206):
-            return True, f"GET {resp.status_code} (HEAD said {resp.status_code})"
-        return False, f"HTTP {resp.status_code}"
-    except httpx.HTTPError as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+    last = ""
+    for attempt in range(TRANSPORT_ATTEMPTS):
+        try:
+            resp = client.head(url, follow_redirects=True, timeout=30.0)
+            if resp.status_code == 200:
+                return "ok", "HEAD 200"
+            ranged = client.get(
+                url, follow_redirects=True, timeout=30.0, headers={"Range": "bytes=0-0"}
+            )
+            if ranged.status_code in (200, 206):
+                return "ok", f"GET {ranged.status_code} (HEAD said {resp.status_code})"
+            # A status came back from the publisher, so this IS evidence about
+            # the artifact. Do not retry it: a 404 does not improve.
+            return "absent", f"HTTP {ranged.status_code}"
+        except httpx.HTTPError as exc:
+            last = f"{type(exc).__name__}: {exc}"
+            if attempt < TRANSPORT_ATTEMPTS - 1:
+                time.sleep(TRANSPORT_BACKOFF * (2**attempt))
+    return "unverified", f"{last} (after {TRANSPORT_ATTEMPTS} attempts)"
 
 
 def main() -> int:
@@ -116,23 +148,26 @@ def main() -> int:
         )
         return 1
 
-    failures: list[str] = []
+    absent: list[str] = []
+    unverified: list[str] = []
     with httpx.Client() as client:
         for tool, os_, arch, url in assets:
             version = version_override or configured_version(tool)
-            ok, why = reachable(client, url)
-            status = "ok" if ok else "MISSING"
-            print(f"  {status:8} {tool:8} {version:10} {os_}/{arch:6} {why}")
-            if not ok:
-                failures.append(
+            outcome, why = reachable(client, url)
+            label = {"ok": "ok", "absent": "MISSING", "unverified": "UNVERIFIED"}[outcome]
+            print(f"  {label:10} {tool:8} {version:10} {os_}/{arch:6} {why}")
+            if outcome == "absent":
+                absent.append(
                     f"{tool} {version} ({os_}/{arch}) is claimed by the platform table but "
                     f"not published: {url} -> {why}"
                 )
+            elif outcome == "unverified":
+                unverified.append(f"{tool} {version} ({os_}/{arch}): {url} -> {why}")
 
     print()
-    if failures:
-        print(f"FAIL: {len(failures)} claimed artifact(s) do not exist.\n", file=sys.stderr)
-        for f in failures:
+    if absent:
+        print(f"FAIL: {len(absent)} claimed artifact(s) do not exist.\n", file=sys.stderr)
+        for f in absent:
             print(f"  - {f}", file=sys.stderr)
         print(
             "\nEither pin a version whose publisher ships every platform the table claims, "
@@ -140,6 +175,23 @@ def main() -> int:
             "Leaving it is what makes a run fail with a 502 instead of a clear refusal.",
             file=sys.stderr,
         )
+    if unverified:
+        print(
+            f"FAIL: {len(unverified)} claimed artifact(s) could NOT BE VERIFIED — the "
+            f"publisher was unreachable after {TRANSPORT_ATTEMPTS} attempts.\n",
+            file=sys.stderr,
+        )
+        for f in unverified:
+            print(f"  - {f}", file=sys.stderr)
+        print(
+            "\nThis is NOT a claim that the version is unpublished, and the distinction "
+            "matters: the likely cause is an incident at the publisher or a network egress "
+            "problem on this runner, not your version pin. Check the publisher's status, "
+            "confirm the asset by hand, and re-run. The check still fails, because an "
+            "unverifiable claim is not a verified one.",
+            file=sys.stderr,
+        )
+    if absent or unverified:
         return 1
 
     print(f"All {len(assets)} claimed platform-tool artifacts exist.")

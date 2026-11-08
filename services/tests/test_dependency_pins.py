@@ -96,6 +96,56 @@ def _docker_dir() -> pathlib.Path:
     )
 
 
+def _helm_root() -> pathlib.Path:
+    """Find helm/terrapod/ under either layout, same idiom as the helm tier's."""
+    for cand in (
+        pathlib.Path("/app/helm/terrapod"),
+        _SERVICES.parent / "helm" / "terrapod",
+        _SERVICES / "helm" / "terrapod",
+    ):
+        if (cand / "values.yaml").is_file():
+            return cand
+    raise AssertionError(
+        "helm/terrapod/ not found — if the test image stopped copying helm/, "
+        "this guard is silently not running."
+    )
+
+
+def test_the_test_image_bakes_the_opa_the_chart_ships() -> None:
+    """CI's Rego tests must exercise the version a deployment actually runs.
+
+    `opa` is pull-through cached rather than baked into a release image, so its
+    version is a Helm value and **nothing bumps it but us** — which is why the
+    pre-release audit reviews it every minor. The test image bakes its OWN copy,
+    for the tests that need a real binary, and that pin is a SIXTH site the
+    review did not know about: four per tool in `values.yaml`, `config.py` and
+    three docs pages, and this one with nothing tying it to any of them.
+
+    It had already drifted. A bump to 1.22.2 left `Dockerfile.test-base` on
+    1.21.0, so every Rego test in CI exercised a different binary from the one
+    operators get — silently, because both versions work and nothing compares
+    them. That is the shape where a test passes while saying less than it
+    appears to.
+    """
+    dockerfile = _docker_dir() / "Dockerfile.test-base"
+    assert dockerfile.is_file(), f"{dockerfile} is missing"
+    baked = re.search(r"^ARG OPA_VERSION=([\d.]+)", dockerfile.read_text(), re.M)
+    assert baked, "Dockerfile.test-base no longer declares ARG OPA_VERSION"
+
+    import yaml  # local: only this guard needs it
+
+    chart = yaml.safe_load((_helm_root() / "values.yaml").read_text())
+    shipped = chart["api"]["config"]["registry"]["platform_tools"]["opa_version"]
+
+    assert baked.group(1) == str(shipped), (
+        f"the test image bakes opa {baked.group(1)} while the chart ships "
+        f"{shipped}. Bump ARG OPA_VERSION in docker/Dockerfile.test-base to "
+        f"match, so the Rego tests exercise the binary a deployment runs. "
+        f"(The chart value is the one operators get; the baked one is only for "
+        f"tests that need a real binary.)"
+    )
+
+
 def _requirement_lines(path: pathlib.Path) -> list[str]:
     """Logical requirement lines, with backslash continuations joined.
 
