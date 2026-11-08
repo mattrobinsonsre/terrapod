@@ -324,7 +324,7 @@ export default function TokensPage() {
               )}
               <button
                 onClick={() => { setShowCreate(!showCreate); setCreatedToken(null) }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
               >
                 {showCreate ? t('tokens.cancel') : t('tokens.createToken')}
               </button>
@@ -413,7 +413,7 @@ export default function TokensPage() {
               <button
                 type="submit"
                 disabled={creating}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
               >
                 {creating ? t('tokens.form.creating') : t('tokens.form.create')}
               </button>
@@ -486,7 +486,7 @@ export default function TokensPage() {
             <button
               onClick={handleBulkRevoke}
               disabled={revoking}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
             >
               {revoking ? t('tokens.revoking') : t('tokens.revokeSelected')}
             </button>

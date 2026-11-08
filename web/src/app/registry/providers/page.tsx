@@ -91,7 +91,7 @@ export default function ProvidersPage() {
           actions={
             <button
               onClick={() => setShowCreate(!showCreate)}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
             >
               {showCreate ? t('providers.cancel') : t('providers.createProvider')}
             </button>
@@ -119,7 +119,7 @@ export default function ProvidersPage() {
             <button
               type="submit"
               disabled={creating}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
             >
               {creating ? t('providers.form.creating') : t('providers.form.create')}
             </button>

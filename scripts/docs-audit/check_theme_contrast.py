@@ -41,10 +41,77 @@ SRC = ROOT / "web" / "src"
 AA = 4.5  # WCAG AA for normal-size text
 MIN_BARE_INKS = 4  # neutral ink stops used with no fill; a floor so a
 #: broken matcher fails here instead of passing on nothing
-FILL_FLOOR = 1.10  # a badge fill must be distinguishable from its card; this is
-# the dark theme's own measured floor, so it is the bar the
-# app already meets rather than a number invented here.
+FILL_FLOOR = 1.10  # a badge fill must be distinguishable from its card.
+# This used to be justified as "the dark theme's own measured
+# floor, so it is the bar the app already meets". Measured
+# against the stock palette the dark theme renders, that is
+# false: `bg-red-900/40` sits at 1.060:1 against its card on
+# dark, and purple/violet/indigo at /40 are all 1.06-1.09, so
+# dark's own floor is nearer 1.06 and 1.10 holds light to a
+# bar dark does not meet. Kept at 1.10 because it is the right
+# bar and lowering it would only make the gate agree with a
+# defect; closing the dark side is ~60 sites and a separate
+# change. The reason is recorded rather than deleted because a
+# justification that reads as measured is the kind that
+# survives review.
 MIN_PAIRS = 40  # a matcher that stops matching must fail, not pass on nothing
+
+#: Literal spellings `class_strings()` must read, each with the strings it must
+#: yield. This is the gate on the gate, and it exists because the previous
+#: matcher's blind spot was invisible to every count: it paired quotes with
+#: `["'`]` on BOTH ends, so a closing quote could act as an opening one and
+#: whether a given `className="..."` was read at all depended on the parity of
+#: every quote above it in the file. 1,989 of 3,733 plain `className` attributes
+#: were unread, ~415 of them carrying a bg/text pair, while the floors below sat
+#: comfortably satisfied -- because a count over the tree cannot distinguish a
+#: className that was deleted from a matcher that stopped reading it. Only
+#: fixtures can, so narrowing the scanner fails HERE, naming the spelling.
+SELF_TEST: list[tuple[str, list[str]]] = [
+    # The attribute form, and the two neighbours whose quotes used to swallow it.
+    ('<div className="bg-red-600 text-white" />', ["bg-red-600 text-white"]),
+    (
+        '<a title="x" className="bg-red-600 text-white">go</a>',
+        ["bg-red-600 text-white"],
+    ),
+    (
+        '<p aria-label="Close dialog" className="bg-red-600 text-white" />',
+        ["Close dialog", "bg-red-600 text-white"],
+    ),
+    # The parity case: prose above the attribute must not shift what is read.
+    (
+        '// a comment that isn\'t balanced\n<div className="bg-red-600 text-white" />',
+        ["bg-red-600 text-white"],
+    ),
+    (
+        '/* it\'s a block comment */\n<div className="bg-red-600 text-white" />',
+        ["bg-red-600 text-white"],
+    ),
+    (
+        "<p>Don't, it's prose</p>\n<div className=\"bg-red-600 text-white\" />",
+        ["bg-red-600 text-white"],
+    ),
+    # A class string in a `.ts` badge table, which is why there is no
+    # `className=` prefix: the second axis was written for exactly these.
+    (
+        "const badge = { ok: 'bg-green-900/40 text-green-300' }",
+        ["bg-green-900/40 text-green-300"],
+    ),
+    (
+        'const cls = cond ? "bg-red-600 text-white" : "bg-slate-700 text-slate-200"',
+        ["bg-red-600 text-white", "bg-slate-700 text-slate-200"],
+    ),
+    # A ternary inside a template literal yields each arm SEPARATELY. Pooling
+    # them would invent a pairing that never renders, which is the mistake the
+    # fourth axis below is written around.
+    (
+        "className={`px-2 text-white ${bad ? 'bg-red-600' : 'bg-green-700'} rounded`}",
+        ["px-2 text-white ${bad ? ", "bg-red-600", "bg-green-700", "} rounded"],
+    ),
+    # Must NOT yield: a quote inside a literal is content, not a delimiter, and
+    # a class string a comment merely mentions is not shipped.
+    ('<img alt="It\'s fine" className="bg-red-600 text-white" />', ["bg-red-600 text-white"]),
+    ('// never ship className="bg-red-600 text-white"', []),
+]
 
 
 def srgb_to_linear(c: float) -> float:
@@ -91,6 +158,92 @@ def _sources() -> list[pathlib.Path]:
     return sorted([*SRC.rglob("*.tsx"), *SRC.rglob("*.ts")])
 
 
+#: A quote opens a literal only where one legitimately can. No JavaScript lets a
+#: string literal follow an identifier, so a quote preceded by a word character
+#: is JSX prose -- `<p>Don't, it's here</p>` -- and treating it as a delimiter is
+#: how prose comes to decide what the scan can see.
+_WORD = re.compile(r"\w")
+#: A literal body is split on quotes, so each quote-free run is judged on its
+#: own. That is what keeps a ternary inside a template literal from pooling: the
+#: two arms are mutually exclusive, and pairing one arm's fill with the other's
+#: ink invents a combination that never renders.
+_SEGMENT = re.compile(r"""[^"'`]+""")
+
+
+def class_strings(text: str) -> list[str]:
+    """Every string literal in a source file, as quote-free runs of 8-400 chars.
+
+    THIS IS A SCANNER AND NOT A REGEX, and the reason is that the delimiters are
+    ambiguous to a pattern. The previous matcher accepted `["'`]` at both ends,
+    so it could not tell an OPENING quote from a CLOSING one: given
+    `<a title="x" className="bg-red-600 text-white">`, it matched from the quote
+    that closes `title` through ` className=` to the quote that OPENS the class
+    string, consuming it -- and the class string was then never read. Whether a
+    given `className` was visible therefore depended on the parity of every
+    quote, and every apostrophe in every comment, above it in the file. 1,989 of
+    3,733 plain `className` attributes went unread that way, ~415 of them
+    carrying a bg/text pair the gate consequently never evaluated, while
+    `globals.css` and this file's own docstring both claimed it read every
+    className in `web/src`. A backreference fixes which quote CLOSES a literal
+    and not which quote may OPEN one, so the fix has to consume literals as
+    units; that also means comments can be skipped, which is the other half of
+    it.
+
+    Two documented limits. A backtick inside a `${...}` interpolation (a nested
+    template literal) ends the outer literal early, and a regex literal
+    containing an unbalanced quote reads as one -- neither occurs in `web/src`,
+    and both fail in the direction of reading LESS, which `MIN_PAIRS` and
+    `SELF_TEST` between them are what catch.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "/" and text[i + 1 : i + 2] == "/":
+            nl = text.find("\n", i)
+            i = n if nl < 0 else nl + 1
+            continue
+        if c == "/" and text[i + 1 : i + 2] == "*":
+            close = text.find("*/", i + 2)
+            i = n if close < 0 else close + 2
+            continue
+        if c in "\"'`" and not (i and _WORD.match(text[i - 1])):
+            j = i + 1
+            while j < n:
+                d = text[j]
+                if d == "\\":
+                    j += 2
+                    continue
+                if d == c or (c != "`" and d == "\n"):
+                    break  # a newline in a '' or "" means it was never a literal
+                j += 1
+            if j < n and text[j] == c:
+                for seg in _SEGMENT.finditer(text[i + 1 : j]):
+                    if 8 <= len(seg.group(0)) <= 400:
+                        out.append(seg.group(0))
+                i = j + 1
+                continue
+        i += 1
+    return out
+
+
+def self_test() -> list[str]:
+    """Pin each spelling BEFORE the scan, so a narrowing fails by name."""
+    out: list[str] = []
+    for text, expected in SELF_TEST:
+        got = class_strings(text)
+        if sorted(got) != sorted(expected):
+            out.append(
+                f"class_strings() no longer reads {text!r} the way it must: "
+                f"expected {sorted(expected)}, read {sorted(got)}. Widen the "
+                "scanner rather than the fixture -- a spelling this gate cannot "
+                "see is a spelling it does not check, and a count over the tree "
+                "cannot tell a deleted className from a matcher that stopped "
+                "matching."
+            )
+    return out
+
+
 def light_palette() -> dict[str, dict[int, tuple[int, int, int]]]:
     """The light theme, read from the `:root:not(.dark)` block in globals.css."""
     css = CSS.read_text()
@@ -116,6 +269,13 @@ def light_palette() -> dict[str, dict[int, tuple[int, int, int]]]:
 
 
 def main() -> int:
+    broken = self_test()
+    if broken:
+        print("check_theme_contrast: the className scanner is broken\n")
+        for b in broken:
+            print(f"  {b}")
+        return 1
+
     pal = light_palette()
     fams = "|".join(sorted(pal))
 
@@ -128,7 +288,15 @@ def main() -> int:
     hov_re = re.compile(rf"(?:^|\s)hover:bg-({fams})-(\d+)(?:/(\d+))?(?=\s|$)")
     txt_re = re.compile(rf"(?:^|\s)text-({fams})-(\d+)(?=\s|$)")
     plain_re = re.compile(r"(?:^|\s)text-(white|black)(?=\s|$)")
-    cls_re = re.compile(r"""(?:className=\{?["'`]|["'`])([^"'`]{8,400})["'`]""")
+    # A hover fill is paired with the hover INK when the element declares one,
+    # and only otherwise with the base ink. Pairing it with the base ink
+    # unconditionally invents a state: `bg-amber-700 hover:bg-amber-600
+    # text-amber-200 hover:text-white` renders amber-200 over amber-700 or white
+    # over amber-600, never amber-200 over amber-600 -- and that phantom was
+    # reported at 1.80:1 across three pages, which is the shape of finding people
+    # learn to silence a gate over.
+    hov_txt_re = re.compile(rf"(?:^|\s)hover:text-({fams})-(\d+)(?=\s|$)")
+    hov_plain_re = re.compile(r"(?:^|\s)hover:text-(white|black)(?=\s|$)")
     PLAIN = {"white": (255, 255, 255), "black": (0, 0, 0)}
 
     # An alpha fill composites over whatever is behind it, which is not knowable
@@ -148,9 +316,7 @@ def main() -> int:
 
     worst: dict[tuple[str, str], tuple[float, str, str]] = {}
     for path in sorted(_sources()):
-        text = path.read_text()
-        for m in cls_re.finditer(text):
-            s = m.group(1)
+        for s in class_strings(path.read_text()):
             fills = [(f, st, a, False) for f, st, a in bg_re.findall(s)] + [
                 (f, st, a, True) for f, st, a in hov_re.findall(s)
             ]
@@ -159,22 +325,27 @@ def main() -> int:
             inks = [(f, int(st), None) for f, st in txt_re.findall(s)] + [
                 (None, None, w) for w in plain_re.findall(s)
             ]
-            if not inks:
+            hov_inks = [(f, int(st), None) for f, st in hov_txt_re.findall(s)] + [
+                (None, None, w) for w in hov_plain_re.findall(s)
+            ]
+            if not inks and not hov_inks:
                 continue
             for bfam, bstop, balpha, hov in fills:
                 bg = pal.get(bfam, {}).get(int(bstop))
                 if bg is None:
                     continue
                 alpha = int(balpha) / 100 if balpha else 1.0
-                for tfam, tstop, plain in inks:
+                for tfam, tstop, plain in (hov_inks or inks) if hov else inks:
                     fg = PLAIN[plain] if plain else pal.get(tfam, {}).get(tstop)
                     if fg is None:
                         continue
+                    hov_ink = hov and bool(hov_inks)
                     key = (
                         ("hover:" if hov else "")
                         + f"bg-{bfam}-{bstop}"
                         + (f"/{balpha}" if balpha else ""),
-                        f"text-{plain}" if plain else f"text-{tfam}-{tstop}",
+                        ("hover:" if hov_ink else "")
+                        + (f"text-{plain}" if plain else f"text-{tfam}-{tstop}"),
                     )
                     low, where = None, ""
                     for pname, parent in parents.items():
@@ -279,8 +450,7 @@ def main() -> int:
     # text-slate-900` declares its fill on the element and is covered above.
     bare: dict[int, str] = {}
     for path in sorted(_sources()):
-        for m in cls_re.finditer(path.read_text()):
-            s = m.group(1)
+        for s in class_strings(path.read_text()):
             if bg_re.search(s):
                 continue  # has its own fill; the pair axis owns it
             for fam, stop in txt_re.findall(s):

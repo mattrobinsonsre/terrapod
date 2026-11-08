@@ -105,7 +105,7 @@ export default function CallbackHandler() {
           <p className="text-red-400 mb-6">{error}</p>
           <a
             href="/login"
-            className="bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
+            className="bg-brand-600 hover:bg-brand-600/80 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
           >
             {t('tryAgain')}
           </a>

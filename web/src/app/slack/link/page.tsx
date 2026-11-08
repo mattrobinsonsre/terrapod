@@ -170,7 +170,7 @@ function SlackLinkInner() {
               </p>
               <button
                 onClick={confirmLink}
-                className="mt-4 w-full rounded bg-brand-600 hover:bg-brand-500 px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="mt-4 w-full rounded bg-brand-600 hover:bg-brand-600/80 px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {t('confirm.button')}
               </button>

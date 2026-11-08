@@ -178,7 +178,9 @@ body {
  * version missed and both of which were hiding real failures), composites every
  * alpha fill over each plausible parent surface, and reports the worst. All
  * eight status badges land at 5.58-6.41:1 ink with 1.12-1.32:1 fill presence,
- * against the dark theme's own floor of 1.10:1.
+ * against a floor of 1.10:1. That floor was described here as "the dark theme's
+ * own" and is not: measured, several `*-900/40` fills sit at 1.06-1.09:1 against
+ * their card on dark, so 1.10 is a bar light meets and dark does not yet.
  * ------------------------------------------------------------------------- */
 :root:not(.dark) {
     /* slate */

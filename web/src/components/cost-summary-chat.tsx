@@ -193,7 +193,7 @@ export function CostSummaryChat({ runId, refreshKey }: Props) {
             type="button"
             onClick={send}
             disabled={sending || !input.trim()}
-            className="inline-flex items-center gap-1.5 rounded bg-brand-600 px-3 py-2 text-xs text-slate-200 hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+            className="inline-flex items-center gap-1.5 rounded bg-brand-600 px-3 py-2 text-xs text-white hover:bg-brand-600/80 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
           >
             {sending ? <LoadingSpinner /> : <Send className="h-3.5 w-3.5" />}
             {sending ? t('chat.thinking') : t('chat.send')}

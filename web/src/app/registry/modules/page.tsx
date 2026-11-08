@@ -338,7 +338,7 @@ export default function ModulesPage() {
               )}
               <button
                 onClick={() => setShowCreate(!showCreate)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
               >
                 {showCreate ? t('modules.cancel') : t('modules.createModule')}
               </button>
@@ -407,7 +407,7 @@ export default function ModulesPage() {
               type="button"
               onClick={runDiscoveryScan}
               disabled={discScanning || !discConnectionId || !discRepoUrl.trim()}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
             >
               {discScanning ? t('modules.discover.scanning') : t('modules.discover.scan')}
             </button>
@@ -485,7 +485,7 @@ export default function ModulesPage() {
                   type="button"
                   onClick={registerDiscoveryPicks}
                   disabled={discRegistering || !discReady}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                 >
                   {discRegistering
                     ? t('modules.discover.registering')
@@ -609,7 +609,7 @@ export default function ModulesPage() {
             <button
               type="submit"
               disabled={creating}
-              className="mt-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+              className="mt-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
             >
               {creating ? t('modules.form.creating') : t('modules.form.create')}
             </button>

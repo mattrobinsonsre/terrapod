@@ -187,7 +187,7 @@ export function ArchitectureCritiqueChat({ workspaceId, refreshKey }: Props) {
             type="button"
             onClick={send}
             disabled={sending || !input.trim()}
-            className="inline-flex items-center gap-1.5 text-xs text-slate-200 bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed px-3 py-2 rounded"
+            className="inline-flex items-center gap-1.5 text-xs text-white bg-brand-600 hover:bg-brand-600/80 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed px-3 py-2 rounded"
           >
             {sending ? <LoadingSpinner /> : <Send className="w-3.5 h-3.5" />}
             {sending ? t('architecture.chat.thinking') : t('architecture.chat.send')}

@@ -293,7 +293,7 @@ export default function OnboardingPage() {
           <button
             type="submit"
             disabled={starting || !provider.trim()}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white whitespace-nowrap"
+            className="px-4 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:opacity-50 text-white whitespace-nowrap"
           >
             {starting ? t('starting') : t('start')}
           </button>
@@ -395,7 +395,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={discover}
                   disabled={discovering || selected.size === 0}
-                  className="mt-4 px-4 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white"
+                  className="mt-4 px-4 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:opacity-50 text-white"
                 >
                   {discovering
                     ? t('discovering')

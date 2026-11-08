@@ -152,7 +152,7 @@ export default function DeletedWorkspacesPage() {
 
         {error && <ErrorBanner message={error} />}
         {notice && (
-          <div className="mb-4 rounded-lg border border-green-800 bg-green-950/40 px-4 py-3 text-sm text-green-300">
+          <div className="mb-4 rounded-lg border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-300">
             {notice}
           </div>
         )}

@@ -215,7 +215,7 @@ export default function ProviderDetailPage() {
               ) : (
                 <div className="flex gap-2">
                   <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('meta.cancel')}</button>
-                  <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? t('meta.saving') : t('meta.save')}</button>
+                  <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? t('meta.saving') : t('meta.save')}</button>
                 </div>
               )}
             </div>
@@ -243,14 +243,14 @@ export default function ProviderDetailPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setLockoutWarning(''); setEditLabels(providerMeta.attributes.labels || {}); }}
-                    className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                    className="px-3 py-1 rounded text-xs text-slate-300 hover:text-slate-100 bg-slate-700 hover:bg-slate-600"
                   >
                     {t('meta.revertLabels')}
                   </button>
                   <button
                     onClick={() => handleSaveMeta(true)}
                     disabled={savingMeta}
-                    className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                    className="px-3 py-1 rounded text-xs text-amber-200 bg-amber-900/40 hover:bg-amber-900/60"
                   >
                     {savingMeta ? t('meta.saving') : t('meta.saveAnyway')}
                   </button>
@@ -357,7 +357,7 @@ export default function ProviderDetailPage() {
                   {t('providerDetail.deleteDialog.cancel')}
                 </button>
                 <button onClick={handleDelete}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 text-white transition-colors">
                   {t('providerDetail.deleteDialog.confirm')}
                 </button>
               </div>

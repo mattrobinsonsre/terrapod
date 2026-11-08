@@ -332,7 +332,7 @@ export default function AdminCatalogPage() {
           actions={!disabled ? (
             <button
               onClick={() => { if (showForm) { setShowForm(false); resetForm() } else startCreate() }}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
             >
               {showForm ? t('actions.cancel') : t('actions.new')}
             </button>
@@ -579,7 +579,7 @@ export default function AdminCatalogPage() {
                 </div>
 
                 <button type="submit" disabled={saving}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {saving ? (editId !== null ? t('actions.saving') : t('actions.creating')) : (editId !== null ? t('actions.saveChanges') : t('actions.create'))}
                 </button>
               </form>

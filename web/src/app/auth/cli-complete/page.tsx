@@ -159,7 +159,7 @@ function CliCompleteInner() {
             <p className="text-slate-400 mb-4">{t('fallback.description')}</p>
             <button
               onClick={handleManualRedirect}
-              className="bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
+              className="bg-brand-600 hover:bg-brand-600/80 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
             >
               {t('fallback.button')}
             </button>
@@ -177,7 +177,7 @@ function CliCompleteInner() {
             */}
             <button
               onClick={handleManualRedirect}
-              className="bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
+              className="bg-brand-600 hover:bg-brand-600/80 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
             >
               {t('fallback.button')}
             </button>

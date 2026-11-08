@@ -142,7 +142,7 @@ const BTN =
 const BTN_DANGER =
   'px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors disabled:opacity-50'
 const BTN_PRIMARY =
-  'px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50'
+  'px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors disabled:opacity-50'
 const MONO = 'font-mono text-xs break-words text-slate-200'
 
 /* ── The data gate ──────────────────────────────────────────────────────────- */

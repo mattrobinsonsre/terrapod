@@ -225,7 +225,7 @@ export function AIPolicyPanel({
             <button
               onClick={override}
               disabled={overriding}
-              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 transition-colors"
+              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-100 transition-colors"
             >
               {overriding ? t('aiPolicyPanel.overriding') : t('aiPolicyPanel.overrideContinue')}
             </button>
