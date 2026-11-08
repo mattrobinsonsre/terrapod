@@ -44,6 +44,40 @@ plan/apply) is **on** in the eval and the agent pool is seeded for you, so you
 can queue a plan in the UI and watch it run on a Kubernetes Job. The first one
 pulls the runner image and a `tofu` binary, so give it a few minutes.
 
+### Pin the image version to the chart you cloned
+
+`make eval` installs the **chart from your clone** and pulls **released images**,
+and the two are versioned independently. The image tag defaults to `latest`,
+which the release pipeline moves on *every* release — so it tracks the newest
+published release of **any** line, not the newest version of the line you have
+checked out. While 2.0 is in pre-release that normally means a 1.11.x patch: a
+pre-release does not stop a later 1.x patch from taking the tag.
+
+So a clone of `main` plus the default `latest` gives you **2.0 templates driving a
+1.x API**, and the way that fails is the problem. A config key the API does not
+recognise is **ignored**, not refused — the settings model is `extra="ignore"` by
+design, so that a newer chart or an operator's leftover key cannot crash-loop the
+pod. The result is a stack that installs, passes `--wait`, serves the UI, logs
+nothing out of the ordinary, and is missing whole features: the chart renders an
+`ansible:` block the API drops on the floor, and a `configure-enabled` write from
+these pages comes back refused as an unknown attribute. Nothing tells you the
+versions disagree; you are left concluding the documentation describes software
+that does not exist.
+
+Set `TERRAPOD_VERSION` to a tag that matches what you cloned:
+
+```sh
+TERRAPOD_VERSION=v2.0.0-alpha.1 make eval   # 2.0 pre-release images for a 2.0 clone
+TERRAPOD_VERSION=v1.11.4        make eval   # or pin the stable line explicitly
+```
+
+The published tags are on the
+[releases page](https://github.com/mattrobinsonsre/terrapod/releases); the tag is
+used verbatim as the image tag, so it carries its leading `v`. If you want the
+stable line rather than a pre-release, check out that line's branch or tag too, so
+the chart and the images agree in both directions — the [version note at the top of
+the documentation index](index.md) says which line these pages document.
+
 ---
 
 ## Prerequisites

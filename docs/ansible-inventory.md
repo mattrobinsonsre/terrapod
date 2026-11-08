@@ -360,6 +360,15 @@ deliberately broad — at scale the hazard is hosts left unconfigured, not hosts
 configured — so visibility is the control, and "what would this target" has to be
 answerable before anything runs.
 
+**A pattern that matches nothing comes back as zero hosts, not as an error.**
+`ansible-inventory` exits 0 with an empty host set and a `Could not match supplied
+host pattern` warning on stderr, and Terrapod reads stderr only on a non-zero
+exit — so there is nothing to distinguish "this group is empty" from "this group
+does not exist". `host-count: 0` is the answer to read. A *configure* handed the
+same pattern does fail, loudly, which is the asymmetry worth knowing before you
+set a workspace's `default-limit`: see [a `default-limit` that matches
+nothing](ansible-configure.md#a-default-limit-that-matches-nothing).
+
 ---
 
 ## Inventory plugins are refused
@@ -872,6 +881,7 @@ that keeps a workspace's effective cloud-identity audiences off its resource.
 
 ## See also
 
+- [Ansible on Terrapod](ansible.md#one-worked-example-from-nothing-to-a-configure-that-runs) — the worked example that declares these rows alongside the workspace settings and the credential they reference
 - [API Reference → Ansible Inventory](api-reference.md#ansible-inventory) — request and response shapes
 - [Terraform provider](terraform-provider.md) — managing Terrapod's own objects as code
 - [RBAC capabilities](rbac-capabilities.md) — the full gate → capability table
