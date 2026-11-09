@@ -1993,7 +1993,14 @@
       "removeProviderAria": "프로바이더 구성 {provider} 제거"
     },
     "showDetail": "전체 설명 표시",
-    "hideDetail": "전체 설명 숨기기"
+    "hideDetail": "전체 설명 숨기기",
+    "copy": {
+      "button": "복사",
+      "copied": "복사됨",
+      "failed": "복사 실패",
+      "failedAria": "복사 실패 — 값을 선택하여 직접 복사하세요",
+      "failedTitle": "브라우저가 클립보드 접근을 거부했습니다. 값을 선택하여 직접 복사하세요."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI 생성",
@@ -2251,7 +2258,6 @@
       "refresh": "새로 고침",
       "refreshTitle": "로그 새로 고침",
       "copy": "복사",
-      "copied": "복사됨!",
       "copyTitle": "일반 텍스트를 클립보드에 복사",
       "copyAria": "로그를 클립보드에 복사",
       "download": "다운로드",

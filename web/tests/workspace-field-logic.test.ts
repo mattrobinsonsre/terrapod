@@ -39,8 +39,6 @@ import {
   toAttributes,
 } from '../src/lib/workspace-fields.ts'
 
-const label = (attr: string) => attr
-
 test('a field with no gate is always meaningful', () => {
   const spec = FIELD_BY_ATTR['name']
   assert.ok(spec, 'name should be a declared field')

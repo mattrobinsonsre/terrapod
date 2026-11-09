@@ -188,8 +188,10 @@ are *registered with your identity provider*, which validates what Terrapod send
 against its own allow-list. Terrapod serving both prefixes does not help: an
 unregistered `redirect_uri` is refused **at the IdP**, before the request reaches
 us. So the callback URL is governed by an explicit switch,
-`api.config.auth.legacy_callback_url`. It defaulted to `true` (the old prefix)
-through 1.x and **defaults to `false` from 2.0.0**.
+`api.config.auth.legacy_callback_url`, which is **new in 2.0.0** and **defaults to
+`false`**. 1.x has no such setting — it builds these URLs from `terrapod_prefix`,
+whose default is the old prefix — so the effect through 1.x is the old URL, and
+2.0.0 is where it moves.
 
 To move it: add `{callback_base_url}/api/v1/auth/callback` — and
 `/api/v1/auth/saml/acs` if you use SAML — to your IdP's allowed URLs **first**,

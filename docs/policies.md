@@ -169,7 +169,61 @@ engine's own account of the change**, so it differs between them.
 |---|---|
 | `input` (Terraform) | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
 | `input` (Pulumi) | A document built from the preview's engine event log — see below. |
+| `input` (Ansible configure) | The run's **resolved inventory document** — `input.hosts`, `input.groups`, `input.children`. See below. |
 | `data.terrapod_context` | Terrapod metadata: `workspace` (`id`, `name`, `labels`) and `run` (`id`, `message`, `source`, `is_destroy`, `plan_only`). |
+
+#### The configure input
+
+A configure has no plan, so there is nothing for `terraform show -json` to
+produce. What a policy sees instead is the run's **resolved inventory
+document** — the hosts, groups and effective variables the playbook will act on,
+which the API resolves and stores as the run's own artifact at creation.
+
+```rego
+package terrapod.policy
+
+# Refuse a configure that would touch a production host.
+deny contains msg if {
+    some name, vars in input.hosts
+    vars.env == "production"
+    msg := sprintf("configure targets production host %s", [name])
+}
+
+# Refuse one that reaches outside a named group.
+deny contains msg if {
+    some name, _ in input.hosts
+    not name in input.groups.canary
+    msg := sprintf("%s is not in the canary group", [name])
+}
+```
+
+The shape:
+
+| Key | Contents |
+|---|---|
+| `hosts` | `{"<name>": {<variables>}}`. The variables are **effective** — group, host and `all` scopes are already merged down per host, so a policy reads one value rather than reconstructing precedence. |
+| `groups` | `{"<group>": ["<host>", ...]}` |
+| `children` | `{"<parent group>": ["<child group>", ...]}` |
+| `partial` | `true` when the API declined to parse a source. Present and `false` on a faithful resolution rather than absent. |
+| `skipped_sources` | What was declined, and why. Empty on a faithful resolution. |
+
+Three things worth knowing before writing a rule against it.
+
+**Check `partial` if your rule reasons about the whole estate.** A rule of the
+form "no host may have X" is answering a different question when the host set is
+incomplete — it passes because the offending host was never parsed. A policy
+that cares should deny on `input.partial` outright rather than reason about a
+set it cannot trust.
+
+**`--limit` is not applied here.** The document is the inventory as resolved,
+not the subset a particular run will touch. A policy sees everything the
+workspace could reach; the run's own narrowing is separate.
+
+**Secrets are not substituted.** A credential delivered through the inventory
+appears as its `${terrapod:...}` placeholder, not its value — deliberately, so
+that a password cannot reach a policy's `input` and from there into a `deny`
+message. A rule can assert that a host *declares* a credential; it cannot read
+one.
 
 #### The Pulumi input
 

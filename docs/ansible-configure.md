@@ -313,6 +313,32 @@ the provider, the MCP server and the UI — and a force that exists gets used
 routinely, which is how it stops being a deliberate act. Unlock the workspace,
 configure it, lock it again.
 
+## Policy sets apply to a configure, if you use them
+
+If you have no policy sets, nothing in this section affects you and a configure
+behaves exactly as it did before — the run asks the API what applies, is told
+nothing does, and proceeds. It does not even download OPA.
+
+If you do use them, a policy set scoped to the workspace is evaluated **before
+the playbook runs**, and a `mandatory` set that denies stops the configure
+having changed nothing. What a policy reads is the run's resolved inventory
+rather than a plan — a configure has no plan — and that document is described
+in [Policies](policies.md#the-configure-input).
+
+Two differences from a plan/apply gate are worth knowing, because they follow
+from a configure being a single operation rather than two:
+
+* **There is no held run to release.** A denied plan waits so you can review and
+  override it, then applies the plan it already computed. A denied configure has
+  executed nothing, so there is nothing to resume: override the policy check and
+  queue a new configure. That is cheap — the only work done was resolving the
+  inventory.
+* **A composite is gated at its configure half separately.** An apply followed
+  by a configure is gated twice: the apply on its own Terraform plan, and the
+  configure on the inventory that apply produced. The second gate necessarily
+  happens after the apply has landed, because the hosts a configure acts on may
+  not exist until it has.
+
 ## A destroy never configures
 
 An apply that is tearing infrastructure down is never followed by a configure,

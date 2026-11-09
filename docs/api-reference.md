@@ -2605,7 +2605,7 @@ GET /api/tfe/v2/workspaces/{id}/vars
 returned.
 
 > **On a catalog-managed workspace, a NON-sensitive variable can come back masked
-> too, and this is the one most likely to be read as a bug (#2425 §5.5).** A
+> too, and this is the one most likely to look like a bug (#2425 §5.5).** A
 > static `native`/`terraform` variable returns `value: null`, `sensitive: true`
 > and `version-id: null` when the item marked it sensitive, when the item **hid**
 > it, or when the item's definition can no longer be tied to this instance — the

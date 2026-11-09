@@ -16,6 +16,8 @@ import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePoolEvents } from '@/lib/use-pool-events'
 import { usePollingInterval } from '@/lib/use-polling-interval'
+import { CopyButton } from '@/components/copy-button'
+import { StatusDot, type EntityStatus } from '@/components/status-dot'
 
 interface PoolAttrs {
   name: string
@@ -25,14 +27,7 @@ interface PoolAttrs {
   'owner-email': string
   permission?: string
   'created-at': string
-  status?: 'online' | 'offline' | 'degraded'
-}
-
-function statusDotClass(status: string | undefined): string {
-  if (status === 'online') return 'bg-green-400'
-  if (status === 'cert-expired') return 'bg-red-400'
-  if (status === 'degraded') return 'bg-amber-400'
-  return 'bg-slate-500'
+  status?: EntityStatus
 }
 
 // Maps a listener status to the catalog key of its explanatory tooltip, or
@@ -346,12 +341,12 @@ export default function AgentPoolDetailPage() {
               <code className="flex-1 text-sm text-green-200 bg-green-900/30 p-2 rounded font-mono overflow-x-auto">
                 {createdToken}
               </code>
-              <button
-                onClick={() => navigator.clipboard.writeText(createdToken)}
-                className="px-3 py-1 rounded text-xs font-medium bg-green-800/50 hover:bg-green-700/50 text-green-200 transition-colors flex-shrink-0"
-              >
-                {t('tokens.created.copy')}
-              </button>
+              <CopyButton
+                value={createdToken}
+                label={t('tokens.created.copy')}
+                testId="join-token-copy"
+                className="flex-shrink-0"
+              />
             </div>
           </div>
         )}
@@ -594,7 +589,10 @@ export default function AgentPoolDetailPage() {
                         <td className="px-4 py-3 text-sm text-slate-200">{l.attributes.name}</td>
                         <td className="px-4 py-3">
                           <span className="flex items-center gap-1.5" title={(() => { const k = statusTitleKey(l.attributes.status); return k ? t(k) : undefined })()}>
-                            <span className={`w-2 h-2 rounded-full ${statusDotClass(l.attributes.status)}`} />
+                            <StatusDot
+                              status={l.attributes.status}
+                              label={t(`listeners.status.${l.attributes.status}`)}
+                            />
                             <span className="text-xs text-slate-400">{t(`listeners.status.${l.attributes.status}`)}</span>
                           </span>
                         </td>

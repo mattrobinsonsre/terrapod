@@ -250,3 +250,78 @@ class TestTheOverrideCoversWhatTheCheckCovers:
         ) as ov:
             assert await policy_check_service.override_check(AsyncMock(), run, "scan", "a@b") == 1
         ov.assert_awaited_once()
+
+
+class TestWhyARunHasNoPolicyEvaluations:
+    """The run-evaluations meta says why there are none (#2435).
+
+    `meta.not-evaluated-reason` is the operator's only signal that a mandatory
+    set in scope was never applied. It was keyed on the workspace's ENGINE, so
+    a standalone configure -- which has no plan and therefore never reaches the
+    post-plan gate at all -- came back with no reason, which reads as "every
+    set in scope passed". That is the defect this names.
+
+    Handlers called directly with a mocked session, as the rest of this file
+    does. All three call sites of the reason function were unverified before
+    this: reverting any of them to drop the run killed zero tests.
+    """
+
+    @staticmethod
+    def _db(run, ws):
+        db = MagicMock()
+
+        async def _get(model, _id):
+            return ws if model.__name__ == "Workspace" else run
+
+        db.get = AsyncMock(side_effect=_get)
+        return db
+
+    @staticmethod
+    def _user():
+        # Built the way this file already builds one, rather than invented.
+        return AuthenticatedUser(
+            email="op@example.com",
+            display_name=None,
+            roles=["admin"],
+            provider_name="local",
+            auth_method="session",
+        )
+
+    async def _meta(self, *, is_configure: bool) -> dict:
+        from terrapod.api.routers import policy_sets as ps_router
+
+        ws_id, run_id = uuid.uuid4(), uuid.uuid4()
+        ws = MagicMock(id=ws_id, engine="terraform", labels={}, owner_email=None)
+        run = MagicMock(id=run_id, workspace_id=ws_id, plan_only=False, is_configure=is_configure)
+        with (
+            patch.object(
+                ps_router.policy_set_service, "get_run_evaluations", AsyncMock(return_value=[])
+            ),
+            patch.object(
+                ps_router.policy_set_service, "run_policy_summary", AsyncMock(return_value={})
+            ),
+            patch.object(ps_router, "_get_run_for_read", AsyncMock(return_value=run)),
+        ):
+            resp = await ps_router.list_run_policy_evaluations(
+                run_id=f"run-{run_id}", user=self._user(), db=self._db(run, ws)
+            )
+        import json as _json
+
+        return _json.loads(resp.body)["meta"]
+
+    async def test_a_configure_run_is_told_why(self) -> None:
+        meta = await self._meta(is_configure=True)
+        reason = meta.get("not-evaluated-reason")
+        assert reason is not None, "a configure must say why nothing was evaluated"
+        assert "configure" in reason.lower()
+
+    async def test_a_plan_apply_run_on_the_same_engine_gets_no_reason(self) -> None:
+        """The pair, not the single case.
+
+        Without this, a reason that fired for EVERY run would pass the test
+        above -- and a blanket reason is exactly the shape that makes
+        `evaluate_post_plan` short-circuit to GATE_PASSED and let every apply
+        through.
+        """
+        meta = await self._meta(is_configure=False)
+        assert "not-evaluated-reason" not in meta

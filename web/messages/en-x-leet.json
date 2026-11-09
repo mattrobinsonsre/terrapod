@@ -1993,7 +1993,14 @@
       "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n"
     },
     "showDetail": "5h0w 7h3 full 3xpl4n4710n",
-    "hideDetail": "H1d3 7h3 full 3xpl4n4710n"
+    "hideDetail": "H1d3 7h3 full 3xpl4n4710n",
+    "copy": {
+      "button": "C0py",
+      "copied": "C0p13d",
+      "failed": "C0py f41l3d",
+      "failedAria": "C0py f41l3d — 53l3c7 7h3 v4lu3 4nd c0py 17 by h4nd",
+      "failedTitle": "7h3 br0w53r r3fu53d cl1pb04rd 4cc355. 53l3c7 7h3 v4lu3 4nd c0py 17 m4nu4lly."
+    }
   },
   "planSummary": {
     "aiGenerated": "41 g3n3r473d",
@@ -2251,7 +2258,6 @@
       "refresh": "R3fr35h",
       "refreshTitle": "R3fr35h l0g",
       "copy": "C0py",
-      "copied": "C0p13d!",
       "copyTitle": "C0py pl41n 73x7 70 cl1pb04rd",
       "copyAria": "C0py l0g 70 cl1pb04rd",
       "download": "D0wnl04d",

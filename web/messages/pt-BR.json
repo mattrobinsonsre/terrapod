@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Remover a configuração de provider {provider}"
     },
     "showDetail": "Mostrar a explicação completa",
-    "hideDetail": "Ocultar a explicação completa"
+    "hideDetail": "Ocultar a explicação completa",
+    "copy": {
+      "button": "Copiar",
+      "copied": "Copiado",
+      "failed": "Falha ao copiar",
+      "failedAria": "Falha ao copiar — selecione o valor e copie-o manualmente",
+      "failedTitle": "O navegador negou o acesso à área de transferência. Selecione o valor e copie-o manualmente."
+    }
   },
   "planSummary": {
     "aiGenerated": "Gerado por IA",
@@ -2251,7 +2258,6 @@
       "refresh": "Atualizar",
       "refreshTitle": "Atualizar log",
       "copy": "Copiar",
-      "copied": "Copiado!",
       "copyTitle": "Copiar texto simples para a área de transferência",
       "copyAria": "Copiar log para a área de transferência",
       "download": "Baixar",

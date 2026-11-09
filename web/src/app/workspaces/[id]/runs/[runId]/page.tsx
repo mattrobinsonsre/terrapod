@@ -27,7 +27,7 @@ import { logPaneHeightPx } from '@/lib/log-pane-height'
 import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
 import { filterHostLog, parseHostLog, pickerHostList, stripHostTags } from '@/lib/host-log'
 import { hostStatusKey } from '@/lib/host-status'
-import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
+import { ArrowDownToLine, RefreshCw, Download, Palette } from 'lucide-react'
 
 import {
   DEFAULT_ENGINE,
@@ -38,6 +38,7 @@ import {
 } from '@/lib/phase-vocabulary'
 import { gateOf, holdActivityKey, phaseOf, type Gate } from '@/lib/run-hold'
 import { RUN_TIMELINE_KEYS } from '@/lib/run-timeline'
+import { CopyButton } from '@/components/copy-button'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
 const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
@@ -590,7 +591,6 @@ function LogPanel({
     setWasStreaming(isStreaming)
     if (isStreaming) setFollowing(true)
   }
-  const [copied, setCopied] = useState(false)
   // A callback ref, not `useRef`, because this panel renders an empty state
   // until the log arrives: on the first render there is no <pre> at all. A
   // plain ref leaves the scroll effect below with nothing to attach to AND no
@@ -929,19 +929,15 @@ function LogPanel({
               </button>
             )}
             {plainContent && (
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(plainContent)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 2000)
-                }}
-                className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+              <CopyButton
+                value={plainContent}
+                label={t('log.copy')}
+                ariaLabel={t('log.copyAria')}
                 title={t('log.copyTitle')}
-                aria-label={t('log.copyAria')}
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{copied ? t('log.copied') : t('log.copy')}</span>
-              </button>
+                responsiveLabel
+                size="compact"
+                testId="run-log-copy"
+              />
             )}
             {/* One download button — the current Color/Plain mode decides what
                 it saves: colored (ANSI codes preserved) in Color mode, stripped

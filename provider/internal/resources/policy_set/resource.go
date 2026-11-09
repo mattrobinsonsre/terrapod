@@ -41,11 +41,13 @@ import (
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/ids"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/stateupgrade"
 )
 
 var (
-	_ resource.Resource                = &policySetResource{}
-	_ resource.ResourceWithImportState = &policySetResource{}
+	_ resource.Resource                 = &policySetResource{}
+	_ resource.ResourceWithImportState  = &policySetResource{}
+	_ resource.ResourceWithUpgradeState = &policySetResource{}
 )
 
 type policySetModel struct {
@@ -92,7 +94,18 @@ func (r *policySetResource) Metadata(_ context.Context, req resource.MetadataReq
 }
 
 func (r *policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
+	resp.Schema = currentSchema()
+}
+
+// schemaVersion is 1 because `allow_labels` and `deny_labels` changed from
+// map(string) to map(list(string)) in #1480 -- the same change, on the same
+// day, as `terrapod_role`. Neither declared a version or an upgrader, so 1.x
+// state could not be read at all (#2452).
+const schemaVersion = 1
+
+func currentSchema() schema.Schema {
+	return schema.Schema{
+		Version:     schemaVersion,
 		Description: "Manages an OPA policy set — a scoped collection of Rego policies evaluated against a run's plan.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -219,6 +232,40 @@ func (r *policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 		},
 	}
+}
+
+// labelAttributes are the two whose element type changed in #1480.
+var labelAttributes = []string{"allow_labels", "deny_labels"}
+
+func priorSchemaV0() *schema.Schema {
+	return stateupgrade.PriorSchemaWithScalarLabels(currentSchema(), labelAttributes...)
+}
+
+func (r *policySetResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema:   priorSchemaV0(),
+			StateUpgrader: upgradePolicySetV0toV1,
+		},
+	}
+}
+
+// upgradePolicySetV0toV1 rewrites each label value `v` as `[v]`; everything
+// else passes through.
+func upgradePolicySetV0toV1(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+	var prior policySetModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	prior.AllowLabels = stateupgrade.WrapLabelValues(ctx, prior.AllowLabels, &resp.Diagnostics)
+	prior.DenyLabels = stateupgrade.WrapLabelValues(ctx, prior.DenyLabels, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, prior)...)
 }
 
 func (r *policySetResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
