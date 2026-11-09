@@ -121,12 +121,51 @@ def test_build_run_context_shape() -> None:
         is_destroy=False,
         plan_only=False,
     )
-    ctx = policy_set_service.build_run_context(ws, run)
+    ctx = policy_set_service.build_run_context(ws, run, "plan")
     assert ctx["workspace"]["name"] == "prod-vpc"
     assert ctx["workspace"]["labels"] == {"env": "prod"}
     assert ctx["run"]["is_destroy"] is False
     assert ctx["run"]["plan_only"] is False
     assert ctx["run"]["message"] == "apply VPC"
+    assert ctx["run"]["phase"] == "plan"
+
+
+@pytest.mark.parametrize("phase", ["plan", "configure"])
+def test_the_phase_reaches_the_policy_input(phase: str) -> None:
+    """A policy must be able to tell which Job is being judged.
+
+    Both Jobs of a COMPOSITE run (apply-then-configure) fetch one bundle for
+    one run, so every other field in this document is identical between them.
+    If the phase does not reach the input, a rule written for the playbook
+    fires on the terraform plan as well, and vice versa.
+    """
+    ws = SimpleNamespace(id=uuid.uuid4(), name="w", labels={})
+    run = SimpleNamespace(
+        id=uuid.uuid4(),
+        message="",
+        source="",
+        is_destroy=False,
+        plan_only=False,
+        # A composite carries this for BOTH Jobs, which is why it cannot be the
+        # discriminator -- asserted here so the claim is pinned, not just said.
+        is_configure=True,
+    )
+    ctx = policy_set_service.build_run_context(ws, run, phase)
+    assert ctx["run"]["phase"] == phase
+    assert "is_configure" not in ctx["run"]
+
+
+def test_no_phase_is_an_empty_string_not_a_missing_key() -> None:
+    """A Rego `input.terrapod_context.run.phase` must always resolve.
+
+    An absent key makes a comparison undefined rather than false, so a rule
+    guarded on the phase would silently not fire at all -- the fail-open shape
+    this whole change exists to remove.
+    """
+    ws = SimpleNamespace(id=uuid.uuid4(), name="w", labels={})
+    run = SimpleNamespace(id=uuid.uuid4(), message="", source="", is_destroy=False, plan_only=False)
+    ctx = policy_set_service.build_run_context(ws, run, None)
+    assert ctx["run"]["phase"] == ""
 
 
 # ── evaluate_post_plan (one branch — others covered alongside the runner-protocol HTTP tests in test_policy_runner_endpoints.py) ──

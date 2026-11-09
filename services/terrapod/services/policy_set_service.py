@@ -155,8 +155,28 @@ def policy_sets_not_evaluated_reason(ws: Workspace, run: Run | None = None) -> s
 # ── OPA input context ─────────────────────────────────────────────────
 
 
-def build_run_context(ws: Workspace, run: Run) -> dict[str, Any]:
-    """Terrapod metadata exposed to policies as ``data.terrapod_context``."""
+def build_run_context(ws: Workspace, run: Run, phase: str | None) -> dict[str, Any]:
+    """Terrapod metadata exposed to policies as ``data.terrapod_context``.
+
+    `phase` is the phase of the Job that asked, read off its runner token
+    rather than off the run -- and it is the ONLY thing here that separates the
+    two evaluations of one COMPOSITE run. A composite (apply-then-configure) is
+    a single Run carrying `is_configure=True`, and both its plan-phase Job and
+    its configure-phase Job fetch this same bundle. Without it a rule written
+    for the playbook also fires on the terraform plan, and one written for the
+    plan also fires on the playbook -- the same defect as the `policies.md`
+    example that denied every configure whose inventory was larger than a
+    group, which is to say a correct one.
+
+    A run-shaped `is_configure` deliberately is NOT exposed: it cannot make
+    that distinction (it is a property of the run, identical for both Jobs) and
+    offering it would invite an author to reach for it when they want `phase`.
+    `phase` is `"plan"` or `"configure"` -- the only two the bundle endpoint
+    admits -- or None where the caller has no token to read it from.
+
+    Required rather than defaulted, for the reason `evaluate_policies.enforce`
+    is: a default makes the bypass the default, and every test would take it.
+    """
     return {
         "workspace": {
             "id": str(ws.id),
@@ -169,6 +189,7 @@ def build_run_context(ws: Workspace, run: Run) -> dict[str, Any]:
             "source": run.source or "",
             "is_destroy": bool(run.is_destroy),
             "plan_only": bool(run.plan_only),
+            "phase": phase or "",
         },
     }
 

@@ -28,7 +28,12 @@ from terrapod.api.routers import policy_sets as router
 # ── _require_runner_for_run via the bundle endpoint ──────────────────
 
 
-def _user(*, method: str = "runner_token", run_id: str | None = "abc123") -> AuthenticatedUser:
+def _user(
+    *,
+    method: str = "runner_token",
+    run_id: str | None = "abc123",
+    run_phase: str | None = None,
+) -> AuthenticatedUser:
     """Minimal AuthenticatedUser stub for direct handler tests. We pass
     it to the handler functions as the resolved `user` dependency."""
     return AuthenticatedUser(
@@ -38,6 +43,7 @@ def _user(*, method: str = "runner_token", run_id: str | None = "abc123") -> Aut
         provider_name="local",
         auth_method=method,
         run_id=run_id,
+        run_phase=run_phase,
     )
 
 
@@ -174,6 +180,40 @@ async def test_bundle_returns_applicable_sets_and_context() -> None:
     assert body["policy_sets"][0]["enforcement_level"] == "mandatory"
     assert body["policy_sets"][0]["policies"][0]["name"] == "no-public-buckets"
     assert body["context"]["workspace"]["name"] == "smoke"
+
+
+@pytest.mark.parametrize("token_phase", ["plan", "configure"])
+@pytest.mark.asyncio
+async def test_the_bundle_context_carries_the_token_s_phase(token_phase: str) -> None:
+    """Driven through the ROUTE, because the phase is the router's to supply.
+
+    `build_run_context` has its own unit test, and it cannot catch this: the
+    router could pass None, or the run's own shape, and that test would still
+    pass. The mutation this exists for is `build_run_context(ws, run, None)`,
+    which compiles and leaves every other assertion in this file green.
+
+    A COMPOSITE run (apply-then-configure) is one Run whose plan Job and
+    configure Job both fetch this bundle, so the phase is the only field that
+    distinguishes them -- a policy guarded on it is otherwise guarded on
+    nothing.
+    """
+    run = _run(is_configure=True, configure_after_apply=True)
+    ws = _ws()
+    run_id = f"run-{run.id}"
+    db = _mock_db_with_run(run, ws)
+    user = _user(method="runner_token", run_id=run_id, run_phase=token_phase)
+
+    with patch.object(
+        router.policy_set_service,
+        "applicable_policy_sets",
+        new=AsyncMock(return_value=[]),
+    ):
+        resp = await router.get_policy_bundle(run_id=run_id, user=user, db=db)
+
+    import json
+
+    body = json.loads(resp.body)
+    assert body["context"]["run"]["phase"] == token_phase
 
 
 @pytest.mark.parametrize(

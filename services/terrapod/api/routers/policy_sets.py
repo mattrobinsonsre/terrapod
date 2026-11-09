@@ -758,7 +758,10 @@ async def get_policy_bundle(
         if policy_set_service.policy_sets_not_evaluated_reason(ws, run)
         else await policy_set_service.applicable_policy_sets(db, ws)
     )
-    context = policy_set_service.build_run_context(ws, run)
+    # The phase comes off the TOKEN, not the run: a composite's plan Job and
+    # its configure Job fetch this same bundle for the same run, and this is
+    # the only field that tells a policy which of the two it is judging.
+    context = policy_set_service.build_run_context(ws, run, user.run_phase)
 
     return JSONResponse(
         content={
