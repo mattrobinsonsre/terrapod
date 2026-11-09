@@ -26,17 +26,31 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+/** Every `.tsx` under a directory, walked in Node.
+ *
+ *  Deliberately NOT `grep -rl ... --include=*.tsx`: the job that runs this is
+ *  an Alpine container, whose BusyBox grep has no `--include` and exits 2 on
+ *  it. That passed locally against BSD grep and failed in CI, which is the
+ *  third dialect of the same trap -- so the walk uses no external tool at all.
+ */
+function tsxFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...tsxFiles(p))
+    else if (entry.name.endsWith('.tsx')) out.push(p)
+  }
+  return out
+}
 
 /** Every file in web/src that renders a StatusDot, from the tree. */
 function sites(): { file: string; src: string }[] {
-  const files = execFileSync('grep', ['-rl', '<StatusDot', 'src', '--include=*.tsx'], {
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean)
-  return files.map((file) => ({ file, src: readFileSync(file, 'utf8') }))
+  return tsxFiles('src')
+    .map((file) => ({ file, src: readFileSync(file, 'utf8') }))
+    .filter(({ src }) => src.includes('<StatusDot'))
 }
 
 /** Each `<StatusDot ... />` with the label expression it was handed. */
