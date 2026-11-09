@@ -512,3 +512,80 @@ class TestTheRoundTripThroughRealAnsible:
             if key != "_meta" and isinstance(value, dict):
                 inherited |= set(value.get("hosts") or [])
         assert inherited - {"all", "ungrouped"} == {"web1", "web2", "db1"}
+
+
+class TestThePolicyInput:
+    """What OPA is handed for a configure (#2435).
+
+    `materialise` renders the `-i` source WITH `${terrapod:...}` placeholders
+    substituted -- that is its job. The policy input must be the document
+    BEFORE that, and the distinction is the whole security property: handing a
+    policy the rendered form would put a delivered password into `input`, and
+    from there into any `deny` message a policy chose to emit.
+    """
+
+    DOCUMENT = {
+        "hosts": {"w1": {"ansible_ssh_private_key_file": placeholder_for("web", "private_key")}},
+        "groups": {"webservers": ["w1"]},
+        "children": {},
+    }
+    RESOLVED = {"web.private_key": "/tp/credentials/k"}
+
+    def _served(self, monkeypatch, document):
+        def fake(url, dest, **kwargs):  # noqa: ARG001
+            Path(dest).write_text(json.dumps(document))
+            return type("R", (), {"ok": True, "status": 200})()
+
+        monkeypatch.setattr(configure_inventory, "download_to_file", fake)
+
+    def test_it_carries_the_placeholder_and_not_the_secret(self, cfg, monkeypatch, tmp_path):
+        """The one that matters. Driven WITH `resolved`, so substitution is
+        live -- a test that passed no credentials would pass whichever document
+        was written and prove nothing."""
+        self._served(monkeypatch, self.DOCUMENT)
+        out = tmp_path / "policy-input.json"
+
+        rendered = _one(
+            materialise(cfg, work_dir=tmp_path, resolved=self.RESOLVED, policy_input=out)
+        )
+
+        # Substitution really did happen, or the assertion below is vacuous.
+        assert "/tp/credentials/k" in rendered.read_text()
+
+        written = json.loads(out.read_text())
+        assert written == self.DOCUMENT, "the policy input is not the document as stored"
+        assert "/tp/credentials/k" not in out.read_text(), (
+            "a delivered credential reached the policy input"
+        )
+
+    def test_it_is_written_on_the_handoff_path_too(self, cfg, monkeypatch, tmp_path):
+        """The handoff branch returns EARLY. A write placed at the ordinary
+        return would leave a configure with a dynamic source evaluated against
+        nothing -- which is the fail-open direction."""
+        sources = tmp_path / "tree" / "ansible" / "hosts.d"
+        sources.mkdir(parents=True)
+        (sources / "10_static.yml").write_text("all:\n  hosts:\n    web1:\n")
+        handoff = {
+            "hosts": {"declared-1": {}},
+            "groups": {},
+            "children": {},
+            "partial": True,
+            "sources": ["ansible/hosts.d/10_static.yml"],
+            "declared": {"all": {"hosts": {"declared-1": {}}}},
+        }
+        self._served(monkeypatch, handoff)
+        out = tmp_path / "policy-input.json"
+
+        materialise(cfg, work_dir=tmp_path / "tree", policy_input=out)
+
+        assert out.is_file(), "a handed-over configure reached OPA with no input"
+        assert json.loads(out.read_text()) == handoff
+
+    def test_nothing_is_written_when_it_is_not_asked_for(self, cfg, monkeypatch, tmp_path):
+        """The parameter is optional, and the non-configure paths do not pass
+        it. Writing regardless would put the inventory somewhere no caller
+        asked for it."""
+        self._served(monkeypatch, self.DOCUMENT)
+        out = tmp_path / "policy-input.json"
+        materialise(cfg, work_dir=tmp_path, resolved=self.RESOLVED)
+        assert not out.exists()
