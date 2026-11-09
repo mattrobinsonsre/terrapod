@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Fjern providerkonfigurasjonen {provider}"
     },
     "showDetail": "Vis hele forklaringen",
-    "hideDetail": "Skjul hele forklaringen"
+    "hideDetail": "Skjul hele forklaringen",
+    "copy": {
+      "button": "Kopier",
+      "copied": "Kopiert",
+      "failed": "Feilet",
+      "failedAria": "Kopiering feilet – merk verdien og kopier den manuelt",
+      "failedTitle": "Nettleseren nektet tilgang til utklippstavlen. Merk verdien og kopier den manuelt."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI-generert",

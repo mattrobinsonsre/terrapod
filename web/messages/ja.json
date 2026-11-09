@@ -1993,7 +1993,14 @@
       "removeProviderAria": "プロバイダー設定 {provider} を削除"
     },
     "showDetail": "詳しい説明を表示",
-    "hideDetail": "詳しい説明を非表示"
+    "hideDetail": "詳しい説明を非表示",
+    "copy": {
+      "button": "コピー",
+      "copied": "コピーしました",
+      "failed": "コピー失敗",
+      "failedAria": "コピー失敗 — 値を選択して手動でコピーしてください",
+      "failedTitle": "ブラウザがクリップボードへのアクセスを拒否しました。値を選択して手動でコピーしてください。"
+    }
   },
   "planSummary": {
     "aiGenerated": "AI生成",

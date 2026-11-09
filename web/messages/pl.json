@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Usuń konfigurację providera {provider}"
     },
     "showDetail": "Pokaż pełne wyjaśnienie",
-    "hideDetail": "Ukryj pełne wyjaśnienie"
+    "hideDetail": "Ukryj pełne wyjaśnienie",
+    "copy": {
+      "button": "Kopiuj",
+      "copied": "Skopiowano",
+      "failed": "Błąd kopiowania",
+      "failedAria": "Błąd kopiowania — zaznacz wartość i skopiuj ją ręcznie",
+      "failedTitle": "Przeglądarka odmówiła dostępu do schowka. Zaznacz wartość i skopiuj ją ręcznie."
+    }
   },
   "planSummary": {
     "aiGenerated": "Wygenerowano przez AI",

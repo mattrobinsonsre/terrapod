@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Poista provider-konfiguraatio {provider}"
     },
     "showDetail": "Näytä koko selitys",
-    "hideDetail": "Piilota koko selitys"
+    "hideDetail": "Piilota koko selitys",
+    "copy": {
+      "button": "Kopioi",
+      "copied": "Kopioitu",
+      "failed": "Kopiointi epäonnistui",
+      "failedAria": "Kopiointi epäonnistui — valitse arvo ja kopioi se käsin",
+      "failedTitle": "Selain esti leikepöydän käytön. Valitse arvo ja kopioi se manuaalisesti."
+    }
   },
   "planSummary": {
     "aiGenerated": "Tekoälyn luoma",

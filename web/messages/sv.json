@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Ta bort providerkonfigurationen {provider}"
     },
     "showDetail": "Visa hela förklaringen",
-    "hideDetail": "Dölj hela förklaringen"
+    "hideDetail": "Dölj hela förklaringen",
+    "copy": {
+      "button": "Kopiera",
+      "copied": "Kopierat",
+      "failed": "Misslyckades",
+      "failedAria": "Kopieringen misslyckades — markera värdet och kopiera det manuellt",
+      "failedTitle": "Webbläsaren nekade åtkomst till urklipp. Markera värdet och kopiera det manuellt."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI-genererad",

@@ -1993,7 +1993,14 @@
       "removeProviderAria": "{provider} provider chenmoHghach teq"
     },
     "showDetail": "QIj naQ ''ang",
-    "hideDetail": "QIj naQ So''"
+    "hideDetail": "QIj naQ So''",
+    "copy": {
+      "button": "velqa'",
+      "copied": "vellu'pu'",
+      "failed": "vel lujpu'",
+      "failedAria": "vel lujpu' — nap yIwIv 'ej ghop yIvel",
+      "failedTitle": "velHaq chaw' lajQo' browser. nap yIwIv 'ej ghop yIvel."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI chenmoHlu'pu'",

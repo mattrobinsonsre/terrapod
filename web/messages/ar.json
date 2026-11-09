@@ -1993,7 +1993,14 @@
       "removeProviderAria": "إزالة تهيئة provider {provider}"
     },
     "showDetail": "إظهار الشرح الكامل",
-    "hideDetail": "إخفاء الشرح الكامل"
+    "hideDetail": "إخفاء الشرح الكامل",
+    "copy": {
+      "button": "نسخ",
+      "copied": "تم النسخ",
+      "failed": "فشل النسخ",
+      "failedAria": "فشل النسخ — اختر القيمة وانسخها يدويًا",
+      "failedTitle": "رفض المتصفّح الوصول إلى الحافظة. اختر القيمة وانسخها يدويًا."
+    }
   },
   "planSummary": {
     "aiGenerated": "أُنشئ بواسطة الذكاء الاصطناعي",

@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Fjern providerkonfigurationen {provider}"
     },
     "showDetail": "Vis den fulde forklaring",
-    "hideDetail": "Skjul den fulde forklaring"
+    "hideDetail": "Skjul den fulde forklaring",
+    "copy": {
+      "button": "Kopiér",
+      "copied": "Kopieret",
+      "failed": "Mislykkedes",
+      "failedAria": "Kopiering mislykkedes — markér værdien og kopiér den manuelt",
+      "failedTitle": "Browseren nægtede adgang til udklipsholderen. Markér værdien, og kopiér den manuelt."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI-genereret",

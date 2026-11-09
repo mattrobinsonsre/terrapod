@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Odebrat konfiguraci provideru {provider}"
     },
     "showDetail": "Zobrazit celé vysvětlení",
-    "hideDetail": "Skrýt celé vysvětlení"
+    "hideDetail": "Skrýt celé vysvětlení",
+    "copy": {
+      "button": "Kopírovat",
+      "copied": "Zkopírováno",
+      "failed": "Kopírování selhalo",
+      "failedAria": "Kopírování selhalo — vyberte hodnotu a zkopírujte ji ručně",
+      "failedTitle": "Prohlížeč odepřel přístup ke schránce. Vyberte hodnotu a zkopírujte ji ručně."
+    }
   },
   "planSummary": {
     "aiGenerated": "Vygenerováno AI",

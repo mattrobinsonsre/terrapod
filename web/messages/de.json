@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Provider-Konfiguration {provider} entfernen"
     },
     "showDetail": "Vollständige Erklärung anzeigen",
-    "hideDetail": "Vollständige Erklärung ausblenden"
+    "hideDetail": "Vollständige Erklärung ausblenden",
+    "copy": {
+      "button": "Kopieren",
+      "copied": "Kopiert",
+      "failed": "Fehlgeschlagen",
+      "failedAria": "Kopieren fehlgeschlagen — markieren Sie den Wert und kopieren Sie ihn von Hand",
+      "failedTitle": "Der Browser hat den Zugriff auf die Zwischenablage verweigert. Markieren Sie den Wert und kopieren Sie ihn manuell."
+    }
   },
   "planSummary": {
     "aiGenerated": "KI-generiert",

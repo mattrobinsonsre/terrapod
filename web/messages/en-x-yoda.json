@@ -1993,7 +1993,14 @@
       "removeProviderAria": "{provider} provider configuration, Remove"
     },
     "showDetail": "The full explanation, show",
-    "hideDetail": "The full explanation, hide"
+    "hideDetail": "The full explanation, hide",
+    "copy": {
+      "button": "Copy",
+      "copied": "Copied, it is",
+      "failed": "Failed, the copy did",
+      "failedAria": "Failed, the copy did — the value select, and by hand copy it",
+      "failedTitle": "Clipboard access, the browser refused. The value select, and manually copy it."
+    }
   },
   "planSummary": {
     "aiGenerated": "generated, AI",

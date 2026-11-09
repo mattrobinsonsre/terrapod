@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Configurationem provider {provider} removere"
     },
     "showDetail": "Explicationem plenam monstrare",
-    "hideDetail": "Explicationem plenam celare"
+    "hideDetail": "Explicationem plenam celare",
+    "copy": {
+      "button": "Exscribere",
+      "copied": "Exscriptum",
+      "failed": "Exscriptio defecit",
+      "failedAria": "Exscriptio defecit — valorem elige et manu exscribe",
+      "failedTitle": "Navigatrum accessum ad tabellam negavit. Valorem elige et manu exscribe."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI generatum",

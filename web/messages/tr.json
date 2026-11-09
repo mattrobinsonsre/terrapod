@@ -1993,7 +1993,14 @@
       "removeProviderAria": "{provider} provider yapılandırmasını kaldır"
     },
     "showDetail": "Tam açıklamayı göster",
-    "hideDetail": "Tam açıklamayı gizle"
+    "hideDetail": "Tam açıklamayı gizle",
+    "copy": {
+      "button": "Kopyala",
+      "copied": "Kopyalandı",
+      "failed": "Kopyalanamadı",
+      "failedAria": "Kopyalanamadı — değeri seçip elle kopyalayın",
+      "failedTitle": "Tarayıcı pano erişimini reddetti. Değeri seçip elle kopyalayın."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI üretti",

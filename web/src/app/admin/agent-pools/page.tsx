@@ -15,6 +15,7 @@ import { getAuthState } from '@/lib/auth'
 import { useIsAdmin } from '@/lib/use-auth-roles'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { StatusDot } from '@/components/status-dot'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface AgentPool {
@@ -32,12 +33,6 @@ interface AgentPool {
 }
 
 type PoolSortKey = 'name' | 'description' | 'created'
-
-function statusDotClass(status: string | undefined): string {
-  if (status === 'online') return 'bg-green-400'
-  if (status === 'degraded') return 'bg-amber-400'
-  return 'bg-slate-500'
-}
 
 export default function AgentPoolsPage() {
   const router = useRouter()
@@ -200,9 +195,11 @@ export default function AgentPoolsPage() {
                           <span
                             className="md:hidden inline-flex items-center gap-1"
                             data-testid="pool-row-status-mobile"
-                            title={t(`badges.status.${pool.attributes.status}`)}
                           >
-                            <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
+                            <StatusDot
+                              status={pool.attributes.status}
+                              label={t(`badges.status.${pool.attributes.status}`)}
+                            />
                           </span>
                         )}
                       </div>
@@ -213,7 +210,10 @@ export default function AgentPoolsPage() {
                     <td className="px-4 py-3 hidden md:table-cell">
                       {pool.attributes.status ? (
                         <span className="inline-flex items-center gap-1.5" title={pool.attributes.status === 'degraded' ? t('badges.degradedTooltip') : undefined}>
-                          <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
+                          <StatusDot
+                            status={pool.attributes.status}
+                            label={t(`badges.status.${pool.attributes.status}`)}
+                          />
                           <span className="text-xs text-slate-400 capitalize">{t(`badges.status.${pool.attributes.status}`)}</span>
                         </span>
                       ) : (
