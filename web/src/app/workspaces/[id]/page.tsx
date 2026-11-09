@@ -3719,62 +3719,7 @@ function WorkspaceDetailContent() {
                       />
                     }
                   />
-                  <div className="sm:col-span-2 min-w-0">
-                    <dt className="text-xs text-slate-500">{t('fields.inventoryPaths')}</dt>
-                    {settingsEditing ? (
-                      <dd className="mt-1 space-y-2">
-                        <p className="text-xs text-slate-400">{t('fields.inventoryPathsHint')}</p>
-                        {/* The shared editor rather than this page's older
-                            inline list: its row actions are real buttons with a
-                            background and a 44px tap target, which bare
-                            coloured text is not. */}
-                        <StringListEditor
-                          values={editInventoryPaths}
-                          onChange={setEditInventoryPaths}
-                          placeholder={t('fields.inventoryPathsPlaceholder')}
-                          addLabel={t('fields.inventoryPathsAdd')}
-                        />
-                      </dd>
-                    ) : (
-                      // An ORDERED list, because the order is the precedence
-                      // order — a later source wins per variable — so a read
-                      // that lost it would misreport the merge.
-                      <dd className="mt-1 text-sm text-slate-200">
-                        {(attrs['inventory-paths'] || []).length > 0 ? (
-                          <ol className="flex flex-col gap-1">
-                            {(attrs['inventory-paths'] || []).map((path) => (
-                              <li key={path}>
-                                <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
-                                  {path}
-                                </code>
-                              </li>
-                            ))}
-                          </ol>
-                        ) : (
-                          <span className="text-slate-500">{t('common.none')}</span>
-                        )}
-                      </dd>
-                    )}
-                  </div>
-                  {/* Which inventory sources ansible may resolve on the
-                      runner (#2033). Terrapod itself never runs either kind,
-                      in either state -- off means a plugin source is refused
-                      by name rather than resolving to a partial host set. */}
-                  {/* ONE ordered select over both grants (#2413 F19). Four
-                      options, not the finding's three: `scripts` without
-                      `plugins` is a real configuration -- see
-                      `lib/dynamic-inventory.ts` for the measurement. The second
-                      attribute is still written, by the control rather than by
-                      a Field of its own, and still appears in this file's state
-                      and payload. */}
                   <Field
-                    attr="dynamic-inventory-enabled"
-                    ctx={ansibleCtx}
-                    kind="select"
-                    display={dynamicInventoryDisplay()}
-                    control={<DynamicInventorySelect ctx={ansibleCtx} />}
-                  />
-<Field
                     attr="hard-limit"
                     ctx={ansibleCtx}
                     kind="text"
