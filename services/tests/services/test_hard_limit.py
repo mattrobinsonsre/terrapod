@@ -49,6 +49,14 @@ from terrapod.services.workspace_settings import validate_hard_limit
 #: `canary` and `web` overlap on h2, `web` and `prod` on h3, and h4 is in `prod`
 #: alone. Chosen so that a composition that unions where it should intersect
 #: shows up as a specific extra host rather than as a count being off.
+#:
+#: Every host carries a var deliberately, and `_resolve` ASSERTS it rather than
+#: this comment merely asking for it: `ansible-inventory --list` emits an EMPTY
+#: `_meta.hostvars` for a host with no variables, so a harness reading the host
+#: set from there against a var-less inventory measures nothing and reports
+#: every pattern as matching no hosts -- which reads as the patterns being
+#: wrong rather than as the fixture being wrong. Stripping the vars must fail
+#: loudly here, not quietly turn the whole matrix into a tautology.
 INVENTORY = """\
 all:
   children:
@@ -65,13 +73,6 @@ all:
         h2: {tag: a}
         h3: {tag: a}
 """
-
-#: Every host carries a var deliberately. `ansible-inventory --list` emits an
-#: EMPTY `_meta.hostvars` for a host with no variables, so a harness that reads
-#: the host set from there against a var-less inventory measures nothing and
-#: reports every pattern as matching no hosts -- which reads as the patterns
-#: being wrong rather than the fixture.
-_HOST_VAR_REQUIRED = True
 
 
 def _working_ansible_inventory() -> str | None:
@@ -105,14 +106,32 @@ def inventory_file():
         yield str(path)
 
 
+#: What the fixture declares, so the harness can tell "this pattern matched
+#: nothing" apart from "this harness can no longer see anything".
+FIXTURE_HOSTS = frozenset({"h1", "h2", "h3", "h4"})
+
+
 def _resolve(inventory_file: str, limit: str) -> frozenset[str]:
-    """The host set ansible itself resolves `limit` to."""
+    """The host set ansible itself resolves `limit` to.
+
+    An empty answer is a legitimate result here -- a ceiling and a run limit
+    can genuinely intersect to nothing -- which is exactly why the fixture's
+    own readability is asserted on the UNLIMITED read instead. If that one came
+    back empty every assertion in this module would pass vacuously.
+    """
     argv = [str(ANSIBLE_INVENTORY), "-i", inventory_file, "--list"]
     if limit:
         argv += ["--limit", limit]
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)  # noqa: S603
     assert proc.returncode == 0, f"{limit!r}: {proc.stderr}"
-    return frozenset(json.loads(proc.stdout).get("_meta", {}).get("hostvars", {}))
+    hosts = frozenset(json.loads(proc.stdout).get("_meta", {}).get("hostvars", {}))
+    if not limit:
+        assert hosts == FIXTURE_HOSTS, (
+            f"the fixture resolves to {sorted(hosts)}, not {sorted(FIXTURE_HOSTS)} -- if it is "
+            "empty, the hosts have lost their variables and `_meta.hostvars` is no longer a "
+            "readable host set, which would make every assertion here vacuous"
+        )
+    return hosts
 
 
 #: Ceilings spanning every admissible shape: a group, a wildcard, an exclusion
