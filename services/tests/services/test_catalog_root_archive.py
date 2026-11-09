@@ -252,6 +252,7 @@ async def test_root_config_version_contains_the_exact_registry_archive(
         ansible_directory="ansible" if configure else "",
         default_playbook="site.yml" if configure else "",
         default_limit="",
+        hard_limit="",
         default_version_pin="0.9.0",
         provider_template_ids=[],
         variable_options=[],

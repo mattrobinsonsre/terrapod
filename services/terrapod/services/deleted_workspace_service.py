@@ -138,6 +138,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "inventory_paths": list(ws.inventory_paths or []),
         "default_playbook": ws.default_playbook,
         "default_limit": ws.default_limit,
+        "hard_limit": ws.hard_limit,
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
@@ -674,6 +675,12 @@ async def restore_workspace(
         inventory_paths=list(settings.get("inventory_paths") or []),
         default_playbook=settings.get("default_playbook") or "",
         default_limit=settings.get("default_limit") or "",
+        # `""` for a snapshot predating the column, which is the right
+        # answer and worth stating: an absent ceiling restores as NO
+        # ceiling, matching what that workspace had when it was deleted.
+        # A restore must never INVENT one, and must never silently drop
+        # one it was given -- the second is what the snapshot gate caught.
+        hard_limit=settings.get("hard_limit") or "",
         stack=settings.get("stack"),
         var_files=list(settings.get("var_files") or []),
         # Empty for a snapshot taken before this column existed, which is the

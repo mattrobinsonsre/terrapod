@@ -129,6 +129,10 @@ class TestTheNativeSurfaceServesEveryEngine:
         "inventory-paths": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-playbook": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
         "default-limit": "an Ansible concept; the TFE surface serves Terraform alone (#1929)",
+        "hard-limit": (
+            "an Ansible concept, and the ceiling its sibling above is the default for; "
+            "the TFE surface serves Terraform alone (#2451)"
+        ),
         # Whether the repository's dynamic inventory sources are resolved on the
         # runner (#2033). Native-only for the same two reasons as the roots: both
         # govern an Ansible inventory resolution, and no `terraform`/`tofu`/`tfci`
