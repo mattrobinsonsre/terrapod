@@ -31,11 +31,13 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/stateupgrade"
 )
 
 var (
-	_ resource.Resource                = &roleResource{}
-	_ resource.ResourceWithImportState = &roleResource{}
+	_ resource.Resource                 = &roleResource{}
+	_ resource.ResourceWithImportState  = &roleResource{}
+	_ resource.ResourceWithUpgradeState = &roleResource{}
 )
 
 type roleModel struct {
@@ -73,7 +75,19 @@ func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest,
 }
 
 func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
+	resp.Schema = currentSchema()
+}
+
+// schemaVersion is 1 because `allow_labels` and `deny_labels` changed from
+// map(string) to map(list(string)) in #1480. State written by a 1.x provider
+// cannot be read by this schema -- every plan fails with
+// `Unable to Read Previously Saved State for UpgradeResourceState` -- so the
+// provider upgrades it itself (#2452).
+const schemaVersion = 1
+
+func currentSchema() schema.Schema {
+	return schema.Schema{
+		Version:     schemaVersion,
 		Description: "Manages a custom RBAC role in Terrapod.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -209,6 +223,45 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 		},
 	}
+}
+
+// labelAttributes are the two whose element type changed in #1480.
+var labelAttributes = []string{"allow_labels", "deny_labels"}
+
+// priorSchemaV0 is `currentSchema` with those two put back the way version 0
+// had them. See `stateupgrade` for why it is derived rather than written out,
+// and `TestThePriorSchemaStillDescribesVersionZero` for the guard that keeps
+// the derivation honest.
+func priorSchemaV0() *schema.Schema {
+	return stateupgrade.PriorSchemaWithScalarLabels(currentSchema(), labelAttributes...)
+}
+
+func (r *roleResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema:   priorSchemaV0(),
+			StateUpgrader: upgradeRoleV0toV1,
+		},
+	}
+}
+
+// upgradeRoleV0toV1 rewrites each label value `v` as the one-element list
+// `[v]`. Every other attribute passes through untouched, so a 1.x state plans
+// as a no-op against a configuration updated to one-element lists.
+func upgradeRoleV0toV1(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+	var prior roleModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	prior.AllowLabels = stateupgrade.WrapLabelValues(ctx, prior.AllowLabels, &resp.Diagnostics)
+	prior.DenyLabels = stateupgrade.WrapLabelValues(ctx, prior.DenyLabels, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, prior)...)
 }
 
 func (r *roleResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

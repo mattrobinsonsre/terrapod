@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Remoov da {provider} providr configurashun"
     },
     "showDetail": "Show meh teh ful xplanashun",
-    "hideDetail": "Hyde teh ful xplanashun"
+    "hideDetail": "Hyde teh ful xplanashun",
+    "copy": {
+      "button": "Copee",
+      "copied": "Copyd",
+      "failed": "Copee faild",
+      "failedAria": "Copee faild — selekt teh valyoo an kopy it wif ur own pawz",
+      "failedTitle": "Teh browsr sez no to clipbord akcess. Selekt teh valyoo an kopy it manueelee."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI generated",
@@ -2251,7 +2258,6 @@
       "refresh": "Refresh",
       "refreshTitle": "Refresh log",
       "copy": "Copee",
-      "copied": "Copyd!",
       "copyTitle": "Copy plain text ta clipbord",
       "copyAria": "Copy log ta clipbord",
       "download": "Download",

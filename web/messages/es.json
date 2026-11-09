@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Quitar la configuración de provider {provider}"
     },
     "showDetail": "Mostrar la explicación completa",
-    "hideDetail": "Ocultar la explicación completa"
+    "hideDetail": "Ocultar la explicación completa",
+    "copy": {
+      "button": "Copiar",
+      "copied": "Copiado",
+      "failed": "Error al copiar",
+      "failedAria": "Error al copiar — seleccione el valor y cópielo a mano",
+      "failedTitle": "El navegador denegó el acceso al portapapeles. Seleccione el valor y cópielo manualmente."
+    }
   },
   "planSummary": {
     "aiGenerated": "Generado por IA",
@@ -2251,7 +2258,6 @@
       "refresh": "Actualizar",
       "refreshTitle": "Actualizar registro",
       "copy": "Copiar",
-      "copied": "¡Copiado!",
       "copyTitle": "Copiar texto plano al portapapeles",
       "copyAria": "Copiar registro al portapapeles",
       "download": "Descargar",

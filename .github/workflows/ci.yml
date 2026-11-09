@@ -228,6 +228,24 @@ jobs:
 
       - name: (docs-audit) Provider defaults agree with the server's
         run: python3 scripts/docs-audit/check_provider_defaults.py
+
+      # A provider attribute whose TYPE changed needs a state upgrader, or a 1.x
+      # state cannot be read at all and EVERY plan fails. It shipped on two
+      # resources at once (#1480) and was reported for one; the other was found
+      # only by auditing all of them. Nothing in `go build`, `go vet` or the Go
+      # tests looks at a schema across a release boundary, and this needs the
+      # previous release's source, so it lives here rather than in the provider.
+      #
+      # This job checks out SHALLOW with no tags, so the tags the gate compares
+      # against are fetched here rather than by raising `fetch-depth` on the
+      # whole job -- every other gate in it would pay for history none of them
+      # read. Fetched at depth 1: `git show <tag>:<path>` needs that commit's
+      # tree, not its ancestry.
+      - name: Fetch the 1.x tags the upgrader gate compares against
+        run: git fetch --depth=1 --no-tags origin "+refs/tags/v1.*:refs/tags/v1.*"
+
+      - name: (docs-audit) A changed attribute type has a state upgrader
+        run: python3 scripts/docs-audit/check_provider_state_upgraders.py
       # Not a docs gate, but it belongs to a job that sees the whole checkout:
       # the pytest tiers run in an image that does not ship `scripts/`, and the
       # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).

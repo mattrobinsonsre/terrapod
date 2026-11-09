@@ -15,6 +15,7 @@ import { getAuthState } from '@/lib/auth'
 import { useIsAdmin } from '@/lib/use-auth-roles'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { StatusDot } from '@/components/status-dot'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface AgentPool {
@@ -32,12 +33,6 @@ interface AgentPool {
 }
 
 type PoolSortKey = 'name' | 'description' | 'created'
-
-function statusDotClass(status: string | undefined): string {
-  if (status === 'online') return 'bg-green-400'
-  if (status === 'degraded') return 'bg-amber-400'
-  return 'bg-slate-500'
-}
 
 export default function AgentPoolsPage() {
   const router = useRouter()
@@ -194,15 +189,26 @@ export default function AgentPoolsPage() {
                         {pool.attributes['is-default'] && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300">{t('badges.default')}</span>
                         )}
-                        {/* Below md the STATUS column is hidden, so reflow the health dot inline —
-                            otherwise a phone loses the healthy/degraded signal entirely (#719). */}
+                        {/* Below md the STATUS column is hidden, so reflow the health signal
+                            inline — otherwise a phone loses healthy/degraded entirely (#719).
+                            The TEXT comes with it: no stop clears WCAG 1.4.11's 3:1 against
+                            both themes' surfaces (the light ones sit at luminance .75-.95
+                            and the dark at .01-.05, so a mid-chroma fill is squeezed from both
+                            ends), and this is the one place the dot would otherwise be the sole
+                            visual carrier of state for a sighted user. The dot reinforces; the
+                            word states. */}
                         {pool.attributes.status && (
                           <span
                             className="md:hidden inline-flex items-center gap-1"
                             data-testid="pool-row-status-mobile"
-                            title={t(`badges.status.${pool.attributes.status}`)}
                           >
-                            <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
+                            <StatusDot
+                              status={pool.attributes.status}
+                              label={t(`badges.status.${pool.attributes.status}`)}
+                            />
+                            <span className="text-xs text-slate-400 capitalize">
+                              {t(`badges.status.${pool.attributes.status}`)}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -213,7 +219,10 @@ export default function AgentPoolsPage() {
                     <td className="px-4 py-3 hidden md:table-cell">
                       {pool.attributes.status ? (
                         <span className="inline-flex items-center gap-1.5" title={pool.attributes.status === 'degraded' ? t('badges.degradedTooltip') : undefined}>
-                          <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
+                          <StatusDot
+                            status={pool.attributes.status}
+                            label={t(`badges.status.${pool.attributes.status}`)}
+                          />
                           <span className="text-xs text-slate-400 capitalize">{t(`badges.status.${pool.attributes.status}`)}</span>
                         </span>
                       ) : (

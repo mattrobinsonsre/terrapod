@@ -189,9 +189,33 @@ body {
     --color-slate-300: #020618;
     --color-slate-400: #0f172b;
     --color-slate-500: #1d293d;
-    --color-slate-600: #cad5e2;
-    --color-slate-700: #e2e8f0;
-    --color-slate-800: #f1f5f9;
+    /* The light theme used to be a straight inversion of Tailwind's slate with
+     * no added hue, so a surface was `#f1f5f9` behind an `#e2e8f0` border --
+     * two near-identical greys, which is what read as a flat, low-contrast
+     * panel (#2446). These carry a hint of the brand's blue instead, so the
+     * edge between two surfaces is legible by HUE where it was not by
+     * luminance alone.
+     *
+     * The luminance steps themselves are unchanged, and that is deliberate
+     * rather than an oversight -- measured, the steps are 1.04 page->panel,
+     * 1.12 panel->row and 1.31 panel->border, almost exactly what the greys
+     * gave (1.05 / 1.13 / 1.36). Deepening them is NOT available: these surfaces
+     * are the ground for translucent badge fills and for hover text, so one
+     * step deeper (blue-100/200/300) takes `check_theme_contrast` from 0
+     * problems to 7 -- `bg-brand-900/50` falls to 1.08:1 against its own card
+     * and `hover:bg-slate-600 + text-brand-300` to 3.77:1. Deeper surfaces would
+     * therefore need those fills reworked first, at every site, which is its own
+     * change.
+     *
+     * Hue sits just cooler than the brand (`#1447e6`) rather than on it, so a
+     * tinted surface does not compete with the blue it is carrying. Text on
+     * these is near-black (`slate-100` is `#020618` here), so darkening the
+     * surface raises text contrast rather than lowering it -- the risk to
+     * watch is chromatic badges on a tinted ground, which the contrast gates
+     * cover. */
+    --color-slate-600: #bedbff;
+    --color-slate-700: #dbeafe;
+    --color-slate-800: #eff6ff;
     --color-slate-900: #f8fafc;
     --color-slate-950: #f8fafc;
 

@@ -101,22 +101,43 @@ async def applicable_policy_sets(db: AsyncSession, ws: Workspace) -> list[Policy
     return [ps for ps in rows if policy_set_applies(ps, ws.name, ws.labels or {})]
 
 
-def policy_sets_not_evaluated_reason(ws: Workspace) -> str | None:
-    """Why no policy set is evaluated for runs of this workspace, or None.
+def policy_sets_not_evaluated_reason(ws: Workspace, run: Run | None = None) -> str | None:
+    """Why no policy set is evaluated for this run, or None.
 
     A workspace whose engine's runner does not evaluate OPA (Pulumi, until
     #1560) is outside every policy set's scope. It is reported rather than left
     silent, so an operator who scoped a mandatory set to it can see the set is
     not being applied.
+
+    **It takes the RUN because "is this evaluated" is a property of the run's
+    shape, not of the engine alone (#2435).** All three post-plan gates are
+    called from one place, `run_service._complete_plan`, and a standalone
+    configure has no plan so never reaches it — nothing is evaluated for it.
+    Keyed on the workspace alone this returned `None` for such a run, which
+    reads as "every set in scope was applied", and an operator who scoped a
+    mandatory set saw nothing anywhere saying otherwise. That is worse than the
+    missing enforcement itself, because the absence is invisible.
+
+    `run=None` keeps the engine-only answer for a caller that has no run in
+    hand. Do NOT make this truthy for a workspace whose plan/apply IS gated:
+    `evaluate_post_plan` below short-circuits to `GATE_PASSED` on a reason, so
+    a workspace-wide reason on a configure-enabled workspace would pass every
+    apply. The run shape is exactly what keeps those two apart.
     """
     from terrapod.engines import evaluates_policy_sets
 
-    if evaluates_policy_sets(ws.engine):
-        return None
-    return (
-        f"Policy sets are not evaluated for {ws.engine} runs yet: the runner "
-        "produces no plan JSON for OPA to read."
-    )
+    if not evaluates_policy_sets(ws.engine):
+        return (
+            f"Policy sets are not evaluated for {ws.engine} runs yet: the runner "
+            "produces no plan JSON for OPA to read."
+        )
+    if run is not None and run.is_configure:
+        return (
+            "Policy sets are not evaluated for a configure: it has no plan, so "
+            "there is no plan JSON for OPA to read. Enforcement for a configure "
+            "is tracked in #2435."
+        )
+    return None
 
 
 # ── OPA input context ─────────────────────────────────────────────────
@@ -194,7 +215,13 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         return GATE_PASSED
-    if policy_sets_not_evaluated_reason(ws):
+    # `run` is passed for correctness rather than for an observable effect: a
+    # standalone configure has no plan and never reaches `_complete_plan`,
+    # which is the only caller of this gate, so `run.is_configure` cannot be
+    # True here today. Mutating it away kills no test, and that is the honest
+    # state -- it is belt-and-braces for when a configure IS gated (#2435),
+    # not a verified path.
+    if policy_sets_not_evaluated_reason(ws, run):
         # Its runner never evaluates, so a mandatory set in scope would be
         # recorded as a synthetic failure and hold every apply (#1567).
         return GATE_PASSED

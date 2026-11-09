@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Remove the {provider} marklar marklar"
     },
     "showDetail": "Show the full marklar",
-    "hideDetail": "Hide the full marklar"
+    "hideDetail": "Hide the full marklar",
+    "copy": {
+      "button": "Copy",
+      "copied": "Copied",
+      "failed": "Marklar failed",
+      "failedAria": "Marklar failed — select the marklar and copy it by marklar",
+      "failedTitle": "The marklar refused marklar marklar. Select the marklar and copy it manually."
+    }
   },
   "planSummary": {
     "aiGenerated": "Marklar generated",
@@ -2251,7 +2258,6 @@
       "refresh": "Refresh",
       "refreshTitle": "Refresh marklar",
       "copy": "Copy",
-      "copied": "Copied!",
       "copyTitle": "Copy plain marklar to marklar",
       "copyAria": "Copy marklar to marklar",
       "download": "Download",

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { CopyButton } from '@/components/copy-button'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -73,7 +74,6 @@ export default function OnboardingPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
   const [discovering, setDiscovering] = useState(false)
-  const [copied, setCopied] = useState('')
   // Raw↔polished view toggle for the reviewable config. Defaults to the polished
   // view when the AI polish is available (falls back to raw automatically when
   // it isn't). Never loses the raw view — the operator can flip back any time.
@@ -213,13 +213,6 @@ export default function OnboardingPage() {
     } finally {
       setDiscovering(false)
     }
-  }
-
-  function copy(key: string, text: string) {
-    navigator.clipboard?.writeText(text).then(() => {
-      setCopied(key)
-      setTimeout(() => setCopied(''), 1500)
-    })
   }
 
   const dataSources = surface?.data_sources ?? []
@@ -491,11 +484,6 @@ export default function OnboardingPage() {
                           ? active.attributes['paired-polished-config']
                           : active.attributes['paired-config']) || ''
                       }
-                      copyKey="paired"
-                      copied={copied}
-                      onCopy={copy}
-                      copyLabel={t('copy')}
-                      copiedLabel={t('copied')}
                     />
                     <p className="text-xs text-slate-500">{t('pairedNote')}</p>
                   </div>
@@ -507,11 +495,6 @@ export default function OnboardingPage() {
                       ? active.attributes['polished-import-blocks']
                       : active.attributes['import-blocks']) || ''
                   }
-                  copyKey="imports"
-                  copied={copied}
-                  onCopy={copy}
-                  copyLabel={t('copy')}
-                  copiedLabel={t('copied')}
                 />
                 <CodeBlock
                   title={t('generatedConfig')}
@@ -520,11 +503,6 @@ export default function OnboardingPage() {
                       ? active.attributes['polished-config']
                       : active.attributes['generated-config']) || ''
                   }
-                  copyKey="config"
-                  copied={copied}
-                  onCopy={copy}
-                  copyLabel={t('copy')}
-                  copiedLabel={t('copied')}
                 />
                 <p className="text-xs text-slate-500">{t('nextStepNote')}</p>
               </div>
@@ -557,33 +535,12 @@ function StatusBar({ status, t }: { status: string; t: ReturnType<typeof useTran
   )
 }
 
-function CodeBlock({
-  title,
-  text,
-  copyKey,
-  copied,
-  onCopy,
-  copyLabel,
-  copiedLabel,
-}: {
-  title: string
-  text: string
-  copyKey: string
-  copied: string
-  onCopy: (k: string, t: string) => void
-  copyLabel: string
-  copiedLabel: string
-}) {
+function CodeBlock({ title, text }: { title: string; text: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
-        <button
-          onClick={() => onCopy(copyKey, text)}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
-        >
-          {copied === copyKey ? copiedLabel : copyLabel}
-        </button>
+        <CopyButton value={text} />
       </div>
       <pre className="overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-950 p-3 text-xs text-slate-300 font-mono whitespace-pre">
         {text}

@@ -286,8 +286,20 @@ always had.
  }
 ```
 
-The same edit applies to `deny_labels`. There is no state migration to run: the
-values are unchanged, only their type in HCL. Once you are on the new type, the
+The same edit applies to `deny_labels`. **The provider upgrades your stored
+state for you** — it declares schema version 1 and rewrites each `"dev"` as
+`["dev"]` when it first reads a state written by a 1.x provider. There is
+nothing to run and nothing to import.
+
+> An earlier revision of this page said "there is no state migration to run:
+> the values are unchanged, only their type in HCL". The values are indeed
+> unchanged, but their type in **state** changed too, and until the upgrader
+> existed a 1.x state could not be read at all: every plan failed with
+> `Unable to Read Previously Saved State for UpgradeResourceState`, and it
+> failed even once the configuration had been corrected. That was #2452, fixed
+> for both `terrapod_role` and `terrapod_policy_set`.
+
+Once you are on the new type, the
 thing you could not say before becomes available — one role covering several
 environments rather than one role per value:
 

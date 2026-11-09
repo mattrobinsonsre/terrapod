@@ -50,6 +50,11 @@ def _run(**kw):
         "message": "m",
         "source": "tfe-api",
         "is_destroy": False,
+        # Must be stated: this builds a MagicMock from `base`, so a key left
+        # out is a TRUTHY mock rather than an error -- and the reason function
+        # now reads the run's shape (#2435), so an absent `is_configure` would
+        # make every mocked run look like a configure.
+        "is_configure": False,
     }
     base.update(kw)
     m = MagicMock()
