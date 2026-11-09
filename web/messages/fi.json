@@ -36,7 +36,9 @@
     "ha": "Korkea käytettävyys",
     "deletedWorkspaces": "Poistetut työtilat",
     "version": "Versio {version}",
-    "vault": "OpenBao/Vaultin tila"
+    "vault": "OpenBao/Vaultin tila",
+    "darkTheme": "Tumma teema",
+    "lightTheme": "Vaalea teema"
   },
   "switcher": {
     "language": "Kieli",

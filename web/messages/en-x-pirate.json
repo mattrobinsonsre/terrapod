@@ -36,7 +36,9 @@
     "ha": "Ever-Afloat",
     "deletedWorkspaces": "Scuttled work-decks",
     "version": "Ship's mark {version}",
-    "vault": "State o’ the OpenBao/Vault strongroom"
+    "vault": "State o’ the OpenBao/Vault strongroom",
+    "darkTheme": "Black flag theme",
+    "lightTheme": "Sunny deck theme"
   },
   "switcher": {
     "language": "Tongue",

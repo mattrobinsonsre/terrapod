@@ -36,7 +36,9 @@
     "ha": "Wysoka dostępność",
     "deletedWorkspaces": "Usunięte przestrzenie robocze",
     "version": "Wersja {version}",
-    "vault": "Stan OpenBao/Vault"
+    "vault": "Stan OpenBao/Vault",
+    "darkTheme": "Ciemny motyw",
+    "lightTheme": "Jasny motyw"
   },
   "switcher": {
     "language": "Język",

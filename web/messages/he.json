@@ -36,7 +36,9 @@
     "ha": "זמינות גבוהה",
     "deletedWorkspaces": "סביבות עבודה שנמחקו",
     "version": "גרסה {version}",
-    "vault": "מצב OpenBao/Vault"
+    "vault": "מצב OpenBao/Vault",
+    "darkTheme": "ערכת נושא כהה",
+    "lightTheme": "ערכת נושא בהירה"
   },
   "switcher": {
     "language": "שפה",

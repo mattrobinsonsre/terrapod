@@ -36,7 +36,9 @@
     "ha": "التوافر العالي",
     "deletedWorkspaces": "مساحات العمل المحذوفة",
     "version": "الإصدار {version}",
-    "vault": "حالة OpenBao/Vault"
+    "vault": "حالة OpenBao/Vault",
+    "darkTheme": "المظهر الداكن",
+    "lightTheme": "المظهر الفاتح"
   },
   "switcher": {
     "language": "اللغة",

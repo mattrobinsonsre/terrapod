@@ -36,7 +36,9 @@
     "ha": "Argaeledd uchel",
     "deletedWorkspaces": "Gweithfannau wedi''u dileu",
     "version": "Fersiwn {version}",
-    "vault": "Statws OpenBao/Vault"
+    "vault": "Statws OpenBao/Vault",
+    "darkTheme": "Thema tywyll",
+    "lightTheme": "Thema golau"
   },
   "switcher": {
     "language": "Iaith",

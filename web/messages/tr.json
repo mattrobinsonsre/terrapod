@@ -36,7 +36,9 @@
     "ha": "Yüksek erişilebilirlik",
     "deletedWorkspaces": "Silinmiş çalışma alanları",
     "version": "Sürüm {version}",
-    "vault": "OpenBao/Vault durumu"
+    "vault": "OpenBao/Vault durumu",
+    "darkTheme": "Koyu tema",
+    "lightTheme": "Açık tema"
   },
   "switcher": {
     "language": "Dil",

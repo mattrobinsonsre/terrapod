@@ -36,7 +36,9 @@
     "ha": "Hochverfügbarkeit",
     "deletedWorkspaces": "Gelöschte Workspaces",
     "version": "Version {version}",
-    "vault": "OpenBao/Vault-Status"
+    "vault": "OpenBao/Vault-Status",
+    "darkTheme": "Dunkles Design",
+    "lightTheme": "Helles Design"
   },
   "switcher": {
     "language": "Sprache",

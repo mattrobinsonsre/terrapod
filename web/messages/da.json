@@ -36,7 +36,9 @@
     "ha": "Høj tilgængelighed",
     "deletedWorkspaces": "Slettede arbejdsområder",
     "version": "Version {version}",
-    "vault": "OpenBao/Vault-status"
+    "vault": "OpenBao/Vault-status",
+    "darkTheme": "Mørkt tema",
+    "lightTheme": "Lyst tema"
   },
   "switcher": {
     "language": "Sprog",

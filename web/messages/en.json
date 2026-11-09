@@ -29,6 +29,8 @@
     "sessions": "Sessions",
     "slackLinks": "Slack links",
     "logOut": "Log out",
+    "darkTheme": "Dark theme",
+    "lightTheme": "Light theme",
     "menu": "Menu",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
