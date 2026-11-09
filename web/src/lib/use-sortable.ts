@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { parseSort, readPref, serializeSort, writePref } from './workspace-view-prefs'
 
 export interface SortState<K extends string> {
   key: K
@@ -10,11 +11,33 @@ export function useSortable<T, K extends string>(
   defaultKey: K,
   defaultDirection: 'asc' | 'desc',
   accessor: (item: T, key: K) => string | number | null | undefined,
+  persist?: { storageKey: string; keys: readonly K[] },
 ) {
+  // Opt-in: only a caller that passes `persist` keeps its sort across navigation.
   const [sortState, setSortState] = useState<SortState<K>>({
     key: defaultKey,
     direction: defaultDirection,
   })
+
+  // Writes wait until the stored sort has been applied, so the default never overwrites it.
+  const [restored, setRestored] = useState(false)
+  const storageKey = persist?.storageKey
+  const keys = persist?.keys
+
+  useEffect(() => {
+    if (!storageKey || !keys) return
+    const stored = parseSort(readPref(window.localStorage, storageKey), keys)
+    if (stored) setSortState(stored)
+    setRestored(true)
+    // Read once on mount: the stored value is the starting point, not a live source.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey])
+
+  useEffect(() => {
+    if (!storageKey || !restored) return
+    const isDefault = sortState.key === defaultKey && sortState.direction === defaultDirection
+    writePref(window.localStorage, storageKey, isDefault ? '' : serializeSort(sortState))
+  }, [sortState, restored, storageKey, defaultKey, defaultDirection])
 
   function toggleSort(key: K) {
     setSortState((prev) =>

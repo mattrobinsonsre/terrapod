@@ -152,6 +152,33 @@ test.describe("Workspaces", () => {
     await expect(filter).toHaveValue(`${wsName} `);
   });
 
+  test("the filter survives leaving the list and stays until cleared", async ({ page }) => {
+    // Storage is per browser context, so this test owns its own state.
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await expect(filter).toBeVisible();
+
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
+
+    // Leave through the nav bar's bare /workspaces link, which carries no query.
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("status:errored ");
+
+    // A reload keeps it too.
+    await page.reload();
+    await expect(filter).toHaveValue("status:errored ");
+
+    // It stays until it is explicitly cleared, and then it stays cleared.
+    await filter.fill("");
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("");
+  });
+
   test("workspace settings can be updated", async ({ page }) => {
     // Create a workspace
     const wsName = `e2e-settings-${Date.now()}`;
