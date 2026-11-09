@@ -13,6 +13,34 @@ major. Everything else stays additive, exactly as in a minor.
 
 If a surface is not listed here, it did not change.
 
+## Policy sets now evaluate on a configure
+
+**If you use OPA policy sets and you have configure-enabled workspaces, read
+this before upgrading.** Policy sets are selected by label, and there is no
+configure opt-in: a set already enabled and in scope for a workspace now
+evaluates on that workspace's **configures** as well as its plans. Before 2.0 a
+configure was never gated, because it has no plan JSON for OPA to read.
+
+What a configure hands a policy is the run's **resolved inventory document** --
+`input.hosts`, `input.groups`, `input.children` -- not a Terraform plan. So:
+
+| your policy | what happens on a configure |
+|---|---|
+| keyed on plan shapes (`input.resource_changes`, `input.planned_values`) | its rules do not match, `deny` is empty, the configure **passes**. No action needed |
+| keyed on the ABSENCE of something (`deny[msg] { not input.terraform_version }`) | the rule **fires**, and on a `mandatory` set it **blocks the configure** |
+| errors on an unexpected input shape | the set reports `errored`, which a `mandatory` set treats as a failure |
+
+So the risk is confined to **mandatory** sets whose rules fire on absence or
+error on shape. An advisory set can only produce a warning.
+
+To check before upgrading, list your enabled sets and the configure-enabled
+workspaces their labels reach, and read each policy for the two rows above. To
+keep a set away from configures entirely, narrow its labels so it does not match
+a configure-enabled workspace.
+
+Writing a policy that is *meant* for a configure is covered in
+[Policies -> The configure input](policies.md#the-configure-input).
+
 ## Pre-flight: the entries with an order
 
 **The rest of this page is a catalogue, not a procedure.** Most of it can be read
