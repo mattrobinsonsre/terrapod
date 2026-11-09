@@ -11,11 +11,13 @@ from __future__ import annotations
 import ast
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 from terrapod.runner import ee_client
-from terrapod.runner.phases import configure
+from terrapod.runner.phases import configure, opa
 from terrapod.runner.phases.configure import ConfigureNotConfigured
 
 #: Stands in for the materialised resolved inventory. A fixed path rather than
@@ -579,3 +581,180 @@ class TestTheGalaxyTokenDoesNotReachThePlaybook:
         configure.run(cfg, work_dir=tree, inventory=_INV)
         env = ee.calls[0]["env"]
         assert not any(k.startswith("TP_") for k in env), sorted(env)
+
+
+class TestTheGateActuallyBlocks:
+    """A mandatory deny must STOP the configure, not merely be recorded.
+
+    The gate shipped inverted: `evaluate_policies` returned a count and raised
+    only on bundle-fetch or results-POST failure, so it failed CLOSED on an
+    infrastructure fault and OPEN on an actual policy denial. A mandatory set
+    could deny, the row be POSTed and shown in the UI, and the playbook run
+    against the whole fleet anyway -- a failed mandatory policy set sitting
+    beside a successful configure.
+
+    The only guarding test asserted LINE ORDERING, and its own docstring said
+    "the only thing that makes it a gate rather than a report is that it runs
+    first". That is true of the implementation and nowhere near sufficient:
+    running first is necessary, and refusing is the point.
+
+    The verdict is the API's, never recomputed here -- "blocking" means a
+    mandatory set that failed or errored and was not overridden, and that rule
+    lives in `policy_set_service.run_is_policy_blocked`. The runner POSTs its
+    results and is told. These tests drive `evaluate_policies` against a fake
+    transport so the decision, not its shape, is what is asserted.
+    """
+
+    @staticmethod
+    def _cfg(tmp_path):
+        return SimpleNamespace(
+            has_api=True,
+            api_url="http://api",
+            run_id="abc",
+            auth_token="t",
+            upload_timeout_seconds=30,
+        )
+
+    @staticmethod
+    def _client(*, blocked: bool):
+        """A transport that serves one mandatory set and reports the verdict."""
+        posted: list[dict] = []
+
+        class _Resp:
+            def __init__(self, code, payload):
+                self.status_code = code
+                self._payload = payload
+
+            def json(self):
+                return self._payload
+
+        class _Client:
+            def get(self, url, **_kw):
+                return _Resp(
+                    200,
+                    {
+                        "policy_sets": [
+                            {
+                                "id": "polset-1",
+                                "name": "prod-guardrails",
+                                "enforcement_level": "mandatory",
+                                "policies": [{"name": "p", "rego": "package terrapod"}],
+                                "shared_evaluation": False,
+                                "support_files": {},
+                            }
+                        ],
+                        "context": {},
+                    },
+                )
+
+            def post(self, url, json=None, **_kw):
+                posted.append(json or {})
+                return _Resp(201, {"recorded": 1, "blocked": blocked})
+
+            def close(self):
+                pass
+
+        return _Client(), posted
+
+    def test_a_blocking_verdict_refuses_when_the_phase_enforces(self, tmp_path):
+        client, posted = self._client(blocked=True)
+        with patch.object(opa, "evaluate_set", return_value={"policy_set_id": "polset-1"}):
+            with pytest.raises(opa.PolicyGateBlocked):
+                opa.evaluate_policies(
+                    self._cfg(tmp_path),
+                    plan_json=tmp_path / "input.json",
+                    work_dir=tmp_path / "work",
+                    enforce=True,
+                    opa_binary="/bin/true",
+                    client=client,
+                )
+        # The results are POSTed BEFORE the refusal, so the UI shows which set
+        # denied beside the failed run rather than only that it failed.
+        assert posted, "the refusal must not discard the evidence"
+
+    def test_a_blocking_verdict_does_NOT_refuse_when_the_phase_does_not_enforce(self, tmp_path):
+        """The plan phase, which the API holds between Jobs.
+
+        Paired with the test above deliberately: a gate that raised
+        unconditionally would pass that one and break every plan on a denying
+        policy, losing the plan artifact and the override path with it.
+        """
+        client, _posted = self._client(blocked=True)
+        with patch.object(opa, "evaluate_set", return_value={"policy_set_id": "polset-1"}):
+            count = opa.evaluate_policies(
+                self._cfg(tmp_path),
+                plan_json=tmp_path / "input.json",
+                work_dir=tmp_path / "work",
+                enforce=False,
+                opa_binary="/bin/true",
+                client=client,
+            )
+        assert count == 1
+
+    def test_a_passing_verdict_refuses_nothing(self, tmp_path):
+        client, _posted = self._client(blocked=False)
+        with patch.object(opa, "evaluate_set", return_value={"policy_set_id": "polset-1"}):
+            count = opa.evaluate_policies(
+                self._cfg(tmp_path),
+                plan_json=tmp_path / "input.json",
+                work_dir=tmp_path / "work",
+                enforce=True,
+                opa_binary="/bin/true",
+                client=client,
+            )
+        assert count == 1
+
+    def test_an_api_that_sends_no_verdict_is_not_treated_as_blocking(self, tmp_path):
+        """Skew: an older API has no `blocked` field.
+
+        Absent reads as False, matching what that API does -- it holds the run
+        itself for a plan and had no configure gate at all -- rather than
+        failing every configure against it.
+        """
+        client, _posted = self._client(blocked=False)
+
+        class _NoVerdict(type(client)):
+            def post(self, url, json=None, **_kw):
+                class _R:
+                    status_code = 201
+
+                    @staticmethod
+                    def json():
+                        return {"recorded": 1}
+
+                return _R()
+
+        with patch.object(opa, "evaluate_set", return_value={"policy_set_id": "polset-1"}):
+            count = opa.evaluate_policies(
+                self._cfg(tmp_path),
+                plan_json=tmp_path / "input.json",
+                work_dir=tmp_path / "work",
+                enforce=True,
+                opa_binary="/bin/true",
+                client=_NoVerdict(),
+            )
+        assert count == 1
+
+    def test_every_call_site_states_whether_it_enforces(self):
+        """`enforce` is required, so no phase can acquire a reporting gate by
+        omission -- and the three sites' answers are pinned here because the
+        right answer is a property of the phase, not of OPA."""
+        import ast
+        import pathlib
+
+        from terrapod.runner import job_entrypoint
+
+        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        answers = []
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "evaluate_policies"
+            ):
+                kw = {k.arg: k.value for k in node.keywords}
+                assert "enforce" in kw, "a call site omits `enforce`"
+                answers.append(ast.literal_eval(kw["enforce"]))
+        # plan, configure, pulumi-preview -- exactly one enforces.
+        assert len(answers) == 3, answers
+        assert sum(1 for a in answers if a) == 1, answers

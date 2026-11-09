@@ -142,7 +142,27 @@ CEILINGS = ["canary", "web", "web*", "!prod", "all:!prod", "canary:!h1", "&web"]
 #: Run limits spanning every shape a run can supply, including the ones a
 #: naive composition gets wrong: a union, an exclusion, an intersect of its
 #: own, and a host the ceiling forbids.
-RUN_LIMITS = ["", "all", "web", "prod", "h1:h4", "canary:prod", "all:!h1", "web:&prod", "*", "h3"]
+#: Note the COMMA entries, and that their absence is what let a ceiling escape
+#: ship. `split_host_pattern` splits on comma IF ONE IS PRESENT and on colon
+#: only otherwise, so appending `:&ceiling` to a comma-separated run limit put
+#: the ceiling inside a term ansible then discarded with a stderr warning. The
+#: matrix spanned bare, union, exclusion, intersection and wildcard and still
+#: missed it, because every entry used the same separator the composer appends.
+RUN_LIMITS = [
+    "",
+    "all",
+    "web",
+    "prod",
+    "h1:h4",
+    "canary:prod",
+    "all:!h1",
+    "web:&prod",
+    "*",
+    "h3",
+    "h1,h4",
+    "canary,prod",
+    "h1,h2,h3",
+]
 
 
 @needs_ansible
@@ -253,24 +273,44 @@ class TestTheComposer:
             ("&web", "all", "all:&web"),
             # Whitespace around either side is not a term.
             ("  canary  ", "  web  ", "web:&canary"),
+            # A comma-separated run limit is normalised, or the appended
+            # ceiling lands inside a term ansible discards.
+            ("canary", "web,db", "web:db:&canary"),
+            ("!prod", "web,db", "web:db:!prod"),
+            ("canary", "h1,h2,h3", "h1:h2:h3:&canary"),
+            # ... including with no ceiling, so the normalisation is not
+            # conditional on there being one.
+            ("", "web,db", "web:db"),
         ],
     )
     def test_composition(self, hard, run, expected):
         assert combine_limits(hard, run) == expected
 
-    def test_the_run_pattern_is_a_prefix_of_the_result(self):
-        """The ceiling is only ever APPENDED.
+    def test_the_run_pattern_is_a_prefix_of_the_result_once_normalised(self):
+        """The ceiling is only ever APPENDED, to the normalised run pattern.
 
         Asserted as a property rather than per-case because a composer that
-        rewrote the run's own pattern -- reordering it, or folding its terms --
-        would satisfy every expectation above that happens to be order-
-        insensitive while changing what the operator asked for.
+        reordered or folded the run's own terms would satisfy every
+        expectation above that happens to be order-insensitive while changing
+        what the operator asked for.
+
+        `startswith(run)` was the original claim and it is exactly what made
+        the comma escape possible: keeping the run byte-verbatim is only exact
+        when its separator set matches the one appended. The property is now
+        stated against the normalised form, which is the honest version -- and
+        the comma entries in `RUN_LIMITS` are what hold it to account.
         """
         for run in RUN_LIMITS:
             if not run:
                 continue
+            normalised = run.replace(",", ":")
             for ceiling in CEILINGS:
-                assert combine_limits(ceiling, run).startswith(run)
+                composed = combine_limits(ceiling, run)
+                assert composed.startswith(normalised), (ceiling, run, composed)
+                assert "," not in composed, (
+                    f"{ceiling!r} + {run!r} -> {composed!r}: a comma survives into the "
+                    "composed limit, so ansible will split on it and discard the ceiling"
+                )
 
     @pytest.mark.parametrize(
         ("pattern", "expected"),

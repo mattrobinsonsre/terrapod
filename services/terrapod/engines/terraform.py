@@ -112,6 +112,37 @@ def combine_limits(hard: str, run: str) -> str:
     resolved inventory, which is the design this deliberately did not take.
     """
     hard, run = (hard or "").strip(), (run or "").strip()
+    # The run's separators are normalised to `:` BEFORE the ceiling is
+    # appended, and without this the ceiling is silently discarded.
+    #
+    # `split_host_pattern` splits on comma IF A COMMA IS PRESENT and on colon
+    # only otherwise -- the two are not interchangeable in a MIXED pattern,
+    # they are alternatives. So appending `:&canary` to a run limit of
+    # `web,db` gives `web,db:&canary`, which ansible splits on the comma into
+    # `web` and `db:&canary`; the second matches no group, is warned about on
+    # stderr and dropped, and the ceiling is gone. Measured against
+    # ansible-core 2.21.5 on an inventory where `w2` is in `prod`:
+    #
+    #     web:db:&canary  -> d1,w1     the ceiling holds
+    #     web,db:&canary  -> w1,w2     the ceiling is GONE, w2 is in prod
+    #     web,db:!prod    -> w1,w2     likewise
+    #
+    # On the ordinary path the artifact is already pruned to the ceiling, so
+    # the escape is contained and the run merely reaches fewer hosts than
+    # asked -- itself the "configure reaching half a fleet and reporting
+    # success" outcome. On the #2033 dynamic-handoff path the pruned document
+    # is deliberately NOT the `-i` source, so `--limit` is the only bound and
+    # this IS a ceiling escape onto a production host.
+    #
+    # Normalising is safe, and measured rather than assumed. For a pattern
+    # separated only by commas the two spellings resolve identically
+    # (`web,db` == `web:db`, `w1,d2` == `w1:d2`, `web,!w2` == `web:!w2`). For a
+    # MIXED pattern it does change the result -- but the result it changes is
+    # one where ansible had already thrown terms away, so normalising honours
+    # what the operator wrote instead of dropping half of it. And a comma
+    # inside a `~regex` quantifier (`~(w|d)[0-9]{1,2}`) is already split by
+    # ansible and already matches nothing, so this cannot make it worse.
+    run = run.replace(",", LIMIT_INTERSECTION[0])
     if not hard:
         return run
     if not run:

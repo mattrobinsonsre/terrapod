@@ -131,12 +131,24 @@ def policy_sets_not_evaluated_reason(ws: Workspace, run: Run | None = None) -> s
             f"Policy sets are not evaluated for {ws.engine} runs yet: the runner "
             "produces no plan JSON for OPA to read."
         )
-    if run is not None and run.is_configure:
-        return (
-            "Policy sets are not evaluated for a configure: it has no plan, so "
-            "there is no plan JSON for OPA to read. Enforcement for a configure "
-            "is tracked in #2435."
-        )
+    # NO configure branch, and its removal is the fix for #2435's own gate
+    # (see the module note above). A configure IS evaluated now -- on the
+    # runner, before the playbook, against the run's resolved inventory -- so a
+    # reason here would be false. It was also doing two things it should never
+    # have done, both fail-OPEN:
+    #
+    #   * `GET /runs/{id}/policy-bundle` hands the runner `[]` whenever this is
+    #     truthy, so every configure fetched an EMPTY bundle and the in-Job gate
+    #     logged "no applicable policy sets" and evaluated nothing. The feature
+    #     shipped inert.
+    #   * `evaluate_post_plan` short-circuits to `GATE_PASSED` on a reason, and
+    #     a COMPOSITE run (apply-then-configure) carries `is_configure=True`
+    #     while genuinely having a plan and an apply -- so the post-plan safety
+    #     net was skipped on the apply half of every composite.
+    #
+    # The second is why the predicate must not simply be narrowed to
+    # `is_standalone_configure`: that would fix the composite and leave the
+    # standalone bundle empty. Neither shape wants a reason at all.
     return None
 
 
@@ -215,12 +227,14 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         return GATE_PASSED
-    # `run` is passed for correctness rather than for an observable effect: a
-    # standalone configure has no plan and never reaches `_complete_plan`,
-    # which is the only caller of this gate, so `run.is_configure` cannot be
-    # True here today. Mutating it away kills no test, and that is the honest
-    # state -- it is belt-and-braces for when a configure IS gated (#2435),
-    # not a verified path.
+    # `run` is passed because the reason can be run-shaped, not only
+    # engine-shaped. The comment here used to say `run.is_configure` could not
+    # be True at this point, on the grounds that a configure never reaches
+    # `_complete_plan` -- true of a STANDALONE configure and false of a
+    # COMPOSITE, which carries `is_configure=True` and is claimed as a plan,
+    # then an apply, then a configure. While the reason was truthy for any
+    # `is_configure` run, that made this short-circuit to `GATE_PASSED` and
+    # skip the safety net on the apply half of every composite.
     if policy_sets_not_evaluated_reason(ws, run):
         # Its runner never evaluates, so a mandatory set in scope would be
         # recorded as a synthetic failure and hold every apply (#1567).

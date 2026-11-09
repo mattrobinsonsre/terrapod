@@ -285,6 +285,7 @@ class TestEvaluatePolicies:
             cfg,
             plan_json=None,  # type: ignore[arg-type]
             work_dir=__import__("pathlib").Path("/tmp"),
+            enforce=False,
             client=client,
         )
         assert n == 0
@@ -303,7 +304,7 @@ class TestOPAIsFetchedNotBaked:
             patch.object(opa.platform_tool, "ensure_tool", fetch),
         ):
             count = opa.evaluate_policies(
-                _cfg(), plan_json=tmp_path / "plan.json", work_dir=tmp_path / "w"
+                _cfg(), plan_json=tmp_path / "plan.json", work_dir=tmp_path / "w", enforce=False
             )
         assert count == 0
         fetch.assert_not_called()
@@ -329,7 +330,9 @@ class TestOPAIsFetchedNotBaked:
             ),
         ):
             with pytest.raises(opa.PolicyEvaluationError, match="cannot be evaluated"):
-                opa.evaluate_policies(_cfg(), plan_json=plan, work_dir=tmp_path / "w")
+                opa.evaluate_policies(
+                    _cfg(), plan_json=plan, work_dir=tmp_path / "w", enforce=False
+                )
 
     def test_an_explicit_binary_skips_the_fetch(self, tmp_path: Path) -> None:
         """Callers that already have a path — tests, and the baked test image —
@@ -349,7 +352,11 @@ class TestOPAIsFetchedNotBaked:
             patch.object(opa, "post_results"),
         ):
             opa.evaluate_policies(
-                _cfg(), plan_json=plan, work_dir=tmp_path / "w", opa_binary="/usr/bin/opa"
+                _cfg(),
+                plan_json=plan,
+                work_dir=tmp_path / "w",
+                enforce=False,
+                opa_binary="/usr/bin/opa",
             )
         fetch.assert_not_called()
 
@@ -367,7 +374,9 @@ class TestThePlanJSONCanBeLazy:
     def test_the_factory_is_not_called_when_no_set_applies(self, tmp_path: Path) -> None:
         factory = MagicMock(return_value=tmp_path / "never.json")
         with patch.object(opa, "fetch_policy_bundle", return_value={"policy_sets": []}):
-            count = opa.evaluate_policies(_cfg(), plan_json=factory, work_dir=tmp_path / "w")
+            count = opa.evaluate_policies(
+                _cfg(), plan_json=factory, work_dir=tmp_path / "w", enforce=False
+            )
         assert count == 0
         factory.assert_not_called()
 
@@ -386,7 +395,11 @@ class TestThePlanJSONCanBeLazy:
             patch.object(opa, "post_results"),
         ):
             count = opa.evaluate_policies(
-                _cfg(), plan_json=factory, work_dir=tmp_path / "w", opa_binary="/bin/true"
+                _cfg(),
+                plan_json=factory,
+                work_dir=tmp_path / "w",
+                enforce=False,
+                opa_binary="/bin/true",
             )
         assert count == 1
         factory.assert_called_once()
@@ -420,6 +433,7 @@ class TestThePlanJSONCanBeLazy:
                 _cfg(),
                 plan_json=lambda: None,
                 work_dir=tmp_path / "w",
+                enforce=False,
                 opa_binary="/bin/true",
             )
         assert count == 1
@@ -441,6 +455,10 @@ class TestThePlanJSONCanBeLazy:
             patch.object(opa, "post_results"),
         ):
             count = opa.evaluate_policies(
-                _cfg(), plan_json=plan, work_dir=tmp_path / "w", opa_binary="/bin/true"
+                _cfg(),
+                plan_json=plan,
+                work_dir=tmp_path / "w",
+                enforce=False,
+                opa_binary="/bin/true",
             )
         assert count == 1

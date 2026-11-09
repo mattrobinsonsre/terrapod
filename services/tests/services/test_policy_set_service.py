@@ -152,15 +152,22 @@ async def test_evaluate_post_plan_speculative_runs_never_block() -> None:
 
 
 class TestWhyNoPolicySetWasEvaluated:
-    """`policy_sets_not_evaluated_reason` answers for a RUN, not an engine (#2435).
+    """`policy_sets_not_evaluated_reason` is ENGINE-shaped, not run-shaped.
 
-    All three post-plan gates are called from one place,
-    `run_service._complete_plan`, and a standalone configure has no plan so
-    never reaches it. Keyed on the workspace alone, the function returned
-    `None` for such a run -- which reads as "every set in scope was applied".
-    An operator who scoped a mandatory set saw nothing anywhere saying
-    otherwise, which is worse than the missing enforcement, because the
-    absence is invisible.
+    It was run-shaped for one release and that was the defect. The class used
+    to assert the opposite -- that a configure carries a reason -- and the
+    reasoning was sound FOR ITS TIME: before #2435 a configure was not gated at
+    all, and an operator who scoped a mandatory set to one saw nothing anywhere
+    saying so, which is worse than the missing enforcement because the absence
+    is invisible.
+
+    #2435 delivered the enforcement, and the reason then became false in the
+    one direction that matters: it told an operator a configure was ungated
+    while the runner was gating it. Worse, two call sites act on it rather than
+    merely reporting it, and both fail OPEN -- see the comments on the function.
+    So the half of the old reasoning that survives is "make the absence
+    visible"; what changed is that there is no longer an absence to make
+    visible.
     """
 
     @staticmethod
@@ -168,49 +175,49 @@ class TestWhyNoPolicySetWasEvaluated:
         return SimpleNamespace(id=uuid.uuid4(), engine=engine)
 
     @staticmethod
-    def _run(*, is_configure: bool) -> SimpleNamespace:
-        return SimpleNamespace(id=uuid.uuid4(), plan_only=False, is_configure=is_configure)
-
-    def test_a_configure_says_why_it_was_not_evaluated(self) -> None:
-        reason = policy_set_service.policy_sets_not_evaluated_reason(
-            self._ws(), self._run(is_configure=True)
+    def _run(*, is_configure: bool, composite: bool = False) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            plan_only=False,
+            is_configure=is_configure,
+            configure_after_apply=composite,
         )
-        assert reason is not None
-        # Names the cause, not just the fact: an operator needs to know it is
-        # the absence of a plan rather than a misscoped set.
-        assert "configure" in reason.lower()
-        assert "plan" in reason.lower()
 
-    def test_a_plan_apply_run_on_THAT_SAME_WORKSPACE_is_still_evaluated(self) -> None:
-        """The relationship, which is the whole safety property.
+    def test_no_run_shape_carries_a_reason(self) -> None:
+        """All three legal run shapes, because each reached a different bug.
 
-        A workspace may have `configure_enabled` AND `plan_apply_enabled`. If
-        the reason were a property of the WORKSPACE, it would be truthy here
-        too -- and `evaluate_post_plan` short-circuits to `GATE_PASSED` on a
-        reason, so that would pass every apply on every configure-enabled
-        workspace. Testing the configure case alone cannot see that; the pair
-        can.
+        A STANDALONE configure got an empty policy bundle, so #2435's in-Job
+        gate evaluated nothing. A COMPOSITE got that AND skipped the post-plan
+        safety net on its apply half, because it carries `is_configure=True`
+        while genuinely having a plan. An ordinary run was always fine, and is
+        here so a fix that simply inverted the predicate cannot pass.
         """
         ws = self._ws()
-        assert (
-            policy_set_service.policy_sets_not_evaluated_reason(ws, self._run(is_configure=True))
-            is not None
-        )
-        assert (
-            policy_set_service.policy_sets_not_evaluated_reason(ws, self._run(is_configure=False))
-            is None
-        )
+        for label, run in (
+            ("standalone configure", self._run(is_configure=True)),
+            ("composite", self._run(is_configure=True, composite=True)),
+            ("ordinary plan/apply", self._run(is_configure=False)),
+        ):
+            assert policy_set_service.policy_sets_not_evaluated_reason(ws, run) is None, label
 
     def test_the_engine_answer_is_unchanged_when_no_run_is_given(self) -> None:
         # The pre-existing contract: a caller with no run in hand still gets
         # the engine-only answer rather than an exception.
         assert policy_set_service.policy_sets_not_evaluated_reason(self._ws()) is None
 
-    def test_an_engine_that_does_not_evaluate_still_wins_over_run_shape(self) -> None:
-        # Order matters: the engine reason is the more fundamental one, and it
-        # names the engine rather than the run shape.
+    def test_an_engine_that_produces_no_plan_json_still_carries_a_reason(self) -> None:
+        """The reason that remains, and it is about the ENGINE.
+
+        Kept for every run shape: an engine whose runner produces no plan JSON
+        has nothing for a plan-shaped policy to read whatever the run is doing.
+        """
         with patch("terrapod.engines.evaluates_policy_sets", return_value=False):
-            reason = policy_set_service.policy_sets_not_evaluated_reason(
-                self._ws("pulumi"), self._run(is_configure=True)
-            )
-        assert reason is not None and "pulumi" in reason
+            for run in (
+                self._run(is_configure=True),
+                self._run(is_configure=True, composite=True),
+                self._run(is_configure=False),
+            ):
+                reason = policy_set_service.policy_sets_not_evaluated_reason(
+                    self._ws("pulumi"), run
+                )
+                assert reason is not None and "pulumi" in reason

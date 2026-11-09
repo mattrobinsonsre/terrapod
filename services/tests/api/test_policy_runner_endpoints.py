@@ -51,10 +51,11 @@ def _run(**kw):
         "source": "tfe-api",
         "is_destroy": False,
         # Must be stated: this builds a MagicMock from `base`, so a key left
-        # out is a TRUTHY mock rather than an error -- and the reason function
-        # now reads the run's shape (#2435), so an absent `is_configure` would
-        # make every mocked run look like a configure.
+        # out is a TRUTHY mock rather than an error. The pair is the run's
+        # shape, and `(False, True)` is not a legal row -- the three legal ones
+        # are ordinary, standalone configure, and composite.
         "is_configure": False,
+        "configure_after_apply": False,
     }
     base.update(kw)
     m = MagicMock()
@@ -173,6 +174,172 @@ async def test_bundle_returns_applicable_sets_and_context() -> None:
     assert body["policy_sets"][0]["enforcement_level"] == "mandatory"
     assert body["policy_sets"][0]["policies"][0]["name"] == "no-public-buckets"
     assert body["context"]["workspace"]["name"] == "smoke"
+
+
+@pytest.mark.parametrize(
+    ("token_phase", "allowed"),
+    [("plan", True), ("configure", True), ("apply", False), (None, True)],
+)
+def test_the_policy_endpoints_admit_the_plan_and_configure_phases(
+    token_phase: str | None, allowed: bool
+) -> None:
+    """The guard both policy endpoints call, driven directly.
+
+    They asked for `phase="plan"` alone, and a configure Job's token carries
+    `phase="configure"` -- so `fetch_policy_bundle` 403'd three times, raised,
+    and `job_entrypoint` returned 1. EVERY configure run failed, on every
+    workspace, whether or not a policy set existed, because the 403 happens
+    before the "no applicable sets" short-circuit ever runs.
+
+    The apply case is the one that must stay refused: the fix is not
+    `phase=None`, which would hand the apply phase a route it has no business
+    on and give back GHSA-xmrf-hxq9-m59m. The `None` case is a listener older
+    than the phase claim and passes by design.
+    """
+    from fastapi import HTTPException
+
+    from terrapod.api.dependencies import AuthenticatedUser, require_runner_for_run
+
+    kw: dict[str, object] = {
+        "email": "runner",
+        "display_name": None,
+        "roles": ["everyone"],
+        "provider_name": "runner",
+        "auth_method": "runner_token",
+        "run_id": "abc",
+    }
+    if token_phase is not None:
+        kw["run_phase"] = token_phase
+    user = AuthenticatedUser(**kw)
+
+    if allowed:
+        require_runner_for_run(user, "abc", phase=("plan", "configure"))
+    else:
+        with pytest.raises(HTTPException) as exc:
+            require_runner_for_run(user, "abc", phase=("plan", "configure"))
+        assert exc.value.status_code == 403
+
+
+def test_the_two_policy_endpoints_ask_for_both_phases() -> None:
+    """Both of them, derived from the source rather than listed.
+
+    `get_policy_bundle` and `post_policy_results` are driven by the plan Job
+    and the configure Job alike, and fixing only the first leaves the second
+    403 behind it -- the runner would fetch a bundle, evaluate it, and then be
+    unable to post what it found.
+    """
+    import ast
+    import pathlib as _pathlib
+
+    from terrapod.api.routers import policy_sets as ps_router
+
+    tree = ast.parse(_pathlib.Path(ps_router.__file__).read_text())
+    asked: dict[str, object] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.AsyncFunctionDef):
+            continue
+        if node.name not in ("get_policy_bundle", "post_policy_results"):
+            continue
+        for call in ast.walk(node):
+            if (
+                isinstance(call, ast.Call)
+                and getattr(call.func, "id", "") == "require_runner_for_run"
+            ):
+                kw = {k.arg: k.value for k in call.keywords}
+                phase = kw.get("phase")
+                asked[node.name] = tuple(ast.literal_eval(phase)) if phase is not None else None
+
+    assert set(asked) == {"get_policy_bundle", "post_policy_results"}, asked
+    for name, phases in asked.items():
+        assert phases is not None, f"{name} dropped its phase guard entirely"
+        assert set(phases) == {"plan", "configure"}, f"{name} asks for {phases}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("label", "shape"),
+    [
+        ("standalone configure", {"is_configure": True, "configure_after_apply": False}),
+        ("composite", {"is_configure": True, "configure_after_apply": True}),
+    ],
+)
+async def test_bundle_is_not_emptied_for_a_configure(label: str, shape: dict) -> None:
+    """A configure's bundle carries its sets -- the regression that shipped.
+
+    #2435 put the configure policy gate IN the Job, and the Job's only view of
+    which sets to evaluate is this endpoint. It emptied the list whenever
+    `policy_sets_not_evaluated_reason` was truthy, and that reason was truthy
+    for any run with `is_configure` -- so every configure fetched an EMPTY
+    bundle, the gate logged "no applicable policy sets" and evaluated nothing.
+    A mandatory set scoped to a configure-enabled workspace was unenforced, and
+    the gate reported success having done nothing.
+
+    Driven through the ENDPOINT rather than through the predicate, because the
+    predicate was only ever half the defect: the feature's own tests supply
+    sets to the gate directly, so they prove the gate works GIVEN a bundle and
+    say nothing about whether it is given one. Both run shapes are here because
+    the composite reached a second bug through the same reason -- see
+    `test_policy_set_service.TestWhyNoPolicySetWasEvaluated`.
+    """
+    run = _run(**shape)
+    ws = _ws()
+    run_id = f"run-{run.id}"
+    db = _mock_db_with_run(run, ws)
+    user = _user(method="runner_token", run_id=run_id)
+
+    policy = MagicMock(id=uuid.uuid4(), rego="package terrapod")
+    policy.name = "no-production-hosts"
+    ps = MagicMock(
+        id=uuid.uuid4(),
+        enforcement_level="mandatory",
+        policies=[policy],
+        shared_evaluation=False,
+        support_files={},
+    )
+    ps.name = "configure-guardrails"
+
+    with patch.object(
+        router.policy_set_service,
+        "applicable_policy_sets",
+        new=AsyncMock(return_value=[ps]),
+    ):
+        resp = await router.get_policy_bundle(run_id=run_id, user=user, db=db)
+
+    import json
+
+    body = json.loads(resp.body)
+    assert len(body["policy_sets"]) == 1, f"{label}: the runner was handed an EMPTY bundle"
+    assert body["policy_sets"][0]["policies"][0]["name"] == "no-production-hosts"
+
+
+@pytest.mark.asyncio
+async def test_bundle_is_still_emptied_for_an_engine_with_no_plan_json() -> None:
+    """The emptying that is CORRECT, so the fix cannot have removed both.
+
+    A runner for an engine that produces no plan JSON is given nothing to
+    evaluate, matching the post-plan gate, which does not wait for it (#1567).
+    Paired with the test above deliberately: a fix that stopped emptying the
+    bundle at all would pass that one and break this.
+    """
+    run = _run()
+    ws = _ws()
+    run_id = f"run-{run.id}"
+    db = _mock_db_with_run(run, ws)
+    user = _user(method="runner_token", run_id=run_id)
+
+    with (
+        patch("terrapod.engines.evaluates_policy_sets", return_value=False),
+        patch.object(
+            router.policy_set_service,
+            "applicable_policy_sets",
+            new=AsyncMock(return_value=[MagicMock()]),
+        ),
+    ):
+        resp = await router.get_policy_bundle(run_id=run_id, user=user, db=db)
+
+    import json
+
+    assert json.loads(resp.body)["policy_sets"] == []
 
 
 @pytest.mark.asyncio
@@ -343,7 +510,11 @@ async def test_results_persists_valid_rows() -> None:
     import json
 
     assert resp.status_code == 201
-    assert json.loads(resp.body) == {"recorded": 1}
+    # `blocked` is the API's own verdict, carried back so the configure gate
+    # can act on it without restating the rule (#2435). Asserted explicitly
+    # rather than loosened to a subset check: the runner refuses the run on
+    # this field, so a change to its name or shape must fail here.
+    assert json.loads(resp.body) == {"recorded": 1, "blocked": True}
     assert len(captured_rows) == 1
     assert captured_rows[0]["outcome"] == "failed"
     assert captured_rows[0]["enforcement_level"] == "mandatory"
@@ -360,6 +531,45 @@ def _mk_db_with_recorded_set_ids(run, ws, recorded_ids):
     result_mock.all = lambda: [(pid,) for pid in recorded_ids]
     db.execute = AsyncMock(return_value=result_mock)
     return db
+
+
+@pytest.mark.asyncio
+async def test_gate_does_not_short_circuit_for_a_composite_run() -> None:
+    """A composite's APPLY half is still policy-gated -- the second regression.
+
+    `evaluate_post_plan` short-circuits to `GATE_PASSED` on a
+    `policy_sets_not_evaluated_reason`, and that reason was truthy for any run
+    carrying `is_configure`. A COMPOSITE (apply-then-configure) carries it
+    while genuinely having a plan and an apply and reaching `_complete_plan`,
+    so the safety net was skipped on every composite apply: a mandatory set
+    with no recorded evaluation passed instead of blocking.
+
+    The function's own comment asserted this path was unreachable -- true of a
+    STANDALONE configure, which never reaches `_complete_plan`, and false of a
+    composite. Driven here rather than argued, which is why this asserts
+    `GATE_BLOCKED` on exactly the fixture the sibling test uses for an ordinary
+    run: the only difference is the run shape.
+    """
+    from terrapod.services import policy_set_service
+
+    run = _run(is_configure=True, configure_after_apply=True)
+    ws = _ws()
+    db = _mk_db_with_recorded_set_ids(run, ws, [])
+
+    ps = MagicMock(id=uuid.uuid4(), enforcement_level="mandatory", policies=[])
+    ps.name = "prod-guardrails"
+
+    with patch.multiple(
+        policy_set_service,
+        applicable_policy_sets=AsyncMock(return_value=[ps]),
+        _insert_evaluations=AsyncMock(),
+        run_is_policy_blocked=AsyncMock(return_value=True),
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+
+    assert result == policy_set_service.GATE_BLOCKED, (
+        "a composite's apply skipped the post-plan safety net"
+    )
 
 
 @pytest.mark.asyncio

@@ -46,6 +46,16 @@ from terrapod.runner.runner_config import RunnerConfig
 logger = structlog.get_logger("runner.opa")
 
 
+class PolicyGateBlocked(Exception):
+    """A mandatory policy set failed or errored, as judged by the API.
+
+    Separate from `PolicyEvaluationError`, which means "we could not evaluate".
+    The two want opposite handling on a phase the API does not hold: a failure
+    to evaluate is an infrastructure fault to report, while this is the gate
+    doing its job and must stop the work.
+    """
+
+
 class PolicyEvaluationError(RuntimeError):
     """Bundle fetch or results POST failed after retries. Caller exits
     non-zero — fail-closed for mandatory sets."""
@@ -476,12 +486,24 @@ def post_results(
     *,
     client: httpx.Client | None = None,
     sleep: callable = time.sleep,
-) -> None:
-    """POST aggregated results. Bounded retries (3, 3s apart); the API
-    enforces ON CONFLICT DO NOTHING so retries are idempotent. On final
-    failure raise PolicyEvaluationError."""
+) -> bool:
+    """POST aggregated results; return whether the API says they BLOCK.
+
+    Bounded retries (3, 3s apart); the API enforces ON CONFLICT DO NOTHING so
+    retries are idempotent. On final failure raise PolicyEvaluationError.
+
+    **The verdict comes from the API, never computed here (#2435).** "Blocking"
+    means a mandatory set that failed or errored and was not overridden, and
+    that rule belongs to `policy_set_service.run_is_policy_blocked`. A second
+    copy in the runner is how the two come to disagree about what mandatory
+    means -- so the response carries it and this returns it.
+
+    `False` when there is no API to ask (`has_api` false, i.e. a local-exec
+    run), which is the same answer that path has always given for every other
+    server-side decision.
+    """
     if not cfg.has_api:
-        return
+        return False
 
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/policy-results"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
@@ -498,7 +520,14 @@ def post_results(
                 resp = client.post(url, json=body, headers=headers)
                 last_status = resp.status_code
                 if resp.status_code == 201:
-                    return
+                    # An older API does not send `blocked`. Absent reads as
+                    # False, which matches what that API does -- it holds the
+                    # run itself between Jobs for a plan, and had no configure
+                    # gate at all -- rather than failing a run against it.
+                    try:
+                        return bool((resp.json() or {}).get("blocked", False))
+                    except ValueError:
+                        return False
                 logger.info(
                     "policy results POST non-201 — will retry",
                     attempt=attempt,
@@ -525,12 +554,29 @@ def evaluate_policies(
     *,
     plan_json: Path | None | Callable[[], Path | None],
     work_dir: Path,
+    enforce: bool,
     opa_binary: str | None = None,
     client: httpx.Client | None = None,
 ) -> int:
     """Drive the whole OPA phase. Returns the number of policy sets
     evaluated (0 = nothing applicable, caller may skip). Raises
     PolicyEvaluationError on FATAL bundle-fetch / POST failures.
+
+    **`enforce` says whether THIS phase is the thing that stops the work, and
+    it is required rather than defaulted (#2435).** Whether a blocking verdict
+    must fail the Job is a property of the phase, not of OPA:
+
+    * The **plan** phase passes `False`. The API holds the run between the plan
+      Job and the apply Job, and `evaluate_post_plan` is the decision; a plan
+      Job that failed itself on a deny would lose the plan artifact and the
+      override path with it.
+    * The **configure** phase passes `True`. A configure is a single Job, so
+      there is no between-Jobs moment and refusing here is the whole mechanism.
+
+    Required because the wrong default is unsafe in one direction and merely
+    annoying in the other: defaulting to `False` would silently give any new
+    single-Job phase a gate that reports instead of gating, which is exactly
+    the defect this parameter was added to fix.
 
     `opa_binary` defaults to fetching OPA from the binary cache (#1208) — but
     only *after* the bundle turns out to have applicable sets, so a run with no
@@ -587,5 +633,22 @@ def evaluate_policies(
         for ps in policy_sets
     ]
     logger.info("evaluated policy sets", count=len(results))
-    post_results(cfg, results, client=client)
+    blocked = post_results(cfg, results, client=client)
+    if blocked and enforce:
+        # Reported as a FAILURE, not as a count, because a caller with no
+        # between-Jobs moment has to act on it. `evaluate_policies` used to
+        # return only `len(results)` and raise solely on infrastructure
+        # failure, so a configure's gate was inverted: it failed CLOSED when
+        # the bundle could not be fetched and OPEN on an actual mandatory
+        # deny -- the playbook ran, with a failed mandatory set beside it in
+        # the UI. The plan phase is unaffected: it ignores the return and the
+        # API holds the run.
+        raise PolicyGateBlocked(
+            f"{len(results)} policy set(s) evaluated and a mandatory set did not pass"
+        )
+    if blocked:
+        # Recorded even where this phase does not act on it, so the plan path's
+        # log says the verdict was known here rather than leaving a reader to
+        # infer it from the API's later decision.
+        logger.info("policy verdict is blocking; this phase does not enforce", enforce=False)
     return len(results)

@@ -189,11 +189,22 @@ deny contains msg if {
     msg := sprintf("configure targets production host %s", [name])
 }
 
-# Refuse one that reaches outside a named group.
+# Refuse a workspace whose inventory declares a host outside a named group.
+#
+# NOTE WHAT THIS IS AND IS NOT. `--limit` is not applied to the document (see
+# below), so this reasons about the INVENTORY, not about the subset a
+# particular run targets -- it denies whenever any declared host is outside
+# `canary`, including on a configure correctly limited to `canary`. That is a
+# fine rule for "this workspace should only ever hold canary hosts" and the
+# wrong one for "this run should only touch canary hosts".
+#
+# For the latter, do not write a policy: `hard_limit` is the control, it is a
+# ceiling no run can widen past, and it is enforced before OPA is consulted.
+# See docs/ansible-configure.md#hard-limit-is-a-ceiling-no-run-can-widen-past.
 deny contains msg if {
     some name, _ in input.hosts
     not name in input.groups.canary
-    msg := sprintf("%s is not in the canary group", [name])
+    msg := sprintf("%s is declared outside the canary group", [name])
 }
 ```
 
